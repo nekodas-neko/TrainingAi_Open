@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 import { generateText, generateObject, streamText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { withAiRetry, isRetryableAiError, isRetryableObjectError } from './retry'
+import { AI_CALL_BUDGET_MS, runWithDeadline } from './deadline'
 
 // ── Model — single source of truth ─────────────────────────────────────────────
 // Was inlined as `google('gemini-3.1-flash-lite')` at 14 call sites; centralised
@@ -141,6 +142,16 @@ function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number;
   })()
 }
 
+/**
+ * One attempt at the underlying SDK call.
+ *
+ * It takes the abort signal rather than closing over nothing (RV-70) so the attempt can be
+ * cancelled when the budget runs out. A zero-argument thunk still satisfies this type, and
+ * `runWithDeadline` bounds it either way — wiring the signal is what makes an abandoned call
+ * actually stop, not what makes the ceiling hold.
+ */
+export type AiCall<T> = (signal: AbortSignal) => Promise<T>
+
 // ── The one chokepoint ──────────────────────────────────────────────────────────
 // Wraps any generateText/generateObject call: runs it through the shared retry
 // policy, times it, and logs usage on success/failure. Generic over the SDK
@@ -155,12 +166,19 @@ function responseModelId(result: unknown): string | null {
 
 export async function withAiLogging<T extends { usage?: unknown }>(
   meta: AiCallMeta,
-  fn: () => Promise<T>,
+  fn: AiCall<T>,
   shouldRetry: (err: unknown) => boolean = isRetryableAiError,
+  budgetMs: number = AI_CALL_BUDGET_MS,
 ): Promise<T> {
   const started = Date.now()
+  const deadlineAt = started + budgetMs
   try {
-    const result = await withAiRetry(fn, { shouldRetry })
+    // RV-70. The budget is TOTAL, so each attempt gets whatever is left rather than a fresh
+    // ceiling, and `deadlineAt` stops a retry starting that could not finish inside it.
+    const result = await withAiRetry(
+      () => runWithDeadline(fn, Math.max(0, deadlineAt - Date.now())),
+      { shouldRetry, deadlineAt },
+    )
     logAiCall(meta, { usage: result.usage, modelId: responseModelId(result), latencyMs: Date.now() - started, ok: true })
     return result
   } catch (err) {
@@ -173,7 +191,7 @@ export async function withAiLogging<T extends { usage?: unknown }>(
 // schema-mismatch (NoObjectGeneratedError), matching the existing call sites.
 export function loggedGenerateObject<T extends { usage?: unknown }>(
   meta: AiCallMeta,
-  fn: () => Promise<T>,
+  fn: AiCall<T>,
 ): Promise<T> {
   return withAiLogging(meta, fn, isRetryableObjectError)
 }
@@ -181,7 +199,7 @@ export function loggedGenerateObject<T extends { usage?: unknown }>(
 // generateText convenience — plain transient-error retry.
 export function loggedGenerateText<T extends { usage?: unknown }>(
   meta: AiCallMeta,
-  fn: () => Promise<T>,
+  fn: AiCall<T>,
 ): Promise<T> {
   return withAiLogging(meta, fn, isRetryableAiError)
 }

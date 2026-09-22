@@ -50,12 +50,13 @@ export async function POST(req: NextRequest) {
   try {
     const { object } = await loggedGenerateObject(
       { section: 'exercises-generate', userId: session.user.id, fingerprint: body.data.name },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: ExerciseGenSchema,
         system: SYSTEM_PROMPT,
         prompt: `Exercise name: "${body.data.name}"`,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     )
     return NextResponse.json(object)

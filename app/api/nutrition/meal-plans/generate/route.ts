@@ -250,10 +250,11 @@ export async function POST(req: Request) {
           excluded: contentKey(...(input.excludedFoods ?? [])),
         },
       },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: DraftSchema,
         maxRetries: 0,
+        abortSignal: signal,
         prompt: [
           'You are a practical sports nutritionist. Design one day of eating.',
           '',

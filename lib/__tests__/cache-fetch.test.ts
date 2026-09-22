@@ -319,3 +319,51 @@ describe('invalidation subscribers', () => {
     expect(seen).toEqual(['energy-balance:'])
   })
 })
+
+/**
+ * RV-69 — a response can be worth painting and not worth keeping.
+ *
+ * The AI prose routes now answer 200 with `degraded: true` and a deterministic readout when the
+ * model fails. That is the right thing to show — it is the user's own figures — and the wrong thing
+ * to store: the workout recap's key holds for 24h and the card's only retry is a refetch, so a
+ * cached fallback outlives every attempt to replace it.
+ */
+describe('cachedFetch — shouldCache', () => {
+  let storage: Storage
+  beforeEach(() => {
+    storage = makeMemoryStorage()
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('localStorage', storage)
+    vi.stubGlobal('sessionStorage', makeMemoryStorage())
+  })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  const respond = (body: unknown) =>
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => body })))
+
+  it('paints a rejected response but does not store it', async () => {
+    respond({ recap: 'as recorded: 45 min', degraded: true })
+    const seen: unknown[] = []
+    await cachedFetch<{ degraded?: boolean }>(
+      'should-cache-degraded', '/api/recap', 3600, d => seen.push(d),
+      { shouldCache: d => !d.degraded },
+    )
+    expect(seen).toEqual([{ recap: 'as recorded: 45 min', degraded: true }])
+    expect(storage.getItem('ta_cache:should-cache-degraded')).toBeNull()
+  })
+
+  it('stores an accepted response exactly as before', async () => {
+    respond({ recap: 'a tidy recap' })
+    await cachedFetch<{ degraded?: boolean }>(
+      'should-cache-ok', '/api/recap', 3600, () => {},
+      { shouldCache: d => !d.degraded },
+    )
+    expect(storage.getItem('ta_cache:should-cache-ok')).toContain('a tidy recap')
+  })
+
+  it('stores unconditionally when no predicate is given', async () => {
+    respond({ recap: 'whatever', degraded: true })
+    await cachedFetch('should-cache-absent', '/api/recap', 3600, () => {})
+    expect(storage.getItem('ta_cache:should-cache-absent')).toContain('whatever')
+  })
+})

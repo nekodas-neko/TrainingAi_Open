@@ -274,6 +274,7 @@ async function cachedFetchCore<T>(
   fromStored: (stored: unknown) => T | null,
   freshWithinTtl?: boolean,
   onError?: (info: CacheFetchErrorInfo) => void,
+  shouldCache?: (data: T) => boolean,
 ): Promise<boolean> {
   // SQLite reads can throw on native if the DB is locked or in an error state.
   // Treat a failed cache read as a miss — proceed to the network fetch.
@@ -363,7 +364,11 @@ async function cachedFetchCore<T>(
           try { waiter.onData(data); } catch { /* ignore — a joined caller's onData threw */ }
         }
       }
-      await setCached(key, toStored(data), ttlSeconds);
+      // RV-69: a response can be worth PAINTING and not worth KEEPING. The AI prose routes now
+      // answer 200 with `degraded: true` and a deterministic readout when the model fails, and
+      // storing that under a long TTL would serve the fallback for as long as the real answer
+      // would have lived — the recap's is 24h, on a card whose only retry is a refetch.
+      if (!shouldCache || shouldCache(data)) await setCached(key, toStored(data), ttlSeconds);
     } catch {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
@@ -408,9 +413,15 @@ export async function cachedFetch<T>(
   url: string,
   ttlSeconds: number,
   onData: (data: T) => void,
-  opts?: { freshWithinTtl?: boolean; onError?: (info: CacheFetchErrorInfo) => void },
+  opts?: {
+    freshWithinTtl?: boolean
+    onError?: (info: CacheFetchErrorInfo) => void
+    // Return false to paint this response without storing it (RV-69). Called only on a fresh
+    // network result — a cached value that is already stored is never re-judged.
+    shouldCache?: (data: T) => boolean
+  },
 ): Promise<boolean> {
-  return cachedFetchCore<T>(key, url, ttlSeconds, onData, d => d, s => s as T, opts?.freshWithinTtl, opts?.onError);
+  return cachedFetchCore<T>(key, url, ttlSeconds, onData, d => d, s => s as T, opts?.freshWithinTtl, opts?.onError, opts?.shouldCache);
 }
 
 // { date, data } envelope for a cache key whose payload carries no date of its own

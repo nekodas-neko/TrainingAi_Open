@@ -106,7 +106,7 @@ export function DoneScreen({
     if (!workoutSessionId) return;
     setRecapLoading(true);
     setRecapError(false);
-    await cachedFetch<{ recap?: string }>(
+    await cachedFetch<{ recap?: string; degraded?: boolean }>(
       `workout-recap:${workoutSessionId}`,
       `/api/workout-sessions/${workoutSessionId}/recap`,
       WORKOUT_RECAP_TTL,
@@ -115,7 +115,14 @@ export function DoneScreen({
         else setRecapError(true);
         setRecapLoading(false);
       },
-      { onError: () => { setRecapError(true); setRecapLoading(false); } },
+      {
+        onError: () => { setRecapError(true); setRecapLoading(false); },
+        // RV-69: the route now answers 200 with a deterministic readout of the session's figures
+        // when the model fails. Show it, but do not store it — this key's TTL is 24h and the only
+        // retry the card offers is a refetch, so a cached fallback would outlive every attempt to
+        // replace it.
+        shouldCache: (data) => !data.degraded,
+      },
     );
   }, [workoutSessionId]);
 

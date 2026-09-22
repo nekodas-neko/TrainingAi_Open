@@ -21,6 +21,17 @@ export interface AiRetryOptions {
   jitterMs?: number
   shouldRetry?: (err: unknown) => boolean
   sleep?: (ms: number) => Promise<void>
+  /**
+   * RV-70. Epoch ms after which no retry may START. The retry is skipped when the backoff alone
+   * would carry it past this, which is what stops one jittered retry from turning a bounded call
+   * into two of them.
+   *
+   * Skipping re-throws the ORIGINAL error rather than a timeout: a 429 that we chose not to retry
+   * is still a 429, and reporting it as "ran out of time" would hide the rate limit from
+   * `error_events`.
+   */
+  deadlineAt?: number
+  now?: () => number
 }
 
 // Exactly one jittered retry. Callers pass maxRetries: 0 to the SDK call so the
@@ -31,12 +42,20 @@ export async function withAiRetry<T>(fn: () => Promise<T>, opts: AiRetryOptions 
     jitterMs = 500,
     shouldRetry = isRetryableAiError,
     sleep = ms => new Promise(r => setTimeout(r, ms)),
+    deadlineAt,
+    now = () => Date.now(),
   } = opts
   try {
     return await fn()
   } catch (err) {
     if (!shouldRetry(err)) throw err
-    await sleep(baseDelayMs + Math.random() * jitterMs)
+    const delay = baseDelayMs + Math.random() * jitterMs
+    if (deadlineAt != null && now() + delay >= deadlineAt) {
+      // Out of budget. Same terminal state as two exhausted attempts, so report it the same way.
+      reportServerError(err)
+      throw err
+    }
+    await sleep(delay)
     try {
       return await fn()
     } catch (retryErr) {

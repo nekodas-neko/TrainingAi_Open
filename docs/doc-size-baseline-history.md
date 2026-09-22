@@ -15266,3 +15266,19 @@ was LA-49, which had measured the whole thing three weeks earlier and was parked
 described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
 the investigation again. That is the argument for the check TN-59 still proposes, more than the
 count it was written against.
+## 2026-09-22 — `projectOverview.md` → 12239, `docs/implementation-backlog.md` → 26583 (RV-69 + RV-70)
+
+The backlog shrank by the two entries the batch `ai-degrade-and-bound` shipped, less a five-line
+cross-reference added to the ai-periodization prescription entry — which has the same catch-path
+shape and is deliberately **not** in scope, because it would degrade to a prescription the user
+trains on rather than to text. Naming that there is what stops the next session reading the shipped
+sibling and "finishing the job".
+
+Both numbers are recomputed against the merged file, not spliced: RV-84/RV-88 and RV-86/RV-87 landed
+while this branch was open, so the backlog started from a higher figure than it did when this work
+began. `projectOverview.md` grew by one Current Status block. It is longer than a status note usually is
+because three of its sentences are corrections: the chokepoint wraps a thunk rather than SDK params,
+so RV-70's "one-place `abortSignal`" fix was not possible as written; the recap answered 500 rather
+than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explain` — the route both
+entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
+only "shipped" would leave all three to be rediscovered.

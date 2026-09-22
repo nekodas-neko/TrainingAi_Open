@@ -45,7 +45,10 @@ export function AiInsightCard({ section, date, hasData }: Props) {
       if (!res.ok) throw new Error()
       const data = await res.json()
       setInsight(data.insight ?? null)
-      if (data.insight) await setCached(key, data.insight, 6 * 60 * 60) // one insight per section per day-ish
+      // RV-69: `degraded` marks a deterministic readout returned because the model failed. Paint it
+      // — it is the section's real readings — but never cache it, or the fallback stands in for the
+      // insight for the next six hours and the refresh button re-reads it from the cache.
+      if (data.insight && !data.degraded) await setCached(key, data.insight, 6 * 60 * 60) // one insight per section per day-ish
     } catch {
       setError(true)
     }
