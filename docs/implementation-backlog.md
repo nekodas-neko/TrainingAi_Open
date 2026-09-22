@@ -8143,7 +8143,7 @@ them — OR-100's split); ~~strike LB-27's already-decided Keep (`connectionTime
 premise was not merely already-decided, it was never true (`connectionTimeoutMillis: 5_000` has been
 in `client.ts` since the initial public snapshot, two weeks before LB-27 was filed), and the symptom
 does not reproduce on current `main` cold or warm. See
-[`2026-09-20-lane-a-lb27-refuted`](overview/entries/2026-09-20-lane-a-lb27-refuted.md);**
+[`2026-09-20-lane-a-lb27-refuted`](overview/history-2026-09-22-folded-1.md#2026-09-20-lane-a-lb27-refuted);**
 repair the 22 dead backlog paths and 43 doubled `docs/overview/overview/` labels; index the 17
 unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge candidates
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).

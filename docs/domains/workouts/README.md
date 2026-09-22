@@ -67,7 +67,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   entry's own acceptance criterion picks the wrong mapping — 92% of the ratings were never touched,
   so they *are* the prefill, and any statistic over all of them is the prefill agreeing with itself.
 - [`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md) — **the orientation indexes named paths that do not exist, 2026-08-18** (Q-554 — `module-map.md:232` carried a row for `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, **neither of which has ever existed**; the real port is the row below and is itself flagged "NOT yet wired", so the map presented planned work as existing infrastructure. Plus three stale domain rows — `app/history/`, `docs/oura-models/`, `app/overview/` — and 49 malformed history display labels (a stray `../` made them resolve to a non-existent root `overview/`).) Now enforced by `scripts/check-index-doc-paths.js`, step 42 of 42, over **748 paths**.
-- [`2026-09-20-feat-or118-movement-balance-card`](../../overview/entries/2026-09-20-feat-or118-movement-balance-card.md)
+- [`2026-09-20-feat-or118-movement-balance-card`](../../overview/history-2026-09-22-folded-1.md#2026-09-20-feat-or118-movement-balance-card)
   — **the push/pull/legs split over 60 days (OR-118), 2026-09-20.** First caller of both
   `/api/muscle-sets` (LB-111) and `movementPattern()` (LB-103), which had shipped with none. No
   target and no verdict — there is no honest universal push:pull ratio — and all four rows render

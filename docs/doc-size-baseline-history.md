@@ -15398,3 +15398,17 @@ the comment being wrong is not the reusable part. That the locale is day-first, 
 is four characters for three months of the year, and that a comma follows a short weekday but not a
 long one are each things a future session would otherwise write from memory and get wrong — which is
 exactly how the original comment came to exist.
+
+## 2026-09-22 — journal compaction: 61 foldable entries → 27 (`history-2026-09-22-folded-1.md`)
+
+`check-doc-index-size` assigns the sweep to whoever adds the entry that crosses 60, and this branch
+was it. Forty entries folded; six held back because an agent baton cites them, which the script
+refuses to rewrite on purpose — one lane editing another's live state file races whatever that lane
+is doing, and batons are rewritten wholesale at handover anyway.
+
+Folded 40 rather than the two that would technically clear the limit. At the rates this README
+records, clearing to the threshold would put the same failure in front of the next lane's PR within
+the day, for a reason unrelated to their diff — which is the exact complaint that made the guard
+attribute itself in the first place. `check-doc-links` (818 files) and `check-index-doc-paths`
+(1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
+other, since a citation whose link *text* is also a path passes the first and fails the second.

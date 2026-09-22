@@ -410,7 +410,7 @@ Live at the time of writing (2026-07-30):
     warning and TN-34's re-wire. Fixing the readers does not create answers; it stops the absence
     being hidden. **TN-58 is the control redesign** — the half that might actually get the question
     answered.
-  ([`2026-09-19-fix-tn50-checkin-not-inferred.md`](../../overview/entries/2026-09-19-fix-tn50-checkin-not-inferred.md))
+  ([`2026-09-19-fix-tn50-checkin-not-inferred.md`](../../overview/history-2026-09-22-folded-1.md#2026-09-19-fix-tn50-checkin-not-inferred))
 
 - **An absent contributor key is not a score disagreement (TN-49).** `READINESS_WEIGHTS` has nine
   members summing to exactly **1.00**, so anything that walks the stored contributor map and skips a
