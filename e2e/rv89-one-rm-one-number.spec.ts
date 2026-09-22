@@ -8,6 +8,11 @@ import { STORAGE_STATE } from './fixtures'
 //
 // Two surfaces one tap apart is what makes this checkable end to end: the assertion is that the
 // row and the sheet agree, which no unit test over either file alone can state.
+//
+// Both halves were controlled SEPARATELY, because the first control stopped at the `~` assertion
+// and never reached the one below it — the shape that made RV-72's `width` control read green.
+// Reverting both files fails at the `~`; reverting only the stats sheet fails at the decimal
+// parity. Each assertion is load-bearing for one file.
 test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
 
 test('the pre-workout row and the stats sheet print the same 1RM', async ({ page }) => {
