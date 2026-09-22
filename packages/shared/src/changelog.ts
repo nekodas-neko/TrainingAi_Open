@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.3",
+    version: "1.465.4",
     date: "2026-09-22",
     changes: [
       "Good, warning and bad now look the same everywhere. Your score colours and your recovery colours were two different sets \u2014 the green on a readiness band and the green on a muscle-recovery bar were visibly different colours in dark mode, not two shades of one. They all follow the theme now, so they also stay correct if the palette ever changes.",
+    ],
+  },
+  {
+    version: "1.465.3",
+    date: "2026-09-22",
+    changes: [
+      "Faint grey text across the app is now readable. Forty-five labels were dimmed past the point where they meet the accessibility floor for body text, and the contrast check could not see them because it only looked at the colours themselves, not at how transparent they were drawn. The worst was the word \"rest\" in the calendar at 7 pixels and half-faded \u2014 the only thing marking a past rest day apart from a day you logged nothing at all, so at low screen brightness the month read as empty. That one is now at full strength.",
     ],
   },
   {

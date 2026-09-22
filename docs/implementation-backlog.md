@@ -479,8 +479,13 @@ below threshold and left in place for next time.
   stored composite over 69 days (2026-07-16 → 2026-09-22). Measured on the **output**, which is what
   makes it new: TN-47 argues the same thing from the inputs.
 - **Lane: A** — `packages/shared/src/health/readiness-composite.ts`.
-- **Gate: owner** — this is a scoring change and re-scores history, so it needs sign-off on the shape
-  before Lane A builds it. The measurement below does not.
+- **✅ OWNER DECIDED 2026-09-22 — build option 1, the compressive tail.** The gate is lifted; this is
+  startable. Keep the linear region exactly as it is, replace the hard clip at ±1.5σ with a curve that
+  keeps compressing so days beyond it retain their **ordering** instead of collapsing onto 0/100.
+  Options 2 and 3 below are recorded as not-chosen and should not be re-proposed without new evidence.
+- **The history recompute is BATCHED — do not fire it from this PR.** Owner decision, same day: the
+  stored days are re-derived **once**, after this, TN-6, BF-13 and LA-121 have all landed, via a single
+  `POST /api/admin/rederive-baselines` run (dry-run first). See LA-122's recorded decisions.
 
 **What the composite's weights actually are, versus what they say.** Weighted standard deviation of
 each contributor's stored score, as a share of all the movement in the final number:
@@ -831,17 +836,25 @@ nothing structured saying why — and a human decides.
   now. The look is diagnostic either way — gone means post-mortem, still there means a stale client
   cache specifically, since the only other candidate is ruled out.
 
-**2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, now `Gate: owner`)
-  `computeBlendedScore`'s penalty ladder (dev 0.4 → 70, 0.7 → 60, 1.2 → 40 from a base of 80) has
-  had no reachable call site since 2026-07-07. Temperature still reaches readiness through
-  `computeReadinessComposite`'s `tempZ`, so nothing is missing — but the ladder was the sharper
-  penalty. **Either answer re-scores stored days, which is why an implementer must not pick.**
-  Adjacent to TN-6 and BF-13, both open on the same baseline.
-  **Re-verified 2026-09-20 and LA-121 was gated then** — it had been printing as Lane A's READY #1
-  while saying in its own text not to start it, which is item 3's defect wearing this entry's name.
-  The measurement also firmed up: last non-null `readiness_score` is **2026-07-07, the re-key date
-  itself**, and the dead condition has **five** sites rather than four (the fifth a live gate with a
-  dead disjunct, so it needs different treatment from the other four).
+**2. ✅ ANSWERED 2026-09-22 — LA-121: do NOT port the temperature ladder; let `tempZ` stand.**
+  The reason, which is the part worth keeping: TN-6 has measured the temperature baseline **0.36 °C
+  too low**, so porting the *sharper* penalty on top of a wrong baseline amplifies the error instead
+  of adding signal. Temperature already reaches readiness through `computeReadinessComposite`. If it
+  looks under-weighted after TN-6's rebuild, that is a new question with data behind it. LA-121's gate
+  is lifted and its remaining work should be behaviour-preserving dead-code removal — see the entry.
+
+**2a. ✅ NEW DECISION 2026-09-22 — the readiness history is re-derived ONCE, not per change.**
+  Four entries each rewrite stored readiness days: **TN-60** (the ±1.5σ rail), **TN-6** + **BF-13**
+  (the temperature baseline) and **LA-121**. Shipped separately the owner's history would visibly
+  shift four times over a few weeks with no way to attribute what he was looking at. So the code
+  changes land in their own PRs as normal, and **`POST /api/admin/rederive-baselines` fires once,
+  after the last of them**, dry-run first.
+  **⚠ Do NOT express this as a `Batch:` field.** `Batch:` means one PR, and one PR here would bundle
+  three code changes with an owner-fired production data write — which the standing rules forbid
+  batching. The shared thing is the *recompute run*, not the diff. Whoever ships the last of the four
+  states plainly in its PR that the recompute is now owed, so it is not silently skipped.
+  **The Body Battery (TN-55) is NOT in this batch** — it writes `body_battery_daily`, a different
+  table, and the owner accepted two re-scores there to get the fix sooner.
 
 **3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
@@ -1371,6 +1384,13 @@ already a pure function of its inputs (LA extracted it for exactly this), so the
 against production reads. TN-56 is still worth building for the 25 sleep-staging constants, whose
 inputs are never persisted — but it does **not** gate this entry.
 
+**✅ OWNER DECIDED 2026-09-22 — ship the four structural changes NOW with the provisional constants,
+and re-sweep after 2026-10-04.** He accepted that the battery re-scores twice as the price of not
+leaving it a countdown for another fortnight. So: build it, note in the changelog that the numbers are
+provisional, and re-run `scripts/tuning/body-battery-replay.cjs` once the window opens — the gain is a
+single dial, so the second pass is small. **The battery's recompute is NOT part of the batched
+readiness re-score** (LA-122): it writes `body_battery_daily`, a different table, so it stands alone.
+
 **⚠ THE CONSTANTS CANNOT BE FINALISED BEFORE 2026-10-04.** The dose stepped 0.5 mg → 1 mg on
 **2026-09-13**, so the calibration-period rule at the head of this file puts the earliest honest fit
 three weeks after that. The four **structural** changes do not depend on the window and can ship now;
@@ -1646,11 +1666,18 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
 - **Lane: A** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
-- **Gate: owner** — added 2026-09-20 on re-verification. The entry's own step (2) says *"Not
-  before"* (1) is answered, and LA-122 item 2 says an implementer must not pick. Without the
-  field this printed as Lane A's **READY #1**, so the queue tool told every implementer to
-  start the one entry that says not to. Same defect LA-122 item 3 names for Q-28/BF-9/BF-7;
-  recording what the entry already said is not the owner's call, so it was not left for them.
+- **✅ OWNER DECIDED 2026-09-22 — DO NOT port the temperature ladder. Let `tempZ` stand.** The gate
+  that stood here from 2026-09-20 is lifted and this is startable. Temperature already reaches
+  readiness through `computeReadinessComposite`, so nothing is missing; the reason for the answer is
+  that **TN-6 has measured the temperature baseline 0.36 °C too low**, and porting a *sharper* penalty
+  on top of a baseline that is already wrong amplifies the error rather than adding signal. If
+  temperature still looks under-weighted once TN-6's rebuild has run, that is a fresh question with
+  real data behind it — not this one.
+- **So the remaining work is dead-code removal, and it should be behaviour-preserving.** The four
+  dead branches keep the fallback arm that already runs on every call, and the fifth site's dead
+  disjunct simplifies away (`a || false` is `a`). **Lane A confirms that before assuming it** — if it
+  turns out to change any stored value, it joins the batched recompute described in LA-122 rather than
+  firing its own.
 - **What was filed was one branch and a guess. The measurement found four, and answered the guess.**
   - `oura_daily.readiness_score` is **NULL on 35 of 35 days** in the last five weeks — the frozen
     Cloud column, exactly as the re-key implies.
@@ -8347,6 +8374,37 @@ those two surfaces this is the fallback path, not the primary.
 - The `Gate: owner` above **is** the decision: which of the two definitions of the estimate they want.
   Nothing here can start until that is answered, so there is no separate verify.
 
+### [devices] PS-47 — the Colmi runs flat in about five days, and a flat ring is indistinguishable from a broken one
+
+- **Lane:** A — `lib/colmi-ble/**` and the pairing card's copy; no schema change
+- **Added:** 2026-09-22 · found while confirming the ring still worked before it was handed to a
+  second wearer
+- **Reference:** the battery series is already in `colmi_readings` (`kind = 'battery'`), so this is
+  answerable without the device
+
+**Measured from the stored battery series, not estimated.** 100% on 26 Aug → 30% on 30 Aug is
+**~19 points/day**; after a recharge, 69% on 1 Sept → **1% on 4 Sept** is ~18/day. So the ring holds
+roughly **five days** from full. It then went flat: **no sensor data at all between 5 Sept 19:35 and
+7 Sept**, and the next reading was 19% on the charger. Two days of a baseline week, lost to a
+battery nobody was watching.
+
+**Why this is a product problem and not just a fact about the hardware.** A flat Colmi presents
+exactly like a broken one — the sync returns `reason: 'silent'`, the card says the ring did not
+respond, and the suggested action ("put it on or place it on the charger") is buried in the same
+message used for a sleeping radio. A second wearer reading that concludes the integration is broken.
+The ring reports its own battery on every sync and we already store it, so the card can say
+**"12% — charge it"** instead.
+
+**A second, smaller oddity in the same series, unexplained:** the value sat at **exactly 70% for
+~40 hours** (30 Aug 12:02 → 1 Sept 04:14) across eight syncs, then resumed falling normally. Either
+the ring quantises its reporting or it returns a stale value after a charge. Worth one look while
+the series is open — a battery readout that freezes is worse than one that is coarse, because a
+warning built on it would not fire.
+
+**Scope:** surface the battery on the pairing card with a low threshold, and split the "silent ring"
+copy so a known-low battery names the real cause. Does not require the device — the decode and the
+stored series are both already there.
+
 ### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
 
 - **Lane:** A — `lib/colmi-ble/frames-to-payload.ts`, decode only; no schema change
@@ -10761,7 +10819,9 @@ statistics when two units differ and names them in `unitsDiffer`, and `spearman`
 
 - **Lane:** A (the engine)
 - **Added:** 2026-08-27
-- **Gate:** device
+- **Gate:** device — ⚠ **re-scoped 2026-09-22: the ring is with a second wearer, so the OWNER cannot
+  run this walk.** It is blocked on whoever holds the ring, or on its return. Do not read the gate as
+  "the owner has not got round to it" — PS-15's steps half waits behind it via `Needs:`.
 
 The four buckets 07:00–10:00 on 2026-08-27 read 485 → 876 → 1128 → 1524, then 11:00 reads 55. Read
 per-bucket the day totals **4562** steps; read as a running total that resets, **2073**. Oura says
