@@ -12,6 +12,7 @@ import {
 import { getScaleBle } from '@/lib/scale-ble/plugin'
 import { useRefreshOnTabShow } from '@/components/shell/tab-visibility'
 import { invalidateBodyMetricWrite, invalidateReadinessInputs } from '@/lib/cache-groups'
+import { formatKg } from '@trainingai/shared/format/units'
 
 // Matches ScaleProtocol.SCALE_SERVICE (android) — Phase 0 capture confirmed the scale
 // advertises this custom 16-bit UUID (0xFFE0), same family as many generic BLE scales.
@@ -248,7 +249,7 @@ export function ScalePairing() {
               <span>
                 {formatTimeOfDay(r.measuredAt, userTz)}
                 {' — '}
-                {r.weightKg != null ? `${r.weightKg.toFixed(1)} kg` : 'unknown'}
+                {r.weightKg != null ? formatKg(r.weightKg) : 'unknown'}
                 {r.bodyFatPct != null && ` · ${r.bodyFatPct}% fat`}
               </span>
               {r.isTrend && (
@@ -266,7 +267,7 @@ export function ScalePairing() {
           </p>
           {pending.map(r => (
             <div key={r.id} className="flex items-center justify-between text-sm">
-              <span>{r.weightKg != null ? `${r.weightKg.toFixed(1)} kg` : 'Unknown weight'}</span>
+              <span>{r.weightKg != null ? formatKg(r.weightKg) : 'Unknown weight'}</span>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" disabled={pendingBusyId === r.id} onClick={() => dismissReading(r.id)}>
                   Not me
@@ -307,7 +308,7 @@ export function ScalePairing() {
                     tells you which is which. `formatTimeOfDay` with the user's tz, never the
                     device's. A frame that would not decode is archived too, so `weightKg` may be
                     null — it still lists. */}
-                {r.weightKg != null ? `${r.weightKg.toFixed(1)} kg` : 'Unknown weight'}
+                {r.weightKg != null ? formatKg(r.weightKg) : 'Unknown weight'}
                 <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
                   {formatTimeOfDay(r.measuredAt, userTz)}
                 </span>

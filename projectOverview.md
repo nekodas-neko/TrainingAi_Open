@@ -26,9 +26,24 @@
 
 ## 🔖 Current Status
 
+**Version:** v1.465.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.465.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**One weigh-in printed four ways; now one helper decides rounding and spacing (RV-90, v1.465.2).**
+`packages/shared/src/format/units.ts` holds `formatKg` / `formatMinutes` / `formatHoursMinutes`, and
+pace keeps `formatPace` / `formatPaceValue` in `vdot.ts`. **The entry's "seven sites, five ways"
+overstates it** — the tree holds three body-weight renders that genuinely disagreed plus six already
+agreeing on `.toFixed(1)`, so most of this was latent drift awaiting a >1dp value from Health Connect
+or a hand-log. **The bug that was actually live is the one nobody filed:** every pace formatter split
+minutes from seconds *before* rounding, so `[5:59.5, 6:00)` printed the literal **`5:60`** — fixed in
+the shared helper by rounding the total first. `formatKg` rounds by exponential shift, not `toFixed`,
+which gave `1.00` for `1.005`. **One documented exception:** `hypnogram.tsx` keeps its own `h/m`,
+because a chart stage label reads better as `2h` than the helper's padded `2h 00m`. ⚠ **The rendered
+output was NOT observed** — the e2e seed user has no weight data, so no kg path was painted in a
+browser; unit-tested only, and not device-verified.
+
 
 **The morning check-in asks a comparative question now (TN-58, v1.465.0).** The absolute 1–5
 produced **two distinct values across 96 check-ins**, sd 0.29, none of them touched — a question

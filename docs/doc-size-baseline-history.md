@@ -15372,3 +15372,14 @@ one, because it retried three times and then gave up with no way to say so. That
 thing a "fixed the blank score row" note would lose, and it generalises — the app-shell domain index
 now carries it as a gotcha, since any `{value && <Row …>}` over a route with no null-payload path is
 the same shape.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26335, `projectOverview.md` → 12358 (RV-90)
+
+The backlog shrinks by RV-90's whole entry; nothing is owed, so no `Keep:` remains. `projectOverview.md`
+grows by one Current Status block, and the lines it spends are on the two things the entry could not
+have known. The first is a correction — "seven sites, five ways" is three genuine disagreements plus
+six sites already agreeing, so the work was mostly against latent drift, and a future sweep reading
+the entry alone would over-rate it. The second is the defect that was actually live and was never
+filed: every pace formatter in the tree split minutes from seconds before rounding and printed the
+literal `5:60`. That one is worth the lines precisely because it was found by testing the helper
+rather than by the entry that sent me, and the shape — round the total, then split — is reusable.

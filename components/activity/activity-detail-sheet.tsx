@@ -15,6 +15,7 @@ import { estimateDistanceKmAtTime, pointAtDistanceKm } from '@/lib/activity/scru
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import type { ActivityLog } from '@trainingai/shared/types'
+import { formatPace } from '@trainingai/shared/health/vdot'
 
 const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
@@ -44,10 +45,6 @@ const ZoneDonutChart = dynamic(
   () => import('./zone-donut-chart').then(m => m.ZoneDonutChart),
   { ssr: false },
 )
-
-function formatPace(secPerKm: number): string {
-  return `${Math.floor(secPerKm / 60)}:${String(Math.round(secPerKm % 60)).padStart(2, '0')} /km`
-}
 
 interface HrData {
   avgHr: number | null

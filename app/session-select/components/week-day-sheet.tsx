@@ -7,6 +7,7 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache"
 import { DAY_LOG_TTL } from "@trainingai/shared/cache-ttl"
 import type { DayLogResult, DayExercise } from "@/app/api/day-log/route"
 import { displayBodyFat } from "@/components/health/body-fat-display"
+import { formatKg } from '@trainingai/shared/format/units'
 
 function formatOverlayDate(dateKey: string): string {
   const [y, m, d] = dateKey.split("/").map(Number)
@@ -78,7 +79,7 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
             }
 
             const metaChips = [
-              bodyMeta?.weightKg != null   && { Icon: WeightIcon,      text: `${bodyMeta.weightKg}kg` },
+              bodyMeta?.weightKg != null   && { Icon: WeightIcon,      text: formatKg(bodyMeta.weightKg) },
               bodyMeta?.steps != null      && { Icon: FootprintsIcon,  text: bodyMeta.steps.toLocaleString() },
               bodyMeta?.calories != null   && { Icon: FlameIcon,       text: `${bodyMeta.calories} kcal` },
               bodyMeta?.protein != null    && { Icon: BeefIcon,        text: `${bodyMeta.protein}g` },
