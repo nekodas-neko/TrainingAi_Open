@@ -26,8 +26,17 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**The ACWR number was painted the "High" colour in every band (RV-97, v1.464.7).** The headline was
+a hard-coded `#f59e0b`, which is exactly what `acwrBand()` reserves for `high`, while the band WORD
+beside it came from the real `interpretation` — so a 1.05 rendered *"✓ Optimal zone"* in warning
+amber, directly above body copy calling 0.8–1.3 the green zone. `acwrBandByKey()` had existed for
+this caller since it was written. **The entry's one-line fix does not compile:** the route's
+`interpretation` is a SIX-key union and that helper takes four, and the card's two guards are
+booleans rather than type predicates, so the key is narrowed explicitly and the unreachable arm
+inherits the text colour instead of inventing one.
 
 **Five places a 384px screen cut the wrong thing (`layout-384` — RV-92/93/94/95/96, v1.464.6).**
 `truncate` on a **flex container** does nothing — the text becomes an anonymous flex item at
