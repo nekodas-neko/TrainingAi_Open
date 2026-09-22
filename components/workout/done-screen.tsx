@@ -462,9 +462,9 @@ export function DoneScreen({
                 <div className="space-y-1">
                   {aggregateHrRecoveryByExercise(hrData.setStats).map(ex => (
                     <div key={ex.exerciseName} className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground truncate max-w-[55%]">
-                        {ex.exerciseName}
-                        <span className="opacity-60"> · {ex.sampleCount}/{ex.totalSets} sets</span>
+                      <span className="flex min-w-0 items-baseline text-muted-foreground">
+                        <span className="truncate">{ex.exerciseName}</span>
+                        <span className="flex-none opacity-60">&nbsp;· {ex.sampleCount}/{ex.totalSets} sets</span>
                       </span>
                       <span className={ex.adequate === false ? 'text-red-400' : ex.adequate ? 'text-green-400' : 'text-muted-foreground'}>
                         {formatRecoveryRate(ex.medianHrr1)}

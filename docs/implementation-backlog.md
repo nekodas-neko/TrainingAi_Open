@@ -731,13 +731,9 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 
 ### [platform] LB-125 — five hand-rolled date option bags beside the shared formatter, and its own comment describes output it does not produce
 
-- **Lane:** B for the five call sites (`components/calendar-widget.tsx:109`,
-  `components/nutrition/weekly-nutrition-chart.tsx:50`,
-  `app/session-select/components/recommendation-card.tsx:36`,
-  `app/session-select/components/week-day-sheet.tsx:13`,
-  `app/nutrition/nutrition-content.tsx:88`); **A for the helper's comment and any new `style`**
-  (`packages/shared/src/date-utils.ts:232-247`). **Added:** 2026-09-22 · filed out of RV-91, which
-  noted this and did not file it.
+- **Lane:** A — `packages/shared/src/date-utils.ts:232-247`. **Added:** 2026-09-22 · filed out of
+  RV-91, which noted this and did not file it; **split 2026-09-22** because one entry spanning two
+  lanes prints as READY to whichever lane cannot start it. The five call sites are **LB-126**.
 - `formatDateDisplay(raw, 'short'|'long')` exists and now has seven callers. Five other sites still
   hand-roll `toLocaleDateString('en-AU', {…})` with their own option bag. **Three of the five are a
   bare `{ weekday: 'short' }`** and would be absorbed by one new `style` variant; the other two
@@ -754,87 +750,21 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   today. The five render a weekday label beside data the user just entered, so the two agree
   except for a traveller at a day boundary.
 
-### [workouts][app-shell] RV-92 — `truncate` on a flex container, so a long exercise name hard-clips and the "done" tick disappears
+### [platform] LB-126 — five date call sites still hand-roll their own option bag
 
-- **Lane:** B — `components/workout/pre-workout-screen.tsx:354`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- **Batch:** `layout-384`
-- `<p className="font-medium truncate flex items-center gap-2">`. `text-overflow` applies to inline
-  content of a **block** container; on a flex container `{ex.name}` becomes an anonymous flex item
-  whose `min-width:auto` resolves to its full content width under the inherited `nowrap`. **The item
-  never shrinks, the ellipsis never paints, and the overflow is clipped flat.**
-- Worse, the green "done today" `CheckIcon` sits *after* the name inside that same box, so on a
-  long-named exercise it is clipped out of existence — **a completed exercise reads as unlogged.**
-- Measured: the name column is ~196px; the longest real library name is **"Dumbbell Overhead Tricep
-  Extension" (34 chars)** ≈ 282px, and 17 library names exceed 22 characters.
-- **Fix:** `<p className="flex items-center gap-2 min-w-0"><span className="truncate">{ex.name}</span>
-  {doneToday && <CheckIcon …/>}</p>`.
-- **✅ This is the only such site in non-admin code** — the other 17 `truncate` uses are correctly on
-  flex *items*. Do not widen the sweep.
-
-### [workouts][app-shell] RV-93 — a live injury chip squeezes the mid-set exercise title to ~15 characters
-
-- **Lane:** B — `components/workout/active-workout-screen.tsx:479-491`,
-  `components/workout/injury-notice.tsx:59,68`. **Added:** 2026-09-21 · Review sweep 52.
-- **Batch:** `layout-384`
-- **This renders for real:** `claude_ro.injuries` holds one unresolved row — `lower back`, started
-  2026-01-01, `resolved_date: null`.
-- The chip is `max-w-[11rem]` **and `shrink-0`**, so it takes **176 of 352px unconditionally**,
-  leaving the `h2` ~168px ≈ **15 characters** at `text-xl font-bold`. Mid-set the title of the
-  movement being performed reads `Single Leg Roma…` (from "Single Leg Romanian Deadlift", 28 chars),
-  while half the header repeats a warning the file's own comment at `:485` says was moved to the
-  ready screen.
-- **Fix:** drop `shrink-0` and add `min-w-0` so the chip yields first, or reduce it to the icon plus
-  `injuryChipLabel` (no "Injury:" prefix, no "Swap" word — swap is reachable from the ready-screen
-  banner). `max-w-[6rem]` returns ~80px to the title.
-- **Not established:** whether `lower back` is actually in `mainMuscles`/`secondaryMuscles` for those
-  exercises, so the chip firing on a *specific* exercise is unproven — only that the injury is live
-  and the geometry is fixed.
-
-### [nutrition][app-shell] RV-94 — the food diary gives a name 22 characters, and 130 of 337 real items are longer
-
-- **Lane:** B — `components/nutrition/food-row.tsx:73`. **Added:** 2026-09-21 · Review sweep 52.
-- **Batch:** `layout-384`
-- **Nutrition is the owner's second most-used screen** (14 of 56 resumes).
-- Arithmetic: row content 318px − 40 (thumb) − 64 (`w-16` calories) − 16 (chevron) − 36 (three
-  `gap-3`) = **162px** ≈ **22 characters** at `text-sm`.
-- Production: **337 food items, 130 longer than 22 chars, 76 longer than 30, longest 66** ("Costco
-  Salt and Pepper Calamari (6 pieces) with Steamed White Rice").
-- **A real collision, not a hypothetical:** "Up & Go Protein Energize Choc Hit" and "Up & Go Protein
-  Energize" both render `Up & Go Protein Energi…` — two identical-looking rows with different
-  calories, indistinguishable without tapping.
-- **Fix:** `line-clamp-2` in place of `truncate` (the row's `min-h-12` already accommodates two
-  lines), or shrink the calorie column to `w-12` and drop the chevron on the diary call site.
-- **Not established:** whether the grey `secondary` line disambiguates that pair in practice — what
-  `meal-card.tsx` passes into it was not read. **Check that first**, it may make the fix unnecessary.
-
-### [workouts][app-shell] RV-95 — the weekly Volume tile wraps its unit onto a second line for every non-zero week
-
-- **Lane:** B — `components/stats/weekly-stats-hub.tsx:54,153-162`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- **Batch:** `layout-384`
-- `grid-cols-4 gap-2` inside a `p-4` card inside a `px-4` screen → cell = (320 − 24)/4 = **74px**. The
-  value is `${totalVolumeKg.toLocaleString()} kg` at `text-xl font-bold tabular-nums`.
-- Production peak weekly volume is **31,083 kg** ≈ 94px against 74px, so it breaks at the space and
-  `kg` drops to line 2. A 4-digit week (`9,088 kg` ≈ 80px) still exceeds 74 — **this wraps whenever
-  volume > 0**, knocking the VOLUME caption ~22px below its three neighbours.
-- **Fix:** move the unit into the existing `unit` line (`value: …toLocaleString()`, `unit: "kg
-  lifted"`), or `whitespace-nowrap text-lg` on the value.
-- **Not established:** whether `/api/weekly-stats` rounds `totalVolumeKg` — a fractional value widens
-  it further.
-
-### [workouts] RV-96 — the done screen clips the HR sample count instead of the exercise name
-
-- **Lane:** B — `components/workout/done-screen.tsx:457-462`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- **Batch:** `layout-384`
-- Both the identifying name and the `· 3/4 sets` coverage figure live inside **one** span with
-  `truncate max-w-[55%]`, so the suffix is always the first thing lost. 55% of ~320px ≈ 176px ≈ 33
-  characters; "Dumbbell Overhead Tricep Extension" (34) plus " · 3/4 sets" (11) = 45.
-- **The caveat on the number silently disappears exactly on the exercises with the longest names** —
-  the owner sees an HRR figure with no indication it came from 3 of 4 sets.
-- **Fix:** split into two spans — `min-w-0 truncate` for the name, `flex-none` for the count — so the
-  count can never be the thing that gets cut.
+- **Lane:** B — `components/calendar-widget.tsx:109`,
+  `components/nutrition/weekly-nutrition-chart.tsx:50`,
+  `app/session-select/components/recommendation-card.tsx:36`,
+  `app/session-select/components/week-day-sheet.tsx:13`,
+  `app/nutrition/nutrition-content.tsx:88`. **Added:** 2026-09-22 · the Lane B half of LB-125.
+- **Needs:** LB-125
+- **Three of the five are a bare `{ weekday: 'short' }`** and cannot be routed through
+  `formatDateDisplay` until it has a style for that, which is LB-125. The other two
+  (`weekday long + month short`, `weekday short + day + month short`) are one-offs and could be
+  converted first — but doing that alone leaves the majority case still hand-rolled, which is the
+  shape RV-91 filed a complaint about in the first place.
+- **Do not start this before LB-125 lands**; converting two of five is what makes the remaining
+  three look deliberate.
 
 ### [readiness] RV-97 — the ACWR number is painted the "High" colour whatever band it is in
 

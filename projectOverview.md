@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
-**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.6).**
+**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.7).**
 The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant
 and records whether the lifter moved each one. Measured on production 2026-09-22 over 97 morning
 check-ins: **78 carry a `perceived_recovery` and 0 of them were ever touched** — two distinct values,
@@ -46,6 +46,18 @@ write-path instruction — make an untouched body count as carrying no answers �
 the owner's daily check-in reaching the server**, because the sheet sends nothing else that counts
 and `pushMutations` rejects such a body as a no-retry poison pill. The Q-465 guard therefore reads
 the submitted body and the nulling applies to what is stored.
+**Five places a 384px screen cut the wrong thing (`layout-384` — RV-92/93/94/95/96, v1.464.6).**
+`truncate` on a **flex container** does nothing — the text becomes an anonymous flex item at
+`min-width:auto`, so the exercise name clipped flat and took the green "done today" tick with it,
+making a logged exercise read as unlogged. The injury chip was `shrink-0` at 176 of 352px, leaving
+the mid-set title ~15 characters. The food diary cut names at 22 against 130 of 337 real items. The
+Volume tile wrapped its unit every non-zero week. The done screen cut the `· 3/4 sets` caveat off
+the longest names. **All three of the batch's "not established" questions were settled, two against
+the entries:** the injury chip does fire on the exercise RV-93 guessed at; `/api/weekly-stats` does
+round; and RV-94's secondary line *does* differ between the colliding pair (350 g vs 258 g) but only
+at the tail, which truncation removes. ⚠ **Not device-verified** — every fix is a pixel claim at
+412px.
+
 **A raw ISO date on two activity screens, and one `Cal` among 155 `kcal` (RV-91, v1.464.5).** The
 activity history row and the activity detail sheet printed `2026-09-15` on the line above a
 correctly formatted time; both now call `formatDateDisplay`, and the day detail's hand-rolled
