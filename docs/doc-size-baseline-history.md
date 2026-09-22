@@ -15118,6 +15118,19 @@ its version and the pull-delta, and the new column needs its regenerated `claude
 build it (BF-185's `.strict()` schema, RV-79's unconditional `setCached`, now this). The cost each
 time is the same: it is only visible if you read the thing the fix would touch before starting.
 
+## 2026-09-22 — `docs/implementation-backlog.md` 26187 → 26149 (RV-64 left the queue)
+
+RV-64's remount half shipped and the entry was removed whole — its engine half had already landed,
+and the device item it might have kept is not owed: the claim is a request count, not a look.
+
+Worth carrying out of it, because the entry was half wrong and the wrong half was the tempting one.
+It offered `freshWithinTtl: true` as an alternative fix and said the invalidation proof that flag
+needs was *"available rather than owed"*, on the strength of two groups containing `hr-profile`.
+Containing the key is not the proof. The proof is that **every writer of the payload** sits in a
+group, and live BLE samples land in the profile's own 90-day window during the workout with nothing
+in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
+across workouts to fix a twenty-call loop inside one.
+
 ## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
 
 `docs/implementation-backlog.md` **26150 → 26158** (`lane-a/la125-gate-the-fat-formula-change`) —

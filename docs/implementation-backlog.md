@@ -712,44 +712,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 
 - **Keep:** this entry until all **six** are answered. Strike each item as it resolves; remove the
   entry when the last one goes.
-### [heart-rate][app-shell] RV-64 — the 90-day HR pull is fetched once per REST PERIOD; the reduction is fixed, the remount is not
-
-- **Lane:** B — `components/workout/live-hr-chart.tsx:46`, `components/workout/active-workout-screen.tsx:520`,
-  `components/workout-screen.tsx`. **Added:** 2026-09-20 · Review sweep 51. **Re-laned and re-scoped
-  2026-09-21** after the engine half shipped; the entry's original `Lane: A` covered work that is done.
-- **⚠ The engine half shipped and the entry's proposed fix was NOT what shipped — read this before
-  re-proposing it.** The original fix was *"add a repo method returning the order statistics directly —
-  `ORDER BY bpm DESC LIMIT k` and its mirror"*, on the strength of an aggregate that answered in 54 ms
-  against a 130k-row pull. Measured properly (2026-09-21), that is wrong in two independent ways:
-  - **It computes a different answer.** `getHrForWindow` returns `preferStrapBuckets(rows)`, which
-    drops every ring row in a 10-second bucket the chest strap already covers — the entry flagged
-    that function as unread, and it is exactly what makes the aggregate unsafe. Over the owner's
-    90 days it drops **1,350 of 130,580 rows**, and the naive aggregate's k-th lowest is **36**
-    against the current code's **37**. The k-th highest agreed at 175, which is luck, not structure.
-  - **A merge-correct aggregate is not faster.** Three formulations were built and timed against
-    production — join+DISTINCT **313–396 ms**, window functions **460–600 ms**, NOT EXISTS
-    **623–790 ms** — against a raw scan+sort of **20–55 ms**. Apples-to-apples on one machine with
-    the same 130,580 rows: **full pull + driver materialisation 197.9 ms**, merge-correct aggregate
-    **266.2 ms**. The aggregate is a wash at best, and the pull's cost is the pg driver building
-    130k row objects, which no SQL rewrite removes.
-- **What DID ship:** `computeObservedHr` got the reduction it actually needed — two k-element windows
-  in one pass instead of sorting all of `plausible`. **60.8 ms → 30.4 ms on 130,580 rows, identical
-  output**, pinned by a 200-trial randomised equivalence test against the old sort.
-- **⚠ Keep: the remount, which is the whole remaining ask and the only thing that changes the order of
-  magnitude.** `live-hr-chart.tsx:46` fetches `hr-profile` in a mount-once effect and
-  `active-workout-screen.tsx:520` mounts it as `{workoutPhase === "rest" && !allSetsLogged && …}`, so
-  it **remounts once per rest period** — a 5-exercise × 4-set workout pays the ~230 ms path ~20 times
-  *during the workout*, against the same 10-connection pool as `log-exercise` and `complete-workout`,
-  and the route's 20/60s rate limit means a dense rest cadence can make the chart **429 itself**.
-  Fixing the reduction took ~230 ms off a ~260 ms call; fixing the remount takes 19 calls off 20.
-- **Fix:** hoist the `hr-profile` read out of `LiveHrChart` into `workout-screen.tsx` and pass it down,
-  or give that fetch `freshWithinTtl: true`. `HR_PROFILE_TTL` is already 6 h and **two groups in
-  `lib/cache-groups.ts` (lines 246, 344) already invalidate the key**, so the written invalidation
-  proof that flag requires is available rather than owed.
-- **Verification:** a workout with N rest periods issues **one** `hr-profile` request rather than N.
-- **Not established:** the route could not be authenticated against in production, so its end-to-end
-  wall time is still inferred from the component timings above rather than measured on the wire.
-
 ### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
 
 - **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.

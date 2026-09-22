@@ -1,12 +1,10 @@
 // components/workout/live-hr-chart.tsx
 'use client'
-import { memo, useEffect, useState, useSyncExternalStore } from 'react'
+import { memo, useSyncExternalStore } from 'react'
 import { HeartPulseIcon } from 'lucide-react'
 import { useLiveHr } from '@/lib/live-hr/use-live-hr'
 import { rollingMedian } from '@trainingai/shared/health/hr-smoothing'
 import { computeHrZones, zoneForBpm } from '@trainingai/shared/health/hr-zones'
-import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
-import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
 import type { HrProfileResponse } from '@/app/api/hr-profile/route'
 import { subscribeTrace, getTraceSnapshot } from '@/lib/live-hr/exercise-trace'
 
@@ -25,11 +23,18 @@ const H_COMPACT = 44          // in-workout rest card — shorter, to spare the 
 //   • Exercise summary: pass `showSetLines` → replays the whole exercise with dotted per-set
 //     boundary markers.
 function LiveHrChartInner({
+  profile,
   sinceMs = null,
   showSetLines = false,
   compact = false,
   className,
 }: {
+  /**
+   * Passed in rather than fetched (RV-64). The active workout mounts this on the rest phase, so a
+   * read of its own ran once per rest period — around twenty times in a 5x4 workout. The screens
+   * that stay mounted own it now, via `useHrProfile()`.
+   */
+  profile: HrProfileResponse | null
   sinceMs?: number | null
   showSetLines?: boolean
   compact?: boolean
@@ -38,13 +43,6 @@ function LiveHrChartInner({
   const H = compact ? H_COMPACT : H_FULL
   const { bpm, live, stale } = useLiveHr()
   const trace = useSyncExternalStore(subscribeTrace, getTraceSnapshot, getTraceSnapshot)
-
-  const [profile, setProfile] = useState<HrProfileResponse | null>(null)
-  useEffect(() => {
-    const seed = readCacheSync<HrProfileResponse>('hr-profile')
-    if (seed) setProfile(seed)
-    cachedFetch<HrProfileResponse>('hr-profile', '/api/hr-profile', HR_PROFILE_TTL, setProfile).catch(() => {})
-  }, [])
 
   const samples = sinceMs != null ? trace.samples.filter(s => s.at >= sinceMs) : trace.samples
 
