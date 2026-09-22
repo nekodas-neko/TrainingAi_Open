@@ -70,7 +70,7 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
           <p className="text-sm font-semibold truncate">{ex.name}</p>
           <div className="flex items-center justify-center gap-2 mt-0.5">
             <span className="text-lg font-black tabular-nums" style={{ color: brandColor }}>
-              {unit === "RM" ? displayOneRm(ex.currentRm, ex.exerciseType).text : `${ex.currentRm.toFixed(1)} kg`}
+              {displayOneRm(ex.currentRm, ex.exerciseType).text}
             </span>
             {ex.gainPct != null && (
               <span className="text-xs font-semibold tabular-nums" style={{ color }}>
@@ -105,8 +105,12 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
       <Sparkline values={values} width={280} height={64} color={brandColor} fill responsive />
 
       <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
-        <span>90d low: {values.length > 0 ? (unit === "RM" ? Math.min(...values) : Math.min(...values).toFixed(1)) : '—'}{unitSuffix}</span>
-        <span>Peak: {unit === "RM" ? displayOneRm(ex.peakRm, ex.exerciseType).value : ex.peakRm.toFixed(1)}{unitSuffix}</span>
+        {/* RV-89 did not name these two; they are the same `.toFixed(1)` as the headline above it,
+            in the same file. The low is taken from the RAW history rather than from `values`, which
+            is already in display units — `bodyweightRepMax` is monotonic in the stored 1RM, so the
+            minimum is the same either way and this one cannot double-convert. */}
+        <span>90d low: {ex.history.length > 0 ? displayOneRm(Math.min(...ex.history.map(h => h.rm)), ex.exerciseType).value : '—'}{unitSuffix}</span>
+        <span>Peak: {displayOneRm(ex.peakRm, ex.exerciseType).value}{unitSuffix}</span>
       </div>
 
       {/* Dot pagination */}
