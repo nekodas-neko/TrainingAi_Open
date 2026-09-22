@@ -722,7 +722,7 @@ export function ProgramEditorSheet({
                                     className="mt-2 cursor-grab active:cursor-grabbing touch-none flex-none"
                                     aria-label="Reorder exercise"
                                   >
-                                    <GripVertical className="h-4 w-4 text-muted-foreground/40" />
+                                    <GripVertical className="h-4 w-4 text-muted-foreground/70" />
                                   </button>
                                   <div className="flex-1 min-w-0 space-y-1.5">
                                     {groupLabel != null && (

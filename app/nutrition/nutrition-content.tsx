@@ -522,7 +522,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 }}
                 aria-label="Next day"
                 aria-disabled={selectedDate >= todayStr}
-                className={`-my-3 flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${selectedDate >= todayStr ? 'cursor-default text-muted-foreground/30' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                className={`-my-3 flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${selectedDate >= todayStr ? 'cursor-default text-muted-foreground/70' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

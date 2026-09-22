@@ -128,7 +128,7 @@ export function GoalSpectrum({
                 >
                   {goal.shortLabel}
                 </span>
-                <span className="text-[9px] text-muted-foreground/60 tabular-nums">{goal.range}</span>
+                <span className="text-[9px] text-muted-foreground/70 tabular-nums">{goal.range}</span>
               </button>
             )
           })}

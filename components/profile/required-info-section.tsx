@@ -57,7 +57,7 @@ export function RequiredInfoSection({
   return (
     <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden divide-y divide-border">
       <div className="px-4 pt-3 pb-1.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Targets &amp; Activity</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Targets &amp; Activity</p>
       </div>
 
       {/* Weight — latest weigh-in -> target */}
