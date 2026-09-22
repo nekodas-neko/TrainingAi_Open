@@ -747,29 +747,6 @@ nothing structured saying why — and a human decides.
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
 
-### [platform] LA-128 — the check-in route strips an unknown key instead of rejecting it, so the next field lands silently
-
-- **Lane:** A — `app/api/day-checkin/route.ts:14`. **Added:** 2026-09-22, Lane A while shipping
-  LB-124, which exists because of this shape.
-- **The hazard, in the words of the entry it cost:** `Body` is built with `.extend()` and is **not
-  `.strict()`**, so Zod drops a key it does not know rather than refusing the body. A client posting
-  a field the server has not learned yet gets **201 and writes nothing**. LB-124 was filed rather
-  than attempted for exactly this reason, and it says why it matters: *"a control that looks like it
-  works and stores nothing is worse than a 400"* — it would have burned TN-58's two-week pass test
-  and reported "no self-report available" when the truth was a dropped field.
-- **LB-124 did not close this.** It closed it for `vsYesterday` by making the key known. The next
-  field added to a check-in sheet before its server half lands hits the same silence.
-- **Fix:** `.strict()` on `Body`, so an unknown key is a 400 naming it.
-- **⚠ Why this is its own entry rather than a line in LB-124's diff.** `.strict()` starts REJECTING
-  bodies that succeed today. Every current client must be checked first — the morning sheet, the
-  evening review, and `pushMutations`, which parses the same two shared schemas. A sheet sending one
-  stale key would go from silently-ignored to a hard failure on every save, and on the outbox path
-  that is a no-retry poison pill. This is a small change with a real blast radius, which is the
-  argument for measuring it rather than for skipping it.
-- **Not established:** whether any current client actually sends an unknown key. Nobody looked —
-  the shape was found by reading the schema, not from a failure. Start there: it decides whether
-  this is a one-line change or a three-file one.
-
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 
 - **Lane:** A — `app/api/next-session/prescription/route.ts:57`,

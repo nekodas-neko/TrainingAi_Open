@@ -31,6 +31,20 @@
 **Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
+`Body` was `.extend()`-built and never `.strict()`, so a sheet posting a field whose server half had
+not landed got **201 and wrote nothing** — the failure LB-124 was filed over rather than attempted,
+and the one that would have burned TN-58's pass test. **Checked before flipping it: no current
+client sends an unknown key** (morning sheet 13, evening review 9, all known; the retired
+`motivation`/`restingSoreness`/`wakeMood` are still in the schema and sent as null on purpose).
+**⛔ The outbox stays LENIENT deliberately — do not "fix" the mismatch.** It never touches the
+route's `Body`; it is `adapter.ts` parsing the two shared schemas non-strictly, and stricting them
+would reject a queued check-in outright rather than surface a mistake, turning a partial save into
+no save. That path is already gated by the local SQLite column list (LB-124 needed a migration),
+which the POST path is not. Reasoning is written beside both. Driven over HTTP on `pnpm dev`, and
+the pre-fix 201-writes-nothing was **observed**, not assumed. No user-visible change.
+
+
 **A doc comment was quoted as evidence of what a screen rendered; it was wrong, and so was its
 neighbour (LB-125).** `formatDateDisplay`'s header claimed `'short'` gave `Jan 5` and `'long'` gave
 `Monday, 5 January`; `en-AU` produces **`15 Sept`** and **`Tuesday 15 September`**. The entry did not
