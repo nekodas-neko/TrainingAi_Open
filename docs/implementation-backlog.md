@@ -473,6 +473,30 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`
+  (`TOP_N = showAll ? Infinity : 10`).
+- **Background:** found twice in two days while verifying my own filings. Prose, not a `Reference:`
+  field — that field files an entry under *read, do not build*.
+
+**Lane A's READY list is 31 entries and the tool prints 10, with no line saying so.** Two entries I had
+just edited (`TN-55`, `LA-121`) appeared **nowhere** in the output, which reads exactly like *removed
+from the queue* — the failure mode the backlog's own two-deletions rule exists to catch. I only
+established they were fine by parsing their fields directly, which is the thing `next-item.js` exists to
+save everyone from doing.
+
+**The fix is one line of output, not a behaviour change.** Keep printing 10; add the count that was
+withheld and how to see them — *"showing 10 of 31 — `--all` for the rest"* — on every bucket it
+truncates, READY and PARKED alike. A tool whose silence is indistinguishable from absence is the same
+class of defect as the prose marker in TN-59: correct output, wrong conclusion drawn from it.
+
+**⚠ Do not raise `TOP_N` instead.** The cap is right — an implementer wants the next few items, not
+thirty-one. What is wrong is that the truncation is invisible.
+
+**Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
+IS in the queue but below the cut-off no longer comes back empty without explanation.
+
 ### [nutrition][platform] RV-103 — the owner re-reported BF-177, and the fix BF-177 shipped cannot report its own failure
 
 - **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts:41-45`. **Added:** 2026-09-22 ·
@@ -1146,10 +1170,38 @@ nothing structured saying why — and a human decides.
   **The Body Battery (TN-55) is NOT in this batch** — it writes `body_battery_daily`, a different
   table, and the owner accepted two re-scores there to get the fix sooner.
 
+<<<<<<< HEAD
 **3. ~~Q-28, BF-9 and BF-7 carry NO `Gate:` field.~~ ✅ ANSWERED 2026-09-22: all three RELEASED.**
   The owner chose release over gating, on this item's own argument — a rule living in a scheduled
   prompt rather than in the file every agent reads goes stale unnoticed. **The Lane A prompt's
   exclusion list should stop naming them.** Original text follows.
+=======
+**2b. 🔴 OPEN — is a contributor worth 2.8% of readiness's movement worth keeping?** (added 2026-09-23,
+  Tuning; would unblock a narrowing of TN-60 and of the composite generally)
+  The variance decomposition in TN-60 measured what each of the nine readiness contributors actually
+  moves. **`activityBalance` carries 2.8%** of all movement on a declared weight of 0.06, and
+  `prevDayActivity` 4.6% on 0.09 — so the two activity terms together are **7.4%** of the number while
+  holding 15% of the weight. Three answers and none is obviously right: **keep** them (they are real
+  signals and thin movement may be correct for a rest-heavy period), **re-weight** them up so the
+  declared weight matches the effect, or **drop** one and redistribute. Each re-scores history, so it
+  is the owner's, and it should wait until TN-60's rail fix has landed — the rail is part of why the
+  effective weights diverge from the declared ones, so the table will move on its own first.
+  **Not urgent, and deliberately not asked yet:** asking before the rail fix would get an answer to a
+  question whose numbers are about to change.
+
+**2c. 🔴 STILL OPEN — item 5's `.size` conflict tax, now with a measured cost.** (unblocks nothing; it
+  taxes everything)
+  Recorded here because it was raised on 2026-09-20 as item 5 and has not been answered while the cost
+  kept accruing. **Measured across this Tuning session alone: five of seven PRs hit a
+  `docs/doc-size/docs/implementation-backlog.md.size` conflict**, each needing a fetch, a merge, a
+  recount, a baseline-note edit and a re-push — and two of those also had to resolve the append-only
+  `doc-size-baseline-history.md` by hand. Every one was mechanical. Item 5's own cheapest fix (BugFix
+  batches a sweep into one PR) does not help here, because the conflicts came from *different agents'*
+  PRs landing between mine. **The fix that does is item 5's alternative — generate the baselines in CI
+  rather than committing them — which needs its own entry and the owner's yes on changing the ratchet.**
+
+**3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
+>>>>>>> origin/main
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
   exclusion list inside the Lane A routine prompt — a convention living in a scheduled prompt rather
   than in the file every agent reads, which is exactly the kind of thing that goes stale unnoticed.
@@ -1693,6 +1745,15 @@ back until TN-33 settles the sign.
 already a pure function of its inputs (LA extracted it for exactly this), so the fit runs offline
 against production reads. TN-56 is still worth building for the 25 sleep-staging constants, whose
 inputs are never persisted — but it does **not** gate this entry.
+
+**⚠ TN-55 IS Q-272's MISSING PROPOSAL, and the plan was REVISED 2026-09-23 after reading it.** Q-272
+(`[readiness][body]`, filed 2026-08-15) is the pre-existing entry for this defect and had been waiting
+for a Tuning proposal the whole time; TN-55 did not check for it before filing. Two things changed as a
+result, both in the plan's **§6a**: **overnight charging is OUT** (Q-272 is right that the wake anchor
+already accounts for the night, and the re-fit without it is strictly better — 0% of days ending at zero
+against 5%), and **Q-272's `r = +0.67` acceptance test does not replicate** (0.252 over 70 days, below
+readiness's own 0.361 autocorrelation), so it must not be used to sign this off. **Build from the plan,
+not from this entry's first version.**
 
 **✅ OWNER DECIDED 2026-09-22 — ship the four structural changes NOW with the provisional constants,
 and re-sweep after 2026-10-04.** He accepted that the battery re-scores twice as the price of not
@@ -19326,14 +19387,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
 
-- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
-  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
-  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
-  putting this in front of the owner asks them to sign a blank page — and it has been counting as
-  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
-
-- **Gate:** owner — changing the Body Battery model re-scores every day, so it is a scoring change
-  and wants an owner-signed proposal first. No proposal is written yet.
+- **✅ THE PROPOSAL EXISTS NOW, AND THE OWNER HAS SIGNED IT (2026-09-22).** This entry waited from
+  2026-08-15 for a Tuning proposal. It is
+  [`2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md),
+  filed as **TN-55**, fitted offline against 64 days with a committed harness
+  (`scripts/tuning/body-battery-replay.cjs`). **Q-272 and TN-55 are one line of work — build from the
+  plan, and read §6a first.** Gate lifted.
+- **⚠ THIS ENTRY'S OWN ACCEPTANCE TEST DOES NOT REPLICATE — do not use it.** The *"v5 end-of-day
+  battery → next-day readiness is r = +0.67 (n = 11)"* below, and the instruction to re-run it after
+  the change, were re-measured 2026-09-23 over **70 days**: **r = +0.252**, against readiness's own
+  day-to-day autocorrelation of **+0.361**. The battery's end value predicts tomorrow's readiness
+  *worse than yesterday's readiness does*. So the conclusion drawn from it — *"v5's level carries real
+  signal; its shape within the day is wrong"* — keeps its second half (the four defects are measured
+  independently) and **loses its first**. Use the plan's distributional pass test instead; a change
+  cannot be validated against a relationship that is not there.
+- **⚠ Direction 1 below is refuted twice over and direction 2 is the survivor.** Q-502 refuted raising
+  `CHARGE_RATE` alone; TN-55 additionally found that overnight charging must **not** be added, because
+  this entry is right that the wake anchor already accounts for the night — re-fitting without it is
+  strictly better (0% of days ending at zero, against 5% with it). Direction 2 (feed daytime HRV into
+  the charge term, from `rr_intervals`) remains open and unmeasured.
 
 - **Branch:** `fix/body-battery-daytime-recovery`
 - **Plan:** none yet · tuning notes live in [`docs/body-battery-tuning.md`](body-battery-tuning.md)

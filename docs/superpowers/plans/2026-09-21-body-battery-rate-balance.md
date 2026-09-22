@@ -39,15 +39,43 @@ Three changes to `walkBodyBattery`, then one global gain on the rates.
 3. **Cut the stress weight** (see §4 — this is a trust decision, not an arithmetic one).
 4. **Scale all four rates by a global gain** to control day-to-day swing without disturbing balance.
 
-### Recommended constants — gain 0.5
+### ⚠ REVISED 2026-09-23 — overnight charging is OUT, and the fit is better without it
+
+**This supersedes the first version of this section, which proposed a `SLEEP_CHARGE_RATE`.** Q-272 —
+the pre-existing Body Battery entry, which this plan had not read — argues that *"overnight recharge
+here is handled by the morning anchor reset rather than accumulated charge, which is a defensible
+difference"*. That argument is right, and charging overnight **on top of** an anchor derived from
+readiness/sleep counts the night twice. It also showed up in the measurements as 13–14% of days pinned
+at 100, which is what double-counting looks like.
+
+Re-fitted with no overnight term, the result is **strictly better on every axis**:
+
+| | shipped | first proposal (sleep charge) | **revised (no sleep charge)** |
+|---|---:|---:|---:|
+| median daily net | −85.1 | −0.2 | **+0.5** |
+| mean end value | 14.8 | 59.2 | **61.4** |
+| sd of end value | 26.4 | 28.0 | **25.3** |
+| days ending at 0 | 66% | 5% | **0%** |
+| days pinned at 100 | 0% | 8% | **9%** |
+
+### Recommended constants — gain 0.40, no overnight term
 
 | constant | shipped | proposed |
 |---|---:|---:|
-| `CHARGE_RATE` | 0.20 | **0.075** |
-| `DRAIN_RATE` | 0.60 | **0.200** |
-| `STRESS_DRAIN_RATE` | 0.20 | **0.050** |
-| `SLEEP_CHARGE_RATE` | — | **0.060** |
+| `CHARGE_RATE` | 0.20 | **0.120** |
+| `DRAIN_RATE` | 0.60 | **0.080** |
+| `STRESS_DRAIN_RATE` | 0.20 | **0.020** |
 | `REST_THRESHOLD` | 0.05 | **0.05** (unchanged) |
+| overnight charge | — | **none — the wake anchor keeps that job** |
+
+Gain 0.30 (`0.090 / 0.060 / 0.015`) takes railing to 6% at sd 22.8 if the pinning shows in use.
+
+**⚠ `DRAIN_RATE` falls 7.5×, and that needs one check this plan cannot make.** Q-521 measured that
+drain already tracks *wear time* rather than exertion (`corr(hr_sample_count, drained)` = **+0.518** vs
+`corr(steps, drained)` = **−0.153**). Weakening drain further could make a hard session even less
+visible. Before shipping, confirm a workout day still separates from a rest day; if it does not, that
+is a **separate defect** (drain is keyed on the wrong input) and must not be patched by raising
+`DRAIN_RATE` back, which would restore the −30/day countdown.
 
 ## 3. Measured outcome, 64 days
 
@@ -114,6 +142,36 @@ on the window and can ship now; re-run `--sweep` after 2026-10-04 and adjust the
 
 **⚠ Do not fit against 2026-09-13 → 2026-10-04.** The implied stress level runs 0.56–0.62 in the last
 four days against 0.14–0.41 before the step, so a fit anchored there encodes the titration as normal.
+
+## 6a. Reconciliation with Q-272 and Q-502 — read this before believing either
+
+**This plan is Q-272's missing proposal.** Q-272 has said since 2026-08-15 that *"the next action is
+Tuning's, not theirs"* and that no proposal existed. It does now; the two entries are one line of work
+and TN-55 points here.
+
+**⚠ Q-272's acceptance test DOES NOT REPLICATE, and it was about to be used to sign off this change.**
+The entry records *"v5 end-of-day battery → next-day readiness is r = +0.67 (n = 11)"* and instructs a
+later session to *"re-run the r = +0.67 check after the change"*. Re-measured 2026-09-23 over **70
+days**: **r = +0.252** — and readiness's own day-to-day autocorrelation is **+0.361**, which is
+*higher*. So the battery's end value predicts tomorrow's readiness **worse than yesterday's readiness
+does**, and it carries no independent predictive signal. The n=11 figure did not survive the sample
+growing.
+
+**Consequences, both of which matter:**
+- **Do not use r = +0.67, or any battery→readiness correlation, as the pass test.** Use the
+  distributional test in §3. A change cannot be validated against a relationship that is not there.
+- **Q-272's argument that *"v5's level carries real signal; its shape within the day is wrong"* loses
+  its evidence.** The shape is still wrong — §1's four defects are independently measured — but the
+  claim that the level is sound rested on that correlation, so it is withdrawn rather than inherited.
+
+**Q-502 says `REST_THRESHOLD` is the lever; §1 says the ceiling is not the binding constraint. Both
+are right about different things.** Q-502 refuted raising `CHARGE_RATE` *alone*, because the window is
+active on only ~6.7% of waking samples — that refutation stands and this plan does not raise
+`CHARGE_RATE`. Where it goes further than the evidence is in concluding the *threshold* is therefore
+the lever: widening it to TN-52's p10 quantile moves it 60.1 → 61 bpm and buys 2.8% → 3.7% of the day.
+The window is barely active for a different reason than its width — sleep is excluded from the walk and
+the ramp zeroes at the ceiling, so the samples inside the window earn almost nothing. Flattening the
+ramp makes the *existing* window productive, which is what Q-502 was reaching for by widening it.
 
 ## 7. What this does NOT establish
 
