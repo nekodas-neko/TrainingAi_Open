@@ -17348,6 +17348,58 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
 
+### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
+
+- **Lane: O** — `scripts/device/**`. **Added:** 2026-09-22, owner-requested.
+- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
+  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
+  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
+  what it takes to make it connect is the finding worth writing down.
+- **Keep:** the first real run, and the fix it will probably need. Until a phone has answered,
+  nothing here is verified — including the claim that it connects at all.
+
+**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
+build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
+Three classes of check are unreachable as a consequence, and they are precisely the ones the
+backlog is full of:
+
+| class | why no sandbox reaches it |
+|---|---|
+| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
+| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
+| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
+
+Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
+cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
+thing.
+
+- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
+  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
+  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
+- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
+  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
+  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
+  needs a *browser* target and an Android WebView commonly exposes only page targets
+  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
+  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
+  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
+- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
+  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
+  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
+  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
+  real differential when it was a coordinate artifact.
+- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
+  navigation reports a bottom inset of `0` and a broken clearance looks correct.
+- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
+  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
+  the ring or the scale (real BLE, and the radio power-gates when worn-idle), anything needing the
+  owner physically present, or any *"does this feel instant"* judgement. **Automatable is not the
+  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
+  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
+  unambiguous ones and leave a shorter, harder list - not an empty one.
+- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
+  substitute. It narrows what the gate has to cover.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A

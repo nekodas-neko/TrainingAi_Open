@@ -15452,3 +15452,22 @@ is how they got there: *"keep BOTH Current Status paragraphs"* is right about th
 wrong if it also keeps the header above them. The baton now says to fix the version line
 explicitly. This is the file every session reads first to orient, so three contradictory version
 numbers at the top of it is worse than a stale one.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26366 → 26418 (OR-127: the USB device harness)
+
+One entry for `scripts/device/**`, which drives the real APK on the real phone over the DevTools
+protocol. The entry is long for a shipped tool because most of it is the **limits**, and those are
+the part that will otherwise be overread: what a pass here is evidence about (one screen, one
+orientation, one navigation mode, one phone), what it cannot touch (the ring, the scale, anything
+needing the owner present, every "does this feel instant" call), and that it does not retire the
+device-verification gate.
+
+Worth carrying: **automatable is not the same as owed.** The harness answers *behavioural*
+questions — did the row disappear, did back land on Home, is the computed padding above the gesture
+bar. A large share of the 104 device checks are look-and-feel, and an automated pass is the weakest
+evidence for exactly those. The honest expectation is a shorter, harder list, not an empty one.
+
+Second thing worth carrying, because it is unusual for this repo: **the harness ships unrun.** No
+sandbox here has `adb` or a phone, so every line was reasoned from the protocol rather than
+observed — including the claim that it connects at all. It is filed with a `Keep:` naming that
+first run as the outstanding work, rather than presented as working software.
