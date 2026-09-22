@@ -15,6 +15,7 @@ import { SessionClock } from "./session-clock";
 import { LastSetRestTimer } from "./last-set-rest-timer";
 import { hapticSuccess } from "@/lib/haptics";
 import { LiveHrChart } from "@/components/workout/live-hr-chart";
+import { useHrProfile } from "@/lib/hooks/use-hr-profile";
 import { getLocalStore } from "@/lib/local-store";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 
@@ -31,6 +32,7 @@ interface ExerciseSummaryScreenProps {
 }
 
 export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, userId }: ExerciseSummaryScreenProps) {
+  const hrProfile = useHrProfile();
   const tz = useUserTimezone();
   const {
     exName,
@@ -155,7 +157,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
 
       <div className="flex-1 overflow-y-auto px-3 pt-3 pb-2 space-y-2">
         <LastSetRestTimer />
-        <LiveHrChart showSetLines className="mb-4" />
+        <LiveHrChart profile={hrProfile} showSetLines className="mb-4" />
         {nextExercise && (
           <div className="rounded-xl bg-muted px-3 py-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Up Next</p>
