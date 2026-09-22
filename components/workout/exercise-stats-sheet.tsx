@@ -66,10 +66,10 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
     void cachedFetch<{ entries: ExerciseHistoryEntry[] } | null>(
       `exercise-history:${exercise.name}`, `/api/exercise-history?name=${encodeURIComponent(exercise.name)}`, EXERCISE_HISTORY_TTL,
       d => setEntries(d?.entries ?? []),
-    ).catch(() => {
-      setError(true);
-      setEntries([]);
-    }).finally(() => setLoading(false));
+      // RV-84: the error branch was chained as `.catch`, which `cachedFetch` can never reach, so
+      // this sheet showed an empty history rather than its error state on a failed load.
+      { onError: () => { setError(true); setEntries([]); } },
+    ).finally(() => setLoading(false));
   }, [exercise?.name]);
 
   if (!exercise) return null;

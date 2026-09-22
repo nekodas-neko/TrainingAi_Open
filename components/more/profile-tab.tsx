@@ -119,7 +119,9 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
         '/api/achievements',
         TTL_SHORT,
         (d) => { setAchievementsData(d); setAchievementsLoading(false) },
-      ).catch(() => setAchievementsLoading(false))
+        // RV-84: `.catch` never ran, so the achievements grid spun forever on any non-ok response.
+        { onError: () => setAchievementsLoading(false) },
+      )
     } else {
       setAchievementsLoading(false)
     }

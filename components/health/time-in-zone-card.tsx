@@ -48,6 +48,7 @@ export const TimeInZoneCard = memo(function TimeInZoneCard() {
   const tz = useUserTimezone();
   const [win, setWin] = useState<Window>("week");
   const [data, setData] = useState<ZoneMinutesResponse | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const range = useMemo(() => {
     const to = todayInTz(tz);
@@ -60,11 +61,21 @@ export const TimeInZoneCard = memo(function TimeInZoneCard() {
     const seed = readCacheSync<ZoneMinutesResponse>(key);
     if (seed) setData(seed);
     else setData(null);
+    setFailed(false);
+    // RV-88: without this the empty branch ran on a failed fetch and told the owner to wear the
+    // ring — blaming him for a server error on a day he had worn it.
     cachedFetch<ZoneMinutesResponse>(key, `/api/zone-minutes?from=${range.from}&to=${range.to}`, ZONE_MINUTES_TTL, d => {
       if (d) setData(d);
-    });
+    }, { onError: () => setFailed(true) });
   }, [range.from, range.to]);
 
+  // RV-88 flagged this fallback as an invented profile shown as fact, and **it is not, in this
+  // card** — checked rather than assumed, so the next sweep does not re-file it. `computeHrZones`
+  // takes `id`, `name` and `color` straight from the fixed `ZONE_DEFS`; only `minBpm`/`maxBpm` vary
+  // with the profile. This card renders `z.id`, `z.name` and `z.color` in the legend and takes the
+  // minutes themselves from the server's `data.days`, so the fabricated 190/60 reaches nothing on
+  // screen. **It would be a real defect in any card that prints a zone's bpm range** — the entry's
+  // reasoning is right in general and wrong about this file.
   const zoneMeta = useMemo(() => {
     const profile = data?.profile ?? { maxHr: 190, restingHr: 60 };
     return computeHrZones(profile);
@@ -140,6 +151,10 @@ export const TimeInZoneCard = memo(function TimeInZoneCard() {
             {fmtDuration(zone2PlusSec)} in Zone 2+ over the last {SPAN_DAYS[win]} day{SPAN_DAYS[win] === 1 ? "" : "s"}.
           </p>
         </>
+      ) : failed ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          Couldn&rsquo;t load your zone minutes — pull to refresh.
+        </p>
       ) : (
         <p className="py-6 text-center text-xs text-muted-foreground">
           No heart-rate data in this window yet — wear the ring or strap during a workout.

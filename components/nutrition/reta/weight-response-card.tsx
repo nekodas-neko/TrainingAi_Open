@@ -53,7 +53,9 @@ export function WeightResponseCard({ userId, sinceDate }: { userId?: string; sin
     cachedFetch<{ recent?: WeightPoint[] }>(
       'body-metadata', '/api/body-metadata', TTL_MEDIUM,
       d => { if (alive) setPoints(d.recent ?? []) },
-    ).catch(() => { if (alive) setPoints([]) });
+      // RV-84: `.catch` is unreachable on `cachedFetch` — the fallback belongs on `onError`.
+      { onError: () => { if (alive) setPoints([]) } },
+    );
     return () => { alive = false };
   }, [userId, sinceDate]);
 
