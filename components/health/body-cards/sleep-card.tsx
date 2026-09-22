@@ -101,7 +101,7 @@ export function SleepCard({ recentSleep, lastSleep, computedSleepScore, metaLoad
       ) : null}
       <button
         onClick={e => { e.stopPropagation(); router.push('/health/sleep'); }}
-        className="mt-2 text-[9px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className="mt-2 text-[9px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
         Sleep details →
       </button>

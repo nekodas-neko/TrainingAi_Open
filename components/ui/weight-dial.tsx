@@ -181,7 +181,7 @@ export const WeightDial = ({
                     ? "text-brand text-lg font-semibold"
                     : distance === 1
                       ? "text-muted-foreground text-lg"
-                      : "text-muted-foreground/40 text-base"
+                      : "text-muted-foreground/70 text-base"
               )}
               onClick={() => {
                 scrollToIndex(indexOfValue(v));

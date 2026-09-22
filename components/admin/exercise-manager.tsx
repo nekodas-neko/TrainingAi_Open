@@ -650,7 +650,7 @@ export default function ExerciseManager() {
                         <Image src={thumb} alt="" fill sizes="40px"
                           unoptimized={thumb.endsWith('.gif')} className="object-cover" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-muted-foreground/30" />
+                        <XCircle className="w-4 h-4 text-muted-foreground/70" />
                       )}
                     </div>
 
@@ -672,7 +672,7 @@ export default function ExerciseManager() {
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
                         : hasS3Gif
                           ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                          : <XCircle className="w-3.5 h-3.5 text-muted-foreground/30" />
+                          : <XCircle className="w-3.5 h-3.5 text-muted-foreground/70" />
                       }
                     </div>
                   </div>

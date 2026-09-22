@@ -106,7 +106,7 @@ export function RhrHrvSpo2Card({ metaToday, metaRecent, metaLoading, onOpenSheet
     })()}
     <button
       onClick={() => router.push('/health/heart-rate')}
-      className="text-[9px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+      className="text-[9px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
     >
       Heart rate details →
     </button>

@@ -48,7 +48,7 @@ function FeedItem({ event }: { event: FeedEvent }) {
           {iconEl}
           <p className="text-xs text-muted-foreground truncate">{text}</p>
         </div>
-        <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+        <p className="text-[10px] text-muted-foreground/70 mt-0.5">
           {formatDistanceToNow(new Date(event.occurredAt), { addSuffix: true })}
         </p>
       </div>
@@ -95,7 +95,7 @@ export function FriendFeed() {
   if (error && events.length === 0) {
     return (
       <div className="py-8 text-center">
-        <Dumbbell className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+        <Dumbbell className="w-8 h-8 text-muted-foreground/70 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">Couldn&apos;t load friend activity.</p>
         <button type="button" onClick={load} className="text-xs font-medium mt-1.5" style={{ color: 'var(--color-brand)' }}>
           Retry
@@ -107,9 +107,9 @@ export function FriendFeed() {
   if (events.length === 0) {
     return (
       <div className="py-8 text-center">
-        <Dumbbell className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+        <Dumbbell className="w-8 h-8 text-muted-foreground/70 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">No friend activity yet.</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">Add friends to see their progress here.</p>
+        <p className="text-xs text-muted-foreground/70 mt-1">Add friends to see their progress here.</p>
       </div>
     );
   }
