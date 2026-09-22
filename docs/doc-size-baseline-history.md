@@ -15131,6 +15131,20 @@ group, and live BLE samples land in the profile's own 90-day window during the w
 in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
 across workouts to fix a twenty-call loop inside one.
 
+## 2026-09-22 — `docs/implementation-backlog.md` 26333 → 26366 (+33), rebased onto a larger main, `projectOverview.md` 12382 → 12380 (−2), PS-47
+
+One new entry, PS-47: the Colmi holds about five days from full, went flat, and cost two days of the
+baseline week. The lines that earn their place are the measurement (100% → 30% over four days, then
+1% on 4 Sept) and the reason it is a product problem rather than a hardware fact — **a flat ring
+returns `reason: 'silent'`, which is the same signal as a sleeping radio**, so a second wearer reads
+"the integration is broken". The unexplained 40 hours pinned at exactly 70% is recorded as an
+oddity to look at, not as a cause, because nothing has established which of quantisation or a stale
+post-charge value it is.
+
+`projectOverview.md` **ratchets down** rather than up: the PS-21 Stage A device-verification row was
+struck to `known-issues-resolved.md` once production showed 200 frames carrying `seq > 0`, and the
+auto-sync row was amended in place instead of struck — the evidence for it is circumstantial and the
+stated check cannot be run from the database at all, which the row now says outright.
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26586 (after merging review sweep 52)
 
 TN-59 and TN-60, filed the morning after the queue produced a fresh instance of the defect TN-59

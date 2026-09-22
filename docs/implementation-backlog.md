@@ -8340,6 +8340,37 @@ those two surfaces this is the fallback path, not the primary.
 - The `Gate: owner` above **is** the decision: which of the two definitions of the estimate they want.
   Nothing here can start until that is answered, so there is no separate verify.
 
+### [devices] PS-47 — the Colmi runs flat in about five days, and a flat ring is indistinguishable from a broken one
+
+- **Lane:** A — `lib/colmi-ble/**` and the pairing card's copy; no schema change
+- **Added:** 2026-09-22 · found while confirming the ring still worked before it was handed to a
+  second wearer
+- **Reference:** the battery series is already in `colmi_readings` (`kind = 'battery'`), so this is
+  answerable without the device
+
+**Measured from the stored battery series, not estimated.** 100% on 26 Aug → 30% on 30 Aug is
+**~19 points/day**; after a recharge, 69% on 1 Sept → **1% on 4 Sept** is ~18/day. So the ring holds
+roughly **five days** from full. It then went flat: **no sensor data at all between 5 Sept 19:35 and
+7 Sept**, and the next reading was 19% on the charger. Two days of a baseline week, lost to a
+battery nobody was watching.
+
+**Why this is a product problem and not just a fact about the hardware.** A flat Colmi presents
+exactly like a broken one — the sync returns `reason: 'silent'`, the card says the ring did not
+respond, and the suggested action ("put it on or place it on the charger") is buried in the same
+message used for a sleeping radio. A second wearer reading that concludes the integration is broken.
+The ring reports its own battery on every sync and we already store it, so the card can say
+**"12% — charge it"** instead.
+
+**A second, smaller oddity in the same series, unexplained:** the value sat at **exactly 70% for
+~40 hours** (30 Aug 12:02 → 1 Sept 04:14) across eight syncs, then resumed falling normally. Either
+the ring quantises its reporting or it returns a stale value after a charge. Worth one look while
+the series is open — a battery readout that freezes is worse than one that is coarse, because a
+warning built on it would not fire.
+
+**Scope:** surface the battery on the pairing card with a low threshold, and split the "silent ring"
+copy so a known-low battery names the real cause. Does not require the device — the decode and the
+stored series are both already there.
+
 ### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
 
 - **Lane:** A — `lib/colmi-ble/frames-to-payload.ts`, decode only; no schema change
@@ -10754,7 +10785,9 @@ statistics when two units differ and names them in `unitsDiffer`, and `spearman`
 
 - **Lane:** A (the engine)
 - **Added:** 2026-08-27
-- **Gate:** device
+- **Gate:** device — ⚠ **re-scoped 2026-09-22: the ring is with a second wearer, so the OWNER cannot
+  run this walk.** It is blocked on whoever holds the ring, or on its return. Do not read the gate as
+  "the owner has not got round to it" — PS-15's steps half waits behind it via `Needs:`.
 
 The four buckets 07:00–10:00 on 2026-08-27 read 485 → 876 → 1128 → 1524, then 11:00 reads 55. Read
 per-bucket the day totals **4562** steps; read as a running total that resets, **2073**. Oura says
