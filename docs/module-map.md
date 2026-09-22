@@ -554,7 +554,7 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 |---|---|
 | Haptics | `lib/haptics.ts` (`hapticTick`, `hapticLight`, `hapticSuccess`) |
 | Class merge | `packages/shared/src/utils.ts` → `cn(...)` |
-| Fetch + toast / retry | `packages/shared/src/ui/fetch-with-toast.ts`, `packages/shared/src/fetch-with-retry.ts` |
+| Fetch + toast / retry | `packages/shared/src/ui/fetch-with-toast.ts`, `packages/shared/src/fetch-with-retry.ts` → `fetchWithRetry(key, url, ttl, onData, isCancelled, attempt?, fetchFn?, opts?)`. Three bounded retries (2.5s/5s/7.5s) when neither cache nor a 200 produced a response. **`opts.onExhausted` is how a caller learns it gave up (RV-85)** — before it fires, an absent value means in-flight; after, it means failed. Without it the helper fixed the transient case and silently accepted the persistent one, landing on the blank widget its own header says it exists to prevent. Any surface that gates a whole row on the fetched value needs it, or a failure renders nothing at all. |
 | Navigation transitions | `lib/navigate-with-transition.ts` |
 | Dynamic background system | `components/dynamic-background/*` + `lib/background/` (`day-phase.ts`, `palettes.ts`, `screen-palettes.ts`, `weather-filters.ts`) — screens go through `bg-page`, never opaque per-screen paint |
 | Toasts | `components/ui/sonner.tsx` |

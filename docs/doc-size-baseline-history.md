@@ -15341,3 +15341,12 @@ sentences are the findings: the compiler caught a re-save path that would have c
 every food-log completion, and the type choice (text, not `-1/0/+1`) turns on this table already
 storing 1 = best … 5 = worst — both things the next person to touch this column needs and neither
 recoverable from the diff.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26405, `projectOverview.md` → 12319 (RV-85)
+
+RV-85 left whole. `projectOverview.md` takes one Current Status block, and the sentence worth the
+lines is the one about `fetchWithRetry`: the helper that exists to stop a blank widget was producing
+one, because it retried three times and then gave up with no way to say so. That is the kind of
+thing a "fixed the blank score row" note would lose, and it generalises — the app-shell domain index
+now carries it as a gotcha, since any `{value && <Row …>}` over a route with no null-payload path is
+the same shape.

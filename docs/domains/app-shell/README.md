@@ -454,6 +454,19 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **`{value && <Row …>}` is a failure-vanish whenever the route has no null-payload path (RV-85).**
+  Home gated its whole score row — plus the illness advisory and the early-deload banner — on
+  `readiness`, and `/api/readiness-score` answers a payload or an error status, never a null
+  payload. So an absent value was always a failure, and the screen rendered **nothing**: no row, no
+  skeleton (`showHomeSkeleton` requires `refreshing`) and no message, on the owner's most-used
+  screen. Before gating a row on a fetched value, check whether its route can legitimately answer
+  "nothing" — if it cannot, the falsy branch needs a message, not an empty slot.
+- **`fetchWithRetry` retries three times and then gives up; pass `opts.onExhausted` or it gives up
+  silently.** The helper's own header says it exists to stop a blank widget, and without that
+  channel it produced one for every persistent failure. **Before it fires, an absent value means
+  in-flight; after, it means failed** — so a message driven by anything earlier would sit under a
+  request that was about to succeed.
+
 - **A dead WebView render process is FATAL by default, not silent (BF-80).** Capacitor's
   `BridgeWebViewClient` already forwards `onRenderProcessGone` to its `WebViewListener`s, and
   `WebViewListener`'s own default returns `false` — which the platform reads as "kill the app". So

@@ -139,6 +139,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
+  // RV-85. `readiness === null` covers two different situations — still loading, and gave up — and
+  // the row rendered nothing for both. `/api/readiness-score` has no null-payload path (it answers
+  // a payload or an error status), so once `fetchWithRetry` reports exhaustion, null is a failure.
+  const [readinessFailed, setReadinessFailed] = useState(false);
   const [stepsGoal, setStepsGoal] = useState(10000);
   const [stepsGoalType, setStepsGoalType] = useState<"daily" | "weekly">("daily");
   const [sleepGoal, setSleepGoal] = useState(8);
@@ -847,12 +851,16 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   useEffect(() => {
     let cancelled = false;
+    // Cleared on every refresh, so pulling to refresh retries and the message goes away rather
+    // than sticking once it has been shown.
+    setReadinessFailed(false);
     fetchWithRetry<import('@/app/api/readiness-score/route').ReadinessScoreResponse>(
       'readiness-score', '/api/readiness-score', READINESS_SCORE_TTL,
       (d) => { if (d) setReadiness(d) },
       () => cancelled,
       0,
       cachedFetchToday,
+      { onExhausted: () => setReadinessFailed(true) },
     );
     return () => { cancelled = true; };
   }, [refreshTick]);
@@ -1108,6 +1116,14 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
         {/* ── Oura Score Chips ── */}
         {readiness && <OuraScoreChipRow readiness={readiness} sleepProvisional={sleepData[0]?.provisional === true} />}
+        {/* RV-85: the row's slot says so rather than going blank. Only after the retries are spent —
+            while they are still running this stays empty, because "slow" and "failed" are different
+            things to tell someone. Not shown under the skeleton, which is already saying "loading". */}
+        {!readiness && readinessFailed && !showHomeSkeleton && (
+          <p className="px-4 pb-2 text-[11px] text-muted-foreground">
+            Scores didn&rsquo;t load — pull to refresh.
+          </p>
+        )}
 
         {/* ── Illness advisory (elevated/fever only — self-hides otherwise) ── */}
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}
