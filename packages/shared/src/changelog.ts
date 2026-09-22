@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.6",
+    date: "2026-09-22",
+    changes: [
+      "Five screens stop cutting off the wrong thing. The exercise list clipped long names flat with no ellipsis and lost the green done tick with them, so an exercise you had already logged looked unlogged. Mid-set, the injury chip took half the header and squeezed the exercise title to about fifteen characters. The food diary cut names at twenty-two characters, which is shorter than 130 of your items. The weekly Volume tile dropped its \"kg\" onto a second line every week you trained. And the workout HR summary cut the \"3 of 4 sets\" caveat off the longest-named exercises \u2014 the ones where it mattered most.",
+    ],
+  },
+  {
     version: "1.464.5",
     date: "2026-09-22",
     changes: [

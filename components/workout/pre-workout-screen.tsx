@@ -351,8 +351,8 @@ export function PreWorkoutScreen({
                       className="w-full text-left hover:opacity-80 active:scale-[0.99] transition-all"
                       onClick={() => setStatsExercise(ex)}
                     >
-                      <p className="font-medium truncate flex items-center gap-2">
-                        {ex.name}
+                      <p className="flex items-center gap-2 min-w-0 font-medium">
+                        <span className="truncate">{ex.name}</span>
                         {doneToday && <CheckIcon className="h-4 w-4 text-green-500 flex-none" />}
                       </p>
                       {((ex.mainMuscles?.length ?? 0) + (ex.secondaryMuscles?.length ?? 0) > 0) && (

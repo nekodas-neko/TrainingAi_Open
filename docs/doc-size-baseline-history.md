@@ -15300,3 +15300,13 @@ only "shipped" would leave all three to be rediscovered.
 `docs/implementation-backlog.md` does not move: RV-91 left the queue and **LB-125 took its place**,
 filed out of the "also noted, not filed" line RV-91 closes with. A finding that leaves with its
 entry is a dropped finding, and this one had already been carried once.
+
+## 2026-09-22 — `layout-384` batch (`feat/layout-384-truncation-batch`)
+
+`projectOverview.md` 12259 → **12271**: twelve lines for the five-entry batch, carrying the three
+"not established" questions it settled — two of them against the entries — because a batch that
+shipped without device verification needs its arithmetic on the record where the next session reads.
+
+`docs/implementation-backlog.md` 26570 → **26500**: five entries out, and LB-125 split into LB-125
+(Lane A, the helper) plus LB-126 (Lane B, the call sites, parked on it). One entry spanning two
+lanes prints as READY to whichever lane cannot start it, which is what it did within the hour.

@@ -51,7 +51,10 @@ export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubP
   const STAT_CARDS = [
     { label: "Sessions",     value: <CountUpValue target={data.totalSessions} fallback={data.totalSessions} />, unit: "this week"  },
     { label: "Sets",         value: <CountUpValue target={data.totalSets} fallback={data.totalSets} />,          unit: "logged"     },
-    { label: "Volume",       value: data.totalVolumeKg > 0 ? `${data.totalVolumeKg.toLocaleString()} kg` : "—", unit: "total lifted" },
+    // RV-95: the cell is (320 − 24)/4 = 74px and `9,088 kg` alone is ~80px, so the unit wrapped
+    // for every non-zero week. It moves to the `unit` line, which already exists and is where the
+    // other three tiles put theirs. (`/api/weekly-stats` rounds, so there is no fractional case.)
+    { label: "Volume",       value: data.totalVolumeKg > 0 ? data.totalVolumeKg.toLocaleString() : "—", unit: "kg lifted" },
     { label: "Avg Duration", value: data.avgDurationMin != null ? `${data.avgDurationMin}m` : "—",          unit: "per session" },
   ];
 
