@@ -390,6 +390,26 @@ Live at the time of writing (2026-07-30):
     is a statistical inference (the 73%), never a per-row fact, so a column added now would be empty
     exactly where the ambiguity lives. The cutoff carries what a column would, for the rows that
     need it, with no migration.
+
+- **⚑ `day_checkins.perceived_recovery` / `sleep_quality_feel` are only answers when their
+  `*_touched` flag is true (TN-57), and the flag has ALWAYS been correct.** This is the mirror of
+  TN-50 above and must not be confused with it: that one is a different sheet, the defect was
+  circularity, and no flag could label the history. Here the morning sheet seeds from a **neutral
+  constant** — no readiness involved, no loop — and has recorded the flag per row since Q-113. The
+  defect was purely on the read side. Measured on production 2026-09-22, over 97 morning check-ins
+  since 2026-07-02: **78 carry a `perceived_recovery` and 0 were ever touched**, two distinct
+  values, standard deviation 0.286; `sleep_quality_feel` was touched 3 times.
+  - **Read the two columns through `answeredMorningScales`** (`packages/shared/src/health/
+    self-report.ts`), never directly. Five readers went through the column and took the seed as
+    data, including a calibration route and a user-facing correlation.
+  - **The seeded value is 3, which is also a legitimate answer** — no value-based check can tell
+    them apart, only the flag.
+  - **Nothing was backfilled and nothing needs to be.** The flag already separates the two
+    populations, so a write would buy nothing and erase the record of how long this ran.
+  - **This is why TN-33 has no independent target with variance**, which in turn blocks TN-16's
+    warning and TN-34's re-wire. Fixing the readers does not create answers; it stops the absence
+    being hidden. **TN-58 is the control redesign** — the half that might actually get the question
+    answered.
   ([`2026-09-19-fix-tn50-checkin-not-inferred.md`](../../overview/entries/2026-09-19-fix-tn50-checkin-not-inferred.md))
 
 - **An absent contributor key is not a score disagreement (TN-49).** `READINESS_WEIGHTS` has nine

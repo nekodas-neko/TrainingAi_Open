@@ -16,6 +16,7 @@ import { workingBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
 import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 
 export interface PrescriptionSignals {
   trainingGoal: string
@@ -229,10 +230,14 @@ export async function aggregateSignals(
   )
   const measuredTimeBudget = buildMeasuredTimeBudget(timingAudit.sessions, timingAudit.sets, timingAudit.exercises)
 
+  // TN-57: the prompt renders these as the lifter's own report — *"Morning check-in (1=best,
+  // 5=worst): recovery 3"* — and 78 of the owner's 97 rows carry a 3 he never chose. Telling a
+  // model a self-report that was not made is the shape the prose guards exist to prevent, so an
+  // untouched scale reaches the prompt as the em dash it already renders for a null. No weight,
+  // threshold or formula moves: the only change is that a value nobody gave is no longer stated.
   const morningCheckin = morningCheckinRow ? {
     wakeMood: morningCheckinRow.wakeMood,
-    perceivedRecovery: morningCheckinRow.perceivedRecovery,
-    sleepQualityFeel: morningCheckinRow.sleepQualityFeel,
+    ...answeredMorningScales(morningCheckinRow),
     restingSoreness: morningCheckinRow.restingSoreness,
     illnessContext: morningCheckinRow.illnessContext,
   } : null

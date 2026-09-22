@@ -26,8 +26,26 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.4).**
+The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant
+and records whether the lifter moved each one. Measured on production 2026-09-22 over 97 morning
+check-ins: **78 carry a `perceived_recovery` and 0 of them were ever touched** — two distinct values,
+standard deviation 0.286 — which is what the owner said unprompted (*"I dont really choose them; I
+let it auto select"*). The row was always honest; the readers were not, and the schema had said so
+since the columns were added (Q-113). A calibration route was fitting to 78 values nobody gave, a
+user-facing correlation was plotting them, the score audit was displaying them, and the periodization
+prompt was telling the model the lifter had reported them. All five now resolve through
+`answeredMorningScales`, and the write paths store null for an untouched scale. **No migration, no
+data write, and the 78 rows are deliberately not backfilled** — the flag already tells them apart.
+**Expect the correlations to EMPTY rather than shift**, which is correct and must not be rescued by
+relaxing the filter. **Five claims in the entry were wrong**; the load-bearing one is that its
+write-path instruction — make an untouched body count as carrying no answers — would have **stopped
+the owner's daily check-in reaching the server**, because the sheet sends nothing else that counts
+and `pushMutations` rejects such a body as a no-retry poison pill. The Q-465 guard therefore reads
+the submitted body and the nulling applies to what is stored.
 
 **AI calls are bounded, and the prose routes answer with their own facts when the model fails
 (RV-69 + RV-70, v1.464.3).** Four routes — the daily and weekly digests, the health insight and the

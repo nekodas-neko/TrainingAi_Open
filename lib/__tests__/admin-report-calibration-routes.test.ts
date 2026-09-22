@@ -360,14 +360,26 @@ describe('GET /api/admin/sleep-feel-calibration', () => {
   })
 
   it('carries the check-in feel through by its own log date', async () => {
+    // `sleepQualityFeelTouched` is what makes the 4 an answer (TN-57) — the sheet seeds the scale
+    // from a neutral constant, so an untouched value is the seed rather than a self-report. The
+    // subject here is the date keying, and the flag is set so it stays that.
     listDayCheckins.mockResolvedValue([
-      { logDate: '2026-03-02', sleepQualityFeel: 4 },
-      { logDate: '2026-03-03', sleepQualityFeel: null },
+      { logDate: '2026-03-02', sleepQualityFeel: 4, sleepQualityFeelTouched: true },
+      { logDate: '2026-03-03', sleepQualityFeel: null, sleepQualityFeelTouched: true },
     ])
     await calibrationReq('?from=2026-03-01&to=2026-03-10')
     const feel = (buildSleepFeelCalibration.mock.calls[0][0] as { feelByDate: Map<string, unknown> }).feelByDate
     expect(feel.get('2026-03-02')).toBe(4)
     expect(feel.get('2026-03-03')).toBeNull()
+  })
+
+  it('does not carry an untouched feel through at all (TN-57)', async () => {
+    listDayCheckins.mockResolvedValue([{ logDate: '2026-03-02', sleepQualityFeel: 4, sleepQualityFeelTouched: false }])
+    await calibrationReq('?from=2026-03-01&to=2026-03-10')
+    const feel = (buildSleepFeelCalibration.mock.calls[0][0] as { feelByDate: Map<string, unknown> }).feelByDate
+    // Present as a key, null as a value — the same distinction the scores map draws above.
+    expect(feel.has('2026-03-02')).toBe(true)
+    expect(feel.get('2026-03-02')).toBeNull()
   })
 
   it('reports a failure as a fault and answers 500', async () => {

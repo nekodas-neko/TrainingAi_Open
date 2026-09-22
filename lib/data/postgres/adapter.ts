@@ -36,6 +36,7 @@ import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
 import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
 import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
@@ -4738,9 +4739,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             hydration:         num(p.hydration),
             lateHeavyMeal:     num(p.lateHeavyMeal),
             wakeMood:          num(p.wakeMood),
-            perceivedRecovery: num(p.perceivedRecovery),
+            // TN-57, mirroring the web route — including its ORDER. This runs after the Q-465
+            // guard above, which here rejects per-item with no retry: nulling first would turn the
+            // owner's daily untouched check-in into a poison pill that never reaches the server.
+            ...answeredMorningScales({
+              perceivedRecovery: num(p.perceivedRecovery),
+              sleepQualityFeel:  num(p.sleepQualityFeel),
+              perceivedRecoveryTouched: extrasCheck.data.perceivedRecoveryTouched ?? false,
+              sleepQualityFeelTouched:  extrasCheck.data.sleepQualityFeelTouched ?? false,
+            }),
             motivation:        num(p.motivation),
-            sleepQualityFeel:  num(p.sleepQualityFeel),
             restingSoreness:   num(p.restingSoreness),
             illnessContext:            extrasCheck.data.illnessContext ?? null,
             perceivedRecoveryTouched:  extrasCheck.data.perceivedRecoveryTouched ?? false,
