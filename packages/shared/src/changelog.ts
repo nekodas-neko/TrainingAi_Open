@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.5",
+    version: "1.465.6",
     date: "2026-09-22",
     changes: [
       "Good, warning and bad now look the same everywhere. Your score colours and your recovery colours were two different sets \u2014 the green on a readiness band and the green on a muscle-recovery bar were visibly different colours in dark mode, not two shades of one. They all follow the theme now, so they also stay correct if the palette ever changes.",
+    ],
+  },
+  {
+    version: "1.465.5",
+    date: "2026-09-22",
+    changes: [
+      "Training phases are no longer coloured like warnings. The AI periodization card painted Realise \u2014 your peak output phase \u2014 in the same red the app uses for something going wrong, and painted Deload green while the home screen calls a deload recommendation amber or red. A phase is a category, not a verdict, so the five now use a cool range and green, amber and red are kept for telling you how something is going. The home deload banner also had a third shade of amber of its own; it uses the shared one now.",
     ],
   },
   {

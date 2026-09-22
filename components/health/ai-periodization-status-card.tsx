@@ -33,12 +33,22 @@ interface SessionOverview {
   lastTrainedDaysAgo: number | null;
 }
 
+// RV-100. A phase is a CATEGORY, not a state, and these were painted in the state language:
+// `realisation` — the peak-output phase — was `text-red-500`, the app's failure colour, and
+// `deload` was `text-green-500` while the Home banner paints a deload RECOMMENDATION amber or red.
+// Both are live: the active program is `ai_dynamic` and production carries 2 sessions in each of
+// those two phases right now.
+//
+// **Not `SESSION_PALETTE`, which is what the entry suggested.** That palette is indexed by session
+// POSITION and contains green and red itself, so borrowing it would re-randomise the same
+// collision rather than end it. This is a cool ramp instead: green, amber and red stay reserved
+// for state, and `baseline` stays neutral because "no phase yet" is genuinely the absence of one.
 const PHASE_COLORS: Record<string, string> = {
   baseline: "text-muted-foreground",
   accumulation: "text-blue-500",
-  intensification: "text-orange-500",
-  realisation: "text-red-500",
-  deload: "text-green-500",
+  intensification: "text-indigo-500",
+  realisation: "text-purple-500",
+  deload: "text-cyan-500",
 };
 
 const PHASE_LABELS: Record<string, string> = {
