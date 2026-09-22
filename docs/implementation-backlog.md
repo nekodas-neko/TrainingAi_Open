@@ -660,26 +660,6 @@ nothing structured saying why — and a human decides.
   spells the `'short'` bag by hand. It takes a timestamp rather than a date string, so it needs a
   `toAestDay` first; admin surfaces are timezone-exempt per CLAUDE.md, so this is optional.
 
-### [app-shell] RV-98 — opacity-modified text falls below AA, and the contrast check cannot see it
-
-- **Lane:** B — the call sites, plus extending `scripts/check-contrast.js`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- `scripts/check-contrast.js:149-160` validates ten **bare token pairs** and has no opacity handling,
-  so `text-muted-foreground/60` and below are entirely unguarded. Measured over `--card`:
-  `/70` 4.64:1 (passes, 17 sites) · **`/60` 3.73:1 (26 sites)** · **`/50` 2.97:1 (6)** ·
-  **`/40` 2.34:1 (8)** · **`/30` 1.83:1 (7)**. AA is 4.5:1 for body text.
-- **The one that carries meaning:** `components/calendar-widget.tsx:187` renders the literal word
-  "rest" at **`text-[7px]` with `/50` = 2.97:1** — and that label is the *only* marker distinguishing
-  a past rest day from a past untracked day in the month grid. At low brightness the calendar reads
-  as if nothing was logged.
-- **Fix:** raise the floor to `/70` for text; use full-opacity `muted-foreground` (8.36:1) for the
-  calendar marker. Then extend the check to parse `text-<token>/<n>` and composite before comparing,
-  with today's offenders as shrink-only `GRANDFATHERED` rows — the script's existing structure
-  already supports that.
-- **Not established:** each site's background was assumed to be `--card`; some sit on `--background`
-  (±0.05) or `--muted` (slightly worse). Icon-only uses were not checked against the 3:1 UI floor,
-  where `/60` and `/70` pass.
-
 ### [platform][app-shell] RV-99 — good/warning/bad exists as two parallel palettes, and only one can follow the theme
 
 - **Lane:** A — `packages/shared/src/health/score-band.ts` first. **Added:** 2026-09-21 ·

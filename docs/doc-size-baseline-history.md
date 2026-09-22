@@ -15413,7 +15413,7 @@ attribute itself in the first place. `check-doc-links` (818 files) and `check-in
 (1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
 other, since a citation whose link *text* is also a path passes the first and fails the second.
 
-## 2026-09-22 (second) — `docs/implementation-backlog.md` → 26353
+## 2026-09-22 (second) — `docs/implementation-backlog.md` → 26333 (after merging concurrent PRs)
 
 +27 to record four owner decisions and lift three gates, which is the cheapest possible use of these
 lines: each one was answered in a chat that would otherwise end with the session, and LA-122 exists
@@ -15426,3 +15426,15 @@ the decision reads as arbitrary and gets re-proposed. And item 2a states why the
 **not** a `Batch:` field: that field means one PR, and one PR would bundle three code changes with an
 owner-fired production data write, which the standing rules forbid batching. The shared thing is the
 recompute run, not the diff — a distinction someone would otherwise "tidy up" into a field.
+## 2026-09-22 — RV-98 (`fix/rv98-opacity-contrast`)
+
+`docs/implementation-backlog.md` → **26306**: RV-98 left the queue.
+
+`projectOverview.md` → **12382**: twelve lines for the sweep, **minus four duplicate header lines
+that were already on `main`**. Current Status opened with three stacked `**Version:**` lines
+(v1.465.2, v1.465.1, v1.465.0) and carried a stray `**Version:** v1.464.8` + `**Last updated:**`
+pair buried mid-section. They are conflict-resolution residue, and the recipe in this lane's baton
+is how they got there: *"keep BOTH Current Status paragraphs"* is right about the paragraphs and
+wrong if it also keeps the header above them. The baton now says to fix the version line
+explicitly. This is the file every session reads first to orient, so three contradictory version
+numbers at the top of it is worse than a stale one.

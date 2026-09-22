@@ -208,7 +208,7 @@ export function ChoiceList({ args, onChoose, disabled }: ChoiceListProps) {
             "flex w-full items-center justify-center gap-2 px-3.5 min-h-[48px] border-t border-border/40",
             "text-sm font-semibold transition-colors",
             picked.size === 0
-              ? "text-muted-foreground/50"
+              ? "text-muted-foreground/70"
               : "text-[var(--accent-purple)] active:bg-muted/40",
           )}
         >
