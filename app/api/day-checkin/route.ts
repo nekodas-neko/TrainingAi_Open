@@ -89,6 +89,7 @@ export async function POST(req: Request) {
     illnessContext: b.illnessContext ?? null,
     perceivedRecoveryTouched: b.perceivedRecoveryTouched ?? false,
     sleepQualityFeelTouched: b.sleepQualityFeelTouched ?? false,
+    vsYesterday: b.vsYesterday ?? null,
     soreMuscles: b.soreMuscles,
     journal: b.journal ?? null,
   })

@@ -189,6 +189,9 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
           wakeMood: null, perceivedRecovery: null, motivation: null,
           sleepQualityFeel: null, restingSoreness: null,
           illnessContext: null, perceivedRecoveryTouched: false, sleepQualityFeelTouched: false,
+          // The comparative question (TN-58) is asked on the MORNING sheet. This writes the evening
+          // row, a different (log_date, phase) key, so a null here cannot reach a morning answer.
+          vsYesterday: null,
           updatedAt: new Date().toISOString(),
           deletedAt: null,
           syncStatus: 'pending',

@@ -562,6 +562,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     illnessContext:            (r.illnessContext as LocalDayCheckin['illnessContext']) ?? null,
     perceivedRecoveryTouched:  Boolean(r.perceivedRecoveryTouched),
     sleepQualityFeelTouched:   Boolean(r.sleepQualityFeelTouched),
+    vsYesterday:       (r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday) ?? null,
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
     updatedAt:         toIso(r.updatedAt),
