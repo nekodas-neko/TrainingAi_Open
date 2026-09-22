@@ -2147,3 +2147,20 @@ and close on the same frame stays open. BF-27 and BF-34 left the queue with it. 
 worth remembering:** a closing surface's `history.back()` is asynchronous, so a per-instance in-flight
 flag let the pop land on the newly-opened surface, which read it as a genuine back gesture. It is a
 module-level counter in `lib/hooks/sheet-back-stack.ts` now.
+
+### [devices] ⚠️ The Colmi ring's decode moved to the server and has not run on the device (PS-21 Stage A, 2026-09-03)
+
+v1.436.4 posts the ring's raw frames and decodes them server-side. Proved equivalent to the old
+client decode over a real 31-frame sync — 209 received, 167 accepted, **166 stored rows identical
+field for field** between the two paths — but against the local dev database, over frames replayed
+from the archive rather than a ring.
+- **What has not run:** an actual sync from the phone. The pairing card's counts now come from
+  response fields (`received`, `decodedBy`) that did not exist before, so a WebView holding an older
+  bundle than the deploy would show zeros while the rows still land. `decodedBy` says which side read
+  the bytes, which is how to tell those apart rather than guessing from counts.
+- **The check:** one Sync on the S25. Readings stored > 0, and `decodedBy` reads `server`.
+- **RESOLVED 2026-09-22 — the device path has run, in production.** `colmi_raw_frames` holds **200
+  rows carrying `seq > 0` (max 157)**, and `seq` is written only by the route that shipped with
+  migration 263 alongside the server decode — an older WebView bundle could not produce it. Readings
+  landed with those frames. The `decodedBy` field was the tell this row was written around; the
+  ordering column turned out to be the stronger one, because it cannot be faked by a stale client.

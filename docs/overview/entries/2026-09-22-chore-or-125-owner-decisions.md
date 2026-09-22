@@ -26,11 +26,25 @@ also how six accumulated. The fix is a list an owner will actually see.
 exclusion list should stop naming them. The owner took the item's own argument: a rule living in a
 prompt rather than in the file every agent reads goes stale unnoticed.
 
-**LA-121's gate is released and the answer is recorded on the entry** — `computeBlendedScore` goes
-with the four dead arms. Two constraints carried forward: the **fifth** site (`:628`) is a live gate
-with a dead disjunct and needs separate treatment, and `temp-penalty-suspension.test.ts` is **not**
-deleted with the ladder, because it is the only record of what the ladder did and "superseded" is a
-decision that can be revisited where a destroyed record cannot.
+**LA-121 was answered TWICE on the same day, by two sessions, and the other one's answer is
+better.** Both reached `tempZ` stands. Mine argued from reversibility — the ladder has not run since
+2026-07-07, so deleting it changes nothing and it stays in git. The version already on `main` argues
+from a measurement: **TN-6 has the temperature baseline 0.36 °C too low**, so porting a *sharper*
+penalty on top of a wrong baseline amplifies the error rather than adding signal. That is a reason;
+mine was an absence of risk. On the merge, `main`'s text was taken whole and mine discarded, and the
+caveat I had added — do not delete `temp-penalty-suspension.test.ts` with the ladder — turned out to
+be redundant: the entry already carried it as its own last bullet.
+
+**That other session also filed something I would have missed: item 2a.** Four entries each rewrite
+stored readiness days (TN-60, TN-6, BF-13, LA-121), and shipping them separately would visibly shift
+the owner's history four times with no way to attribute what he was looking at. The recompute fires
+**once**, after the last of them — and deliberately **not** as a `Batch:`, because that means one PR
+and one PR here would bundle three code changes with an owner-fired production data write.
+
+**Worth recording rather than smoothing over:** two sessions put the same question to the owner on
+the same day and got the same answer, which is benign here only because the answers agreed. Both
+were reading LA-122, which is the ledger that exists so questions reach a human — it has no way to
+show that one is already in flight.
 
 **Q-29's ball came back to us**, which is the right outcome. Declining to answer a one-line summary
 of an irreversible change is not indecision. `OR-126` is filed for the brief: what is dropped, what
