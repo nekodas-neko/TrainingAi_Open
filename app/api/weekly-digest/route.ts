@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { degradedFromFacts } from '@/lib/ai/degrade'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, todayMidnightUtc, todayDayOfWeek } from '@trainingai/shared/date-utils'
@@ -281,14 +282,21 @@ export async function POST(req: Request) {
   try {
     ;({ text } = await loggedGenerateText(
       { section: 'weekly-digest', userId, fingerprint: { isoWeekKey, contextHash } },
-      () => generateText({
+      signal => generateText({
         model: aiModel(),
         prompt: `You are a personal training coach. Write a concise recap of the user's last completed training week (Monday to Sunday, the week that just ended). 4–6 bullet points, max 180 words total. Cover training load, any PRs, recovery (HRV/readiness/sleep), and one specific recommendation for the week ahead. Be specific, encouraging, and actionable. Use the data below — quote its numbers, never invent or recompute any.\n\n${PROSE_GUARDS}\n\n${context}`,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     ))
   } catch (err) {
     console.error('[weekly-digest] generateText failed:', err)
+    // RV-69. Not cached — see the daily-digest twin: storing this would stand in for the real
+    // digest all week, since the cache is keyed on the week and the context hash, both unchanged.
+    const degraded = degradedFromFacts('here is the week as recorded', context)
+    if (degraded) {
+      return NextResponse.json({ digest: degraded, weekStart: isoWeekKey, generatedAt: null, cached: false, metrics, degraded: true })
+    }
     return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
   }
 

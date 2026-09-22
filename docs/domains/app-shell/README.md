@@ -47,7 +47,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   the entry, and is now gone from both. **A screen that scrolls its own container gets no restoration
   from being inside the shell — check the call, not the layout.** `/health/day`'s scroller had no
   bottom padding at all. Both owe **one** device pass; RV-37 has still never been observed.
-- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/entries/2026-09-19-fix-bf100-touch-cancels-pending-restore.md)
+- [`2026-09-19-fix-bf100-touch-cancels-pending-restore`](../../overview/history-2026-09-22-folded-1.md#2026-09-19-fix-bf100-touch-cancels-pending-restore)
   — **BF-100's `touchstart` cause CONFIRMED and fixed, 2026-09-19.** Supersedes the inconclusive
   probe below. Instrumenting a live `/more` back-navigation showed the takeover listeners attach
   **182 ms before** the restore lands, and seeding an unreachable target — which widens that window
@@ -97,6 +97,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   handle is dead, not defaulted.** `tab-shell.tsx` carried a comment asserting the opposite
   (*"Android back exits the app like a native tab app"*), which is how it survived; the fix corrects
   it. `backActionForPath` (`components/shell/tabs.ts`) is the one place that decides. Device pass owed.
+- [`docs/reviews/2026-09-21-sweep-52-what-the-owner-sees.md`](../../reviews/2026-09-21-sweep-52-what-the-owner-sees.md) — **the visual sweep, 2026-09-21** (RV-84…RV-102), ranked by where the owner actually is (resume telemetry: Home 22 · Nutrition 14 · Health 11 · More 7 · Workout 2). **Systemic:** `cachedFetch` cannot reject — its network section is wrapped in `try/catch/finally` — so every `.catch()` chained onto it is dead code at **16 sites**, and the error states built on them are unreachable (RV-84). **Home carries three failure-vanish bugs:** the score row disappears with no skeleton or message (RV-85, whose helper `fetchWithRetry` retries 3× then gives up *silently*, landing on the blank widget its own header says it exists to prevent), a failed streak fetch paints a confident **0-day streak** (RV-86), and Profile invents *Level 1 · Novice · 0 XP* (RV-87). **One stored 1RM renders four numbers** — 92.5 / 92.25 / ~92 / 92.3 — with four sites calling the shared `displayOneRm` for the bodyweight branch and hand-rolling the weighted one (RV-89); `mround125` doing display duty already shipped BF-127. **A real CSS bug:** `truncate` on a flex container clips the name with no ellipsis *and* clips the green done-tick out of existence (RV-92). **A number painted the wrong band's colour:** the ACWR value is hard-coded to the `high` amber while its label says "Optimal" (RV-97). Layout findings are measured against production content (130 of 337 food items exceed the 22-char budget; the owner's lower-back injury is live).
 - [`docs/reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md`](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
 - [`docs/reviews/2026-09-06-deload-confirm-eviction-gap.md`](../../reviews/2026-09-06-deload-confirm-eviction-gap.md) — **the owner's stale-screen report traced to cause, 2026-09-06** (RV-49 — the Home deload confirm calls `invalidatePrescriptionChanged()` id-less, which the group's own conditional turns into a no-op for every `workout-card:<id>`, and `next-session` is not in the group; RV-50 — three raw seed-only `readCacheSync('workout-card:<id>')` reads that can never revalidate). The nutrition add surface swept in the same pass is **clean at source** — all nine writers close the `onLogged` loop.
 - [`2026-09-11-fix-ps35b-boot-and-weather`](../../overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather)
@@ -452,6 +453,19 @@ Live at the time of writing (2026-07-30):
   screens; NOT device-verified).
 
 ## Gotchas specific to this domain
+
+- **`{value && <Row …>}` is a failure-vanish whenever the route has no null-payload path (RV-85).**
+  Home gated its whole score row — plus the illness advisory and the early-deload banner — on
+  `readiness`, and `/api/readiness-score` answers a payload or an error status, never a null
+  payload. So an absent value was always a failure, and the screen rendered **nothing**: no row, no
+  skeleton (`showHomeSkeleton` requires `refreshing`) and no message, on the owner's most-used
+  screen. Before gating a row on a fetched value, check whether its route can legitimately answer
+  "nothing" — if it cannot, the falsy branch needs a message, not an empty slot.
+- **`fetchWithRetry` retries three times and then gives up; pass `opts.onExhausted` or it gives up
+  silently.** The helper's own header says it exists to stop a blank widget, and without that
+  channel it produced one for every persistent failure. **Before it fires, an absent value means
+  in-flight; after, it means failed** — so a message driven by anything earlier would sit under a
+  request that was about to succeed.
 
 - **A dead WebView render process is FATAL by default, not silent (BF-80).** Capacitor's
   `BridgeWebViewClient` already forwards `onRenderProcessGone` to its `WebViewListener`s, and

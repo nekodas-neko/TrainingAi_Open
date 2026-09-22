@@ -8,7 +8,7 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL, TTL_LONG } from "@trainingai/shared/cache-ttl";
-import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { todayInTz, shiftDateStr, formatDateDisplay } from "@trainingai/shared/date-utils";
 import { DayReadThrough } from "@/components/health/day-detail/day-read-through";
 import { StressDayChart } from "@/components/body-battery/stress-day-chart";
 import type { DayLogResult } from "@/app/api/day-log/route";
@@ -181,10 +181,10 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
   const closeDeleteSession = useCallback(() => setDeleteSession(null), [setDeleteSession]);
   const closeDeleteActivity = useCallback(() => setDeleteActivity(null), [setDeleteActivity]);
 
-  const label = useMemo(() => {
-    const d = new Date(`${selectedDate}T12:00:00Z`);
-    return d.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
-  }, [selectedDate]);
+  // Sibling of the two RV-91 sites: the same long-form date, hand-rolled. The noon-UTC anchor
+  // rendered in UTC was correct — it is what stopped the day shifting — and `formatDateDisplay`
+  // reaches the same string by constructing component-wise, which is the Q-130 fix.
+  const label = useMemo(() => formatDateDisplay(selectedDate, "long"), [selectedDate]);
 
   const s = data?.scores;
 

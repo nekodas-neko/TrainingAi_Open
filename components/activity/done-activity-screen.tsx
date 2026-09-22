@@ -20,6 +20,8 @@ import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
+import { formatPace } from '@trainingai/shared/health/vdot'
+import { formatMinutes } from '@trainingai/shared/format/units'
 
 const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
@@ -326,7 +328,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
 
       <div className="mb-4 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-muted/60 border border-border px-2 py-3">
-          <p className="text-lg font-bold tabular-nums">{draftSummary.durationMin.toFixed(1)}</p>
+          <p className="text-lg font-bold tabular-nums">{formatMinutes(draftSummary.durationMin, { unit: false })}</p>
           <p className="text-[10px] text-muted-foreground">min</p>
         </div>
         {draftSummary.distanceKm != null && (
@@ -422,7 +424,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
           {draftSummary.splits.map(s => (
             <div key={s.km} className="flex justify-between rounded-lg bg-muted/60 border border-border px-3 py-1.5 text-sm">
               <span>Km {s.km}</span>
-              <span className="tabular-nums">{Math.floor(s.paceSec / 60)}:{String(Math.round(s.paceSec % 60)).padStart(2, '0')} /km</span>
+              <span className="tabular-nums">{formatPace(s.paceSec)}</span>
             </div>
           ))}
         </div>

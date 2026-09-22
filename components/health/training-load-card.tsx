@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { InfoIcon, CheckCircle2Icon, TriangleAlertIcon, CircleAlertIcon, MoonIcon, ChevronDownIcon } from 'lucide-react'
 import { accentCardStyle } from '@trainingai/shared/utils'
+import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr'
 import { TrainingStressLine } from '@/components/health/training-stress-line'
 import type { TrainingLoadResponse } from '@/app/api/training-load/route'
 
@@ -49,8 +50,18 @@ function MonotonyMeter({ monotony, strain }: { monotony: number; strain: number 
  */
 export function TrainingLoadCard({ trainingLoad }: { trainingLoad: TrainingLoadResponse | null }) {
   const [open, setOpen] = useState(false)
-  const insufficient = !trainingLoad || trainingLoad.interpretation === 'insufficient_data'
-  const baselining = trainingLoad?.interpretation === 'baselining'
+  const interpretation = trainingLoad?.interpretation
+  const insufficient = !trainingLoad || interpretation === 'insufficient_data'
+  const baselining = interpretation === 'baselining'
+  // RV-97 asks whether `interpretation` can carry a key outside `AcwrBand['key']`: it can. The
+  // route's union has SIX members and `acwrBandByKey` takes four, so the entry's one-line fix does
+  // not compile — the two guards above are booleans, not type predicates, and cannot narrow the
+  // property for the branch below. Narrowing it here is what makes the lookup total; the `null`
+  // arm is unreachable through those guards, and inherits the text colour rather than inventing
+  // one if it ever stops being.
+  const bandKey = interpretation && interpretation !== 'insufficient_data' && interpretation !== 'baselining'
+    ? interpretation
+    : null
 
   return (
     <div className="rounded-2xl p-4" style={accentCardStyle('#f59e0b')}>
@@ -68,7 +79,16 @@ export function TrainingLoadCard({ trainingLoad }: { trainingLoad: TrainingLoadR
             <p className="text-base font-semibold text-foreground">Baselining new routine</p>
           ) : (
             <div className="mt-0.5 flex items-end gap-3">
-              <p className="text-3xl font-bold tabular-nums" style={{ color: '#f59e0b' }}>{trainingLoad!.acwr!.toFixed(2)}</p>
+              {/* The literal here was `#f59e0b` — exactly what `acwrBand()` reserves for `high`,
+                  so an ACWR of 1.05 rendered in warning amber beside its own "✓ Optimal zone"
+                  label and above body copy calling 0.8–1.3 the green zone. The card's accent stays
+                  amber; only the value takes the band. */}
+              <p
+                className="text-3xl font-bold tabular-nums"
+                style={{ color: bandKey ? acwrBandByKey(bandKey).color : undefined }}
+              >
+                {trainingLoad!.acwr!.toFixed(2)}
+              </p>
               <p className="mb-1 flex items-center gap-1 text-sm text-muted-foreground">
                 {trainingLoad!.interpretation === 'optimal'   && (<><CheckCircle2Icon className="w-3.5 h-3.5" /> Optimal zone</>)}
                 {trainingLoad!.interpretation === 'high'      && (<><TriangleAlertIcon className="w-3.5 h-3.5" /> Slightly elevated</>)}

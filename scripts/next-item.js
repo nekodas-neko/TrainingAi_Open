@@ -14,6 +14,15 @@
 //   node scripts/next-item.js                 both lanes
 //   node scripts/next-item.js --lane A        one lane
 //   node scripts/next-item.js --all           do not truncate READY
+//   node scripts/next-item.js --sittings      owed device checks, grouped by domain
+//
+// `--sittings` answers a different question from the rest of the file: not *what can I start* but
+// *what could the owner clear in one pick-up of the phone*. A device check costs the owner's
+// attention and the device; CI costs neither, which is why the batching rule aggregates on what has
+// to be VERIFIED. This prints the grouping WITHOUT writing it down — CLAUDE.md forbids assigning
+// `Batch:` in a bulk pass, because a batch decided without re-reading the entry goes stale where a
+// generated view cannot. Domain tag is the proxy for screen: it is already on every heading, it is
+// mechanical, and no judgement gets frozen into the file.
 //
 // READY is work nobody has started. An entry that shipped and still owes an owner sign-off or a
 // device run states so with `- **Keep:**` and is listed under KEEP instead — see lib/keep.js for
@@ -41,6 +50,7 @@ const laneArg = (() => {
   return v ? v.toUpperCase() : null;
 })();
 const showAll = argv.includes('--all');
+const sittingsOnly = argv.includes('--sittings');
 const TOP_N = showAll ? Infinity : 10;
 
 const lines = fs.readFileSync(BACKLOG, 'utf8').split('\n');
@@ -94,7 +104,23 @@ for (const line of lines.slice(queueStart)) {
 
   // Entries not yet migrated off the prose marker. Treated as parked, and named as unmigrated so
   // the remaining ones stay visible instead of quietly reading as ready.
-  if (!current.legacyBlocked && line.includes('⛔')) {
+  //
+  // **The glyph alone is not the marker — `⛔ block…` is** (LA-49, narrowed 2026-09-22 by OR-122).
+  // The file's own protocol documents the marker as `⛔ blocked: <reason>`, so this is the file's
+  // convention rather than a new heuristic. Matching the bare glyph parked **28 entries of which
+  // ~7 meant blocked**; the other 21 use ⛔ as an emphasis glyph for a warning to whoever BUILDS the
+  // entry — *"⛔ Do not extend this to the conic-gradient rings"*, *"⛔ Do not re-litigate the
+  // missing e2e"* — which is the opposite of a reason not to build it. Measured 2026-09-01 at 34/7
+  // and unchanged three weeks later, because **LA-49, the entry that describes this, quotes the
+  // glyph and was parked by its own bug.** A detector whose false-positive rate is 75% teaches
+  // implementers to ignore the section it fills.
+  //
+  // ⚠ **This change is second on purpose.** LA-49's own caution is that narrowing the rule without
+  // triaging first trades a section nobody reads for a section an implementer starts from — two of
+  // the entries it exposes open with *"REFUTED"*. The triage shipped in the same PR: the genuinely
+  // blocked ones (TN-2, Q-49, Q-72, Q-85, Q-538, Q-252) carry a `Gate:`/`Needs:` now, and the
+  // refuted ones (BF-14, LA-57) carry a `Reference:`. Do not re-widen this without redoing that.
+  if (!current.legacyBlocked && /⛔[^\n]{0,40}block/i.test(line)) {
     current.legacyBlocked = line.replace(/^\s*[-*]?\s*/, '').slice(0, 90);
   }
 }
@@ -181,6 +207,40 @@ const fmt = (e) => {
   return `${e.id.padEnd(7)} ${(tags + title).slice(0, 100)}${unlaned}`;
 };
 
+// --- Sittings: what could be cleared in one pick-up of the phone? -----------------------------
+//
+// An entry owes a device check when it carries `Verify: device` or a `Keep:` whose residue names
+// the device. Both shapes are counted — BF-90 found eleven entries writing the same debt in both
+// places, so keying on either alone undercounts.
+if (sittingsOnly) {
+  const owed = entries.filter((e) => {
+    if (e.verify?.value === 'device') return true;
+    return /\bdevice\b|\bS25\b|\bAPK\b|on-device/i.test(e.keep?.text ?? '');
+  });
+  const groups = new Map();
+  for (const e of owed) {
+    const key = e.tags[0] ?? '(untagged)';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+  const batched = owed.filter((e) => e.batch).length;
+  console.log(`\nDEVICE CHECKS OWED (${owed.length}) — ${batched} already in a batch, ${owed.length - batched} loose`);
+  console.log('Grouped by primary domain tag. A group is a candidate sitting, not an assignment:');
+  console.log('per CLAUDE.md a `Batch:` is written when the entry is next touched, never in a sweep.\n');
+  [...groups.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .forEach(([tag, es]) => {
+      console.log(`  ${tag} (${es.length})`);
+      es.forEach((e) => {
+        const lane = e.lane ? `Lane ${e.lane}` : 'lane unstated';
+        console.log(`      ${e.id.padEnd(8)} ${lane.padEnd(14)}${e.batch ? `batch \`${e.batch}\`` : ''}`);
+      });
+    });
+  console.log('\n⚠ A batch cannot span lanes and never covers a migration or a sync-push change.');
+  console.log('');
+  process.exit(0);
+}
+
 console.log(`\nQueue: ${entries.length} entries${laneArg ? ` · lane ${laneArg}` : ''}\n`);
 
 const unlanedReady = ready.filter((e) => e.lane === null).length;
@@ -252,3 +312,4 @@ if (parked.length) {
   parked.forEach(({ e, reasons }) => console.log(`      ${fmt(e)}\n        ${reasons.join(' · ')}`));
 }
 console.log('');
+

@@ -351,8 +351,8 @@ export function PreWorkoutScreen({
                       className="w-full text-left hover:opacity-80 active:scale-[0.99] transition-all"
                       onClick={() => setStatsExercise(ex)}
                     >
-                      <p className="font-medium truncate flex items-center gap-2">
-                        {ex.name}
+                      <p className="flex items-center gap-2 min-w-0 font-medium">
+                        <span className="truncate">{ex.name}</span>
                         {doneToday && <CheckIcon className="h-4 w-4 text-green-500 flex-none" />}
                       </p>
                       {((ex.mainMuscles?.length ?? 0) + (ex.secondaryMuscles?.length ?? 0) > 0) && (
@@ -381,9 +381,11 @@ export function PreWorkoutScreen({
                             if (reps != null && weight != null) parts.push(`${reps} × ${weight}kg`);
                             else if (reps != null) parts.push(`${reps} reps`);
                             if (ex.estimated1rm != null) {
-                              parts.push(ex.exerciseType === "bodyweight"
-                                ? `${displayOneRm(ex.estimated1rm, "bodyweight").text}`
-                                : `est 1RM ~${Math.round(ex.estimated1rm)}kg`);
+                              // RV-89: the `~` and `Math.round` were not a deliberate approximation
+                              // signal, just the fourth hand-rolled rounding of one stored number —
+                              // this row read `~92kg` where the summary read `92.25 kg`.
+                              const label = ex.exerciseType === "bodyweight" ? "" : "est 1RM ";
+                              parts.push(`${label}${displayOneRm(ex.estimated1rm, ex.exerciseType).text}`);
                             }
                             return parts.join(" · ");
                           })()}

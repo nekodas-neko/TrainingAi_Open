@@ -23,7 +23,11 @@ import { STREAK_LOOKBACK_DAYS } from '@trainingai/shared/workout/streak-window'
  * observe while both numbers agree.
  */
 const ROOT = path.resolve(__dirname, '../..')
-const CONSUMER = 'app/session-select/session-select-content.tsx'
+// The loop moved out of `session-select-content.tsx` on 2026-09-22 (RV-86 needed eleven lines in a
+// file at its size baseline, so the walk was extracted rather than the comments shaved). That move
+// turned this file red, which is the behaviour to keep: a path named here is how the test notices
+// the consumer has gone somewhere it is no longer watching.
+const CONSUMER = 'app/session-select/compute-streak.ts'
 
 /** Comments quote the retired literal while explaining the fix, so a raw match would pass on prose. */
 const source = readFileSync(path.join(ROOT, CONSUMER), 'utf8')

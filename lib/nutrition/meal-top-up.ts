@@ -112,10 +112,11 @@ export async function scaleWithTopUp(
           missing: contentKey(...missing),
         },
       },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: TopUpSchema,
         maxRetries: 0,
+        abortSignal: signal,
         prompt: [
           'You are a practical sports nutritionist. A meal is short of its targets and cannot get there by serving more of what it already contains.',
           '',

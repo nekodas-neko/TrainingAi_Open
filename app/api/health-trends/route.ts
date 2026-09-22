@@ -9,6 +9,7 @@ import { restAdherencePct } from '@trainingai/shared/workout/rest-adherence'
 import { energyBalanceByDay, medianOf } from '@trainingai/shared/health/energy-balance'
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { sessionEffort, type SessionRpeSource } from '@trainingai/shared/workout/derive-session-rpe'
 import { isPlausibleSessionDuration } from '@trainingai/shared/health/workout-energy'
@@ -132,7 +133,11 @@ export async function GET(req: Request) {
     // Cloud (and frozen for the owner since the BLE re-key), which left this correlation empty.
     const readinessByDate = new Map(ouraDaily.map(d => [d.date, d.readinessScore ?? null]))
     for (const d of derivedDaily) if (d.readinessScore != null) readinessByDate.set(d.day, d.readinessScore)
+    // TN-57: `perceivedRecoveryTouched`, not just non-null. This is a user-facing correlation
+    // against a series with a standard deviation of 0.286 across two distinct values, none of them
+    // answered — a coefficient that cannot mean anything, presented as though it did.
     const paired = checkins
+      .map(c => ({ ...c, perceivedRecovery: answeredMorningScales(c).perceivedRecovery }))
       .filter(c => c.perceivedRecovery != null && readinessByDate.get(c.logDate) != null)
       .map(c => ({ x: readinessByDate.get(c.logDate)!, y: c.perceivedRecovery!, d: dayIndex(c.logDate) }))
     const points = paired.map(({ x, y }) => ({ x, y }))

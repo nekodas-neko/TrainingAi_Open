@@ -5,7 +5,7 @@ import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getActivityIcon } from '@trainingai/shared/constants/activity-icons'
 import dynamic from 'next/dynamic'
-import { formatTime12h, startOfWeekInTz } from '@trainingai/shared/date-utils'
+import { formatDateDisplay, formatTime12h, startOfWeekInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import type { LocalActivityLog } from '@/lib/local-store/types'
 import type { ActivityLog, ActivityType } from '@trainingai/shared/types'
@@ -139,7 +139,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{formatActivityTitle(log.title)}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {log.date}
+                      {formatDateDisplay(log.date)}
                       {log.startTime ? ` · ${formatTime12h(log.startTime)}` : ''}
                       {log.durationMin ? ` · ${Math.round(log.durationMin)} min` : ''}
                     </p>

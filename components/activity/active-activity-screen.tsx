@@ -12,6 +12,7 @@ import { CadenceReadout } from './cadence-readout'
 import { HrReadout } from './hr-readout'
 import { ActivitySecondaryMetrics } from './activity-secondary-metrics'
 import { computeElevationChange } from '@/lib/activity/activity-metrics'
+import { formatPace } from '@trainingai/shared/health/vdot'
 
 const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
@@ -60,8 +61,8 @@ export function ActiveActivityScreen() {
   )
 
   const paceLabel = currentPaceSecPerKm
-    ? `${Math.floor(currentPaceSecPerKm / 60)}:${String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')} /km`
-    : '--:-- /km'
+    ? formatPace(currentPaceSecPerKm)
+    : '--:--/km'
 
   return (
     <div className="flex h-full flex-col">

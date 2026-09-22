@@ -132,10 +132,11 @@ export async function POST(req: Request) {
           meal: contentKey(input.currentMeal?.name),
         },
       },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: MealSchema,
         maxRetries: 0,
+        abortSignal: signal,
         prompt: [
           rewriting
             ? 'You are a practical sports nutritionist. REWRITE the meal below, following the change the user asked for and keeping everything else about it as close as you can.'

@@ -12,6 +12,7 @@ import {
   type ChartOptions,
 } from 'chart.js'
 import { resolveColor } from '@trainingai/shared/chart-colors'
+import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip)
 
@@ -23,10 +24,6 @@ interface Split {
 interface Props {
   splits: Split[]
   bestEfforts?: Record<string, number>
-}
-
-function formatPace(secPerKm: number): string {
-  return `${Math.floor(secPerKm / 60)}:${String(Math.round(secPerKm % 60)).padStart(2, '0')}`
 }
 
 const BEST_EFFORT_LABELS: Record<string, string> = { '1km': 'Fastest 1km', '5km': 'Fastest 5km' }
@@ -59,7 +56,7 @@ export function PaceBarChart({ splits, bestEfforts }: Props) {
           color: resolveColor('var(--muted-foreground)'),
           font: { size: 9 },
           maxTicksLimit: 4,
-          callback: v => formatPace(Number(v)),
+          callback: v => formatPaceValue(Number(v)),
         },
         grid: { color: resolveColor('var(--border)') },
       },
@@ -78,7 +75,7 @@ export function PaceBarChart({ splits, bestEfforts }: Props) {
         <div className="grid grid-cols-2 gap-2 text-center">
           {efforts.map(([key, paceSec]) => (
             <div key={key} className="rounded-xl bg-muted px-2 py-2">
-              <p className="text-sm font-bold tabular-nums">{formatPace(paceSec)} /km</p>
+              <p className="text-sm font-bold tabular-nums">{formatPace(paceSec)}</p>
               <p className="text-[10px] text-muted-foreground">{BEST_EFFORT_LABELS[key] ?? key}</p>
             </div>
           ))}

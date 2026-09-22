@@ -6,6 +6,86 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.2",
+    date: "2026-09-22",
+    changes: [
+      "Your weight now reads the same everywhere. The same weigh-in showed as 82.45 kg on the home card, 82.5 kg in the day detail and 82.45kg \u2014 no space \u2014 in the week sheet, because each screen decided its own rounding and spacing. One place decides both now, and run duration got the same treatment: a 42.4-minute run no longer reads 42.4 on the finish screen and 42 when you reopen it.",
+      "Fixed a pace that could print as 5:60/km. Anything that rounded up to exactly the next minute showed sixty seconds instead of rolling over \u2014 so a 5:59.6 pace read 5:60/km rather than 6:00/km. It affected every pace on every screen.",
+    ],
+  },
+  {
+    version: "1.465.1",
+    date: "2026-09-22",
+    changes: [
+      "Home now tells you when your scores failed to load instead of just leaving a gap. The whole row \u2014 readiness, sleep, the illness note and the deload banner \u2014 disappeared if the request failed, with no spinner and no message, so it looked like a day with nothing to show. It now says \u201cScores didn't load \u2014 pull to refresh\u201d, but only after it has quietly retried three times, so a slow morning still just looks slow.",
+    ],
+  },
+  {
+    version: "1.465.0",
+    date: "2026-09-22",
+    changes: [
+      "The morning check-in now asks whether today is better, about the same, or worse than yesterday \u2014 three taps at the top of the sheet. The 1-to-5 recovery scale below it has produced exactly two different numbers in 81 days and you have never once moved the slider, which is the normal fate of an absolute self-rating: comparing two days is a much easier question to answer than scoring one. Nothing is pre-selected and skipping it stores nothing, on purpose. The old scale is unchanged and still there.",
+    ],
+  },
+  {
+    version: "1.464.9",
+    date: "2026-09-22",
+    changes: [
+      "The Training Load number is now the colour of its own zone. It was painted amber \u2014 the warning colour \u2014 no matter what the reading was, so a perfectly normal 1.05 showed in amber beside the words \"Optimal zone\" and above a line saying 0.8 to 1.3 is the green zone. The card disagreed with itself twice in one glance. Green in the optimal zone, amber when elevated, red when high, grey when undertraining.",
+    ],
+  },
+  {
+    version: "1.464.8",
+    date: "2026-09-22",
+    changes: [
+      "Groundwork for a better morning question. The recovery slider asks you to rate today on its own, and in 81 days it has only ever produced two different answers \u2014 which makes it useless for working out what actually affects how you feel. The app can now store a simpler one: better, the same, or worse than yesterday. Nothing asks it yet; the question itself is the next change. Skipping it stores nothing at all rather than a middle value, which is the point.",
+    ],
+  },
+  {
+    version: "1.464.7",
+    date: "2026-09-22",
+    changes: [
+      "Your morning recovery and sleep-feel sliders no longer count as answers unless you actually move one. The sheet starts both at the middle and remembers whether you touched them \u2014 and in 97 check-ins you have moved recovery zero times, so every reading of it was the app's own starting position, not something you said. The calibration reports, the readiness-versus-recovery chart, the day review and the AI's session prescription all now ignore a slider you left alone. Expect those charts to go empty rather than change: three answers that are real are worth more than 78 that are not. Nothing already saved was altered.",
+    ],
+  },
+  {
+    version: "1.464.6",
+    date: "2026-09-22",
+    changes: [
+      "Five screens stop cutting off the wrong thing. The exercise list clipped long names flat with no ellipsis and lost the green done tick with them, so an exercise you had already logged looked unlogged. Mid-set, the injury chip took half the header and squeezed the exercise title to about fifteen characters. The food diary cut names at twenty-two characters, which is shorter than 130 of your items. The weekly Volume tile dropped its \"kg\" onto a second line every week you trained. And the workout HR summary cut the \"3 of 4 sets\" caveat off the longest-named exercises \u2014 the ones where it mattered most.",
+    ],
+  },
+  {
+    version: "1.464.5",
+    date: "2026-09-22",
+    changes: [
+      "Activity dates now read as dates. The activity history row and the activity detail sheet printed the raw \"2026-09-15\", on the line directly above a properly formatted time. They now read \"15 Sept\" and \"Tuesday 15 September\", the same way every other screen writes a date. The day detail was already writing the long form and now uses the same shared formatter to do it.",
+      "One calorie label on the home timeline said \"Cal\" where the other 155 places in the app say \"kcal\". Same unit, same number \u2014 it now says kcal too.",
+    ],
+  },
+  {
+    version: "1.464.4",
+    date: "2026-09-22",
+    changes: [
+      "One estimated 1RM now shows the same number everywhere. A lift stored at 92.25 kg read as 92.5 on the ready screen, ~92 in the exercise list, 92.3 in the stats sheet and on the strength trend, and 92.25 in the exercise summary \u2014 four numbers for one lift, in one session. The ready screen was the worst of them: it was rounding to the nearest pair of plates, which is the right thing to do for a weight you are about to load and the wrong thing for a number you are only reading.",
+    ],
+  },
+  {
+    version: "1.464.3",
+    date: "2026-09-22",
+    changes: [
+      "When the AI cannot write a summary, you now get the figures instead of an error. Your day review, weekly recap, health insight and workout recap each work out every number themselves before asking the AI to write the sentences about them \u2014 and all four used to throw that away and show an error if the AI call failed. They now show what was recorded, and say plainly that it is not the written summary. The fallback is never saved, so the next attempt still gets to replace it.",
+      "AI requests now give up after 30 seconds instead of waiting indefinitely. Nothing enforced a time limit anywhere, and a single retry could double however long the first attempt took. The limit covers the retry too, so the whole request is bounded \u2014 and at 30 seconds it is roughly six times the slowest AI call this app has ever recorded.",
+    ],
+  },
+  {
+    version: "1.464.2",
+    date: "2026-09-22",
+    changes: [
+      "A number that failed to load now shows as \u2014 instead of as a zero. If the streak request failed, Home read \"0 days\" and \"0 sessions this week\" \u2014 the same thing it shows when you genuinely have not trained. Profile was worse: a failed load read as Level 1, Novice, 0 XP, with a lifetime of zeros including your best-ever streak. Both now leave the figure blank and say so, so a missing reading can no longer be mistaken for a bad one.",
+    ],
+  },
+  {
     version: "1.464.1",
     date: "2026-09-21",
     changes: [

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { BatteryCharging, Copy, Check, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 /**
  * Admin R&D probe for the ring's battery telemetry (0x61 debug_data). Answers the owner's three
@@ -80,8 +81,7 @@ export function RingBatteryConsole() {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function fmtDuration(sec: number | null): string {
   if (sec == null) return '—'
-  const m = Math.round(sec / 60)
-  return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m` : `${m}m`
+  return formatHoursMinutes(sec / 60)
 }
 
 function formatBattery(d: any): string {

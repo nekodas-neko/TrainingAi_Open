@@ -52,9 +52,15 @@ export function WeeklyRecapBanner() {
     setIsLoading(true);
     fetch("/api/weekly-digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
       .then(res => { if (!res.ok) throw new Error("failed"); return res.json(); })
-      .then((data: { digest: string; weekStart: string }) => {
+      .then((data: { digest: string; weekStart: string; degraded?: boolean }) => {
         setContent(data.digest);
-        localStorage.setItem(cacheKeyRef.current, JSON.stringify({ content: data.digest, weekStart: data.weekStart }));
+        // RV-69: `degraded` is a deterministic readout of the week, returned because the model
+        // failed. It is worth showing and not worth keeping — this cache is keyed on the week, and
+        // the effect below returns early on a hit, so storing it would stand in for the real recap
+        // until the week rolls over.
+        if (!data.degraded) {
+          localStorage.setItem(cacheKeyRef.current, JSON.stringify({ content: data.digest, weekStart: data.weekStart }));
+        }
       })
       .catch(() => setError(true))
       .finally(() => setIsLoading(false));

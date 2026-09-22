@@ -5,6 +5,7 @@ import { readSameDayInsights, SAME_DAY_GUIDANCE } from '@/lib/ai/same-day-contex
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { degradedFromFacts } from '@/lib/ai/degrade'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
@@ -140,12 +141,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // RV-69: the deterministic half, kept separate from the same-day prose below so the degraded
+  // answer is facts this route computed rather than an earlier model's sentences re-served.
+  const facts = lines.join('\n')
+
   // Q-291: inside the hash, not appended to the prompt afterwards. Anything the model sees has to
   // be hashed, or a digest cached this morning is served against an insight written since.
   const sameDay = await readSameDayInsights(repo, userId, todayIso)
-  if (sameDay) lines.push(sameDay)
 
-  const context = lines.join('\n')
+  const context = sameDay ? `${facts}\n${sameDay}` : facts
   const contextHash = hashInsightContext(context)
 
   if (!force) {
@@ -161,14 +165,20 @@ export async function POST(req: Request) {
   try {
     ;({ text } = await loggedGenerateText(
       { section: 'daily-digest', userId, fingerprint: { date: todayIso, contextHash } },
-      () => generateText({
+      signal => generateText({
         model: aiModel(),
         prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any. If a line below flags a domain's logging coverage as sparse, do not give corrective advice for that domain (e.g. telling the user to eat more or less of something) — one day's numbers do not support it; mention that domain only in passing, if at all.\n\n${PROSE_GUARDS}${sameDay ? `\n\n${SAME_DAY_GUIDANCE}` : ''}\n\n${context}`,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     ))
   } catch (err) {
     console.error('[daily-digest] generateText failed:', err)
+    // RV-69: the day's figures are already assembled — answer with them rather than discarding
+    // them. Deliberately NOT cached: `upsertAiHealthInsight` below would make this the stored
+    // digest for the day and block the next successful call from replacing it.
+    const degraded = degradedFromFacts('here is the day as recorded', facts)
+    if (degraded) return NextResponse.json({ digest: degraded, date: todayIso, cached: false, degraded: true })
     return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
   }
 

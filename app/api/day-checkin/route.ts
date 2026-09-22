@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { todayInTz, DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
 import { rateLimit } from '@/lib/rate-limit'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // One check-in's answers.
@@ -73,13 +74,22 @@ export async function POST(req: Request) {
     hydration: b.hydration ?? null,
     lateHeavyMeal: b.lateHeavyMeal ?? null,
     wakeMood: b.wakeMood ?? null,
-    perceivedRecovery: b.perceivedRecovery ?? null,
+    // TN-57: an untouched scale is stored as null, so `count(perceived_recovery)` is the honest
+    // count of real answers from here on. Deliberately AFTER the Q-465 guard above — the morning
+    // sheet posts nothing else that counts as an answer, so nulling first would 400 an untouched
+    // save and the sheet would re-prompt all day.
+    ...answeredMorningScales({
+      perceivedRecovery: b.perceivedRecovery ?? null,
+      sleepQualityFeel: b.sleepQualityFeel ?? null,
+      perceivedRecoveryTouched: b.perceivedRecoveryTouched ?? false,
+      sleepQualityFeelTouched: b.sleepQualityFeelTouched ?? false,
+    }),
     motivation: b.motivation ?? null,
-    sleepQualityFeel: b.sleepQualityFeel ?? null,
     restingSoreness: b.restingSoreness ?? null,
     illnessContext: b.illnessContext ?? null,
     perceivedRecoveryTouched: b.perceivedRecoveryTouched ?? false,
     sleepQualityFeelTouched: b.sleepQualityFeelTouched ?? false,
+    vsYesterday: b.vsYesterday ?? null,
     soreMuscles: b.soreMuscles,
     journal: b.journal ?? null,
   })

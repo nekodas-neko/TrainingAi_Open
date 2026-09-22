@@ -14,6 +14,7 @@ import { buildReadinessAudit } from './readiness'
 import { buildActivityAudit } from './activity'
 import { buildHeartRateAudit } from './heart-rate'
 import type { DayAudit, PillarAudit } from './types'
+import { answeredMorningScales } from '../self-report'
 
 /** Trailing history fetched so the 28-day baselines and the ACWR chronic window are complete. */
 export const AUDIT_HISTORY_DAYS = 28
@@ -226,15 +227,22 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
           }
         : null,
       morningCheckin: morningCheckin
-        ? {
-            // Stored 1 = slept great … 5 = terrible (the on-screen selector reverses this).
-            sleepQualityFeel: morningCheckin.sleepQualityFeel,
-            sleepQualityFeelLabel:
-              morningCheckin.sleepQualityFeel != null ? sleepFeelLabel(morningCheckin.sleepQualityFeel) : null,
-            perceivedRecovery: morningCheckin.perceivedRecovery,
-            motivation: morningCheckin.motivation,
-            journal: morningCheckin.journal,
-          }
+        ? (() => {
+            // TN-57: the audit exists to show what the day's inputs actually were, so a scale the
+            // lifter never moved reads as absent rather than as a neutral 3 they chose. Both the
+            // value and its label go null together — a label derived from a seed is the same claim
+            // in words.
+            const answered = answeredMorningScales(morningCheckin)
+            return {
+              // Stored 1 = slept great … 5 = terrible (the on-screen selector reverses this).
+              sleepQualityFeel: answered.sleepQualityFeel,
+              sleepQualityFeelLabel:
+                answered.sleepQualityFeel != null ? sleepFeelLabel(answered.sleepQualityFeel) : null,
+              perceivedRecovery: answered.perceivedRecovery,
+              motivation: morningCheckin.motivation,
+              journal: morningCheckin.journal,
+            }
+          })()
         : null,
       workouts: dayWorkouts.map(ws => ({
         id: ws.id,
