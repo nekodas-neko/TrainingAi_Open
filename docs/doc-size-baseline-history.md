@@ -15219,3 +15219,14 @@ file the entry names as its own reference — and **9** were genuinely broken. A
 when it has a handler *and* no `onError`, which is the distinction the count missed. Two naive greps
 answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
 test rather than only in prose.
+
+## 2026-09-22 — RV-86 + RV-87 (`fix/rv86-rv87-absence-not-zero`)
+
+`docs/implementation-backlog.md` 26551 → **26522**: RV-86 and RV-87 shipped together and left the
+queue. They are not batched in the file — neither carries a `Batch:` slug — but they share one
+verification (absence must render as "—", not a confident zero) and touch disjoint files, and the
+protocol assigns batches when an entry is next touched.
+
+`projectOverview.md` 12212 → **12222**: ten lines at the top of Current Status for that fix. The
+version line had been reading v1.457.14 against a `package.json` on 1.464.1 — four days and several
+merges behind — so it is corrected here too rather than left to the next sweep.

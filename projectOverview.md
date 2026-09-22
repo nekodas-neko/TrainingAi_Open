@@ -26,8 +26,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.14 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-18.
+**Version:** v1.464.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-22.
+
+**A failed read is no longer painted as a measured zero (RV-86 + RV-87, v1.464.2).** Home's Streak
+card rendered `calendarDays`'s `{}` initial value as "0 sessions this week" with an empty progress
+bar, and the Profile tab rendered a row of `?? 0` defaults as a genuine *Level 1 · Novice · 0 XP*
+with an all-zero lifetime, **best streak included** — both reached on a first launch after a
+reinstall, offline, or any failed fetch past the cache seed. Each screen now carries a gate raised
+only by a successful read, and shows "—" until it is. **Two of the entries' own claims were wrong
+and the fix went where the defect actually was:** the streak *number* already degraded to "—", and
+the rest-day banner comes from `/api/next-session`, not from the streak fetch. Held by e2e specs
+that were run against the unfixed components as a control, not only against the fix.
 
 **The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
 went **90 → 89 on a day he trained**; his real streak is **102 days**, unbroken since 2026-06-08.
