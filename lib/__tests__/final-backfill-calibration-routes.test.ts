@@ -356,9 +356,12 @@ describe('GET /api/admin/battery-recovery-calibration', () => {
 
   it('keys battery by its date and recovery by the check-in’s log date', async () => {
     getBodyBatteryHistory.mockResolvedValue([{ date: '2026-03-02', endValue: 61 }])
+    // `perceivedRecoveryTouched` is what makes the 4 an answer (TN-57): the morning sheet seeds
+    // this scale from a neutral constant, and 78 of the owner's 97 rows carry a value he never
+    // chose. The subject here is the date keying, so the flag is set to keep it that.
     listDayCheckins.mockResolvedValue([
-      { logDate: '2026-03-02', perceivedRecovery: 4 },
-      { logDate: '2026-03-03', perceivedRecovery: null },
+      { logDate: '2026-03-02', perceivedRecovery: 4, perceivedRecoveryTouched: true },
+      { logDate: '2026-03-03', perceivedRecovery: null, perceivedRecoveryTouched: true },
     ])
     await batteryReq('?from=2026-03-01&to=2026-03-10')
     const input = buildBatteryRecoveryCalibration.mock.calls[0][0] as {
@@ -367,6 +370,15 @@ describe('GET /api/admin/battery-recovery-calibration', () => {
     expect(input.batteryByDate.get('2026-03-02')).toBe(61)
     expect(input.recoveryByDate.get('2026-03-02')).toBe(4)
     expect(input.recoveryByDate.get('2026-03-03')).toBeNull()
+  })
+
+  it('does not carry an untouched recovery through at all (TN-57)', async () => {
+    getBodyBatteryHistory.mockResolvedValue([{ date: '2026-03-02', endValue: 61 }])
+    listDayCheckins.mockResolvedValue([{ logDate: '2026-03-02', perceivedRecovery: 4, perceivedRecoveryTouched: false }])
+    await batteryReq('?from=2026-03-01&to=2026-03-10')
+    const input = buildBatteryRecoveryCalibration.mock.calls[0][0] as { recoveryByDate: Map<string, unknown> }
+    expect(input.recoveryByDate.has('2026-03-02')).toBe(true)
+    expect(input.recoveryByDate.get('2026-03-02')).toBeNull()
   })
 
   it('reports the caller’s timezone back, and uses it for the window', async () => {

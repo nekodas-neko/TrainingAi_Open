@@ -15313,7 +15313,8 @@ lanes prints as READY to whichever lane cannot start it, which is what it did wi
 
 ## 2026-09-22 — RV-97 (`fix/rv97-acwr-band-colour`)
 
-`projectOverview.md` 12271 → **12280**: nine lines at the top of Current Status, carrying why the
+`projectOverview.md` 12271 → 12280 → **12316** on re-merge with #1399: nine lines at the top of
+Current Status, carrying why the
 entry's one-line fix does not compile — a six-key union into a four-key helper — because that is
 the part a future session would otherwise rediscover.
 
@@ -15321,3 +15322,34 @@ the part a future session would otherwise rediscover.
 appended. It had fallen four merged PRs behind. Two lessons were merged to make room: the
 vacuous-guard rule folded into the control rule it is a case of, and the Morning Check-in modal
 into the Playwright-mechanics bullet beside it.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26431, `projectOverview.md` → 12288 (TN-57)
+
+The backlog lost TN-57 whole, which was a long entry: it carried the production measurement table,
+the correction of its own first draft (the defect is not circularity — that is TN-50, a different
+sheet), and the argument for why this blocks TN-33/TN-16/TN-34. None of that is owed any more, so
+none of it was kept.
+
+`projectOverview.md` grew by one Current Status block, and most of it is a correction rather than a
+summary: the entry's write-path instruction would have stopped the owner's daily check-in reaching
+the server, because the morning sheet sends nothing else the Q-465 guard counts and `pushMutations`
+rejects such a body with no retry. A note saying only "readers now check the flag" would leave the
+next session to rediscover that by shipping it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26427, `projectOverview.md` up one block (LB-124 out, LA-128 in)
+
+Nearly a wash, and the two halves are worth naming separately. LB-124 left whole — it was a long
+entry because it argued its own case for being filed rather than attempted, and that argument is
+spent now that the column exists. In its place LA-128 records the shape LB-124 was really about: the
+check-in route strips an unknown key instead of rejecting it, so the next field added ahead of its
+server half lands silently too. LB-124 closed that for one field by making the key known, not for
+the class.
+
+TN-58 grew by a few lines rather than shrinking: its `Needs:` cleared, and its inline claim that
+TN-57 was the engine half was wrong and is corrected in place. A cleared dependency that leaves a
+false sentence behind is worse than one that never cleared.
+
+`projectOverview.md` takes one Current Status block. Longer than "column added" because two of its
+sentences are the findings: the compiler caught a re-save path that would have cleared the answer on
+every food-log completion, and the type choice (text, not `-1/0/+1`) turns on this table already
+storing 1 = best … 5 = worst — both things the next person to touch this column needs and neither
+recoverable from the diff.

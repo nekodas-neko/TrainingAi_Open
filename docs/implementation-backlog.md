@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **280** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v39** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **282** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v40** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -610,108 +610,6 @@ the structured fields exist to replace; a heuristic that sorts "do not fix this 
 cannot start" would be a third convention to maintain. The check reports the *shape* — parked, with
 nothing structured saying why — and a human decides.
 
-### [readiness][platform] TN-57 — the self-report has never once been answered, and three consumers read the unanswered default as data 🔴 LIVE
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, answering the owner's *"what is your
-  suggestion to get better tuning and have it be more accurate"*. **This is the answer to that
-  question**, and it is the reason every calibration to date has been fitted to internal consistency
-  rather than to anything true.
-- **Lane: A** — `app/api/health-trends/route.ts`, `app/api/admin/battery-recovery-calibration/route.ts`,
-  `app/api/day-checkin/route.ts`. Per §3's rule, engine half first; the control redesign is TN-58.
-- **No migration and no data write.** The column that distinguishes answered from unanswered already
-  exists and is already populated correctly. Nothing needs backfilling.
-
-**Measured on production 2026-09-21 — 96 check-ins, 2026-07-02 to 2026-09-21:**
-
-| | |
-|---|---|
-| rows with a `perceived_recovery` value | **77** |
-| rows where `perceived_recovery_touched` is true | **0** |
-| distinct values ever recorded | **2** (only 2 and 3) |
-| standard deviation | **0.29** |
-| `sleep_quality_feel_touched` true | **3 of 96** |
-| distinct `wake_mood` values | **2** |
-
-**The owner has never answered this control, once, in 81 days** — which is exactly what he said
-unprompted (*"I dont really choose them; I let it auto select"*). The sheet seeds
-`NEUTRAL_SCALES = { perceivedRecovery: 3 }` (`components/morning-checkin-sheet.tsx:21`), tracks
-`touched` correctly, and posts **both**. The route stores both. So the row is honest; the readers are not.
-
-**⚠ THE DEFECT IS NOT CIRCULARITY, and filing it as such would send an implementer to the wrong
-file.** This entry was first drafted claiming the control is pre-filled *from readiness*. It is not —
-it seeds from a neutral constant. The **circular** one is the separate energy check-in,
-`readinessToEnergy()` in `components/mood-checkin-sheet.tsx` (TN-50). Two different sheets, two
-different defects; do not conflate them.
-
-**The actual defect: an untouched default is persisted and then consumed as an answer.** Three
-readers, none of which checks the flag sitting in the same row:
-
-1. `app/api/admin/battery-recovery-calibration/route.ts:83` — builds `recoveryByDate` from
-   `c.perceivedRecovery`. **A calibration route is being calibrated against 77 values nobody gave.**
-2. `app/api/health-trends/route.ts:136` — filters `perceivedRecovery != null` and correlates it
-   against readiness. Correlating against a series with sd 0.29 cannot produce a meaningful
-   coefficient, and it is presented as one.
-3. `app/api/body-battery/stress-day/route.ts:17` — its own comment already records
-   *"`perceived_recovery` reads 3 on all 17 days"*. The observation was made and the flag was not reached for.
-
-**Why this is the root cause of inaccurate tuning, not one bug among many.** TN-33 cannot validate the
-daytime-stress **sign** because there is no independent target with variance. That blocks TN-16's
-warning, TN-34's re-wire and the stress weight that TN-55 measured at **61% of all Body Battery
-drain**. Q-465 already fixed the adjacent case (an empty body writing all-null); this is the case a
-non-empty body with an unanswered value slips through.
-
-**First action, and it is small.** Make the three readers require `perceived_recovery_touched`
-(and `sleep_quality_feel_touched` for its sibling). That is the whole of stage 1: it stops a
-calibration route and a user-facing correlation from consuming values nobody supplied, and it needs
-no schema change and no data write, because the flag already separates the two populations. Expect
-the health-trends correlation to **disappear** rather than change — there are zero answered rows to
-plot. That is the correct outcome and must not be "fixed" by relaxing the filter.
-
-**Then harden the write path:** `POST /api/day-checkin` should store `null` for a scale whose
-`*_touched` is false, so `count(perceived_recovery)` is the honest count of real answers going
-forward. Keep Q-465's existing guard; a body carrying only untouched defaults now counts as carrying
-no answers.
-
-**⚠ Do not backfill the 77 rows to null.** The flag already tells them apart, so a write buys nothing
-and destroys the record of how long this ran. This entry is deliberately a no-data-write change.
-
-**Pass test:** `SELECT count(*) FROM day_checkins WHERE perceived_recovery IS NOT NULL AND NOT
-perceived_recovery_touched` stops growing, and neither the calibration route nor health-trends reads a
-row whose flag is false.
-
-### [readiness][platform] LB-124 — the comparative check-in field does not exist anywhere, so TN-58's control has nowhere to write
-
-- **Lane: A** — it starts with a Postgres migration, and *"Postgres migration numbers and local
-  SQLite versions belong to Lane A alone"*. **Added:** 2026-09-22 · found by Lane B on taking TN-58
-  off READY. The `LB-` letter records who found it, not who ships it.
-- **TN-58 printed READY and is not buildable.** It says *"add the comparative field beside"*
-  `perceived_recovery`, and **nothing for it exists**: no column in `lib/data/postgres/schema.ts`, no
-  field in `DayCheckinScalesSchema` or `DayCheckinExtrasSchema`
-  (`packages/shared/src/validation/day-checkin.ts`), nothing in `app/api/day-checkin/route.ts`.
-- **⚠ TN-57 is NOT this.** TN-58 calls it "the engine half", but TN-57's own entry says *"No
-  migration and no data write. The column that distinguishes answered from unanswered already
-  exists"* — it fixes three consumers that read an unanswered default as data. Shipping TN-57 leaves
-  TN-58 exactly as blocked. **Read TN-57's scope rather than TN-58's description of it.**
-- **⚠ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
-  route is **not** `.strict()`, so Zod strips an unknown key instead of rejecting it: a sheet posting
-  `vsYesterday` would get **201** and write nothing. A control that looks like it works and stores
-  nothing is worse than a 400, and worse than the neutral-default bug TN-57 exists to fix — it would
-  burn the two-week pass test and report "self-report is not available from this owner" when the
-  truth was a dropped field.
-- **Scope, which is why it is not a footnote.** `day_checkins` is offline-first: a migration **and**
-  `lib/data/postgres/schema.ts`, both Zod schemas, the route, the repository write path and its
-  row→object mapper, the local SQLite table (`lib/local-store/sqlite-backend.ts:1212`) with a store
-  version bump, and the pull-delta at `:2038`. A missed mapper reads as "the answer does not save".
-- **The twin is required.** A new column on a `claude_ro`-covered table ships its regenerated views
-  in the same PR, and `claude-ro-readonly-role.test.ts` / `db-snapshot-integration.test.ts` fail CI
-  without it — both need a **TCP** `DATABASE_URL` to run locally, or they skip and say nothing.
-- **⚠ NULL is the whole point.** Per TN-58: a skipped answer stores NULL, never a neutral. Give the
-  column no default, and follow `perceivedRecoveryTouched`'s existing shape if a touched flag is
-  wanted — the neutral-stored-as-answer bug is exactly what this question is meant to escape.
-- **Not established:** the column's type was not decided here. An enum (`better`/`same`/`worse`) and
-  a signed integer (`-1`/`0`/`+1`) both work; the integer is easier for TN-33 to correlate and the
-  enum is harder to misread. That is Lane A's call at build time, not a blocker.
-
 ### [readiness][app-shell] TN-58 — ask whether today is better or worse than yesterday, because an absolute 1–5 has produced two distinct values in 81 days
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning · **owner asked for this direction**
@@ -719,10 +617,16 @@ row whose flag is false.
   decline is the design constraint, not an obstacle.
 - **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. This one changes what
   is asked.
-- **Needs: LB-124** — the field it writes to does not exist in the schema, the validators or the
-  route, and the route is not `.strict()`, so a control built now would post `201` and store
-  nothing. **TN-57 is not that engine half** despite the line below saying so: its own entry ships
-  no migration and fixes three consumers instead.
+- **The engine half SHIPPED 2026-09-22 (LB-124).** `day_checkins.vs_yesterday` exists (migration
+  280, `claude_ro` twin 281, local SQLite v40), stores `better` | `same` | `worse` with **no
+  default**, and is carried by both write paths, all three row mappers, the local store and the
+  pull-delta. It is in the Zod schema, so the silent-strip this entry feared is gone: an invalid
+  value is a 400 rather than a 201-that-stores-nothing. It also counts in `dayCheckinHasAnswers`,
+  so a check-in whose ONLY answer is this one saves rather than being rejected as empty.
+  **TN-57 was never that engine half** despite the line below saying so — it shipped no migration.
+- **What is left for this entry is the CONTROL** (`components/morning-checkin-sheet.tsx` and its
+  siblings) and nothing else. Post `vsYesterday` as one of the three strings, or omit it for a
+  skip; never send a neutral placeholder, which is the whole reason the column has no default.
 
 **The control asks for an absolute rating and gets the middle of the scale.** Measured 2026-09-21:
 **2 distinct values across 96 check-ins, sd 0.29, and zero of them touched** (full table in TN-57).
@@ -926,6 +830,29 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Fix:** one categorical series palette in `packages/shared/src/chart-colors.ts` beside
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
+
+### [platform] LA-128 — the check-in route strips an unknown key instead of rejecting it, so the next field lands silently
+
+- **Lane:** A — `app/api/day-checkin/route.ts:14`. **Added:** 2026-09-22, Lane A while shipping
+  LB-124, which exists because of this shape.
+- **The hazard, in the words of the entry it cost:** `Body` is built with `.extend()` and is **not
+  `.strict()`**, so Zod drops a key it does not know rather than refusing the body. A client posting
+  a field the server has not learned yet gets **201 and writes nothing**. LB-124 was filed rather
+  than attempted for exactly this reason, and it says why it matters: *"a control that looks like it
+  works and stores nothing is worse than a 400"* — it would have burned TN-58's two-week pass test
+  and reported "no self-report available" when the truth was a dropped field.
+- **LB-124 did not close this.** It closed it for `vsYesterday` by making the key known. The next
+  field added to a check-in sheet before its server half lands hits the same silence.
+- **Fix:** `.strict()` on `Body`, so an unknown key is a 400 naming it.
+- **⚠ Why this is its own entry rather than a line in LB-124's diff.** `.strict()` starts REJECTING
+  bodies that succeed today. Every current client must be checked first — the morning sheet, the
+  evening review, and `pushMutations`, which parses the same two shared schemas. A sheet sending one
+  stale key would go from silently-ignored to a hard failure on every save, and on the outbox path
+  that is a no-retry poison pill. This is a small change with a real blast radius, which is the
+  argument for measuring it rather than for skipping it.
+- **Not established:** whether any current client actually sends an unknown key. Nobody looked —
+  the shape was found by reading the schema, not from a failure. Start there: it decides whether
+  this is a one-line change or a three-file one.
 
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 

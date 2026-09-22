@@ -109,6 +109,9 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
             logDate: date,
             physicalTiredness: null, mentalDrain: null, barelyMoved: null,
             hydration: null, lateHeavyMeal: null,
+            // LB-124 shipped the column; TN-58 adds the control that fills it. Until then the
+            // morning row carries no comparative answer, which is the honest value for it.
+            vsYesterday: null,
             ...payload,
             updatedAt: new Date().toISOString(),
             deletedAt: null,

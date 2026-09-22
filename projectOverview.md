@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.9 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
-**The ACWR number was painted the "High" colour in every band (RV-97, v1.464.7).** The headline was
+**The ACWR number was painted the "High" colour in every band (RV-97, v1.464.9).** The headline was
 a hard-coded `#f59e0b`, which is exactly what `acwrBand()` reserves for `high`, while the band WORD
 beside it came from the real `interpretation` — so a 1.05 rendered *"✓ Optimal zone"* in warning
 amber, directly above body copy calling 0.8–1.3 the green zone. `acwrBandByKey()` had existed for
@@ -38,6 +38,42 @@ this caller since it was written. **The entry's one-line fix does not compile:**
 booleans rather than type predicates, so the key is narrowed explicitly and the unreachable arm
 inherits the text colour instead of inventing one.
 
+**Version:** v1.464.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-22.
+
+**The comparative check-in now has a column to write to (LB-124, v1.464.8).** TN-58 asks *"is today
+better or worse than yesterday?"* instead of an absolute 1-5, because the absolute scale produced
+two distinct values in 81 days. The field did not exist anywhere, and the route's `Body` is not
+`.strict()`, so a control built first would have posted **201 and stored nothing** — which is why
+Lane B filed this rather than attempting it. `day_checkins.vs_yesterday` now exists (migration 280,
+`claude_ro` twin 281, local SQLite v40): `better` | `same` | `worse`, **nullable with no default**,
+carried by both write paths, all three row mappers, the local store and the pull-delta, and counted
+by `dayCheckinHasAnswers` so a check-in whose only answer is this one saves rather than reading as
+empty. Text rather than a signed integer because every other scale on this table stores 1 = best …
+5 = worst, and a `+1 = better` column would put two polarities in one row. **The compiler found two
+sites no test would have**: `food-logging-complete` re-saves the evening row and would have cleared
+the answer on every food-log completion, and there are three row mappers rather than two. **What
+remains is TN-58's control** — the sheet — and nothing else. `LA-128` records the `.strict()` hazard
+that made this entry necessary: LB-124 closed it for one field by making the key known, not for the
+class.
+
+**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.7).**
+The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant
+and records whether the lifter moved each one. Measured on production 2026-09-22 over 97 morning
+check-ins: **78 carry a `perceived_recovery` and 0 of them were ever touched** — two distinct values,
+standard deviation 0.286 — which is what the owner said unprompted (*"I dont really choose them; I
+let it auto select"*). The row was always honest; the readers were not, and the schema had said so
+since the columns were added (Q-113). A calibration route was fitting to 78 values nobody gave, a
+user-facing correlation was plotting them, the score audit was displaying them, and the periodization
+prompt was telling the model the lifter had reported them. All five now resolve through
+`answeredMorningScales`, and the write paths store null for an untouched scale. **No migration, no
+data write, and the 78 rows are deliberately not backfilled** — the flag already tells them apart.
+**Expect the correlations to EMPTY rather than shift**, which is correct and must not be rescued by
+relaxing the filter. **Five claims in the entry were wrong**; the load-bearing one is that its
+write-path instruction — make an untouched body count as carrying no answers — would have **stopped
+the owner's daily check-in reaching the server**, because the sheet sends nothing else that counts
+and `pushMutations` rejects such a body as a no-retry poison pill. The Q-465 guard therefore reads
+the submitted body and the nulling applies to what is stored.
 **Five places a 384px screen cut the wrong thing (`layout-384` — RV-92/93/94/95/96, v1.464.6).**
 `truncate` on a **flex container** does nothing — the text becomes an anonymous flex item at
 `min-width:auto`, so the exercise name clipped flat and took the green "done today" tick with it,

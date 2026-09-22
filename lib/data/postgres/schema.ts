@@ -600,6 +600,11 @@ export const dayCheckins = pgTable('day_checkins', {
   // as real self-report.
   perceivedRecoveryTouched:  boolean('perceived_recovery_touched').notNull().default(false),
   sleepQualityFeelTouched:   boolean('sleep_quality_feel_touched').notNull().default(false),
+  // TN-58's comparative self-report (migration 280): 'better' | 'same' | 'worse'. NULL means not
+  // answered, and there is deliberately NO DEFAULT — a neutral stored as an answer is the bug
+  // TN-57 fixed on the scales above, and this is the question meant to escape it. It needs no
+  // `*_touched` twin either: the control has no seeded position that leaving it alone would accept.
+  vsYesterday:               text('vs_yesterday'),
   soreMuscles:       text('sore_muscles').array().notNull().default([]),
   journal:           text('journal'),
   /** Q-387 — "I have finished logging today". NULL means not marked, which the maintenance

@@ -171,6 +171,126 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
   })
 
 
+  it('day_checkins: both paths store an untouched scale as null, and still write the row (TN-57)', async () => {
+    // The parity that matters here is the ORDER of two steps, not the presence of one. Q-465's
+    // guard reads the submitted body; the nulling applies to what is stored. Reversed, an untouched
+    // morning save carries no answers — a 400 on the web route, and on this path a per-item
+    // rejection with no retry, which drops the check-in permanently rather than delaying it.
+    const sheet = {
+      phase: 'morning', perceivedRecovery: 3, sleepQualityFeel: 3,
+      perceivedRecoveryTouched: false, sleepQualityFeelTouched: false,
+      illnessContext: null, motivation: null, restingSoreness: null, wakeMood: null,
+      soreMuscles: [], journal: null,
+    }
+    const { POST } = await import('@/app/api/day-checkin/route')
+    const res = await POST(jsonReq('http://localhost/api/day-checkin', { ...sheet, date: '2026-01-06' }) as never)
+    expect(res.status).toBe(201)
+    const webRow = await pool.query(
+      `SELECT perceived_recovery, sleep_quality_feel, perceived_recovery_touched
+         FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-06'`, [TEST_USER_ID])
+    expect(webRow.rowCount).toBe(1)
+    expect(webRow.rows[0].perceived_recovery).toBeNull()
+    expect(webRow.rows[0].sleep_quality_feel).toBeNull()
+    // The flag survives — it is what tells the 78 existing seeded rows from a real answer.
+    expect(webRow.rows[0].perceived_recovery_touched).toBe(false)
+
+    const result = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-checkin-4', domain: 'day_checkins', date: '2026-01-07', payload: sheet,
+    }])
+    expect(result.processed).toBe(1)
+    const pushRow = await pool.query(
+      `SELECT perceived_recovery, sleep_quality_feel FROM day_checkins
+         WHERE user_id = $1 AND log_date = '2026-01-07'`, [TEST_USER_ID])
+    expect(pushRow.rows[0].perceived_recovery).toBeNull()
+    expect(pushRow.rows[0].sleep_quality_feel).toBeNull()
+
+    // And a scale the lifter did move survives on both paths — the seeded value is 3, so a touched
+    // 3 is exactly the case a value-based check would throw away.
+    const touched = { ...sheet, perceivedRecoveryTouched: true }
+    await POST(jsonReq('http://localhost/api/day-checkin', { ...touched, date: '2026-01-08' }) as never)
+    const webTouched = await pool.query(
+      `SELECT perceived_recovery FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-08'`, [TEST_USER_ID])
+    expect(webTouched.rows[0].perceived_recovery).toBe(3)
+
+    await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-checkin-5', domain: 'day_checkins', date: '2026-01-09', payload: touched,
+    }])
+    const pushTouched = await pool.query(
+      `SELECT perceived_recovery FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-09'`, [TEST_USER_ID])
+    expect(pushTouched.rows[0].perceived_recovery).toBe(3)
+
+    await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
+  })
+
+  it('day_checkins: the comparative answer round-trips on both paths, and NULL stays NULL (LB-124)', async () => {
+    // A real column read back from a real table, because the whole risk here is a write path that
+    // accepts the field and never persists it. Every layer between the body and the column is a
+    // place it can be dropped silently, and four of them had to be edited for this to pass.
+    const { POST } = await import('@/app/api/day-checkin/route')
+    const res = await POST(jsonReq('http://localhost/api/day-checkin',
+      { date: '2026-02-01', phase: 'morning', vsYesterday: 'worse' }) as never)
+    expect(res.status).toBe(201)
+    const web = await pool.query(
+      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-01'`, [TEST_USER_ID])
+    expect(web.rows[0].vs_yesterday).toBe('worse')
+
+    const result = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-vsy-1', domain: 'day_checkins', date: '2026-02-02',
+      payload: { phase: 'morning', vsYesterday: 'better' },
+    }])
+    expect(result.processed).toBe(1)
+    const push = await pool.query(
+      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-02'`, [TEST_USER_ID])
+    expect(push.rows[0].vs_yesterday).toBe('better')
+
+    // Skipped stays NULL on both paths — there is no neutral to fall back to, which is the point.
+    await POST(jsonReq('http://localhost/api/day-checkin',
+      { date: '2026-02-03', phase: 'morning', journal: 'nothing to add' }) as never)
+    await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-vsy-2', domain: 'day_checkins', date: '2026-02-04',
+      payload: { phase: 'morning', journal: 'nothing to add' },
+    }])
+    const skipped = await pool.query(
+      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date IN ('2026-02-03','2026-02-04')`,
+      [TEST_USER_ID])
+    expect(skipped.rowCount).toBe(2)
+    expect(skipped.rows.every(r => r.vs_yesterday === null)).toBe(true)
+
+    // And re-saving the row keeps the answer rather than clearing it.
+    await POST(jsonReq('http://localhost/api/day-checkin',
+      { date: '2026-02-01', phase: 'morning', vsYesterday: 'same' }) as never)
+    const resaved = await pool.query(
+      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-01'`, [TEST_USER_ID])
+    expect(resaved.rows[0].vs_yesterday).toBe('same')
+
+    await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
+  })
+
+  /**
+   * The erase trap, which the compiler found rather than a test: `food-logging-complete` re-saves
+   * the evening row to flip one flag, and `saveDayCheckin` overwrites every column it is given a
+   * value for. A route that omitted `vsYesterday` would clear the answer every time the food log
+   * was marked complete — silently, and only on days the lifter had answered.
+   */
+  it('day_checkins: marking the food log complete does not clear the comparative answer (LB-124)', async () => {
+    const { POST: checkin } = await import('@/app/api/day-checkin/route')
+    await checkin(jsonReq('http://localhost/api/day-checkin',
+      { date: '2026-02-05', phase: 'evening', vsYesterday: 'better' }) as never)
+
+    const { POST: complete } = await import('@/app/api/food-logging-complete/route')
+    const res = await complete(jsonReq('http://localhost/api/food-logging-complete',
+      { date: '2026-02-05', complete: true }) as never)
+    expect(res.status).toBe(200)
+
+    const after = await pool.query(
+      `SELECT vs_yesterday, food_logging_completed_at FROM day_checkins
+         WHERE user_id = $1 AND log_date = '2026-02-05' AND phase = 'evening'`, [TEST_USER_ID])
+    expect(after.rows[0].vs_yesterday).toBe('better')
+    expect(after.rows[0].food_logging_completed_at).not.toBeNull()
+
+    await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
+  })
+
   it('food_logs: both paths reject a quantityMultiplier outside [0.01, 100]', async () => {
     const { POST } = await import('@/app/api/nutrition/food-logs/route')
     const res = await POST(jsonReq('http://localhost/api/nutrition/food-logs', {

@@ -2,6 +2,8 @@
 // End of Day review. All scale fields are 1–5; journal is the only free text.
 export type CheckinPhase = 'evening' | 'morning'
 
+export type VsYesterday = 'better' | 'same' | 'worse'
+
 export interface DayCheckin {
   id: string
   userId: string
@@ -25,6 +27,9 @@ export interface DayCheckin {
   // self-report from an unedited, score-derived prefill (Q-113).
   perceivedRecoveryTouched: boolean
   sleepQualityFeelTouched: boolean
+  // TN-58: is today better, the same, or worse than yesterday? NULL = not answered. A comparative
+  // question because the absolute 1-5 above produced two distinct values in 81 days.
+  vsYesterday: VsYesterday | null
   soreMuscles: string[]
   journal: string | null
   /**

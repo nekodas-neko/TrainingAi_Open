@@ -8,6 +8,7 @@ import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { buildSleepFeelCalibration } from '@trainingai/shared/health/sleep-feel-calibration'
 import { reportServerError } from '@/lib/observability'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 
 /**
  * Admin sleep-feel calibration: the model's Sleep Score for each night next to the rating the owner
@@ -86,8 +87,10 @@ export async function GET(req: NextRequest) {
     const scoresByDate = new Map<string, number | null>(
       computeSleepScoreSeries(nights, tz).map(r => [r.session.date, r.result?.score ?? null]),
     )
+    // TN-57's sibling. `sleep_quality_feel` was touched 3 times in 97 rows, so this reads 3
+    // answers instead of 78 seeded ones — a small number that is real beats a large one that is not.
     const feelByDate = new Map<string, number | null>(
-      checkins.map(c => [c.logDate, c.sleepQualityFeel]),
+      checkins.map(c => [c.logDate, answeredMorningScales(c).sleepQualityFeel]),
     )
 
     return NextResponse.json(

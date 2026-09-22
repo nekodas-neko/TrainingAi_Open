@@ -29,6 +29,11 @@ export const DayCheckinExtrasSchema = z.object({
   illnessContext: z.enum(['sick', 'alcohol', 'poor_sleep']).nullable().optional(),
   perceivedRecoveryTouched: z.boolean().optional(),
   sleepQualityFeelTouched: z.boolean().optional(),
+  // TN-58 (LB-124). Here rather than in the scales schema above: it is not a 1-5 scale, and
+  // ANSWER_SCALES is derived from that schema's keys, so adding it there would type it as one.
+  // `dayCheckinHasAnswers` counts it explicitly instead — see the note there, which is the half
+  // that would fail silently if missed.
+  vsYesterday: z.enum(['better', 'same', 'worse']).nullable().optional(),
 })
 
 /**
@@ -62,9 +67,15 @@ export function dayCheckinHasAnswers(body: {
   soreMuscles?: string[] | null
   journal?: string | null
   illnessContext?: string | null
+  vsYesterday?: string | null
   [key: string]: unknown
 }): boolean {
   if (ANSWER_SCALES.some(k => typeof body[k] === 'number')) return true
+  // TN-58 (LB-124). It counts, and this line is load-bearing: the comparative control REPLACES the
+  // absolute scale rather than joining it, so a morning check-in whose only answer is this one is
+  // the expected shape, not an edge case. Without it that body carries "no answers" — a 400 on the
+  // web route, and a no-retry rejection in pushMutations that drops the check-in for good.
+  if (body.vsYesterday != null) return true
   if (body.illnessContext != null) return true
   if (typeof body.journal === 'string' && body.journal.trim().length > 0) return true
   if (Array.isArray(body.soreMuscles) && body.soreMuscles.length > 0) return true

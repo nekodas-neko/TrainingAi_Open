@@ -36,6 +36,7 @@ import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
 import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
 import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
@@ -3237,6 +3238,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQualityFeel: r.sleepQualityFeel, restingSoreness: r.restingSoreness,
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
+      vsYesterday: r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday | null,
       soreMuscles: r.soreMuscles ?? [],
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
@@ -3256,6 +3258,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQualityFeel: r.sleepQualityFeel, restingSoreness: r.restingSoreness,
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
+      vsYesterday: r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday | null,
       soreMuscles: r.soreMuscles ?? [],
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
@@ -3288,6 +3291,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         illnessContext:            checkin.illnessContext,
         perceivedRecoveryTouched:  checkin.perceivedRecoveryTouched,
         sleepQualityFeelTouched:   checkin.sleepQualityFeelTouched,
+        vsYesterday:               checkin.vsYesterday,
         soreMuscles:       checkin.soreMuscles,
         journal:           checkin.journal,
         foodLoggingCompletedAt: checkin.foodLoggingCompletedAt ?? null,
@@ -3309,6 +3313,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           illnessContext:            sql`EXCLUDED.illness_context`,
           perceivedRecoveryTouched:  sql`EXCLUDED.perceived_recovery_touched`,
           sleepQualityFeelTouched:   sql`EXCLUDED.sleep_quality_feel_touched`,
+          vsYesterday:               sql`EXCLUDED.vs_yesterday`,
           soreMuscles:       sql`EXCLUDED.sore_muscles`,
           journal:           sql`EXCLUDED.journal`,
           // Only when the caller supplied one — otherwise keep whatever is stored (see the note
@@ -3328,6 +3333,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQualityFeel: r.sleepQualityFeel, restingSoreness: r.restingSoreness,
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
+      vsYesterday: r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday | null,
       soreMuscles: r.soreMuscles ?? [],
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
@@ -4738,13 +4744,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             hydration:         num(p.hydration),
             lateHeavyMeal:     num(p.lateHeavyMeal),
             wakeMood:          num(p.wakeMood),
-            perceivedRecovery: num(p.perceivedRecovery),
+            // TN-57, mirroring the web route — including its ORDER. This runs after the Q-465
+            // guard above, which here rejects per-item with no retry: nulling first would turn the
+            // owner's daily untouched check-in into a poison pill that never reaches the server.
+            ...answeredMorningScales({
+              perceivedRecovery: num(p.perceivedRecovery),
+              sleepQualityFeel:  num(p.sleepQualityFeel),
+              perceivedRecoveryTouched: extrasCheck.data.perceivedRecoveryTouched ?? false,
+              sleepQualityFeelTouched:  extrasCheck.data.sleepQualityFeelTouched ?? false,
+            }),
             motivation:        num(p.motivation),
-            sleepQualityFeel:  num(p.sleepQualityFeel),
             restingSoreness:   num(p.restingSoreness),
             illnessContext:            extrasCheck.data.illnessContext ?? null,
             perceivedRecoveryTouched:  extrasCheck.data.perceivedRecoveryTouched ?? false,
             sleepQualityFeelTouched:   extrasCheck.data.sleepQualityFeelTouched ?? false,
+            vsYesterday:               extrasCheck.data.vsYesterday ?? null,
             soreMuscles:       extrasCheck.data.soreMuscles,
             journal:           extrasCheck.data.journal ?? null,
           })
