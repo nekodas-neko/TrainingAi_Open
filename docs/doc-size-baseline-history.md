@@ -15222,9 +15222,10 @@ test rather than only in prose.
 
 ## 2026-09-22 — RV-86 + RV-87 (`fix/rv86-rv87-absence-not-zero`)
 
-`docs/implementation-backlog.md` 26551 → 26522 → **26575** on re-merge: RV-86 and RV-87 shipped
-together and left the queue, and #1390 then landed with a net +53. The number here is the merged
-one — recomputed with `--fix`, never spliced from either side. They are not batched in the file — neither carries a `Batch:` slug — but they share one
+`docs/implementation-backlog.md` 26551 → 26522 → 26575 → **26619** across two re-merges: RV-86 and RV-87 shipped
+together and left the queue; #1390 then landed with a net +53 and #1393 with a further +44 while
+this PR waited on CI. The number here is the merged one — recomputed with `--fix` on each
+re-merge, never spliced from either side. They are not batched in the file — neither carries a `Batch:` slug — but they share one
 verification (absence must render as "—", not a confident zero) and touch disjoint files, and the
 protocol assigns batches when an entry is next touched.
 
@@ -15249,3 +15250,19 @@ measurement decayed; it simply never printed in a READY list. That is the second
 found this week (BF-165's *"ungate it the moment the fix lands"* was the first), and both have the
 same shape: **a condition for becoming visible that can only be met by someone who can already see
 it.** When writing a park of any kind, check that something outside the entry can lift it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26604 → 26648 (OR-124: TN-59 reconciled, `--sittings` documented)
+
+Two additions, no removal. **TN-59** was at the top of READY and its premise had been superseded
+hours earlier by #1390 — it specified a Custom Rules check against a 28-entry backlog of
+prose-parked entries, and that backlog is **0** on this commit. Reconciled in place rather than
+removed: the preventive half still earns its keep, at a fraction of the size, with an empty
+baseline. The rest is the `--sittings` view documented where an implementer reads about the tool.
+
+Worth carrying: **TN-59 and OR-122 are the same finding, reached independently on the same day from
+opposite directions** — Tuning from having swept 17 markers by hand and watched a new one arrive,
+the Orchestrator from Lane B having nothing to start. Neither saw the other, and the common cause
+was LA-49, which had measured the whole thing three weeks earlier and was parked by the bug it
+described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
+the investigation again. That is the argument for the check TN-59 still proposes, more than the
+count it was written against.

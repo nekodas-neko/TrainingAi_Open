@@ -14,6 +14,15 @@
 //   node scripts/next-item.js                 both lanes
 //   node scripts/next-item.js --lane A        one lane
 //   node scripts/next-item.js --all           do not truncate READY
+//   node scripts/next-item.js --sittings      owed device checks, grouped by domain
+//
+// `--sittings` answers a different question from the rest of the file: not *what can I start* but
+// *what could the owner clear in one pick-up of the phone*. A device check costs the owner's
+// attention and the device; CI costs neither, which is why the batching rule aggregates on what has
+// to be VERIFIED. This prints the grouping WITHOUT writing it down — CLAUDE.md forbids assigning
+// `Batch:` in a bulk pass, because a batch decided without re-reading the entry goes stale where a
+// generated view cannot. Domain tag is the proxy for screen: it is already on every heading, it is
+// mechanical, and no judgement gets frozen into the file.
 //
 // READY is work nobody has started. An entry that shipped and still owes an owner sign-off or a
 // device run states so with `- **Keep:**` and is listed under KEEP instead — see lib/keep.js for
@@ -41,6 +50,7 @@ const laneArg = (() => {
   return v ? v.toUpperCase() : null;
 })();
 const showAll = argv.includes('--all');
+const sittingsOnly = argv.includes('--sittings');
 const TOP_N = showAll ? Infinity : 10;
 
 const lines = fs.readFileSync(BACKLOG, 'utf8').split('\n');
@@ -197,6 +207,40 @@ const fmt = (e) => {
   return `${e.id.padEnd(7)} ${(tags + title).slice(0, 100)}${unlaned}`;
 };
 
+// --- Sittings: what could be cleared in one pick-up of the phone? -----------------------------
+//
+// An entry owes a device check when it carries `Verify: device` or a `Keep:` whose residue names
+// the device. Both shapes are counted — BF-90 found eleven entries writing the same debt in both
+// places, so keying on either alone undercounts.
+if (sittingsOnly) {
+  const owed = entries.filter((e) => {
+    if (e.verify?.value === 'device') return true;
+    return /\bdevice\b|\bS25\b|\bAPK\b|on-device/i.test(e.keep?.text ?? '');
+  });
+  const groups = new Map();
+  for (const e of owed) {
+    const key = e.tags[0] ?? '(untagged)';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+  const batched = owed.filter((e) => e.batch).length;
+  console.log(`\nDEVICE CHECKS OWED (${owed.length}) — ${batched} already in a batch, ${owed.length - batched} loose`);
+  console.log('Grouped by primary domain tag. A group is a candidate sitting, not an assignment:');
+  console.log('per CLAUDE.md a `Batch:` is written when the entry is next touched, never in a sweep.\n');
+  [...groups.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .forEach(([tag, es]) => {
+      console.log(`  ${tag} (${es.length})`);
+      es.forEach((e) => {
+        const lane = e.lane ? `Lane ${e.lane}` : 'lane unstated';
+        console.log(`      ${e.id.padEnd(8)} ${lane.padEnd(14)}${e.batch ? `batch \`${e.batch}\`` : ''}`);
+      });
+    });
+  console.log('\n⚠ A batch cannot span lanes and never covers a migration or a sync-push change.');
+  console.log('');
+  process.exit(0);
+}
+
 console.log(`\nQueue: ${entries.length} entries${laneArg ? ` · lane ${laneArg}` : ''}\n`);
 
 const unlanedReady = ready.filter((e) => e.lane === null).length;
@@ -268,3 +312,4 @@ if (parked.length) {
   parked.forEach(({ e, reasons }) => console.log(`      ${fmt(e)}\n        ${reasons.join(' · ')}`));
 }
 console.log('');
+
