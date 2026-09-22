@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.9",
+    date: "2026-09-22",
+    changes: [
+      "The Training Load number is now the colour of its own zone. It was painted amber \u2014 the warning colour \u2014 no matter what the reading was, so a perfectly normal 1.05 showed in amber beside the words \"Optimal zone\" and above a line saying 0.8 to 1.3 is the green zone. The card disagreed with itself twice in one glance. Green in the optimal zone, amber when elevated, red when high, grey when undertraining.",
+    ],
+  },
+  {
     version: "1.464.8",
     date: "2026-09-22",
     changes: [
