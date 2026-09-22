@@ -1170,12 +1170,6 @@ nothing structured saying why — and a human decides.
   **The Body Battery (TN-55) is NOT in this batch** — it writes `body_battery_daily`, a different
   table, and the owner accepted two re-scores there to get the fix sooner.
 
-<<<<<<< HEAD
-**3. ~~Q-28, BF-9 and BF-7 carry NO `Gate:` field.~~ ✅ ANSWERED 2026-09-22: all three RELEASED.**
-  The owner chose release over gating, on this item's own argument — a rule living in a scheduled
-  prompt rather than in the file every agent reads goes stale unnoticed. **The Lane A prompt's
-  exclusion list should stop naming them.** Original text follows.
-=======
 **2b. 🔴 OPEN — is a contributor worth 2.8% of readiness's movement worth keeping?** (added 2026-09-23,
   Tuning; would unblock a narrowing of TN-60 and of the composite generally)
   The variance decomposition in TN-60 measured what each of the nine readiness contributors actually
@@ -1200,8 +1194,10 @@ nothing structured saying why — and a human decides.
   PRs landing between mine. **The fix that does is item 5's alternative — generate the baselines in CI
   rather than committing them — which needs its own entry and the owner's yes on changing the ratchet.**
 
-**3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
->>>>>>> origin/main
+**3. ~~Q-28, BF-9 and BF-7 carry NO `Gate:` field.~~ ✅ ANSWERED 2026-09-22: all three RELEASED.**
+  The owner chose release over gating, on this item's own argument — a rule living in a scheduled
+  prompt rather than in the file every agent reads goes stale unnoticed. **The Lane A prompt's
+  exclusion list should stop naming them.** Original text follows.
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
   exclusion list inside the Lane A routine prompt — a convention living in a scheduled prompt rather
   than in the file every agent reads, which is exactly the kind of thing that goes stale unnoticed.
