@@ -21,7 +21,7 @@
 // Add a prefix here and every site gains it at once. That is the whole point: `lib/lane.js` carries
 // the same lesson in its own comment, from the time its rule was duplicated and the copies drifted
 // within a day.
-const PREFIXES = ['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'PS', 'Q'];
+const PREFIXES = ['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'DV', 'PS', 'Q'];
 
 const ALT = PREFIXES.join('|');
 
