@@ -15130,6 +15130,25 @@ Containing the key is not the proof. The proof is that **every writer of the pay
 group, and live BLE samples land in the profile's own 90-day window during the workout with nothing
 in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
 across workouts to fix a twenty-call loop inside one.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26586 (after merging review sweep 52)
+
+TN-59 and TN-60, filed the morning after the queue produced a fresh instance of the defect TN-59
+describes.
+
+**TN-60** is a variance decomposition of the readiness composite over 69 stored days, and it is new
+because it measures the **output** — TN-47 argues the same case from the inputs. The finding: the
+declared weights are not the effective ones (`hrvBalance` carries 22.8% of all movement against a
+0.15 weight), and the mechanism is the ±1.5σ rail, which clips `hrvBalance` on **38% of days** and
+renders z of −1.63 and z of −4.37 as the same zero. Most of its length is the two warnings — do not
+fix it by lowering the weight, and do not conflate it with the MAD-denominator inflation, which is a
+separate entry and does not explain a −4.37.
+
+**TN-59** asks for a check because the 2026-09-20 hand sweep did not hold: 28 entries are still
+parked by a prose marker alone, and LB-124 was filed and parked the same morning, taking Lane B's
+READY list to zero. Its own first draft was parked by writing the marker character inside backticks,
+and then filed under REFERENCE by using that field for background reading — both recorded in the
+entry, because they are the argument for the check rather than embarrassments to leave out.
 ## 2026-09-21 — `docs/implementation-backlog.md` +335 (26149 → 26484) (Review sweep 52)
 
 Nineteen entries (**RV-84…RV-102**) from a visual sweep — formatting drift, 384px layout,
