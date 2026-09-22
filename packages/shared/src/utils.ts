@@ -47,9 +47,25 @@ export function readableOn(hex: string): 'black' | 'white' {
 }
 
 export function accentCardStyle(hex: string): CSSProperties {
+  // RV-99. A non-hex colour used to fall straight through to the bare muted background, dropping
+  // the gradient and the border with no error — and `scoreBand()` now returns `var(--accent-green)`
+  // rather than a hex, so the HRV-baseline card would have lost its tint silently. `color-mix`
+  // takes any CSS colour, including a `var()`, so the token path gets a real accent.
+  // **`transparent` keeps the bail**: it is the picker's "no accent" choice, not a colour, and
+  // mixing it would paint a grey wash where the user asked for nothing.
+  // The hex branch below is left alone deliberately — `rgba()` from parsed components and
+  // `color-mix(in oklch)` are not identical, and ~30 cards render through it today.
+  if (hex === 'transparent') {
+    return {
+      backgroundColor: 'color-mix(in oklch, var(--muted) var(--card-tint-pct, 60%), transparent)',
+      willChange: 'transform',
+    };
+  }
   if (!hex.startsWith('#')) {
     return {
       backgroundColor: 'color-mix(in oklch, var(--muted) var(--card-tint-pct, 60%), transparent)',
+      backgroundImage: `linear-gradient(135deg, color-mix(in oklch, ${hex} 30%, transparent), color-mix(in oklch, ${hex} 12%, transparent))`,
+      border: `1px solid color-mix(in oklch, ${hex} 40%, transparent)`,
       willChange: 'transform',
     };
   }

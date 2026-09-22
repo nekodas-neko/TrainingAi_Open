@@ -675,23 +675,37 @@ nothing structured saying why — and a human decides.
   (±0.05) or `--muted` (slightly worse). Icon-only uses were not checked against the 3:1 UI floor,
   where `/60` and `/70` pass.
 
-### [platform][app-shell] RV-99 — good/warning/bad exists as two parallel palettes, and only one can follow the theme
+### [platform][app-shell] RV-99 — the hex band triad is still copy-pasted at ~180 sites
 
-- **Lane:** A — `packages/shared/src/health/score-band.ts` first. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- `score-band.ts:6-8` returns raw hex `#22c55e`/`#f59e0b`/`#ef4444`; `recovery-band.ts:4-6` and
-  `body-battery-band.ts:12-15` return `var(--accent-green)`/`var(--accent-amber)`/`var(--destructive)`
-  for the identical concept. Resolved in dark these are **different colours, not shades**: green
-  `rgb(34,197,94)` vs `rgb(86,238,102)`; the two reds differ in contrast too (4.93:1 vs 6.42:1).
-- The hex triad is copy-pasted rather than imported — **173 occurrences across ~25 files**. So Body
-  Battery "Low" and a readiness "Moderate" are two different ambers.
-- **Fix:** make `scoreBand()` return the tokens (the only half that can follow the theme) and have the
-  hex sites import it. **Chart.js callers must pass the result through the existing `resolveColor()`**
-  (`packages/shared/src/chart-colors.ts`) — canvas cannot resolve `var()` and silently paints black.
-- **⛔ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
-  identity tint, `rarity-colors.ts`, and `hr-zones.ts`'s deliberate blue→red ramp are legitimate
-  one-off uses. Audit before replacing, then a check script banning the three literals outside
-  `score-band.ts` holds it.
+- **Lane:** B for `components/**` and `app/**`; **A** for the four shared modules listed below.
+  **Added:** 2026-09-21 · Review sweep 52. **Half shipped 2026-09-22** — see below.
+- **✅ Done (PR #1405, Lane A):** `scoreBand()` and `scoreBandByLabel()` return
+  `var(--accent-green)`/`var(--accent-amber)`/`var(--destructive)` via the exported
+  `SCORE_BAND_COLOR`, agreeing with `recovery-band.ts` and `body-battery-band.ts`. All 11 consumers
+  were checked and every one is DOM or SVG, so no `resolveColor()` call was needed.
+- **⛔ Corrected — the entry welded two jobs together and mis-sized the second.** Measured
+  2026-09-22: the hex triad is **183 occurrences across 68 files**, not "173 across ~25". The
+  `scoreBand` consumer set is a different and much smaller population (11 files), which is why the
+  first half shipped in an afternoon and this half did not.
+- **⛔ The blocking hazard was NOT the one the entry named.** It warned about Chart.js canvas and
+  `resolveColor()`; no `scoreBand` consumer touches a canvas. The live hazard was
+  `accentCardStyle(hex)` (`packages/shared/src/utils.ts`), which sliced the string to parse it and
+  **returned a bare muted background — no gradient, no border, no error — for anything not starting
+  with `#`**. Fixed in the same PR with a `color-mix` path; the hex branch is untouched on purpose,
+  because `rgba()` from parsed components and `color-mix(in oklch)` are not the same colour and ~30
+  cards render through it. **Any further migration must check this function, not just canvases.**
+- **Remaining, Lane A — four shared modules with genuine band semantics**, each needing its own
+  consumer check first: `ai-periodization/acwr.ts` (also touched by RV-97),
+  `nutrition/calorie-balance.ts`, `health/strength-progress.ts`, `types/day-checkin.ts`.
+- **Remaining, Lane B — the component sites.**
+- **⛔ Do not migrate blind; this was re-confirmed by measurement, not inherited.** Verified
+  legitimate one-off uses that must NOT be replaced: `rarity-colors.ts`, `health/hr-zones.ts` (the
+  deliberate blue→red ramp), `nutrition/macro-colors.ts` (protein's identity colour) and
+  `lib/home/home-prefs.ts` (per-metric identity colours). Migrating a colour changes what renders —
+  the dark green moves from `rgb(34,197,94)` to `rgb(86,238,102)` — so a card that uses the hex as
+  an identity tint is not a band and keeps it.
+- **The check script banning the three literals outside `score-band.ts` comes LAST**, after both
+  halves; adding it now fails CI on 183 legitimate-until-migrated sites.
 
 ### [workouts][app-shell] RV-100 — "Deload" is green on one screen and red on another
 

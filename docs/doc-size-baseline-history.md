@@ -15412,3 +15412,18 @@ the day, for a reason unrelated to their diff — which is the exact complaint t
 attribute itself in the first place. `check-doc-links` (818 files) and `check-index-doc-paths`
 (1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
 other, since a citation whose link *text* is also a path passes the first and fails the second.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26340, `projectOverview.md` → 12391 (RV-99, half)
+
+The backlog GROWS on an entry that shipped half its work, which is the right direction here. RV-99
+was one heading covering two jobs of very different size — retargeting `scoreBand()` (11 consumer
+files, done) and migrating 183 hardcoded hexes across 68 files (not done). The rewritten entry costs
+lines because it now carries three things the original did not: the corrected file count, the four
+modules whose hex is an identity colour and must NOT be migrated, and the hazard that actually
+blocked the work.
+
+That last one is why this is worth the space. The entry warned about Chart.js canvas and
+`resolveColor()`; no consumer touches a canvas. What would have broken is `accentCardStyle`, which
+returned a bare background with no gradient, no border and no error for any non-hex input. A future
+session reading only the original entry would check for canvases, find none, and ship the silent
+regression.

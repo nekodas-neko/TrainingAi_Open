@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { scoreBand } from '@trainingai/shared/health/score-band'
+import { scoreBand, SCORE_BAND_COLOR } from '@trainingai/shared/health/score-band'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
@@ -52,9 +52,11 @@ describe('BF-172 — the fit score is not called readiness', () => {
   })
 
   it('leaves scoreBand itself alone — every other caller is scoring real readiness', () => {
-    expect(scoreBand(84)).toEqual({ label: 'High', color: '#22c55e' })
-    expect(scoreBand(60)).toEqual({ label: 'Moderate', color: '#f59e0b' })
-    expect(scoreBand(37)).toEqual({ label: 'Low', color: '#ef4444' })
+    // Colours come from SCORE_BAND_COLOR rather than literals: RV-99 moved them to theme tokens,
+    // and this case is about BF-172 leaving the BANDS alone, not about which three colours they are.
+    expect(scoreBand(84)).toEqual({ label: 'High', color: SCORE_BAND_COLOR.High })
+    expect(scoreBand(60)).toEqual({ label: 'Moderate', color: SCORE_BAND_COLOR.Moderate })
+    expect(scoreBand(37)).toEqual({ label: 'Low', color: SCORE_BAND_COLOR.Low })
   })
 
   it('covers every band, so a new one cannot render undefined', () => {

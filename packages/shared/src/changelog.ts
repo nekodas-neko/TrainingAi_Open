@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.3",
+    date: "2026-09-22",
+    changes: [
+      "Good, warning and bad now look the same everywhere. Your score colours and your recovery colours were two different sets \u2014 the green on a readiness band and the green on a muscle-recovery bar were visibly different colours in dark mode, not two shades of one. They all follow the theme now, so they also stay correct if the palette ever changes.",
+    ],
+  },
+  {
     version: "1.465.2",
     date: "2026-09-22",
     changes: [
