@@ -4068,17 +4068,15 @@ evening sync. BLE does not exist in the sandbox, so the timer, the visibility li
 where Sync is not pressed and that day's stress still reaches the database past 18:00 — the previous
 days stop dead at 06:30 and 17:30.
 
-### [devices] ⚠️ The Colmi ring's decode moved to the server and has not run on the device (PS-21 Stage A, 2026-09-03)
-
-v1.436.4 posts the ring's raw frames and decodes them server-side. Proved equivalent to the old
-client decode over a real 31-frame sync — 209 received, 167 accepted, **166 stored rows identical
-field for field** between the two paths — but against the local dev database, over frames replayed
-from the archive rather than a ring.
-- **What has not run:** an actual sync from the phone. The pairing card's counts now come from
-  response fields (`received`, `decodedBy`) that did not exist before, so a WebView holding an older
-  bundle than the deploy would show zeros while the rows still land. `decodedBy` says which side read
-  the bytes, which is how to tell those apart rather than guessing from counts.
-- **The check:** one Sync on the S25. Readings stored > 0, and `decodedBy` reads `server`.
+**Amended 2026-09-22 — strong circumstantial evidence, and the stated check still cannot be run.**
+Production holds **16 syncs over 3–8 September** at 06:13, 06:27, 06:33, 06:48, 07:29, 08:40, 08:58,
+11:48, 13:07, 13:33, 17:10, 17:34, 19:03, 20:37 and 21:13 Brisbane — three of them evening, and a
+scatter no one presses by hand. That is consistent with the timer and the resume listener working.
+**It is not proof, and cannot be made proof from the database**, because nothing distinguishes an
+automatic sync from a pressed one once it arrives: `attemptAutoSync` records its last run in
+`localStorage`, and the ingest route stores no trigger. So this row stays open on a technicality
+worth naming — the cheapest way to close it is a `trigger: 'auto' | 'manual'` field on the ingest
+body, after which one query answers it forever.
 
 ### [nutrition][devices] ⚠️ The Coach plan card's save took the web fallback, not the offline-first path (LA-47, 2026-09-02)
 
