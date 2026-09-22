@@ -28,12 +28,17 @@ const EXEMPT_PREFIXES = [
 // local-time Dates carrying a calendar date, so rendering them device-local returns the same
 // date in any zone. There is nothing to fix; they are listed to record that the judgement was
 // made, so nobody re-triages them.
+//
+// FOUR OF THE FIVE ARE GONE (LB-126). They were benign, and they are now also absent: each spelled
+// its own `{ weekday: … }` option bag, and `formatDateDisplay` grew the styles for them in LB-125,
+// so they route through the one formatter and no longer call `toLocale*String` at all. The rows
+// are deleted rather than kept, per this check's own rule — the four it named were
+// `nutrition-content`, `recommendation-card`, `week-day-sheet` and `weekly-nutrition-chart`.
 const REVIEWED_BENIGN = new Set([
-  'app/nutrition/nutrition-content.tsx',            // new Date(dateStr + 'T12:00:00') — local noon
-  'app/session-select/components/recommendation-card.tsx', // new Date(y, mo - 1, dd)
-  'app/session-select/components/week-day-sheet.tsx',      // new Date(y, m - 1, d)
+  // The one LB-126 deliberately did NOT convert: this renders a MONTH and YEAR from
+  // `(viewYear, viewMonth - 1, 1)`, while `formatDateDisplay` takes a `YYYY-MM-DD` string and has
+  // no month-year style. Still benign for the original reason — a calendar-component Date.
   'components/calendar-widget.tsx',                 // new Date(viewYear, viewMonth - 1, 1) — month label
-  'components/nutrition/weekly-nutrition-chart.tsx',// new Date(date + 'T12:00:00') — local noon
 ]);
 
 // REAL but BLOCKED — this list is now EMPTY, and that is the finished state of Q-148, not an
