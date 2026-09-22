@@ -178,7 +178,7 @@ export const EnergyCard = memo(function EnergyCard({
               onClick={() => setShowInfo(v => !v)}
               aria-label="How energy balance is calculated"
               aria-expanded={showInfo}
-              className="-m-1 rounded-full p-2.5 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+              className="-m-1 rounded-full p-2.5 text-muted-foreground/70 transition-colors hover:text-muted-foreground"
             >
               <Info className="h-3.5 w-3.5" />
             </button>

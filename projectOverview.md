@@ -26,10 +26,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.465.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**Opacity-modified text was below AA and the contrast check could not see it (RV-98, v1.465.3).**
+`check-contrast.js` validated ten BARE token pairs and had no opacity handling, so everything from
+`text-muted-foreground/60` down was unguarded: over `--card`, 70% opacity gives 4.64:1 and passes,
+60% gives 3.73, 50% 2.97, 40% 2.34, 30% 1.83 — against 4.5:1 for body text. **45 call sites raised
+to 70%**, four exempted with written reasons (an inactive future day, two ring *tracks* where the
+class is a fill colour rather than text, a separator glyph). The calendar's `rest` marker went to
+**full** opacity rather than the floor: it is `text-[7px]` and the only thing distinguishing a past
+rest day from a past untracked one. The check now composites alpha **in gamma-encoded sRGB** —
+blending the linear values put 40% at 3.93:1 instead of 2.34:1, and a wrong number in an error
+message is worse than no number. **RV-98's own measurements reproduced independently to ±0.01**,
+which given this sweep's record with entry claims is worth recording.
 
 **A doc comment was quoted as evidence of what a screen rendered; it was wrong, and so was its
 neighbour (LB-125).** `formatDateDisplay`'s header claimed `'short'` gave `Jan 5` and `'long'` gave
@@ -82,8 +92,6 @@ this caller since it was written. **The entry's one-line fix does not compile:**
 booleans rather than type predicates, so the key is narrowed explicitly and the unreachable arm
 inherits the text colour instead of inventing one.
 
-**Version:** v1.464.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-22.
 
 **Home's score row said nothing when it failed to load (RV-85, v1.464.9).** `{readiness && <row>}`
 gated the whole row — and with it the illness advisory and the early-deload banner — so a failed
@@ -1751,7 +1759,6 @@ the builder cannot program an exercise the swap sheet would offer to replace, an
 would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-lane-a-sleep-provisional)).
 
 **A logged meal stops breaking apart, and two nutrition controls stop meaning the wrong thing (BF-72/73/74/76).** The owner's *"it starts as the meal with the image, then breaks into its ingredients"* was the diary hydrating from the server and **omitting `savedMealId`/`mealGroupId`** — a local upsert overwrites every column it is given, so the screen stripped its own grouping and then rendered the stripped copy. There are exactly two `applyDelta` callers and the sync engine's was already correct, so this was the one site BF-39's audit did not reach. The meal photo's ✕ **sat where the sheet's close button would be** — and the sheet passes `hideCloseButton`, so it was the only ✕ on screen: a reach for dismiss deleted the photo. It is a bin at the bottom-right now, with undo. Capture tiles went **60 px → 79 px** and `New` now outranks a small delete bin. **Two findings came out of it that outlive the batch.** `min-h-[Npx]` **does nothing on a `<button>`** — a bare `button { min-height: 48px }` in `globals.css` beats the utility (measured: 48 px on a button, 84 px on a div), so BF-50's documented "62 px" tile actually measured 60; filed as LB-32. And **BF-76's safe-area sweep found the opposite of what it expected** — nothing in nutrition is under-padded, three sheets are *over*-padded by declaring the inset on both the content and the footer, and the `vh`→`dvh` hypothesis is not the mechanism at all, since a bottom sheet is `fixed bottom-0` and its height moves only its top edge. No padding changed: every available fix costs more than the 12–24 px it saves ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-uplift)).
-
 
 
 **A red check took an hour to prove innocent, and the hour is the finding (LB-31).** `body-battery`'s anchor-precedence test failed on CI in code this branch does not touch. It did **not** reproduce: the failed job re-run on the identical commit passed, and the full suite passes locally against a freshly migrated database — so it is a flaky test, **not** the red `main` the first reading suggested. The mechanism is still worth fixing: those three assertions are cumulative on one user, and the route under test calls `buildReadinessPayload`, **which persists**, so step 2's own sleep insert can land the readiness step 3 is meant to establish. The durable half is that `ci.yml` has no `push: [main]` trigger — correctly, and for reasons written into the workflow — so nothing verifies the *combination* after several independently-green PRs land together, and there is no signal that separates "flaky test" from "main is broken". That is what cost the hour.
