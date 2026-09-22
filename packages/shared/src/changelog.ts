@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.464.4",
+    version: "1.464.5",
     date: "2026-09-22",
     changes: [
       "Your morning recovery and sleep-feel sliders no longer count as answers unless you actually move one. The sheet starts both at the middle and remembers whether you touched them \u2014 and in 97 check-ins you have moved recovery zero times, so every reading of it was the app's own starting position, not something you said. The calibration reports, the readiness-versus-recovery chart, the day review and the AI's session prescription all now ignore a slider you left alone. Expect those charts to go empty rather than change: three answers that are real are worth more than 78 that are not. Nothing already saved was altered.",
+    ],
+  },
+  {
+    version: "1.464.4",
+    date: "2026-09-22",
+    changes: [
+      "One estimated 1RM now shows the same number everywhere. A lift stored at 92.25 kg read as 92.5 on the ready screen, ~92 in the exercise list, 92.3 in the stats sheet and on the strength trend, and 92.25 in the exercise summary \u2014 four numbers for one lift, in one session. The ready screen was the worst of them: it was rounding to the nearest pair of plates, which is the right thing to do for a weight you are about to load and the wrong thing for a number you are only reading.",
     ],
   },
   {

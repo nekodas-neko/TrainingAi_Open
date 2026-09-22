@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
-**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.4).**
+**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.5).**
 The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant
 and records whether the lifter moved each one. Measured on production 2026-09-22 over 97 morning
 check-ins: **78 carry a `perceived_recovery` and 0 of them were ever touched** — two distinct values,
@@ -46,6 +46,16 @@ write-path instruction — make an untouched body count as carrying no answers �
 the owner's daily check-in reaching the server**, because the sheet sends nothing else that counts
 and `pushMutations` rejects such a body as a no-retry poison pill. The Q-465 guard therefore reads
 the submitted body and the nulling applies to what is stored.
+**One stored 1RM printed four different numbers (RV-89, v1.464.4).** A lift stored on the 0.25 grid
+at 92.25 read as **92.5** on the ready screen, **~92** in the exercise list, **92.3** in the stats
+sheet and on the Strength Trend card, and **92.25** in the exercise summary — in one session. All
+of them now call `displayOneRm`. **The ready screen's rounder was `mround125`, the 1.25 kg plate
+grid** — a *prescription* rounder, and the one that told the owner to load 82.5 kg onto a pull-up in
+BF-127; its import is gone from that file, while the stats sheet's two remaining calls are genuine
+prescription weights. **The Strength Trend card held three of the sites, not the one the entry
+named** (headline, 90-day low, peak), and both of the entry's open questions are answered in the
+negative: the `~` was not a deliberate approximation signal, and no site reads a pre-rounded server
+field.
 
 **AI calls are bounded, and the prose routes answer with their own facts when the model fails
 (RV-69 + RV-70, v1.464.3).** Four routes — the daily and weekly digests, the health insight and the

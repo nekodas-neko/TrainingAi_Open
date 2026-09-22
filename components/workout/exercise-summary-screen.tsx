@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { ExerciseSummaryData } from "./types";
 import { formatTime, formatSetLoad } from "./utils";
-import { bodyweightRepMax, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
+import { bodyweightRepMax, displayOneRm, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
 import { SessionClock } from "./session-clock";
@@ -227,14 +227,14 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
               <p className="text-base font-bold tabular-nums">
                 {isBodyweight
                   ? (prevRepMax != null ? `${prevRepMax} RM` : "—")
-                  : (prevEst1rm != null ? `${prevEst1rm} kg` : "—")}
+                  : (prevEst1rm != null ? displayOneRm(prevEst1rm, exerciseType).text : "—")}
               </p>
             </div>
             {RmArrowIcon && <RmArrowIcon className={cn("h-5 w-5", rmColor)} />}
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">This session</p>
               <p className={cn("text-base font-bold tabular-nums", rmColor)}>
-                {isBodyweight ? `${newRepMax} RM` : `${newEst1rm} kg`}
+                {isBodyweight ? `${newRepMax} RM` : displayOneRm(newEst1rm, exerciseType).text}
               </p>
             </div>
           </div>

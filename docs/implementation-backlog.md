@@ -708,27 +708,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   tab-show + pull-to-sync fan-out (`cachedFetch` de-dupes concurrent calls for the same key, which
   reduces it).
 
-### [workouts] RV-89 — one stored 1RM renders four different numbers, and four sites half-use the shared helper
-
-- **Lane:** B — `components/workout/{active-workout-screen,pre-workout-screen,exercise-summary-screen,
-  exercise-stats-sheet}.tsx`, `components/health/strength-trend-card.tsx`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- The value is stored on a 0.25 grid (`packages/shared/src/1rm.ts:81`). For a stored **92.25**, in one
-  session: ready screen `mround125(...)` → **92.5 kg**; exercise summary raw → **92.25 kg**;
-  pre-workout list `Math.round(...)` → **~92kg**; Strength trend `.toFixed(1)` → **92.3 kg**; stats
-  sheet `.toFixed(1)` → **92.3 kg**. Four numbers, three unit spacings.
-- **The telling detail:** four of those five call `displayOneRm(...)` for the **bodyweight** branch of
-  the same ternary and hand-roll the weighted branch. The shared helper is already imported and half
-  used.
-- **⛔ `mround125` must not do display duty — this has already shipped a live bug.**
-  `components/workout/utils.ts:47` rounds to a 1.25 barbell-plate grid clamped 5–250; it is a
-  *prescription* rounder. `projectOverview.md` records **BF-127**, where the baseline banner told the
-  owner to load **82.5 kg on a pull-up** because `mround125` was applied to a bodyweight 1RM index.
-- **Fix:** route all six through `displayOneRm(oneRm, exerciseType, addedKg)` and render `.text`.
-- **Not established:** whether the pre-workout `~` prefix is a deliberate approximation signal; and
-  whether any site reads a differently-rounded server field rather than the stored column (only
-  `strength-trend` and the summary path were traced).
-
 ### [body][platform] RV-90 — body weight renders five ways across seven sites, and no shared formatter exists
 
 - **Lane:** A — a new helper in `packages/shared/src/`, then the call sites.

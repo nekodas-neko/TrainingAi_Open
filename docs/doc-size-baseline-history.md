@@ -15266,6 +15266,16 @@ was LA-49, which had measured the whole thing three weeks earlier and was parked
 described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
 the investigation again. That is the argument for the check TN-59 still proposes, more than the
 count it was written against.
+
+## 2026-09-22 — RV-89 (`fix/rv89-one-rm-display-helper`)
+
+`docs/implementation-backlog.md` 26619 → 26598 → **26562** on re-merge: RV-89 shipped and left the
+queue, and #1394 then landed while this PR waited on CI.
+
+`projectOverview.md` 12222 → 12233 → **12250** on re-merge: eleven lines at the top of Current
+Status, plus #1394's own paragraph, which is kept above this one rather than spliced with it. The entry named
+five surfaces; the Strength Trend card turned out to hold three sites rather than one, and the
+`mround125` half is worth the space because it is the same rounder behind BF-127.
 ## 2026-09-22 — `projectOverview.md` → 12239, `docs/implementation-backlog.md` → 26583 (RV-69 + RV-70)
 
 The backlog shrank by the two entries the batch `ai-degrade-and-bound` shipped, less a five-line
@@ -15283,7 +15293,7 @@ than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explai
 entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
 only "shipped" would leave all three to be rediscovered.
 
-## 2026-09-22 — `docs/implementation-backlog.md` → 26514, `projectOverview.md` → 12257 (TN-57)
+## 2026-09-22 — `docs/implementation-backlog.md` → 26493, `projectOverview.md` → 12267 (TN-57)
 
 The backlog lost TN-57 whole, which was a long entry: it carried the production measurement table,
 the correction of its own first draft (the defect is not circularity — that is TN-50, a different

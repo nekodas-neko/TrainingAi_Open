@@ -175,7 +175,7 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
               {allTime1rm != null && (
                 <div className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: "var(--accent-amber)" }}>
                   <TrophyIcon className="w-3 h-3" />
-                  <span>All-time: <strong>{isBodyweight ? displayOneRm(allTime1rm, "bodyweight").text : `${allTime1rm.toFixed(1)} kg`}</strong></span>
+                  <span>All-time: <strong>{displayOneRm(allTime1rm, exercise.exerciseType).text}</strong></span>
                 </div>
               )}
               {rmTargets.map(t => (
