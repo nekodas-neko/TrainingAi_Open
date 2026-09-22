@@ -4245,6 +4245,21 @@ helper the call site calls.
   scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
   traps in BF-100's hook** — they are paid for and written into it.
 
+- **⚠ POSSIBLY STILL LIVE — observed 2026-09-22, NOT yet confirmed as a failure.** The owner sent a
+  DevTools screencast of the running APK in which **the address bar reads `/more` while Home
+  renders** — which is this entry's recorded symptom word for word. It is filed as an observation
+  rather than a reopening because **how that state was reached is unknown**, and the fix only claims
+  the cases where `TabShell` mounts.
+  - **What would settle it, and it is one sequence:** from Home, tap **More**, open **Profile
+    details**, press the **system back**. The fixed behaviour lands on More with the URL reading
+    `/more`. Home rendering under a `/more` URL is the unfixed behaviour.
+  - **⛔ Do not assume a stale build.** This fix is in `components/shell/tab-shell.tsx` — JS, which
+    reaches the device through a Railway deploy with no APK rebuild. The phone should have it. If
+    the sequence above reproduces, the fix is incomplete on device rather than undelivered, and the
+    likely gap is that `TabShell` did not remount: the initializer reads `window.location.pathname`
+    **at mount**, so a path that leaves the component mounted keeps the stale tab.
+  - This is the `back-gesture-sitting` batch's own check arriving early, by screenshot. Answer it
+    in that sitting rather than separately.
 - **Lane:** B — `components/shell/tab-shell.tsx`.
 - **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
   pressing back gets me to the home page again."*
