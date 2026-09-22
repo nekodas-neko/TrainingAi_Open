@@ -1211,7 +1211,11 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 
 - **Lane:** B — `components/nutrition/supplements-section.tsx:66-106`. **Added:** 2026-09-20 ·
   Review sweep 51.
-- **Gate: device** — the contention this is about cannot be staged off the APK.
+- **Verification:** device. The contention this is about cannot be staged off the APK, so the fix
+  ships and is then looked at on the S25 — **it is not gated**. `Gate: device` was written here on
+  2026-09-20 and parked buildable work for two days (OR-122): the fix below is three statements
+  moved above a `try`, needs nothing from the phone to write, and a gate that cannot be lifted until
+  someone starts the work it forbids starting is circular. Unbuilt work gets a Verification line.
 - `applyOptimistic()` sits at **line 92**, behind `await store.upsertSupplementLog(...)`, `await
   store.queueMutation(...)` and `await cancelSupplementReminder(s.id)` (`:89`), with `if (toggling)
   return` (`:47`) disabling the row for that whole span. The web-fallback branch is worse —
@@ -1364,7 +1368,10 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Lane:** B — `components/health/health-score-detail.tsx:49-57`. **Added:** 2026-09-20 ·
   Review sweep 51.
 - **Batch:** `motion-polish`
-- **Gate: device** — see the compositor risk below.
+- **Verification:** device — see the compositor risk below. The risk is in the *fix*, which is a
+  reason to look at the S25 after it lands, not a reason to forbid writing it; this carried
+  `Gate: device` from 2026-09-20 until OR-122. It ships with the rest of `motion-polish`, which is
+  already a device sitting.
 - `:49` is `const displayScore = useCountUp(score)`, easing the digits over 600 ms. Eight lines
   below, the `<circle>` sets `strokeDashoffset` inline with **no transition**, so the arc is already
   at its final position before the number finishes. That is an inconsistency inside a single
@@ -3028,7 +3035,9 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   [Journal](overview/history-2026-09-21-folded-1.md#2026-09-17-fix-lb116-checkin-sends-suggested-sore), which carries the
   reasoning, the Lane A schema edit it needed, and why its e2e was deleted rather than shipped green.
 - **Lane:** B — `components/mood-checkin-sheet.tsx`
-- **Gate: device** — the residue below is the gate: the offline path cannot be staged off the APK.
+- **Verify: device** — the residue below. The offline path cannot be staged off the APK. This was
+  `Gate: device` until OR-122, which **parks** a shipped entry beside work that genuinely cannot
+  start; per BF-90 a shipped entry owing a look takes `Verify:`, which does not park.
 - **Keep:** the **offline check-in case, which needs the device** — queue a check-in with no network
   and confirm the stored `suggested_sore_muscles` is what the sheet drew at the time, not what the
   server would derive hours later when the mutation lands. That divergence is half of why this entry
@@ -3850,13 +3859,20 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   elimination list.
 - **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
   activity' nothing actually happens."* Reported on the APK.
-- **Gate: device** — added 2026-09-17, once the root cause below was measured. **This is a gate on
-  the FIX, not on the diagnosis**, and the distinction is why it was absent for two days: the cause
-  is now reproducible in the harness (recipe below), so the investigation never needed the device and
-  the entry correctly headed READY while that was the open work. What is left does need it — a fix
-  here rewrites history handling for every sheet that navigates, and the Android back gesture is a
-  Capacitor channel Playwright cannot fire. Ungate it the moment the fix lands in a branch needing
-  only the S25 look.
+- **Batch:** `back-gesture-sitting` — with **BF-166**, **LB-107**, **LA-109** and **BF-100**. A fix
+  here changes history handling for every sheet that navigates, which is the same Android back
+  gesture those four already need one sitting for. Added by OR-122 in place of the gate below.
+- **Verification:** device. The Android system back gesture arrives over a Capacitor channel
+  Playwright cannot fire, so the look is owed on the S25 — but the fix is written first.
+- **⚠ This entry carried `Gate: device` from 2026-09-17 until OR-122, and the gate was CIRCULAR.**
+  It said *"Ungate it the moment the fix lands in a branch needing only the S25 look"* — but a gated
+  entry never prints as READY, so nobody starts the fix, so the condition for lifting the gate can
+  never arrive. Two days of that had already been noticed and written off as correct
+  (*"the distinction is why it was absent for two days"*); five days of it parked a **live
+  owner-reported bug** whose root cause is fully measured below and whose design constraints are
+  written out. The general rule this is the worst instance of: **`Gate: device` means SHIPPED and
+  awaiting a look. Unbuilt work gets a Verification line**, however certain it is that the device
+  will be needed at the end.
 - **This blocks a path the owner was told to use yesterday.** BF-160 established that a fitness test
   earns no calories, and "Other activity → Treadmill" is the recommended way to log a steady
   treadmill walk (the guided walk is interval-only, minimum 1 fast + 1 slow block). That
@@ -9230,10 +9246,15 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
   state now names the **installed** build rather than only the newest one — the update state used to
   name a version the phone does not have and say nothing about the one it does. The date came from
   `nativeBuiltAt`, which `/api/version` was already returning and the card was dropping.
-- **Gate:** device — the card returns early unless `Capacitor.isNativePlatform()`, so on web and in
-  every e2e harness it renders nothing at all and none of its three states has been on a screen.
-  The check is the one below: on a phone whose APK is behind the web app, About names both numbers,
-  says which is which, and the tick refers unambiguously to the Android build.
+- **Gate:** owner — **the screenshot**. Corrected from `Gate: device` by OR-122: the device check
+  already happened and **failed**, so a device gate now describes debt that is settled and hides the
+  thing actually blocking this. What is owed is the owner's screenshot of the failing card, because
+  a bare fail does not say which of the three states was wrong and the entry's whole difficulty is
+  which-number-where. Once that arrives this is ordinary Lane B work.
+- **Verification** after the re-fix: on a phone whose APK is behind the web app, About names both
+  numbers, says which is which, and the tick refers unambiguously to the Android build. The card
+  returns early unless `Capacitor.isNativePlatform()`, so on web and in every e2e harness it renders
+  nothing at all — this cannot be checked anywhere but the S25.
 
 - **Lane:** B — `components/more/update-check-card.tsx:81`.
 - **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
@@ -9915,39 +9936,6 @@ one. A swipe on the single Start button adds an affordance that does not current
   change tabs or scroll the page; the first tap on the revealed Rest lands (BF-61); a vertical drag
   still scrolls; the card still reaches Rest in one tap on a deload day; and the choice survives a
   tab switch and an app restart (which is BF-84's half).
-
-### [platform] LA-49 — 34 entries carry a `⛔`; only 7 mean blocked, and the tool parks all 34
-
-- **Lane:** A — `scripts/next-item.js`, plus a triage pass over `docs/implementation-backlog.md`.
-- **Added:** 2026-09-01 · found while shipping BF-90, which fixed the same disease in the `Gate:`
-  field and left this half standing.
-
-**Measured 2026-09-01, on the same queue BF-90 measured.** `next-item.js` treats **any** `⛔` in an
-entry body as an unmigrated blocked marker and parks the entry. 34 entries contain one. Only **7**
-use it to mean blocked — and one of those seven, BF-1's, is struck through and marked
-`✅ CLEARED`. The other 27 use it as an emphasis glyph: *"⛔ Do NOT impute the check-in on unlogged
-days"*, *"⛔ Do not touch the 0.3/0.5/1.0 ladder"*, *"⛔ TN-2 does not fix this"*. Every one of
-those is a warning to whoever builds the entry, which is the opposite of a reason not to build it.
-
-**This is strictly larger than the problem BF-90 fixed** — 27 false parks against 17 mis-filed
-gates — and it is the reason the parked count still overstates blocking after BF-90.
-
-- **The obvious fix, and why it is not obviously safe.** The file's own protocol (near the top)
-  documents the marker as `⛔ blocked: <reason>`, so matching `⛔` followed by the word *block*
-  rather than the bare glyph is the file's own convention rather than a new heuristic. Measured, it
-  moves 27 entries out of PARKED: **16 to READY**, 1 to KEEP, 1 to VERIFY, 9 stay parked on a real
-  `Gate:`/`Needs:`.
-- **⚠ Those 16 are not all startable, and that is the whole problem.** The set includes `BF-14`,
-  whose heading opens *"❌ REFUTED 2026-08-24"*, and `Q-49`, marked 🔴. They are mis-filed today —
-  in the queue with no `Reference:`, no `Keep:`, nothing but a `⛔` holding them out of sight — and
-  narrowing the detector would put them at the top of the work list rather than fixing them.
-  **So the detector change must come second**, after the 16 are triaged; doing it first trades a
-  section nobody reads for a section an implementer starts from, which is the worse failure.
-- **Do it in this order:** (1) triage the 16 — a completed one leaves the queue, a refuted one gets
-  a `Reference:` or leaves, a real block gets a `Gate:`; (2) then narrow the detector and delete the
-  `legacyBlocked` migration path, since the 7 real ones will have proper fields by then.
-- **Verification:** `next-item.js`'s PARKED count matches the entries that genuinely cannot start,
-  and no entry in READY is one whose own heading says it is refuted, shipped or superseded.
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
@@ -14786,6 +14774,11 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
   a rate balance that nets **−29.8 points/day**. Read TN-55 before doing anything here; what survives
   of this entry is the history-recompute policy and the owner's 2026-08-26 decision to recompute
   rather than freeze.
+- **Gate: owner** — added 2026-09-22 (OR-122), expressing in a field what the ⛔ below has said in
+  prose since 2026-08-24. What is owed is the `.constants.json` set: it is downloaded at boot into
+  `OURA_CONSTANTS_DIR`, Q-49 removed it from the repository, and neither path exists in a session
+  container. Until it is supplied, the stress term cannot execute here **at all** — and (a) and (b)
+  below are each independently sufficient on top of it.
 - ⛔ **THE FIT CANNOT BE DONE FROM AN AGENT SANDBOX — measured 2026-08-24, not assumed. Read this
   before attempting it, or you will rediscover it.** The entry requires the fit to include the
   stress term. `buildDaytimeStressSeriesFromModel` needs `DaytimeStressConstants`, which are
@@ -15436,6 +15429,11 @@ handoff, so each role compacts its own on its next one, moving narrative to a da
 Close this when all five are under ~150 lines.
 
 ### [devices][readiness] BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
+
+- **Reference:** the trap, not the fix. Field added 2026-09-22 (OR-122): the entry says outright
+  that it is *kept, not deleted*, and nothing here is to be built. It was being held out of the work
+  list by a `⛔` alone, which is the wrong mechanism — a narrowed marker rule would have put a
+  refuted entry at the top of an implementer's list.
 
 > **⛔ REFUTED by measurement (Tuning, 2026-08-24). Do not implement this. It is kept, not deleted,
 > because the trap it fell into is worth reading — and because the same trap caught Tuning the same
@@ -17559,6 +17557,35 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
 
+### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
+
+- **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A
+  by the first clause of the lane rule.
+- **Added:** 2026-09-22 (OR-122), lifting a block out of Q-538's prose. Q-538 said the bound on
+  `oura_raw.db` was *"blocked, and not by anything in this queue"* because this work **had no
+  entry** — so the block could not be a `Needs:` and was held by a `⛔` instead, which parks the
+  entry for a reason no field states. Filing the target is the fix; Q-538 now carries
+  `Needs: OR-123`.
+- **The chain, re-verified 2026-08-25 and unchanged.** `pruneRaw` deletes only rows marked
+  `rolled_up`. The only writer of that flag is `markRolledUp`. Its sole caller would be the WebView
+  rollup consumer, which is not built — a repo-wide grep finds no caller for `markRolledUp`,
+  `pruneRaw` or `getUnrolledRaw` outside the plugin interface. **So wiring the prune today deletes
+  zero rows**, and any measurement of it would read as "the prune works, there was nothing to
+  remove".
+- **What it has to do:** read unrolled raw rows from the device store, fold them into the on-device
+  rollup, and mark them `rolled_up` — in that order, and only marking what is durably folded. The
+  cursor discipline is the server pipeline's, for the same reason: a flag advanced past work that
+  was not completed loses the span permanently, and the device copy is a 14-day rolling window with
+  nothing behind it.
+- **Nothing blocks this.** The plugin methods it calls already exist; what is missing is the
+  consumer.
+- **Do NOT reach for the server's archive to recover a mistake here.** The device store is
+  deliberately transient (the owner's 2026-08-02 retention decision) and local pruning is
+  **local-only** — it must never reach a server delete or influence a sync decision.
+- **Verification:** device. `rawStats()` from the admin console before and after a rollup pass shows
+  the unrolled count falling and the store's size following it. Q-538's own on-device read is the
+  natural sitting to do it in — it owes one anyway, and it is the entry this unblocks.
+
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
 
 - **Lane:** A — `lib/local-store/**` pruning on the device — storage, so Lane A by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep.)
@@ -17624,8 +17651,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   **WebView rollup consumer — D2 Task 5, still not built** (re-verified 2026-08-25: a repo-wide grep
   finds no caller for `markRolledUp`/`pruneRaw`/`getUnrolledRaw` outside the plugin interface).
   Wiring the prune today deletes zero rows. That work is a rollup consumer over local storage —
-  **Lane A's** — and has no queue entry, which is why this is written out rather than expressed as a
-  `Needs:` whose absent target would read as "already shipped".
+  **Lane A's** — and **now has an entry, `OR-123`**, filed 2026-09-22 (OR-122). This paragraph used
+  to end *"has no queue entry, which is why this is written out rather than expressed as a `Needs:`
+  whose absent target would read as 'already shipped'"* — correct reasoning about the field, and the
+  answer to it was to file the target rather than to leave the block in prose. It is a `Needs:` now.
+- **Needs:** OR-123
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
@@ -19779,6 +19809,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Gate:** owner
 
 ### [readiness][devices] ⛔ LA-57 — REFUTED: the night-HRV "step" at the re-key is a ramp
+
+- **Reference:** the corrected reasoning. Field added 2026-09-22 (OR-122) — *"do not implement
+  anything below"* is the entry's own instruction, and it was held out of the work list by the `⛔`
+  glyph rather than by a field. The narrow question it leaves open is genuinely open; it is not
+  this entry's build.
 
 > **⛔ THIS ENTRY'S CENTRAL CLAIM IS WRONG, corrected 2026-09-04 by the agent that filed it a day
 > earlier.** [`review`](reviews/2026-09-04-hrv-ramp-not-step.md). Do not implement anything below;
@@ -21978,6 +22013,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-252 — error tracking with session replay, for the bug class that cannot be reproduced from source
 
+- **Needs:** BF-92 — added 2026-09-22 (OR-122). The entry's own recommendation is *"once BF-92 lands
+  and a browser event is confirmed on the device, retitle this"*; that is a dependency, and it was
+  being held by a `⛔` inside a status table instead of by a field.
+
 > **⚠ MOSTLY SUPERSEDED, AND ITS HEADLINE ASK WAS DECIDED AGAINST (2026-09-03, Lane A). Do not build
 > this as written.** Filed 2026-08-14, before the vendor was chosen. Checked line by line against
 > what shipped:
@@ -22931,6 +22970,8 @@ whole 1–5 scale. Concretely:
 A night the owner rated worst-of-month and a night they rated best-of-month score within a point of
 each other. The score has ~18 points of dynamic range and spends all of it above 80.
 
+- **Gate: owner** — the decision named on the next line. Added as a field 2026-09-22 (OR-122); it
+  had been prose since the entry was written, which meant the queue held it only by accident.
 - **⛔ Needs an owner decision before code.** Re-tuning the Sleep Score changes a number they read
   every morning, and "what should a bad night score" is a product judgement, not a fit. Two shapes:
   (a) rescale so the observed range spreads across 0–100, or (b) leave the score and add a separate
@@ -23392,6 +23433,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [workouts] Q-85 — compress accessory rest at a Quick budget, and leave the compound alone
 
+- **Gate: owner** — field added 2026-09-22 (OR-122) for the decision named below, which had been
+  carried in prose only.
 - **Lane:** A — `packages/shared/src/ai-periodization/{time-budget,generate-prescription}.ts`.
 - **✅ DECIDED BY THE OWNER 2026-08-23 — option (a), with a 45-second accessory floor.** The plan's
   §4 question is answered and this entry is startable. Build §5's shape as written.
@@ -23876,6 +23919,9 @@ the goal layout's §7 off-ramp says is missing.
 ### [platform] 🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
 
 - **Lane:** A
+- **Gate: owner** — field added 2026-09-22 (OR-122). Phase B deletes 81.2 MB of Oura-extracted
+  material from a repository's history and is irreversible; the 🔴 in the heading and the ⛔
+  correction below have been the only things holding it, and neither is a field the queue reads.
 > **⚑⚑ 2026-08-10 — THE PLAN'S IP SCOPE WAS INCOMPLETE, and the gap is the most sensitive material
 > in the repo.** A full audit of what is tracked (`scripts/check-private-paths.js`, shipped with this
 > finding) measures **81.2 MB** of Oura-extracted material across **seven** directories. Everything
@@ -24181,7 +24227,9 @@ describing a safety net that no longer exists.
 | **F3** | Play Store + multi-user are stated requirements in `device-agnostic-source-architecture.md` and appear in no stage; `public-launch-checklist.md` holds one item while five launch-gating items sit in four other docs (HC declared-use-case review, privacy policy/data-safety, map attribution, one-owner BLE assumptions, `006_admin_flag.sql`) | ✅ **ANSWERED 2026-08-03: IN.** Owner: *"yes part of the plan. I want other people to be able to use this app as its really good."* So: **every write stays `user_id`-scoped, the sync engine is maintained and extended rather than reduced, and no surface may assume the owner's own device or ring.** Still to do — add Stage 8 to the goal layout and gather the five scattered launch-gating items into `public-launch-checklist.md`. The **Health Connect declared-use-case review is the long pole** (an external approval with a lead time nobody controls) and should be started well before the rest |
 | **F4** | Stage 1 is called "the spine" and defines no schema — 70 `pgTable` vs 37 local tables with no residency/ownership record. Stage 5 generates Room entities from it. Q-44 Phase 3's 22-table rename is unsequenced against it and must land *at* Stage 1 or never | Stage 1's deliverable becomes a table-by-table residency matrix (device/server/both, writer, retention tier, derived?) + the `oura_*` rename go/no-go |
 | **F5** | Stage 5 re-implements the subsystem with the worst incident history in the repo (#47/#74/#82) with no plan, no parity harness, an unowned native replacement for `scripts/check-push-mutations.js`, and a transitional *third* write path per domain | Stage 5 opens with a golden-vector parity harness driving both implementations; add the native one-write-path guard as a named task; add a "Stage 5 without Stage 6" off-ramp |
-| ~~**F6**~~ | ✅ **ANSWERED AND APPLIED 2026-09-02.** The gate is **released** — Q-49 did it (*"releases the Q-1 + Q-30 gates on Q-32, which were sequencing preferences rather than technical dependencies"*) and the public cut has happened. What was left was a stale line: **Q-1b contradicted itself**, saying the gates were released in a 2026-09-01 note and still carrying *"Q-31 and Q-32 stay ⛔ blocked behind it"* from 2026-08-02 further down. Struck, with both sides cited. There is no Q-32 *entry* to state a deferral on — it is referenced but not queued — so the edit landed where the contradiction actually was | Done |
+| ~~**F6**~~ | ✅ **ANSWERED AND APPLIED 2026-09-02.** The gate is **released** — Q-49 did it (*"releases the Q-1 + Q-30 gates on Q-32, which were sequencing preferences rather than technical dependencies"*) and the public cut has happened. What was left was a stale line: **Q-1b contradicted itself**, saying the gates were released in a 2026-09-01 note and still carrying *"Q-31 and Q-32 stay […] blocked behind it"* from 2026-08-02 further down (the
+glyph is elided from the quotation deliberately: reproducing it here parked Q-48 on a line whose
+whole content is that the block was released — OR-122, 2026-09-22). Struck, with both sides cited. There is no Q-32 *entry* to state a deferral on — it is referenced but not queued — so the edit landed where the contradiction actually was | Done |
 | ~~**F7**~~ | ✅ **ANSWERED by the owner 2026-09-01: keep web-push, build the scheduler.** The transport already works once the app has been opened; what is missing is the **server-side scheduler (E6)** that decides when to send, and that is needed under *either* transport — so it is the half that cannot be wasted. **FCM is deferred, not rejected:** it is the right answer for a Play Store listing and for reaching a closed app reliably, but migrating first would mean a Capacitor plugin, a Firebase project, native config and a new APK *and still leave the scheduler unbuilt*. Build E6, learn whether notifications earn their place, then revisit FCM with that evidence. **The gap stands and is not fixed by this decision** — until E6 exists nothing can notify anyone on a day they have not opened the app. | Build E6 (server-side scheduler) on the existing web-push transport; keep the FCM decision point at Stage 5/6, now with a stated default of "revisit after E6" |
 
 **F8 (five drifted doc claims) is already fixed in the same PR as this entry** — do not re-file it.
@@ -24410,6 +24458,11 @@ describing a safety net that no longer exists.
 
 ### [app-shell] Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement
 
+- **Gate: owner** — field added 2026-09-22 (OR-122). The deferral below is a third-time owner hold
+  with a v2 trigger, and it was being carried by a `⛔ blocked` glyph further down the entry. That
+  glyph happens to be the one genuine prose marker left in the queue, so it parked correctly — by
+  accident. **Do not put this to the owner again before v2**; the gate records the hold, it is not
+  an invitation to re-ask.
 - **⏸ DEFERRED A THIRD TIME, 2026-09-15 — and this one comes with a trigger, which the previous two
   did not.** Owner, shown the measurement they asked for: *"Yes defer for now; but keep it as a goal
   for when we reach version 2 of the app."*
