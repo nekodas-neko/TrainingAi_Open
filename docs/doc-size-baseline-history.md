@@ -15383,3 +15383,18 @@ the entry alone would over-rate it. The second is the defect that was actually l
 filed: every pace formatter in the tree split minutes from seconds before rounding and printed the
 literal `5:60`. That one is worth the lines precisely because it was found by testing the helper
 rather than by the entry that sent me, and the shape — round the total, then split — is reusable.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26326, `projectOverview.md` → 12375 (LB-125)
+
+The backlog barely moves: LB-125's entry is removed, but most of those lines go straight back in as
+corrections to **LB-126**, the Lane B half that inherited its counts. That trade is the point — the
+successor entry said three sites were a bare `{ weekday: 'short' }` when two are, and listed a fifth
+site (`calendar-widget.tsx`) the helper structurally cannot take, being a month-and-year label built
+from numbers rather than a date string. Letting Lane B discover that mid-PR costs more than the
+lines do.
+
+`projectOverview.md` spends its block on the `en-AU` facts rather than on "fixed a comment", because
+the comment being wrong is not the reusable part. That the locale is day-first, that `month: 'short'`
+is four characters for three months of the year, and that a comma follows a short weekday but not a
+long one are each things a future session would otherwise write from memory and get wrong — which is
+exactly how the original comment came to exist.

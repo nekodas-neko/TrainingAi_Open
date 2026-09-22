@@ -627,27 +627,6 @@ nothing structured saying why — and a human decides.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-### [platform] LB-125 — five hand-rolled date option bags beside the shared formatter, and its own comment describes output it does not produce
-
-- **Lane:** A — `packages/shared/src/date-utils.ts:232-247`. **Added:** 2026-09-22 · filed out of
-  RV-91, which noted this and did not file it; **split 2026-09-22** because one entry spanning two
-  lanes prints as READY to whichever lane cannot start it. The five call sites are **LB-126**.
-- `formatDateDisplay(raw, 'short'|'long')` exists and now has seven callers. Five other sites still
-  hand-roll `toLocaleDateString('en-AU', {…})` with their own option bag. **Three of the five are a
-  bare `{ weekday: 'short' }`** and would be absorbed by one new `style` variant; the other two
-  (`weekday long + month short`, `weekday short + day + month short`) are each a one-off.
-- **⛔ The helper's own header comment is WRONG, and RV-91 quoted it instead of running it.** It
-  says *"'short' gives \"Jan 5\" … 'long' gives \"Monday, 5 January\""*. Measured 2026-09-22:
-  `en-AU` is day-first and puts **no comma** before the day, so it returns **`15 Sept`** and
-  **`Tuesday 15 September`**. RV-91's "the same day reads … *Monday, 15 September* in the day
-  detail" is the comment's string, not the screen's — the day detail rendered the comma-less one.
-  Correct the comment in the same PR as any `style` work; a comment that is quoted as evidence is
-  worse than none.
-- **Not established:** whether a `'weekday'` style should take the timezone the other date helpers
-  thread (`DEFAULT_TZ` as a default parameter), or stay device-local as all five call sites are
-  today. The five render a weekday label beside data the user just entered, so the two agree
-  except for a traveller at a day boundary.
-
 ### [platform] LB-126 — five date call sites still hand-roll their own option bag
 
 - **Lane:** B — `components/calendar-widget.tsx:109`,
@@ -655,14 +634,26 @@ nothing structured saying why — and a human decides.
   `app/session-select/components/recommendation-card.tsx:36`,
   `app/session-select/components/week-day-sheet.tsx:13`,
   `app/nutrition/nutrition-content.tsx:88`. **Added:** 2026-09-22 · the Lane B half of LB-125.
-- **Needs:** LB-125
-- **Three of the five are a bare `{ weekday: 'short' }`** and cannot be routed through
-  `formatDateDisplay` until it has a style for that, which is LB-125. The other two
-  (`weekday long + month short`, `weekday short + day + month short`) are one-offs and could be
-  converted first — but doing that alone leaves the majority case still hand-rolled, which is the
-  shape RV-91 filed a complaint about in the first place.
-- **Do not start this before LB-125 lands**; converting two of five is what makes the remaining
-  three look deliberate.
+- **LB-125 has landed — every style this needs now exists.** `formatDateDisplay(raw, style)` takes
+  `short` · `long` · `weekday` · `weekday-date` · `weekday-date-long`, each pinned to its exact
+  output in `packages/shared/src/__tests__/date-utils.test.ts`.
+- **⛔ Corrected while landing LB-125 — this entry's counts were wrong, measured 2026-09-22.**
+  **TWO of the five are a bare `{ weekday: 'short' }`**, not three: `recommendation-card.tsx:36`
+  and `weekly-nutrition-chart.tsx:50`. The two the entry called one-offs are the same shape with
+  different weekday widths, and each has a style: `week-day-sheet.tsx:13` →
+  **`weekday-date-long`**, `nutrition-content.tsx:88` → **`weekday-date`**.
+- **⛔ `calendar-widget.tsx:109` is NOT convertible, and is the reason this is four sites, not
+  five.** It is a `{ month: 'long', year: 'numeric' }` MONTH-AND-YEAR label built from
+  `(viewYear, viewMonth)` **numbers** — `formatDateDisplay` takes a `YYYY-MM-DD` string and
+  renders a day, so routing it would mean inventing a day-of-month to throw away. Leave it, or
+  file a separate month-label helper; do not force it.
+- **Check the rendered string before and after, do not assume it is unchanged.** `en-AU` emits a
+  comma after a SHORT weekday and none after a long one, so `weekday-date` gives `Tue, 15 Sept` —
+  which is what `nutrition-content` already renders, making that one a true no-op. Confirm the
+  same for the other three rather than trusting it.
+- **Also duplicated, outside this entry's list:** `components/admin/time-audit-card.tsx:200`
+  spells the `'short'` bag by hand. It takes a timestamp rather than a date string, so it needs a
+  `toAestDay` first; admin surfaces are timezone-exempt per CLAUDE.md, so this is optional.
 
 ### [app-shell] RV-98 — opacity-modified text falls below AA, and the contrast check cannot see it
 
