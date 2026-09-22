@@ -15364,3 +15364,11 @@ than a defect to fix.
 `docs/implementation-backlog.md` does not shrink: TN-58 stays in the queue as a `Keep:` for that
 pass test, per the rule that an entry still owing a check states what is owed rather than being
 deleted.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26356, `projectOverview.md` → 12343 (RV-85)
+
+RV-85 left whole. `projectOverview.md` takes one Current Status block, and the sentence worth the
+lines is the one about `fetchWithRetry`: the helper that exists to stop a blank widget was producing
+one, because it retried three times and then gave up with no way to say so. That is the kind of
+thing a "fixed the blank score row" note would lose, and it generalises — the app-shell domain index
+now carries it as a gotcha, since any `{value && <Row …>}` over a route with no null-payload path is
+the same shape.

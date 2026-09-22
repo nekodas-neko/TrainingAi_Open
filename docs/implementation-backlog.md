@@ -627,28 +627,6 @@ nothing structured saying why — and a human decides.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-### [workouts][app-shell] RV-85 — Home's whole score row vanishes on a failed fetch, and the helper meant to prevent that has no way to report it
-
-- **Lane:** A — `packages/shared/src/fetch-with-retry.ts` first, then the Home render.
-  **Added:** 2026-09-21 · Review sweep 52.
-- **Home is the owner's most-used screen** (22 of 56 resumes in the telemetry window).
-- `app/session-select/session-select-content.tsx:1128` — `{readiness && <OuraScoreChipRow …>}`, which
-  also gates the illness advisory (`:1131`) and the early-deload banner (`:1141`). On failure there is
-  no row, **no skeleton** (`showHomeSkeleton` requires `refreshing`) and no message. The route has no
-  null-payload path, so `readiness === null` always means the request failed — this is a
-  failure-vanish, not a "nothing to say" hide.
-- **⚑ Read `fetch-with-retry.ts` before fixing — its own header states the problem it does not
-  solve.** It says it exists because a blip *"silently yields nothing and never retries, leaving the
-  readiness/sleep widgets blank until the app is restarted"*. It then retries 3× (2.5s/5s/7.5s) and
-  gives up **silently**: `.catch(() => {})` (itself RV-84's dead shape) and a `void` return with no
-  error channel. It fixes the transient case and quietly accepts the persistent one, landing on
-  exactly the blank widget it was written to prevent.
-- **Fix, engine half first:** give `fetchWithRetry` an `onExhausted` callback, then render a one-line
-  "Scores didn't load — pull to refresh" in the row's slot.
-- **Not established:** how often the route's 20/60s limit is actually exceeded by the mount +
-  tab-show + pull-to-sync fan-out (`cachedFetch` de-dupes concurrent calls for the same key, which
-  reduces it).
-
 ### [body][platform] RV-90 — body weight renders five ways across seven sites, and no shared formatter exists
 
 - **Lane:** A — a new helper in `packages/shared/src/`, then the call sites.

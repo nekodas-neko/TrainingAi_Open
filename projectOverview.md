@@ -26,6 +26,7 @@
 
 ## 🔖 Current Status
 
+**Version:** v1.465.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
@@ -51,6 +52,21 @@ inherits the text colour instead of inventing one.
 
 **Version:** v1.464.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**Home's score row said nothing when it failed to load (RV-85, v1.464.9).** `{readiness && <row>}`
+gated the whole row — and with it the illness advisory and the early-deload banner — so a failed
+fetch rendered **nothing at all**: no row, no skeleton (`showHomeSkeleton` requires `refreshing`)
+and no message, on the owner's most-used screen. `/api/readiness-score` has no null-payload path, so
+an absent value there is always a failure rather than "nothing to say". **The helper meant to
+prevent this is the one that permitted it**: `fetchWithRetry` exists, by its own header, to stop a
+blip *"leaving the readiness/sleep widgets blank until the app is restarted"* — it retries three
+times and then gave up silently, landing on exactly that. It now reports exhaustion, and the row's
+slot says *"Scores didn't load — pull to refresh."* **The distinction is the feature**: an absent
+value means "still trying" until the attempts are spent, so the message cannot appear under a
+request that is about to succeed. The retry ladder is unchanged. The helper had **no tests at all**;
+it has nine now, and an e2e that fails the route persistently, asserts the slot stays empty partway
+through the ladder, and carries a control case — a test that only checked the message appears would
+pass against a build that showed it always.
 
 **The comparative check-in now has a column to write to (LB-124, v1.464.8).** TN-58 asks *"is today
 better or worse than yesterday?"* instead of an absolute 1-5, because the absolute scale produced

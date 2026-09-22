@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.1",
+    date: "2026-09-22",
+    changes: [
+      "Home now tells you when your scores failed to load instead of just leaving a gap. The whole row \u2014 readiness, sleep, the illness note and the deload banner \u2014 disappeared if the request failed, with no spinner and no message, so it looked like a day with nothing to show. It now says \u201cScores didn't load \u2014 pull to refresh\u201d, but only after it has quietly retried three times, so a slow morning still just looks slow.",
+    ],
+  },
+  {
     version: "1.465.0",
     date: "2026-09-22",
     changes: [
