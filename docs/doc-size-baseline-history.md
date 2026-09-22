@@ -15546,3 +15546,20 @@ measurement that makes it stick.
 TN-61 (Lane O) and ledger items 2b/2c are the rest: a queue tool that truncates silently, a readiness
 contributor worth 2.8% of the movement on a 0.06 weight, and the `.size` conflict tax with a measured
 cost of five of seven PRs in one session.
+
+## 2026-09-22 — a seventh baton: `docs/agents/state/device.md` at 123, and `orchestrator.md` 61 → 81
+
+**New role.** 📱 Device Verification runs on the owner's machine with the S25 on USB — the only
+agent outside this container, and the only one that can answer the 104 checks the device gate has
+accumulated. Its baton is seeded with the task list rather than left empty, because it starts with
+a harness nobody has ever run.
+
+**The Orchestrator baton grew and the ratchet caught it, which is the ratchet working.** It went to
+95 lines on the first pass. Rather than raise the number to fit, it was cut twice — the narrative
+compressed out of "Now", four gotchas merged into two. 81 is what is left after that, and the
+growth that remains is genuinely new state: a seventh agent to coordinate with, and a task list
+that used to live in a chat transcript.
+
+Worth carrying: **a baton is state, not a story.** The contract already says rewrite it in full and
+never append; the size ratchet is what makes that enforceable, because appending is invisible until
+somebody counts. The right response to this check on a baton is almost always to cut, not to raise.
