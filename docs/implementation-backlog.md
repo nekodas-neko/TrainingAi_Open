@@ -533,13 +533,50 @@ and destroys the record of how long this ran. This entry is deliberately a no-da
 perceived_recovery_touched` stops growing, and neither the calibration route nor health-trends reads a
 row whose flag is false.
 
+### [readiness][platform] LB-124 — the comparative check-in field does not exist anywhere, so TN-58's control has nowhere to write
+
+- **Lane: A** — it starts with a Postgres migration, and *"Postgres migration numbers and local
+  SQLite versions belong to Lane A alone"*. **Added:** 2026-09-22 · found by Lane B on taking TN-58
+  off READY. The `LB-` letter records who found it, not who ships it.
+- **TN-58 printed READY and is not buildable.** It says *"add the comparative field beside"*
+  `perceived_recovery`, and **nothing for it exists**: no column in `lib/data/postgres/schema.ts`, no
+  field in `DayCheckinScalesSchema` or `DayCheckinExtrasSchema`
+  (`packages/shared/src/validation/day-checkin.ts`), nothing in `app/api/day-checkin/route.ts`.
+- **⚠ TN-57 is NOT this.** TN-58 calls it "the engine half", but TN-57's own entry says *"No
+  migration and no data write. The column that distinguishes answered from unanswered already
+  exists"* — it fixes three consumers that read an unanswered default as data. Shipping TN-57 leaves
+  TN-58 exactly as blocked. **Read TN-57's scope rather than TN-58's description of it.**
+- **⛔ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
+  route is **not** `.strict()`, so Zod strips an unknown key instead of rejecting it: a sheet posting
+  `vsYesterday` would get **201** and write nothing. A control that looks like it works and stores
+  nothing is worse than a 400, and worse than the neutral-default bug TN-57 exists to fix — it would
+  burn the two-week pass test and report "self-report is not available from this owner" when the
+  truth was a dropped field.
+- **Scope, which is why it is not a footnote.** `day_checkins` is offline-first: a migration **and**
+  `lib/data/postgres/schema.ts`, both Zod schemas, the route, the repository write path and its
+  row→object mapper, the local SQLite table (`lib/local-store/sqlite-backend.ts:1212`) with a store
+  version bump, and the pull-delta at `:2038`. A missed mapper reads as "the answer does not save".
+- **The twin is required.** A new column on a `claude_ro`-covered table ships its regenerated views
+  in the same PR, and `claude-ro-readonly-role.test.ts` / `db-snapshot-integration.test.ts` fail CI
+  without it — both need a **TCP** `DATABASE_URL` to run locally, or they skip and say nothing.
+- **⚠ NULL is the whole point.** Per TN-58: a skipped answer stores NULL, never a neutral. Give the
+  column no default, and follow `perceivedRecoveryTouched`'s existing shape if a touched flag is
+  wanted — the neutral-stored-as-answer bug is exactly what this question is meant to escape.
+- **Not established:** the column's type was not decided here. An enum (`better`/`same`/`worse`) and
+  a signed integer (`-1`/`0`/`+1`) both work; the integer is easier for TN-33 to correlate and the
+  enum is harder to misread. That is Lane A's call at build time, not a blocker.
+
 ### [readiness][app-shell] TN-58 — ask whether today is better or worse than yesterday, because an absolute 1–5 has produced two distinct values in 81 days
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning · **owner asked for this direction**
   2026-09-21 (*"yes go for it"*) after declining a three-week daily log the same morning — that
   decline is the design constraint, not an obstacle.
-- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. TN-57 is the engine
-  half; this one changes what is asked.
+- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. This one changes what
+  is asked.
+- **Needs: LB-124** — the field it writes to does not exist in the schema, the validators or the
+  route, and the route is not `.strict()`, so a control built now would post `201` and store
+  nothing. **TN-57 is not that engine half** despite the line below saying so: its own entry ships
+  no migration and fixes three consumers instead.
 
 **The control asks for an absolute rating and gets the middle of the scale.** Measured 2026-09-21:
 **2 distinct values across 96 check-ins, sd 0.29, and zero of them touched** (full table in TN-57).
@@ -779,11 +816,22 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Lane:** A — production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
   RV-66).
 - **Gate:** owner
-- **Measured 2026-09-21.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein / 141 g
-  carbs / 55 g fat**, which is *exactly* the `goal_recommendations` row from **2026-08-31** — a row
-  the model wrote and the sheet applied. The computed baseline for the owner's current profile
-  (70.35 kg, 25.7% BF, measured RMR 1,325 @ 51.5 kg FFM, recomp, moderate) is **1,410 / 115 / 143 /
-  42**. So the live targets run **+250 kcal (+18%)** and **+35 g protein (+30%)** above the formula.
+- **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
+  only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
+  141 g carbs / 55 g fat**, *exactly* the `goal_recommendations` row from **2026-08-31** — a row the
+  model wrote and the sheet applied.
+- **The steps goal is a model number too, and it is the impossible one.**
+  `claude_ro.users.steps_goal` reads **5,000** — the value from the 2026-09-14 recommendation, which
+  `STEP_GOAL_BY_ACTIVITY` cannot produce at all (it returns only 7,000 / 8,500 / 10,000 / 12,000,
+  and the owner is `moderate` → 10,000). The original filing said this could not be read; that was
+  wrong, and the reason is recorded under the retired LA-127: it was looked for in a `user_goals`
+  table, and the goals are columns on `users`.
+- **The body-fat correction widens the gap rather than excusing it.** `claude_ro.dexa_scans` holds a
+  real DEXA at **28.5%** against the scale's 25.7%, and `correctBodyFatPct` moves body fat toward the
+  scan — which lowers lean mass, and with it protein and calories. Baseline at the scale reading is
+  **1,410 / 115 / 143 / 42**; at the DEXA reading it is **1,359 / 111 / 143 / 38**. So the live
+  targets run **+259 kcal (+19%)** and **+39 g protein (+35%)** above the formula, not the +18%/+30%
+  first filed.
 - RV-66 stops any *future* recommendation being model-invented. It does not touch what is already
   stored, and it must not: rewriting a user's goals is a production data write.
 - **What the owner has to decide**, and it is genuinely a choice rather than a correction: the
@@ -823,25 +871,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   wants the owner's eye on the number before it ships.
 - **Verification:** the route's response equals `calculateBaseline` field-for-field, and the
   `lose_weight` floor test still passes.
-
-### [platform] LA-127 — two tables have no `claude_ro` twin, so they are invisible to every read
-
-- **Lane:** A — `lib/data/postgres/migrations/`, `scripts/generate-claude-ro-views.js`.
-  **Added:** 2026-09-21 (Lane A, found while measuring RV-66).
-- `claude_ro.user_goals` and `claude_ro.body_fat_calibration` both return *relation does not exist*.
-  `claude_ro` is default-deny, so a table with no view is unreadable rather than partially readable.
-- **What it cost in one session:** the RV-66 measurement could not read the owner's steps goal at all
-  (`user_goals`), and could not reproduce `correctBodyFatPct` (`body_fat_calibration`), so the
-  lean-mass-derived half of that comparison had to be stated as approximate. The step-goal half
-  survived only because it happens not to depend on body fat.
-- **Not established:** whether these are deliberate omissions (the generator has an exclusion list)
-  or drift from a migration that shipped without its twin. **Read the generator's exclusions before
-  regenerating** — if they are deliberate, this entry becomes a docs fix naming the reason.
-- **Fix:** regenerate the views per CLAUDE.md's twin rule, as a NEW migration number, diffing against
-  the previous one to confirm only the intended views moved. The owner's id must not appear in the
-  output (Q-456).
-- **Verification:** both tables answer a `SELECT` through `/api/admin/db-query`;
-  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` pass on a TCP `DATABASE_URL`.
 
 ### [nutrition][app-shell] RV-68 — the supplement tick paints only after three awaited local writes and a native call
 

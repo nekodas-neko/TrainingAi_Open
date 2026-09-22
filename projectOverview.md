@@ -2375,6 +2375,13 @@ steps** where the calculation said **10,000** — and `STEP_GOAL_BY_ACTIVITY` ca
 stored recommendations the model produced six different step goals and **four of them were
 impossible**. The safety clamp changed none of it, because it is a band, not a derivation.
 
+**Corrected 2026-09-22, in the direction that matters.** Your **steps goal itself** still reads
+**5,000** — that impossible number is not just in a stored recommendation, it is your live goal. And
+the body-fat correction makes the intake gap bigger, not smaller: your DEXA reads **28.5%** against
+the scale's 25.7%, which lowers lean mass and so lowers the calculated targets to **1,359 kcal /
+111 g protein**. Against the 1,660 / 150 you are eating to, that is **+19% calories and +35%
+protein**, not the +18%/+30% first written here.
+
 **Two smaller things came out of measuring it**, both queued: `calculateBaseline` and the clamp
 disagree about fat (25% of calories vs 0.6 g/kg — 39 g against 42 g for you), so the recommendation
 is the baseline *made safe* rather than the baseline exactly (LA-125); and `user_goals` and

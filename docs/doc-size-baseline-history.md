@@ -15099,6 +15099,25 @@ TN-58 also records that the owner declined a three-week daily log the same morni
 decline a design constraint rather than a blocker — that context is why the entry proposes three taps
 instead of re-asking.
 
+## 2026-09-22 — `docs/implementation-backlog.md` 26150 → 26187 (TN-58's engine half did not exist)
+
+TN-58 printed as Lane B's only READY item and is not buildable. It says to *"add the comparative
+field beside"* `perceived_recovery`; nothing for that field exists — no column, no entry in either
+Zod schema, nothing in the route. It names TN-57 as "the engine half", and TN-57's own entry says it
+ships **no migration** and fixes three consumers instead, so shipping TN-57 would have left TN-58
+exactly as blocked.
+
+The 37 lines are **LB-124**, filed for Lane A because the work starts with a migration, plus a
+`Needs:` on TN-58. Most of those lines are scope rather than description, and deliberately so: the
+route's `Body` is not `.strict()`, so a control built now would post **201 and store nothing** —
+silent, and it would burn TN-58's two-week pass test into a false "self-report is not available from
+this owner". `day_checkins` is also offline-first, so the engine half reaches the local SQLite table,
+its version and the pull-delta, and the new column needs its regenerated `claude_ro` twin.
+
+**Third instance this run of the same shape** — an entry wrong about the field that decides who can
+build it (BF-185's `.strict()` schema, RV-79's unconditional `setCached`, now this). The cost each
+time is the same: it is only visible if you read the thing the fix would touch before starting.
+
 ## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
 
 `docs/implementation-backlog.md` **26150 → 26158** (`lane-a/la125-gate-the-fat-formula-change`) —
@@ -15115,3 +15134,22 @@ field name sat mid-bullet where the checker looks for it, and it warned. LA-125 
 wrote the words at all, so there was nothing to detect: **the check finds a gate in the wrong place,
 not a gate that is missing.** Catching one and not the other reads like the checker working, which
 is how the second one survived.
+
+## 2026-09-22 — LA-127 was filed against two tables that do not exist
+
+`docs/implementation-backlog.md` **26187** · `projectOverview.md` **12205 → 12212**
+(`lane-a/la125-gate-the-fat-formula-change`, folded in).
+
+LA-127 claimed `user_goals` and `body_fat_calibration` had no `claude_ro` twin. Neither is a table.
+`getUserGoals` reads **columns on `users`**; `getBodyFatCalibration` derives its answer from
+**`dexa_scans`** in TypeScript and stores nothing. The generator's `DENIED` set holds only
+`invited_emails` and `rate_limits`, so there was no policy exclusion either — and no drift, because
+there is nothing to generate a view for. Retired rather than built.
+
+**The retraction makes the finding it came from stronger, which is why it is worth the lines.** That
+entry existed to excuse a gap in RV-66's measurement. With the right relations read:
+`claude_ro.users.steps_goal` is **5,000** — so the impossible step goal is the owner's *live* goal,
+not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** against the scale's
+25.7%, which lowers lean mass and takes the computed baseline to **1,359 kcal / 111 g protein**. The
+gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
+read as "this number might be softer than stated" was hiding a number that was harder.
