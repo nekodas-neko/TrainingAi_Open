@@ -15453,7 +15453,7 @@ wrong if it also keeps the header above them. The baton now says to fix the vers
 explicitly. This is the file every session reads first to orient, so three contradictory version
 numbers at the top of it is worse than a stale one.
 
-## 2026-09-22 — `docs/implementation-backlog.md` 26366 → 26418 (OR-127: the USB device harness)
+## 2026-09-22 — `docs/implementation-backlog.md` 26366 → 26429 (OR-127: the USB device harness + the recorder)
 
 One entry for `scripts/device/**`, which drives the real APK on the real phone over the DevTools
 protocol. The entry is long for a shipped tool because most of it is the **limits**, and those are
@@ -15466,6 +15466,12 @@ Worth carrying: **automatable is not the same as owed.** The harness answers *be
 questions — did the row disappear, did back land on Home, is the computed padding above the gesture
 bar. A large share of the 104 device checks are look-and-feel, and an automated pass is the weakest
 evidence for exactly those. The honest expectation is a shorter, harder list, not an empty one.
+
+Third thing, added on the owner correcting the design: the first draft captured a **single** frame,
+and that was a gap. The whole `motion-polish` batch is timing questions — does the ring finish with
+the number, is the sheet 300 ms or the stock 500 — and no still frame answers one. `record.js` takes
+compositor frames over a window with the ms each landed at. **Read the timestamps, never the frame
+count**: the phone drops frames under load, so a sparse recording reads as a fast transition.
 
 Second thing worth carrying, because it is unusual for this repo: **the harness ships unrun.** No
 sandbox here has `adb` or a phone, so every line was reasoned from the protocol rather than

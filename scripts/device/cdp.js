@@ -102,9 +102,17 @@ class Session {
     this.ws = ws;
     this.id = 0;
     this.pending = new Map();
+    this.listeners = new Map();
     ws.addEventListener('message', (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
+      // An event carries a method and no id; a response carries an id and no method.
+      if (msg.method) {
+        for (const fn of this.listeners.get(msg.method) ?? []) {
+          try { fn(msg.params); } catch { /* a bad handler must not kill the socket */ }
+        }
+        return;
+      }
       const p = this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
@@ -174,6 +182,44 @@ class Session {
     await this.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt });
     await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     return box;
+  }
+
+  on(method, fn) {
+    if (!this.listeners.has(method)) this.listeners.set(method, new Set());
+    this.listeners.get(method).add(fn);
+    return () => this.listeners.get(method)?.delete(fn);
+  }
+
+  /**
+   * Frames over a window of time — the thing a single screenshot cannot give.
+   *
+   * This is what `chrome://inspect`'s mirrored phone screen is made of: `Page.startScreencast`
+   * streams the compositor's own frames and `Input.dispatchTouchEvent` sends taps back. The mirror
+   * exists so a HUMAN can watch and click; reading the DOM is strictly better for deciding whether
+   * something is right. What the mirror has that a screenshot does not is **time**, and three owed
+   * checks are timing questions that no still frame can answer: RV-74 (does the ring finish with
+   * the number, or 600 ms before it), RV-75 (is the sheet 300 ms or the stock 500), RV-72 (do the
+   * bars animate a compositor property or a layout one).
+   *
+   * Each frame carries `msFromStart`, so the answer is a measurement rather than an impression.
+   * The device's own compositor produces these, so they show what Samsung's WebView really paints.
+   *
+   * ⚠ `everyNthFrame: 1` asks for everything and the phone may still drop frames under load — the
+   * timestamps are the truth, never the frame count. Ack every frame or the stream stalls after a
+   * few: the protocol treats an un-acked frame as back-pressure.
+   */
+  async record(ms, { maxWidth = 800, quality = 80, everyNthFrame = 1 } = {}) {
+    const frames = [];
+    const t0 = Date.now();
+    const off = this.on('Page.screencastFrame', (p) => {
+      frames.push({ msFromStart: Date.now() - t0, data: p.data, metadata: p.metadata });
+      this.send('Page.screencastFrameAck', { sessionId: p.sessionId }).catch(() => {});
+    });
+    await this.send('Page.startScreencast', { format: 'jpeg', quality, maxWidth, everyNthFrame });
+    await new Promise((r) => setTimeout(r, ms));
+    await this.send('Page.stopScreencast').catch(() => {});
+    off();
+    return frames;
   }
 
   close() { try { this.ws.close(); } catch { /* already gone */ } }

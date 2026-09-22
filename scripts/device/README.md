@@ -45,12 +45,40 @@ the manifest's own debuggable flag, so a release APK can never expose the socket
 ## Running it
 
 ```
-node scripts/device/probe.js
+node scripts/device/probe.js                         # read-only: platform, real insets, a screenshot
+node scripts/device/record.js 1500 --tap '#open'     # frames over time, with the ms each one landed
 ```
 
-Reads the platform, the real safe-area insets and a screenshot, and changes nothing. Run it first;
-if it cannot connect, nothing else here will either. `ADB_PATH` and `DEVICE_CDP_PORT` override the
-`adb` binary and the forwarded port; `DEVICE_PROBE_OUT` moves the screenshot directory.
+Run `probe.js` first; if it cannot connect, nothing else here will either. It changes nothing.
+`ADB_PATH` and `DEVICE_CDP_PORT` override the `adb` binary and the forwarded port;
+`DEVICE_PROBE_OUT` moves the output directory.
+
+### Why there is a recorder as well as a screenshot
+
+`chrome://inspect`'s mirrored phone screen is `Page.startScreencast` (the compositor's own frames)
+plus `Input.dispatchTouchEvent` (taps sent back) — the same protocol this harness speaks. The mirror
+exists so a **human** can watch and click; for deciding whether something is *right*, reading the
+DOM beats looking at a picture of it.
+
+What the mirror has that a screenshot does not is **time**, and three owed checks are timing
+questions no still frame can answer:
+
+| | the question |
+|---|---|
+| **RV-74** | the hero's number eases over 600 ms while the ring snaps — do they end together? |
+| **RV-75** | is the sheet 300 ms, or the stock 500? `duration-250` was written for the close and **is not a Tailwind class**, so it compiled to nothing. A typo'd class fails nothing; only a measurement finds it |
+| **RV-72** | do the bars animate a compositor property, or a layout one? |
+
+`record.js` writes each frame named with its offset from the start, plus an `index.json`. **The
+timestamps are the evidence; the frame count is not** — the phone drops frames under load, and it
+prints the longest gap so a sparse recording is never mistaken for a fast transition.
+
+### Watching it yourself at the same time
+
+Leaving `chrome://inspect` open while the harness is attached is worth trying — modern Chrome
+supports several protocol clients on one target — but **screencast in particular may conflict**,
+and this has not been tested. If the mirror goes black or the recorder returns no frames, that is
+the collision; close one of them.
 
 ## Writing a check
 

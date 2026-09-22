@@ -17390,6 +17390,17 @@ thing.
   real differential when it was a coordinate artifact.
 - **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
   navigation reports a bottom inset of `0` and a broken clearance looks correct.
+- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
+  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
+  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
+  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
+  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
+  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
+  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
+  property or a layout one). Frames are written named by their offset from the start.
+  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
+  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
+  exactly that reason.
 - **What this does NOT license, and it is the part most likely to be overread.** A pass here is
   evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
   the ring or the scale (real BLE, and the radio power-gates when worn-idle), anything needing the
