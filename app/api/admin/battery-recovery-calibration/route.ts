@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { buildBatteryRecoveryCalibration } from '@trainingai/shared/health/battery-recovery-calibration'
 import { reportServerError } from '@/lib/observability'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 
 /**
  * Admin Body-Battery calibration: each day's end-of-day battery next to the recovery rating the
@@ -80,7 +81,11 @@ export async function GET(req: NextRequest) {
           from: start,
           to: end,
           batteryByDate: new Map(battery.map(b => [b.date, b.endValue])),
-          recoveryByDate: new Map(checkins.map(c => [c.logDate, c.perceivedRecovery])),
+          // TN-57: the touched flag, not the column. 78 of the owner's 97 morning rows carry a
+          // `perceived_recovery` and none of them was ever answered — so this route was calibrating
+          // against a neutral seed. The correlation is expected to EMPTY rather than shift, and
+          // that is the correct result, not something to rescue by relaxing the filter.
+          recoveryByDate: new Map(checkins.map(c => [c.logDate, answeredMorningScales(c).perceivedRecovery])),
         }),
       },
       { headers: { 'Cache-Control': 'private, no-store' } },

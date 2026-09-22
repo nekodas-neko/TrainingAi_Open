@@ -15310,3 +15310,15 @@ shipped without device verification needs its arithmetic on the record where the
 `docs/implementation-backlog.md` 26570 → **26500**: five entries out, and LB-125 split into LB-125
 (Lane A, the helper) plus LB-126 (Lane B, the call sites, parked on it). One entry spanning two
 lanes prints as READY to whichever lane cannot start it, which is what it did within the hour.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26431, `projectOverview.md` → 12288 (TN-57)
+
+The backlog lost TN-57 whole, which was a long entry: it carried the production measurement table,
+the correction of its own first draft (the defect is not circularity — that is TN-50, a different
+sheet), and the argument for why this blocks TN-33/TN-16/TN-34. None of that is owed any more, so
+none of it was kept.
+
+`projectOverview.md` grew by one Current Status block, and most of it is a correction rather than a
+summary: the entry's write-path instruction would have stopped the owner's daily check-in reaching
+the server, because the morning sheet sends nothing else the Q-465 guard counts and `pushMutations`
+rejects such a body with no retry. A note saying only "readers now check the flag" would leave the
+next session to rediscover that by shipping it.
