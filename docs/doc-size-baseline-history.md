@@ -15149,3 +15149,16 @@ whether the grey secondary line already disambiguates the colliding food rows, R
 both deload surfaces are even reachable in one session, RV-93 notes the injury-chip collision is
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26484 → 26449 (RV-84 and RV-88 left the queue)
+
+Both shipped and were removed whole. The baseline had just risen with sweep 52's nineteen new
+entries; this is the first two coming back off.
+
+Worth carrying out of them: **RV-84's count was wrong three ways**, and the correction is the useful
+part. It said 16 chained `.catch`es on `cachedFetch`; there are **81**, of which 68 are harmless
+`.catch(() => {})`, 4 are redundant because `onError` is already wired beside them — including the
+file the entry names as its own reference — and **9** were genuinely broken. A site is only a defect
+when it has a handler *and* no `onError`, which is the distinction the count missed. Two naive greps
+answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
+test rather than only in prose.

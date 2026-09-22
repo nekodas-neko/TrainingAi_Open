@@ -609,24 +609,6 @@ be worth asking occasionally once there is something to anchor it against.
 **Pass test:** after two weeks, the comparative field has **≥3 distinct values** and a touched-rate
 materially above zero. If it does not, the answer is that self-report is not available from this owner
 at all — which is itself a finding worth having, and it costs a fortnight to get.
-### [platform][app-shell] RV-84 — `.catch()` on `cachedFetch` is dead code, so 16 error states can never fire
-
-- **Lane:** B — the call sites. **Added:** 2026-09-21 · Review sweep 52.
-- **Batch:** `error-state-onerror`
-- `cachedFetchCore`'s whole network section is inside `try/catch/finally` (`lib/sqlite/cache.ts:336-372`):
-  a `!res.ok` returns after calling `onError`, a network throw is caught. **The promise resolves a
-  boolean and can never reject.** Every `.catch()` chained onto it is unreachable — **16 sites**.
-- **Confirmed consequences:** `components/coach/choice-list.tsx:63` `.catch(() => setFailed(true))`
-  never runs, so the Coach option picker sits on *"Loading your options…"* forever; the same shape at
-  `components/more/profile-tab.tsx:122` leaves the achievements grid spinning.
-- **Fix:** move each to the `opts.onError` channel. `components/health/oura-section.tsx:70-76` is the
-  reference, and `components/health/nutrition-activity-trends-card.tsx:22-39` carries an explicit
-  comment explaining why the `.catch` cannot work.
-- **⚠ This is one rule with a one-line test, so it wants a check script rather than a re-sweep:**
-  `.catch(` chained directly onto `cachedFetch(`/`cachedFetchToday(` is *always* wrong. Freeze the
-  current 16 as a shrink-only baseline the way `check-aest-midnight-timezone.js` does.
-- **Not established:** only three of the 16 were traced to a user-visible consequence.
-
 ### [workouts][app-shell] RV-85 — Home's whole score row vanishes on a failed fetch, and the helper meant to prevent that has no way to report it
 
 - **Lane:** A — `packages/shared/src/fetch-with-retry.ts` first, then the Home render.
@@ -677,23 +659,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   the grid below spins forever (RV-84).
 - **Fix:** hold `achievementsData === null` as its own state, render "—" per tile plus one
   "Couldn't load your stats" line, driven by `onError` rather than the `??` defaults.
-
-### [cardio][readiness] RV-88 — two Health cards treat "the fetch failed" as "you have no data"
-
-- **Lane:** B — `components/cardio/trends-section.tsx:37,60` and
-  `components/health/time-in-zone-card.tsx:63-66,144`. **Added:** 2026-09-21 · Review sweep 52.
-- **Batch:** `error-state-onerror`
-- Neither passes `onError`, and `useCachedValue`/`cachedFetch` return null on a non-ok response — so
-  failure and empty are the same state. Cardio Trends renders `!data ? <div className="h-40 …
-  animate-pulse" />` — **a grey pulsing block that never resolves**, under three tab buttons that
-  change nothing. Time in Zone takes its empty branch and prints *"No heart-rate data in this window
-  yet — wear the ring or strap during a workout."* — **blaming the owner for a server failure**, on a
-  day he wore it.
-- Both cards already have good *empty* copy; only the failure case is missing.
-- **⚠ Second defect in the same file, do not miss it:** `time-in-zone-card.tsx:71` is
-  `const profile = data?.profile ?? { maxHr: 190, restingHr: 60 }` — an **invented** HR profile fed to
-  `computeHrZones` and used to label the zones. Against the repo's "no invented number shown as fact"
-  posture. Only use it when `data` exists but `profile` is absent, or hide the legend.
 
 ### [workouts] RV-89 — one stored 1RM renders four different numbers, and four sites half-use the shared helper
 

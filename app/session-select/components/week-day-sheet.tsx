@@ -35,7 +35,10 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
     cachedFetch<DayLogResult>(
       `day-log:${date}`, `/api/day-log?date=${encodeURIComponent(date)}`, DAY_LOG_TTL,
       (d) => { if (!cancelled) { setData(d); setLoading(false) } },
-    ).catch(() => { if (!cancelled) setLoading(false) })
+      // RV-84: `cachedFetch` resolves a boolean and never rejects, so a `.catch` here never ran and
+      // a failed load spun forever. `onError` is the only channel that fires on a non-ok response.
+      { onError: () => { if (!cancelled) setLoading(false) } },
+    )
     return () => { cancelled = true }
   }, [date])
 
