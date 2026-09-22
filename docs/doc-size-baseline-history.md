@@ -15453,7 +15453,72 @@ wrong if it also keeps the header above them. The baton now says to fix the vers
 explicitly. This is the file every session reads first to orient, so three contradictory version
 numbers at the top of it is worse than a stale one.
 
-## 2026-09-22 — `CLAUDE.md` 816 → 827 and `docs/implementation-backlog.md` → 26390 (OR-125: six owner answers)
+## 2026-09-22 — LB-126 (`feat/lb126-shared-date-styles`)
+
+`docs/implementation-backlog.md` → **26338**: LB-126 left the queue, one PR after LB-125 (its Lane A
+half) landed. The split that parked it was made the same day and did its job — the entry surfaced
+the moment its dependency shipped, rather than being started early and converting two of five.
+
+`projectOverview.md` → **12389** (12391 before re-merging #1406): nine lines. Worth the space for the part that will not be obvious
+later: converting these four also emptied four `REVIEWED_BENIGN` rows out of
+`check-timezone-rendering.js`, because a site that stops calling `toLocale*String` stops being a
+device-local renderer.
+
+## 2026-09-22 — `docs/implementation-backlog.md` +368 (26339 → 26707) (Review sweep 53)
+
+Twenty entries (**RV-103…RV-122**) from the sweep the owner scoped himself — animations and page
+swaps, caching, and what should merge — at ~18 lines each.
+
+**RV-103 is longer than its fix because the fix is not the discovery.** The owner's report turned
+out to be a *re*-report: BF-177's docblock already quotes him on the identical symptom. The entry
+spends its length on why that fix did not hold (`cachedFetch(...).catch(() => {})` with no
+`onError`, dead per RV-84) and on a second defect in the same four lines — `setBalance(d ?? null)`
+makes the budget *disappear* rather than go stale on a null payload. An implementer who reads only
+"add onError" ships half of it.
+
+**Five entries carry a ⛔ or a check-this-first**, which is the material a shorter entry loses.
+RV-104 says fix the shape rather than the site, because BF-177 was patched site-by-site and its own
+comment admits to a third site it did not name. RV-110 says confirm the sub-tab query params survive
+a shell flip before converting 37 call sites. RV-111 names the ordering hazard — the scanner injects
+a global `visibility: hidden` and a double-pop would leave the app blank. RV-113 says try the
+one-line CSS variant first, because the cross-dissolve fights the animation-pausing the repo added
+after a device profile. RV-119 says do **not** collapse the illness and deload banners.
+
+**RV-120 exists only because of "No orphaned findings".** `aiVolume` is built, has a live render
+arm, is in no order array, and had zero backlog entries behind a comment promising a merge. The
+entry deliberately does not decide merge-vs-delete; it refuses to let the promise keep living in a
+code comment.
+
+## 2026-09-22 — `docs/agents/state/review.md` 205 → 202 (ratcheted down, Review sweep 53)
+
+The baton came in three lines under its baseline, so the check asked for the number to follow it
+down. That is the ratchet working as designed: a baton that shrinks and leaves its old ceiling in
+place has simply bought itself room to regrow.
+
+It shrank because §Now stopped re-narrating closed sweeps. Sweeps 47–52 are now one paragraph
+carrying only their *durable rules* — read which field a 4xx names, pair a refusal with a one-field
+control, `claude_ro` is the owner's rows only, rank visual findings by the resume telemetry — and
+the narrative lives in each sweep's own write-up, which the pillar indexes already link. State, not
+history, which is what the baton is for.
+
+## 2026-09-22 — `CLAUDE.md` 816 → 825, and the backlog +8 (Review sweep 53, owner decision)
+
+Nine lines for one standing instruction: **large UI changes are mocked up before they are built.**
+The owner asked for it directly after seeing four consolidation entries (RV-116…RV-119) that were
+technically unblocked and would still have rearranged the screen he opens most.
+
+It earns the space in `CLAUDE.md` rather than a reference doc because it changes *when* work starts,
+not how it is done — a rule that only fires at the moment an implementer would otherwise begin
+coding has to be in the file every agent reads first. The eight backlog lines are the matching
+`Gate: owner` on those four entries, so the queue enforces it rather than relying on the rule being
+remembered.
+
+The distinction the rule draws is the part worth keeping exact: restyling a component or fixing a
+layout bug does not need a mockup; merging a card, collapsing a banner stack, or moving a card
+between tabs does. The test is whether the owner would notice the screen is *arranged* differently,
+not whether it looks different.
+
+## 2026-09-22 — `CLAUDE.md` → 836 and `docs/implementation-backlog.md` → 26772 (OR-125: six owner answers)
 
 **CLAUDE.md +11**: one new standing rule — a filing sweep ships as ONE PR, not one per entry — plus
 the `--sittings` pointer beside the batching rule and a note that `enable_pr_auto_merge` does not
