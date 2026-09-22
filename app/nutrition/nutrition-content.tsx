@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import { cachedFetch, readCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { invalidateNutritionWrite } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, ENERGY_BALANCE_TTL } from '@trainingai/shared/cache-ttl';
-import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { todayInTz, shiftDateStr, formatDateDisplay } from "@trainingai/shared/date-utils";
 import { reconcileMealReminders, cancelAllMealReminders } from "@/lib/meal-reminders";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import type { NutritionAdherenceResponse } from "@/app/api/nutrition/adherence/route";
@@ -84,8 +84,7 @@ function formatDateLabel(dateStr: string, todayStr: string): string {
   if (dateStr === todayStr) return 'Today';
   const yStr = shiftDateStr(todayStr, -1);
   if (dateStr === yStr) return 'Yesterday';
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  return formatDateDisplay(dateStr, 'weekday-date');
 }
 
 export default function NutritionContent({ userId }: { userId?: string }) {
