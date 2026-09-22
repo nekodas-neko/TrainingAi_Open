@@ -184,10 +184,22 @@ describe('/api/cardio-week', () => {
     await getWeek()
 
     expect(getHrForWindow).toHaveBeenCalledTimes(1)
-    // And the one call is the profile's 90-day window, not either of the reported ones.
+    // And the one call is the profile's 90-day window, not either of the 30-day reported ones.
+    //
+    // **Asserted as a range, and that is the fix rather than a loosening.** The window runs from
+    // LOCAL MIDNIGHT ninety days back (`resolveHrProfileWithWindow`, which anchors there because
+    // the repo's date rule says ranges must) to `new Date()` — so its span is 90 days plus however
+    // much of today has elapsed, from 90.0 at midnight to just under 91.0. Pinning
+    // `Math.round(span) === 90` made this red from local **midday** onward: `Math.round` tips at
+    // 90.5, which is 12:00 Brisbane. It was failing for roughly half of every day, on every
+    // branch, and it blocked `main` for every lane until it was read rather than re-run.
+    //
+    // The range still separates 90 from 30, which is the only thing this assertion is for.
     const [, from, to] = getHrForWindow.mock.calls[0] as [string, Date, Date]
-    const spanDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
-    expect(spanDays).toBe(90)
+    const spanDays = (to.getTime() - from.getTime()) / 86_400_000
+    expect(spanDays, 'the one call is not the 90-day profile window').toBeGreaterThanOrEqual(90)
+    expect(spanDays, 'the window runs past a full extra day — it is not anchored at local midnight')
+      .toBeLessThan(91)
   })
 
   it('slices the two windows out of that one pull rather than merging them', async () => {
