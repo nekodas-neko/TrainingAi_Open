@@ -68,7 +68,19 @@ over a Capacitor channel. That is why these five are batched.
       WebView than a desktop tab; a real backgrounding across local midnight is the case that
       matters.
 
-### Round 3 — then work by how unambiguous the answer is
+### Round 3 — then work the queue
+
+**Your assigned work is `node scripts/next-item.js --lane DV`, in queue order.** Any agent can put
+something there by writing `Lane: DV` on an entry — Review, BugFix, the Orchestrator, an implementer
+who needs a behaviour confirmed. Read it at the start of every session; it is how work reaches you
+without anyone having to be awake at the same time as you.
+
+**The device CHECKS owed across the queue are a different list:**
+`node scripts/next-item.js --sittings`. Those entries keep their own lanes and carry
+`Verify: device` or a `Keep:`; the view gathers them by screen, **ordered by queue position**, so
+the Orchestrator promotes a whole sitting by moving one entry up. Work the first group first.
+
+Within a sitting, by how unambiguous the answer is —
 
 `node scripts/next-item.js --sittings` lists all 104, grouped by screen. **Not by group size — by
 how binary the result is.** A check that yields a number or a boolean is worth ten that yield an
@@ -87,6 +99,19 @@ opinion.
 
 **Look-and-feel stays the owner's.** Automated evidence is weakest exactly there. Do not convert an
 opinion into a pass.
+
+## Reporting back
+
+**Findings go on the entries**, in the same PR — that is the durable record every other session
+reads. A FAILED check goes back to the lane that owns the surface (`Lane: A` or `Lane: B`) with what
+reproduces it; you never fix product code.
+
+**Anything needing the owner or a decision goes to `Lane: O`**, not to a message. The Orchestrator
+holds the owner-facing queue, and an entry outlives the session that wrote it.
+
+**When a round closes, wake the Orchestrator** with a `create_trigger` bound to its session — the
+pattern Review already uses — saying what changed and what is now unblocked. Do that when a round
+finishes or something urgent turns up, not per check.
 
 ## Do not re-litigate
 

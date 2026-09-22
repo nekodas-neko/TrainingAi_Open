@@ -17729,6 +17729,57 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
 
+### [devices][platform] DV-1 — make the harness connect, and write down what was wrong with it
+
+- **Lane: DV** · **Added:** 2026-09-22 (Orchestrator). The first task in this lane.
+- `scripts/device/**` was written from the DevTools protocol by a session that has never seen a
+  phone. **Expect it to fail.** Run `node scripts/device/probe.js`, fix what breaks, and record the
+  fixes — that record is the most valuable thing this round produces, because nobody in this project
+  has it.
+- **Resolve `connectOverCDP` before writing any bespoke check.**
+  `chromium.connectOverCDP('http://127.0.0.1:9222')` from `playwright-core`, already a dependency.
+  **If it attaches, stop and say so** — the ~100 existing `e2e/**` specs could then run against the
+  real device on a config change, which is worth more than every bespoke check in this lane
+  combined. If it refuses (an Android WebView often exposes only page targets, with no
+  `webSocketDebuggerUrl` on `/json/version`) that is a one-line finding and the bespoke path
+  continues. **Either answer is the deliverable.**
+- **Verification:** `probe.js` reports a native platform, a non-zero bottom inset with gesture
+  navigation on, and a screenshot; `tour.js` produces a folder whose digest numbers look sane.
+
+### [app-shell][activity] DV-2 — the back-gesture sitting: five entries, one pass
+
+- **Needs:** DV-1
+- **Lane: DV** · **Batch:** `back-gesture-sitting` · **Added:** 2026-09-22.
+- The Android system back arrives over a Capacitor channel Playwright cannot fire, which is why
+  these five are one sitting. `adb shell input keyevent 4` (the `systemBack()` export) is the real
+  thing. **Answer each on its own entry** as VERIFIED / FAILED / COULD NOT CHECK, not here.
+  - **BF-165** — the owner's live report: *"when I try click the treadmill... nothing actually
+    happens"*, *"it just scrolls to the top of cardio hub"*. Root cause measured: the sheet's own
+    `history.back()` lands ~400 ms after the push and eats it. Does it still reproduce, and does it
+    happen on **any other sheet that navigates**? The scope correction says the defect is *any
+    navigation issued from inside a closing sheet*.
+  - **LA-109** — Home, then More, then Profile details, then system back. Must land on **More**.
+  - **LB-107** — from a tab root, back lands on Home; from Home, back minimises the app.
+  - **BF-100** — from a scrolled `/more` and back: does the offset return?
+  - **BF-166** — the back listener against the overlay stack.
+- **⛔ Read `location.pathname` in the page, never an inspector's address bar.** It updates on
+  `Page.frameNavigated`, which `history.replaceState` does not fire, so it goes stale on this app —
+  that artifact already produced one false LA-109 finding and its retraction.
+
+### [app-shell][nutrition] DV-3 — three cheap blockers, unrelated to each other
+
+- **Needs:** DV-1
+- **Lane: DV** · **Added:** 2026-09-22.
+- **BF-111** — open **More, then About**, and capture it. It shipped, then FAILED on the S25 with no
+  note, and the difficulty is which-number-where: the app version, the Android build version, and an
+  up-to-date tick. **Say which of the three is wrong.** This is the one thing the Orchestrator is
+  currently waiting on the owner for, so answering it here removes an owner gate outright.
+- **LB-116** — queue a check-in with **no network** and confirm the stored
+  `suggested_sore_muscles` is what the sheet drew at the time, not what the server derives when the
+  mutation lands hours later.
+- **Q-477** — the date rollover hangs off `visibilitychange`, which behaves differently in a WebView
+  than a desktop tab. A real backgrounding across local midnight is the case that matters.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A

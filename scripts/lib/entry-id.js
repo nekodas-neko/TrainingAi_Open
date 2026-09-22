@@ -3,8 +3,9 @@
 // The backlog's entry-ID prefixes, in ONE place.
 //
 // Each standing agent counts up from its own letter (`docs/agents/README.md` §3): Lane A `LA-`,
-// Lane B `LB-`, BugFix `BF-`, Review `RV-`, Tuning `TN-`, Orchestrator `OR-`, one-off sessions
-// `PS-`, plus the legacy `Q-` numbers, which stay valid and are never renumbered.
+// Lane B `LB-`, BugFix `BF-`, Review `RV-`, Tuning `TN-`, Orchestrator `OR-`, Device Verification
+// `DV-`, one-off sessions `PS-`, plus the legacy `Q-` numbers, which stay valid and are never
+// renumbered.
 //
 // **This exists because the alternation was written out four times and `OR-` was in none of them**
 // (PS-6). The Orchestrator role was created 2026-08-20 and the tooling was never taught its letter;
@@ -21,7 +22,15 @@
 // Add a prefix here and every site gains it at once. That is the whole point: `lib/lane.js` carries
 // the same lesson in its own comment, from the time its rule was duplicated and the copies drifted
 // within a day.
-const PREFIXES = ['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'PS', 'Q'];
+//
+// **It happened again on 2026-09-22, exactly as described above, to `DV-`.** Device Verification
+// was created as the seventh standing role and three entries were written into its lane; all three
+// were **silently dropped** — the queue total read identically with and without them, and
+// `--lane DV` printed *"nothing startable"* while the headings sat in the file. The role's own PR
+// had already added `DV` to `lib/lane.js`, so the lane parsed and the id did not, which is the
+// worst shape: every individual piece looked correct. **Adding a role means adding its letter
+// HERE, in the same PR as the role.**
+const PREFIXES = ['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'DV', 'PS', 'Q'];
 
 const ALT = PREFIXES.join('|');
 

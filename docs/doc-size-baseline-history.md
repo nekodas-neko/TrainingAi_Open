@@ -15563,3 +15563,18 @@ that used to live in a chat transcript.
 Worth carrying: **a baton is state, not a story.** The contract already says rewrite it in full and
 never append; the size ratchet is what makes that enforceable, because appending is invisible until
 somebody counts. The right response to this check on a baton is almost always to cut, not to raise.
+
+## 2026-09-22 — the lane field becomes the cross-agent channel (`docs/agents/README.md`, backlog +47)
+
+Three `DV-` entries and two new README sections. The growth is a mechanism, not narrative: **any
+agent can now hand work to any other by writing `Lane:`**, with `DV` added beside `A`, `B` and `O`,
+and each role re-reading its own lane on a cadence.
+
+Worth carrying, and it is a repeat this file predicted: **`scripts/lib/entry-id.js` already carried
+a comment about `OR-` having been added as a role without its letter reaching the shared prefix
+list, and the failure being "silent deletion, not a wrong label".** The same thing happened to `DV-`
+on the same day the role was created. Three entries were written, the queue total read identically
+with and without them, and `--lane DV` printed *"nothing startable"* while the headings sat in the
+file. The role's PR had already taught `lib/lane.js` the new value, so the lane parsed and the id
+did not — every individual piece looked right. **A new role means its letter goes in
+`entry-id.js` in the same PR as the role**, and that sentence is now in the file itself.

@@ -6,6 +6,13 @@
 // yields an id and pushes only what it built, so an `OR-` heading was dropped from the queue
 // entirely — measured, the total read 194 with and without a scratch `OR-99`, and it appeared
 // nowhere in the output, not even under UNCLASSIFIED.
+//
+// **It recurred on 2026-09-22 with `DV-`**, on the same day Device Verification was created as the
+// seventh role. Three entries were written into its lane; the queue total read identically with and
+// without them and `--lane DV` printed "nothing startable" while the headings sat in the file. The
+// role's PR had already taught `lib/lane.js` the value, so the lane parsed and the id did not —
+// every piece looked correct on its own. This test is what turns "add the letter" from a habit into
+// a step you cannot skip, so **a new role's letter belongs here in the same PR as the role.**
 import { describe, it, expect } from 'vitest'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PREFIXES, idPattern, idPartsPattern } = require('../lib/entry-id.js') as {
@@ -17,14 +24,18 @@ const { PREFIXES, idPattern, idPartsPattern } = require('../lib/entry-id.js') as
 describe('backlog entry-id prefixes', () => {
   // The list in docs/agents/README.md §3, plus the legacy Q- numbers.
   it('knows every prefix the agents actually use', () => {
-    expect(new Set(PREFIXES)).toEqual(new Set(['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'PS', 'Q']))
+    expect(new Set(PREFIXES)).toEqual(new Set(['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'DV', 'PS', 'Q']))
   })
 
   it('matches an OR- id in a heading — the one that was missing', () => {
     expect('### [platform] OR-1 — something'.match(idPattern())?.[1]).toBe('OR-1')
   })
 
-  it.each(['LA-19', 'LB-11', 'BF-23', 'RV-31', 'TN-8', 'OR-1', 'PS-6', 'Q-477'])(
+  it('matches a DV- id in a heading — the second time this was missed', () => {
+    expect('### [devices] DV-1 — something'.match(idPattern())?.[1]).toBe('DV-1')
+  })
+
+  it.each(['LA-19', 'LB-11', 'BF-23', 'RV-31', 'TN-8', 'OR-1', 'DV-1', 'PS-6', 'Q-477'])(
     'matches %s', id => { expect(`### [x] ${id} — t`.match(idPattern())?.[1]).toBe(id) },
   )
 

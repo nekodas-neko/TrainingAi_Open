@@ -59,6 +59,53 @@ with, and a task list that until today lived only in a chat transcript.
 never append. The size ratchet is what makes that enforceable, because appending is invisible until
 something counts. On a baton, the right response to that check is almost always to cut.
 
+## The flow between agents, which is what the owner actually asked for
+
+The first pass hand-wrote a task list into the device agent's baton. That was wrong, and the owner
+named the right model: **tasks go in the queue, in a lane; the agent reads its lane and works it
+off.** Exactly how implementers already work.
+
+**`Lane:` is now the whole channel.** `DV` joins `A`, `B` and `O` as a value, so any agent hands
+work to any other by writing a field — Review finds something only the phone can settle and writes
+`Lane: DV`; the device agent finds a real defect and writes `Lane: B`; anyone hits a question
+needing the owner and writes `Lane: O`. No message, no handoff doc, no two sessions awake at once.
+**The queue is the channel, and an entry outlives the session that wrote it.**
+
+**`O` and `DV` are strict where `A` and `B` are not.** An unstated lane means *"§3's path rule
+answers it"*, and that rule only ever resolves to an implementer — so untagged work showing in both
+implementer lanes is the safe failure it was designed as, and the same 400 entries shown to the
+Orchestrator or the device agent would bury the dozen genuinely theirs.
+
+**A device check is not a lane assignment**, and keeping those separate is the part most likely to
+be got wrong later. A shipped entry owing a look keeps its own lane and carries `Verify: device` or
+a `Keep:`; `--sittings` gathers those across the queue by screen, now **ordered by queue position**
+so moving one entry up promotes a whole sitting. `Lane: DV` is for what the device agent
+*delivers*. Merging the two would put a hundred entries in one lane and tell it nothing about order.
+
+**Cadence**: each session arms a recurring wake-up and re-reads its own lane — hourly for the
+implementers and the Orchestrator, on demand for Device Verification, which needs the phone and the
+owner present. **A quiet wake-up is silent**: re-arm and say nothing, because an agent that reports
+"nothing to do" every hour trains everyone to stop reading it.
+
+`DV-1`, `DV-2` and `DV-3` are filed as the first entries in that lane — make the harness connect,
+the back-gesture sitting, three cheap blockers — with `DV-2` and `DV-3` correctly parked behind
+`DV-1`.
+
+## The same bug, predicted by its own file, twice
+
+`scripts/lib/entry-id.js` opens with the story of `OR-` being added as a role without its letter
+reaching the shared prefix list, and the failure being *"silent deletion, not a wrong label"*.
+
+**That happened again, to `DV-`, on the day the role was created.** Three entries were written; the
+queue total read **identically with and without them**, and `--lane DV` printed *"nothing
+startable"* while the headings sat in the file. The role's own PR had already taught `lib/lane.js`
+the new value — **so the lane parsed and the id did not**, which is the worst shape available:
+every individual piece looked correct.
+
+The letter is in `entry-id.js` now, the test that pins the set knows it, and both carry the second
+instance in their comments. **Adding a role means adding its letter there, in the same PR as the
+role.**
+
 ## Not done
 
 - **Nothing has been run against a device.** Every task on the new baton is unticked, and the

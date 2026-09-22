@@ -190,6 +190,59 @@ lib/haptics.ts  lib/shell-nav.ts  lib/navigate-with-transition.ts
 lib/view-transition.ts  lib/use-copy.ts  lib/use-online-status.ts  lib/session-icon.tsx
 ```
 
+### Re-reading your lane on a cadence — so assigned work is picked up without being announced
+
+A lane only works as a channel if somebody reads it. **Each standing session arms a recurring
+wake-up for itself** (`create_trigger` bound to its own session, or `send_later` re-armed each
+time) and, when it fires, re-runs `node scripts/next-item.js --lane <its lane>` and acts on
+anything new.
+
+| role | cadence | why that one |
+|---|---|---|
+| Implementation A · B | **hourly** | the queue moves fastest here, and a lane sitting idle is the expensive case |
+| Orchestrator | **hourly** | it holds the owner-facing items, and a question that waits is a lane that waits |
+| Device Verification | **on demand** | it needs the phone and the owner's presence; a timer would fire into an empty room |
+| BugFix · Tuning · Review | **their own sweep cadence** | they find rather than consume, so they read the queue to avoid duplicating, not to take work |
+
+**A quiet wake-up is silent.** If nothing in the lane changed, re-arm and say nothing — no message
+to the owner, no comment on a PR. The cadence exists to catch assigned work, not to produce
+activity, and an agent that reports "nothing to do" every hour trains everyone to stop reading it.
+
+**⚠ Do not use a short timer to poll for something the harness already notifies you about.** CI and
+PR events wake a session on their own; a wake-up is the fallback for what they miss, and the whole
+loop can be a single long-interval trigger rather than a busy one.
+
+### Assigning work to another agent — the lane field is the whole mechanism
+
+**Any agent can put work in any lane by writing the field.** That is the point of `Lane:` being a
+value rather than a convention: Review finds something only the phone can settle and writes
+`Lane: DV`; the device agent finds a real defect and writes `Lane: B`; anyone hits a question that
+needs the owner and writes `Lane: O`. No message, no handoff doc, no waiting for a session to be
+awake — the queue *is* the channel, and an entry survives every session that reads it.
+
+| value | whose | what belongs there |
+|---|---|---|
+| `A` / `B` | Implementation | code, decided by §3's path rule |
+| `O` | Orchestrator | the queue and docs themselves, CI config, repo settings — **and anything needing the owner or a round of thinking before it can be built** |
+| `DV` | Device Verification | work whose *deliverable* needs the phone |
+| `?` | nobody yet | "I could not tell" — it surfaces to a human rather than being guessed |
+
+**`O` and `DV` see only what is tagged for them; `A` and `B` also see the untagged.** An unstated
+lane means *"§3's path rule answers it"*, and that rule only ever resolves to an implementer — so
+showing untagged work to both implementer lanes is the safe failure it was designed as, and showing
+the same 400 entries to the Orchestrator or the device agent would bury the dozen genuinely theirs.
+
+**A device CHECK is not a lane assignment.** A shipped entry owing a look keeps its own lane and
+carries `Verify: device` or a `Keep:`; `node scripts/next-item.js --sittings` gathers those across
+the whole queue, grouped by screen and **ordered by queue position**, so moving one entry up
+promotes its whole sitting. `Lane: DV` is for work the device agent *delivers* — a round, a harness
+fix — not for every entry that happens to owe a look. Mixing the two would put a hundred entries in
+one lane and tell it nothing about order.
+
+**When a check comes back FAILED, the entry goes back to the lane that owns the surface** with what
+reproduces it. That is the loop closing: the device agent never fixes product code, and the lane
+never has to guess what the phone did.
+
 ### Anything not listed — decide it by the rule, not by the list
 
 `lib/` holds around 68 top-level entries and **40 of them are named in neither list above**. An
