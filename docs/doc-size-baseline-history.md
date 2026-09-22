@@ -15413,6 +15413,19 @@ attribute itself in the first place. `check-doc-links` (818 files) and `check-in
 (1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
 other, since a citation whose link *text* is also a path passes the first and fails the second.
 
+## 2026-09-22 (second) — `docs/implementation-backlog.md` → 26333 (after merging concurrent PRs)
+
++27 to record four owner decisions and lift three gates, which is the cheapest possible use of these
+lines: each one was answered in a chat that would otherwise end with the session, and LA-122 exists
+precisely because that has happened before.
+
+Two of the additions are reasons rather than answers, and those are the ones worth the space. LA-121's
+answer is *don't port the temperature ladder* — the reason being that TN-6 measured the baseline
+0.36 °C too low, so a sharper penalty on a wrong baseline amplifies the error. Without that sentence
+the decision reads as arbitrary and gets re-proposed. And item 2a states why the batched recompute is
+**not** a `Batch:` field: that field means one PR, and one PR would bundle three code changes with an
+owner-fired production data write, which the standing rules forbid batching. The shared thing is the
+recompute run, not the diff — a distinction someone would otherwise "tidy up" into a field.
 ## 2026-09-22 — RV-98 (`fix/rv98-opacity-contrast`)
 
 `docs/implementation-backlog.md` → **26306**: RV-98 left the queue.
