@@ -712,33 +712,33 @@ below threshold and left in place for next time.
   switch — confirm both re-seed from cache, or the swap trades a hard cut for a skeleton. That
   caveat plus More's traffic (7) is why this ranks last of the navigation set.
 
-### [nutrition][app-shell] RV-116 — Home offers two widgets that answer "how much can I still eat" from one cache key
+### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
 
 - **Lane:** B — `components/home/home-nutrition-card.tsx:48`,
   `components/home/home-energy-balance-card.tsx:14`. **Added:** 2026-09-22 · Review sweep 53.
-- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
-  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
+  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise; see below.
 - **Batch:** `home-ia-merge`
-- Both call `useEnergyBalanceToday()` — same hook, same `energy-balance:${today}` key — and both are
-  offered independently in the widget picker. Enabled together they stack the same number twice
-  against the same budget.
-- **This exact shape already produced two live bugs:** Q-401/Q-415, two budgets 271–274 kcal apart,
-  both labelled "left". They agree today only because `budgetProvenance` was centralised; nothing
-  structural stops them diverging again.
-- **Fix:** fold the energy-balance card's `eaten · burned · maintenance` provenance line and its
-  zone word into the nutrition card, then drop the widget key from `CARD_WIDGET_DEFS`,
-  `CARD_DEFAULT_COLORS` and the hidden-section label map.
-- **What is lost, honestly:** anyone wanting energy balance *without* macros loses that option, and
-  the provenance line must be carried across or "why is my budget this size" disappears.
-- **⚠ A stale `ta_ss_cards` in localStorage may still name the removed key** — `HomeCardWidget`
-  no-ops on unknown keys, but the label map needs the entry removed with care.
+- **The original entry proposed folding the energy-balance card's provenance line into the nutrition
+  card. That was wrong: the nutrition card already has it.** `HomeNutritionZoneBar` renders
+  `CalorieZoneBar`, which prints the `N resting rate — no movement recorded yet today` line (Q-401),
+  so the running card already carries ring + totals + zone bar + provenance + macros.
+- **What remains** is structural: both call `useEnergyBalanceToday()` — same hook, same
+  `energy-balance:${today}` key — and both sit in the picker. `DEFAULT_CARD_WIDGETS` is `[]`, so
+  `energyBalanceWidget` is opt-in and off; the duplication is latent, not on screen.
+- **This shape already produced two live bugs:** Q-401/Q-415, two budgets 271–274 kcal apart, both
+  labelled "left" — they agree today only because `budgetProvenance` was centralised.
+- **Remaining delta, if the second card were enabled:** the large `remainingKcal` figure, the
+  `zoneLabel` word, and the `eaten · burned · maintenance` breakdown (no equivalent on the other).
+- **Fix, reduced:** merge and delete nothing. Relabel the picker entry so it reads as an alternative
+  to the nutrition card rather than an addition, and grey it out while that card is on if cheap.
+- **No owner gate** — the reduced fix changes picker copy, it does not rearrange a screen.
 
 ### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
 
 - **Lane:** B — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
   Review sweep 53.
-- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
-  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
 - **Batch:** `health-ia-merge`
 - The "Balance" tile renders `netKcal` `vs TDEE est.` in group **Body**; `CalorieBalanceBar` renders
   `remainingKcal` + zone band in group **Activity & intake**. Same payload, two different numbers,
@@ -755,8 +755,8 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
   **Added:** 2026-09-22 · Review sweep 53.
-- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
-  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
 - **Batch:** `health-ia-merge`
 - Body has a "Trend" tile with the kg/wk regression slope and **no chart**; Progress has a card
   **titled "Weight Trend"** with a sparkline and two goal bars and **no slope number**. One question
@@ -773,8 +773,8 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
   Review sweep 53.
-- **Gate: owner** — a large visible change to a screen the owner uses daily; **show a mockup and
-  get a yes before writing code** (see CLAUDE.md, *Large UI changes are mocked up first*).
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
 - **Batch:** `home-ia-merge`
 - Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
   weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
