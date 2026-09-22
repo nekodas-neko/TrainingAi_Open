@@ -15219,3 +15219,22 @@ file the entry names as its own reference — and **9** were genuinely broken. A
 when it has a handler *and* no `onError`, which is the distinction the count missed. Two naive greps
 answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
 test rather than only in prose.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26604 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
+
+Net +52 across a removal and an addition, recomputed after merging review sweep 52 rather than spliced. **Out:** LA-49, whose two steps both shipped in this PR.
+**In:** OR-123, the WebView rollup consumer — filed because Q-538's bound was *"blocked, and not by
+anything in this queue"*, held by a `⛔` because the target had no entry to point a `Needs:` at.
+Filing the target is what converts a prose block into a field.
+
+The rest is six blocks that existed only as prose being written as `Gate:`/`Needs:`/`Reference:`
+lines — TN-2, Q-49, Q-72, Q-85, Q-1b, Q-538, Q-252, BF-14, LA-57. Each costs three or four lines
+and buys the thing the queue actually reads.
+
+Worth carrying: **LA-49 sat for three weeks because it was parked by the bug it described.** It
+measured, on 2026-09-01, that 34 entries carried a `⛔` and only 7 meant blocked — and it quotes
+three of those emphasis markers as evidence, so the detector parked it too. Nothing about the
+measurement decayed; it simply never printed in a READY list. That is the second circular gate
+found this week (BF-165's *"ungate it the moment the fix lands"* was the first), and both have the
+same shape: **a condition for becoming visible that can only be met by someone who can already see
+it.** When writing a park of any kind, check that something outside the entry can lift it.

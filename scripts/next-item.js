@@ -94,7 +94,23 @@ for (const line of lines.slice(queueStart)) {
 
   // Entries not yet migrated off the prose marker. Treated as parked, and named as unmigrated so
   // the remaining ones stay visible instead of quietly reading as ready.
-  if (!current.legacyBlocked && line.includes('⛔')) {
+  //
+  // **The glyph alone is not the marker — `⛔ block…` is** (LA-49, narrowed 2026-09-22 by OR-122).
+  // The file's own protocol documents the marker as `⛔ blocked: <reason>`, so this is the file's
+  // convention rather than a new heuristic. Matching the bare glyph parked **28 entries of which
+  // ~7 meant blocked**; the other 21 use ⛔ as an emphasis glyph for a warning to whoever BUILDS the
+  // entry — *"⛔ Do not extend this to the conic-gradient rings"*, *"⛔ Do not re-litigate the
+  // missing e2e"* — which is the opposite of a reason not to build it. Measured 2026-09-01 at 34/7
+  // and unchanged three weeks later, because **LA-49, the entry that describes this, quotes the
+  // glyph and was parked by its own bug.** A detector whose false-positive rate is 75% teaches
+  // implementers to ignore the section it fills.
+  //
+  // ⚠ **This change is second on purpose.** LA-49's own caution is that narrowing the rule without
+  // triaging first trades a section nobody reads for a section an implementer starts from — two of
+  // the entries it exposes open with *"REFUTED"*. The triage shipped in the same PR: the genuinely
+  // blocked ones (TN-2, Q-49, Q-72, Q-85, Q-538, Q-252) carry a `Gate:`/`Needs:` now, and the
+  // refuted ones (BF-14, LA-57) carry a `Reference:`. Do not re-widen this without redoing that.
+  if (!current.legacyBlocked && /⛔[^\n]{0,40}block/i.test(line)) {
     current.legacyBlocked = line.replace(/^\s*[-*]?\s*/, '').slice(0, 90);
   }
 }
