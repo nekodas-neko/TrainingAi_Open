@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { degradedFromFacts } from '@/lib/ai/degrade'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { rateLimit } from '@/lib/rate-limit'
@@ -213,14 +214,21 @@ export async function POST(req: Request) {
     // AI route, so backoff + reportServerError live in one place instead of the SDK's default retry.
     ;({ text } = await loggedGenerateText(
       { section: 'health-insight', userId, fingerprint: { section, date, contextHash } },
-      () => generateText({
+      signal => generateText({
         model: aiModel(),
         prompt,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     ))
   } catch (err) {
     console.error('[ai/health-insight] generateText failed:', err)
+    // RV-69. `dataLines` and not `prompt` — the prompt carries the instructions and the absent-metric
+    // notes too, and only the measured lines are facts about this section. Not cached, for the same
+    // reason as its siblings: the context hash is unchanged, so a stored fallback would be served
+    // ahead of every later attempt.
+    const degraded = degradedFromFacts('the readings', dataLines.join('\n'))
+    if (degraded) return NextResponse.json({ insight: degraded, degraded: true })
     return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
   }
 

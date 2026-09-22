@@ -301,12 +301,13 @@ async function runPrescriptionGeneration(
   try {
     const result = await loggedGenerateObject(
       { section: 'prescription', userId, fingerprint: { programSessionId, today } },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: PrescriptionSchema,
         system: systemPrompt,
         prompt: userPrompt,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     )
     parsed = result.object

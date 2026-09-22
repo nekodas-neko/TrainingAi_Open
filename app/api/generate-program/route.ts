@@ -345,12 +345,13 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
   try {
     const { object: raw } = await loggedGenerateObject(
       { section: 'generate-program', userId, fingerprint: userPrompt },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: GeneratedProgramSchema,
         system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     )
 

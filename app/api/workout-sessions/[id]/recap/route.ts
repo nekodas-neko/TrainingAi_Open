@@ -1,5 +1,6 @@
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { degradedFromFacts } from '@/lib/ai/degrade'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -96,10 +97,26 @@ In at most 3 sentences: say what stood out about this session, and give one thin
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
-    const { text } = await loggedGenerateText(
-      { section: 'workout-recap', userId, fingerprint: { sessionId, contextHash } },
-      () => generateText({ model: aiModel(), prompt, maxRetries: 0 }),
-    )
+    let text: string
+    try {
+      ;({ text } = await loggedGenerateText(
+        { section: 'workout-recap', userId, fingerprint: { sessionId, contextHash } },
+        signal => generateText({ model: aiModel(), prompt, maxRetries: 0, abortSignal: signal }),
+      ))
+    } catch (err) {
+      // RV-69, and the reason this one needed its OWN catch: the handler-wide catch below covers the
+      // session lookup and the repo reads too, so degrading there would answer 200 with a recap for
+      // a request that never got as far as building one. Scoped to the model call, `lines` is known
+      // to exist. A null degrade (no facts at all) falls through to that catch unchanged.
+      console.error('[workout-recap] generateText failed:', err)
+      const degraded = degradedFromFacts('the session', lines)
+      if (degraded) {
+        // Not persisted: `upsertAiHealthInsight` would make this the session's stored recap, and a
+        // completed session's context hash never changes, so nothing would ever replace it.
+        return NextResponse.json({ recap: degraded, degraded: true }, { headers: { 'Cache-Control': 'private, no-store' } })
+      }
+      throw err
+    }
     const recap = text.trim()
     await repo.upsertAiHealthInsight(userId, cacheSection, date, recap, contextHash)
 

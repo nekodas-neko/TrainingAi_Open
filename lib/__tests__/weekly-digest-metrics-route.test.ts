@@ -226,3 +226,54 @@ Body weight change: -1.3 kg over 2 weeks
 7.3h avg sleep
 Sleep quality: 67/100 avg nightly sleep score that week (week before 55/100)
 Friends training that week: 3 friends connected`
+
+/**
+ * RV-69 — the model's failure must not discard the week.
+ *
+ * Every number in the recap is computed by this route before the model is ever called; the model
+ * only writes the sentences about them. Answering 502 threw away a complete `WeeklyDigestMetrics`
+ * and the whole context block built from it. `running-plan/explain` had already established the
+ * shape: 200, the deterministic content, `degraded: true`.
+ */
+describe('a failed model call degrades to the facts (RV-69)', () => {
+  const fail = () => generateText.mockRejectedValue(new Error('provider exploded'))
+
+  it('answers 200 with the week as recorded, not 502', async () => {
+    loadFixture(); fail()
+    const res = await post()
+    expect(res.status).toBe(200)
+    const json = await bodyOf(res) as { digest: string; degraded?: boolean }
+    expect(json.degraded).toBe(true)
+    expect(json.digest).toContain('2 sessions, 7000 kg volume')
+  })
+
+  it('still returns the metrics, which the banner renders regardless of the prose', async () => {
+    loadFixture(); fail()
+    const json = await bodyOf(await post())
+    expect(json.metrics.training.volumeKg).toBe(7000)
+    expect(json.weekStart).toBe('2026-08-31')
+  })
+
+  /**
+   * The load-bearing half. The insight cache is keyed on (user, week, context hash) and none of the
+   * three moves for the rest of the week — so a stored fallback would be served ahead of every
+   * later attempt, turning one provider blip into a week of no recap.
+   */
+  it('does not persist the fallback as the week\'s digest', async () => {
+    loadFixture(); fail()
+    await post()
+    expect(upsertAiHealthInsight).not.toHaveBeenCalled()
+  })
+
+  it('carries the same lines the model was given', async () => {
+    loadFixture()
+    const withModel = await bodyOf(await post())
+    const context = contextOf()
+    generateText.mockClear()
+    sessionUser = { id: `u-${++seq}`, timezone: fx.TZ }
+    fail()
+    const degraded = await bodyOf(await post()) as { digest: string }
+    for (const line of context.split('\n')) expect(degraded.digest).toContain(line)
+    expect(withModel.digest).toBe('the recap')
+  })
+})
