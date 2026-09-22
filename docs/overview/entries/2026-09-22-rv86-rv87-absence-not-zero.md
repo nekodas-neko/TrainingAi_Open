@@ -41,6 +41,12 @@ lines. Rather than shave comments, the streak walk moved to `app/session-select/
 rule — two rest days are bridged and credited, the third breaks the walk — which nothing asserted
 while it was inline.
 
+The move turned `lib/__tests__/rv57-streak-lookback-contract.test.ts` red, which is the right
+behaviour and was left as-is rather than loosened: RV-57 asserts the consumer of
+`STREAK_LOOKBACK_DAYS` imports it instead of walking to a literal, and naming a path is how that
+test notices the consumer has gone somewhere it is no longer watching. It was repointed, not
+relaxed.
+
 ## Verification
 
 - `pnpm check:rules` — **Ran 75 of 75**, all passed (it was the component-size step that failed
