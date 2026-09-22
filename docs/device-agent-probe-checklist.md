@@ -13,18 +13,48 @@ session cannot reach them, which is why every Review sweep to date ends on the s
 
 ## The reporting contract — read this before running anything
 
-**A probe that reports "looks fine" is worthless here.** Every item below returns a **number, a
-list, or an artifact**. That is the whole point: a Review sweep turns evidence into a backlog entry,
-and "seemed OK" cannot be filed, cannot be argued with, and cannot be re-checked next month.
+**Your role's three outcomes still apply, unchanged:** every check ends VERIFIED ON THE S25, FAILED
+ON THE S25, or COULD NOT CHECK and why (`docs/agents/README.md`). An earlier draft of this file said
+"never a verdict", which contradicted that and was wrong — corrected here.
 
-- Report the **measurement**, then your reading of it — in that order, so the number survives even if
-  the reading is wrong.
+What this file adds is the other half: **the verdict must carry the measurement that produced it.**
+A VERIFIED with no number behind it cannot be filed as an entry, argued with, or re-checked next
+month, and a Review sweep has nothing to do with it.
+
+- Report the **measurement**, then the verdict — in that order, so the number survives even if the
+  reading is wrong.
 - **A zero is a result.** "No requests fired" is the finding in P1, not a failed probe.
-- **Say which probes you could not run and why.** A silent omission reads as a pass.
-- Name the **build** (APK version, or the Railway deploy's `/api/version`) and whether the app was
+- **COULD NOT CHECK is a real answer and is never a silent omission.** Several probes below are
+  blocked right now; say so rather than skipping them.
+- Name the **build** (APK version and the Railway deploy's `/api/version`) and whether the app was
   cold-started or resumed. Several of these differ between the two.
-- Where a probe finds something, give the **smallest reproduction**: route, action, and the observed
-  value. Not a narrative.
+- Where a probe finds something, give the **smallest reproduction**: route, action, observed value.
+
+### Two limits that change what you can run here
+
+- **The phone is signed into production.** Probes P1 and P3 are built on *writes* — logging a food,
+  saving a weigh-in, completing a workout — and those are real rows in the owner's real data. **Get
+  his go-ahead per write type before running them**, and prefer the reversible ones (log then delete
+  a food) over the ones with no undo (completing a workout). Where he says no, the probe is COULD
+  NOT CHECK, not a guess.
+- **The phone was on three-button navigation at the first sitting** (baton, 2026-09-23). Every
+  clearance measurement in P4 is invalid until it is switched to gesture nav, because that is the
+  mode the floored-utility rule exists for. Confirm the current mode before running P4 and report
+  which mode the numbers were taken in.
+
+### What the harness already does — do not rebuild it
+
+`scripts/device/` landed with the role (#1417) and covers part of this file already:
+
+- `probe.js` — the real resolved `env(safe-area-inset-bottom)`, whether the local store is real,
+  and a compositor screenshot. **That is P4's anchor measurement**; take it from here.
+- `record.js` — compositor frames with landing times, `--tap` to cover a transition. **That is P5.**
+- `tour.js` — walks routes, captures each, and emits a DOM digest including the computed bottom
+  padding of the lowest action row against the real inset. **That covers P9 and part of P4.**
+
+So the genuinely new asks below are **P1, P2, P3, P7, P8 and P10** — the ones needing the network
+layer, the local store's contents, or a long session. Extend the harness rather than working by
+hand; `scripts/device/**` is the one code path the role owns.
 
 ---
 
@@ -100,12 +130,14 @@ construction** in `pnpm dev`. This is the single largest blind spot in the proje
 
 A human eyeballs one screen; you can enumerate every element on every route.
 
-- **Bottom-anchored clearance.** For every `position: fixed` or `sticky` element whose bottom edge is
-  within 24 px of the viewport bottom, report the **computed `padding-bottom` in px** and the
-  element's selector. The floored utilities (`pb-safe-action`, `pb-safe-action-lg`) must resolve to a
-  real number; bare `env(safe-area-inset-bottom)` resolves near **zero** on Android gesture-nav,
-  which is the recurring bug. **Report the actual resolved px of `env(safe-area-inset-bottom)` on
-  this device once** — everything else is read against it.
+- **Bottom-anchored clearance — gesture nav only.** Take the device's resolved
+  `env(safe-area-inset-bottom)` from `probe.js` first; everything else is read against it. Then, for
+  every `position: fixed` or `sticky` element whose bottom edge is within 24 px of the viewport
+  bottom, report the **computed `padding-bottom` in px** and the element's selector. The floored
+  utilities (`pb-safe-action`, `pb-safe-action-lg`) must resolve to a real number; bare
+  `env(safe-area-inset-bottom)` resolves near **zero** on gesture-nav, which is the recurring bug.
+  **On three-button nav this measurement proves nothing** — the inset is generous there and a
+  broken utility passes. Report the nav mode with the numbers, or COULD NOT CHECK.
 - **Horizontal overflow.** On every route, report any element where `scrollWidth > clientWidth` at
   384 px, with its selector and the overflow in px.
 - **Tap targets.** List every interactive element whose rendered box is under 44 × 44 px, by route.
