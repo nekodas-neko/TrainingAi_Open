@@ -777,35 +777,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   tab-show + pull-to-sync fan-out (`cachedFetch` de-dupes concurrent calls for the same key, which
   reduces it).
 
-### [workouts][app-shell] RV-86 — a failed streak fetch paints a confident "0-day streak, 0 sessions"
-
-- **Lane:** B — `app/session-select/session-select-content.tsx:538-543`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- `setCalendarDays` runs only from `onData`, and the `.catch(() => {})` beside it is RV-84's dead
-  shape — so on failure `calendarDays` keeps its `{}` initial value, `streak` (`:1011`) counts 0 from
-  empty input, and `StreakCard` (`:1284-1290`) receives plain numbers with **no "unknown"
-  representation**.
-- **Absence rendered as zero, on the most alarming number this screen can show.** Reached on a first
-  launch after reinstall or cleared data, offline, or any failed fetch past the seed floor — i.e.
-  exactly the moment the owner would most distrust the app.
-- **Fix:** a `streakLoaded` flag set from `onData` and from the `readCacheSync` seed (`:271`), with
-  "—" in the streak and this-week cells until it is true.
-  `components/health/observed-hr-card.tsx:40,55-56` is the in-repo measured-vs-missing shape.
-- **Not established:** whether the local-store `pendingDays` overlay (`:386`) can independently
-  populate a nonzero streak offline — read as covering unsynced workouts only, not history.
-
-### [app-shell] RV-87 — the Profile tab invents a whole lifetime when its fetch fails
-
-- **Lane:** B — `components/more/profile-tab.tsx:175-190`. **Added:** 2026-09-21 · Review sweep 52.
-- Every stat is a `??` default: `xp ?? 0`, `level ?? 1`, `levelLabel … ?? 'Novice'`,
-  `lifetimeStats.* ?? 0`, `unlockedCount ?? 0`. Those values are then passed to `StatsGrid` (`:322`)
-  and `AchievementsSection` (`:330`) and **rendered as facts**.
-- On a cold cache plus a failed `/api/achievements`, the hero reads *Level 1 · Novice · 0 XP*, the
-  stats strip reads all zeros **including best streak**, the header reads *0 / 0* achievements — and
-  the grid below spins forever (RV-84).
-- **Fix:** hold `achievementsData === null` as its own state, render "—" per tile plus one
-  "Couldn't load your stats" line, driven by `onError` rather than the `??` defaults.
-
 ### [workouts] RV-89 — one stored 1RM renders four different numbers, and four sites half-use the shared helper
 
 - **Lane:** B — `components/workout/{active-workout-screen,pre-workout-screen,exercise-summary-screen,

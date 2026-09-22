@@ -83,7 +83,7 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
-import { STREAK_LOOKBACK_DAYS } from "@trainingai/shared/workout/streak-window";
+import { computeStreak } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 
@@ -116,6 +116,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [logWidget, setLogWidget]           = useState<WidgetDef | null>(null);
   const [recommendation, setRecommendation] = useState<NextSessionRecommendation | null>(null);
   const [calendarDays, setCalendarDays] = useState<Record<string, string[]>>({});
+  // RV-86: `{}` is both "no history" and "the fetch failed", and the card rendered the second
+  // as the first — a confident 0-day streak at exactly the moment the data is least trustworthy.
+  // Set from the cache seed and from `onData`, never from `onError`, so a failure keeps it false.
+  const [streakLoaded, setStreakLoaded] = useState(false);
   // Held apart from `calendarDays` rather than merged into it: every writer of `calendarDays`
   // lets the newest server payload win a day key, which is what makes a deleted workout
   // disappear. Pending rows can't be in that payload by definition, so they merge at read time
@@ -270,7 +274,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       if (cachedPrevCal?.trainedDays) Object.assign(merged, cachedPrevCal.trainedDays);
       const cachedStreak = readCacheSync<{ trainedDays: Record<string, string[]> }>('streak-data');
       if (cachedStreak?.trainedDays) Object.assign(merged, cachedStreak.trainedDays);
-      if (Object.keys(merged).length > 0) setCalendarDays(merged);
+      if (Object.keys(merged).length > 0) { setCalendarDays(merged); setStreakLoaded(true); }
     } catch { /* ignore */ }
 
     try {
@@ -539,8 +543,14 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           'streak-data',
           '/api/streak-data',
           TTL_LONG,
-          (d) => { if (d?.trainedDays) setCalendarDays(prev => ({ ...prev, ...d.trainedDays })); },
-        ).catch(() => {}),
+          (d) => {
+            if (!d?.trainedDays) return;
+            setCalendarDays(prev => ({ ...prev, ...d.trainedDays }));
+            // An empty `trainedDays` from a 2xx is a real answer — a user with no history —
+            // so this is keyed off the response arriving, not off it being non-empty.
+            setStreakLoaded(true);
+          },
+        ),
         cachedFetchToday<NextSessionRecommendation>(
           'next-session', '/api/next-session', NEXT_SESSION_TTL,
           (rec) => {
@@ -1007,35 +1017,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     });
   }, [trainedDays, tz]);
 
-  // Streak: counts calendar days in the active window (training + allowed rest days)
-  const streak = useMemo(() => {
-    let count = 0;
-    let consecutiveRest = 0;
-    // 2 consecutive rest days keep the streak (warning); the 3rd breaks it — mirrors
-    // the server rule in lib/ai-periodization/ai-dynamic.ts (streakWarning at 2,
-    // streakBroken at >= 3) and the StreakCard banner copy. Breaking here at > 1 made
-    // the count one day stricter than the banner promised.
-    const MAX_REST_GAP = 2;
-    // Only credit today if already trained — don't consume the rest-day allowance
-    // for a day that hasn't ended yet.
-    if ((trainedDays[dayKey(0)] ?? []).length > 0) count = 1;
-    // Walk back from yesterday so an untrained today doesn't break the streak.
-    // The bound is the SHARED constant, not a literal (RV-57): its module calls itself a contract
-    // between the route that decides how many days to send and this loop that decides how far to
-    // walk, and a literal here cannot be held to it. The value is unchanged — 365 either way — so
-    // this changes nothing today and makes BF-176 unrepeatable tomorrow.
-    for (let ago = 1; ago < STREAK_LOOKBACK_DAYS; ago++) {
-      const trained = (trainedDays[dayKey(ago)] ?? []).length > 0;
-      if (trained) {
-        count += 1 + consecutiveRest;
-        consecutiveRest = 0;
-      } else {
-        consecutiveRest++;
-        if (consecutiveRest > MAX_REST_GAP) break;
-      }
-    }
-    return count;
-  }, [trainedDays]);
+  const streak = useMemo(() => computeStreak(trainedDays, dayKey), [trainedDays]);
 
   // This Week: Mon → today count (not rolling 7-day)
   const weekSessionCount = useMemo(
@@ -1289,6 +1271,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                       weekSessionCount={weekSessionCount}
                       weeklyTarget={weeklyTarget}
                       calendarDays={trainedDays}
+                      loaded={streakLoaded}
                       cardColors={cardColors}
                       sectionEditMode={sectionEditMode}
                       dayKey={dayKey}

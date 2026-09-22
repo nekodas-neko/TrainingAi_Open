@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.2",
+    date: "2026-09-22",
+    changes: [
+      "A number that failed to load now shows as \u2014 instead of as a zero. If the streak request failed, Home read \"0 days\" and \"0 sessions this week\" \u2014 the same thing it shows when you genuinely have not trained. Profile was worse: a failed load read as Level 1, Novice, 0 XP, with a lifetime of zeros including your best-ever streak. Both now leave the figure blank and say so, so a missing reading can no longer be mistaken for a bad one.",
+    ],
+  },
+  {
     version: "1.464.1",
     date: "2026-09-21",
     changes: [

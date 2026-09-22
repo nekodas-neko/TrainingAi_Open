@@ -9,6 +9,9 @@ interface AchievementsSectionProps {
   achievements: AchievementResult[] | null
   showAllAchievements: boolean
   setShowAllAchievements: (v: boolean | ((prev: boolean) => boolean)) => void
+  /** False when the achievements fetch has not come back — the two counts are then `?? 0`
+   *  defaults, and "0 / 0" reads as a measured answer rather than a missing one (RV-87). */
+  countsKnown: boolean
   unlockedCount: number
   totalAchievements: number
   recentUnlocked: AchievementResult[]
@@ -16,6 +19,7 @@ interface AchievementsSectionProps {
 
 export function AchievementsSection({
   achievementsLoading,
+  countsKnown,
   achievements,
   showAllAchievements,
   setShowAllAchievements,
@@ -34,7 +38,7 @@ export function AchievementsSection({
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Achievements</p>
         <div className="flex items-center gap-2">
           <p className="text-[10px] font-semibold" style={{ color: 'var(--color-brand)' }}>
-            {unlockedCount} / {totalAchievements}
+            {countsKnown ? `${unlockedCount} / ${totalAchievements}` : '— / —'}
           </p>
           <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${showAllAchievements ? 'rotate-90' : ''}`} />
         </div>

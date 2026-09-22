@@ -15220,6 +15220,18 @@ when it has a handler *and* no `onError`, which is the distinction the count mis
 answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
 test rather than only in prose.
 
+## 2026-09-22 — RV-86 + RV-87 (`fix/rv86-rv87-absence-not-zero`)
+
+`docs/implementation-backlog.md` 26551 → 26522 → 26575 → **26619** across two re-merges: RV-86 and RV-87 shipped
+together and left the queue; #1390 then landed with a net +53 and #1393 with a further +44 while
+this PR waited on CI. The number here is the merged one — recomputed with `--fix` on each
+re-merge, never spliced from either side. They are not batched in the file — neither carries a `Batch:` slug — but they share one
+verification (absence must render as "—", not a confident zero) and touch disjoint files, and the
+protocol assigns batches when an entry is next touched.
+
+`projectOverview.md` 12212 → **12222**: ten lines at the top of Current Status for that fix. The
+version line had been reading v1.457.14 against a `package.json` on 1.464.1 — four days and several
+merges behind — so it is corrected here too rather than left to the next sweep.
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26604 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
 
 Net +52 across a removal and an addition, recomputed after merging review sweep 52 rather than spliced. **Out:** LA-49, whose two steps both shipped in this PR.

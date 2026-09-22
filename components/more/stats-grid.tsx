@@ -16,6 +16,10 @@ interface ProgramWeeks {
 }
 
 interface StatsGridProps {
+  /** False when `/api/achievements` has not come back — the five lifetime figures below are then
+   *  `??` defaults, not measurements, and render as "—" (RV-87). `programWeeks` and the user's
+   *  join date come from other fetches and are unaffected. */
+  known: boolean
   totalSessions: number
   totalSets: number
   totalVolumeKg: number
@@ -38,33 +42,34 @@ function formatDistance(km: number): string {
   return `${km.toFixed(1)} km`
 }
 
-export function StatsGrid({ totalSessions, totalSets, totalVolumeKg, bestStreak, totalDistanceKm, programWeeks, user }: StatsGridProps) {
+export function StatsGrid({ known, totalSessions, totalSets, totalVolumeKg, bestStreak, totalDistanceKm, programWeeks, user }: StatsGridProps) {
   const userTz = useUserTimezone()
+  const show = (value: string) => (known ? value : '—')
   return (
     <div className="max-w-xs mx-auto grid grid-cols-3 gap-2">
       <div className="rounded-2xl bg-muted/40 border border-border p-2.5 flex flex-col items-center gap-1 text-center">
         <Dumbbell className="h-4 w-4" style={{ color: 'var(--color-brand)' }} />
-        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--color-brand)' }}>{totalSessions}</p>
+        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--color-brand)' }}>{show(String(totalSessions))}</p>
         <p className="text-[9px] text-muted-foreground leading-tight">Sessions</p>
       </div>
       <div className="rounded-2xl bg-muted/40 border border-border p-2.5 flex flex-col items-center gap-1 text-center">
         <ListChecks className="h-4 w-4" style={{ color: 'var(--accent-green)' }} />
-        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--accent-green)' }}>{totalSets.toLocaleString()}</p>
+        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--accent-green)' }}>{show(totalSets.toLocaleString())}</p>
         <p className="text-[9px] text-muted-foreground leading-tight">Sets</p>
       </div>
       <div className="rounded-2xl bg-muted/40 border border-border p-2.5 flex flex-col items-center gap-1 text-center">
         <Weight className="h-4 w-4" style={{ color: '#ff6a1a' }} />
-        <p className="text-base font-bold tabular-nums" style={{ color: '#ff6a1a' }}>{formatVolume(totalVolumeKg)}</p>
+        <p className="text-base font-bold tabular-nums" style={{ color: '#ff6a1a' }}>{show(formatVolume(totalVolumeKg))}</p>
         <p className="text-[9px] text-muted-foreground leading-tight">Volume</p>
       </div>
       <div className="rounded-2xl bg-muted/40 border border-border p-2.5 flex flex-col items-center gap-1 text-center">
         <Flame className="h-4 w-4" style={{ color: 'var(--accent-amber)' }} />
-        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--accent-amber)' }}>{bestStreak}</p>
+        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--accent-amber)' }}>{show(String(bestStreak))}</p>
         <p className="text-[9px] text-muted-foreground leading-tight">Best streak</p>
       </div>
       <div className="rounded-2xl bg-muted/40 border border-border p-2.5 flex flex-col items-center gap-1 text-center">
         <MapPin className="h-4 w-4" style={{ color: 'var(--accent-cyan)' }} />
-        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--accent-cyan)' }}>{formatDistance(totalDistanceKm)}</p>
+        <p className="text-base font-bold tabular-nums" style={{ color: 'var(--accent-cyan)' }}>{show(formatDistance(totalDistanceKm))}</p>
         <p className="text-[9px] text-muted-foreground leading-tight">Distance</p>
       </div>
       {programWeeks?.mode === 'cycle' ? (
