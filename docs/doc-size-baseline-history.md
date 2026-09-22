@@ -15293,7 +15293,13 @@ than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explai
 entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
 only "shipped" would leave all three to be rediscovered.
 
-<<<<<<< HEAD
+## 2026-09-22 — RV-91 (`fix/rv91-raw-iso-date-and-cal-label`)
+
+`projectOverview.md` 12250 → **12259**: nine lines at the top of Current Status.
+
+`docs/implementation-backlog.md` does not move: RV-91 left the queue and **LB-125 took its place**,
+filed out of the "also noted, not filed" line RV-91 closes with. A finding that leaves with its
+entry is a dropped finding, and this one had already been carried once.
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26501, `projectOverview.md` → 12276 (TN-57)
 
 The backlog lost TN-57 whole, which was a long entry: it carried the production measurement table,
@@ -15306,12 +15312,3 @@ summary: the entry's write-path instruction would have stopped the owner's daily
 the server, because the morning sheet sends nothing else the Q-465 guard counts and `pushMutations`
 rejects such a body with no retry. A note saying only "readers now check the flag" would leave the
 next session to rediscover that by shipping it.
-=======
-## 2026-09-22 — RV-91 (`fix/rv91-raw-iso-date-and-cal-label`)
-
-`projectOverview.md` 12250 → **12259**: nine lines at the top of Current Status.
-
-`docs/implementation-backlog.md` does not move: RV-91 left the queue and **LB-125 took its place**,
-filed out of the "also noted, not filed" line RV-91 closes with. A finding that leaves with its
-entry is a dropped finding, and this one had already been carried once.
->>>>>>> origin/main
