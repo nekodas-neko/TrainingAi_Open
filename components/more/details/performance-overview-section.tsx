@@ -47,7 +47,10 @@ export function PerformanceOverviewSection({ userId }: { userId?: string }) {
     cachedFetch<{ fitnessTests: FitnessTestRow[] }>(
       'fitness-tests', '/api/fitness-tests', FITNESS_TESTS_TTL,
       d => { if (alive) setTests(d.fitnessTests ?? []) },
-    ).catch(() => { if (alive) setTests([]) });
+      // RV-84: the `.catch` here could never fire — `cachedFetch` resolves a boolean rather than
+      // rejecting, so a failed load left the section on its loading state.
+      { onError: () => { if (alive) setTests([]) } },
+    );
     return () => { alive = false };
   }, [userId]);
 

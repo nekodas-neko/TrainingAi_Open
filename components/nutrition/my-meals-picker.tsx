@@ -85,9 +85,10 @@ export function MyMealsPicker({
     // stale/blank first paints happen.
     const seed = readCacheSync<SavedMeal[]>('saved-meals')
     if (seed) setMeals(seed)
+    // RV-84: the fallback was chained as `.catch`, which `cachedFetch` never reaches.
     cachedFetch<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM,
-      d => setMeals(Array.isArray(d) ? d : []))
-      .catch(() => setMeals(prev => prev ?? []))
+      d => setMeals(Array.isArray(d) ? d : []),
+      { onError: () => setMeals(prev => prev ?? []) })
   }, [])
 
   const keptCount = selectedIds.length + typedMeals.filter(m => m.keep && m.ingredients.length > 0).length

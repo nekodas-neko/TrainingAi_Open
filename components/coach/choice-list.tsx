@@ -58,9 +58,12 @@ export function ChoiceList({ args, onChoose, disabled }: ChoiceListProps) {
     if (seed?.options) setFetched(seed.options);
     const qs = new URLSearchParams({ source: args.source });
     if (args.sourceId) qs.set("sourceId", args.sourceId);
+    // RV-84: this was `.catch(() => setFailed(true))`, which `cachedFetch` can never reach — it
+    // resolves a boolean on a 429 or a 500 rather than rejecting. The picker sat on
+    // "Loading your options…" forever. `onError` is the channel that actually fires.
     cachedFetch<{ options: Option[] }>(key, `/api/coach/options?${qs}`, TTL_SHORT, d => {
       if (d?.options) setFetched(d.options);
-    }).catch(() => setFailed(true));
+    }, { onError: () => setFailed(true) });
   }, [key, args.source, args.sourceId]);
 
   const options: Option[] = args.source ? fetched ?? [] : args.options ?? [];

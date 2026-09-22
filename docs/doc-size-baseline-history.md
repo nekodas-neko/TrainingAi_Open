@@ -15205,3 +15205,17 @@ not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** 
 25.7%, which lowers lean mass and takes the computed baseline to **1,359 kcal / 111 g protein**. The
 gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
 read as "this number might be softer than stated" was hiding a number that was harder.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26551 (RV-84 and RV-88 left the queue)
+
+Both shipped and were removed whole — a net −35 from this branch. The number above is higher than
+the one it started from because sweep 52 (#1368) and another entry landed while this was open; it is
+recomputed against the merged file, not spliced.
+
+Worth carrying out of them: **RV-84's count was wrong three ways**, and the correction is the useful
+part. It said 16 chained `.catch`es on `cachedFetch`; there are **81**, of which 68 are harmless
+`.catch(() => {})`, 4 are redundant because `onError` is already wired beside them — including the
+file the entry names as its own reference — and **9** were genuinely broken. A site is only a defect
+when it has a handler *and* no `onError`, which is the distinction the count missed. Two naive greps
+answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
+test rather than only in prose.
