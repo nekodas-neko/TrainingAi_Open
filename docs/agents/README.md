@@ -105,6 +105,35 @@ block or one carrying `Gate: owner`, never moves down what the owner moved up, a
 it does make in the PR body. A silent reprioritisation is indistinguishable from a bad merge, and
 this repo has had both.
 
+### Device Verification
+
+**The only role that runs outside this container.** It runs on the owner's own machine with the S25
+plugged in over USB, and drives the real app in the real APK over the DevTools protocol
+(`scripts/device/**`). Every other session — this one included — is a cloud container with no path
+to that phone, which is why `playwright.config.ts` says in its own header that the e2e harness gives
+*"evidence about the web path only"*.
+
+It exists because the device-verification gate had no owner. **104 checks are owed on the S25** and
+they accumulate faster than the owner clears them by hand, because each one costs his attention
+rather than CI time. Three classes of check are reachable nowhere else: offline-first reads (off the
+APK `getLocalStore` returns null, so the device branch never runs), safe-area clearance (the insets
+are `0` in desktop Chromium), and what Samsung's WebView actually paints. A fourth — the Android
+system back — arrives over a Capacitor channel that Playwright cannot fire at all.
+
+**It verifies and reports; it does not implement.** Its authority is docs-only like BugFix, Tuning
+and Review, with one exception: `scripts/device/**` is its own, because that harness shipped unrun
+and whoever first points it at a phone is the only session that can fix it. A failed check is not
+verification debt — it is work, and it goes back to the lane that owns the surface.
+
+It answers in exactly three ways and never a fourth: **VERIFIED ON THE S25**, **FAILED ON THE S25**,
+or **COULD NOT CHECK** with the reason. The third is a real answer. **A result that does not name
+its screen, orientation and navigation mode is not a result** — three-button navigation alone
+reports every safe-area inset as `0`, which makes a broken clearance look correct.
+
+Its captures reach the other agents through git: a throwaway `device-captures/<date>` branch that is
+read and then deleted, never merged. The per-screen digest in `tour.json` matters more than the
+images, because a remote reviewer pays for every image and reads text for free.
+
 ---
 
 ## 2. What every agent may do without asking
@@ -217,6 +246,7 @@ makes "what has Review found, and did any of it get built" a question you can ac
 | Review | `RV-` |
 | Tuning | `TN-` |
 | Orchestrator | `OR-` |
+| Device Verification | `DV-` |
 | One-off sessions (planning, urgent) | `PS-` |
 
 Counters are **unbounded**. Find your next free number with one command:
@@ -364,7 +394,7 @@ the same name** — the mechanism below is a safety net for that, not the routin
 ### The names are fixed — copy them exactly
 
 A successor session must be created with the **same title** as the one it replaces, character for
-character, emoji included. That title is how the owner tells six concurrent sessions apart at a
+character, emoji included. That title is how the owner tells seven concurrent sessions apart at a
 glance, so a renamed successor is a lost thread even when its baton is perfect.
 
 | Session title | Baton | Prompt |
@@ -375,6 +405,12 @@ glance, so a renamed successor is a lost thread even when its baton is perfect.
 | **🎶 Tuning Agent 🟢** | `state/tuning.md` | `prompts/tuning.md` |
 | **📖 Review Agent 🟢** | `state/review.md` | `prompts/review.md` |
 | **🪐 Orchestrator 🟢** | `state/orchestrator.md` | `prompts/orchestrator.md` |
+| **📱 Device Verification Agent 🟢** | `state/device.md` | `prompts/device.md` |
+
+**Device Verification is the one that does not run here.** It is created on the owner's own machine,
+with the S25 plugged in — a session of it started in a container cannot do the job and is told to
+say so and stop. That is also why its cadence is on demand rather than a sweep: it runs when the
+owner has the phone and the time.
 
 The two Implementation lanes deliberately share an emoji and differ only by the `(A)` / `(B)`
 suffix — they are one role in two lanes, and the suffix is the part that carries meaning. Do not
