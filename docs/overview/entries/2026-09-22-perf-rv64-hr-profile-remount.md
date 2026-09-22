@@ -73,6 +73,20 @@ the same two-spec pairing, on the branch and on clean `main`. It is in the same 
 reported on #1377. **Recorded as unexplained rather than closed:** it was not reproduced, and one
 red that will not come back is not the same as one understood.
 
+## What blocked this PR was not this PR
+
+Its `Tests` check went red on `lib/__tests__/cardio-hub-routes.test.ts` — nothing in this diff.
+Reading it rather than re-running found `main` red for every lane: the test asserted
+`Math.round(spanDays) === 90` against a window that runs from **local midnight** ninety days back to
+`now`, so the span is 90.0–91.0 and `Math.round` tips at local **12:00**. It had been failing for
+roughly half of every day, on every branch. Fixed test-only in **#1387**, which merged first.
+
+**The sweep that PR listed as not established is now done, and it was the only one.** Three other
+tests assert an exact day span — `oura-ble-device-routes.test.ts` ×3 — and all of them inject the
+clock with `vi.setSystemTime`, so both sides are fixed, which is the shape the date rule prescribes.
+`ai-periodization-program-routes.test.ts` compares two fixed ISO dates. No other assertion in the
+suite divides a live `Date` delta into days and pins the result.
+
 ## No version bump
 
 Nothing user-visible changed. The chart draws the same zones from the same profile; what changed is
