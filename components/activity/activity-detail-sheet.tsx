@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { getActivityIcon } from '@trainingai/shared/constants/activity-icons'
 import { decodeRoute } from '@/lib/activity/route-encoding'
-import { formatTime12h } from '@trainingai/shared/date-utils'
+import { formatDateDisplay, formatTime12h } from '@trainingai/shared/date-utils'
 import { ZoneBreakdown } from '@/components/health/zone-breakdown'
 import { Sparkline } from '@/components/ui/sparkline'
 import { estimateDistanceKmAtTime, pointAtDistanceKm } from '@/lib/activity/scrub'
@@ -145,7 +145,7 @@ export function ActivityDetailSheet({ log, icon, onOpenChange }: ActivityDetailS
         {log && (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              {log.date}
+              {formatDateDisplay(log.date, 'long')}
               {log.startTime ? ` · ${formatTime12h(log.startTime)}` : ''}
               {log.endTime ? ` – ${formatTime12h(log.endTime)}` : ''}
             </p>

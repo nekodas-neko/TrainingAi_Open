@@ -15292,3 +15292,11 @@ so RV-70's "one-place `abortSignal`" fix was not possible as written; the recap 
 than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explain` — the route both
 entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
 only "shipped" would leave all three to be rediscovered.
+
+## 2026-09-22 — RV-91 (`fix/rv91-raw-iso-date-and-cal-label`)
+
+`projectOverview.md` 12250 → **12259**: nine lines at the top of Current Status.
+
+`docs/implementation-backlog.md` does not move: RV-91 left the queue and **LB-125 took its place**,
+filed out of the "also noted, not filed" line RV-91 closes with. A finding that leaves with its
+entry is a dropped finding, and this one had already been carried once.

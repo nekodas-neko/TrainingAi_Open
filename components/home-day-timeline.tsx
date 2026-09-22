@@ -114,7 +114,7 @@ function WalkCard({ ev }: { ev: TimelineEvent }) {
         {ev.calories != null && (
           <span className="flex items-center gap-1">
             <Flame className="h-3 w-3" />
-            {ev.calories} Cal
+            {ev.calories} kcal
           </span>
         )}
       </div>

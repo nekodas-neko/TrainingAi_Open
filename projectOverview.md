@@ -26,8 +26,17 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**A raw ISO date on two activity screens, and one `Cal` among 155 `kcal` (RV-91, v1.464.5).** The
+activity history row and the activity detail sheet printed `2026-09-15` on the line above a
+correctly formatted time; both now call `formatDateDisplay`, and the day detail's hand-rolled
+long-form date calls it too. **The entry quoted the helper's header comment instead of running the
+function** — it says the day detail reads *"Monday, 15 September"*, and that string exists nowhere:
+`en-AU` is day-first with no comma, so the real returns are `15 Sept` and `Tuesday 15 September`.
+The comment is in `packages/shared`, so it is filed as **LB-125** with the five remaining
+hand-rolled option bags, not edited here.
 
 **One stored 1RM printed four different numbers (RV-89, v1.464.4).** A lift stored on the 0.25 grid
 at 92.25 read as **92.5** on the ready screen, **~92** in the exercise list, **92.3** in the stats
