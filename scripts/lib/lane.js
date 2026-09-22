@@ -11,11 +11,26 @@
 // Q-421 hit the same thing the moment it was handed over — its shipped-banner read "(Lane A)".
 'use strict';
 
-const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(A\b|B\b|O\b|\?)/;
-const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|O\b|\?)/;
+// `DV` is matched BEFORE the single letters. It shares no first character with them, so the order
+// is not load-bearing today — it is written this way so a future two-letter lane cannot be silently
+// shadowed by a one-letter alternative matching its prefix.
+const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|\?)/;
+const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|\?)/;
 
 /**
- * @returns `'A'` · `'B'` · `'O'` · `'?'` · or `null` for "not stated".
+ * @returns `'A'` · `'B'` · `'O'` · `'DV'` · `'?'` · or `null` for "not stated".
+ *
+ * `'DV'` is Device Verification's lane, added 2026-09-23. **The letter on an ENTRY ID and the lane
+ * are different things and this is where they diverge most visibly:** `DV-1` was found by the
+ * device agent and carries `Lane: O`, because the work is the Orchestrator's. The prefix records
+ * who found it; the lane records who builds it. `Lane: DV` is for work the device agent
+ * *delivers* — a sitting, a harness fix — and any agent can hand it something by writing the field.
+ *
+ * **`O` and `DV` are STRICT in the caller and `A`/`B` are not**, deliberately. An unstated lane
+ * means "§3's path rule answers it", and that rule only ever resolves to an implementer — so an
+ * unstated entry is shown to both implementer lanes as the safe failure it was designed as, and to
+ * neither `O` nor `DV`, whose work is assigned rather than derived. Showing 400 untagged entries to
+ * the device agent would bury the few genuinely its.
  *
  * `'O'` is the Orchestrator's own lane, added 2026-09-06 (OR-103). It exists because CI config,
  * workflow files and repository settings are in NEITHER implementer lane's paths, so §3's path rule
