@@ -15463,3 +15463,12 @@ the moment its dependency shipped, rather than being started early and convertin
 later: converting these four also emptied four `REVIEWED_BENIGN` rows out of
 `check-timezone-rendering.js`, because a site that stops calling `toLocale*String` stops being a
 device-local renderer.
+
+## 2026-09-22 — RV-100 (`fix/rv100-deload-colour`)
+
+`docs/implementation-backlog.md` → **26321**: RV-100 left the queue.
+
+`projectOverview.md` → **12399**: ten lines. The part worth carrying is not the fix but the
+correction: the entry named `SESSION_PALETTE` as the non-semantic source to borrow, and that
+palette contains green and red itself, so following the entry literally would have moved the
+collision rather than ended it.

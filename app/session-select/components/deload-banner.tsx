@@ -18,12 +18,15 @@ export const DeloadBanner = memo(function DeloadBanner({
   consecutiveRestDays,
   streakBroken,
 }: DeloadBannerProps) {
+  // RV-100: the soft tier was a THIRD amber (`#fbbf24`) beside `#f59e0b` and `--accent-amber`.
+  // It uses the token now. The other two keep their literals: red and orange carry the escalation
+  // and the repo has no orange token, so converting one of a pair would be worse than neither.
   const borderColor = deloadStrength === 'strong' ? '#ef4444'
     : deloadStrength === 'recommended' ? '#f97316'
-    : '#fbbf24'
+    : 'var(--accent-amber)'
   const bgColor = deloadStrength === 'strong' ? 'rgba(239,68,68,0.10)'
     : deloadStrength === 'recommended' ? 'rgba(249,115,22,0.10)'
-    : 'rgba(251,191,36,0.10)'
+    : 'color-mix(in oklch, var(--accent-amber) 10%, transparent)'
 
   let message: string
   if (temperatureAlert) {

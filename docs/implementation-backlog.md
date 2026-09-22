@@ -650,23 +650,6 @@ nothing structured saying why — and a human decides.
   one-off uses. Audit before replacing, then a check script banning the three literals outside
   `score-band.ts` holds it.
 
-### [workouts][app-shell] RV-100 — "Deload" is green on one screen and red on another
-
-- **Lane:** B — `components/health/ai-periodization-status-card.tsx:36-41`,
-  `app/session-select/components/deload-banner.tsx:21-26`. **Added:** 2026-09-21 · Review sweep 52.
-- `PHASE_COLORS` has `deload: "text-green-500"`; the banner paints the same concept `#ef4444` /
-  `#f97316` / `#fbbf24` by strength. Glance at the phase card and green reads "all good"; glance at
-  the banner and it reads "act now". Neither is wrong alone; the pair cannot both be right.
-- **Two riders in the same file:** `realisation` — the peak-output phase — is `text-red-500`, the
-  app's failure colour everywhere else; and the banner introduces a **third** amber (`#fbbf24`)
-  alongside `#f59e0b` and `--accent-amber`.
-- **Fix:** separate the axes. Phase identity is *categorical* — give `PHASE_COLORS` a non-semantic set
-  (`packages/shared/src/session-palette.ts` is already the repo's categorical palette) and keep
-  green/amber/red exclusively for state.
-- **Not established:** whether both surfaces are reachable in one session. If the phase card only
-  shows `deload` while the banner is suppressed, the collision is theoretical — **check that before
-  sizing the work.**
-
 ### [workouts][app-shell] RV-101 — the muscle heatmap paints two incompatible colour scales into one silhouette
 
 - **Lane:** B — `components/muscle-heatmap.tsx:39-42,98,105-110`. **Added:** 2026-09-21 ·
