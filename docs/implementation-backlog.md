@@ -464,6 +464,115 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][platform] TN-57 — the self-report has never once been answered, and three consumers read the unanswered default as data 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, answering the owner's *"what is your
+  suggestion to get better tuning and have it be more accurate"*. **This is the answer to that
+  question**, and it is the reason every calibration to date has been fitted to internal consistency
+  rather than to anything true.
+- **Lane: A** — `app/api/health-trends/route.ts`, `app/api/admin/battery-recovery-calibration/route.ts`,
+  `app/api/day-checkin/route.ts`. Per §3's rule, engine half first; the control redesign is TN-58.
+- **No migration and no data write.** The column that distinguishes answered from unanswered already
+  exists and is already populated correctly. Nothing needs backfilling.
+
+**Measured on production 2026-09-21 — 96 check-ins, 2026-07-02 to 2026-09-21:**
+
+| | |
+|---|---|
+| rows with a `perceived_recovery` value | **77** |
+| rows where `perceived_recovery_touched` is true | **0** |
+| distinct values ever recorded | **2** (only 2 and 3) |
+| standard deviation | **0.29** |
+| `sleep_quality_feel_touched` true | **3 of 96** |
+| distinct `wake_mood` values | **2** |
+
+**The owner has never answered this control, once, in 81 days** — which is exactly what he said
+unprompted (*"I dont really choose them; I let it auto select"*). The sheet seeds
+`NEUTRAL_SCALES = { perceivedRecovery: 3 }` (`components/morning-checkin-sheet.tsx:21`), tracks
+`touched` correctly, and posts **both**. The route stores both. So the row is honest; the readers are not.
+
+**⚠ THE DEFECT IS NOT CIRCULARITY, and filing it as such would send an implementer to the wrong
+file.** This entry was first drafted claiming the control is pre-filled *from readiness*. It is not —
+it seeds from a neutral constant. The **circular** one is the separate energy check-in,
+`readinessToEnergy()` in `components/mood-checkin-sheet.tsx` (TN-50). Two different sheets, two
+different defects; do not conflate them.
+
+**The actual defect: an untouched default is persisted and then consumed as an answer.** Three
+readers, none of which checks the flag sitting in the same row:
+
+1. `app/api/admin/battery-recovery-calibration/route.ts:83` — builds `recoveryByDate` from
+   `c.perceivedRecovery`. **A calibration route is being calibrated against 77 values nobody gave.**
+2. `app/api/health-trends/route.ts:136` — filters `perceivedRecovery != null` and correlates it
+   against readiness. Correlating against a series with sd 0.29 cannot produce a meaningful
+   coefficient, and it is presented as one.
+3. `app/api/body-battery/stress-day/route.ts:17` — its own comment already records
+   *"`perceived_recovery` reads 3 on all 17 days"*. The observation was made and the flag was not reached for.
+
+**Why this is the root cause of inaccurate tuning, not one bug among many.** TN-33 cannot validate the
+daytime-stress **sign** because there is no independent target with variance. That blocks TN-16's
+warning, TN-34's re-wire and the stress weight that TN-55 measured at **61% of all Body Battery
+drain**. Q-465 already fixed the adjacent case (an empty body writing all-null); this is the case a
+non-empty body with an unanswered value slips through.
+
+**First action, and it is small.** Make the three readers require `perceived_recovery_touched`
+(and `sleep_quality_feel_touched` for its sibling). That is the whole of stage 1: it stops a
+calibration route and a user-facing correlation from consuming values nobody supplied, and it needs
+no schema change and no data write, because the flag already separates the two populations. Expect
+the health-trends correlation to **disappear** rather than change — there are zero answered rows to
+plot. That is the correct outcome and must not be "fixed" by relaxing the filter.
+
+**Then harden the write path:** `POST /api/day-checkin` should store `null` for a scale whose
+`*_touched` is false, so `count(perceived_recovery)` is the honest count of real answers going
+forward. Keep Q-465's existing guard; a body carrying only untouched defaults now counts as carrying
+no answers.
+
+**⚠ Do not backfill the 77 rows to null.** The flag already tells them apart, so a write buys nothing
+and destroys the record of how long this ran. This entry is deliberately a no-data-write change.
+
+**Pass test:** `SELECT count(*) FROM day_checkins WHERE perceived_recovery IS NOT NULL AND NOT
+perceived_recovery_touched` stops growing, and neither the calibration route nor health-trends reads a
+row whose flag is false.
+
+### [readiness][app-shell] TN-58 — ask whether today is better or worse than yesterday, because an absolute 1–5 has produced two distinct values in 81 days
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning · **owner asked for this direction**
+  2026-09-21 (*"yes go for it"*) after declining a three-week daily log the same morning — that
+  decline is the design constraint, not an obstacle.
+- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. TN-57 is the engine
+  half; this one changes what is asked.
+
+**The control asks for an absolute rating and gets the middle of the scale.** Measured 2026-09-21:
+**2 distinct values across 96 check-ins, sd 0.29, and zero of them touched** (full table in TN-57).
+An absolute self-rating invites pegging to the centre; that is the well-known failure of the form,
+not a quirk of this owner.
+
+**The proposal: replace the absolute scale with a comparative one — *better / same / worse than
+yesterday*.** Three taps, **no default and no pre-selection**, on a sheet he already sees.
+
+**Why comparative rather than absolute, framed a year out.** Two reasons, and the second is the one
+that matters:
+1. People are reliably better at ordering two things than at scoring one, so it produces variance by
+   construction rather than by asking harder.
+2. **Pairwise orderings are sufficient to validate a metric's sign and ranking**, which is the whole
+   of what TN-33 is blocked on. Calibrated absolute values are not needed for that — so the cheaper
+   question buys the expensive answer.
+
+**What it unblocks, in order:** TN-33's sign → TN-16's prolonged-stress warning → TN-34's re-wire →
+TN-55's stress weight (61% of Body Battery drain, currently de-weighted precisely because the sign is
+unknown).
+
+**⚠ A skipped answer must store NULL, not a neutral.** The entire finding in TN-57 is a neutral
+default stored as though it were an answer. A redesign that ships a default recreates it under a new
+name. An empty control the owner skips is *more* useful than a filled one he accepts.
+
+**⚠ Do not remove the absolute scale's column.** Keep `perceived_recovery` as-is and add the
+comparative field beside it; the 77 untouched rows are evidence, and the absolute question may still
+be worth asking occasionally once there is something to anchor it against.
+
+**Pass test:** after two weeks, the comparative field has **≥3 distinct values** and a touched-rate
+materially above zero. If it does not, the answer is that self-report is not available from this owner
+at all — which is itself a finding worth having, and it costs a fortnight to get.
+
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 
 - **Lane:** A — `app/api/next-session/prescription/route.ts:57`,
