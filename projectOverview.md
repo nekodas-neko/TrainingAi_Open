@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
-**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.5).**
+**The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.6).**
 The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant
 and records whether the lifter moved each one. Measured on production 2026-09-22 over 97 morning
 check-ins: **78 carry a `perceived_recovery` and 0 of them were ever touched** — two distinct values,
@@ -46,6 +46,15 @@ write-path instruction — make an untouched body count as carrying no answers �
 the owner's daily check-in reaching the server**, because the sheet sends nothing else that counts
 and `pushMutations` rejects such a body as a no-retry poison pill. The Q-465 guard therefore reads
 the submitted body and the nulling applies to what is stored.
+**A raw ISO date on two activity screens, and one `Cal` among 155 `kcal` (RV-91, v1.464.5).** The
+activity history row and the activity detail sheet printed `2026-09-15` on the line above a
+correctly formatted time; both now call `formatDateDisplay`, and the day detail's hand-rolled
+long-form date calls it too. **The entry quoted the helper's header comment instead of running the
+function** — it says the day detail reads *"Monday, 15 September"*, and that string exists nowhere:
+`en-AU` is day-first with no comma, so the real returns are `15 Sept` and `Tuesday 15 September`.
+The comment is in `packages/shared`, so it is filed as **LB-125** with the five remaining
+hand-rolled option bags, not edited here.
+
 **One stored 1RM printed four different numbers (RV-89, v1.464.4).** A lift stored on the 0.25 grid
 at 92.25 read as **92.5** on the ready screen, **~92** in the exercise list, **92.3** in the stats
 sheet and on the Strength Trend card, and **92.25** in the exercise summary — in one session. All

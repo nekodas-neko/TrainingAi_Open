@@ -729,22 +729,30 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   unit spellings (`5:12/km` vs `5:12 /km`); and four hand-rolled `h/m` formatters exist in three
   shapes with no shared helper.
 
-### [activity][platform] RV-91 — two activity surfaces print a raw ISO date, and one card says `Cal` where the other 154 say `kcal`
+### [platform] LB-125 — five hand-rolled date option bags beside the shared formatter, and its own comment describes output it does not produce
 
-- **Lane:** B — `components/health/activity-history-card.tsx:142,149`,
-  `components/activity/activity-detail-sheet.tsx:148`, `components/home-day-timeline.tsx:117`.
-  **Added:** 2026-09-21 · Review sweep 52.
-- `{log.date}` renders the raw `2026-09-15` in the activity history row and the detail-sheet header —
-  **beside a correctly formatted `formatTime12h()` on the next line in both files.** The shared
-  `formatDateDisplay(raw, 'short'|'long')` (`packages/shared/src/date-utils.ts:236-247`) is used at
-  four other sites. The same day reads *"2026-09-15 · 6:42 am"* in history and *"Monday, 15
-  September"* in the day detail.
-- Energy: a word-boundary tally gives **154 `kcal` and exactly 1 `Cal`** in rendered copy, at
-  `components/home-day-timeline.tsx:117` — `{ev.calories} Cal`. The numbers already agree
-  (`app/api/day-timeline/route.ts:250` rounds); only the label differs. One literal.
-- **Not established:** whether "Cal" (capital-C food calorie) was deliberate — nothing in the file
-  says so. Also noted, not filed: four hand-rolled `toLocaleDateString` option bags sit beside the
-  shared helper; a third `style` variant would absorb two of them.
+- **Lane:** B for the five call sites (`components/calendar-widget.tsx:109`,
+  `components/nutrition/weekly-nutrition-chart.tsx:50`,
+  `app/session-select/components/recommendation-card.tsx:36`,
+  `app/session-select/components/week-day-sheet.tsx:13`,
+  `app/nutrition/nutrition-content.tsx:88`); **A for the helper's comment and any new `style`**
+  (`packages/shared/src/date-utils.ts:232-247`). **Added:** 2026-09-22 · filed out of RV-91, which
+  noted this and did not file it.
+- `formatDateDisplay(raw, 'short'|'long')` exists and now has seven callers. Five other sites still
+  hand-roll `toLocaleDateString('en-AU', {…})` with their own option bag. **Three of the five are a
+  bare `{ weekday: 'short' }`** and would be absorbed by one new `style` variant; the other two
+  (`weekday long + month short`, `weekday short + day + month short`) are each a one-off.
+- **⛔ The helper's own header comment is WRONG, and RV-91 quoted it instead of running it.** It
+  says *"'short' gives \"Jan 5\" … 'long' gives \"Monday, 5 January\""*. Measured 2026-09-22:
+  `en-AU` is day-first and puts **no comma** before the day, so it returns **`15 Sept`** and
+  **`Tuesday 15 September`**. RV-91's "the same day reads … *Monday, 15 September* in the day
+  detail" is the comment's string, not the screen's — the day detail rendered the comma-less one.
+  Correct the comment in the same PR as any `style` work; a comment that is quoted as evidence is
+  worse than none.
+- **Not established:** whether a `'weekday'` style should take the timezone the other date helpers
+  thread (`DEFAULT_TZ` as a default parameter), or stay device-local as all five call sites are
+  today. The five render a weekday label beside data the user just entered, so the two agree
+  except for a traveller at a day boundary.
 
 ### [workouts][app-shell] RV-92 — `truncate` on a flex container, so a long exercise name hard-clips and the "done" tick disappears
 

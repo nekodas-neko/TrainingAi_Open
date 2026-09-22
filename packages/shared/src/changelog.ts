@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.464.5",
+    version: "1.464.6",
     date: "2026-09-22",
     changes: [
       "Your morning recovery and sleep-feel sliders no longer count as answers unless you actually move one. The sheet starts both at the middle and remembers whether you touched them \u2014 and in 97 check-ins you have moved recovery zero times, so every reading of it was the app's own starting position, not something you said. The calibration reports, the readiness-versus-recovery chart, the day review and the AI's session prescription all now ignore a slider you left alone. Expect those charts to go empty rather than change: three answers that are real are worth more than 78 that are not. Nothing already saved was altered.",
+    ],
+  },
+  {
+    version: "1.464.5",
+    date: "2026-09-22",
+    changes: [
+      "Activity dates now read as dates. The activity history row and the activity detail sheet printed the raw \"2026-09-15\", on the line directly above a properly formatted time. They now read \"15 Sept\" and \"Tuesday 15 September\", the same way every other screen writes a date. The day detail was already writing the long form and now uses the same shared formatter to do it.",
+      "One calorie label on the home timeline said \"Cal\" where the other 155 places in the app say \"kcal\". Same unit, same number \u2014 it now says kcal too.",
     ],
   },
   {
