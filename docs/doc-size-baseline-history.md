@@ -15098,3 +15098,22 @@ long this ran. Both are the kind of thing a later session reverses by reasonable
 TN-58 also records that the owner declined a three-week daily log the same morning, which makes the
 decline a design constraint rather than a blocker — that context is why the entry proposes three taps
 instead of re-asking.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26150 → 26187 (TN-58's engine half did not exist)
+
+TN-58 printed as Lane B's only READY item and is not buildable. It says to *"add the comparative
+field beside"* `perceived_recovery`; nothing for that field exists — no column, no entry in either
+Zod schema, nothing in the route. It names TN-57 as "the engine half", and TN-57's own entry says it
+ships **no migration** and fixes three consumers instead, so shipping TN-57 would have left TN-58
+exactly as blocked.
+
+The 37 lines are **LB-124**, filed for Lane A because the work starts with a migration, plus a
+`Needs:` on TN-58. Most of those lines are scope rather than description, and deliberately so: the
+route's `Body` is not `.strict()`, so a control built now would post **201 and store nothing** —
+silent, and it would burn TN-58's two-week pass test into a false "self-report is not available from
+this owner". `day_checkins` is also offline-first, so the engine half reaches the local SQLite table,
+its version and the pull-delta, and the new column needs its regenerated `claude_ro` twin.
+
+**Third instance this run of the same shape** — an entry wrong about the field that decides who can
+build it (BF-185's `.strict()` schema, RV-79's unconditional `setCached`, now this). The cost each
+time is the same: it is only visible if you read the thing the fix would touch before starting.
