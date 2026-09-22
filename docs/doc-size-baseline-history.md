@@ -15525,3 +15525,21 @@ The distinction the rule draws is the part worth keeping exact: restyling a comp
 layout bug does not need a mockup; merging a card, collapsing a banner stack, or moving a card
 between tabs does. The test is whether the owner would notice the screen is *arranged* differently,
 not whether it looks different.
+
+## 2026-09-22 — `projectOverview.md` 12399 → 12413, backlog 26690 → 26682 (RV-103/RV-104)
+
+The fourteen lines on `projectOverview.md` are one Known-Issues entry, and it is there for the half
+that did **not** ship rather than the half that did. RV-103's report path is wired and only fired in
+one of five sandbox runs, because `cachedFetch` gates `onError` on `cached === null` on both its
+failure paths and `fetchWithRetry` counts a cached paint as a response — so a failed revalidation is
+unreportable by any caller while anything is cached. An entry that said only "the refetch now
+reports failures" would be the kind of claim the never-mark-fixed-from-intent rule exists to stop,
+and the next session would build on it. The mechanism, the measurement and the flake that was the
+finding are in the journal entry; what stays in the index is the caveat and the pointer, which is
+the split that keeps this file from regrowing.
+
+First draft of that entry ran 21 lines over the baseline and was cut to 14 rather than granted the
+space — the detail belongs in `docs/overview/entries/`, and the index carries the warning only.
+
+The backlog ratchets **down** eight lines: RV-104 shipped whole and left the queue, and RV-103 came
+back shorter as a `Keep:` entry, against the new LB-128 filed for Lane A.
