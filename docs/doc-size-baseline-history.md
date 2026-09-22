@@ -15238,3 +15238,19 @@ measurement decayed; it simply never printed in a READY list. That is the second
 found this week (BF-165's *"ungate it the moment the fix lands"* was the first), and both have the
 same shape: **a condition for becoming visible that can only be met by someone who can already see
 it.** When writing a park of any kind, check that something outside the entry can lift it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26604 → 26648 (OR-124: TN-59 reconciled, `--sittings` documented)
+
+Two additions, no removal. **TN-59** was at the top of READY and its premise had been superseded
+hours earlier by #1390 — it specified a Custom Rules check against a 28-entry backlog of
+prose-parked entries, and that backlog is **0** on this commit. Reconciled in place rather than
+removed: the preventive half still earns its keep, at a fraction of the size, with an empty
+baseline. The rest is the `--sittings` view documented where an implementer reads about the tool.
+
+Worth carrying: **TN-59 and OR-122 are the same finding, reached independently on the same day from
+opposite directions** — Tuning from having swept 17 markers by hand and watched a new one arrive,
+the Orchestrator from Lane B having nothing to start. Neither saw the other, and the common cause
+was LA-49, which had measured the whole thing three weeks earlier and was parked by the bug it
+described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
+the investigation again. That is the argument for the check TN-59 still proposes, more than the
+count it was written against.

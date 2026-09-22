@@ -60,6 +60,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 > order, PARKED with the reason, and UNCLASSIFIED for anything it could not place. Priority is still
 > yours and still queue position — the script computes *readiness*, never priority.
 >
+> **`node scripts/next-item.js --sittings`** answers the other question: *what could be cleared in
+> one pick-up of the phone?* It lists every entry owing a device check — from a `Verify: device` or
+> from a `Keep:` naming the device, because BF-90 found eleven entries writing the same debt in both
+> places — grouped by primary domain tag, with each one's lane and existing batch. **It prints the
+> grouping; it does not write it.** Assigning `Batch:` in a sweep is forbidden (CLAUDE.md), and a
+> generated view is the reason that costs nothing: it cannot go stale, where a batch decided without
+> re-reading the entry can. Measured 2026-09-22: **104 owed, 27 batched, 77 loose** — app-shell 27,
+> nutrition 19, workouts 15, devices 13.
+>
 > - **`Lane: A` / `Lane: B`** — optional, and usually absent, which is correct: **lane ownership is
 >   decided by the file paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md).
 >   State a lane when the rule is genuinely ambiguous, when the item needs a migration number
@@ -538,6 +547,41 @@ above moves toward the declared weights.
 - **Background:** the 2026-09-20 sweep that converted 17 of these by hand, and its journal entry.
   (Written as prose, not a `Reference:` field — that field files an entry under *read, do not build*,
   and this one is to be built. Third field-semantics slip in this filer's day; see TN-59's own point.)
+
+## ⚑ SUPERSEDED IN ITS PREMISE, 2026-09-22 (OR-122, #1390) — the parking is GONE; what is left is a much smaller prevention
+
+**`next-item.js` no longer parks on the bare glyph.** It matches `U+26D4` followed within 40
+characters by the word *block* — the convention this file's own protocol documents
+(`<no-entry sign> blocked: <reason>`). **Measured on this commit: entries parked by a prose marker
+alone = 0**, against the 28 this entry counted the same morning. LB-124, named below as the case
+that took Lane B's READY list to zero, is READY. So every number in the text that follows is a
+record of the 2026-09-22 morning, not of now.
+
+**Two sessions found this independently on the same day, which is worth more than either finding.**
+Tuning filed this entry from the *sweep* side — it had converted 17 markers by hand two days earlier
+and watched a new one arrive. OR-122 found it from the *queue* side: Lane B had zero startable
+entries. Neither saw the other. The common cause was `LA-49`, which measured the whole thing on
+2026-09-01, specified the fix in two ordered steps, and then **sat for three weeks because it quotes
+the glyph as evidence and was parked by the bug it describes.** Both of these entries are what a
+self-parking finding costs — it does not stay found, it gets re-found.
+
+**What survives, and it is worth building.** The detector is narrower, so the old failure shape
+cannot recur; the new one can. Someone writes `<no-entry sign> blocked: <reason>` in prose where a
+`Gate:`/`Needs:` belongs, and the entry parks for a reason no field states and no tool can act on.
+**Baseline that at 0** — it is 0 today, which is the strongest baseline a shrink-only check can
+have, the same shape as `check-aest-midnight-timezone.js`. The check is materially smaller than the
+specification below: no 28-entry baseline to freeze, no triage to precede it.
+
+**⛔ The caution below still stands and is the load-bearing part: do not make the check guess which
+kind of marker it is reading.** It reports the shape — parked with nothing structured saying why —
+and a human decides. (Checked rather than assumed: this line does **not** park the entry — the
+narrowed rule wants *block* within 40 characters of the glyph, and this one carries a caution
+instead. TN-59 is READY. An earlier draft of this note asserted the opposite without running the
+tool, which is the same mistake in miniature as the one the entry is about.)
+
+---
+
+**Everything below is the 2026-09-22 morning record, kept for the reasoning.**
 
 **`next-item.js` parks any entry containing the no-entry sign (U+26D4) when no structured field
 explains it — spelled by codepoint here on purpose, because writing the character even inside
