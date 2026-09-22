@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.5",
+    date: "2026-09-22",
+    changes: [
+      "Activity dates now read as dates. The activity history row and the activity detail sheet printed the raw \"2026-09-15\", on the line directly above a properly formatted time. They now read \"15 Sept\" and \"Tuesday 15 September\", the same way every other screen writes a date. The day detail was already writing the long form and now uses the same shared formatter to do it.",
+      "One calorie label on the home timeline said \"Cal\" where the other 155 places in the app say \"kcal\". Same unit, same number \u2014 it now says kcal too.",
+    ],
+  },
+  {
     version: "1.464.4",
     date: "2026-09-22",
     changes: [
