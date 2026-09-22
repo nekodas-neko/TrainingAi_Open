@@ -13,7 +13,7 @@ const SHIPPED_HALF = /\blane\s+(A|B)\s+half\s+(?:has\s+)?(?:already\s+)?shipped\
 const DATED = /\b(?:19|20)\d{2}\b/;
 
 /** Any entry id, so a line naming a DIFFERENT one can be read as a citation rather than a claim. */
-const ENTRY_ID = /\b(?:LA|LB|BF|RV|TN|OR|PS|Q)-\d+[a-z]?\b/gi;
+const ENTRY_ID = /\b(?:LA|LB|BF|RV|TN|OR|DV|PS|Q)-\d+[a-z]?\b/gi;
 
 /**
  * The drifted line for an entry, or null.

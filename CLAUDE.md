@@ -654,6 +654,25 @@ said nothing, because both had skipped inside it.
 
 ## Decisions That Come Back To Me — answer the whole question the first time
 
+**⚑ STRUCTURAL QUESTIONS ARE YOURS — owner, 2026-09-22: *"I'd like it if you could take a lot of
+these structural questions."*** That is a standing narrowing of everything below, not a one-off.
+**Architecture, tooling, process, file layout, naming, which mechanism to use, how to test
+something, how the queue and the docs are organised — decide them, state the call in one line, and
+continue.** Bringing one of those back reads as caution and is not: it hands the work back, and the
+owner has said so outright.
+
+**What is still theirs, and the list is short:** anything that **destroys or rewrites data**
+(a data-dropping migration, a non-reversible one, a production write); **money**; **auth, sessions,
+secrets**; **scoring calibration**, because a bad one is hard to notice from inside and it changes
+numbers they read daily; and a **genuine product preference** that cannot be derived from the repo —
+what the app should *do*, not how it should be built. When a structural choice would quietly change
+one of those, it is that one, not a structural question.
+
+**A structural call you make still gets written down** — in the entry, the journal or the rule it
+becomes, with the reason and what it would cost to reverse. Delegated is not undocumented: the
+owner is trading *being asked* for *being able to read it later*, and the second half is the part
+that makes the first safe.
+
 **First, don't ask.** A decision is the owner's only if it is **hard to reverse** (migration, auth,
 external contract, public surface), **expensive to reverse** (it seeds a pattern the codebase will
 copy), or a **genuine preference** not derivable from the repo. Everything else — naming, file

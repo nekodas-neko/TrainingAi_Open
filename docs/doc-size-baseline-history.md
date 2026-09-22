@@ -15546,6 +15546,68 @@ measurement that makes it stick.
 TN-61 (Lane O) and ledger items 2b/2c are the rest: a queue tool that truncates silently, a readiness
 contributor worth 2.8% of the movement on a 0.06 weight, and the `.size` conflict tax with a measured
 cost of five of seven PRs in one session.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26770 (OR-127: the USB device harness + the recorder)
+
+One entry for `scripts/device/**`, which drives the real APK on the real phone over the DevTools
+protocol. The entry is long for a shipped tool because most of it is the **limits**, and those are
+the part that will otherwise be overread: what a pass here is evidence about (one screen, one
+orientation, one navigation mode, one phone), what it cannot touch (the ring, the scale, anything
+needing the owner present, every "does this feel instant" call), and that it does not retire the
+device-verification gate.
+
+Worth carrying: **automatable is not the same as owed.** The harness answers *behavioural*
+questions — did the row disappear, did back land on Home, is the computed padding above the gesture
+bar. A large share of the 104 device checks are look-and-feel, and an automated pass is the weakest
+evidence for exactly those. The honest expectation is a shorter, harder list, not an empty one.
+
+Third thing, added on the owner correcting the design: the first draft captured a **single** frame,
+and that was a gap. The whole `motion-polish` batch is timing questions — does the ring finish with
+the number, is the sheet 300 ms or the stock 500 — and no still frame answers one. `record.js` takes
+compositor frames over a window with the ms each landed at. **Read the timestamps, never the frame
+count**: the phone drops frames under load, so a sparse recording reads as a fast transition.
+
+Second thing worth carrying, because it is unusual for this repo: **the harness ships unrun.** No
+sandbox here has `adb` or a phone, so every line was reasoned from the protocol rather than
+observed — including the claim that it connects at all. It is filed with a `Keep:` naming that
+first run as the outstanding work, rather than presented as working software.
+
+## 2026-09-22 — `CLAUDE.md` → 844 (structural questions are the agent's) and the OR-127 corrections
+
+**CLAUDE.md**: a standing narrowing of the decisions section, on the owner's instruction — *"I'd
+like it if you could take a lot of these structural questions."* Architecture, tooling, process,
+layout, naming and how to test something are the agent's; what stays theirs is data destruction,
+money, auth and secrets, scoring calibration, and genuine product preference. It costs lines
+because the *carve-out list* is the load-bearing half — a delegation with no boundary is not a
+delegation, it is an invitation to decide something irreversible.
+
+Worth carrying: **delegated is not undocumented.** The rule says a structural call still gets
+written down with its reason and its reversal cost. The owner is trading *being asked* for *being
+able to read it later*, and without the second half the first is just a loss of oversight.
+
+**OR-127** gained a testing order and lost a wrong sentence. The first draft said the harness "does
+not reach the ring or the scale", in three places. It was wrong: this drives the app on the phone
+they are **paired to**, so every app-side BLE surface is reachable — roughly 17 checks written off
+by one line. The real limit is on making the hardware *produce* (wear the ring overnight, wake a
+power-gated radio, stand on the scale), not on reading what it already produced. Reading is not
+producing, and conflating them cost more than any other error in that entry.
+
+---
+
+## 2026-09-23 — backlog → 26664 (−224), projectOverview → 12362 (−37), new baton `device-verification.md` → 66 (device/first-run)
+
+**Backlog −255.** The first S25 sitting run by the local Device Verification agent verified three
+shipped fixes on the device — **LA-109**, **LB-107**, **BF-100** — and they left the queue whole
+(192 + 54 + 47 lines, less the result bullets written into BF-166, BF-165 and BF-111), and **DV-1** (+31) was filed in its
+place: `pnpm ci:local` cannot pass on Windows, where that agent runs. Net −224, ratcheted to the
+measured size so the space cannot be quietly regrown.
+
+**projectOverview −37.** LA-109's Known-Issues row moved whole to `known-issues-resolved.md`: the
+device gesture was the only thing it still owed, and it was verified on the S25 the same day.
+
+**New baseline: `docs/agents/state/device-verification.md` at 66**, its size on creation. A seventh
+role's baton joins the six already ratcheted; the same rule applies from its first line — it only
+comes down.
+
 
 ## 2026-09-22 — `CLAUDE.md` → 836 and `docs/implementation-backlog.md` → 26772 (OR-125: six owner answers)
 
