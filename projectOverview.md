@@ -26,8 +26,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.9 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**The morning check-in asks a comparative question now (TN-58, v1.465.0).** The absolute 1–5
+produced **two distinct values across 96 check-ins**, sd 0.29, none of them touched — a question
+with no variance cannot be a target, which is what blocks TN-33. *Better / about the same / worse
+than yesterday*, three taps above the two scales, **no default and no pre-selection**: the column
+has no default for the same reason, since a neutral stored as an answer is the TN-57 defect under a
+new name. **Added rather than replacing the absolute scale**, despite the entry saying "replace" in
+one line: `perceivedRecovery` feeds `signals.morningCheckin` and shapes the prescription, so
+retiring its control silently changes what the engine receives. ⚠ **A two-week pass test is owed**
+— ≥3 distinct values and a touched-rate above zero, or the finding is that self-report is not
+available from this owner at all. It is the backlog `Keep:` on TN-58, and **not device-verified**.
 
 **The ACWR number was painted the "High" colour in every band (RV-97, v1.464.9).** The headline was
 a hard-coded `#f59e0b`, which is exactly what `acwrBand()` reserves for `high`, while the band WORD

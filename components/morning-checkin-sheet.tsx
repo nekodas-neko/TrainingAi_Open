@@ -8,9 +8,10 @@ import { toast } from 'sonner'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { invalidateCheckinAffectsPrescription, invalidateHealthTrends } from '@/lib/cache-groups'
-import { MORNING_SCALES, type MorningScaleKey, type IllnessContext } from '@trainingai/shared/types/day-checkin'
+import { MORNING_SCALES, type MorningScaleKey, type IllnessContext, type VsYesterday } from '@trainingai/shared/types/day-checkin'
 import { ScaleSelector } from '@/components/nutrition/end-of-day/scale-selector'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
+import { VsYesterdayPicker } from '@/components/checkin/vs-yesterday-picker'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
@@ -35,6 +36,10 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     perceivedRecovery: false, sleepQualityFeel: false,
   })
   const [illnessContext, setIllnessContext] = useState<IllnessContext | null>(null)
+  // TN-58. No NEUTRAL_SCALES equivalent and no `touched` flag, both deliberately: the column has
+  // no default, so `null` already distinguishes "not answered" from every answer, and there is no
+  // seeded position for an untouched save to accept.
+  const [vsYesterday, setVsYesterday] = useState<VsYesterday | null>(null)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   // Set as soon as the user taps anything — the async saved-checkin fetch below must
@@ -46,6 +51,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       setLoaded(false); editedRef.current = false
       setScales({ ...NEUTRAL_SCALES })
       setTouched({ perceivedRecovery: false, sleepQualityFeel: false })
+      setVsYesterday(null)
       setIllnessContext(null)
       return
     }
@@ -70,6 +76,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
             sleepQualityFeel:  saved.sleepQualityFeelTouched ?? false,
           })
           setIllnessContext(saved.illnessContext ?? null)
+          setVsYesterday(saved.vsYesterday ?? null)
         } else {
           setScales({ ...NEUTRAL_SCALES })
         }
@@ -91,6 +98,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       perceivedRecoveryTouched: touched.perceivedRecovery,
       sleepQualityFeelTouched:  touched.sleepQualityFeel,
       illnessContext,
+      vsYesterday,
       // Retired scales — always null so a re-save clears any historical value.
       motivation:        null,
       restingSoreness:   null,
@@ -109,9 +117,6 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
             logDate: date,
             physicalTiredness: null, mentalDrain: null, barelyMoved: null,
             hydration: null, lateHeavyMeal: null,
-            // LB-124 shipped the column; TN-58 adds the control that fills it. Until then the
-            // morning row carries no comparative answer, which is the honest value for it.
-            vsYesterday: null,
             ...payload,
             updatedAt: new Date().toISOString(),
             deletedAt: null,
@@ -184,6 +189,13 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-4">
+          {/* First on the sheet, above the two scales. It is the question this check-in actually
+              wants answered — the absolute one below it has been skipped every time for 81 days —
+              and a question placed after two the owner skips inherits their fate. */}
+          <VsYesterdayPicker
+            value={vsYesterday}
+            onChange={v => { editedRef.current = true; setVsYesterday(v) }}
+          />
           {MORNING_SCALES.map(scale => (
             <ScaleSelector
               key={scale.key}
