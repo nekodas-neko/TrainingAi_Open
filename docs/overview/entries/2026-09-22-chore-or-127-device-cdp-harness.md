@@ -131,6 +131,40 @@ Writing this onto OR-127 rather than into `docs/superpowers/plans/` is itself a 
 seven-line order of attack for tooling that already exists is not a plan document, and putting it
 where the tool is described keeps it from going stale separately.
 
+## A finding filed and retracted the same day
+
+A DevTools screencast showed the address bar reading `/more` above a rendered Home screen — LA-109's
+recorded symptom word for word, on a fix that shipped 2026-09-15 with its device check owed. It was
+filed as an observation within minutes.
+
+**The owner then reported that the bar never updates for them at all; it is stuck at whatever it
+held when DevTools attached.** So it says nothing about the app's route, and the observation was
+retracted the same day.
+
+**The mechanism is worth more than the false alarm.** DevTools updates its address bar on
+`Page.frameNavigated`. This app's tab flips are `history.replaceState`, which fires no such event —
+so on a Capacitor WebView doing client-side routing the bar is *expected* to go stale, and is never
+a reliable read. **A shipped fix was nearly recorded as failing on device on the strength of a
+stale widget.** `probe.js` and `tour.js` both read `location.pathname` in the page, and the rule is
+now in the runbook and the module map: never read the route from an inspector's address bar.
+
+## How a remote session reviews the running app
+
+The owner asked what, short of pasting screenshots by hand, would let a session review live pages.
+Decided rather than asked, per the standing rule: **the channel is git.** `tour.js` walks a set of
+screens and writes a folder; it is committed to a throwaway `device-captures/<date>` branch and
+pushed; the reviewing session pulls and reads it, then the branch is deleted. It never merges —
+this puts images in a repository, accepted only because it is bounded and auditable.
+
+**The digest is the part that matters, not the image.** Each screen carries a DOM summary taken in
+the page: the real route, the active tab, visible error text, the button count, whether the page
+scrolls horizontally, and the lowest action row's computed bottom padding against the measured
+safe-area inset. **A remote reviewer pays for every image and reads text for free**, and most
+"is this working" questions fall out of the digest alone.
+
+Rejected: hand-pasted screenshots (works, does not scale, and is what prompted the question), and a
+live view (impossible — the reviewing session is a container with no path to a USB device).
+
 ## Worth carrying
 
 **The harness ships unrun, and says so everywhere it can be read.** No sandbox in this project has

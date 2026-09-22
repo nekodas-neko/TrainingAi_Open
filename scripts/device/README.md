@@ -54,6 +54,7 @@ the manifest's own debuggable flag, so a release APK can never expose the socket
 ```
 node scripts/device/probe.js                         # read-only: platform, real insets, a screenshot
 node scripts/device/record.js 1500 --tap '#open'     # frames over time, with the ms each one landed
+node scripts/device/tour.js [routes.json]            # walk a set of screens, capture each
 ```
 
 Run `probe.js` first; if it cannot connect, nothing else here will either. It changes nothing.
@@ -79,6 +80,44 @@ questions no still frame can answer:
 `record.js` writes each frame named with its offset from the start, plus an `index.json`. **The
 timestamps are the evidence; the frame count is not** — the phone drops frames under load, and it
 prints the longest gap so a sparse recording is never mistaken for a fast transition.
+
+### How a session that is not on this machine reviews the app
+
+It cannot see the phone, and asking a person to screenshot every screen does not scale past a
+handful. The channel is **git**:
+
+```
+node scripts/device/tour.js
+git checkout -b device-captures/$(date +%F) && git add device-probe && git commit -m "device tour" && git push
+```
+
+The reviewing session pulls that branch and reads the folder. **Delete the branch once it has been
+read** — this puts images in git, which is why the captures are JPEG-width-capped and why the
+branch is never merged to `main`.
+
+**Each screen yields more than a picture.** `tour.json` carries a per-screen digest taken *in the
+page*: the real route, what the tab bar thinks is active, visible error text, the button count,
+whether the page scrolls horizontally, and the computed bottom padding of the lowest action row
+against the measured safe-area inset. Most *"is this feature working"* questions are answerable
+from the digest alone; the image is for the half that is genuinely visual. That matters for a
+remote reviewer, who pays for every image and reads text for free.
+
+A `~` in the output means the app did not end up where it was sent. That is often correct — a
+guard, a redirect — and always worth reading before treating the capture as that screen.
+
+### ⛔ Never read the route from an inspector's address bar
+
+DevTools updates its URL bar on `Page.frameNavigated`. This app's tab flips are
+`history.replaceState`, which fires no such event — so on a Capacitor WebView doing client-side
+routing **the address bar goes stale and stays stale**, holding whatever it had when DevTools
+attached.
+
+This is not hypothetical: on 2026-09-22 a screencast showing `/more` above a rendered Home screen
+was filed as a probable LA-109 recurrence — that entry's symptom word for word — and retracted
+hours later when the owner reported the bar never updates for them at all. **A shipped fix was
+nearly recorded as failing on device on the strength of a stale widget.**
+
+`probe.js` evaluates `location.pathname` **in the page**, and every check here must do the same.
 
 ### Watching it yourself at the same time
 

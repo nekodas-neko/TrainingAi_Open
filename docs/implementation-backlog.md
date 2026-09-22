@@ -4245,21 +4245,25 @@ helper the call site calls.
   scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
   traps in BF-100's hook** — they are paid for and written into it.
 
-- **⚠ POSSIBLY STILL LIVE — observed 2026-09-22, NOT yet confirmed as a failure.** The owner sent a
-  DevTools screencast of the running APK in which **the address bar reads `/more` while Home
-  renders** — which is this entry's recorded symptom word for word. It is filed as an observation
-  rather than a reopening because **how that state was reached is unknown**, and the fix only claims
-  the cases where `TabShell` mounts.
-  - **What would settle it, and it is one sequence:** from Home, tap **More**, open **Profile
-    details**, press the **system back**. The fixed behaviour lands on More with the URL reading
-    `/more`. Home rendering under a `/more` URL is the unfixed behaviour.
-  - **⛔ Do not assume a stale build.** This fix is in `components/shell/tab-shell.tsx` — JS, which
-    reaches the device through a Railway deploy with no APK rebuild. The phone should have it. If
-    the sequence above reproduces, the fix is incomplete on device rather than undelivered, and the
-    likely gap is that `TabShell` did not remount: the initializer reads `window.location.pathname`
-    **at mount**, so a path that leaves the component mounted keeps the stale tab.
-  - This is the `back-gesture-sitting` batch's own check arriving early, by screenshot. Answer it
-    in that sitting rather than separately.
+- **⛔ RETRACTED THE SAME DAY IT WAS FILED, 2026-09-22. There is no evidence of a recurrence here,
+  and the thing that looked like evidence is a measurement artifact worth knowing about.**
+  A DevTools screencast of the running APK showed **the address bar reading `/more` while Home
+  rendered** — this entry's recorded symptom word for word. The owner then reported that **that URL
+  bar does not update as they navigate at all; it is stuck at whatever it held when DevTools
+  attached.** So it says nothing about the app's actual route.
+  - **The mechanism, because this will be reached for again:** DevTools updates its address bar on
+    `Page.frameNavigated`. This app's tab flips are `history.replaceState` — a client-side route
+    change that fires no such event. So the URL bar is expected to go stale here, and on a
+    Capacitor WebView doing client-side routing it is **never** a reliable read.
+  - **⛔ Read `location.pathname` from the page, never the URL bar of any inspector.**
+    `scripts/device/probe.js` evaluates it in the page for exactly this reason.
+  - **What was nearly done:** a shipped fix was nearly recorded as failing on device on the strength
+    of a stale widget. The entry's actual device check is unchanged and still owed — from Home, tap
+    More, open Profile details, press the system back.
+  - **Still true and worth keeping from that false alarm:** if the real check ever does reproduce,
+    do **not** assume a stale build. This fix is in `components/shell/tab-shell.tsx` — JS, which
+    reaches the device through a Railway deploy with no APK rebuild. The likely gap would be that
+    `TabShell` did not remount, since the initializer reads `window.location.pathname` **at mount**.
 - **Lane:** B — `components/shell/tab-shell.tsx`.
 - **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
   pressing back gets me to the home page again."*
@@ -17797,6 +17801,20 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
    those, and pretending otherwise is how a green run starts meaning less than it says.
 
+- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
+  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
+  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
+  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
+  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
+  a repository, which is a cost accepted only because it is bounded and auditable.
+  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
+    *in the page*: the real route, the active tab, visible error text, the button count, whether the
+    page scrolls horizontally, and the lowest action row's computed bottom padding against the
+    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
+    *"is this feature working"* questions are answerable from the digest alone.
+  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
+    the question); a live view (impossible — the reviewing session is a container with no path to a
+    USB device).
 - **⛔ A device result that does not name its screen, orientation and navigation mode is not a
   result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
   invalidates every clearance reading in step 4.
