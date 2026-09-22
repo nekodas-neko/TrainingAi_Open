@@ -66,6 +66,15 @@
   below. The standing agents come up 🟢 from their own prompts; everything else sets its own.
 - **When the user says the session is wrapping up** — "let's wrap this session", "let's close this session", "we're finishing up", or anything equivalent — that is a request for the three-part wrap-up ritual below (handoff doc → documentation cleanup → next-agent prompt), not just an acknowledgement. See **Session Wrap-Up** immediately after this list.
 - **Tick off roadmap items immediately when pushed to `main`** — as soon as any planned feature or fix lands on `main` (even for testing), mark it as ✅ in `projectOverview.md`. If it still needs testing or has known gaps, add a ⚠️ note inline rather than leaving it unchecked. Never leave a shipped item unchecked because it "isn't fully verified yet".
+- **Large UI changes are mocked up first — the owner sees it before it is built.** Any change that
+  visibly rearranges a screen he uses daily (merging or removing a card or widget, collapsing a
+  banner stack, moving a card between tabs, changing what the tab bar or Home shows) gets a **mockup
+  presented and a yes returned before any code is written**. It is cheap to render a static page and
+  expensive to implement an information-architecture change he then dislikes — and a lane can build
+  the change *correctly* and still produce a Home he does not want, which is the failure this
+  prevents. **Such entries carry `Gate: owner`**, with the mockup named as what is owed; an entry
+  that merely restyles a component or fixes a layout bug does not. Show before/after at the real
+  384 px dark viewport, not a description of it.
 - **Decisions come with a recommendation attached, and cheap reversible ones don't come at all.** Recommendation first, why it wins long-term, alternatives and what each is better at, reversal cost, plain English. Full rule: **Decisions That Come Back To Me**, below.
 - **Break things into components** — where possible, split code into smaller components and avoid creating very long files.
 - **Keep plan-generation prompts small.** When turning a design spec into an implementation plan (`docs/superpowers/plans/`), don't hand a sub-agent the entire spec plus the full task breakdown in one massive prompt — it can time out. Investigate the relevant files first (small, scoped Explore calls), then write the plan directly. If a spec covers many independent areas (DB/backend, sync, UI, admin), consider splitting it into multiple smaller plan documents rather than one giant one.

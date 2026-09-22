@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-21 · **By:** fifty sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1, 2026-09-21 ×1) · **Next ID: `RV-103`.**
+**Updated:** 2026-09-22 · **By:** fifty-one sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1, 2026-09-21 ×1, 2026-09-22 ×1) · **Next ID: `RV-123`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -37,41 +37,38 @@ From sweeps 29–39
 worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
 `/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
 
-## Now — sweep 52 filed (2026-09-21). **Next ID: `RV-103`.**
+## Now — sweep 53 filed (2026-09-22). **Next ID: `RV-123`.**
 
-**Sweep 52 was a visual sweep, angles self-chosen** — formatting drift, 384px layout,
-empty/zero/error states, colour/contrast. [Write-up](../../reviews/2026-09-21-sweep-52-what-the-owner-sees.md)
-· **RV-84…RV-102** · batches `error-state-onerror` (2), `layout-384` (5).
+**Sweep 53 ran the angles the owner named** — animations/page swaps, caching (from a live report),
+and what should merge. [Write-up](../../reviews/2026-09-22-sweep-53-stale-surfaces-and-movement.md)
+· **RV-103…RV-122** · batches `nutrition-freshness` (2), `stale-surface-subscribe` (3),
+`tab-nav-shell` (2), `home-ia-merge` (2), `health-ia-merge` (2).
 
-**RANK VISUAL FINDINGS BY THE RESUME TELEMETRY, NOT BY TASTE.** `error_events` `bf110 resume
-dom-intact` rows carry the URL: **Home 22 · Nutrition 14 · Health 11 · More 7 · Workout 2**. That
-query is the cheapest prioritisation evidence this repo has — reuse it.
+**THE LESSON OF THIS SWEEP: check whether an owner report is a RE-report before investigating it.**
+His *"macro not updating… requires page swap"* is quoted verbatim in BF-177's docblock. Finding that
+first turned a bug hunt into "why did the fix not hold", which is a much shorter path — the answer
+was `cachedFetch(...).catch(() => {})` with no `onError`, dead per RV-84. **Grep `docs/` and the
+relevant file headers for the owner's own words before opening the code.**
 
-**RV-84 is systemic and the highest-leverage:** `cachedFetch` **cannot reject** (its network section
-is inside `try/catch/finally`), so every `.catch()` chained onto it is dead — 16 sites, and the error
-states behind them unreachable. One rule, one-line test → a check script, not a re-sweep.
+**The other half of that lesson: BF-177 was patched SITE BY SITE.** Delete refetches the weekly
+chart, add does not, and the delete site's comment calls itself *"BF-177's third site, which that
+entry did not name"*. When a fix is a call added at a call site, ask how many call sites exist.
 
-**Home carries three failure-vanish bugs** (RV-85/86/87). The one to read is RV-85: `fetchWithRetry`
-exists — per its own header — so a blip does not leave widgets "blank until the app is restarted",
-and it then retries 3× and gives up *silently*, with no error channel, landing on that exact blank.
+**Why the fetch-once ratchet missed four findings:** it matches only `useEffect(…, [])`, and its
+comment calls a non-empty dep array *"a different (and usually correct) shape"* — true in general,
+false inside a shell where `[userId]`/`[today]` never change (RV-105).
 
-**The lens that worked, third sweep running:** treat a claim in a comment, prompt or helper name as
-a *hypothesis* and find its counter-example — RV-84 (a `.catch` that cannot fire), RV-85 (a helper
-that does not do what its header says), RV-97 (a colour contradicting its own label), RV-89 (a
-shared helper half-used).
+**The sharpest single number: 37 cross-tab `router.push` sites vs 5 `navigateToTab`** — a push tears
+down the whole tab shell. Home does both on adjacent lines.
 
-**Production content beats invented worst cases.** The layout findings are measured against real
-rows — 130 of 337 food items exceed the diary's 22-char budget; the owner's lower-back injury is
-**live**, so the chip that eats the mid-set title renders for real. Query the content before sizing
-a truncation finding.
+**Clean, do not re-sweep:** mood check-in, water log, home day timeline, end-of-day read-through,
+`WeekDaySheet`, `sleep-sessions` on both tabs; the View-Transition layer, sheet timing,
+`SwipeCarousel`, `TabSwipeNavigator`, the back stack; no layout-property animation anywhere.
 
-**Carried from sweep 51:** a backlog conflict of a **third kind** the rules do not name — Lane A
-*updated* an entry while I added entries above it, so neither two-deletions nor two-additions
-applied. Read the headings; keep mine plus their newer version.
-
-**Sweeps 47–51 closed.** **Their durable rules:** a 4xx is not evidence the guard fired (read which
-field it names); pair every refusal with a one-field control; `claude_ro` is **the owner's rows
-only**. **Owed:** RV-37/39 device; RV-38/41/43 owner decision.
+**Sweeps 47–52 closed.** **Durable rules:** a 4xx is not evidence the guard fired, so read which
+field it names; pair every refusal with a one-field control; `claude_ro` is **the owner's rows
+only**; rank visual findings by the resume telemetry (Home 22 · Nutrition 14 · Health 11 · More 7 ·
+Workout 2). **Owed:** RV-37/39 device; RV-38/41/43 owner decision.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
