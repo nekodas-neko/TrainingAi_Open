@@ -17,6 +17,7 @@ import { resolveColor } from "@trainingai/shared/chart-colors";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { ZONE_MINUTES_TTL } from "@trainingai/shared/cache-ttl";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -36,9 +37,7 @@ interface ZoneMinutesResponse {
 }
 
 function fmtDuration(sec: number): string {
-  const m = Math.round(sec / 60);
-  if (m < 60) return `${m}m`;
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+  return formatHoursMinutes(sec / 60);
 }
 
 // Day / week / month time-in-HR-zone, from the reconcile-on-read /api/zone-minutes rollups. One

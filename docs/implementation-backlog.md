@@ -627,27 +627,6 @@ nothing structured saying why — and a human decides.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-### [body][platform] RV-90 — body weight renders five ways across seven sites, and no shared formatter exists
-
-- **Lane:** A — a new helper in `packages/shared/src/`, then the call sites.
-  **Added:** 2026-09-21 · Review sweep 52.
-- The scale ingest applies no rounding (`app/api/scale-ble/samples/route.ts:46,117` — range validation
-  only), so the stored value carries the load cell's resolution. For one weigh-in of **82.45**:
-  Home card `${currentWeight} kg` → **82.45 kg**; Health › Body → **82.45 kg**; day detail
-  `.toFixed(1)` → **82.5 kg**; Profile (×2) → **82.5 kg**; week-day sheet `${weightKg}kg` → **82.45kg**
-  (raw *and* no space); stats grid / public profile `Math.round` → **82kg**.
-- **Fix:** add `formatKg(value, { decimals: 1 })` beside the other display helpers and route all seven
-  through it, so unit spacing stops being a per-site decision.
-- **Not established:** the decimal resolution the owner's scale actually emits. If it emits 1dp today,
-  four of these agree and drift only when a Health-Connect or hand-logged value with more precision
-  lands — which makes this a latent drift, not a visible one every day.
-- **Same class, filed together because one helper fixes all three:** activity duration is
-  `.toFixed(1)` on the done screen (`done-activity-screen.tsx:329`) and `Math.round` everywhere else —
-  a 42.4-minute run reads **42.4** then **42** when reopened; pace has a shared `formatPace`
-  (`packages/shared/src/health/vdot.ts:103`) used at two sites and hand-rolled at seven more in two
-  unit spellings (`5:12/km` vs `5:12 /km`); and four hand-rolled `h/m` formatters exist in three
-  shapes with no shared helper.
-
 ### [platform] LB-125 — five hand-rolled date option bags beside the shared formatter, and its own comment describes output it does not produce
 
 - **Lane:** A — `packages/shared/src/date-utils.ts:232-247`. **Added:** 2026-09-22 · filed out of

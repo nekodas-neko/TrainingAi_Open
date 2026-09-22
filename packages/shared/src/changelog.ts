@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.2",
+    date: "2026-09-22",
+    changes: [
+      "Your weight now reads the same everywhere. The same weigh-in showed as 82.45 kg on the home card, 82.5 kg in the day detail and 82.45kg \u2014 no space \u2014 in the week sheet, because each screen decided its own rounding and spacing. One place decides both now, and run duration got the same treatment: a 42.4-minute run no longer reads 42.4 on the finish screen and 42 when you reopen it.",
+      "Fixed a pace that could print as 5:60/km. Anything that rounded up to exactly the next minute showed sixty seconds instead of rolling over \u2014 so a 5:59.6 pace read 5:60/km rather than 6:00/km. It affected every pace on every screen.",
+    ],
+  },
+  {
     version: "1.465.1",
     date: "2026-09-22",
     changes: [
