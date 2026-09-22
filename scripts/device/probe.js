@@ -86,9 +86,12 @@ async function main() {
   console.log(`  taken on ${where.path}`);
 
   console.log('\nConnection works. What this does NOT establish:');
-  console.log('  · nothing about the ring or the scale — real BLE needs the real hardware');
   console.log('  · nothing about how anything FEELS; that stays a human call');
-  console.log('  · nothing about a screen you were not on — these are readings, not a sweep\n');
+  console.log('  · nothing about a screen you were not on — these are readings, not a sweep');
+  console.log('  · and the limit on the ring and scale is narrower than it sounds: this IS the');
+  console.log('    phone they are paired to, so every app-side BLE surface is reachable. What');
+  console.log('    cannot be done is making the hardware DO something — wear the ring overnight,');
+  console.log('    wake a radio that is power-gating, stand on the scale.\n');
   session.close();
 }
 

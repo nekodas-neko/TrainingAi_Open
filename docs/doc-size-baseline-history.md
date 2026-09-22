@@ -15542,3 +15542,23 @@ Second thing worth carrying, because it is unusual for this repo: **the harness 
 sandbox here has `adb` or a phone, so every line was reasoned from the protocol rather than
 observed — including the claim that it connects at all. It is filed with a `Keep:` naming that
 first run as the outstanding work, rather than presented as working software.
+
+## 2026-09-22 — `CLAUDE.md` → 844 (structural questions are the agent's) and the OR-127 corrections
+
+**CLAUDE.md**: a standing narrowing of the decisions section, on the owner's instruction — *"I'd
+like it if you could take a lot of these structural questions."* Architecture, tooling, process,
+layout, naming and how to test something are the agent's; what stays theirs is data destruction,
+money, auth and secrets, scoring calibration, and genuine product preference. It costs lines
+because the *carve-out list* is the load-bearing half — a delegation with no boundary is not a
+delegation, it is an invitation to decide something irreversible.
+
+Worth carrying: **delegated is not undocumented.** The rule says a structural call still gets
+written down with its reason and its reversal cost. The owner is trading *being asked* for *being
+able to read it later*, and without the second half the first is just a loss of oversight.
+
+**OR-127** gained a testing order and lost a wrong sentence. The first draft said the harness "does
+not reach the ring or the scale", in three places. It was wrong: this drives the app on the phone
+they are **paired to**, so every app-side BLE surface is reachable — roughly 17 checks written off
+by one line. The real limit is on making the hardware *produce* (wear the ring overnight, wake a
+power-gated radio, stand on the scale), not on reading what it already produced. Reading is not
+producing, and conflating them cost more than any other error in that entry.

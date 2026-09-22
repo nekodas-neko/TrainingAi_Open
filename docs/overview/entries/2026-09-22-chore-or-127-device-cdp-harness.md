@@ -91,6 +91,46 @@ is time** — and the entire `motion-polish` batch is timing questions no still 
 between frames, because **the phone drops frames under load and a sparse recording reads as a fast
 transition**. The timestamps are the evidence; the frame count never is.
 
+## Two corrections the owner made, and one standing change
+
+**The ring and the scale are reachable, and saying otherwise was wrong.** Three places in the first
+draft said the harness "does not reach the ring or the scale — real BLE needs real hardware". The
+owner's point: *"then you get the exact app that has the devices connected."* Correct. This drives
+the app on **the phone they are paired to**, so every app-side BLE surface is reachable — what the
+pipeline has actually ingested, what the admin consoles read, whether a sync button does anything.
+That is most of the `devices` group and all of `admin-console-sitting`, about 17 checks written off
+by a sentence. **The real limit is on making the hardware PRODUCE** — wearing the ring overnight,
+waking a radio that power-gates when worn-idle, standing on the scale. Reading is not producing,
+and the first draft conflated them. Corrected in `probe.js`, the README and the entry.
+
+**Structural questions are the agent's now** — owner, this session: *"I'd like it if you could take
+a lot of these structural questions."* Written into CLAUDE.md as a standing narrowing of the
+decisions section. Architecture, tooling, process, layout, naming, how to test something: decide,
+state the call in one line, continue. What stays theirs is short — data destruction, money, auth
+and secrets, scoring calibration, and genuine product preference. **A delegated call still gets
+written down**, with its reason and its reversal cost: the trade is *being asked* for *being able
+to read it later*, and the second half is what makes the first safe.
+
+## The testing order, decided rather than asked
+
+Acting on that rule immediately. **Not by group size — by how unambiguous the answer is.** A check
+whose result is a number or a boolean is worth ten whose result is an opinion.
+
+1. **Prove the pipe** (`probe.js`, once) — the only step needing the owner.
+2. **Try `connectOverCDP` before writing any bespoke check.** If it attaches, the ~100 existing
+   `e2e/**` specs run against the real device on a config change alone. That is a multiplier no
+   hand-written check matches, and it is the highest-leverage unknown in the plan.
+3. **Offline-first reads** — binary, mechanical, and never exercised anywhere.
+4. **Safe-area clearance as one sweep**, not N checks: walk every bottom-anchored action row and
+   assert computed padding ≥ the measured inset.
+5. **Devices and the admin console** (17), reachable for the reason corrected above.
+6. **`motion-polish` via `record.js`** — measurable rather than judged.
+7. **Look-and-feel stays the owner's.** Automation is the weakest evidence for exactly those.
+
+Writing this onto OR-127 rather than into `docs/superpowers/plans/` is itself a structural call: a
+seven-line order of attack for tooling that already exists is not a plan document, and putting it
+where the tool is described keeps it from going stale separately.
+
 ## Worth carrying
 
 **The harness ships unrun, and says so everywhere it can be read.** No sandbox in this project has

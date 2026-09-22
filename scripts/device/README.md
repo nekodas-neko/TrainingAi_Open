@@ -23,9 +23,16 @@ And one more, which is the reason `back-gesture-sitting` exists: **the Android s
 Playwright cannot fire it because it arrives over a Capacitor channel, not as a DOM event.
 `adb shell input keyevent 4` is the real thing, and `systemBack()` wraps it.
 
-**It does not reach:** the ring or the scale (real BLE needs real hardware and the ring's radio
-power-gates when worn-idle), anything needing you physically present, and every *"does this feel
-instant"* judgement. Those stay the owner's.
+**It does not reach:** anything needing you physically present, and every *"does this feel instant"*
+judgement. Those stay the owner's.
+
+**The ring and the scale are NOT on that list, and an earlier draft of this file wrongly put them
+there.** This drives the app on *the phone they are paired to*, so every app-side BLE surface is
+reachable: what the pipeline has actually ingested, what the admin consoles read, whether a sync
+button does anything, what a live HR subscription yields. That is most of the `devices` group and
+all of `admin-console-sitting`. **What cannot be done is making the hardware DO something** — wear
+the ring overnight, wake a radio that is power-gating (it sleeps when worn-idle by design), or
+stand on the scale. The limit is on producing data, not on reading it.
 
 ## Setup, once
 

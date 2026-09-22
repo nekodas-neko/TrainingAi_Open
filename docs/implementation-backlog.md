@@ -17744,13 +17744,47 @@ thing.
   exactly that reason.
 - **What this does NOT license, and it is the part most likely to be overread.** A pass here is
   evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
-  the ring or the scale (real BLE, and the radio power-gates when worn-idle), anything needing the
-  owner physically present, or any *"does this feel instant"* judgement. **Automatable is not the
+  anything needing the owner physically present, or any *"does this feel instant"* judgement.
+  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
+  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
+  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
+  whether a sync button does anything. That is most of the `devices` group and all of
+  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
+  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
   same as owed:** these are behavioural checks, and a large share of the 104 device checks are
   look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
   unambiguous ones and leave a shorter, harder list - not an empty one.
 - **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
   substitute. It narrows what the gate has to cover.
+
+**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
+instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
+answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
+
+1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
+   else is worthless until it passes.
+2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
+   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
+   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
+   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
+   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
+   first.**
+3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
+   returns null off the APK, so these have never been exercised. Highest value per check.
+4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
+   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
+   and the floored-utility rule it enforces has never been checkable at all.
+5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
+   for the reason the correction above records: this is the phone the ring and scale are paired to.
+   Mostly *"does this button do anything"*, which is binary.
+6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
+   sheet 300 ms or the stock 500.
+7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
+   those, and pretending otherwise is how a green run starts meaning less than it says.
+
+- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
+  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
+  invalidates every clearance reading in step 4.
 
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
