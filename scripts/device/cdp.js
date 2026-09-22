@@ -15,9 +15,10 @@
 // protocol to the page target directly, which always exists. Trying connectOverCDP against the
 // same forwarded port is the natural next step once a device has confirmed this path works.
 //
-// ⚠ **NOT RUN AGAINST A DEVICE. Written blind.** No sandbox in this project has `adb` or a phone,
-// so every line here is reasoned from the protocol, not observed. Treat the first run as the test:
-// expect to fix something, and record what, rather than trusting a clean read.
+// ✅ **RUN ON THE S25, 2026-09-23.** connect/evaluate/tap/systemBack worked unchanged, including a
+// re-attach after a force-stop (the socket name changes with the pid; `findSocket` re-finds it).
+// And `/json/version` DOES expose a browser-level `webSocketDebuggerUrl` on this WebView, so
+// `connectOverCDP` attaches too — see the README's "What the first run corrected".
 
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');

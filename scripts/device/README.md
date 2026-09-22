@@ -5,9 +5,10 @@ returns null, so every offline-first domain takes its web fallback here… A gre
 about the web path only."* This directory removes that ceiling by driving the **real app on the
 real phone** over the DevTools protocol.
 
-**It has never been run against a device.** No sandbox in this project has `adb` or a phone, so
-every line was reasoned from the protocol rather than observed. The first run is the test — expect
-to fix something and record what, rather than trusting a clean read.
+**First run against the S25: 2026-09-23**, by the local Device Verification Agent (`📱 Device
+Verification Agent 🟢`, baton `docs/agents/state/device-verification.md`). The connection worked
+unchanged; what the protocol-only draft got wrong is recorded under **What the first run
+corrected**, at the bottom — read that before trusting anything above it.
 
 ## What it unlocks, and what it does not
 
@@ -42,8 +43,14 @@ stand on the scale. The limit is on producing data, not on reading it.
    not `unauthorized`.
 3. Open the app and bring it to the foreground — the DevTools socket does not exist until the
    WebView does.
-4. **Gesture navigation must be on** for any safe-area check to mean anything. With three-button
-   navigation the bottom inset reads `0` and a broken clearance looks fine.
+4. **Gesture navigation must be on** for any safe-area check to mean anything — and read the mode
+   from Android, never from the inset: `adb shell settings get secure navigation_mode` (`0`
+   three-button · `1` two-button · `2` gesture). `probe.js` prints it. On the S25 three-button nav
+   gives a **48px** inset (the button bar), not `0`, so the inset alone cannot tell you. Changing the
+   mode is a system setting: ask the owner, do not flip it yourself.
+
+Node **≥ 22.12**: the harness itself runs on any Node 22, but `pnpm test` does not start below 22.12
+(`rolldown`'s Windows binding is skipped at install — DV-1).
 
 The APK must be the **debug** build. `MainActivity.java` gates `setWebContentsDebuggingEnabled` on
 the manifest's own debuggable flag, so a release APK can never expose the socket. CI publishes
@@ -84,16 +91,17 @@ prints the longest gap so a sparse recording is never mistaken for a fast transi
 ### How a session that is not on this machine reviews the app
 
 It cannot see the phone, and asking a person to screenshot every screen does not scale past a
-handful. The channel is **git**:
+handful. The channel is **git — as text, never as images.**
 
-```
-node scripts/device/tour.js
-git checkout -b device-captures/$(date +%F) && git add device-probe && git commit -m "device tour" && git push
-```
+> ⛔ **This repository is public** (Q-49). Every capture is the owner's real production account:
+> name, email, avatar, health numbers. An earlier draft of this file said to push the capture folder
+> to a `device-captures/*` branch — **that publishes it**, and deleting the branch afterwards does
+> not un-publish it. `device-probe/` is gitignored for this reason. Never `git add -f` it.
 
-The reviewing session pulls that branch and reads the folder. **Delete the branch once it has been
-read** — this puts images in git, which is why the captures are JPEG-width-capped and why the
-branch is never merged to `main`.
+So the local agent reads the captures here and writes what they show — the route, what was on
+screen, the numbers — into the backlog entry, the journal entry or its baton. The `tour.json`
+digest is text, but it can still carry names and values from the screen: read it before quoting
+any of it into a commit.
 
 **Each screen yields more than a picture.** `tour.json` carries a per-screen digest taken *in the
 page*: the real route, what the tab bar thinks is active, visible error text, the button count,
@@ -156,3 +164,42 @@ you were on when you read it — `probe.js` prints the path for that reason.
 disappear, did back land on Home, is the computed padding above the gesture bar. A large share of
 the device checks in the backlog are look-and-feel, and an automated pass is the weakest evidence
 for exactly those. Expect this to clear the unambiguous ones and leave a shorter, harder list.
+
+## What the first run corrected — S25 Ultra, 2026-09-23
+
+Samsung SM-S938B, Android 16, WebView Chrome 152, APK 1.460.4 (debug), web v1.465.4, portrait,
+three-button navigation. Each line is observed, not reasoned.
+
+| the draft said | what the device did |
+|---|---|
+| `probe.js` will probably fail to connect | **Connected first time**, no change needed |
+| a WebView often has no browser `webSocketDebuggerUrl` on `/json/version` | **It has one** (`ws://127.0.0.1:9222/devtools/browser`) |
+| try `connectOverCDP` | **It attaches** — 98 ms, 1 context, 1 page, `location.pathname` readable. See below |
+| `playwright-core` is a dependency | Only **transitively**, through `@playwright/test`. Resolve it with `require.resolve('playwright-core', { paths: [require.resolve('@playwright/test')] })` |
+| three-button nav makes the inset read `0` | It reads **48px** (the button bar). Read `navigation_mode`; `probe.js` now does |
+| push captures to a `device-captures/*` branch | **Never** — the repo is public. See the ⛔ above |
+| (not stated) | A force-stop gives the app a new pid and a new socket name; `connect()` re-finds it with no change |
+
+**`connectOverCDP` attaching means the `e2e/**` specs can in principle run against the real APK**,
+which is the largest lever this directory has. **Do not just point `playwright.config.ts` at it.**
+The phone is signed into the owner's **production** account, and those specs were written for the
+seeded local `test@local.dev` — every spec that writes (logs food, completes a workout, edits a
+program) would write into real health history. A device project needs a read-only allowlist of
+specs, or a separate test account on the phone. That is an owner decision, not a config change.
+
+**Two harness traps found on the first sitting, both mine to have avoided:**
+
+- **`tap()` centres its target before tapping, which pins a scroll offset.** A scroll-restoration
+  check that taps a row with `tap()` always leaves from the offset that centres that row, so "it
+  came back to the same place" is true by construction and proves nothing. Centre, then shift the
+  scroller by a known amount, and tap with a hit-tested touch that does *not* re-scroll — that is how
+  BF-100 was measured (675→675, 1075→1075).
+- **`adb()` returns stdout as a string, not `{ stdout }`.** Reading `.stdout` off it gives
+  `undefined`, and a focus check built on that reported the app as backgrounded while it was on
+  screen — one near-false finding before it was caught. Test the helper against a known state
+  before trusting a negative from it.
+
+**What a back press on this app looks like from `dumpsys`:** back from Home leaves
+`mCurrentFocus` on `com.sec.android.app.launcher`, and relaunching prints *"its current task has
+been brought to the front"* with the same pid and the same `performance.timeOrigin` — that is
+"minimised", as opposed to finished and reloaded.

@@ -15,11 +15,11 @@
 // It changes nothing. It is a read, and it is the proof the connection works before anything
 // depends on it.
 //
-// ⚠ NOT RUN AGAINST A DEVICE — see the header of cdp.js. The first run is the test.
+// ✅ Run on the S25, 2026-09-23 — connected first time. The navigation-mode read was added after it.
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { connect } = require('./cdp');
+const { connect, adb } = require('./cdp');
 
 const OUT = process.env.DEVICE_PROBE_OUT || path.join(process.cwd(), 'device-probe');
 
@@ -67,12 +67,18 @@ async function main() {
   console.log('');
   console.log(`  viewport ${insets.w}×${insets.h} css px @ dpr ${insets.dpr}`);
   console.log(`  safe-area  top ${insets.top} · bottom ${insets.bottom} · left ${insets.left} · right ${insets.right}`);
-  const bottom = parseFloat(insets.bottom) || 0;
-  if (bottom === 0) {
-    console.log(hm('bottom inset is 0 — either three-button navigation is on, or the WebView is not edge-to-edge.'));
-    console.log('  Switch the phone to gesture navigation before judging any clearance check.');
+  // Ask Android which navigation mode is on — never infer it from the inset. The first device run
+  // (S25, 2026-09-23) read a 48px bottom inset under THREE-BUTTON navigation: the button bar is
+  // 48dp, so a non-zero inset proves nothing about gesture nav, and the earlier "0 means
+  // three-button" reading was wrong on this phone. 0 = three-button, 1 = two-button, 2 = gesture.
+  const mode = String(await adb(['shell', 'settings', 'get', 'secure', 'navigation_mode']).catch(() => '')).trim();
+  const MODE = { 0: 'three-button', 1: 'two-button', 2: 'gesture' }[mode] ?? `unknown (${mode || 'unreadable'})`;
+  console.log(`  navigation ${MODE}`);
+  if (mode === '2') {
+    console.log(ok(`gesture navigation, bottom inset ${insets.bottom} — clearance checks mean something here`));
   } else {
-    console.log(ok(`bottom inset is ${insets.bottom} — this is the number the floored utilities exist to beat`));
+    console.log(hm(`${MODE} navigation — safe-area clearance checks are NOT valid until the phone is on gesture nav.`));
+    console.log('  Back checks are fine: keyevent 4 is the same KEYCODE_BACK either way.');
   }
 
   // 3 — what the compositor paints.

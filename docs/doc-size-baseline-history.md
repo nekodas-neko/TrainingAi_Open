@@ -15590,3 +15590,20 @@ they are **paired to**, so every app-side BLE surface is reachable — roughly 1
 by one line. The real limit is on making the hardware *produce* (wear the ring overnight, wake a
 power-gated radio, stand on the scale), not on reading what it already produced. Reading is not
 producing, and conflating them cost more than any other error in that entry.
+
+---
+
+## 2026-09-23 — backlog → 26664 (−224), projectOverview → 12362 (−37), new baton `device-verification.md` → 66 (device/first-run)
+
+**Backlog −255.** The first S25 sitting run by the local Device Verification agent verified three
+shipped fixes on the device — **LA-109**, **LB-107**, **BF-100** — and they left the queue whole
+(192 + 54 + 47 lines, less the result bullets written into BF-166, BF-165 and BF-111), and **DV-1** (+31) was filed in its
+place: `pnpm ci:local` cannot pass on Windows, where that agent runs. Net −224, ratcheted to the
+measured size so the space cannot be quietly regrown.
+
+**projectOverview −37.** LA-109's Known-Issues row moved whole to `known-issues-resolved.md`: the
+device gesture was the only thing it still owed, and it was verified on the S25 the same day.
+
+**New baseline: `docs/agents/state/device-verification.md` at 66**, its size on creation. A seventh
+role's baton joins the six already ratcheted; the same rule applies from its first line — it only
+comes down.

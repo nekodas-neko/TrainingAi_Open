@@ -5,9 +5,8 @@
 //
 // This exists to answer one question: how does an agent that is NOT on this machine review the
 // running app? It cannot see the phone, and asking a person to screenshot every screen does not
-// scale past a handful. So: capture here, commit the folder to a scratch branch, push. The remote
-// session pulls and reads. Images in git are not free, which is why this writes JPEGs at a capped
-// width and why the branch is meant to be deleted once read — see the README.
+// scale past a handful. So: capture here, read it here, and send the FINDINGS on as text — the repo
+// is public, so the images themselves never leave this machine (see the README).
 //
 // Each screen yields more than a picture. The **digest** is a small DOM summary taken in the page:
 // the real route, what the tab bar thinks is active, any visible error text, and the computed
@@ -100,7 +99,8 @@ async function main() {
 
   fs.writeFileSync(path.join(dir, 'tour.json'), JSON.stringify({ takenAt: stamp, results }, null, 2));
   console.log(`\n  ${results.length} screens → ${dir}`);
-  console.log('  Commit the folder to a scratch branch and push it; the reviewing session pulls it.');
+  console.log('  ⛔ Never commit or push these images: this repository is PUBLIC and they show the owner’s');
+  console.log('    real account. Read them here and write the findings down as text (see the README).');
   console.log('  ⚠ A `~` means the app did not end up where it was sent — often correct (a guard,');
   console.log('    a redirect), and always worth reading before treating the capture as that screen.\n');
   session.close();
