@@ -7,7 +7,7 @@
 - **Always test on the local dev server before merging.** Before merging (or presenting work for confirmation on a destructive change), spin up `pnpm dev` and exercise every changed API route and UI flow against the local non-prod database. TypeScript and lint passing is not sufficient — runtime errors, broken validation, and cache bugs only surface when the server actually runs. If something breaks during testing, fix it before asking to merge.
 - **The local custom-rules gate is `pnpm check:rules` — nothing else counts as "custom rules pass".** It parses `.github/workflows/ci.yml`, runs every step of the job named *Custom Rules*, and prints how many it ran (`Ran N of N …`); quote that count rather than the word "pass". **Do not hardcode N anywhere** — it was 31 on 2026-08-13 and 33 by the end of the same day; the runner reads it from the YAML, which is the point. Globbing `scripts/check-*.js` reaches only the steps that invoke a script — the difference between that and `Ran N of N` is the count it misses — and `pnpm ci:local` used to run 3, and both report clean while the inline grep rules — UTC date slicing, hardcoded session names, safe-area stacking, local-SQLite PRAGMAs, nested buttons, `JSON.parse` of LLM output, hand-rolled `invalidateCache` — never execute. That gap shipped a component-level `invalidateCache()` call through a green local gate (#1279). `pnpm ci:local` now runs it.
 - **Docs/plans/low-risk changes merge with zero ceremony.** **Documentation-only** changes (`.md` files like `projectOverview.md`, `CLAUDE.md`), **implementation plans / planning docs** (`docs/superpowers/plans/`), and **bug fixes for features already on `main`** never need confirmation and are exempt even from the destructive-change carve-out above (they can't be destructive by nature). They still need a feature branch + green CI — that's the only path now. Note: a *markdown-only* PR still runs CI (the `pull_request` trigger has no `paths-ignore`) so required checks report and it can merge.
-- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Five roles run against this repo (Orchestrator, Implementation in two lanes, BugFix, Tuning, Review), up to six sessions concurrently, and that file is the contract between them: who owns which files, which letter your entry IDs come from, and what you may merge without asking. **A standing agent is meant to run as one continuous session per role** — rely on Claude Code's automatic context compaction rather than writing a handoff and spawning a successor just because context is getting long; that keeps cached tokens working for you instead of resetting them. Handing off to a successor is now the exception (owner reset, or a session lost outside your control), not the routine end of a generation — see `docs/agents/README.md` §4. If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor (or your own earlier self, after a reset) left you.
+- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Six roles run against this repo (Orchestrator, Implementation in two lanes, BugFix, Tuning, Review, Device Verification), up to seven sessions concurrently — **and one of them, Device Verification, runs on the owner's own machine rather than in a container**, and that file is the contract between them: who owns which files, which letter your entry IDs come from, and what you may merge without asking. **A standing agent is meant to run as one continuous session per role** — rely on Claude Code's automatic context compaction rather than writing a handoff and spawning a successor just because context is getting long; that keeps cached tokens working for you instead of resetting them. Handing off to a successor is now the exception (owner reset, or a session lost outside your control), not the routine end of a generation — see `docs/agents/README.md` §4. If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor (or your own earlier self, after a reset) left you.
 - **At the start of every session**, read `projectOverview.md` first — it is a lean index holding current status, the live Known Issues & Risks tables, and the **What's Left To Do** list. Use it to orient before doing anything. The session journal lives in `docs/overview/entries/` (recent, one file per PR) and the batched `docs/overview/history-*.md` archives (see the Document Map at the bottom of `projectOverview.md`) — only open those when you need history.
 - **Also at session start, read `error_events` in production** — it is the only view of faults that never reach a human. **It DOES prune at 30 days — the 2026-09-01 amendment claiming otherwise was wrong and is retracted (BF-93).** The `DELETE` is in `insertErrorEvent` (`lib/data/postgres/adapter.ts`), throttled to once a day by the shared `shouldPrune`, and it has been there since the initial public snapshot. **The evidence that convinced a session otherwise is what a working prune looks like:** a prune fired from a write path only runs when something is written, and errors are now rare, so the oldest row ages past 30 days between faults. Measured 2026-09-01 — last write **2026-08-30**, oldest row **2026-07-31**, span **exactly 30 days**, matching the cutoff computed from the last write to the day. Reading "oldest row is 32 days old" against *today* rather than against the *last write* is what produced the false finding. So: read the table early, because a fault that stops on its own goes unnoticed and then expires. The table is the second-largest object in the database at 52 MB — **and that 52 MB is BLOAT, not payload; the earlier reading of it as "30 days of retained payload rather than unbounded growth" is corrected here (RV sweep 50, 2026-09-18).** Measured that day: **12 MB heap + 39 MB TOAST + 752 kB index behind 115 live rows.** The figure was written when the table held 7,331 rows, and the prune removed the rows without reclaiming the space. So the size is real and the *conclusion* drawn from it was not: a 52 MB `error_events` is not evidence that faults are being retained, and shrinking it is a `VACUUM FULL`/rewrite question, not a retention question. The first read of that table (2026-08-04) found three faults, **two of which had already stopped before anyone looked**. One query via the admin endpoint:
   ```
@@ -83,7 +83,7 @@
 
 ---
 
-## The Standing Agents — six sessions, one repo
+## The Standing Agents — seven sessions, one repo, one of them not in a container
 
 Full contract: [`docs/agents/README.md`](docs/agents/README.md). The rules below are the ones that
 must bind even if that file is never opened.
@@ -96,8 +96,11 @@ owns the engine (`lib/data/**` including every migration, `lib/local-store/**`, 
 device pipelines, auth/security, `android/**`), Lane B owns the surface (`app/**` except
 `app/api/**`, `components/**`, `app/globals.css`, `lib/hooks/**`, `lib/stores/**`). **BugFix** turns
 owner reports into backlog entries. **Tuning** turns lived feedback into calibration proposals.
-**Review** sweeps the running app weekly and files what it finds. Those four end at a docs-only PR
-and never write code — which is what keeps the collision surface to Lane A against Lane B.
+**Review** sweeps the running app weekly and files what it finds. **Device Verification** runs
+**locally, on the owner's machine with the S25 on USB** — the only role that can see the real app in
+the real APK, driving it over the DevTools protocol (`scripts/device/**`). Those five end at a
+docs-only PR and never write product code, which keeps the collision surface to Lane A against
+Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
 
 - **Lane ownership is decided by a rule, not a list.** Reached by `app/api/**` or touching storage
   → Lane A. Reached only from `app/**` or `components/**` → Lane B. Both → Lane A, engine half
@@ -107,7 +110,9 @@ and never write code — which is what keeps the collision surface to Lane A aga
   releases the claim when that branch merges.
 - **Entry IDs come from your own letter and count up forever — there is no band and no pointer.**
   Lane A `LA-` · Lane B `LB-` · BugFix `BF-` · Review `RV-` · Tuning `TN-` · Orchestrator `OR-` ·
-  one-off sessions `PS-`. Find
+  Device Verification `DV-` · one-off sessions `PS-`. **Adding a role means adding its letter to
+  `scripts/lib/entry-id.js` in the same PR** — that was missed for `OR-` and again for `DV-`, and
+  the failure is silent deletion, not a wrong label: the entry vanishes from the queue entirely. Find
   your next number with `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. A shared
   next-free pointer is a floor, not an authority — it cannot see an unmerged PR, which caused six
   collisions in three days and two live duplicates. Reserved bands fixed that and ran out instead
@@ -130,6 +135,23 @@ and never write code — which is what keeps the collision surface to Lane A aga
   removes completed entries. `Gate:` takes only `owner` or `device`. **`Reference:` marks an entry other
   entries READ rather than build**, so it prints in its own section, never heading the work list.
   `check-backlog-pointers.js` enforces all of it — cycles, an invented `Needs:`, a prose-only reference.
+- **`Lane:` is how any agent hands work to any other — it is the channel, not a label.** `A`/`B`
+  are decided by §3's path rule; `O` is the queue, the docs and anything needing the owner or a
+  round of thinking first; `DV` is work whose deliverable needs the phone. Review can put something
+  in `DV`, the device agent can put a defect in `B`, anyone can put a question in `O`. **No message
+  and no two sessions awake at once — the queue outlives the session that wrote the entry.**
+  **`O` and `DV` see only what is tagged for them**, because an unstated lane means "the path rule
+  answers it" and that rule only resolves to an implementer.
+- **The entry's LETTER and its LANE are different things.** The letter records who found it and
+  never changes; the lane records who builds it. `DV-1` was found by the device agent and carries
+  `Lane: O`.
+- **A device check answers VERIFIED / FAILED / COULD NOT CHECK, and never a fourth thing.** A
+  **FAILED is work, not verification debt** — it goes back to the lane that owns the surface with
+  what reproduces it, not into a `Keep:` that reads as finished. **COULD NOT CHECK is a real
+  answer.** And a result that does not name its screen, orientation and navigation mode is not a
+  result: three-button navigation reports every safe-area inset as `0`, which makes a broken
+  clearance look correct — measured on the S25 on 2026-09-23, where it invalidated the largest
+  group of owed checks outright.
 - **Postgres migration numbers and local SQLite versions belong to Lane A alone.** Any other agent
   that finds it needs a schema change stops and hands the item to Lane A.
 - **Tuning proposes; it never ships a scoring change.** Scoring drives every recommendation the app
@@ -148,7 +170,7 @@ and never write code — which is what keeps the collision surface to Lane A aga
   `- **Keep:** <what is owed>` rather than being deleted or left to look finished.
 - **The session titles are fixed, and a successor reuses its predecessor's exactly** — `🚧 Implementation
   Agent (A) 🟢` · `🚧 Implementation Agent (B) 🟢` · `🪲 BugFix Intake Agent 🟢` · `🎶 Tuning Agent 🟢` ·
-  `📖 Review Agent 🟢` · `🪐 Orchestrator 🟢`. Leading emoji = role; **trailing = this session's status, and
+  `📖 Review Agent 🟢` · `🪐 Orchestrator 🟢` · `📱 Device Verification Agent 🟢`. Leading emoji = role; **trailing = this session's status, and
   the outgoing session flips 🟢 to 🔴 as its last act** so the owner archives the reds. A renamed successor
   is a lost thread even with a perfect baton; every handoff states its successor's title outright.
 - **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a
