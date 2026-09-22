@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.4",
+    date: "2026-09-22",
+    changes: [
+      "Four more day labels \u2014 the weekly nutrition chart, the recommendation card, the week-day sheet and the nutrition date header \u2014 now come from the one place that decides how a date reads, instead of each spelling out its own format. The text is unchanged; this is the groundwork that stops screens drifting apart, which is what had the activity list printing a raw 2026-09-15 next to a properly formatted time.",
+    ],
+  },
+  {
     version: "1.465.3",
     date: "2026-09-22",
     changes: [

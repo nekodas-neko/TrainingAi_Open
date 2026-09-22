@@ -473,6 +473,375 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [nutrition][platform] RV-103 — the owner re-reported BF-177, and the fix BF-177 shipped cannot report its own failure
+
+- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts:41-45`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Batch:** `nutrition-freshness`
+- **Owner report, 2026-09-22:** *"nutrition calorie macro not updating on screen when food added -
+  requires page swap"*. **BF-177 already quotes him saying the same thing** — *"The kcal left in the
+  top right; doesnt load on the same page: it requires page switching to show."* So this is a
+  RE-REPORT of a bug that was fixed once, not a new one.
+- **The mechanism BF-177 left open.** Its refetch is
+  `void cachedFetch(...).catch(() => {})` with **no `onError`**. Per RV-84 `cachedFetch` never
+  rejects, so that `.catch` is dead code. A 500, or bad signal, or offline, and the refetch silently
+  does nothing: `energyBalance` keeps the object fetched **before** the meal, "kcal left" and the
+  macro targets stay stale, **nothing on screen says so, and there is no retry**. A page swap
+  re-runs `fetchData`, which is exactly the recovery the owner describes — both times.
+- **⚠ Do not add another cache bust.** BF-177 establishes eviction was never the problem:
+  `invalidateNutritionWrite()` clears `energy-balance:` and always has. This is the Q-402 shape.
+- **Fix:** pass `onError` and render a retry affordance, or reuse `fetchWithRetry` — but see RV-85,
+  which is the same "retries then gives up silently" gap in that helper, so fix the helper first or
+  this inherits it.
+- **⚠ Second defect in the same callback, and it is worse than staleness:**
+  `d => setBalance(d ?? null)` sets **null** on an empty payload, and `balanceForDate` is gated on
+  `energyBalance?.date === selectedDate` (`nutrition-content.tsx:453`). So a null or wrong-date
+  payload makes the budget and macro targets **disappear** rather than go stale.
+- **Not established:** neither failure was reproduced — no device, and the sandbox cannot drive the
+  real write path. The mechanism is read from source; the owner's report is the evidence it fires.
+
+### [nutrition][app-shell] RV-104 — deleting a food refetches the weekly chart; adding one does not
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx:303-312` (add) vs `:390-396` (delete).
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `nutrition-freshness`
+- The delete path explicitly refetches `nutrition-weekly-summary`. `handleFoodLogged` does
+  `setLogs` + `refetchBalance` and **nothing else**. Both `nutrition-weekly-summary` and
+  `nutrition-adherence` are otherwise fetched **only** from `fetchMountData`, whose effect deps are
+  stable (`[fetchMountData, userId]`), on a screen the tab shell never unmounts.
+- **So: the 7-day calorie bar chart and the adherence percentages below it hold their launch-time
+  values until the app is restarted.** A tab switch does not fix them — `useRefreshOnTabShow`
+  re-runs `fetchData` (logs + balance), never `fetchMountData`.
+- **The asymmetry is the finding**: same screen, same quantity, delete updates it and add does not.
+  Both keys *are* in `invalidateNutritionWrite()` — this is Q-402 again, a missed re-render rather
+  than a missed eviction.
+- **⚑ The delete site's own comment names the cause:** *"BF-177's third site, which that entry did
+  not name"*. BF-177 was patched site-by-site, so a fourth site was always likely. **Fix the shape,
+  not the site** — subscribe both keys via `useCachedValue` or `useInvalidationRefetch` so no future
+  write path has to remember.
+- **Not established:** whether a single ~300 kcal add visibly moves a 7-day bar. The adherence
+  figures are unambiguous text and do not have that excuse.
+
+### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
+
+- **Lane:** A — `scripts/check-fetch-once-effects.js:164`. **Added:** 2026-09-22 · Review sweep 53.
+- The gate is `if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(...)) continue;` — **only an empty dependency
+  array counts.** Its comment states the rationale: *"a non-empty one re-runs when its deps change,
+  which is a different (and usually correct) shape."*
+- **That reasoning is sound in general and wrong for this app.** Inside the persistent tab shell,
+  `[userId]`, `[today]` and `[trendsProp]` never change either, so those effects are fetch-once in
+  every way that matters. **Four of the five freshness findings in this sweep (RV-104, RV-106,
+  RV-107, RV-109) are that shape, and all four are invisible to the ratchet.**
+- **⚠ Widening the pattern is NOT a one-line change, and the file says why.** Its header records
+  that the first version used a non-greedy regex, swallowed unrelated code between effects, and
+  **inflated its own baseline by 11 of 25**. The brace-matching it uses now is the fix for that.
+  Extending to stable-deps needs a judgement about *which* deps are stable — `[userId]` on a
+  persistent screen is, `[date]` on a sheet that remounts per open is not (`week-day-sheet.tsx` is
+  the legitimate counter-example).
+- **Fix, narrowly:** treat a dep array containing **only** identifiers known to be shell-stable
+  (`userId`, `tz`, `today`) as fetch-once, re-baseline, and leave everything else alone.
+- **Not established:** how many *new* sites a widened pattern would surface — the four above were
+  found by hand, not by a candidate scan.
+
+### [heart-rate][app-shell] RV-106 — a ring sync updates Home's HR strip and leaves Health's HR card on pre-sync data
+
+- **Lane:** B — `components/health/hr-day-card.tsx:39-51`. **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `stale-surface-subscribe`
+- `invalidateOuraSync()` clears `oura-hr-day:` and Home's reader is gated on `refreshTick`, which the
+  `ta:oura-ble-synced` listener bumps. Health's reader is `cachedFetch` in a `useEffect(…, [today])`
+  on a card the shell mounts once and never unmounts, and `health-content`'s invalidation
+  subscription covers `body-metadata`/`sleep-sessions`/`readiness-score` — **not this key**. Neither
+  `fetchSharedHealthData` nor `fetchActiveTabHealthData` fetches it, so the `tabEpoch` pass does not
+  reach it either.
+- **Two surfaces, same quantity, one updates.** A tab switch does **not** fix it; recovery needs a
+  shell remount (a non-tab route and back), midnight rollover, or a restart.
+- **Fix:** `useInvalidationRefetch(['oura-hr-day:', 'workout-sessions-day:'], load)` — the in-repo
+  escape hatch for a read that also seeds and sets several pieces of state.
+- **Not established:** whether `useStressDay(today)` in the same card shares the gap — not traced.
+
+### [nutrition][app-shell] RV-107 — editing macro targets leaves the Nutrition screen banding against the old numbers
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx:262-265`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Batch:** `stale-surface-subscribe`
+- `macro-targets-pane.tsx:101-107` POSTs and then awaits `invalidateGoalRecommendations()`, which
+  clears `nutrition-targets`. Nutrition reads that key inside the same mount-scoped `fetchMountData`
+  as RV-104, at `TTL_LONG`, and nothing subscribes — so the macro rings keep banding against the
+  previous target for the life of the app. Applying a goal recommendation from Home routes through
+  the same group and has the same result.
+- **⚑ The proof the refetch is needed is already in the file:** the TDEE card's `onApplied`
+  (`:637`) refetches — a different write path that *did* get the treatment. One path was fixed, its
+  siblings were not.
+- **Fix:** `useInvalidationRefetch('nutrition-targets', …)` rather than `useCachedValue` here —
+  `targets` is currently set from two places, and the repo's one-fetch-expression-per-key rule
+  (`packages/shared/src/cache-ttl.ts`) makes the hook the smaller change.
+
+### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
+
+- **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Gate: device** — the broken branch is the local-store one, which does not run off the APK.
+- The sheet contains **no `invalidate*` call at all**. Its local-store branch ends at `onSaved(...)`
+  with a bare `pushMutations(userId!)`. The consumer branches — `if (freshMeta) { setMetaToday(...);
+  invalidateReadinessInputs() } else { invalidateBodyMetricWrite() }` — so on device only the
+  **readiness** subset is cleared. **Not cleared:** `body-metadata`, `energy-balance:`, `day-log:`,
+  `health-trends-summary`, `hr-profile`, `training-stress`, `achievements:`, `collection`, and both
+  review-window keys.
+- **⚑ Its sibling two files away does it correctly:** `components/profile/water-log-sheet.tsx:78-82`
+  calls `pushThenRevalidate(userId!, invalidateBodyMetricWrite)` **and** an immediate
+  `invalidateBodyMetricWrite()` on the same local branch. Copy that exactly.
+- **This is a missed invalidation, not a missed re-render** — the other findings in this sweep are
+  the opposite, and the fixes are different. Recovery today is TTL expiry or an incidental
+  `pullDelta`, i.e. a delay rather than a repaint.
+- **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
+  for a body-metrics delta on the device that wrote it. If it does, the window is shorter than TTL
+  but still non-deterministic.
+
+### [activity][app-shell] RV-109 — Health's Activity History never shows an activity confirmed from Home
+
+- **Lane:** B — `components/health/activity-history-card.tsx:72-107`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Batch:** `stale-surface-subscribe`
+- Seed plus two `cachedFetch` calls in a `useEffect(…, [userId])`. All three Health sub-tabs render
+  simultaneously inside the `SwipeCarousel`, so the card is mounted for the life of the shell once
+  Health is visited, and nothing in the `tabEpoch` pass fetches `activity-logs`.
+- So an activity reviewed from Home (`exercise-review-sheet.tsx:219` fires
+  `invalidateActivityWrites()`) or arriving via background sync never appears until a shell remount.
+  A walk logged through `/activity` self-heals **only because that route change unmounts the shell**
+  — which is why this looks intermittent rather than broken.
+- **Fix:** `useInvalidationRefetch(['activity-logs','activity-types'], load)` — the card seeds from
+  the local store and merges pending rows, the case that hook's docblock says `useCachedValue`
+  cannot own.
+
+### [app-shell][platform] RV-110 — 37 cross-tab `router.push` sites tear down the whole tab shell; 5 use the helper that does not
+
+- **Lane:** B — `lib/shell-nav.ts` call sites across `app/` and `components/`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `tab-nav-shell`
+- Counted 2026-09-22: **37** `router.push('/health'|'/nutrition'|'/more'|'/workout')` sites against
+  **5** `navigateToTab(...)`. `app/(home)` and `app/health` are different route segments, so a push
+  unmounts the entire `TabShell` — every panel's component state, `state.mounted`, and every inner
+  `scrollTop` — and the four code-split tabs re-mount.
+- **The illustration is two adjacent lines on Home** (`session-select-content.tsx:436-437`):
+  `handleNavigateStats` uses `router.push("/health?tab=training")`, `handleNavigateHealthBody` uses
+  `navigateToTab(router, "/health?tab=body")`. Two taps on one screen, one slow and one instant, for
+  no reason the owner could infer.
+- `lib/view-transition.ts:118-126` deliberately declines to animate a tab href but still forwards it
+  to `router.push`, so `useTransitionRouter` does not save these sites.
+- **Fix:** route them through `navigateToTab`, which already falls back to `router.push` when no
+  shell is mounted (covering `done-activity-screen`, `walk-summary`, `test-result`). Then a grep
+  rule holds it.
+- **⚠ Check the query-param destinations before converting.** The shell's `show()` `replaceState`s
+  the full href, but whether Health/Nutrition read `?tab=`/`?review=` **on a flip** rather than only
+  on mount has to be confirmed per screen — a flip landing on the wrong sub-tab is a regression the
+  current full navigation does not have.
+
+### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
+
+- **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
+  `components/nutrition/ingredient-picker.tsx:302`. **Added:** 2026-09-22 · Review sweep 53.
+- **Gate: device** — the hardware back path only exists on the APK.
+- The scanner **replaces the sheet's body** rather than opening a surface of its own, and neither
+  file registers a back-stack entry (`grep` for `useSheetBackDismiss`/`sheet-back-stack` in both →
+  none). `SheetContent` renders `BackDismiss` once, so the native listener sees one open surface and
+  pops the **Log Food sheet**, throwing away the capture flow instead of stepping back one level.
+- Adjacent to, not a repeat of, BF-166 / BF-95 / BF-34, which are all handled.
+- **Fix:** `useSheetBackDismiss(scanning, () => setScanning(false))` in both files. The stack is
+  already depth-aware and already handles a surface opening inside another.
+- **⚠ The ordering risk is the thing to test, and it is not cosmetic.** The scanner injects a global
+  `body.scanner-active > *:not([data-scanner-overlay]) { visibility: hidden !important }`
+  (`barcode-scanner.tsx:73-76`) and removes it in `stopNative()` on unmount. **If one back press
+  ever closed both surfaces in a single pop, the app would be left with every body child hidden.**
+  The existing `pendingSelfPops` accounting is what prevents that.
+- **Not established:** whether the native barcode activity intercepts hardware back before the JS
+  listener runs — device-only, and it may already mask this.
+
+### [app-shell] RV-112 — Home and More share one scroll-restoration key and overwrite each other
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1052-1055`,
+  `app/more/more-content.tsx:152-155`. **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `tab-nav-shell`
+- `use-scroll-restoration.ts:105` keys on `keySuffix ? pathname#suffix : pathname`. Health passes
+  three suffixes (`scrollKey="body"|"training"|"progress"`); **Home and More pass none**, and both
+  panels stay mounted, so while the URL reads `/more` both containers save and restore the same
+  `ta_scroll:/more` slot. The restore path has no owner check.
+- **Fix:** `scrollKey="home"` and `scrollKey="more"` — one prop each, copying what Health already
+  does. Keys are session-scoped, so nothing needs migrating.
+- **Not established:** the real magnitude. Restores need ≥40px and the takeover listeners cancel
+  aggressively, so the collision may often resolve to a no-op. The e2e spec
+  (`e2e/scroll-restoration.spec.ts`) was not run.
+
+### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
+
+- **Lane:** B — `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- The incoming panel gets `tab-panel-enter` and the outgoing one gets
+  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
+  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
+  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
+  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
+  content fading out first; **that half is not implemented.**
+- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
+  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
+  so there is nothing to hide and the blink cannot happen.
+- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
+  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
+  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
+  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
+- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
+  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
+  they decide whether this is worth doing at all.**
+
+### [app-shell] RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed
+
+- **Lane:** B — `components/more/friend-leaderboard.tsx:111`, `components/more/friend-feed.tsx:28`,
+  `app/nutrition/nutrition-content.tsx:140`, `app/coach/**`, `app/collection/**`,
+  `app/register/register-form.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- The transition router is used in 30 files and a plain `useRouter` in 16. The asymmetric pair:
+  both friends surfaces push `/profile/${userId}` with a plain router while that screen's own back
+  runs the `"back"` keyframes — **open hard, close animated**, the exact inversion
+  `lib/hooks/use-back-or-fallback.ts:30-34` was written to prevent. Transition-less both ways:
+  Nutrition → `/coach` (Nutrition is the #2 screen), the coach confirm route, `/collection` back,
+  and register.
+- **Fix:** swap `useRouter` for `useTransitionRouter` — same call signature, and it already no-ops
+  for tab hrefs and same-URL pushes, so it is import-only.
+- **⚠ Known hazard:** `lib/view-transition.ts:36`'s 300ms cap freezes the outgoing screen if the
+  destination never commits. `/coach` and `/coach/confirm/[toolCallId]` are dynamic routes and a
+  cold compile could hit it — a 300ms hold rather than a break, but check it on those two.
+
+### [app-shell] RV-115 — More's Profile ↔ Friends swap is a hard `display:none` toggle that carries the other view's scroll
+
+- **Lane:** B — `app/more/more-content.tsx:157-163`. **Added:** 2026-09-22 · Review sweep 53.
+- Two `<div style={{display: …}}>` inside one shared scroller: no motion, and the scroll offset
+  carries across. Meanwhile Health's sub-tabs slide via `SwipeCarousel` and **the Friends tab's own
+  child view crossfades** via `TabPanels` — the single call site of that primitive.
+- **Fix:** wrap both panels in the existing `<TabPanels value={tab}>` and reset `scrollTop` in
+  `onValueChange`. Opacity-only, already inherits the global `MotionConfig`.
+- **⚠ `mode="wait"` unmounts the outgoing panel**, discarding Profile's and Friends' state on every
+  switch — confirm both re-seed from cache, or the swap trades a hard cut for a skeleton. That
+  caveat plus More's traffic (7) is why this ranks last of the navigation set.
+
+### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
+
+- **Lane:** B — `components/home/home-nutrition-card.tsx:48`,
+  `components/home/home-energy-balance-card.tsx:14`. **Added:** 2026-09-22 · Review sweep 53.
+  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise; see below.
+- **Batch:** `home-ia-merge`
+- **The original entry proposed folding the energy-balance card's provenance line into the nutrition
+  card. That was wrong: the nutrition card already has it.** `HomeNutritionZoneBar` renders
+  `CalorieZoneBar`, which prints the `N resting rate — no movement recorded yet today` line (Q-401),
+  so the running card already carries ring + totals + zone bar + provenance + macros.
+- **What remains** is structural: both call `useEnergyBalanceToday()` — same hook, same
+  `energy-balance:${today}` key — and both sit in the picker. `DEFAULT_CARD_WIDGETS` is `[]`, so
+  `energyBalanceWidget` is opt-in and off; the duplication is latent, not on screen.
+- **This shape already produced two live bugs:** Q-401/Q-415, two budgets 271–274 kcal apart, both
+  labelled "left" — they agree today only because `budgetProvenance` was centralised.
+- **Remaining delta, if the second card were enabled:** the large `remainingKcal` figure, the
+  `zoneLabel` word, and the `eaten · burned · maintenance` breakdown (no equivalent on the other).
+- **Fix, reduced:** merge and delete nothing. Relabel the picker entry so it reads as an alternative
+  to the nutrition card rather than an addition, and grey it out while that card is on if cheap.
+- **No owner gate** — the reduced fix changes picker copy, it does not rearrange a screen.
+
+### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
+
+- **Lane:** B — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `health-ia-merge`
+- The "Balance" tile renders `netKcal` `vs TDEE est.` in group **Body**; `CalorieBalanceBar` renders
+  `remainingKcal` + zone band in group **Activity & intake**. Same payload, two different numbers,
+  both presented as today's energy answer, with the Sleep group and eight Heart-&-recovery cards in
+  between.
+- `use-health-calcs.ts:44-47` records that these two surfaces **already disagreed once**, each
+  deriving its own TDEE. The data was unified; the presentation was not.
+- **Fix:** fold `netKcal` and `maintenance` in as a secondary line of `CalorieBalanceBar`, **behind a
+  prop** — that component is shared with Nutrition and `/health/day`, which did not ask for the extra
+  number.
+- **Fold, do not delete:** surplus/deficit and remaining-to-eat are genuinely different framings.
+
+### [body] RV-118 — "Weight Trend" exists twice in Health, and the card with that title has no trend number
+
+- **Lane:** B — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `health-ia-merge`
+- Body has a "Trend" tile with the kg/wk regression slope and **no chart**; Progress has a card
+  **titled "Weight Trend"** with a sparkline and two goal bars and **no slope number**. One question
+  — am I losing weight, how fast, how far to target — split across two sub-tabs the owner must swipe
+  between.
+- **Fix:** one card with sparkline + slope + goal bars. Body is the better home (it holds the
+  weight, body-fat and lean-mass cards it derives from). Both are plain JSX in one file sharing one
+  context, so the mechanical risk is low.
+- **What is lost:** the goal bars are Progress's subject, so **Progress becomes a 4-card tab.** Say
+  that out loud before doing it.
+- Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
+
+### [app-shell] RV-119 — seven independent banners stack above Home's first real content
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `home-ia-merge`
+- Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
+  weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
+  a Monday after a detected walk with an early-deload flag, the owner scrolls past five cards to
+  reach the recommendation — which is why he opens Home.
+- **⚠ Do NOT collapse all seven.** The illness advisory and early-deload are things he should see
+  *today*; putting them in a dismissible strip beside an APK banner makes them easy to miss. Split
+  by severity: those two stay full-width, the other five collapse.
+- **The APK banner should simply go** — the canonical runtime *is* the APK, and the same download
+  row already exists at More → About.
+- **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
+  `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
+  whoever takes it should do both rather than extract twice.
+
+### [platform] RV-120 — `aiVolume` is built, rendered nowhere, and has no backlog entry
+
+- **Lane:** B — `app/health/health-sections.tsx:30,692`, `app/health/health-content.tsx:58-61`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- `AiWeeklyVolumeCard` is imported and has a live `case "aiVolume"` render arm, but the key is in
+  **no order array**, so nothing mounts it. The comment says it is *"intentionally omitted: it
+  duplicates the 'Muscle Volume This Week' card… the visualisation is deferred until it's merged
+  into a single volume card."*
+- **That deferred merge has no entry.** `grep -rn "aiVolume\|Weekly Volume vs Target"
+  docs/implementation-backlog.md projectOverview.md` → **0 hits**. Under CLAUDE.md's **No orphaned
+  findings** this is a dropped finding that has been sitting in a code comment instead of the queue.
+- **This entry does not decide the outcome** — merge into the volume card, or delete the component
+  and the render arm. Either is fine; leaving a built-but-unreachable card with a comment promising
+  work nobody queued is not.
+
+### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
+
+- **Lane:** B — `components/home/home-card-widget.tsx:325`, `components/more/home-widgets-section.tsx`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- `/collection` has **exactly one** in-app link, inside `case 'card_collectionWidget'`, which returns
+  null unless the widget is enabled — and `DEFAULT_CARD_WIDGETS` is `[]`
+  (`lib/home/home-prefs.ts:110`). So on a fresh install the route exists and nothing can reach it.
+  Not dead; hidden behind a preference. Decide whether that is intended.
+- Separately: the picker labels `moodWidget` **"Readiness"**, which collides with the chip row's
+  actual Readiness score, while the widget renders **"Exercise Readiness"** — the subjective
+  check-in. One word, and it stops two different numbers sharing a name in the place where the owner
+  chooses between them.
+- **Also noted, not filed separately:** three step readings can be on Home at once
+  (`stepsWidget`, the Steps metric tile, and the chip row's Activity score).
+
+### [platform][app-shell] RV-122 — the sync-failure card cannot trigger the sync that clears it
+
+- **Lane:** B — `components/more/sync-health-card.tsx:85`,
+  `components/more/data-sync-panel.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- The More tab's nav dot points at the sync-failure card, which lists pending and dead-lettered
+  mutations with a per-item retry. The global **"Sync now"** that usually clears them is one tap
+  deeper at `/more/data`. One task, two screens.
+- **Fix:** render "Sync now" on the failure card (or `DataSyncPanel` beneath it) when it is non-null.
+- **Keep it scoped — this is promoting one button, not merging a screen.** Restore and Export stay at
+  `/more/data`: they are rare and destructive-adjacent and do not belong on a card that appears
+  unprompted.
+- **Watch:** do not double-fire against `PullToSync`'s `handlePullSync` on the same screen.
+
+
 ### [readiness] TN-60 — the ±1.5σ rail clips 38% of HRV days, so a z of −1.63 and a z of −4.37 both score zero 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning, from a variance decomposition of the
@@ -632,34 +1001,6 @@ nothing structured saying why — and a human decides.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-### [platform] LB-126 — five date call sites still hand-roll their own option bag
-
-- **Lane:** B — `components/calendar-widget.tsx:109`,
-  `components/nutrition/weekly-nutrition-chart.tsx:50`,
-  `app/session-select/components/recommendation-card.tsx:36`,
-  `app/session-select/components/week-day-sheet.tsx:13`,
-  `app/nutrition/nutrition-content.tsx:88`. **Added:** 2026-09-22 · the Lane B half of LB-125.
-- **LB-125 has landed — every style this needs now exists.** `formatDateDisplay(raw, style)` takes
-  `short` · `long` · `weekday` · `weekday-date` · `weekday-date-long`, each pinned to its exact
-  output in `packages/shared/src/__tests__/date-utils.test.ts`.
-- **⛔ Corrected while landing LB-125 — this entry's counts were wrong, measured 2026-09-22.**
-  **TWO of the five are a bare `{ weekday: 'short' }`**, not three: `recommendation-card.tsx:36`
-  and `weekly-nutrition-chart.tsx:50`. The two the entry called one-offs are the same shape with
-  different weekday widths, and each has a style: `week-day-sheet.tsx:13` →
-  **`weekday-date-long`**, `nutrition-content.tsx:88` → **`weekday-date`**.
-- **⛔ `calendar-widget.tsx:109` is NOT convertible, and is the reason this is four sites, not
-  five.** It is a `{ month: 'long', year: 'numeric' }` MONTH-AND-YEAR label built from
-  `(viewYear, viewMonth)` **numbers** — `formatDateDisplay` takes a `YYYY-MM-DD` string and
-  renders a day, so routing it would mean inventing a day-of-month to throw away. Leave it, or
-  file a separate month-label helper; do not force it.
-- **Check the rendered string before and after, do not assume it is unchanged.** `en-AU` emits a
-  comma after a SHORT weekday and none after a long one, so `weekday-date` gives `Tue, 15 Sept` —
-  which is what `nutrition-content` already renders, making that one a true no-op. Confirm the
-  same for the other three rather than trusting it.
-- **Also duplicated, outside this entry's list:** `components/admin/time-audit-card.tsx:200`
-  spells the `'short'` bag by hand. It takes a timestamp rather than a date string, so it needs a
-  `toAestDay` first; admin surfaces are timezone-exempt per CLAUDE.md, so this is optional.
-
 ### [platform][app-shell] RV-99 — good/warning/bad exists as two parallel palettes, and only one can follow the theme
 
 - **Lane:** A — `packages/shared/src/health/score-band.ts` first. **Added:** 2026-09-21 ·
@@ -673,7 +1014,7 @@ nothing structured saying why — and a human decides.
 - **Fix:** make `scoreBand()` return the tokens (the only half that can follow the theme) and have the
   hex sites import it. **Chart.js callers must pass the result through the existing `resolveColor()`**
   (`packages/shared/src/chart-colors.ts`) — canvas cannot resolve `var()` and silently paints black.
-- **⛔ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
+- **⚠ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
   identity tint, `rarity-colors.ts`, and `hr-zones.ts`'s deliberate blue→red ramp are legitimate
   one-off uses. Audit before replacing, then a check script banning the three literals outside
   `score-band.ts` holds it.
@@ -770,7 +1111,7 @@ nothing structured saying why — and a human decides.
 - **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
   those two routes call `getNextSession` alone and read the program off its result. Risk-free —
   same data, same request.
-- **⛔ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
+- **⚠ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
   program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
   but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
   wanted, it is its own entry with that trade stated.
@@ -879,7 +1220,7 @@ nothing structured saying why — and a human decides.
   3 more fetches) and `fetchActiveTabHealthData()` believing they are cache hits. Home does the same.
 - **This is the Q-262 rule read in the direction nobody wrote down:** the TTL constants govern how
   long a *seed* survives, not how often the app touches the network.
-- **⛔ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
+- **⚠ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
   staleness if any writer is missed, and CLAUDE.md requires a **written invalidation proof** per key:
   list every write that changes the payload and show each one's group contains the key. Candidates,
   all already `TTL_LONG` and already in a group: `workout-data:meta`, `muscle-recovery`,
@@ -4248,7 +4589,7 @@ composite reports which of its inputs were inferred.
   data**, and the two are not the same state — `hasData: false` and `anchorSource: "default"` both say
   so in the same payload. **Recommended:** `sufficient` is false when `sampleCount === 0`, whatever
   the window; keep the grace for a genuinely young day that has *some* readings. One condition.
-- **⛔ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
+- **⚠ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
   nothing must qualify the 50 it prints — and it is the whole point of the entry. The card
   (`components/body-battery-card.tsx`) is also correct and unchanged since #1214: its guard is
   `conf != null && !conf.sufficient`, which is right; it is being told `true`.
