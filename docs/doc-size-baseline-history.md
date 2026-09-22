@@ -15464,6 +15464,14 @@ later: converting these four also emptied four `REVIEWED_BENIGN` rows out of
 `check-timezone-rendering.js`, because a site that stops calling `toLocale*String` stops being a
 device-local renderer.
 
+## 2026-09-22 — RV-100 (`fix/rv100-deload-colour`)
+
+`docs/implementation-backlog.md` → **26690**: RV-100 left the queue, and Review sweep 53 (#1389) landed twenty new entries underneath it in the same window — the number is the merged one.
+
+`projectOverview.md` → **12399**: ten lines. The part worth carrying is not the fix but the
+correction: the entry named `SESSION_PALETTE` as the non-semantic source to borrow, and that
+palette contains green and red itself, so following the entry literally would have moved the
+collision rather than ended it.
 ## 2026-09-22 — `docs/implementation-backlog.md` +368 (26339 → 26707) (Review sweep 53)
 
 Twenty entries (**RV-103…RV-122**) from the sweep the owner scoped himself — animations and page
@@ -15518,6 +15526,26 @@ layout bug does not need a mockup; merging a card, collapsing a banner stack, or
 between tabs does. The test is whether the owner would notice the screen is *arranged* differently,
 not whether it looks different.
 
+## 2026-09-23 — `docs/implementation-backlog.md` → 26758
+
++68, and the largest block is a retraction rather than a finding.
+
+**Q-272 is the pre-existing Body Battery entry and TN-55 was filed without checking for it.** Q-272 had
+said since 2026-08-15 that the next action was Tuning's and no proposal existed; TN-55 is that proposal.
+Linking them cost lines on both entries and is worth every one, because two entries prescribing
+different fixes for one defect is how a lane gets sent two ways.
+
+Two of the additions exist to stop a later session inheriting a false premise. Q-272's acceptance test —
+`r = +0.67 (n = 11)` for end-of-day battery against next-day readiness, with an instruction to re-run it
+after the change — **does not replicate**: 0.252 over 70 days, against readiness's own 0.361
+autocorrelation. Someone would have validated the whole rework against a relationship that is not there.
+And overnight charging is now recorded as **out**, because Q-272 is right that the wake anchor already
+accounts for the night; the re-fit without it is strictly better, so the warning also carries the
+measurement that makes it stick.
+
+TN-61 (Lane O) and ledger items 2b/2c are the rest: a queue tool that truncates silently, a readiness
+contributor worth 2.8% of the movement on a 0.06 weight, and the `.size` conflict tax with a measured
+cost of five of seven PRs in one session.
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26770 (OR-127: the USB device harness + the recorder)
 
 One entry for `scripts/device/**`, which drives the real APK on the real phone over the DevTools

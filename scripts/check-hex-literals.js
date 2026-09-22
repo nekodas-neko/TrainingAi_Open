@@ -52,7 +52,7 @@ const BASELINE = {
   'app/icon.tsx': 8,
   'app/layout.tsx': 1,
   'app/profile/[userId]/page.tsx': 3,
-  'app/session-select/components/deload-banner.tsx': 3,
+  'app/session-select/components/deload-banner.tsx': 2,  // RV-100 took the third amber to --accent-amber
   'app/session-select/components/deload-explanation.tsx': 3,
   'app/session-select/components/recommendation-card.tsx': 6,
   'app/session-select/components/streak-card.tsx': 4,

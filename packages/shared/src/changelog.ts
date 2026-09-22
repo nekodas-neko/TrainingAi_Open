@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.5",
+    date: "2026-09-22",
+    changes: [
+      "Training phases are no longer coloured like warnings. The AI periodization card painted Realise \u2014 your peak output phase \u2014 in the same red the app uses for something going wrong, and painted Deload green while the home screen calls a deload recommendation amber or red. A phase is a category, not a verdict, so the five now use a cool range and green, amber and red are kept for telling you how something is going. The home deload banner also had a third shade of amber of its own; it uses the shared one now.",
+    ],
+  },
+  {
     version: "1.465.4",
     date: "2026-09-22",
     changes: [
