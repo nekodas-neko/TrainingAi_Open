@@ -524,6 +524,14 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   walk; spawn `npx` portably. For the Node floor, set `engines.node` to `>=22.12` so the mismatch
   fails at `pnpm install` with a message instead of at test time with a missing binding. The local
   machine's own upgrade is the owner's.
+- **Node half resolved on the device machine, 2026-09-23:** upgraded to 22.23.2 (winget
+  `OpenJS.NodeJS.22`) and `pnpm exec vitest run` starts. The `engines.node` floor is still worth
+  setting so the next machine fails at install, not at test time.
+- **With the tests running (Node 22.23.2, 2026-09-23), two more show up** in `scripts/__tests__`
+  (25 of 27 files pass, 258 of 259 tests): `strict-schema-inert.test.ts` shells out to step 50's
+  script and inherits its path bug; `check-comment-blindness.test.ts`'s `check-hex-literals` case
+  times out at 30 s — three full scans of `app/` + `components/`, which Windows' filesystem makes
+  slower. Measure before raising the timeout.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
@@ -3972,64 +3980,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
   session and confirm the labels are unchanged from today.
 
-### [app-shell] BF-166 — the back listener ignored the overlay stack the app already had (fixed; device check owed)
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `lib/hooks/sheet-back-stack.ts` and `components/mobile-auth-handler.tsx`. Shipped
-  2026-09-15. **`components/ui/sheet.tsx` and `dialog.tsx` needed NO change**, and neither did the 52
-  call sites.
-- **Added:** 2026-09-15 (BugFix intake). Owner: *"If you have a nutrition meal creator menu open and
-  you press the back button - it makes the page behind it go back to main."*
-- **⚠ THIS ENTRY'S PREMISE WAS WRONG, and acting on it would have made things worse.** It stated
-  *"no overlay registry exists"* and proposed building a module-level stack that `SheetContent` and
-  `DialogContent` push to. **One already exists**: `lib/hooks/sheet-back-stack.ts`, reached via
-  `useSheetBackDismiss` → `BackDismiss`, which **both** primitives already render (BF-27 put it
-  there, deliberately central, for this exact reason). The grep that found nothing looked for
-  `openOverlay|overlayStack|topOverlay`; the real names are `openSurface`/`closeSurface`. **Building
-  the proposed registry would have left two stacks disagreeing about what is open.**
-- **The real defect is one line and narrower than described.** `openSurface` pushes with
-  `pushState(state, '')` — **no URL** — so `window.location.pathname` never moves. And
-  `backActionForPath` reads nothing but the pathname. So on a tab route it answers `"home"` and the
-  listener calls `navigateToTab`; on `/` it answers `"minimize"`. **Neither touches history**, so the
-  surface's pushed entry is never consumed and the page moves out from under an open sheet.
-  **Only `"pop"` ever worked, and only by coincidence** — `history.back()` happens to be the thing
-  that consumes the entry.
-- **So `"minimize"` is a second symptom the entry did not name:** a sheet open on Home and the app
-  goes to the background instead of closing it.
-- **The fix:** export `hasOpenSurface()` from the existing stack, and have the listener
-  `history.back()` when it is true. That reaches `handlePop`, which closes the topmost surface
-  through Radix's own `onOpenChange` — the identical path as the X button, so every guard already on
-  a sheet's close still runs.
-- **The entry's ordering instruction was right and is kept.** The overlay check sits **after** the
-  three mode guards, because each of them *raises* a dialog (`LeaveWorkoutDialog` and siblings) that
-  is itself on this stack; checking overlays first would make a mid-workout back press close the
-  confirmation instead of answering it. A test pins that order.
-- **Proven load-bearing:** `components/__tests__/bf166-back-closes-overlay.test.ts` — **4 of its 5
-  assertions fail against `main`**. The fifth deliberately passes on both sides: it records that the
-  primitives were already wired, which is the finding that stopped a duplicate registry being built.
-- **✅ VERIFIED ON THE S25, 2026-09-23 (Device Verification Agent, `device/first-run`)** — every
-  part except the mid-workout one. v1.465.4 web / APK 1.460.4, portrait, **three-button navigation**
-  (`adb shell input keyevent 4`, the same `KEYCODE_BACK` the gesture delivers), path read from
-  `location.pathname` in the page. Back with a sheet open: `/nutrition` *My Foods* and *Add food* →
-  sheet closed, still `/nutrition`; Home's mood check-in sheet → closed, still `/`, app **not**
-  minimised; `/program` *New Program* sheet (a sub-route) → closed, still `/program`. That last one
-  takes **two** presses, and correctly: the sheet autofocuses its name field, so the first back
-  dismisses the keyboard (`mInputShown=true→false`) — standard Android IME behaviour, not a defect.
-- **The rest of `back-gesture-sitting` left the queue the same day:** **LA-109**, **LB-107** and
-  **BF-100** all VERIFIED ON THE S25 and removed — evidence in
-  `docs/overview/entries/2026-09-23-device-first-run.md`. **BF-165** reproduced and stays open.
-- **Keep:** the mid-workout half only — start a workout, press back, confirm the leave prompt is
-  raised rather than a sheet closing or the route moving. **Not run** because starting a workout on
-  the owner's production account creates a real session; it needs the owner's go-ahead or a
-  workout the owner is doing anyway.
-
 ### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
 
 - **Lane:** B — `components/workout/log-activity-sheet.tsx`,
@@ -4038,9 +3988,10 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   elimination list.
 - **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
   activity' nothing actually happens."* Reported on the APK.
-- **Batch:** `back-gesture-sitting` — with **BF-166**, **LB-107**, **LA-109** and **BF-100**. A fix
-  here changes history handling for every sheet that navigates, which is the same Android back
-  gesture those four already need one sitting for. Added by OR-122 in place of the gate below.
+- **Batch:** `back-gesture-sitting` — now with **DV-2** only: BF-166, LB-107, LA-109 and BF-100 were
+  verified on the S25 on 2026-09-23 and left the queue. DV-2 (*Leave* on the leave-workout prompt
+  does not leave) is the same mechanism in a dialog, so one fix covers both. Added by OR-122 in
+  place of the gate below.
 - **Verification:** device. The Android system back gesture arrives over a Capacitor channel
   Playwright cannot fire, so the look is owed on the S25 — but the fix is written first.
 - **⚠ This entry carried `Gate: device` from 2026-09-17 until OR-122, and the gate was CIRCULAR.**
@@ -4166,6 +4117,42 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   so whatever it is only bites on the push path.
 
 ---
+
+### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
+
+- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
+  a navigation issued while a surface closes is eaten by that surface's own history entry.
+- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
+  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
+- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
+- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
+  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
+  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
+  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
+  the session just abandoned. `history` instrumented in the page:
+  ```
+  3229ms pushState()                              ← the dialog opens and pushes its surface entry
+  5055ms back()                                   ← ONE back for the Leave tap
+  5073ms replaceState(/workout?session=…)
+  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
+  ```
+  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
+  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
+  spent on the dialog's own entry. Reproduced twice.
+- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
+  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
+- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
+  verified. This is the prompt's *Leave* button, which BF-166 never touched.
+- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
+  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
+  device). The surface has to be told the close was superseded by a navigation.
+- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
+  `/workout?session=…` for wherever back would have gone before the workout, and one more back
+  does not return to the abandoned session.
+- **Production data:** nothing was written. The only non-GET the page sent was the
+  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
+  for 2026-09-23 returned `sessions: []` afterwards.
+
 
 ## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 

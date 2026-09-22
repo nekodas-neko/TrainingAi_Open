@@ -15607,3 +15607,12 @@ device gesture was the only thing it still owed, and it was verified on the S25 
 **New baseline: `docs/agents/state/device-verification.md` at 66**, its size on creation. A seventh
 role's baton joins the six already ratcheted; the same rule applies from its first line — it only
 comes down.
+
+---
+
+## 2026-09-23 — backlog → 26651 (−13), projectOverview → 12333 (−29) (device/bf166-mid-workout)
+
+BF-166's mid-workout half ran on the S25 and the entry left the queue whole; **DV-2** (*Leave* on the
+leave-workout prompt does not leave) was filed beside BF-165 in its place. BF-166's Known-Issues row
+moved to the resolved archive. DV-1 gained the two Windows test failures found once Node was
+upgraded. Both baselines set to the measured sizes.
