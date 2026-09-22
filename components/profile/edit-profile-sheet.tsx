@@ -172,7 +172,7 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
                   min={20}
                   max={500}
                   step={0.1}
-                  className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+                  className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
                 />
               </div>
             </div>

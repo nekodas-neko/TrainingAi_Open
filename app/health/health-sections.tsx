@@ -289,7 +289,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                   </p>
                 )}
               </div>
-              <button onClick={() => toggleInfo('lean')} aria-label="Body composition info" className="p-2.5 rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+              <button onClick={() => toggleInfo('lean')} aria-label="Body composition info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
                 <InfoIcon className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -359,7 +359,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                 <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#a78bfa' }}>Body Composition (Scale)</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">From your last weigh-in</p>
               </div>
-              <button onClick={() => toggleInfo('bodyComposition')} aria-label="Body composition scale info" className="p-2.5 rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+              <button onClick={() => toggleInfo('bodyComposition')} aria-label="Body composition scale info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
                 <InfoIcon className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -498,7 +498,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full pointer-events-none" style={{ background: "#a78bfa", filter: "blur(20px)", opacity: 0.2 }} />
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#a78bfa" }}>BMI</p>
-                <button onClick={() => toggleInfo('bmi')} aria-label="BMI info" className="p-2.5 rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                <button onClick={() => toggleInfo('bmi')} aria-label="BMI info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
                   <InfoIcon className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -508,7 +508,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                 <>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: "#a78bfa" }}>{bmi.toFixed(1)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{bmiLabel}</p>
-                  {bmiUsesBf && <p className="text-[9px] text-muted-foreground/60 mt-0.5">via body fat %{latestBfIsCorrected ? " (DEXA-calibrated)" : ""}</p>}
+                  {bmiUsesBf && <p className="text-[9px] text-muted-foreground/70 mt-0.5">via body fat %{latestBfIsCorrected ? " (DEXA-calibrated)" : ""}</p>}
                 </>
               ) : (
                 <p className="text-xs text-muted-foreground">No data</p>
@@ -534,7 +534,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full pointer-events-none" style={{ background: "#22c55e", filter: "blur(20px)", opacity: 0.2 }} />
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#22c55e" }}>Trend</p>
-                <button onClick={() => toggleInfo('trend')} aria-label="Weight trend info" className="p-2.5 rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                <button onClick={() => toggleInfo('trend')} aria-label="Weight trend info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
                   <InfoIcon className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -560,7 +560,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full pointer-events-none" style={{ background: "#00d4ff", filter: "blur(20px)", opacity: 0.2 }} />
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>Balance</p>
-                <button onClick={() => toggleInfo('balance')} aria-label="Energy balance info" className="p-2.5 rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                <button onClick={() => toggleInfo('balance')} aria-label="Energy balance info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
                   <InfoIcon className="h-3.5 w-3.5" />
                 </button>
               </div>

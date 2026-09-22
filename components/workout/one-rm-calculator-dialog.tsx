@@ -82,7 +82,7 @@ export function OneRmCalculatorDialog({
                 80% target: {Math.round(calcResult * 0.8 * 4) / 4} kg
               </p>
               {adjustedResult && highestPctSet && (
-                <p className="text-[10px] text-muted-foreground/60 mt-1">
+                <p className="text-[10px] text-muted-foreground/70 mt-1">
                   Adjusted for {highestPctSet.pct}% × {highestPctSet.reps} rep prescription
                 </p>
               )}

@@ -68,7 +68,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
           onClick={() => setShowInfo(v => !v)}
           aria-label="How energy balance is calculated"
           aria-expanded={showInfo}
-          className="p-2.5 -m-1 rounded-full text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+          className="p-2.5 -m-1 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors"
         >
           <Info className="h-3.5 w-3.5" />
         </button>

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.3",
+    date: "2026-09-22",
+    changes: [
+      "Faint grey text across the app is now readable. Forty-five labels were dimmed past the point where they meet the accessibility floor for body text, and the contrast check could not see them because it only looked at the colours themselves, not at how transparent they were drawn. The worst was the word \"rest\" in the calendar at 7 pixels and half-faded \u2014 the only thing marking a past rest day apart from a day you logged nothing at all, so at low screen brightness the month read as empty. That one is now at full strength.",
+    ],
+  },
+  {
     version: "1.465.2",
     date: "2026-09-22",
     changes: [

@@ -30,8 +30,8 @@ function BadgeSlot({ achievement, onUnpin }: { achievement?: AchievementResult; 
   if (!achievement) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/40 aspect-square bg-muted/10">
-        <Lock className="w-5 h-5 text-muted-foreground/30" />
-        <p className="text-[9px] text-muted-foreground/40 mt-1">Empty</p>
+        <Lock className="w-5 h-5 text-muted-foreground/70" />
+        <p className="text-[9px] text-muted-foreground/70 mt-1">Empty</p>
       </div>
     );
   }
