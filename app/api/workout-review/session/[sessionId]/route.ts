@@ -104,12 +104,13 @@ export async function POST(
   try {
     const result = await loggedGenerateObject(
       { section: 'workout-review', userId, fingerprint: { programSessionId, today } },
-      () => generateObject({
+      signal => generateObject({
         model: aiModel(),
         schema: WorkoutReviewSchema,
         system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         maxRetries: 0,
+        abortSignal: signal,
       }),
     )
     parsed = result.object

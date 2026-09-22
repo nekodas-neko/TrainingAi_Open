@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
-**One stored 1RM printed four different numbers (RV-89, v1.464.3).** A lift stored on the 0.25 grid
+**One stored 1RM printed four different numbers (RV-89, v1.464.4).** A lift stored on the 0.25 grid
 at 92.25 read as **92.5** on the ready screen, **~92** in the exercise list, **92.3** in the stats
 sheet and on the Strength Trend card, and **92.25** in the exercise summary — in one session. All
 of them now call `displayOneRm`. **The ready screen's rounder was `mround125`, the 1.25 kg plate
@@ -40,6 +40,23 @@ named** (headline, 90-day low, peak), and both of the entry's open questions are
 negative: the `~` was not a deliberate approximation signal, and no site reads a pre-rounded server
 field.
 
+**AI calls are bounded, and the prose routes answer with their own facts when the model fails
+(RV-69 + RV-70, v1.464.3).** Four routes — the daily and weekly digests, the health insight and the
+workout recap — assemble a complete fact block from the user's logs *before* calling the model, and
+threw all of it away on the catch path (502, or 500 for the recap). They now return it with
+`degraded: true` and status 200, the shape `running-plan/explain` already used. **Nothing degraded is
+stored**: the insight cache keys on a context hash that does not move, so a persisted fallback would
+be served ahead of every later attempt, and the three clients that cache are guarded (`cachedFetch`
+gained a `shouldCache` predicate — a response can be worth painting and not worth keeping).
+Separately, **no AI call carried a wall-clock ceiling** — every route passes `maxRetries: 0`, which
+takes the SDK's own timeout handling out of the picture, and nothing replaced it. One **30 s total
+budget** now applies at the chokepoint, across the shared retry rather than per attempt, sized
+against a slowest-call-ever-recorded of **4,786 ms**. **Four claims in the two entries were wrong and
+are corrected in the journal**, the load-bearing one being that the chokepoint wraps a *thunk*, so
+the "one-place `abortSignal`" fix the entry described was not possible as written; 17 call sites now
+pass the signal, and the deadline also races the attempt so a site that ignores it is still bounded.
+**The degraded path has not been seen in production** — the model has not failed since the logging
+existed — so it is verified by tests at all four routes, not by observation.
 **A failed read is no longer painted as a measured zero (RV-86 + RV-87, v1.464.2).** Home's Streak
 card rendered `calendarDays`'s `{}` initial value as "0 sessions this week" with an empty progress
 bar, and the Profile tab rendered a row of `?? 0` defaults as a genuine *Level 1 · Novice · 0 XP*

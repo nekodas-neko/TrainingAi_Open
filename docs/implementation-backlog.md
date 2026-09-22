@@ -1163,7 +1163,10 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   `phase_action`, off the blocking path.
 - **A second reason this is worth doing even at low call volume:** the `catch` at `:307` returns a
   502 with **no deterministic fallback**, so a provider failure leaves the user with no prescription
-  at all — although a complete one was derivable without the model.
+  at all — although a complete one was derivable without the model. RV-69 shipped the same fallback
+  for the four PROSE routes and left this one alone deliberately: those degrade to text, where this
+  one would degrade to a *prescription the user trains on*, which is the decision above and not a
+  catch-path change. `lib/ai/degrade.ts` is the prose helper and is the wrong tool here.
 - **Not established:** how far the model's chosen pct actually sits from the zone midpoint on stored
   prescriptions. That needs a per-exercise join of `session_periodization.prescription` against each
   exercise's zone, which was not run — so "the model contributes nothing numerically" is argued from
@@ -1255,45 +1258,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Not established:** `getLocalStore()` returns null off the APK, so the contention was **not
   reproduced here**. This rests on the source ordering plus the repo's own recorded measurement of
   the identical shape — which is why the gate is the device.
-
-### [platform] RV-69 — four prose routes answer 502 when the model fails, discarding facts they had already assembled
-
-- **Lane:** A — `app/api/daily-digest/route.ts:172`, `weekly-digest/route.ts`,
-  `ai/health-insight/route.ts:224`, `workout-sessions/[id]/recap/route.ts:236`.
-  **Added:** 2026-09-20 · Review sweep 51.
-- **Batch:** `ai-degrade-and-bound` — ships with **RV-70**; both are one-place changes on the same
-  surface and verify together.
-- **The sibling already does it right:** `app/api/running-plan/explain/route.ts:120` returns
-  `{ message: rationale, degraded: true }` with status 200, falling back to the deterministic
-  rationale it was handed. The other four return an error although the facts are already strings in
-  scope — `daily-digest` has built a complete fact block by `:148`, `health-insight` has run
-  `splitMeasured`, `recap` has run `buildRecapFacts` (duration, volume, PR count, RPE drift, rest
-  adherence).
-- `health-insight` **already proves the pattern is acceptable** — `:191` returns a hand-written
-  deterministic sentence when nothing was measured, explicitly to avoid paying for a model call whose
-  only honest output is that.
-- **Fix:** on the catch path return the assembled lines with `degraded: true`, as the reference does.
-- **Not established:** how each client renders a 502 — it may already show a tolerable empty state
-  rather than an error. Check before assuming the user currently sees something broken.
-
-### [platform] RV-70 — no AI call carries a timeout, and the shared retry doubles the worst case
-
-- **Lane:** A — `lib/ai/instrument.ts:163`, `lib/ai/retry.ts:28`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- **Batch:** `ai-degrade-and-bound`
-- Every route passes `maxRetries: 0` to the SDK, so the SDK's own timeout handling is out of the
-  picture, and grepping `app/api/**/route.ts` finds `abortSignal`/`AbortSignal.timeout` on exactly
-  one route — `admin/mirror-dataset-gifs`, not an AI one. Only two AI routes declare any ceiling at
-  all (`export const maxDuration = 30`). `withAiRetry` retries once after `1000 + random*500` ms, so
-  a retryable 429/5xx makes the worst case 2× plus backoff.
-- **Fix:** pass `abortSignal: AbortSignal.timeout(n)` inside `loggedGenerateText`/
-  `loggedGenerateObject` — one place, since every call already routes through `lib/ai/instrument.ts`
-  — sized per section, and skip the retry once the deadline has passed.
-- **Pairs with RV-69:** a bounded call that degrades to deterministic facts is the whole fix; either
-  alone is half of it.
-- **Not established:** no hang has been observed — `ai_call_log` p90s are all under 5 s, and
-  truncated or abandoned calls were not looked for. This is a bound on a tail nobody has measured,
-  which is an argument for a generous timeout rather than a tight one.
 
 ### [app-shell] RV-71 — the shared Button has no press state on a touch-only product, while 45 files hand-roll one
 

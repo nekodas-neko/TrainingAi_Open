@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.464.3",
+    version: "1.464.4",
     date: "2026-09-22",
     changes: [
       "One estimated 1RM now shows the same number everywhere. A lift stored at 92.25 kg read as 92.5 on the ready screen, ~92 in the exercise list, 92.3 in the stats sheet and on the strength trend, and 92.25 in the exercise summary \u2014 four numbers for one lift, in one session. The ready screen was the worst of them: it was rounding to the nearest pair of plates, which is the right thing to do for a weight you are about to load and the wrong thing for a number you are only reading.",
+    ],
+  },
+  {
+    version: "1.464.3",
+    date: "2026-09-22",
+    changes: [
+      "When the AI cannot write a summary, you now get the figures instead of an error. Your day review, weekly recap, health insight and workout recap each work out every number themselves before asking the AI to write the sentences about them \u2014 and all four used to throw that away and show an error if the AI call failed. They now show what was recorded, and say plainly that it is not the written summary. The fallback is never saved, so the next attempt still gets to replace it.",
+      "AI requests now give up after 30 seconds instead of waiting indefinitely. Nothing enforced a time limit anywhere, and a single retry could double however long the first attempt took. The limit covers the retry too, so the whole request is bounded \u2014 and at 30 seconds it is roughly six times the slowest AI call this app has ever recorded.",
     ],
   },
   {

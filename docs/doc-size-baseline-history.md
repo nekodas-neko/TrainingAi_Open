@@ -15269,8 +15269,26 @@ count it was written against.
 
 ## 2026-09-22 — RV-89 (`fix/rv89-one-rm-display-helper`)
 
-`docs/implementation-backlog.md` 26619 → **26598**: RV-89 shipped and left the queue.
+`docs/implementation-backlog.md` 26619 → 26598 → **26562** on re-merge: RV-89 shipped and left the
+queue, and #1394 then landed while this PR waited on CI.
 
-`projectOverview.md` 12222 → **12233**: eleven lines at the top of Current Status. The entry named
+`projectOverview.md` 12222 → 12233 → **12250** on re-merge: eleven lines at the top of Current
+Status, plus #1394's own paragraph, which is kept above this one rather than spliced with it. The entry named
 five surfaces; the Strength Trend card turned out to hold three sites rather than one, and the
 `mround125` half is worth the space because it is the same rounder behind BF-127.
+## 2026-09-22 — `projectOverview.md` → 12239, `docs/implementation-backlog.md` → 26583 (RV-69 + RV-70)
+
+The backlog shrank by the two entries the batch `ai-degrade-and-bound` shipped, less a five-line
+cross-reference added to the ai-periodization prescription entry — which has the same catch-path
+shape and is deliberately **not** in scope, because it would degrade to a prescription the user
+trains on rather than to text. Naming that there is what stops the next session reading the shipped
+sibling and "finishing the job".
+
+Both numbers are recomputed against the merged file, not spliced: RV-84/RV-88 and RV-86/RV-87 landed
+while this branch was open, so the backlog started from a higher figure than it did when this work
+began. `projectOverview.md` grew by one Current Status block. It is longer than a status note usually is
+because three of its sentences are corrections: the chokepoint wraps a thunk rather than SDK params,
+so RV-70's "one-place `abortSignal`" fix was not possible as written; the recap answered 500 rather
+than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explain` — the route both
+entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
+only "shipped" would leave all three to be rediscovered.
