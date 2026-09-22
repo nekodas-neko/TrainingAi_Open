@@ -522,27 +522,6 @@ below threshold and left in place for next time.
 - **Not established:** whether a single ~300 kcal add visibly moves a 7-day bar. The adherence
   figures are unambiguous text and do not have that excuse.
 
-### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
-
-- **Lane:** A — `scripts/check-fetch-once-effects.js:164`. **Added:** 2026-09-22 · Review sweep 53.
-- The gate is `if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(...)) continue;` — **only an empty dependency
-  array counts.** Its comment states the rationale: *"a non-empty one re-runs when its deps change,
-  which is a different (and usually correct) shape."*
-- **That reasoning is sound in general and wrong for this app.** Inside the persistent tab shell,
-  `[userId]`, `[today]` and `[trendsProp]` never change either, so those effects are fetch-once in
-  every way that matters. **Four of the five freshness findings in this sweep (RV-104, RV-106,
-  RV-107, RV-109) are that shape, and all four are invisible to the ratchet.**
-- **⚠ Widening the pattern is NOT a one-line change, and the file says why.** Its header records
-  that the first version used a non-greedy regex, swallowed unrelated code between effects, and
-  **inflated its own baseline by 11 of 25**. The brace-matching it uses now is the fix for that.
-  Extending to stable-deps needs a judgement about *which* deps are stable — `[userId]` on a
-  persistent screen is, `[date]` on a sheet that remounts per open is not (`week-day-sheet.tsx` is
-  the legitimate counter-example).
-- **Fix, narrowly:** treat a dep array containing **only** identifiers known to be shell-stable
-  (`userId`, `tz`, `today`) as fetch-once, re-baseline, and leave everything else alone.
-- **Not established:** how many *new* sites a widened pattern would surface — the four above were
-  found by hand, not by a candidate scan.
-
 ### [heart-rate][app-shell] RV-106 — a ring sync updates Home's HR strip and leaves Health's HR card on pre-sync data
 
 - **Lane:** B — `components/health/hr-day-card.tsx:39-51`. **Added:** 2026-09-22 · Review sweep 53.

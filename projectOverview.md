@@ -29,6 +29,23 @@
 **Version:** v1.465.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
+to it (RV-105).** ⛔ **The entry claims four; two survive checking** — RV-106 and RV-109 are this
+shape, while RV-104 and RV-107 are `nutrition-content.tsx:318`'s `useCallback` shape
+(`}, [fetchMountData, userId]`, no `cachedFetch` in the effect body), which the script excludes on
+purpose: counting it is what inflated its baseline by 11 of 25 in the first version. `check-fetch-once-effects.js` gated on an empty dep array; inside the
+persistent tab shell `[userId]`, `[tz]` and `[today]` never change either, so those effects re-run
+never. **The entry's open question is answered by a scan rather than by hand: widening takes the
+tracked population from 11 to 25 across 20 files** — a re-baseline, not a tweak. **⛔ The entry
+contradicts itself on `trendsProp`** — its diagnosis names it, its narrow fix list omits it; the fix
+list is right, because `trendsProp` is a prop the parent resolves from `undefined`, so it genuinely
+changes and `oura-section.tsx` already carries a second effect to adopt it. Excluded, with the
+reason in the code. ⚠ **This widened the lens, it did not audit what it revealed** — all 14 new
+sites predate it and went into the baseline. `sync-provider.tsx` is 4 of them and is the sanctioned
+warm pass; `hr-day-card`, `activity-history-card` and `workout-screen` still need judging by where
+they MOUNT, which RV-104/106/107/109 own. Mutation-checked in both directions, six cases.
+
+
 **Four more date labels moved onto the shared formatter (LB-126, v1.465.4).** LB-125 (#1404, Lane A)
 gave `formatDateDisplay` the `weekday`, `weekday-date` and `weekday-date-long` styles; these are the
 call sites RV-91 closed with as *"noted, not filed"*. Output is byte-identical — checked before the
