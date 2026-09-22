@@ -533,13 +533,50 @@ and destroys the record of how long this ran. This entry is deliberately a no-da
 perceived_recovery_touched` stops growing, and neither the calibration route nor health-trends reads a
 row whose flag is false.
 
+### [readiness][platform] LB-124 — the comparative check-in field does not exist anywhere, so TN-58's control has nowhere to write
+
+- **Lane: A** — it starts with a Postgres migration, and *"Postgres migration numbers and local
+  SQLite versions belong to Lane A alone"*. **Added:** 2026-09-22 · found by Lane B on taking TN-58
+  off READY. The `LB-` letter records who found it, not who ships it.
+- **TN-58 printed READY and is not buildable.** It says *"add the comparative field beside"*
+  `perceived_recovery`, and **nothing for it exists**: no column in `lib/data/postgres/schema.ts`, no
+  field in `DayCheckinScalesSchema` or `DayCheckinExtrasSchema`
+  (`packages/shared/src/validation/day-checkin.ts`), nothing in `app/api/day-checkin/route.ts`.
+- **⚠ TN-57 is NOT this.** TN-58 calls it "the engine half", but TN-57's own entry says *"No
+  migration and no data write. The column that distinguishes answered from unanswered already
+  exists"* — it fixes three consumers that read an unanswered default as data. Shipping TN-57 leaves
+  TN-58 exactly as blocked. **Read TN-57's scope rather than TN-58's description of it.**
+- **⛔ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
+  route is **not** `.strict()`, so Zod strips an unknown key instead of rejecting it: a sheet posting
+  `vsYesterday` would get **201** and write nothing. A control that looks like it works and stores
+  nothing is worse than a 400, and worse than the neutral-default bug TN-57 exists to fix — it would
+  burn the two-week pass test and report "self-report is not available from this owner" when the
+  truth was a dropped field.
+- **Scope, which is why it is not a footnote.** `day_checkins` is offline-first: a migration **and**
+  `lib/data/postgres/schema.ts`, both Zod schemas, the route, the repository write path and its
+  row→object mapper, the local SQLite table (`lib/local-store/sqlite-backend.ts:1212`) with a store
+  version bump, and the pull-delta at `:2038`. A missed mapper reads as "the answer does not save".
+- **The twin is required.** A new column on a `claude_ro`-covered table ships its regenerated views
+  in the same PR, and `claude-ro-readonly-role.test.ts` / `db-snapshot-integration.test.ts` fail CI
+  without it — both need a **TCP** `DATABASE_URL` to run locally, or they skip and say nothing.
+- **⚠ NULL is the whole point.** Per TN-58: a skipped answer stores NULL, never a neutral. Give the
+  column no default, and follow `perceivedRecoveryTouched`'s existing shape if a touched flag is
+  wanted — the neutral-stored-as-answer bug is exactly what this question is meant to escape.
+- **Not established:** the column's type was not decided here. An enum (`better`/`same`/`worse`) and
+  a signed integer (`-1`/`0`/`+1`) both work; the integer is easier for TN-33 to correlate and the
+  enum is harder to misread. That is Lane A's call at build time, not a blocker.
+
 ### [readiness][app-shell] TN-58 — ask whether today is better or worse than yesterday, because an absolute 1–5 has produced two distinct values in 81 days
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning · **owner asked for this direction**
   2026-09-21 (*"yes go for it"*) after declining a three-week daily log the same morning — that
   decline is the design constraint, not an obstacle.
-- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. TN-57 is the engine
-  half; this one changes what is asked.
+- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. This one changes what
+  is asked.
+- **Needs: LB-124** — the field it writes to does not exist in the schema, the validators or the
+  route, and the route is not `.strict()`, so a control built now would post `201` and store
+  nothing. **TN-57 is not that engine half** despite the line below saying so: its own entry ships
+  no migration and fixes three consumers instead.
 
 **The control asks for an absolute rating and gets the middle of the scale.** Measured 2026-09-21:
 **2 distinct values across 96 check-ins, sd 0.29, and zero of them touched** (full table in TN-57).
