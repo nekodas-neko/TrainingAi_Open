@@ -497,6 +497,37 @@ thirty-one. What is wrong is that the truncation is invisible.
 **Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
 IS in the queue but below the cut-off no longer comes back empty without explanation.
 
+### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Device Verification · **Lane: O** — the rule
+  scripts under `scripts/`, `scripts/check-test-typecheck.js`, and `package.json` `engines`.
+- **Why it matters now:** the role that runs next to the phone is a **local Windows** session, and
+  its prompt makes `pnpm ci:local` the pre-push gate. On 2026-09-23 it could not produce a clean
+  run for reasons that have nothing to do with the diff, so the gate was CI alone.
+- **Measured on Windows 11, Node 22.9.0, `device/first-run` — `Ran 75 of 75`, four FAIL, none
+  touching the diff:**
+
+  | step | cause |
+  |---|---|
+  | 27 *Sign-out wipes the device* | compares `lib\sign-out.ts` against an allowance written `lib/sign-out.ts` |
+  | 30 *An e2e stub does not hand the app a literal date* | same — `EXEMPT` keys use `/`, the walk yields `\` |
+  | 50 *Non-strict request schemas do not increase* | same — baseline keyed `app/api/…`, lookup `app\api\…` |
+  | 68 *No async function resolves to a Capacitor plugin proxy* | `execSync("grep -rl … 2>/dev/null | grep -v …")` runs under `cmd.exe` → *"The system cannot find the path specified."* |
+
+  Then `typecheck:tests` dies with `spawnSync npx ENOENT` (`npx` is `npx.cmd` on Windows, so it
+  needs `shell: true` or the `.cmd` name), and `pnpm test` cannot start at all:
+  `rolldown@1.0.3` declares `engines.node ^20.19.0 || >=22.12.0`, so its
+  `@rolldown/binding-win32-x64-msvc` is skipped at install on 22.9 and vitest throws
+  `Cannot find module './rolldown-binding.win32-x64-msvc.node'`.
+- **The fix:** normalise every walked path with `.split(path.sep).join('/')` before comparing (one
+  helper, reused — three scripts carry the same bug); replace step 68's shell pipeline with a Node
+  walk; spawn `npx` portably. For the Node floor, set `engines.node` to `>=22.12` so the mismatch
+  fails at `pnpm install` with a message instead of at test time with a missing binding. The local
+  machine's own upgrade is the owner's.
+- **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
+- **Not a device check** — nothing here needs the phone.
+
+
 ### [nutrition][platform] RV-103 — the owner re-reported BF-177, and the fix BF-177 shipped cannot report its own failure
 
 - **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts:41-45`. **Added:** 2026-09-22 ·
@@ -3983,12 +4014,21 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Proven load-bearing:** `components/__tests__/bf166-back-closes-overlay.test.ts` — **4 of its 5
   assertions fail against `main`**. The fifth deliberately passes on both sides: it records that the
   primitives were already wired, which is the finding that stopped a duplicate registry being built.
-- **Keep: the device check, and only that.** Android's hardware back is a Capacitor channel that
-  Playwright cannot fire, so **no harness run can exercise this** — the unit tests cover the stack's
-  behaviour and the listener's ordering, not the gesture. On the S25: open a sheet over a tab route
-  (`/nutrition` meal builder) and over a sub-route, press back, confirm the overlay closes and the
-  page does not move; open one on Home and confirm back closes it rather than minimising the app;
-  then mid-workout, confirm back still raises the leave prompt.
+- **✅ VERIFIED ON THE S25, 2026-09-23 (Device Verification Agent, `device/first-run`)** — every
+  part except the mid-workout one. v1.465.4 web / APK 1.460.4, portrait, **three-button navigation**
+  (`adb shell input keyevent 4`, the same `KEYCODE_BACK` the gesture delivers), path read from
+  `location.pathname` in the page. Back with a sheet open: `/nutrition` *My Foods* and *Add food* →
+  sheet closed, still `/nutrition`; Home's mood check-in sheet → closed, still `/`, app **not**
+  minimised; `/program` *New Program* sheet (a sub-route) → closed, still `/program`. That last one
+  takes **two** presses, and correctly: the sheet autofocuses its name field, so the first back
+  dismisses the keyboard (`mInputShown=true→false`) — standard Android IME behaviour, not a defect.
+- **The rest of `back-gesture-sitting` left the queue the same day:** **LA-109**, **LB-107** and
+  **BF-100** all VERIFIED ON THE S25 and removed — evidence in
+  `docs/overview/entries/2026-09-23-device-first-run.md`. **BF-165** reproduced and stays open.
+- **Keep:** the mid-workout half only — start a workout, press back, confirm the leave prompt is
+  raised rather than a sheet closing or the route moving. **Not run** because starting a workout on
+  the owner's production account creates a real session; it needs the owner's go-ahead or a
+  workout the owner is doing anyway.
 
 ### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
 
@@ -4229,8 +4269,29 @@ variable, and it is the opposite of what the pre-retraction table claimed.
   sweep before a fix is called complete.
 - **⛔ Still do NOT lengthen `NAVIGATION_TIMEOUT_MS`** and do not touch `animate()`: the push is
   fine, and app-wide navigation must not change for a call-site ordering bug.
-- **Device check is still owed** — this is measured in the harness at one viewport, and the report
-  was on the APK.
+- **❌ REPRODUCED ON THE S25, 2026-09-23 (Device Verification Agent)** — the harness finding holds on
+  the APK, and the device is **faster** than the harness at undoing it. v1.465.4 web / APK 1.460.4,
+  portrait, three-button nav. Workout → Cardio → *Other activity* (sheet opens, `pushState()` of its
+  own entry) → *Treadmill*, `history` instrumented in the page:
+  ```
+  1741ms startViewTransition @/cardio
+  1754ms pushState(/activity) @/cardio
+  1761ms back() @/activity        ← 7 ms later on the S25, vs 415–428 ms in the harness
+  1764ms replaceState(/cardio) @/cardio
+  1779ms popstate @/cardio
+  ```
+  Screen stays on `/cardio` with the sheet closed, sampled for 2 s. So a fix that relies on any
+  timing window is refuted on the canonical runtime before it is written.
+- **Scope sweep (the correction above asked for it):** the only other close-then-push site is
+  `components/cardio/time-picker-sheet.tsx` `start()` — `onOpenChange(false)` then
+  `router.push('/running' | '/activity/guided-walk')`, the identical shape. **COULD NOT CHECK on
+  the device:** its trigger ("How much time do you have?") renders only `!hasRunningPlan`, and the
+  owner has a running plan. Fix it with this one. (`nutrition-content.tsx` navigates, but not from
+  inside a sheet.)
+- **Residue of every failed tap:** `selectType` runs `startActivity` *before* the push, so each dead
+  tap leaves `localStorage.ta_activity_state` at `mode: "pre"`, `activityType: "treadmill"` with a
+  fresh `activitySessionId`. Nothing reaches the server in `pre`, but the fix should decide whether a
+  navigation that never lands should leave the selection behind.
 
 - **⛔ THE OBVIOUS FIX DOES NOT WORK, and this was measured rather than reasoned (2026-09-17).
   Do not spend the attempt again.** The natural reading of the trace is *"a self-pop is in flight
@@ -4274,41 +4335,6 @@ helper the call site calls.
 - **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
   (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
 
-
-### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `components/shell/tab-shell.tsx`.
-- **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
-  pressing back gets me to the home page again."*
-- **Shipped 2026-09-15.** The cause held up: `show()` flips tabs with
-  `window.history.replaceState(null, "", href)`, and Next's patched `replaceState` re-injects its own
-  current tree — still the previous tab's, because no Next navigation happened. Popping back to that
-  entry restores the stale tree, so the URL reads `/more` and Home renders.
-- **The fix reads the address bar at mount instead of reaching into Next's internals.** `TabShell`'s
-  `useState` became a lazy initializer that prefers `tabKeyForHref(window.location.pathname)` over
-  the `initialTab` the stale tree produced. `usePathname()` would not work — it reads from the very
-  tree that is wrong. Nothing touches `__PRIVATE_NEXTJS_INTERNALS_TREE`, and all three things a fix
-  had to preserve still hold: the flip adds no history entry, the URL stays honest, and LB-107's
-  back-to-Home from a tab root is unchanged (both specs re-run green).
-- **Proven load-bearing, not merely green.** `e2e/la109-back-from-subroute.spec.ts` was run against
-  `main`'s unfixed `tab-shell.tsx` and goes **red** there. This is the check the first draft of the
-  spec failed: it used `goto('/more/details')`, a full document load that rebuilds history, and
-  passed while the bug was untouched.
-- **⚑ The BF-49 link is REFUTED — see BF-49's entry.** The trial this entry demanded was run and came
-  back negative. Do not re-run it.
-- **⚑ BF-100 is now re-testable.** This entry blocked it: if back rendered Home there was no `/more`
-  scroll position to restore. That blocker is gone, so BF-100's own cause can be read on its own.
-- **Keep:** the device check, and only that. On the S25: from Home flip to More, open Profile
-  details, press the system back gesture — arrive on **More** with the More tab active. The harness
-  cannot speak for the Android back gesture or the WebView's history handling.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
@@ -5498,53 +5524,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   confirm the ingredient rows, their quantities, and the resulting macro total match the sum of the
   sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
   real library.
-
-### [app-shell] LB-107 — back on a tab with nothing to pop should land on Home, not leave the app
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-- **Lane:** B — the tab shell's history handling; `app/**` and `components/shell/**`.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while clearing RV-36 from the queue.
-- **The owner asked for this by name** during the 2026-09-13 app-shell pass: *"Just need to make
-  sure when you press back on a tab and there is no where to go it should go to the home screen."*
-- **It had no entry.** It was recorded inside **RV-36's body** — an entry that had already shipped
-  and been verified — and in that session's journal. RV-36's removal is what surfaced it; left
-  there, it would have been deleted with the entry that was done.
-- **This is a separate requirement from scroll restoration** and shares nothing with it but the
-  sitting they were reported in. RV-36 was about restoring an offset; this is about where the back
-  gesture goes when the stack is empty.
-- **✅ Measured 2026-09-14, and the guess in the line this replaces was wrong.** It is **wrong**
-  handling, not absent, and **all four non-home tabs** reach an empty stack — not an edge case.
-  `mobile-auth-handler.tsx` registers a Capacitor `backButton` listener, which **suppresses the
-  Android default**, then called `window.history.back()` for every path but `/`. `tab-shell.tsx`
-  flips tabs with `history.replaceState` (*"tabs are peers, not a history trail"*), so a tab route
-  has nothing to pop and that call was a **silent no-op**. Back was dead on Health, Workout,
-  Nutrition and More — it did not exit the app, it did nothing.
-- **The stack behaviour is now pinned in a real browser**, not inferred:
-  `e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures `history.length` across a tab flip
-  (unchanged) against a sub-route push (grows). That contrast is the premise the fix rests on.
-- **Shipped 2026-09-14** (`fix/lb107-back-on-tab-goes-home`): `backActionForPath` in
-  `components/shell/tabs.ts` returns `minimize` on `/`, `home` on a tab route, `pop` otherwise, and
-  the listener switches on it. Home is reached via `navigateToTab`, not a location assignment —
-  the latter reloads the WebView and discards every mounted tab. Sub-routes are untouched because
-  `tabKeyForHref` matches the path **exactly**, so `/nutrition/meal/123` still pops.
-- **Keep:** the device check, and only that. On the S25, from Health/Workout/Nutrition/More press
-  the system back gesture — Home, not the launcher and not a dead press. Then from Home press it
-  again — the app minimizes. The harness cannot send that gesture (`page.goBack()` is a different
-  path), so this is the one part no CI run can close.
-- **⚠ The harness cannot send the system back gesture**, which is what the owner is pressing.
-  `page.goBack()` is not it, and `e2e/scroll-restoration.spec.ts`'s header records that
-  `page.goto()` is a hard navigation that skips React cleanup entirely. Expect to need the S25.
-- **Pass test:** on the S25, open a tab with nothing pushed on top of it and press the system back
-  gesture — Home, not the launcher.
-- **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
-  it is called done.
 
 > **✅ LB-109 DONE and removed, 2026-09-15 (OR-116).** All three cleared. **BF-141** and **BF-135**
 > were verified and left the queue; **LB-47** was handled as this entry insisted — not swept with
@@ -9409,18 +9388,26 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 
 - **❌ FAILED ON THE S25, 2026-09-13** (owner, no note). The card returns early off-native, so this is
   the first time any of its three states has been on a screen — and it did not survive that.
-  **Ask for the screenshot before starting:** the entry's whole difficulty is that the failure is
-  which-number-where, and a bare fail does not say which of the three states was wrong.
+  The screenshot this asked for was taken on 2026-09-23 — see the ❌ bullet below: it is the **date**.
 
 - **✅ SHIPPED 2026-09-03** (`fix/bf-111-version-labels`, v1.436.4). Both numbers labelled, and every
   state now names the **installed** build rather than only the newest one — the update state used to
   name a version the phone does not have and say nothing about the one it does. The date came from
   `nativeBuiltAt`, which `/api/version` was already returning and the card was dropping.
-- **Gate:** owner — **the screenshot**. Corrected from `Gate: device` by OR-122: the device check
-  already happened and **failed**, so a device gate now describes debt that is settled and hides the
-  thing actually blocking this. What is owed is the owner's screenshot of the failing card, because
-  a bare fail does not say which of the three states was wrong and the entry's whole difficulty is
-  which-number-where. Once that arrives this is ordinary Lane B work.
+- **❌ THE SCREENSHOT, FROM THE S25, 2026-09-23 (Device Verification Agent) — the gate it waited on
+  is answered.** More → About on v1.465.4 web / APK 1.460.4 reads: badge **`App v1.465.4`** ✓;
+  *ANDROID BUILD* **"Up to date — v1.460.4, built 23 Aug"**; tick green. **The two numbers and the
+  tick are right** — `dumpsys package` gives `versionName=1.460.4`, `/api/version` gives
+  `nativeVersion: "1.460.4"`, so "up to date" is true. **The date is wrong.** 1.460.4 is dated
+  2026-09-20 in `changelog.ts` and its APK asset on `apk-latest` was uploaded
+  `2026-09-20T22:32:10Z`; **23 Aug is the rolling release's own `published_at`**
+  (`2026-08-23T12:33:06Z`), which never moves when `android.yml` re-uploads the asset.
+  `lib/github-release.ts:86` maps `publishedAt: release.published_at`, and every build since the
+  first will print that same date.
+  **Fix:** take the date from the `app-debug.apk` asset's `updated_at` (fall back to
+  `published_at` only when no asset). Whether the 2026-09-13 owner fail was this same date or a
+  different state then is **not knowable now** — this is what is wrong today.
+- **Lane:** A — `lib/github-release.ts` (serves `app/api/version`). The card is fine.
 - **Verification** after the re-fix: on a phone whose APK is behind the web app, About names both
   numbers, says which is which, and the tick refers unambiguously to the Android build. The card
   returns early unless `Capacitor.isNativePlatform()`, so on web and in every e2e harness it renders
@@ -9743,198 +9730,6 @@ feature and not a deletion like LB-41:
 - **The reconstruction that diagnosed this was arithmetic against live values, not a trace**, and it
   is preserved in the journal entry rather than here. It matched the screen at three independent
   points; the fix does not depend on it, because it relabels figures the component already holds.
-
-### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `lib/hooks/use-scroll-restoration.ts` and `components/pull-to-sync.tsx` — reached only from `components/**`, and it stores nothing. (Assigned 2026-09-15, OR-116 lane sweep.)
-
-- **Verify:** device
-- **Keep:** the S25 pass, and it is the whole of what is left *if the fix holds*. Press back from a
-  scrolled `/more` onto *Profile details* and back again, and read whether the offset returns.
-  **If it still lands at the top, this is buildable work again** — say so plainly rather than
-  re-filing it as a check, because that mis-filing is what hid this entry for a day once already.
-  **The one-tap experiment survives as the fallback and is still the thing that settles causation:**
-  come back from *Profile details* with a **UI back control** instead of the gesture. If that
-  restores while the gesture does not, the cause is elsewhere in the gesture path.
-
-- **⚑ THE `touchstart` CANDIDATE IS NOW CONFIRMED AS A REAL, REPRODUCIBLE MECHANISM, AND FIXED —
-  2026-09-19, `fix/bf100-touch-cancels-pending-restore`.** It was a source reading before this; it is
-  a measurement now.
-  **What was measured.** Instrumenting `addEventListener` and `sessionStorage` on a live `/more`
-  back-navigation: the takeover listeners attach at 15681 ms and the restore lands at 15863 ms — a
-  **182 ms window in which `done` is false and the listeners are live.** The window is real and
-  non-empty, which nothing had established before.
-  **Why the 2026-09-15 probe came back null, settled.** Not the element and not the dispatch site —
-  `page.goBack()` does not resolve until *after* the mount and the restore, so any touch dispatched
-  after it is on the wrong side of the window by construction. Arming the dispatcher *before*
-  `goBack()` does not help either: the container only matches a selector once it has mounted, which
-  is the same instant the restore lands. **The 182 ms window cannot be hit from the test side at
-  all** — that is a limit of the instrument, and reading the null result as evidence against the
-  hypothesis would have been wrong.
-  **What made it testable.** Seeding an offset the container can never reach widens the pending
-  window from 182 ms to the whole of `RESTORE_WINDOW_MS`, because `attempt()` never lands and the
-  restore stays pending until the timer fires at `min(target, gap)`. The touch then places trivially.
-  Against the unfixed hook that reproduces the cancellation outright:
-  `restored to 0 against a reachable 1019`.
-  **The fix** is the takeover event, `touchstart` → **`touchmove`**, via a single `TAKEOVER_EVENTS`
-  constant so the add and remove lists cannot drift apart. `stop` latches `done = true` and clears
-  the timer with **no re-arm**, so whichever event is listed abandons a pending restore permanently —
-  and a finger going down has scrolled nothing. Trap (4) is intact: takeover is still an **input
-  event**, not a scroll delta. `e2e/bf100-touch-does-not-cancel-pending-restore.spec.ts` pins both
-  directions and **both arms were proven red against the pre-fix hook** — `touchstart` cancelled when
-  it should not have, and `touchmove` was not listened for so it failed to cancel when it should.
-  All three existing `scroll-restoration.spec.ts` cases stay green.
-  **⚠ This is NOT confirmed as the S25 symptom, and must not be read as one.** The harness fires no
-  touch on a back navigation, so it cannot say whether the S25's gesture delivers one into that
-  window — only the device can. What is now established is that *if* it does, this was fatal, and it
-  no longer is.
-  **Why `Verify: device` is the right field here when it was the wrong one before.** Until
-  2026-09-14 this entry carried a check while the check had **already been taken and failed** with
-  nothing new since — work filed as *"nothing is blocked"*. The device has never seen this change,
-  so the field now says what it means. The `Keep:` above states the reversal condition outright so a
-  second failure cannot hide behind it again.
-
-- **❌ FAILED ON THE S25 TWICE — most recently 2026-09-13** (both *before* the 2026-09-19 fix above;
-  neither pass saw it). Owner: *"Checked on more - and still
-  doesnt work"*. **This was buildable work rather than a pending check, and stayed so until
-  2026-09-19**, and the `Keep:`/`Verify: device`
-  this entry carried until 2026-09-14 said the opposite — it printed under *"shipped; a look is owed,
-  nothing is blocked"* while the look had already been taken and failed. That is the trap the
-  `Verify:` field's own documentation names (OR-105), and it hid this for a day.
-- **RV-36 passed in the same sitting, which narrows this rather than contradicting it.** Owner
-  there: *"Mostly works."* Scroll restoration largely works; **`/more` specifically does not.**
-- **⚠ It is a DEVICE-ONLY failure, and the harness says the opposite.** Measured in Playwright,
-  `/more` → *Profile details* → back restores **840**. So a green `e2e/scroll-restoration.spec.ts` is
-  not evidence here, and the next attempt must not read it as any. Whatever differs is the S25's
-  system back gesture or the WebView's restore timing — neither reachable from the sandbox.
-- **⚑ LA-109 SHIPPED 2026-09-15, so the block this carried is lifted — re-test on the next device
-  pass before reading anything below as still open.** LA-109 is the owner's same-day report on the
-  **same route**: *"Going to more; then going to profile details and pressing back gets me to the
-  home page again."* It is measured — after a tab flip the history entry reads `/more` while carrying
-  Next's route tree for `/`, so popping back restores the Home tree and Home renders under the right
-  URL.
-  **If back lands on Home, there is no `/more` scroll position to restore, because you are not on
-  `/more`.** That is a different failure wearing the same description, and it would look exactly like
-  "back always lands at the top" to someone checking the screen rather than the URL.
-  **This does not retire BF-100.** Scroll restoration genuinely works elsewhere (RV-36, same
-  sitting: *"Mostly works"*), and the `use-scroll-restoration.ts:158` finding — takeover cancelled on
-  `touchstart` with no re-arm, which the S25's gesture triggers and `page.goBack()` does not — is a
-  real mechanism on its own. **The point is sequencing:** only one of the two can be confirmed while
-  the other stands, so fixing LA-109 first tells you whether anything is left here. It also explains
-  the harness disagreement without needing the WebView: the spec's route never goes through a tab
-  flip, so it never carries a stale tree.
-  **Status 2026-09-15:** LA-109's fix is on `main` and is proven load-bearing (its spec goes red
-  against the unfixed file). So the sequencing condition is satisfied and this entry is unblocked —
-  what it now needs is a device pass to say whether anything is left, not more reading.
-- **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
-  question is what `/more` does that `health-content` and `session-select-content` do not, given all
-  three take the same `PullToSync` path.
-- **⚠ THE `touchstart` CANDIDATE WAS PROBED IN THE HARNESS ON 2026-09-15 AND THE RESULT IS
-  INCONCLUSIVE — read this before re-running it, because the obvious probe does not work.**
-  The mechanism is real *in source*: `stop()` latches `done = true` and disconnects the observer, and
-  it is registered for `wheel`/`touchstart`/`keydown` with **no re-arm**. What is not established is
-  that the back gesture's touch reaches it in time.
-  **What was run:** the existing `/more` push-and-back, twice in one test with equal settle windows —
-  once plain, once dispatching `new Event('touchstart', {bubbles:true})` on the scroll container
-  immediately after `goBack()`. **Control restored. The touch arm ALSO restored, to 840.**
-  **That refutes the PROBE, not the hypothesis**, and the two reasons are specific:
-  (a) the element was picked as *"first node whose `scrollHeight` exceeds `clientHeight`"*, which is
-  not necessarily the `ref` the hook attached its listener to; and (b) the dispatch may land after the
-  restore has already completed, since it fires as soon as the URL settles.
-  **The next attempt must instrument, not guess:** confirm which element carries the listener and
-  that the event arrives *inside* the restore window, before reading anything into the outcome.
-  `__scrollRestorationInternals` exports `RESTORE_WINDOW_MS`, which is where that timing comes from.
-- **✅ THE SECOND FINDING FROM THAT RUN IS FIXED (2026-09-17).** `scroll-restoration.spec.ts`
-  asserted `toBe(before)` — an **exact** offset — and an exact assertion cannot tell *cancelled* from
-  *imprecise*, which is the distinction this entry turns on. Reproduced before changing it: saved
-  **718**, restored **1019**, red while restoration was working, because these screens seed from
-  cache and revalidate so the content grows between the save and the restore.
-  Both assertions now go through `expectRestoredNear`, a **floor** at 90% of the saved offset with no
-  upper bound (capping would re-introduce the same flake from the other side). Proven both ways: it
-  passes on content growth, and with the restore neutered (`el.scrollTop = 0`) both cases fail
-  naming the cancellation — *"restored to 0 against a saved 879"*. **So this file can now answer the
-  device question when the S25 pass happens**, which it could not before: a red here means cancelled,
-  not merely imprecise.
-- **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
-  explains the harness/device split outright, which no previous hypothesis did.**
-  `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
-  `stop` sets `done = true` with **no re-arm**: one touch abandons the pending restore permanently.
-  **The S25's system back gesture IS a touch**, delivered to the WebView as the new screen mounts.
-  `page.goBack()` in Playwright fires no touch at all — which is exactly why the harness restores 840
-  and the device does not, and why a green `scroll-restoration.spec.ts` was never going to see this.
-- **Why `/more` and not the other two, on the same hypothesis:** the cancel only matters while the
-  restore is still PENDING — the hook waits for the container to grow tall enough to hold the saved
-  offset. A screen whose content reaches full height immediately has already restored before any
-  touch can arrive. `/more` mounts both tab panels (`display:none` on the inactive one) plus
-  `SyncHealthCard`, so it is the slowest of the three to reach height. That also fits RV-36's
-  *"Mostly works"* in the same sitting: the fast screens are fine.
-- **THE DISCRIMINATING EXPERIMENT, and it is one tap:** on the S25, scroll `/more` down, tap into
-  *Profile details*, and come back with a **UI back control** rather than the system gesture. If the
-  offset restores that way and not with the gesture, the `touchstart` cancel is the cause and this
-  stops being a mystery. Every device check so far has used the gesture — the entry's own
-  verification step says to — so this path has never been tried.
-- **Proposed fix if it confirms, recorded so it is not re-derived:** move the takeover from
-  `touchstart` to `touchmove`. That keeps the principle the hook already argues for in its own
-  comment — *"user takeover is an INPUT event, not a scroll delta"* — while distinguishing a stray
-  touch from an actual drag, which is what a takeover means. A time-based grace after mount is the
-  weaker alternative: it picks a number, and the number is what breaks on a slower cold start.
-  **Not built, because it must not be shipped on a hypothesis** — it changes takeover behaviour on
-  every screen, and the experiment above costs one tap.
-- **Verification:** on the S25, scroll `/more` well down, tap into *Profile details*, press the
-  **system back gesture** (not a UI back button), on a cold cache and a warm one; and confirm
-  reaching the same screen forward still starts at the top.
-- **⚠ Q-93-followup asked for the same back behaviour on `/health/day`** — whether its back control
-  returns to Home rather than stranding the user on a navless route. That entry left the queue on
-  2026-09-14 (its taps were verified on the S25); the back half is **LB-107**, which generalises it,
-  so nothing was dropped when it went.
-- **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
-  `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
-  the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
-  against a cold harness server.
-- **⚠ "every screen using the shell inherits it" is WRONG — corrected 2026-09-03 (Review sweep 41).**
-  Every screen using **`PullToSync`** inherits it, and three screens use it: `health-content`,
-  `more-content`, `session-select-content`. The **Nutrition tab owns its own scroller**
-  (`nutrition-content.tsx:563`) and inherits nothing — measured, `/nutrition` → `/coach` → back saves
-  no `ta_scroll:` key and returns 0, against `/more`'s 840. Filed as **RV-36**, which also records why
-  the live gap is only that one path. The hook itself is fine and takes a ref; it is simply not called
-  anywhere else.
-- **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
-  loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
-  unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
-  "evidence" was a red run whose real cause was `page.goBack()` landing on **`about:blank`** after a
-  bottom-nav Link click.
-- **⚠ SIX implementation traps are paid for and written into the hook. Do not re-derive them:**
-  (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked effect
-  consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has already
-  detached the node — track it from a `scroll` listener; (3) setting the offset once lands
-  **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it down,
-  so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to what you
-  set treats that settling as a finger and yields every time — takeover is an **input event**;
-  (5) **consuming the saved value on read** is eaten by StrictMode a second way — pass one takes it,
-  finds the container too short, waits; pass one's cleanup writes 0 over the pending target; pass two
-  reads 0 and discards it. Read without consuming; clear when the restore lands; and never write 0
-  over a target that has not landed. (6) A screen can come back **shorter** than it was, so the
-  window must land at `min(target, available)` rather than abandon the restore.
-- **⚠ And four SPEC traps, which cost more than the code did.** All four reported
-  `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
-  opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
-  screens navigate from `router.push` **buttons**; the bottom nav makes `goBack()` land on
-  `about:blank`. **`/more` → *Profile details* → back is the verified path**, and the spec's
-  precondition assertions are what separate a fixture problem from a regression — keep them.
-- **The timer was NOT the cause of the cold-server failure**, though it looked like it twice. Raised
-  to 120 s as a controlled experiment: still red. That is what forced the instrumented run that found
-  trap (5).
-- **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
-  to a new page; when I press back I want to go back to that page at the same scroll level I was at.
-  It usually starts me at the top of the page. This is on many pages if not all pages."*
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
@@ -17728,6 +17523,117 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
+
+### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
+
+- **Lane: O** — `scripts/device/**`. **Added:** 2026-09-22, owner-requested.
+- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
+  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
+  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
+  what it takes to make it connect is the finding worth writing down.
+- **Keep:** the first real run, and the fix it will probably need. Until a phone has answered,
+  nothing here is verified — including the claim that it connects at all.
+
+**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
+build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
+Three classes of check are unreachable as a consequence, and they are precisely the ones the
+backlog is full of:
+
+| class | why no sandbox reaches it |
+|---|---|
+| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
+| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
+| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
+
+Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
+cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
+thing.
+
+- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
+  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
+  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
+- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
+  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
+  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
+  needs a *browser* target and an Android WebView commonly exposes only page targets
+  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
+  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
+  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
+- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
+  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
+  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
+  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
+  real differential when it was a coordinate artifact.
+- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
+  navigation reports a bottom inset of `0` and a broken clearance looks correct.
+- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
+  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
+  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
+  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
+  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
+  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
+  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
+  property or a layout one). Frames are written named by their offset from the start.
+  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
+  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
+  exactly that reason.
+- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
+  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
+  anything needing the owner physically present, or any *"does this feel instant"* judgement.
+  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
+  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
+  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
+  whether a sync button does anything. That is most of the `devices` group and all of
+  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
+  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
+  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
+  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
+  unambiguous ones and leave a shorter, harder list - not an empty one.
+- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
+  substitute. It narrows what the gate has to cover.
+
+**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
+instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
+answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
+
+1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
+   else is worthless until it passes.
+2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
+   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
+   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
+   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
+   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
+   first.**
+3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
+   returns null off the APK, so these have never been exercised. Highest value per check.
+4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
+   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
+   and the floored-utility rule it enforces has never been checkable at all.
+5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
+   for the reason the correction above records: this is the phone the ring and scale are paired to.
+   Mostly *"does this button do anything"*, which is binary.
+6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
+   sheet 300 ms or the stock 500.
+7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
+   those, and pretending otherwise is how a green run starts meaning less than it says.
+
+- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
+  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
+  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
+  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
+  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
+  a repository, which is a cost accepted only because it is bounded and auditable.
+  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
+    *in the page*: the real route, the active tab, visible error text, the button count, whether the
+    page scrolls horizontally, and the lowest action row's computed bottom padding against the
+    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
+    *"is this feature working"* questions are answerable from the digest alone.
+  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
+    the question); a live view (impossible — the reviewing session is a container with no path to a
+    USB device).
+- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
+  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
+  invalidates every clearance reading in step 4.
 
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
