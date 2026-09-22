@@ -4,7 +4,7 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-23 · **By:** the first-run session (`device/bf166-mid-workout`) · **Next ID:** `DV-3`
+**Updated:** 2026-09-23 · **By:** the first-run session (`device/bf166-mid-workout`) · **Next ID:** `DV-4`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
@@ -30,6 +30,7 @@ Nothing in flight once `device/bf166-mid-workout` merges. Results so far (web v1
 | BF-111 | ❌ "built 23 Aug" is the release's `published_at`. Lane A |
 | DV-2 | ❌ new — *Leave* on "Leave workout?" stays on the session screen. Lane B, batched with BF-165 |
 | DV-1 | Lane O — Windows rule-script paths. **Node half fixed here** (22.23.2) |
+| DV-3 | Lane A — migration-163 test flaked on #1419 CI (another file's user deleted mid-migration); re-run green |
 
 ## Next — in this order
 

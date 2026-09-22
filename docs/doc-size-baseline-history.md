@@ -15610,9 +15610,10 @@ comes down.
 
 ---
 
-## 2026-09-23 — backlog → 26651 (−13), projectOverview → 12333 (−29) (device/bf166-mid-workout)
+## 2026-09-23 — backlog → 26672, projectOverview → 12333 (−29) (device/bf166-mid-workout)
 
 BF-166's mid-workout half ran on the S25 and the entry left the queue whole; **DV-2** (*Leave* on the
 leave-workout prompt does not leave) was filed beside BF-165 in its place. BF-166's Known-Issues row
 moved to the resolved archive. DV-1 gained the two Windows test failures found once Node was
-upgraded. Both baselines set to the measured sizes.
+upgraded, and DV-3 (a CI flake in the migration-163 test) was filed. Both baselines set to the
+measured sizes.
