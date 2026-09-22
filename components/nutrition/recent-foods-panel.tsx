@@ -63,7 +63,10 @@ export function RecentFoodsPanel({ userId, onSelectFood }: Props) {
       '/api/nutrition/recent-for-meal',
       TTL_MEDIUM,
       list => { if (!cancelled && Array.isArray(list)) { setItems(list); setLoaded(true) } },
-    ).catch(() => { if (!cancelled) setLoaded(true) })
+      // RV-84: `.catch` never fires here, so a failed load left the panel on "Loading…" instead of
+      // its empty copy. `cachedFetch` resolves a boolean rather than rejecting.
+      { onError: () => { if (!cancelled) setLoaded(true) } },
+    )
     return () => { cancelled = true }
   }, [userId])
 

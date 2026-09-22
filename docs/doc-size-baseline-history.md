@@ -15206,7 +15206,67 @@ not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** 
 gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
 read as "this number might be softer than stated" was hiding a number that was harder.
 
-## 2026-09-22 — `projectOverview.md` +18 lines, `docs/implementation-backlog.md` −36 (RV-69 + RV-70)
+## 2026-09-22 — `docs/implementation-backlog.md` → 26551 (RV-84 and RV-88 left the queue)
+
+Both shipped and were removed whole — a net −35 from this branch. The number above is higher than
+the one it started from because sweep 52 (#1368) and another entry landed while this was open; it is
+recomputed against the merged file, not spliced.
+
+Worth carrying out of them: **RV-84's count was wrong three ways**, and the correction is the useful
+part. It said 16 chained `.catch`es on `cachedFetch`; there are **81**, of which 68 are harmless
+`.catch(() => {})`, 4 are redundant because `onError` is already wired beside them — including the
+file the entry names as its own reference — and **9** were genuinely broken. A site is only a defect
+when it has a handler *and* no `onError`, which is the distinction the count missed. Two naive greps
+answered 8 and 59 before a balanced-paren pass gave 81, which is why the number is in the entry's
+test rather than only in prose.
+
+## 2026-09-22 — RV-86 + RV-87 (`fix/rv86-rv87-absence-not-zero`)
+
+`docs/implementation-backlog.md` 26551 → 26522 → 26575 → **26619** across two re-merges: RV-86 and RV-87 shipped
+together and left the queue; #1390 then landed with a net +53 and #1393 with a further +44 while
+this PR waited on CI. The number here is the merged one — recomputed with `--fix` on each
+re-merge, never spliced from either side. They are not batched in the file — neither carries a `Batch:` slug — but they share one
+verification (absence must render as "—", not a confident zero) and touch disjoint files, and the
+protocol assigns batches when an entry is next touched.
+
+`projectOverview.md` 12212 → **12222**: ten lines at the top of Current Status for that fix. The
+version line had been reading v1.457.14 against a `package.json` on 1.464.1 — four days and several
+merges behind — so it is corrected here too rather than left to the next sweep.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26604 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
+
+Net +52 across a removal and an addition, recomputed after merging review sweep 52 rather than spliced. **Out:** LA-49, whose two steps both shipped in this PR.
+**In:** OR-123, the WebView rollup consumer — filed because Q-538's bound was *"blocked, and not by
+anything in this queue"*, held by a `⛔` because the target had no entry to point a `Needs:` at.
+Filing the target is what converts a prose block into a field.
+
+The rest is six blocks that existed only as prose being written as `Gate:`/`Needs:`/`Reference:`
+lines — TN-2, Q-49, Q-72, Q-85, Q-1b, Q-538, Q-252, BF-14, LA-57. Each costs three or four lines
+and buys the thing the queue actually reads.
+
+Worth carrying: **LA-49 sat for three weeks because it was parked by the bug it described.** It
+measured, on 2026-09-01, that 34 entries carried a `⛔` and only 7 meant blocked — and it quotes
+three of those emphasis markers as evidence, so the detector parked it too. Nothing about the
+measurement decayed; it simply never printed in a READY list. That is the second circular gate
+found this week (BF-165's *"ungate it the moment the fix lands"* was the first), and both have the
+same shape: **a condition for becoming visible that can only be met by someone who can already see
+it.** When writing a park of any kind, check that something outside the entry can lift it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26604 → 26648 (OR-124: TN-59 reconciled, `--sittings` documented)
+
+Two additions, no removal. **TN-59** was at the top of READY and its premise had been superseded
+hours earlier by #1390 — it specified a Custom Rules check against a 28-entry backlog of
+prose-parked entries, and that backlog is **0** on this commit. Reconciled in place rather than
+removed: the preventive half still earns its keep, at a fraction of the size, with an empty
+baseline. The rest is the `--sittings` view documented where an implementer reads about the tool.
+
+Worth carrying: **TN-59 and OR-122 are the same finding, reached independently on the same day from
+opposite directions** — Tuning from having swept 17 markers by hand and watched a new one arrive,
+the Orchestrator from Lane B having nothing to start. Neither saw the other, and the common cause
+was LA-49, which had measured the whole thing three weeks earlier and was parked by the bug it
+described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
+the investigation again. That is the argument for the check TN-59 still proposes, more than the
+count it was written against.
+## 2026-09-22 — `projectOverview.md` → 12239, `docs/implementation-backlog.md` → 26583 (RV-69 + RV-70)
 
 The backlog shrank by the two entries the batch `ai-degrade-and-bound` shipped, less a five-line
 cross-reference added to the ai-periodization prescription entry — which has the same catch-path
@@ -15214,7 +15274,9 @@ shape and is deliberately **not** in scope, because it would degrade to a prescr
 trains on rather than to text. Naming that there is what stops the next session reading the shipped
 sibling and "finishing the job".
 
-`projectOverview.md` grew by one Current Status block. It is longer than a status note usually is
+Both numbers are recomputed against the merged file, not spliced: RV-84/RV-88 and RV-86/RV-87 landed
+while this branch was open, so the backlog started from a higher figure than it did when this work
+began. `projectOverview.md` grew by one Current Status block. It is longer than a status note usually is
 because three of its sentences are corrections: the chokepoint wraps a thunk rather than SDK params,
 so RV-70's "one-place `abortSignal`" fix was not possible as written; the recap answered 500 rather
 than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explain` — the route both

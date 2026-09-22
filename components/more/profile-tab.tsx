@@ -93,6 +93,9 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null)
   const [achievementsData, setAchievementsData] = useState<AchievementsData | null>(null)
   const [achievementsLoading, setAchievementsLoading] = useState(true)
+  // RV-87: separate from `achievementsLoading` because they answer different questions —
+  // "is a request in flight" vs "did the last one come back". Only this one gets a message.
+  const [achievementsFailed, setAchievementsFailed] = useState(false)
   const [showAllAchievements, setShowAllAchievements] = useState(false)
   const [showTitlePicker, setShowTitlePicker] = useState(false)
   const [friendCodeCopied, setFriendCodeCopied] = useState(false)
@@ -118,8 +121,10 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
         achCacheKey,
         '/api/achievements',
         TTL_SHORT,
-        (d) => { setAchievementsData(d); setAchievementsLoading(false) },
-      ).catch(() => setAchievementsLoading(false))
+        (d) => { setAchievementsData(d); setAchievementsLoading(false); setAchievementsFailed(false) },
+        // RV-84: `.catch` never ran, so the achievements grid spun forever on any non-ok response.
+        { onError: () => { setAchievementsLoading(false); setAchievementsFailed(true) } },
+      )
     } else {
       setAchievementsLoading(false)
     }
@@ -172,6 +177,12 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
   const initials = (displayName ?? user?.email ?? '?').slice(0, 2).toUpperCase()
   const title = equippedTitle ? TITLES[equippedTitle] : null
 
+  // RV-87: every figure below is a `??` default, and the screen used to render all of them as
+  // fact — a cold cache plus a failed /api/achievements read as a genuine "Level 1 · Novice ·
+  // 0 XP" with a lifetime of zeros, best streak included. The defaults stay, because the
+  // arithmetic and the formatters below have to stay total; `statsKnown` is what decides whether
+  // any of what they produce reaches the screen.
+  const statsKnown = achievementsData != null
   const xp = achievementsData?.xp ?? 0
   const level = achievementsData?.level ?? 1
   const levelLabel = achievementsData?.levelLabel ?? LEVEL_LABELS[level] ?? 'Novice'
@@ -281,13 +292,15 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
               className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black"
               style={{ background: 'var(--color-brand)', color: "var(--brand-foreground)" }}
             >
-              {level}
+              {statsKnown ? level : '—'}
             </div>
             <div className="text-left">
               <p className="text-xs font-bold leading-none text-shadow-bg" style={{ color: 'var(--color-brand)' }}>
-                Level {level} · {levelLabel}
+                {statsKnown ? `Level ${level} · ${levelLabel}` : 'Level —'}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{xp} XP total · tap for details</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {statsKnown ? `${xp} XP total · tap for details` : 'Tap for details'}
+              </p>
             </div>
           </button>
         </LevelSheet>
@@ -309,10 +322,17 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
             </div>
           </div>
         )}
+
+        {achievementsFailed && (
+          <p className="text-xs text-muted-foreground text-center">
+            Couldn&rsquo;t load your stats — pull to refresh.
+          </p>
+        )}
       </div>
 
       {/* ── Stats strip ───────────────────────────────────────────────────── */}
       <StatsGrid
+        known={statsKnown}
         totalSessions={totalSessions}
         totalSets={totalSets}
         totalVolumeKg={totalVolumeKg}
@@ -331,6 +351,7 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
         achievements={achievementsData?.achievements ?? null}
         showAllAchievements={showAllAchievements}
         setShowAllAchievements={setShowAllAchievements}
+        countsKnown={statsKnown}
         unlockedCount={unlockedCount}
         totalAchievements={totalAchievements}
         recentUnlocked={recentUnlocked}

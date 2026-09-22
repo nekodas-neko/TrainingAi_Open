@@ -34,7 +34,12 @@ type ViewKey = (typeof VIEWS)[number]['key']
 
 export const CardioTrendsSection = memo(function CardioTrendsSection() {
   const [view, setView] = useState<ViewKey>('zones')
-  const data = useCachedValue<CardioTrendsResponse>(CACHE_KEY, '/api/cardio-trends', CARDIO_TRENDS_TTL)
+  const [failed, setFailed] = useState(false)
+  // RV-88: without `onError` a failed fetch is indistinguishable from no data, and the card's
+  // not-yet-loaded branch is a pulsing skeleton — so a 429 or a 500 left a grey block that never
+  // resolved, under three tab buttons that changed nothing.
+  const data = useCachedValue<CardioTrendsResponse>(CACHE_KEY, '/api/cardio-trends', CARDIO_TRENDS_TTL,
+    { onError: () => setFailed(true) })
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">
@@ -56,7 +61,11 @@ export const CardioTrendsSection = memo(function CardioTrendsSection() {
         ))}
       </div>
 
-      {!data ? (
+      {!data && failed ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          Couldn&rsquo;t load your trends — pull to refresh.
+        </p>
+      ) : !data ? (
         <div className="h-40 w-full animate-pulse rounded-xl bg-muted" />
       ) : view === 'zones' ? (
         data.weeklyZoneStacks.length > 0 ? (

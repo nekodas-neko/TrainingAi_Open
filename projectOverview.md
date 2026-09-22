@@ -26,11 +26,11 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **AI calls are bounded, and the prose routes answer with their own facts when the model fails
-(RV-69 + RV-70, v1.464.2).** Four routes — the daily and weekly digests, the health insight and the
+(RV-69 + RV-70, v1.464.3).** Four routes — the daily and weekly digests, the health insight and the
 workout recap — assemble a complete fact block from the user's logs *before* calling the model, and
 threw all of it away on the catch path (502, or 500 for the recap). They now return it with
 `degraded: true` and status 200, the shape `running-plan/explain` already used. **Nothing degraded is
@@ -46,6 +46,15 @@ the "one-place `abortSignal`" fix the entry described was not possible as writte
 pass the signal, and the deadline also races the attempt so a site that ignores it is still bounded.
 **The degraded path has not been seen in production** — the model has not failed since the logging
 existed — so it is verified by tests at all four routes, not by observation.
+**A failed read is no longer painted as a measured zero (RV-86 + RV-87, v1.464.2).** Home's Streak
+card rendered `calendarDays`'s `{}` initial value as "0 sessions this week" with an empty progress
+bar, and the Profile tab rendered a row of `?? 0` defaults as a genuine *Level 1 · Novice · 0 XP*
+with an all-zero lifetime, **best streak included** — both reached on a first launch after a
+reinstall, offline, or any failed fetch past the cache seed. Each screen now carries a gate raised
+only by a successful read, and shows "—" until it is. **Two of the entries' own claims were wrong
+and the fix went where the defect actually was:** the streak *number* already degraded to "—", and
+the rest-day banner comes from `/api/next-session`, not from the streak fetch. Held by e2e specs
+that were run against the unfixed components as a control, not only against the fix.
 
 **The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
 went **90 → 89 on a day he trained**; his real streak is **102 days**, unbroken since 2026-06-08.

@@ -6,11 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.464.2",
+    version: "1.464.3",
     date: "2026-09-22",
     changes: [
       "When the AI cannot write a summary, you now get the figures instead of an error. Your day review, weekly recap, health insight and workout recap each work out every number themselves before asking the AI to write the sentences about them \u2014 and all four used to throw that away and show an error if the AI call failed. They now show what was recorded, and say plainly that it is not the written summary. The fallback is never saved, so the next attempt still gets to replace it.",
       "AI requests now give up after 30 seconds instead of waiting indefinitely. Nothing enforced a time limit anywhere, and a single retry could double however long the first attempt took. The limit covers the retry too, so the whole request is bounded \u2014 and at 30 seconds it is roughly six times the slowest AI call this app has ever recorded.",
+    ],
+  },
+  {
+    version: "1.464.2",
+    date: "2026-09-22",
+    changes: [
+      "A number that failed to load now shows as \u2014 instead of as a zero. If the streak request failed, Home read \"0 days\" and \"0 sessions this week\" \u2014 the same thing it shows when you genuinely have not trained. Profile was worse: a failed load read as Level 1, Novice, 0 XP, with a lifetime of zeros including your best-ever streak. Both now leave the figure blank and say so, so a missing reading can no longer be mistaken for a bad one.",
     ],
   },
   {
