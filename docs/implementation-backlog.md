@@ -464,6 +464,151 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][platform] TN-57 — the self-report has never once been answered, and three consumers read the unanswered default as data 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, answering the owner's *"what is your
+  suggestion to get better tuning and have it be more accurate"*. **This is the answer to that
+  question**, and it is the reason every calibration to date has been fitted to internal consistency
+  rather than to anything true.
+- **Lane: A** — `app/api/health-trends/route.ts`, `app/api/admin/battery-recovery-calibration/route.ts`,
+  `app/api/day-checkin/route.ts`. Per §3's rule, engine half first; the control redesign is TN-58.
+- **No migration and no data write.** The column that distinguishes answered from unanswered already
+  exists and is already populated correctly. Nothing needs backfilling.
+
+**Measured on production 2026-09-21 — 96 check-ins, 2026-07-02 to 2026-09-21:**
+
+| | |
+|---|---|
+| rows with a `perceived_recovery` value | **77** |
+| rows where `perceived_recovery_touched` is true | **0** |
+| distinct values ever recorded | **2** (only 2 and 3) |
+| standard deviation | **0.29** |
+| `sleep_quality_feel_touched` true | **3 of 96** |
+| distinct `wake_mood` values | **2** |
+
+**The owner has never answered this control, once, in 81 days** — which is exactly what he said
+unprompted (*"I dont really choose them; I let it auto select"*). The sheet seeds
+`NEUTRAL_SCALES = { perceivedRecovery: 3 }` (`components/morning-checkin-sheet.tsx:21`), tracks
+`touched` correctly, and posts **both**. The route stores both. So the row is honest; the readers are not.
+
+**⚠ THE DEFECT IS NOT CIRCULARITY, and filing it as such would send an implementer to the wrong
+file.** This entry was first drafted claiming the control is pre-filled *from readiness*. It is not —
+it seeds from a neutral constant. The **circular** one is the separate energy check-in,
+`readinessToEnergy()` in `components/mood-checkin-sheet.tsx` (TN-50). Two different sheets, two
+different defects; do not conflate them.
+
+**The actual defect: an untouched default is persisted and then consumed as an answer.** Three
+readers, none of which checks the flag sitting in the same row:
+
+1. `app/api/admin/battery-recovery-calibration/route.ts:83` — builds `recoveryByDate` from
+   `c.perceivedRecovery`. **A calibration route is being calibrated against 77 values nobody gave.**
+2. `app/api/health-trends/route.ts:136` — filters `perceivedRecovery != null` and correlates it
+   against readiness. Correlating against a series with sd 0.29 cannot produce a meaningful
+   coefficient, and it is presented as one.
+3. `app/api/body-battery/stress-day/route.ts:17` — its own comment already records
+   *"`perceived_recovery` reads 3 on all 17 days"*. The observation was made and the flag was not reached for.
+
+**Why this is the root cause of inaccurate tuning, not one bug among many.** TN-33 cannot validate the
+daytime-stress **sign** because there is no independent target with variance. That blocks TN-16's
+warning, TN-34's re-wire and the stress weight that TN-55 measured at **61% of all Body Battery
+drain**. Q-465 already fixed the adjacent case (an empty body writing all-null); this is the case a
+non-empty body with an unanswered value slips through.
+
+**First action, and it is small.** Make the three readers require `perceived_recovery_touched`
+(and `sleep_quality_feel_touched` for its sibling). That is the whole of stage 1: it stops a
+calibration route and a user-facing correlation from consuming values nobody supplied, and it needs
+no schema change and no data write, because the flag already separates the two populations. Expect
+the health-trends correlation to **disappear** rather than change — there are zero answered rows to
+plot. That is the correct outcome and must not be "fixed" by relaxing the filter.
+
+**Then harden the write path:** `POST /api/day-checkin` should store `null` for a scale whose
+`*_touched` is false, so `count(perceived_recovery)` is the honest count of real answers going
+forward. Keep Q-465's existing guard; a body carrying only untouched defaults now counts as carrying
+no answers.
+
+**⚠ Do not backfill the 77 rows to null.** The flag already tells them apart, so a write buys nothing
+and destroys the record of how long this ran. This entry is deliberately a no-data-write change.
+
+**Pass test:** `SELECT count(*) FROM day_checkins WHERE perceived_recovery IS NOT NULL AND NOT
+perceived_recovery_touched` stops growing, and neither the calibration route nor health-trends reads a
+row whose flag is false.
+
+### [readiness][platform] LB-124 — the comparative check-in field does not exist anywhere, so TN-58's control has nowhere to write
+
+- **Lane: A** — it starts with a Postgres migration, and *"Postgres migration numbers and local
+  SQLite versions belong to Lane A alone"*. **Added:** 2026-09-22 · found by Lane B on taking TN-58
+  off READY. The `LB-` letter records who found it, not who ships it.
+- **TN-58 printed READY and is not buildable.** It says *"add the comparative field beside"*
+  `perceived_recovery`, and **nothing for it exists**: no column in `lib/data/postgres/schema.ts`, no
+  field in `DayCheckinScalesSchema` or `DayCheckinExtrasSchema`
+  (`packages/shared/src/validation/day-checkin.ts`), nothing in `app/api/day-checkin/route.ts`.
+- **⚠ TN-57 is NOT this.** TN-58 calls it "the engine half", but TN-57's own entry says *"No
+  migration and no data write. The column that distinguishes answered from unanswered already
+  exists"* — it fixes three consumers that read an unanswered default as data. Shipping TN-57 leaves
+  TN-58 exactly as blocked. **Read TN-57's scope rather than TN-58's description of it.**
+- **⛔ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
+  route is **not** `.strict()`, so Zod strips an unknown key instead of rejecting it: a sheet posting
+  `vsYesterday` would get **201** and write nothing. A control that looks like it works and stores
+  nothing is worse than a 400, and worse than the neutral-default bug TN-57 exists to fix — it would
+  burn the two-week pass test and report "self-report is not available from this owner" when the
+  truth was a dropped field.
+- **Scope, which is why it is not a footnote.** `day_checkins` is offline-first: a migration **and**
+  `lib/data/postgres/schema.ts`, both Zod schemas, the route, the repository write path and its
+  row→object mapper, the local SQLite table (`lib/local-store/sqlite-backend.ts:1212`) with a store
+  version bump, and the pull-delta at `:2038`. A missed mapper reads as "the answer does not save".
+- **The twin is required.** A new column on a `claude_ro`-covered table ships its regenerated views
+  in the same PR, and `claude-ro-readonly-role.test.ts` / `db-snapshot-integration.test.ts` fail CI
+  without it — both need a **TCP** `DATABASE_URL` to run locally, or they skip and say nothing.
+- **⚠ NULL is the whole point.** Per TN-58: a skipped answer stores NULL, never a neutral. Give the
+  column no default, and follow `perceivedRecoveryTouched`'s existing shape if a touched flag is
+  wanted — the neutral-stored-as-answer bug is exactly what this question is meant to escape.
+- **Not established:** the column's type was not decided here. An enum (`better`/`same`/`worse`) and
+  a signed integer (`-1`/`0`/`+1`) both work; the integer is easier for TN-33 to correlate and the
+  enum is harder to misread. That is Lane A's call at build time, not a blocker.
+
+### [readiness][app-shell] TN-58 — ask whether today is better or worse than yesterday, because an absolute 1–5 has produced two distinct values in 81 days
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning · **owner asked for this direction**
+  2026-09-21 (*"yes go for it"*) after declining a three-week daily log the same morning — that
+  decline is the design constraint, not an obstacle.
+- **Lane: B** — `components/morning-checkin-sheet.tsx` and its sheet siblings. This one changes what
+  is asked.
+- **Needs: LB-124** — the field it writes to does not exist in the schema, the validators or the
+  route, and the route is not `.strict()`, so a control built now would post `201` and store
+  nothing. **TN-57 is not that engine half** despite the line below saying so: its own entry ships
+  no migration and fixes three consumers instead.
+
+**The control asks for an absolute rating and gets the middle of the scale.** Measured 2026-09-21:
+**2 distinct values across 96 check-ins, sd 0.29, and zero of them touched** (full table in TN-57).
+An absolute self-rating invites pegging to the centre; that is the well-known failure of the form,
+not a quirk of this owner.
+
+**The proposal: replace the absolute scale with a comparative one — *better / same / worse than
+yesterday*.** Three taps, **no default and no pre-selection**, on a sheet he already sees.
+
+**Why comparative rather than absolute, framed a year out.** Two reasons, and the second is the one
+that matters:
+1. People are reliably better at ordering two things than at scoring one, so it produces variance by
+   construction rather than by asking harder.
+2. **Pairwise orderings are sufficient to validate a metric's sign and ranking**, which is the whole
+   of what TN-33 is blocked on. Calibrated absolute values are not needed for that — so the cheaper
+   question buys the expensive answer.
+
+**What it unblocks, in order:** TN-33's sign → TN-16's prolonged-stress warning → TN-34's re-wire →
+TN-55's stress weight (61% of Body Battery drain, currently de-weighted precisely because the sign is
+unknown).
+
+**⚠ A skipped answer must store NULL, not a neutral.** The entire finding in TN-57 is a neutral
+default stored as though it were an answer. A redesign that ships a default recreates it under a new
+name. An empty control the owner skips is *more* useful than a filled one he accepts.
+
+**⚠ Do not remove the absolute scale's column.** Keep `perceived_recovery` as-is and add the
+comparative field beside it; the 77 untouched rows are evidence, and the absolute question may still
+be worth asking occasionally once there is something to anchor it against.
+
+**Pass test:** after two weeks, the comparative field has **≥3 distinct values** and a touched-rate
+materially above zero. If it does not, the answer is that self-report is not available from this owner
+at all — which is itself a finding worth having, and it costs a fortnight to get.
 ### [platform][app-shell] RV-84 — `.catch()` on `cachedFetch` is dead code, so 16 error states can never fire
 
 - **Lane:** B — the call sites. **Added:** 2026-09-21 · Review sweep 52.
@@ -902,44 +1047,6 @@ below threshold and left in place for next time.
 
 - **Keep:** this entry until all **six** are answered. Strike each item as it resolves; remove the
   entry when the last one goes.
-### [heart-rate][app-shell] RV-64 — the 90-day HR pull is fetched once per REST PERIOD; the reduction is fixed, the remount is not
-
-- **Lane:** B — `components/workout/live-hr-chart.tsx:46`, `components/workout/active-workout-screen.tsx:520`,
-  `components/workout-screen.tsx`. **Added:** 2026-09-20 · Review sweep 51. **Re-laned and re-scoped
-  2026-09-21** after the engine half shipped; the entry's original `Lane: A` covered work that is done.
-- **⚠ The engine half shipped and the entry's proposed fix was NOT what shipped — read this before
-  re-proposing it.** The original fix was *"add a repo method returning the order statistics directly —
-  `ORDER BY bpm DESC LIMIT k` and its mirror"*, on the strength of an aggregate that answered in 54 ms
-  against a 130k-row pull. Measured properly (2026-09-21), that is wrong in two independent ways:
-  - **It computes a different answer.** `getHrForWindow` returns `preferStrapBuckets(rows)`, which
-    drops every ring row in a 10-second bucket the chest strap already covers — the entry flagged
-    that function as unread, and it is exactly what makes the aggregate unsafe. Over the owner's
-    90 days it drops **1,350 of 130,580 rows**, and the naive aggregate's k-th lowest is **36**
-    against the current code's **37**. The k-th highest agreed at 175, which is luck, not structure.
-  - **A merge-correct aggregate is not faster.** Three formulations were built and timed against
-    production — join+DISTINCT **313–396 ms**, window functions **460–600 ms**, NOT EXISTS
-    **623–790 ms** — against a raw scan+sort of **20–55 ms**. Apples-to-apples on one machine with
-    the same 130,580 rows: **full pull + driver materialisation 197.9 ms**, merge-correct aggregate
-    **266.2 ms**. The aggregate is a wash at best, and the pull's cost is the pg driver building
-    130k row objects, which no SQL rewrite removes.
-- **What DID ship:** `computeObservedHr` got the reduction it actually needed — two k-element windows
-  in one pass instead of sorting all of `plausible`. **60.8 ms → 30.4 ms on 130,580 rows, identical
-  output**, pinned by a 200-trial randomised equivalence test against the old sort.
-- **⚠ Keep: the remount, which is the whole remaining ask and the only thing that changes the order of
-  magnitude.** `live-hr-chart.tsx:46` fetches `hr-profile` in a mount-once effect and
-  `active-workout-screen.tsx:520` mounts it as `{workoutPhase === "rest" && !allSetsLogged && …}`, so
-  it **remounts once per rest period** — a 5-exercise × 4-set workout pays the ~230 ms path ~20 times
-  *during the workout*, against the same 10-connection pool as `log-exercise` and `complete-workout`,
-  and the route's 20/60s rate limit means a dense rest cadence can make the chart **429 itself**.
-  Fixing the reduction took ~230 ms off a ~260 ms call; fixing the remount takes 19 calls off 20.
-- **Fix:** hoist the `hr-profile` read out of `LiveHrChart` into `workout-screen.tsx` and pass it down,
-  or give that fetch `freshWithinTtl: true`. `HR_PROFILE_TTL` is already 6 h and **two groups in
-  `lib/cache-groups.ts` (lines 246, 344) already invalidate the key**, so the written invalidation
-  proof that flag requires is available rather than owed.
-- **Verification:** a workout with N rest periods issues **one** `hr-profile` request rather than N.
-- **Not established:** the route could not be authenticated against in production, so its end-to-end
-  wall time is still inferred from the component timings above rather than measured on the wire.
-
 ### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
 
 - **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.

@@ -10,6 +10,7 @@ import { ActiveSetCard } from "./active-set-card";
 import { SetsGrid } from "./sets-grid";
 import { Live1rmReadout } from "./live-1rm-readout";
 import { LiveHrChart } from "@/components/workout/live-hr-chart";
+import { useHrProfile } from "@/lib/hooks/use-hr-profile";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { wouldDiscardWork } from "./leave-guard";
 import { OneRmCalculatorDialog } from "./one-rm-calculator-dialog";
@@ -91,6 +92,9 @@ export function ActiveWorkoutScreen({
   onRequestInjurySwap,
   userId,
 }: ActiveWorkoutScreenProps) {
+  // RV-64 — read once for the screen's whole lifetime. `LiveHrChart` fetched this itself and is
+  // mounted on the rest phase, so it ran once per rest period against a 20-per-60s route limit.
+  const hrProfile = useHrProfile();
   const tz = useUserTimezone();
   // Only the SET-1 working weight is read reactively here (for the warmup ramp + the "load the
   // bar to" header). The per-set weight/reps/lap/rest/RPE the active card renders live on every
@@ -518,7 +522,7 @@ export function ActiveWorkoutScreen({
                 then ramped during rest). `sinceMs={restStartMs}` shows just the current
                 rest's recovery dip; the full-exercise trace lives on the summary card. */}
             {workoutPhase === "rest" && !allSetsLogged && (
-              <LiveHrChart sinceMs={restStartMs} compact className="mt-2" />
+              <LiveHrChart profile={hrProfile} sinceMs={restStartMs} compact className="mt-2" />
             )}
 
             {/* ── Centre: active card or rest timer — always in the same flex zone ── */}

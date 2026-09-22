@@ -15080,7 +15080,8 @@ rather than emphasis, and both belong to other roles — TN-35 carries a second 
 a sweep would notice, and its residue is only a device check, so unparking it would surface nothing.
 Judging another role's emphasis is not this lane's call; the parser fix is LB-121 and the
 Orchestrator's.
-## 2026-09-21 — `docs/implementation-backlog.md` +336 (26041 → 26377) (Review sweep 52)
+<<<<<<< HEAD
+## 2026-09-21 — `docs/implementation-backlog.md` +336 (26149 → 26485) (Review sweep 52)
 
 Nineteen entries (**RV-84…RV-102**) from a visual sweep — formatting drift, 384px layout,
 empty/zero/error states, colour semantics and contrast — at ~18 lines each, below this file's own
@@ -15099,3 +15100,55 @@ whether the grey secondary line already disambiguates the colliding food rows, R
 both deload surfaces are even reachable in one session, RV-93 notes the injury-chip collision is
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
+=======
+
+## 2026-09-21 (third) — `docs/implementation-backlog.md` → 26150
+
++109 for TN-57 and TN-58, which between them answer the owner's question about why tuning is not
+accurate: the self-report that is the app's only candidate ground truth has **never once been
+answered** — 0 of 96 rows touched, 2 distinct values, sd 0.29 — and three consumers read the
+unanswered neutral default as data, including a calibration route and a user-facing correlation.
+
+Two blocks earn the length. The first is the correction: this was drafted as *circularity* (the
+control pre-filled from readiness) and that is false — it seeds from a neutral constant, and the
+circular one is a different sheet (TN-50). Left unwritten, an implementer opens the wrong file. The
+second is the **no-data-write** instruction with its reason: the `*_touched` flag already separates
+answered from unanswered, so backfilling the 77 rows buys nothing and destroys the evidence of how
+long this ran. Both are the kind of thing a later session reverses by reasonable-sounding accident.
+
+TN-58 also records that the owner declined a three-week daily log the same morning, which makes the
+decline a design constraint rather than a blocker — that context is why the entry proposes three taps
+instead of re-asking.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26150 → 26187 (TN-58's engine half did not exist)
+
+TN-58 printed as Lane B's only READY item and is not buildable. It says to *"add the comparative
+field beside"* `perceived_recovery`; nothing for that field exists — no column, no entry in either
+Zod schema, nothing in the route. It names TN-57 as "the engine half", and TN-57's own entry says it
+ships **no migration** and fixes three consumers instead, so shipping TN-57 would have left TN-58
+exactly as blocked.
+
+The 37 lines are **LB-124**, filed for Lane A because the work starts with a migration, plus a
+`Needs:` on TN-58. Most of those lines are scope rather than description, and deliberately so: the
+route's `Body` is not `.strict()`, so a control built now would post **201 and store nothing** —
+silent, and it would burn TN-58's two-week pass test into a false "self-report is not available from
+this owner". `day_checkins` is also offline-first, so the engine half reaches the local SQLite table,
+its version and the pull-delta, and the new column needs its regenerated `claude_ro` twin.
+
+**Third instance this run of the same shape** — an entry wrong about the field that decides who can
+build it (BF-185's `.strict()` schema, RV-79's unconditional `setCached`, now this). The cost each
+time is the same: it is only visible if you read the thing the fix would touch before starting.
+
+## 2026-09-22 — `docs/implementation-backlog.md` 26187 → 26149 (RV-64 left the queue)
+
+RV-64's remount half shipped and the entry was removed whole — its engine half had already landed,
+and the device item it might have kept is not owed: the claim is a request count, not a look.
+
+Worth carrying out of it, because the entry was half wrong and the wrong half was the tempting one.
+It offered `freshWithinTtl: true` as an alternative fix and said the invalidation proof that flag
+needs was *"available rather than owed"*, on the strength of two groups containing `hr-profile`.
+Containing the key is not the proof. The proof is that **every writer of the payload** sits in a
+group, and live BLE samples land in the profile's own 90-day window during the workout with nothing
+in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
+across workouts to fix a twenty-call loop inside one.
+>>>>>>> origin/main

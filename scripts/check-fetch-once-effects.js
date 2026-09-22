@@ -65,17 +65,23 @@ const BASELINE = {
   // Not by the directory the file sits in, and not by whether it is called a sheet — the tab
   // screens mount their sheets unconditionally with a null prop, so sheets do not unmount here.
 
-  // ── Unmount on navigate or on a conditional render, so their next mount refetches. **12 sites
-  // across 10 files** — count them off the map below rather than trusting this line, which said
+  // ── Unmount on navigate or on a conditional render, so their next mount refetches. **11 sites
+  // across 9 files** — count them off the map below rather than trusting this line, which said
   // "13 across 11" for a day after a conversion removed a file and left the prose behind. That is
   // the same class of error as the over-counting scanner above, in the same file, and it is why the
   // run line prints the computed totals.
   //
   // Latent rather than broken, and **on the evidence to date none of them is worth converting**
   // (judged 2026-08-20, per site, not as a group):
-  //   · `run-hr-zone-hero`, `done-screen`, `run-active-screen` and `live-hr-chart` read `hr-profile`
-  //     or an HR series while a run/workout is in progress or just finished. Nothing writes those
-  //     keys during that window, so a subscription would wait on a signal that never fires.
+  //   · `run-hr-zone-hero`, `done-screen` and `run-active-screen` read `hr-profile` or an HR series
+  //     while a run/workout is in progress or just finished. Nothing writes those keys during that
+  //     window, so a subscription would wait on a signal that never fires.
+  //   · `live-hr-chart` was in this list and is gone (RV-64) — for a reason this judgement does not
+  //     cover. It was annotated "inside exercise-summary-screen", which was only half its mounts:
+  //     `active-workout-screen` renders it on `workoutPhase === "rest"`, so it remounted once per
+  //     REST PERIOD, ~20 times in a 5x4 workout, against a 20-per-60s route limit. The staleness
+  //     judgement above was right and the COST was never the question this list asks. It takes the
+  //     profile as a prop now. **Judge a site by every place it mounts, not the first one found.**
   //   · `my-meals-picker` reads `saved-meals`, and the only writer reachable from the flow it sits
   //     in — `meal-plan-setup-sheet`'s `invalidateSavedMeals()` — runs at the END of the wizard,
   //     after `{step === 4 && <MyMealsPicker/>}` has unmounted it. **The open question here is now
@@ -98,7 +104,6 @@ const BASELINE = {
   'components/nutrition/my-meals-picker.tsx': 1,             // conditional, inside a sheet
   'components/running/running-plan-content.tsx': 3,
   'components/workout/done-screen.tsx': 1,
-  'components/workout/live-hr-chart.tsx': 1,                 // inside exercise-summary-screen
 };
 
 
