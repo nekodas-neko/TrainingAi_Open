@@ -26,8 +26,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**One stored 1RM printed four different numbers (RV-89, v1.464.4).** A lift stored on the 0.25 grid
+at 92.25 read as **92.5** on the ready screen, **~92** in the exercise list, **92.3** in the stats
+sheet and on the Strength Trend card, and **92.25** in the exercise summary — in one session. All
+of them now call `displayOneRm`. **The ready screen's rounder was `mround125`, the 1.25 kg plate
+grid** — a *prescription* rounder, and the one that told the owner to load 82.5 kg onto a pull-up in
+BF-127; its import is gone from that file, while the stats sheet's two remaining calls are genuine
+prescription weights. **The Strength Trend card held three of the sites, not the one the entry
+named** (headline, 90-day low, peak), and both of the entry's open questions are answered in the
+negative: the `~` was not a deliberate approximation signal, and no site reads a pre-rounded server
+field.
 
 **AI calls are bounded, and the prose routes answer with their own facts when the model fails
 (RV-69 + RV-70, v1.464.3).** Four routes — the daily and weekly digests, the health insight and the
