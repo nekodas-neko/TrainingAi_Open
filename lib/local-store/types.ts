@@ -574,6 +574,8 @@ export interface LocalDayCheckin {
   illnessContext:            import('@trainingai/shared/types/day-checkin').IllnessContext | null;
   perceivedRecoveryTouched:  boolean;
   sleepQualityFeelTouched:   boolean;
+  /** TN-58 comparative self-report. NULL = not answered; there is no neutral. */
+  vsYesterday: import('@trainingai/shared/types/day-checkin').VsYesterday | null;
   soreMuscles:       string[];
   journal:           string | null;
   /** Q-387 — ISO timestamp of "I have finished logging today"; null or absent means not marked.

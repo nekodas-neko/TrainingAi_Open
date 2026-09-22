@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(39)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(40)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
@@ -22,6 +22,32 @@ describe('local schema', () => {
         `food_logs.${column} missing from RECONCILE_COLUMNS`,
       ).toBe(true)
     }
+  })
+
+  // LB-124, the same three-part rule again, and the reason it keeps earning a test: the column is
+  // in CREATE_DAY_CHECKINS for fresh installs, so a device that already has the table would never
+  // see it without this ALTER — and "the answer does not save" is how that reads on the device,
+  // with nothing failing anywhere.
+  it('v40 adds vs_yesterday by ALTER, not only in the CREATE body', () => {
+    const v40 = MIGRATIONS.find(m => m.toVersion === 40)!
+    const ddl = v40.statements.join('\n')
+    expect(ddl).toContain('ALTER TABLE day_checkins ADD COLUMN vs_yesterday')
+    expect(
+      RECONCILE_COLUMNS.some(c => c.table === 'day_checkins' && c.column === 'vs_yesterday'),
+      'day_checkins.vs_yesterday missing from RECONCILE_COLUMNS',
+    ).toBe(true)
+  })
+
+  /**
+   * NULL is the whole point (TN-58), so the column must carry no DEFAULT on either side. A neutral
+   * stored as though it were an answer is the bug TN-57 fixed on the scales beside it, and this is
+   * the question meant to escape it.
+   */
+  it('gives vs_yesterday no default, in the ALTER and in RECONCILE_COLUMNS', () => {
+    const v40 = MIGRATIONS.find(m => m.toVersion === 40)!
+    expect(v40.statements.join('\n')).not.toMatch(/vs_yesterday[^\n]*DEFAULT/i)
+    const row = RECONCILE_COLUMNS.find(c => c.table === 'day_checkins' && c.column === 'vs_yesterday')!
+    expect(row.ddl).not.toMatch(/DEFAULT/i)
   })
 
   // BF-3, same shape once more. Five columns across two tables that both already exist on every

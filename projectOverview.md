@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.464.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.464.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**The comparative check-in now has a column to write to (LB-124, v1.464.8).** TN-58 asks *"is today
+better or worse than yesterday?"* instead of an absolute 1-5, because the absolute scale produced
+two distinct values in 81 days. The field did not exist anywhere, and the route's `Body` is not
+`.strict()`, so a control built first would have posted **201 and stored nothing** — which is why
+Lane B filed this rather than attempting it. `day_checkins.vs_yesterday` now exists (migration 280,
+`claude_ro` twin 281, local SQLite v40): `better` | `same` | `worse`, **nullable with no default**,
+carried by both write paths, all three row mappers, the local store and the pull-delta, and counted
+by `dayCheckinHasAnswers` so a check-in whose only answer is this one saves rather than reading as
+empty. Text rather than a signed integer because every other scale on this table stores 1 = best …
+5 = worst, and a `+1 = better` column would put two polarities in one row. **The compiler found two
+sites no test would have**: `food-logging-complete` re-saves the evening row and would have cleared
+the answer on every food-log completion, and there are three row mappers rather than two. **What
+remains is TN-58's control** — the sheet — and nothing else. `LA-128` records the `.strict()` hazard
+that made this entry necessary: LB-124 closed it for one field by making the key known, not for the
+class.
 
 **The self-report was never answered, and five readers took the seed as data (TN-57, v1.464.7).**
 The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.8",
+    date: "2026-09-22",
+    changes: [
+      "Groundwork for a better morning question. The recovery slider asks you to rate today on its own, and in 81 days it has only ever produced two different answers \u2014 which makes it useless for working out what actually affects how you feel. The app can now store a simpler one: better, the same, or worse than yesterday. Nothing asks it yet; the question itself is the next change. Skipping it stores nothing at all rather than a middle value, which is the point.",
+    ],
+  },
+  {
     version: "1.464.7",
     date: "2026-09-22",
     changes: [
