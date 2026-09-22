@@ -15169,7 +15169,7 @@ both deload surfaces are even reachable in one session, RV-93 notes the injury-c
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
 
-## 2026-09-22 — `docs/implementation-backlog.md` 26586 → 26638 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
+## 2026-09-22 — `docs/implementation-backlog.md` 26586 → 26639 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
 
 Net +52 across a removal and an addition, recomputed after merging review sweep 52 rather than spliced. **Out:** LA-49, whose two steps both shipped in this PR.
 **In:** OR-123, the WebView rollup consumer — filed because Q-538's bound was *"blocked, and not by
