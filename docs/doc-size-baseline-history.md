@@ -15526,6 +15526,26 @@ layout bug does not need a mockup; merging a card, collapsing a banner stack, or
 between tabs does. The test is whether the owner would notice the screen is *arranged* differently,
 not whether it looks different.
 
+## 2026-09-23 — `docs/implementation-backlog.md` → 26758
+
++68, and the largest block is a retraction rather than a finding.
+
+**Q-272 is the pre-existing Body Battery entry and TN-55 was filed without checking for it.** Q-272 had
+said since 2026-08-15 that the next action was Tuning's and no proposal existed; TN-55 is that proposal.
+Linking them cost lines on both entries and is worth every one, because two entries prescribing
+different fixes for one defect is how a lane gets sent two ways.
+
+Two of the additions exist to stop a later session inheriting a false premise. Q-272's acceptance test —
+`r = +0.67 (n = 11)` for end-of-day battery against next-day readiness, with an instruction to re-run it
+after the change — **does not replicate**: 0.252 over 70 days, against readiness's own 0.361
+autocorrelation. Someone would have validated the whole rework against a relationship that is not there.
+And overnight charging is now recorded as **out**, because Q-272 is right that the wake anchor already
+accounts for the night; the re-fit without it is strictly better, so the warning also carries the
+measurement that makes it stick.
+
+TN-61 (Lane O) and ledger items 2b/2c are the rest: a queue tool that truncates silently, a readiness
+contributor worth 2.8% of the movement on a 0.06 weight, and the `.size` conflict tax with a measured
+cost of five of seven PRs in one session.
 ## 2026-09-22 — `projectOverview.md` 12399 → 12413, backlog 26690 → 26682 (RV-103/RV-104)
 
 The fourteen lines on `projectOverview.md` are one Known-Issues entry, and it is there for the half
@@ -15541,5 +15561,8 @@ the split that keeps this file from regrowing.
 First draft of that entry ran 21 lines over the baseline and was cut to 14 rather than granted the
 space — the detail belongs in `docs/overview/entries/`, and the index carries the warning only.
 
-The backlog ratchets **down** eight lines: RV-104 shipped whole and left the queue, and RV-103 came
-back shorter as a `Keep:` entry, against the new LB-128 filed for Lane A.
+The backlog figure moves **up** on arithmetic and **down** on this branch's own account: RV-104
+shipped whole and left the queue and RV-103 came back shorter as a `Keep:` entry, for −8 against
+the new LB-128 filed for Lane A — but TN-61 landed from `main` in the same merge, so the recorded
+baseline lands at 26750 rather than 26682. The ratchet only ever records where the file ended up;
+what this paragraph is for is that the eight lines were genuinely given back, not absorbed.
