@@ -1215,11 +1215,22 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Lane:** A — production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
   RV-66).
 - **Gate:** owner
-- **Measured 2026-09-21.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein / 141 g
-  carbs / 55 g fat**, which is *exactly* the `goal_recommendations` row from **2026-08-31** — a row
-  the model wrote and the sheet applied. The computed baseline for the owner's current profile
-  (70.35 kg, 25.7% BF, measured RMR 1,325 @ 51.5 kg FFM, recomp, moderate) is **1,410 / 115 / 143 /
-  42**. So the live targets run **+250 kcal (+18%)** and **+35 g protein (+30%)** above the formula.
+- **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
+  only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
+  141 g carbs / 55 g fat**, *exactly* the `goal_recommendations` row from **2026-08-31** — a row the
+  model wrote and the sheet applied.
+- **The steps goal is a model number too, and it is the impossible one.**
+  `claude_ro.users.steps_goal` reads **5,000** — the value from the 2026-09-14 recommendation, which
+  `STEP_GOAL_BY_ACTIVITY` cannot produce at all (it returns only 7,000 / 8,500 / 10,000 / 12,000,
+  and the owner is `moderate` → 10,000). The original filing said this could not be read; that was
+  wrong, and the reason is recorded under the retired LA-127: it was looked for in a `user_goals`
+  table, and the goals are columns on `users`.
+- **The body-fat correction widens the gap rather than excusing it.** `claude_ro.dexa_scans` holds a
+  real DEXA at **28.5%** against the scale's 25.7%, and `correctBodyFatPct` moves body fat toward the
+  scan — which lowers lean mass, and with it protein and calories. Baseline at the scale reading is
+  **1,410 / 115 / 143 / 42**; at the DEXA reading it is **1,359 / 111 / 143 / 38**. So the live
+  targets run **+259 kcal (+19%)** and **+39 g protein (+35%)** above the formula, not the +18%/+30%
+  first filed.
 - RV-66 stops any *future* recommendation being model-invented. It does not touch what is already
   stored, and it must not: rewriting a user's goals is a production data write.
 - **What the owner has to decide**, and it is genuinely a choice rather than a correction: the
@@ -1233,6 +1244,14 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 
 - **Lane:** A — `packages/shared/src/nutrition/goal-recommendation.ts:205,262-268`.
   **Added:** 2026-09-21 (Lane A, found while shipping RV-66).
+- **Gate:** owner — **added 2026-09-21 as a correction.** The entry always said the fix *"changes
+  the computed fat target for real users, so it wants the owner's eye on the number before it
+  ships"*, and that sentence was prose. `Gate:` is a FIELD; written inline it is ignored, so this sat
+  at **READY position 1** describing its own owner gate in a form nothing reads. Its sibling LA-126
+  was filed the same hour with the same mistake and `check-backlog-pointers.js` caught that one,
+  because there the field name appeared mid-bullet where the checker looks for it. Here it was never
+  written at all, so there was nothing to catch: **the check finds a gate in the wrong place, not a
+  gate that is missing.**
 - `calculateBaseline` sets `fatG = round(calories * 0.25 / 9)`. `clampRecommendation` floors fat at
   `round(0.6 * weightKg)`. For the owner those are **39 g and 42 g**, so the clamp raises fat and
   carbs fall out of the remainder at **143 instead of 150**.
@@ -1251,25 +1270,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
   wants the owner's eye on the number before it ships.
 - **Verification:** the route's response equals `calculateBaseline` field-for-field, and the
   `lose_weight` floor test still passes.
-
-### [platform] LA-127 — two tables have no `claude_ro` twin, so they are invisible to every read
-
-- **Lane:** A — `lib/data/postgres/migrations/`, `scripts/generate-claude-ro-views.js`.
-  **Added:** 2026-09-21 (Lane A, found while measuring RV-66).
-- `claude_ro.user_goals` and `claude_ro.body_fat_calibration` both return *relation does not exist*.
-  `claude_ro` is default-deny, so a table with no view is unreadable rather than partially readable.
-- **What it cost in one session:** the RV-66 measurement could not read the owner's steps goal at all
-  (`user_goals`), and could not reproduce `correctBodyFatPct` (`body_fat_calibration`), so the
-  lean-mass-derived half of that comparison had to be stated as approximate. The step-goal half
-  survived only because it happens not to depend on body fat.
-- **Not established:** whether these are deliberate omissions (the generator has an exclusion list)
-  or drift from a migration that shipped without its twin. **Read the generator's exclusions before
-  regenerating** — if they are deliberate, this entry becomes a docs fix naming the reason.
-- **Fix:** regenerate the views per CLAUDE.md's twin rule, as a NEW migration number, diffing against
-  the previous one to confirm only the intended views moved. The owner's id must not appear in the
-  output (Q-456).
-- **Verification:** both tables answer a `SELECT` through `/api/admin/db-query`;
-  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` pass on a TCP `DATABASE_URL`.
 
 ### [nutrition][app-shell] RV-68 — the supplement tick paints only after three awaited local writes and a native call
 

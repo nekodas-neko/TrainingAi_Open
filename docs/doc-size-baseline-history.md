@@ -15169,6 +15169,43 @@ both deload surfaces are even reachable in one session, RV-93 notes the injury-c
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
 
+
+## 2026-09-21 — LA-125 described its own owner gate in a form nothing reads
+
+`docs/implementation-backlog.md` **26150 → 26158** (`lane-a/la125-gate-the-fat-formula-change`) —
+recomputed against main on the third re-merge while this waited.
+
+Filed hours earlier with the sentence *"that changes the computed fat target for real users, so it
+wants the owner's eye on the number before it ships"* — as **prose**. `Gate:` is a field, and written
+any other way it is ignored, so the entry sat at **READY position 1** advertising a gate that nothing
+could act on.
+
+Worth the note because the near-miss is asymmetric. Its sibling **LA-126** was filed in the same
+edit with the same mistake and `check-backlog-pointers.js` caught it within a minute — there the
+field name sat mid-bullet where the checker looks for it, and it warned. LA-125 never
+wrote the words at all, so there was nothing to detect: **the check finds a gate in the wrong place,
+not a gate that is missing.** Catching one and not the other reads like the checker working, which
+is how the second one survived.
+
+## 2026-09-22 — LA-127 was filed against two tables that do not exist
+
+`docs/implementation-backlog.md` **26187** · `projectOverview.md` **12205 → 12212**
+(`lane-a/la125-gate-the-fat-formula-change`, folded in).
+
+LA-127 claimed `user_goals` and `body_fat_calibration` had no `claude_ro` twin. Neither is a table.
+`getUserGoals` reads **columns on `users`**; `getBodyFatCalibration` derives its answer from
+**`dexa_scans`** in TypeScript and stores nothing. The generator's `DENIED` set holds only
+`invited_emails` and `rate_limits`, so there was no policy exclusion either — and no drift, because
+there is nothing to generate a view for. Retired rather than built.
+
+**The retraction makes the finding it came from stronger, which is why it is worth the lines.** That
+entry existed to excuse a gap in RV-66's measurement. With the right relations read:
+`claude_ro.users.steps_goal` is **5,000** — so the impossible step goal is the owner's *live* goal,
+not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** against the scale's
+25.7%, which lowers lean mass and takes the computed baseline to **1,359 kcal / 111 g protein**. The
+gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
+read as "this number might be softer than stated" was hiding a number that was harder.
+
 ## 2026-09-22 — `docs/implementation-backlog.md` 26586 → 26639 (OR-122: LA-49 out, OR-123 in, six blocks lifted into fields)
 
 Net +52 across a removal and an addition, recomputed after merging review sweep 52 rather than spliced. **Out:** LA-49, whose two steps both shipped in this PR.
