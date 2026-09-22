@@ -15131,7 +15131,7 @@ group, and live BLE samples land in the profile's own 90-day window during the w
 in `lib/live-hr/**` invalidating anything. The flag would have pinned a stale profile for six hours
 across workouts to fix a twenty-call loop inside one.
 
-## 2026-09-22 — `docs/implementation-backlog.md` 26326 → 26359 (+33), rebased onto a larger main, `projectOverview.md` 12375 → 12373 (−2), PS-47
+## 2026-09-22 — `docs/implementation-backlog.md` 26306 → 26339 (+33), rebased onto a larger main, `projectOverview.md` 12382 → 12380 (−2), PS-47
 
 One new entry, PS-47: the Colmi holds about five days from full, went flat, and cost two days of the
 baseline week. The lines that earn their place are the measurement (100% → 30% over four days, then
@@ -15426,3 +15426,16 @@ the day, for a reason unrelated to their diff — which is the exact complaint t
 attribute itself in the first place. `check-doc-links` (818 files) and `check-index-doc-paths`
 (1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
 other, since a citation whose link *text* is also a path passes the first and fails the second.
+
+## 2026-09-22 — RV-98 (`fix/rv98-opacity-contrast`)
+
+`docs/implementation-backlog.md` → **26306**: RV-98 left the queue.
+
+`projectOverview.md` → **12382**: twelve lines for the sweep, **minus four duplicate header lines
+that were already on `main`**. Current Status opened with three stacked `**Version:**` lines
+(v1.465.2, v1.465.1, v1.465.0) and carried a stray `**Version:** v1.464.8` + `**Last updated:**`
+pair buried mid-section. They are conflict-resolution residue, and the recipe in this lane's baton
+is how they got there: *"keep BOTH Current Status paragraphs"* is right about the paragraphs and
+wrong if it also keeps the header above them. The baton now says to fix the version line
+explicitly. This is the file every session reads first to orient, so three contradictory version
+numbers at the top of it is worse than a stale one.

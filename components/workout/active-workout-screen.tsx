@@ -238,7 +238,7 @@ export function ActiveWorkoutScreen({
           <p className="text-xs font-semibold text-muted-foreground truncate">
             {sessionName ?? (soloMode ? "Solo log" : "Workout")}
           </p>
-          <p className="text-[10px] text-muted-foreground/60 truncate">
+          <p className="text-[10px] text-muted-foreground/70 truncate">
             {sessionContext}
             {soloMode ? "Solo" : `Ex ${exerciseIndex + 1}/${totalExercises}`}
             {timerStarted && <ExerciseClock startMs={exerciseStartMs} />}

@@ -17,7 +17,7 @@ export function HomeSortableSection({ id, editMode, onHide, children }: Props) {
       {editMode && onHide && (
         <button
           onClick={() => onHide(id)}
-          className="absolute right-5 top-1/2 -translate-y-1/2 z-10 rounded-lg p-1 text-muted-foreground/60 hover:text-muted-foreground active:scale-90 transition"
+          className="absolute right-5 top-1/2 -translate-y-1/2 z-10 rounded-lg p-1 text-muted-foreground/70 hover:text-muted-foreground active:scale-90 transition"
           aria-label="Hide section"
         >
           <EyeOffIcon className="h-4 w-4" />
