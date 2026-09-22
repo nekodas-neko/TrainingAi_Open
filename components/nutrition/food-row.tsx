@@ -70,7 +70,7 @@ export const FoodRow = memo(function FoodRow({
     <>
       {showThumb && <MealThumb src={thumbSrc} />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium leading-snug">{name}</span>
+        <span className="block line-clamp-2 text-sm font-medium leading-snug">{name}</span>
         {secondary && (
           <span className="mt-0.5 block truncate text-xs text-muted-foreground">{secondary}</span>
         )}
