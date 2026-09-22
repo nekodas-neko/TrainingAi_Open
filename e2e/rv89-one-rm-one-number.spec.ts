@@ -13,6 +13,14 @@ test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
 test('the pre-workout row and the stats sheet print the same 1RM', async ({ page }) => {
   await page.goto('/workout', { waitUntil: 'networkidle' })
 
+  // `/workout` opens on the session CHOOSER. One press moves to the pre-workout screen, which is
+  // the exercise list this test is about; the SECOND press is what would actually start a workout,
+  // and is deliberately not made — this spec shares one seeded database with every other.
+  const startWorkout = page.getByRole('button', { name: 'Start Workout' })
+  await startWorkout.waitFor({ timeout: 120_000 })
+  await startWorkout.click()
+  await page.waitForURL(/[?&]session=/, { timeout: 60_000 })
+
   const row = page.locator('p', { hasText: /est 1RM/ }).first()
   await expect(row).toBeVisible({ timeout: 15_000 })
   const rowText = (await row.innerText()).replace(/\s+/g, ' ')

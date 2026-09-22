@@ -15266,3 +15266,11 @@ was LA-49, which had measured the whole thing three weeks earlier and was parked
 described. A self-parking finding does not stay found; it gets re-found, and each re-finding pays
 the investigation again. That is the argument for the check TN-59 still proposes, more than the
 count it was written against.
+
+## 2026-09-22 — RV-89 (`fix/rv89-one-rm-display-helper`)
+
+`docs/implementation-backlog.md` 26619 → **26598**: RV-89 shipped and left the queue.
+
+`projectOverview.md` 12222 → **12233**: eleven lines at the top of Current Status. The entry named
+five surfaces; the Strength Trend card turned out to hold three sites rather than one, and the
+`mround125` half is worth the space because it is the same rounder behind BF-127.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.464.3",
+    date: "2026-09-22",
+    changes: [
+      "One estimated 1RM now shows the same number everywhere. A lift stored at 92.25 kg read as 92.5 on the ready screen, ~92 in the exercise list, 92.3 in the stats sheet and on the strength trend, and 92.25 in the exercise summary \u2014 four numbers for one lift, in one session. The ready screen was the worst of them: it was rounding to the nearest pair of plates, which is the right thing to do for a weight you are about to load and the wrong thing for a number you are only reading.",
+    ],
+  },
+  {
     version: "1.464.2",
     date: "2026-09-22",
     changes: [
