@@ -15455,7 +15455,7 @@ numbers at the top of it is worse than a stale one.
 
 ## 2026-09-22 — LB-126 (`feat/lb126-shared-date-styles`)
 
-`docs/implementation-backlog.md` → **26278**: LB-126 left the queue, one PR after LB-125 (its Lane A
+`docs/implementation-backlog.md` → **26338**: LB-126 left the queue, one PR after LB-125 (its Lane A
 half) landed. The split that parked it was made the same day and did its job — the entry surfaced
 the moment its dependency shipped, rather than being started early and converting two of five.
 
