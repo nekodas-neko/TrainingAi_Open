@@ -26,8 +26,17 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
+
+**Four more date labels moved onto the shared formatter (LB-126, v1.465.4).** LB-125 (#1404, Lane A)
+gave `formatDateDisplay` the `weekday`, `weekday-date` and `weekday-date-long` styles; these are the
+call sites RV-91 closed with as *"noted, not filed"*. Output is byte-identical — checked before the
+swap, not after. **The fifth site that entry named is not one:** `calendar-widget` renders a MONTH
+and YEAR, which the helper cannot take, and the test asserts it stays as it is. **An unpredicted
+consequence:** all four were `REVIEWED_BENIGN` rows in `check-timezone-rendering.js`, and routing
+them through the helper means they no longer call `toLocale*String` at all — the gate failed until
+their rows were deleted, which is that script's own rule working.
 
 **Opacity-modified text was below AA and the contrast check could not see it (RV-98, v1.465.3).**
 `check-contrast.js` validated ten BARE token pairs and had no opacity handling, so everything from

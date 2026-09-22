@@ -15425,3 +15425,14 @@ is how they got there: *"keep BOTH Current Status paragraphs"* is right about th
 wrong if it also keeps the header above them. The baton now says to fix the version line
 explicitly. This is the file every session reads first to orient, so three contradictory version
 numbers at the top of it is worse than a stale one.
+
+## 2026-09-22 — LB-126 (`feat/lb126-shared-date-styles`)
+
+`docs/implementation-backlog.md` → **26278**: LB-126 left the queue, one PR after LB-125 (its Lane A
+half) landed. The split that parked it was made the same day and did its job — the entry surfaced
+the moment its dependency shipped, rather than being started early and converting two of five.
+
+`projectOverview.md` → **12391**: nine lines. Worth the space for the part that will not be obvious
+later: converting these four also emptied four `REVIEWED_BENIGN` rows out of
+`check-timezone-rendering.js`, because a site that stops calling `toLocale*String` stops being a
+device-local renderer.

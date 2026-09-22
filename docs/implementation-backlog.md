@@ -627,34 +627,6 @@ nothing structured saying why — and a human decides.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-### [platform] LB-126 — five date call sites still hand-roll their own option bag
-
-- **Lane:** B — `components/calendar-widget.tsx:109`,
-  `components/nutrition/weekly-nutrition-chart.tsx:50`,
-  `app/session-select/components/recommendation-card.tsx:36`,
-  `app/session-select/components/week-day-sheet.tsx:13`,
-  `app/nutrition/nutrition-content.tsx:88`. **Added:** 2026-09-22 · the Lane B half of LB-125.
-- **LB-125 has landed — every style this needs now exists.** `formatDateDisplay(raw, style)` takes
-  `short` · `long` · `weekday` · `weekday-date` · `weekday-date-long`, each pinned to its exact
-  output in `packages/shared/src/__tests__/date-utils.test.ts`.
-- **⛔ Corrected while landing LB-125 — this entry's counts were wrong, measured 2026-09-22.**
-  **TWO of the five are a bare `{ weekday: 'short' }`**, not three: `recommendation-card.tsx:36`
-  and `weekly-nutrition-chart.tsx:50`. The two the entry called one-offs are the same shape with
-  different weekday widths, and each has a style: `week-day-sheet.tsx:13` →
-  **`weekday-date-long`**, `nutrition-content.tsx:88` → **`weekday-date`**.
-- **⛔ `calendar-widget.tsx:109` is NOT convertible, and is the reason this is four sites, not
-  five.** It is a `{ month: 'long', year: 'numeric' }` MONTH-AND-YEAR label built from
-  `(viewYear, viewMonth)` **numbers** — `formatDateDisplay` takes a `YYYY-MM-DD` string and
-  renders a day, so routing it would mean inventing a day-of-month to throw away. Leave it, or
-  file a separate month-label helper; do not force it.
-- **Check the rendered string before and after, do not assume it is unchanged.** `en-AU` emits a
-  comma after a SHORT weekday and none after a long one, so `weekday-date` gives `Tue, 15 Sept` —
-  which is what `nutrition-content` already renders, making that one a true no-op. Confirm the
-  same for the other three rather than trusting it.
-- **Also duplicated, outside this entry's list:** `components/admin/time-audit-card.tsx:200`
-  spells the `'short'` bag by hand. It takes a timestamp rather than a date string, so it needs a
-  `toAestDay` first; admin surfaces are timezone-exempt per CLAUDE.md, so this is optional.
-
 ### [platform][app-shell] RV-99 — good/warning/bad exists as two parallel palettes, and only one can follow the theme
 
 - **Lane:** A — `packages/shared/src/health/score-band.ts` first. **Added:** 2026-09-21 ·
