@@ -15310,6 +15310,18 @@ shipped without device verification needs its arithmetic on the record where the
 `docs/implementation-backlog.md` 26570 → **26500**: five entries out, and LB-125 split into LB-125
 (Lane A, the helper) plus LB-126 (Lane B, the call sites, parked on it). One entry spanning two
 lanes prints as READY to whichever lane cannot start it, which is what it did within the hour.
+
+## 2026-09-22 — RV-97 (`fix/rv97-acwr-band-colour`)
+
+`projectOverview.md` 12271 → 12280 → **12316** on re-merge with #1399: nine lines at the top of
+Current Status, carrying why the
+entry's one-line fix does not compile — a six-key union into a four-key helper — because that is
+the part a future session would otherwise rediscover.
+
+`docs/agents/state/implementation-lane-b.md` stays at **65**, rewritten in full rather than
+appended. It had fallen four merged PRs behind. Two lessons were merged to make room: the
+vacuous-guard rule folded into the control rule it is a case of, and the Morning Check-in modal
+into the Playwright-mechanics bullet beside it.
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26431, `projectOverview.md` → 12288 (TN-57)
 
 The backlog lost TN-57 whole, which was a long entry: it carried the production measurement table,
@@ -15342,7 +15354,7 @@ every food-log completion, and the type choice (text, not `-1/0/+1`) turns on th
 storing 1 = best … 5 = worst — both things the next person to touch this column needs and neither
 recoverable from the diff.
 
-## 2026-09-22 — `docs/implementation-backlog.md` → 26405, `projectOverview.md` → 12319 (RV-85)
+## 2026-09-22 — `docs/implementation-backlog.md` → 26388, `projectOverview.md` → 12331 (RV-85)
 
 RV-85 left whole. `projectOverview.md` takes one Current Status block, and the sentence worth the
 lines is the one about `fetchWithRetry`: the helper that exists to stop a blank widget was producing

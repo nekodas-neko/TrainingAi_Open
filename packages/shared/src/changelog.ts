@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.464.9",
+    version: "1.464.10",
     date: "2026-09-22",
     changes: [
       "Home now tells you when your scores failed to load instead of just leaving a gap. The whole row \u2014 readiness, sleep, the illness note and the deload banner \u2014 disappeared if the request failed, with no spinner and no message, so it looked like a day with nothing to show. It now says \u201cScores didn't load \u2014 pull to refresh\u201d, but only after it has quietly retried three times, so a slow morning still just looks slow.",
+    ],
+  },
+  {
+    version: "1.464.9",
+    date: "2026-09-22",
+    changes: [
+      "The Training Load number is now the colour of its own zone. It was painted amber \u2014 the warning colour \u2014 no matter what the reading was, so a perfectly normal 1.05 showed in amber beside the words \"Optimal zone\" and above a line saying 0.8 to 1.3 is the green zone. The card disagreed with itself twice in one glance. Green in the optimal zone, amber when elevated, red when high, grey when undertraining.",
     ],
   },
   {

@@ -717,23 +717,6 @@ at all — which is itself a finding worth having, and it costs a fortnight to g
 - **Do not start this before LB-125 lands**; converting two of five is what makes the remaining
   three look deliberate.
 
-### [readiness] RV-97 — the ACWR number is painted the "High" colour whatever band it is in
-
-- **Lane:** B — `components/health/training-load-card.tsx:71`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- `<p … style={{ color: '#f59e0b' }}>{trainingLoad.acwr.toFixed(2)}</p>` — a hard-coded literal that
-  is exactly what `acwrBand()` reserves for **`high`** (`packages/shared/src/ai-periodization/acwr.ts:77`),
-  while `optimal` is `#22c55e`, `low` `#94a3b8`, `very_high` `#ef4444`.
-- The band **word** beside it comes from the real `interpretation` (`:72-77`). So an ACWR of 1.05
-  renders **"✓ Optimal zone" with the number in warning amber**, above body copy at `:91` saying the
-  green zone is 0.8–1.3. The card contradicts itself twice on one line.
-- **`acwrBandByKey()` exists at `acwr.ts:90` for exactly this caller and is not imported.**
-- **Fix:** `style={{ color: acwrBandByKey(trainingLoad.interpretation).color }}`. Leave
-  `accentCardStyle('#f59e0b')` as the card's identity — only the *value* takes the band colour.
-- **Not established:** whether `interpretation` can carry a key outside `AcwrBand['key']`
-  (`insufficient_data`/`baselining` are handled on earlier branches, so the coloured branch looks
-  unreachable for them).
-
 ### [app-shell] RV-98 — opacity-modified text falls below AA, and the contrast check cannot see it
 
 - **Lane:** B — the call sites, plus extending `scripts/check-contrast.js`. **Added:** 2026-09-21 ·
