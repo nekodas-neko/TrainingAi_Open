@@ -56,8 +56,8 @@ corrected*. The ones that change what anyone does next:
 ## Also
 
 - Windows could not check out `main` at all: a stray file named `ord.endsWith('ss')||` (added by
-  accident in #672) has a `|` in it. PR #1414 deletes it; until then the workaround is in the
-  role's prompt.
+  accident in #672) has a `|` in it. PR #1414 deleted it (merged the same day, before this
+  PR), so a fresh Windows clone checks out cleanly now.
 - New role written into `docs/agents/README.md`, `prompts/device-verification.md` and a baton at
   `state/device-verification.md`, with the `DV-` prefix. It runs locally, so its successor is opened
   by the owner, not by `create_session`.

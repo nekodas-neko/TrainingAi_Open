@@ -40,10 +40,8 @@ Then `node scripts/device/probe.js` — it prints the platform, the insets and t
 mode**. Safe-area checks need **gesture** navigation; the phone has been on three-button, which
 reads a 48px inset, not 0. Changing the mode is a system setting: ask the owner.
 
-**Windows checkout.** If `git checkout` fails with `error: invalid path 'ord.endsWith('ss')||'`,
-PR #1414 has not landed. Work around it with
-`git sparse-checkout set --no-cone '/*' '!/ord.endsWith*'` and prefix git commands with
-`-c core.protectNTFS=false`.
+**The clone may be shallow.** If a merge says *refusing to merge unrelated histories*, run
+`git fetch --deepen=200 origin main` and merge again — it is a missing parent, not a rewrite.
 
 **Take work in this order:** whatever the Orchestrator has scoped into a sitting, then by how
 unambiguous the answer is — a check whose result is a number or a boolean before one whose result
