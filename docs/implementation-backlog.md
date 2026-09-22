@@ -464,6 +464,108 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness] TN-60 — the ±1.5σ rail clips 38% of HRV days, so a z of −1.63 and a z of −4.37 both score zero 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning, from a variance decomposition of the
+  stored composite over 69 days (2026-07-16 → 2026-09-22). Measured on the **output**, which is what
+  makes it new: TN-47 argues the same thing from the inputs.
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`.
+- **Gate: owner** — this is a scoring change and re-scores history, so it needs sign-off on the shape
+  before Lane A builds it. The measurement below does not.
+
+**What the composite's weights actually are, versus what they say.** Weighted standard deviation of
+each contributor's stored score, as a share of all the movement in the final number:
+
+| contributor | declared weight | sd | share of movement |
+|---|---:|---:|---:|
+| **hrvBalance** | 0.15 | **35.8** | **22.8%** |
+| previousNight | 0.16 | 23.6 | 16.0% |
+| restingHeartRate | 0.15 | 24.7 | 15.7% |
+| sleepBalance | 0.10 | 32.6 | 13.8% |
+| recoveryIndex | 0.09 | 28.0 | 10.7% |
+| temperature | 0.10 | 16.6 | 7.0% |
+| checkin | 0.10 | 15.2 | 6.5% |
+| prevDayActivity | 0.09 | 12.1 | 4.6% |
+| activityBalance | 0.06 | 11.1 | 2.8% |
+
+Readiness itself: mean 62.2, sd 15.3, range 25–87.
+
+**The declared weights are not the effective ones**, because the contributors are measured on rulers
+of different widths. `hrvBalance` carries **half again** the influence its 0.15 says it does;
+`activityBalance` carries half of its 0.06. Nobody chose that distribution.
+
+**⚠ THE RAIL IS THE MECHANISM, AND IT IS WHERE THE INFORMATION GOES.** `Z_POINTS_PER_UNIT = 50/1.5`
+puts the score's floor and ceiling at **z = ±1.5**. Measured:
+
+- `hrvBalance` is **railed on 26 of 69 days — 38%** (16 at 100, 10 at 0).
+- The z values landing on **score 0** span **−1.63 to −4.37**. A 2.7σ spread is rendered as one number.
+- The z values landing on **score 100** span 2.28 to 2.37.
+
+So on more than a third of days the largest contributor to readiness reports "as bad as possible" or
+"as good as possible" and cannot say which kind of bad. A mildly low HRV night and the worst night in
+the record are the same score.
+
+**Options, with a recommendation.**
+1. **Recommended — replace the hard clip with a compressive tail.** Keep the linear region as it is,
+   so the middle of the range and every shipped expectation about it are unchanged, and let scores
+   beyond ±1.5σ keep *ordering* as they saturate toward 0/100. Nothing needs re-fitting, it is a
+   shape change rather than a constant change, and it restores resolution exactly where it is lost.
+2. **Per-contributor rail width, set from each contributor's own trailing quantiles.** Strictly
+   better at making the declared weights the effective ones — the table above would flatten — and it
+   is self-referencing, so the calibration-period rule at the head of this file does not apply. It
+   lost on blast radius: it changes all nine contributors at once and re-scores everything.
+3. **Widen `Z_POINTS_PER_UNIT` globally.** Cheapest, and wrong: it dilutes the contributors that are
+   correctly scaled in order to fix the one that is not.
+
+**⚠ Do NOT fix this by lowering hrvBalance's weight.** The weight is not what is wrong. Dropping it
+would reduce HRV's influence on the 62% of days where it is working correctly, in order to mask the
+38% where it is saturated.
+
+**⚠ The MAD denominator makes these z values run hot, and that is a separate entry (TN-47).** The
+baselines use mean absolute deviation, which is ≈0.798σ for normal data, so every z here is roughly
+1.25× inflated. That inflation is part of *why* the rail is hit so often — but widening the rail and
+fixing the denominator are independent fixes and must not be conflated. **A −4.37 stays extreme even
+after deflating to ≈−3.5.**
+
+**Pass test:** on the same 69 days, the share of `hrvBalance` days at a rail falls below ~10%, the
+ordering of the ten worst HRV days is preserved rather than tied, and the share-of-movement table
+above moves toward the declared weights.
+
+### [platform] TN-59 — an entry parked only by a prose marker is invisible, and the queue is still producing new ones
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning · **Lane: O** — `scripts/`, the queue
+  tooling, which §3's path rule does not reach.
+- **Background:** the 2026-09-20 sweep that converted 17 of these by hand, and its journal entry.
+  (Written as prose, not a `Reference:` field — that field files an entry under *read, do not build*,
+  and this one is to be built. Third field-semantics slip in this filer's day; see TN-59's own point.)
+
+**`next-item.js` parks any entry containing the no-entry sign (U+26D4) when no structured field
+explains it — spelled by codepoint here on purpose, because writing the character even inside
+backticks parks the entry that describes it, as the first draft of this one discovered.** The marker is
+doing two jobs across the file — *"this cannot start"* and *"do not implement it this way"* — and the
+second is far commoner. A sweep on 2026-09-20 read all 25 marker lines across 19 parked tuning
+entries and found **17 were cautions**; converting them took the queue's READY list from 6 to 21.
+
+**This is not a cleared backlog, which is the reason to build the check rather than sweep again.**
+Measured 2026-09-22: **28 entries are still parked by a prose marker alone** — and **LB-124 was filed
+that same morning and parked immediately**, taking Lane B's entire READY list to zero, because its
+marker reads *"the failure mode is SILENT, which is why this is filed rather than attempted"* — an
+explanation of why it was written up, not a statement that it cannot begin. The rule was in the file
+and the sweep was two days old.
+
+**What to build.** A Custom Rules check that fails when an entry's **only** block is a prose marker —
+mechanically detectable, and always a human judgement to resolve: either it is genuinely blocked and
+wants a `Gate:`/`Needs:`, or the marker is a caution and should carry a warning sign instead.
+**The check must exempt its own entry and any doc that discusses the convention**, which is the same
+self-reference trap. Baseline the existing
+**28 shrink-only**, exactly as `check-fetch-once-effects.js` freezes its 36 sites, so the debt is
+visible and a new one fails.
+
+**⚠ Do not make the check guess which kind of marker it is reading.** Prose detection is the thing
+the structured fields exist to replace; a heuristic that sorts "do not fix this by…" from "this
+cannot start" would be a third convention to maintain. The check reports the *shape* — parked, with
+nothing structured saying why — and a human decides.
+
 ### [readiness][platform] TN-57 — the self-report has never once been answered, and three consumers read the unanswered default as data 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, answering the owner's *"what is your
@@ -546,7 +648,7 @@ row whose flag is false.
   migration and no data write. The column that distinguishes answered from unanswered already
   exists"* — it fixes three consumers that read an unanswered default as data. Shipping TN-57 leaves
   TN-58 exactly as blocked. **Read TN-57's scope rather than TN-58's description of it.**
-- **⛔ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
+- **⚠ The failure mode is SILENT, which is why this is filed rather than attempted.** `Body` in the
   route is **not** `.strict()`, so Zod strips an unknown key instead of rejecting it: a sheet posting
   `vsYesterday` would get **201** and write nothing. A control that looks like it works and stores
   nothing is worse than a 400, and worse than the neutral-default bug TN-57 exists to fix — it would
@@ -609,6 +711,341 @@ be worth asking occasionally once there is something to anchor it against.
 **Pass test:** after two weeks, the comparative field has **≥3 distinct values** and a touched-rate
 materially above zero. If it does not, the answer is that self-report is not available from this owner
 at all — which is itself a finding worth having, and it costs a fortnight to get.
+### [platform][app-shell] RV-84 — `.catch()` on `cachedFetch` is dead code, so 16 error states can never fire
+
+- **Lane:** B — the call sites. **Added:** 2026-09-21 · Review sweep 52.
+- **Batch:** `error-state-onerror`
+- `cachedFetchCore`'s whole network section is inside `try/catch/finally` (`lib/sqlite/cache.ts:336-372`):
+  a `!res.ok` returns after calling `onError`, a network throw is caught. **The promise resolves a
+  boolean and can never reject.** Every `.catch()` chained onto it is unreachable — **16 sites**.
+- **Confirmed consequences:** `components/coach/choice-list.tsx:63` `.catch(() => setFailed(true))`
+  never runs, so the Coach option picker sits on *"Loading your options…"* forever; the same shape at
+  `components/more/profile-tab.tsx:122` leaves the achievements grid spinning.
+- **Fix:** move each to the `opts.onError` channel. `components/health/oura-section.tsx:70-76` is the
+  reference, and `components/health/nutrition-activity-trends-card.tsx:22-39` carries an explicit
+  comment explaining why the `.catch` cannot work.
+- **⚠ This is one rule with a one-line test, so it wants a check script rather than a re-sweep:**
+  `.catch(` chained directly onto `cachedFetch(`/`cachedFetchToday(` is *always* wrong. Freeze the
+  current 16 as a shrink-only baseline the way `check-aest-midnight-timezone.js` does.
+- **Not established:** only three of the 16 were traced to a user-visible consequence.
+
+### [workouts][app-shell] RV-85 — Home's whole score row vanishes on a failed fetch, and the helper meant to prevent that has no way to report it
+
+- **Lane:** A — `packages/shared/src/fetch-with-retry.ts` first, then the Home render.
+  **Added:** 2026-09-21 · Review sweep 52.
+- **Home is the owner's most-used screen** (22 of 56 resumes in the telemetry window).
+- `app/session-select/session-select-content.tsx:1128` — `{readiness && <OuraScoreChipRow …>}`, which
+  also gates the illness advisory (`:1131`) and the early-deload banner (`:1141`). On failure there is
+  no row, **no skeleton** (`showHomeSkeleton` requires `refreshing`) and no message. The route has no
+  null-payload path, so `readiness === null` always means the request failed — this is a
+  failure-vanish, not a "nothing to say" hide.
+- **⚑ Read `fetch-with-retry.ts` before fixing — its own header states the problem it does not
+  solve.** It says it exists because a blip *"silently yields nothing and never retries, leaving the
+  readiness/sleep widgets blank until the app is restarted"*. It then retries 3× (2.5s/5s/7.5s) and
+  gives up **silently**: `.catch(() => {})` (itself RV-84's dead shape) and a `void` return with no
+  error channel. It fixes the transient case and quietly accepts the persistent one, landing on
+  exactly the blank widget it was written to prevent.
+- **Fix, engine half first:** give `fetchWithRetry` an `onExhausted` callback, then render a one-line
+  "Scores didn't load — pull to refresh" in the row's slot.
+- **Not established:** how often the route's 20/60s limit is actually exceeded by the mount +
+  tab-show + pull-to-sync fan-out (`cachedFetch` de-dupes concurrent calls for the same key, which
+  reduces it).
+
+### [workouts][app-shell] RV-86 — a failed streak fetch paints a confident "0-day streak, 0 sessions"
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:538-543`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- `setCalendarDays` runs only from `onData`, and the `.catch(() => {})` beside it is RV-84's dead
+  shape — so on failure `calendarDays` keeps its `{}` initial value, `streak` (`:1011`) counts 0 from
+  empty input, and `StreakCard` (`:1284-1290`) receives plain numbers with **no "unknown"
+  representation**.
+- **Absence rendered as zero, on the most alarming number this screen can show.** Reached on a first
+  launch after reinstall or cleared data, offline, or any failed fetch past the seed floor — i.e.
+  exactly the moment the owner would most distrust the app.
+- **Fix:** a `streakLoaded` flag set from `onData` and from the `readCacheSync` seed (`:271`), with
+  "—" in the streak and this-week cells until it is true.
+  `components/health/observed-hr-card.tsx:40,55-56` is the in-repo measured-vs-missing shape.
+- **Not established:** whether the local-store `pendingDays` overlay (`:386`) can independently
+  populate a nonzero streak offline — read as covering unsynced workouts only, not history.
+
+### [app-shell] RV-87 — the Profile tab invents a whole lifetime when its fetch fails
+
+- **Lane:** B — `components/more/profile-tab.tsx:175-190`. **Added:** 2026-09-21 · Review sweep 52.
+- Every stat is a `??` default: `xp ?? 0`, `level ?? 1`, `levelLabel … ?? 'Novice'`,
+  `lifetimeStats.* ?? 0`, `unlockedCount ?? 0`. Those values are then passed to `StatsGrid` (`:322`)
+  and `AchievementsSection` (`:330`) and **rendered as facts**.
+- On a cold cache plus a failed `/api/achievements`, the hero reads *Level 1 · Novice · 0 XP*, the
+  stats strip reads all zeros **including best streak**, the header reads *0 / 0* achievements — and
+  the grid below spins forever (RV-84).
+- **Fix:** hold `achievementsData === null` as its own state, render "—" per tile plus one
+  "Couldn't load your stats" line, driven by `onError` rather than the `??` defaults.
+
+### [cardio][readiness] RV-88 — two Health cards treat "the fetch failed" as "you have no data"
+
+- **Lane:** B — `components/cardio/trends-section.tsx:37,60` and
+  `components/health/time-in-zone-card.tsx:63-66,144`. **Added:** 2026-09-21 · Review sweep 52.
+- **Batch:** `error-state-onerror`
+- Neither passes `onError`, and `useCachedValue`/`cachedFetch` return null on a non-ok response — so
+  failure and empty are the same state. Cardio Trends renders `!data ? <div className="h-40 …
+  animate-pulse" />` — **a grey pulsing block that never resolves**, under three tab buttons that
+  change nothing. Time in Zone takes its empty branch and prints *"No heart-rate data in this window
+  yet — wear the ring or strap during a workout."* — **blaming the owner for a server failure**, on a
+  day he wore it.
+- Both cards already have good *empty* copy; only the failure case is missing.
+- **⚠ Second defect in the same file, do not miss it:** `time-in-zone-card.tsx:71` is
+  `const profile = data?.profile ?? { maxHr: 190, restingHr: 60 }` — an **invented** HR profile fed to
+  `computeHrZones` and used to label the zones. Against the repo's "no invented number shown as fact"
+  posture. Only use it when `data` exists but `profile` is absent, or hide the legend.
+
+### [workouts] RV-89 — one stored 1RM renders four different numbers, and four sites half-use the shared helper
+
+- **Lane:** B — `components/workout/{active-workout-screen,pre-workout-screen,exercise-summary-screen,
+  exercise-stats-sheet}.tsx`, `components/health/strength-trend-card.tsx`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- The value is stored on a 0.25 grid (`packages/shared/src/1rm.ts:81`). For a stored **92.25**, in one
+  session: ready screen `mround125(...)` → **92.5 kg**; exercise summary raw → **92.25 kg**;
+  pre-workout list `Math.round(...)` → **~92kg**; Strength trend `.toFixed(1)` → **92.3 kg**; stats
+  sheet `.toFixed(1)` → **92.3 kg**. Four numbers, three unit spacings.
+- **The telling detail:** four of those five call `displayOneRm(...)` for the **bodyweight** branch of
+  the same ternary and hand-roll the weighted branch. The shared helper is already imported and half
+  used.
+- **⛔ `mround125` must not do display duty — this has already shipped a live bug.**
+  `components/workout/utils.ts:47` rounds to a 1.25 barbell-plate grid clamped 5–250; it is a
+  *prescription* rounder. `projectOverview.md` records **BF-127**, where the baseline banner told the
+  owner to load **82.5 kg on a pull-up** because `mround125` was applied to a bodyweight 1RM index.
+- **Fix:** route all six through `displayOneRm(oneRm, exerciseType, addedKg)` and render `.text`.
+- **Not established:** whether the pre-workout `~` prefix is a deliberate approximation signal; and
+  whether any site reads a differently-rounded server field rather than the stored column (only
+  `strength-trend` and the summary path were traced).
+
+### [body][platform] RV-90 — body weight renders five ways across seven sites, and no shared formatter exists
+
+- **Lane:** A — a new helper in `packages/shared/src/`, then the call sites.
+  **Added:** 2026-09-21 · Review sweep 52.
+- The scale ingest applies no rounding (`app/api/scale-ble/samples/route.ts:46,117` — range validation
+  only), so the stored value carries the load cell's resolution. For one weigh-in of **82.45**:
+  Home card `${currentWeight} kg` → **82.45 kg**; Health › Body → **82.45 kg**; day detail
+  `.toFixed(1)` → **82.5 kg**; Profile (×2) → **82.5 kg**; week-day sheet `${weightKg}kg` → **82.45kg**
+  (raw *and* no space); stats grid / public profile `Math.round` → **82kg**.
+- **Fix:** add `formatKg(value, { decimals: 1 })` beside the other display helpers and route all seven
+  through it, so unit spacing stops being a per-site decision.
+- **Not established:** the decimal resolution the owner's scale actually emits. If it emits 1dp today,
+  four of these agree and drift only when a Health-Connect or hand-logged value with more precision
+  lands — which makes this a latent drift, not a visible one every day.
+- **Same class, filed together because one helper fixes all three:** activity duration is
+  `.toFixed(1)` on the done screen (`done-activity-screen.tsx:329`) and `Math.round` everywhere else —
+  a 42.4-minute run reads **42.4** then **42** when reopened; pace has a shared `formatPace`
+  (`packages/shared/src/health/vdot.ts:103`) used at two sites and hand-rolled at seven more in two
+  unit spellings (`5:12/km` vs `5:12 /km`); and four hand-rolled `h/m` formatters exist in three
+  shapes with no shared helper.
+
+### [activity][platform] RV-91 — two activity surfaces print a raw ISO date, and one card says `Cal` where the other 154 say `kcal`
+
+- **Lane:** B — `components/health/activity-history-card.tsx:142,149`,
+  `components/activity/activity-detail-sheet.tsx:148`, `components/home-day-timeline.tsx:117`.
+  **Added:** 2026-09-21 · Review sweep 52.
+- `{log.date}` renders the raw `2026-09-15` in the activity history row and the detail-sheet header —
+  **beside a correctly formatted `formatTime12h()` on the next line in both files.** The shared
+  `formatDateDisplay(raw, 'short'|'long')` (`packages/shared/src/date-utils.ts:236-247`) is used at
+  four other sites. The same day reads *"2026-09-15 · 6:42 am"* in history and *"Monday, 15
+  September"* in the day detail.
+- Energy: a word-boundary tally gives **154 `kcal` and exactly 1 `Cal`** in rendered copy, at
+  `components/home-day-timeline.tsx:117` — `{ev.calories} Cal`. The numbers already agree
+  (`app/api/day-timeline/route.ts:250` rounds); only the label differs. One literal.
+- **Not established:** whether "Cal" (capital-C food calorie) was deliberate — nothing in the file
+  says so. Also noted, not filed: four hand-rolled `toLocaleDateString` option bags sit beside the
+  shared helper; a third `style` variant would absorb two of them.
+
+### [workouts][app-shell] RV-92 — `truncate` on a flex container, so a long exercise name hard-clips and the "done" tick disappears
+
+- **Lane:** B — `components/workout/pre-workout-screen.tsx:354`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- **Batch:** `layout-384`
+- `<p className="font-medium truncate flex items-center gap-2">`. `text-overflow` applies to inline
+  content of a **block** container; on a flex container `{ex.name}` becomes an anonymous flex item
+  whose `min-width:auto` resolves to its full content width under the inherited `nowrap`. **The item
+  never shrinks, the ellipsis never paints, and the overflow is clipped flat.**
+- Worse, the green "done today" `CheckIcon` sits *after* the name inside that same box, so on a
+  long-named exercise it is clipped out of existence — **a completed exercise reads as unlogged.**
+- Measured: the name column is ~196px; the longest real library name is **"Dumbbell Overhead Tricep
+  Extension" (34 chars)** ≈ 282px, and 17 library names exceed 22 characters.
+- **Fix:** `<p className="flex items-center gap-2 min-w-0"><span className="truncate">{ex.name}</span>
+  {doneToday && <CheckIcon …/>}</p>`.
+- **✅ This is the only such site in non-admin code** — the other 17 `truncate` uses are correctly on
+  flex *items*. Do not widen the sweep.
+
+### [workouts][app-shell] RV-93 — a live injury chip squeezes the mid-set exercise title to ~15 characters
+
+- **Lane:** B — `components/workout/active-workout-screen.tsx:479-491`,
+  `components/workout/injury-notice.tsx:59,68`. **Added:** 2026-09-21 · Review sweep 52.
+- **Batch:** `layout-384`
+- **This renders for real:** `claude_ro.injuries` holds one unresolved row — `lower back`, started
+  2026-01-01, `resolved_date: null`.
+- The chip is `max-w-[11rem]` **and `shrink-0`**, so it takes **176 of 352px unconditionally**,
+  leaving the `h2` ~168px ≈ **15 characters** at `text-xl font-bold`. Mid-set the title of the
+  movement being performed reads `Single Leg Roma…` (from "Single Leg Romanian Deadlift", 28 chars),
+  while half the header repeats a warning the file's own comment at `:485` says was moved to the
+  ready screen.
+- **Fix:** drop `shrink-0` and add `min-w-0` so the chip yields first, or reduce it to the icon plus
+  `injuryChipLabel` (no "Injury:" prefix, no "Swap" word — swap is reachable from the ready-screen
+  banner). `max-w-[6rem]` returns ~80px to the title.
+- **Not established:** whether `lower back` is actually in `mainMuscles`/`secondaryMuscles` for those
+  exercises, so the chip firing on a *specific* exercise is unproven — only that the injury is live
+  and the geometry is fixed.
+
+### [nutrition][app-shell] RV-94 — the food diary gives a name 22 characters, and 130 of 337 real items are longer
+
+- **Lane:** B — `components/nutrition/food-row.tsx:73`. **Added:** 2026-09-21 · Review sweep 52.
+- **Batch:** `layout-384`
+- **Nutrition is the owner's second most-used screen** (14 of 56 resumes).
+- Arithmetic: row content 318px − 40 (thumb) − 64 (`w-16` calories) − 16 (chevron) − 36 (three
+  `gap-3`) = **162px** ≈ **22 characters** at `text-sm`.
+- Production: **337 food items, 130 longer than 22 chars, 76 longer than 30, longest 66** ("Costco
+  Salt and Pepper Calamari (6 pieces) with Steamed White Rice").
+- **A real collision, not a hypothetical:** "Up & Go Protein Energize Choc Hit" and "Up & Go Protein
+  Energize" both render `Up & Go Protein Energi…` — two identical-looking rows with different
+  calories, indistinguishable without tapping.
+- **Fix:** `line-clamp-2` in place of `truncate` (the row's `min-h-12` already accommodates two
+  lines), or shrink the calorie column to `w-12` and drop the chevron on the diary call site.
+- **Not established:** whether the grey `secondary` line disambiguates that pair in practice — what
+  `meal-card.tsx` passes into it was not read. **Check that first**, it may make the fix unnecessary.
+
+### [workouts][app-shell] RV-95 — the weekly Volume tile wraps its unit onto a second line for every non-zero week
+
+- **Lane:** B — `components/stats/weekly-stats-hub.tsx:54,153-162`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- **Batch:** `layout-384`
+- `grid-cols-4 gap-2` inside a `p-4` card inside a `px-4` screen → cell = (320 − 24)/4 = **74px**. The
+  value is `${totalVolumeKg.toLocaleString()} kg` at `text-xl font-bold tabular-nums`.
+- Production peak weekly volume is **31,083 kg** ≈ 94px against 74px, so it breaks at the space and
+  `kg` drops to line 2. A 4-digit week (`9,088 kg` ≈ 80px) still exceeds 74 — **this wraps whenever
+  volume > 0**, knocking the VOLUME caption ~22px below its three neighbours.
+- **Fix:** move the unit into the existing `unit` line (`value: …toLocaleString()`, `unit: "kg
+  lifted"`), or `whitespace-nowrap text-lg` on the value.
+- **Not established:** whether `/api/weekly-stats` rounds `totalVolumeKg` — a fractional value widens
+  it further.
+
+### [workouts] RV-96 — the done screen clips the HR sample count instead of the exercise name
+
+- **Lane:** B — `components/workout/done-screen.tsx:457-462`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- **Batch:** `layout-384`
+- Both the identifying name and the `· 3/4 sets` coverage figure live inside **one** span with
+  `truncate max-w-[55%]`, so the suffix is always the first thing lost. 55% of ~320px ≈ 176px ≈ 33
+  characters; "Dumbbell Overhead Tricep Extension" (34) plus " · 3/4 sets" (11) = 45.
+- **The caveat on the number silently disappears exactly on the exercises with the longest names** —
+  the owner sees an HRR figure with no indication it came from 3 of 4 sets.
+- **Fix:** split into two spans — `min-w-0 truncate` for the name, `flex-none` for the count — so the
+  count can never be the thing that gets cut.
+
+### [readiness] RV-97 — the ACWR number is painted the "High" colour whatever band it is in
+
+- **Lane:** B — `components/health/training-load-card.tsx:71`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- `<p … style={{ color: '#f59e0b' }}>{trainingLoad.acwr.toFixed(2)}</p>` — a hard-coded literal that
+  is exactly what `acwrBand()` reserves for **`high`** (`packages/shared/src/ai-periodization/acwr.ts:77`),
+  while `optimal` is `#22c55e`, `low` `#94a3b8`, `very_high` `#ef4444`.
+- The band **word** beside it comes from the real `interpretation` (`:72-77`). So an ACWR of 1.05
+  renders **"✓ Optimal zone" with the number in warning amber**, above body copy at `:91` saying the
+  green zone is 0.8–1.3. The card contradicts itself twice on one line.
+- **`acwrBandByKey()` exists at `acwr.ts:90` for exactly this caller and is not imported.**
+- **Fix:** `style={{ color: acwrBandByKey(trainingLoad.interpretation).color }}`. Leave
+  `accentCardStyle('#f59e0b')` as the card's identity — only the *value* takes the band colour.
+- **Not established:** whether `interpretation` can carry a key outside `AcwrBand['key']`
+  (`insufficient_data`/`baselining` are handled on earlier branches, so the coloured branch looks
+  unreachable for them).
+
+### [app-shell] RV-98 — opacity-modified text falls below AA, and the contrast check cannot see it
+
+- **Lane:** B — the call sites, plus extending `scripts/check-contrast.js`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- `scripts/check-contrast.js:149-160` validates ten **bare token pairs** and has no opacity handling,
+  so `text-muted-foreground/60` and below are entirely unguarded. Measured over `--card`:
+  `/70` 4.64:1 (passes, 17 sites) · **`/60` 3.73:1 (26 sites)** · **`/50` 2.97:1 (6)** ·
+  **`/40` 2.34:1 (8)** · **`/30` 1.83:1 (7)**. AA is 4.5:1 for body text.
+- **The one that carries meaning:** `components/calendar-widget.tsx:187` renders the literal word
+  "rest" at **`text-[7px]` with `/50` = 2.97:1** — and that label is the *only* marker distinguishing
+  a past rest day from a past untracked day in the month grid. At low brightness the calendar reads
+  as if nothing was logged.
+- **Fix:** raise the floor to `/70` for text; use full-opacity `muted-foreground` (8.36:1) for the
+  calendar marker. Then extend the check to parse `text-<token>/<n>` and composite before comparing,
+  with today's offenders as shrink-only `GRANDFATHERED` rows — the script's existing structure
+  already supports that.
+- **Not established:** each site's background was assumed to be `--card`; some sit on `--background`
+  (±0.05) or `--muted` (slightly worse). Icon-only uses were not checked against the 3:1 UI floor,
+  where `/60` and `/70` pass.
+
+### [platform][app-shell] RV-99 — good/warning/bad exists as two parallel palettes, and only one can follow the theme
+
+- **Lane:** A — `packages/shared/src/health/score-band.ts` first. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- `score-band.ts:6-8` returns raw hex `#22c55e`/`#f59e0b`/`#ef4444`; `recovery-band.ts:4-6` and
+  `body-battery-band.ts:12-15` return `var(--accent-green)`/`var(--accent-amber)`/`var(--destructive)`
+  for the identical concept. Resolved in dark these are **different colours, not shades**: green
+  `rgb(34,197,94)` vs `rgb(86,238,102)`; the two reds differ in contrast too (4.93:1 vs 6.42:1).
+- The hex triad is copy-pasted rather than imported — **173 occurrences across ~25 files**. So Body
+  Battery "Low" and a readiness "Moderate" are two different ambers.
+- **Fix:** make `scoreBand()` return the tokens (the only half that can follow the theme) and have the
+  hex sites import it. **Chart.js callers must pass the result through the existing `resolveColor()`**
+  (`packages/shared/src/chart-colors.ts`) — canvas cannot resolve `var()` and silently paints black.
+- **⛔ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
+  identity tint, `rarity-colors.ts`, and `hr-zones.ts`'s deliberate blue→red ramp are legitimate
+  one-off uses. Audit before replacing, then a check script banning the three literals outside
+  `score-band.ts` holds it.
+
+### [workouts][app-shell] RV-100 — "Deload" is green on one screen and red on another
+
+- **Lane:** B — `components/health/ai-periodization-status-card.tsx:36-41`,
+  `app/session-select/components/deload-banner.tsx:21-26`. **Added:** 2026-09-21 · Review sweep 52.
+- `PHASE_COLORS` has `deload: "text-green-500"`; the banner paints the same concept `#ef4444` /
+  `#f97316` / `#fbbf24` by strength. Glance at the phase card and green reads "all good"; glance at
+  the banner and it reads "act now". Neither is wrong alone; the pair cannot both be right.
+- **Two riders in the same file:** `realisation` — the peak-output phase — is `text-red-500`, the
+  app's failure colour everywhere else; and the banner introduces a **third** amber (`#fbbf24`)
+  alongside `#f59e0b` and `--accent-amber`.
+- **Fix:** separate the axes. Phase identity is *categorical* — give `PHASE_COLORS` a non-semantic set
+  (`packages/shared/src/session-palette.ts` is already the repo's categorical palette) and keep
+  green/amber/red exclusively for state.
+- **Not established:** whether both surfaces are reachable in one session. If the phase card only
+  shows `deload` while the banner is suppressed, the collision is theoretical — **check that before
+  sizing the work.**
+
+### [workouts][app-shell] RV-101 — the muscle heatmap paints two incompatible colour scales into one silhouette
+
+- **Lane:** B — `components/muscle-heatmap.tsx:39-42,98,105-110`. **Added:** 2026-09-21 ·
+  Review sweep 52.
+- A categorical role scale (`PRIMARY #22c55e`, `SECONDARY #f59e0b`, `INJURED #ef4444`) and a
+  sequential ramp (`VOLUME_TINT_STEPS`) are declared three lines apart, and which one paints is
+  decided at `:98` purely by which prop the caller passed. **`#22c55e` is both step 4 of the ramp and
+  `PRIMARY_COLOR`** — the same fill means "primary mover" in one mode and "60–80% of volume target" in
+  the other, with no on-screen key: the only legend is an "Injured" swatch gated on an injury.
+- Contrast against `--card`: the bottom two ramp steps are **2.04:1 and 2.60:1**, under the 3:1
+  non-text floor — so a muscle under ~40% of target is near-indistinguishable from an untouched one,
+  and the heatmap under-reports exactly the muscles it exists to flag.
+- **Fix:** give the volume ramp its own hue so it cannot collide with the role scale, lift the bottom
+  two stops past 3:1, and render a key in **both** modes — it is the mode indicator as much as the
+  legend.
+- **Not established:** the unfilled-muscle default colour is drawn by the third-party body component
+  and was not read, so ramp separation is computed against `--card` rather than that default.
+
+### [platform] RV-102 — three ad-hoc chart palettes, five dead theme tokens, and a duplicated colour table
+
+- **Lane:** B — `components/chart-message.tsx:34-41`, `components/workout/hr-recovery-chart.tsx:22`,
+  `components/workout/utils.ts:8`, `components/more/home-widgets-section.tsx:27-38`.
+  **Added:** 2026-09-21 · Review sweep 52.
+- Three independent categorical palettes with three different "series 1" colours, all drawing from the
+  semantic triad — so in the workout screen set 1 is warning-amber and set 2 is good-green purely by
+  index. Meanwhile `app/globals.css:186-190` defines `--chart-1`…`--chart-5` and a repo-wide grep
+  finds **no consumer**: they are dead tokens. They could not be adopted as-is either — `--chart-1`
+  resolves to **2.72:1** against `--card`, under the 3:1 UI floor.
+- `CARD_DEFAULT_COLORS` is declared **twice** — `app/session-select/constants.ts:1-14` (what the cards
+  render) and a private shadow at `home-widgets-section.tsx:27-38` (**what the colour picker shows**).
+  Identical today, tied together by no test.
+- **Nothing is broken now** — this is filed so that a future edit to one table does not show the owner
+  a swatch the card does not honour.
+- **Fix:** one categorical series palette in `packages/shared/src/chart-colors.ts` beside
+  `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
+  `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
 
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 
