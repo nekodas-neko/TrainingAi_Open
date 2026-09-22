@@ -177,7 +177,7 @@ export async function POST(req: Request) {
     // RV-69: the day's figures are already assembled — answer with them rather than discarding
     // them. Deliberately NOT cached: `upsertAiHealthInsight` below would make this the stored
     // digest for the day and block the next successful call from replacing it.
-    const degraded = degradedFromFacts('the day', facts)
+    const degraded = degradedFromFacts('here is the day as recorded', facts)
     if (degraded) return NextResponse.json({ digest: degraded, date: todayIso, cached: false, degraded: true })
     return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
   }

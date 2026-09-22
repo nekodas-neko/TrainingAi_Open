@@ -109,7 +109,7 @@ In at most 3 sentences: say what stood out about this session, and give one thin
       // a request that never got as far as building one. Scoped to the model call, `lines` is known
       // to exist. A null degrade (no facts at all) falls through to that catch unchanged.
       console.error('[workout-recap] generateText failed:', err)
-      const degraded = degradedFromFacts('the session', lines)
+      const degraded = degradedFromFacts('here is the session as recorded', lines)
       if (degraded) {
         // Not persisted: `upsertAiHealthInsight` would make this the session's stored recap, and a
         // completed session's context hash never changes, so nothing would ever replace it.

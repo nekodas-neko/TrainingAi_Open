@@ -227,7 +227,7 @@ export async function POST(req: Request) {
     // notes too, and only the measured lines are facts about this section. Not cached, for the same
     // reason as its siblings: the context hash is unchanged, so a stored fallback would be served
     // ahead of every later attempt.
-    const degraded = degradedFromFacts('the readings', dataLines.join('\n'))
+    const degraded = degradedFromFacts('here are the readings as recorded', dataLines.join('\n'))
     if (degraded) return NextResponse.json({ insight: degraded, degraded: true })
     return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
   }

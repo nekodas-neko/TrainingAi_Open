@@ -10,7 +10,7 @@ import { degradedFromFacts } from '@/lib/ai/degrade'
 
 describe('degradedFromFacts', () => {
   it('joins the fact lines into one line, so a plain <p> cannot collapse them into a run-on', () => {
-    const out = degradedFromFacts('the day', 'Trained today: Upper\nSteps: 8000/10000 today')
+    const out = degradedFromFacts('here is the day as recorded', 'Trained today: Upper\nSteps: 8000/10000 today')
     expect(out).not.toContain('\n')
     expect(out).toContain('Trained today: Upper')
     expect(out).toContain('Steps: 8000/10000 today')
@@ -18,7 +18,7 @@ describe('degradedFromFacts', () => {
   })
 
   it('says it is not the written summary', () => {
-    expect(degradedFromFacts('the week', 'Sessions: 4')).toMatch(/could not be generated/i)
+    expect(degradedFromFacts('here is the week as recorded', 'Sessions: 4')).toMatch(/could not be generated/i)
   })
 
   /**
@@ -26,12 +26,21 @@ describe('degradedFromFacts', () => {
    * keeps its existing failure response. Every route checks for null rather than assuming a string.
    */
   it('returns null when there are no facts at all', () => {
-    expect(degradedFromFacts('the day', '')).toBeNull()
-    expect(degradedFromFacts('the day', '\n  \n')).toBeNull()
+    expect(degradedFromFacts('here is the day as recorded', '')).toBeNull()
+    expect(degradedFromFacts('here is the day as recorded', '\n  \n')).toBeNull()
+  })
+
+  /**
+   * A bare noun in this slot produced "here is the readings" on the one section whose subject is
+   * plural — found by running the route locally, not by any test, which is why one exists now.
+   */
+  it('lets a plural subject carry its own verb', () => {
+    expect(degradedFromFacts('here are the readings as recorded', 'Resting heart rate: 48 bpm'))
+      .toContain('so here are the readings as recorded: Resting heart rate: 48 bpm')
   })
 
   it('drops blank lines rather than printing empty separators', () => {
-    expect(degradedFromFacts('the session', 'Duration: 45 min\n\nTotal volume: 8200 kg'))
+    expect(degradedFromFacts('here is the session as recorded', 'Duration: 45 min\n\nTotal volume: 8200 kg'))
       .toContain('Duration: 45 min · Total volume: 8200 kg')
   })
 
@@ -42,6 +51,6 @@ describe('degradedFromFacts', () => {
    */
   it('reproduces the fact lines verbatim', () => {
     const facts = 'Readiness: 80/100 avg that week (week before 74/100)'
-    expect(degradedFromFacts('the week', facts)).toContain(facts)
+    expect(degradedFromFacts('here is the week as recorded', facts)).toContain(facts)
   })
 })

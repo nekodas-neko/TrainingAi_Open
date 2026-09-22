@@ -26,8 +26,26 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.457.14 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-18.
+**Version:** v1.464.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-22.
+
+**AI calls are bounded, and the prose routes answer with their own facts when the model fails
+(RV-69 + RV-70, v1.464.2).** Four routes — the daily and weekly digests, the health insight and the
+workout recap — assemble a complete fact block from the user's logs *before* calling the model, and
+threw all of it away on the catch path (502, or 500 for the recap). They now return it with
+`degraded: true` and status 200, the shape `running-plan/explain` already used. **Nothing degraded is
+stored**: the insight cache keys on a context hash that does not move, so a persisted fallback would
+be served ahead of every later attempt, and the three clients that cache are guarded (`cachedFetch`
+gained a `shouldCache` predicate — a response can be worth painting and not worth keeping).
+Separately, **no AI call carried a wall-clock ceiling** — every route passes `maxRetries: 0`, which
+takes the SDK's own timeout handling out of the picture, and nothing replaced it. One **30 s total
+budget** now applies at the chokepoint, across the shared retry rather than per attempt, sized
+against a slowest-call-ever-recorded of **4,786 ms**. **Four claims in the two entries were wrong and
+are corrected in the journal**, the load-bearing one being that the chokepoint wraps a *thunk*, so
+the "one-place `abortSignal`" fix the entry described was not possible as written; 17 call sites now
+pass the signal, and the deadline also races the attempt so a site that ignores it is still bounded.
+**The degraded path has not been seen in production** — the model has not failed since the logging
+existed — so it is verified by tests at all four routes, not by observation.
 
 **The streak counted the API's window, not the training (BF-176, v1.457.13).** The owner asked why it
 went **90 → 89 on a day he trained**; his real streak is **102 days**, unbroken since 2026-06-08.

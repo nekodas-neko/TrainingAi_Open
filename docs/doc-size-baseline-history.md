@@ -15205,3 +15205,18 @@ not only a stored recommendation — and `claude_ro.dexa_scans` holds **28.5%** 
 25.7%, which lowers lean mass and takes the computed baseline to **1,359 kcal / 111 g protein**. The
 gap against what he is eating to is **+19% / +35%**, not the +18% / +30% first filed. A caveat that
 read as "this number might be softer than stated" was hiding a number that was harder.
+
+## 2026-09-22 — `projectOverview.md` +18 lines, `docs/implementation-backlog.md` −36 (RV-69 + RV-70)
+
+The backlog shrank by the two entries the batch `ai-degrade-and-bound` shipped, less a five-line
+cross-reference added to the ai-periodization prescription entry — which has the same catch-path
+shape and is deliberately **not** in scope, because it would degrade to a prescription the user
+trains on rather than to text. Naming that there is what stops the next session reading the shipped
+sibling and "finishing the job".
+
+`projectOverview.md` grew by one Current Status block. It is longer than a status note usually is
+because three of its sentences are corrections: the chokepoint wraps a thunk rather than SDK params,
+so RV-70's "one-place `abortSignal`" fix was not possible as written; the recap answered 500 rather
+than the 502 RV-69 recorded, from a handler-wide catch; and `running-plan/explain` — the route both
+entries held up as the reference — was the one site missing `maxRetries: 0`. A status note that said
+only "shipped" would leave all three to be rediscovered.

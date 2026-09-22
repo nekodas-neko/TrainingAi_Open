@@ -293,7 +293,7 @@ export async function POST(req: Request) {
     console.error('[weekly-digest] generateText failed:', err)
     // RV-69. Not cached — see the daily-digest twin: storing this would stand in for the real
     // digest all week, since the cache is keyed on the week and the context hash, both unchanged.
-    const degraded = degradedFromFacts('the week', context)
+    const degraded = degradedFromFacts('here is the week as recorded', context)
     if (degraded) {
       return NextResponse.json({ digest: degraded, weekStart: isoWeekKey, generatedAt: null, cached: false, metrics, degraded: true })
     }

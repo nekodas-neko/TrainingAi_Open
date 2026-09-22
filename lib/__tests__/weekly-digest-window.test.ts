@@ -163,13 +163,24 @@ describe('caching and failure', () => {
     expect(readFreshInsight.mock.calls[0][4]).not.toBe(firstHash)
   })
 
-  it('answers 502 on a model failure, without leaking the error', async () => {
+  /**
+   * Was `expect(502)`. RV-69 changed the status deliberately: the route has already computed every
+   * number in the recap before it calls the model, so it now answers 200 with those lines and
+   * `degraded: true` rather than discarding them. The property this test was written for is
+   * untouched and is what is still asserted — **the error text must not reach the body**, which is
+   * the live incident behind it (`errorLog`'s `[ERROR]: ${error}` once published a whole failing
+   * statement to the client). A degraded answer is a wider body than a bare error, so the leak
+   * check matters more here than it did before, not less.
+   */
+  it('degrades without leaking the error, and stores nothing', async () => {
     freezeAt('2026-09-10T14:00:00Z')
     generateText.mockRejectedValue(new Error('select * from workout_sessions blew up'))
     const res = await post()
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(200)
     const text = await res.text()
+    expect(JSON.parse(text).degraded).toBe(true)
     expect(text).not.toContain('workout_sessions')
+    expect(text).not.toContain('blew up')
     expect(upsertAiHealthInsight).not.toHaveBeenCalled()
   })
 

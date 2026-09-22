@@ -26,12 +26,14 @@
  * Returns `null` when there are no facts — a lead with nothing after it is worse than the error
  * state it would replace, so the caller keeps its existing failure response in that case.
  *
- * @param subject what the facts are OF, as it reads after "here is": `the day`, `the week`,
- *                `the session`, `the readings`.
- * @param facts   newline-separated fact lines, exactly as they were handed to the model.
+ * @param clause how the route names what follows, as a full clause — `here is the day as recorded`,
+ *               `here are the readings as recorded`. A bare noun was tried first and produced "here
+ *               is the readings" on the one section whose subject is plural; the verb has to travel
+ *               with the noun, and running the route locally is what showed it.
+ * @param facts  newline-separated fact lines, exactly as they were handed to the model.
  */
-export function degradedFromFacts(subject: string, facts: string): string | null {
+export function degradedFromFacts(clause: string, facts: string): string | null {
   const lines = facts.split('\n').map(l => l.trim()).filter(Boolean)
   if (lines.length === 0) return null
-  return `A written summary could not be generated just now, so here is ${subject} as recorded: ${lines.join(' · ')}`
+  return `A written summary could not be generated just now, so ${clause}: ${lines.join(' · ')}`
 }
