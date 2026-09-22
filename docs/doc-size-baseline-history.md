@@ -15149,3 +15149,40 @@ whether the grey secondary line already disambiguates the colliding food rows, R
 both deload surfaces are even reachable in one session, RV-93 notes the injury-chip collision is
 proven only for the geometry and not for a specific exercise, and RV-84 asks for a check script
 rather than a repeatable sweep.
+
+## 2026-09-22 — `docs/implementation-backlog.md` +360 (26484 → 26844) (Review sweep 53)
+
+Twenty entries (**RV-103…RV-122**) from the sweep the owner scoped himself — animations and page
+swaps, caching, and what should merge — at ~18 lines each.
+
+**RV-103 is longer than its fix because the fix is not the discovery.** The owner's report turned
+out to be a *re*-report: BF-177's docblock already quotes him on the identical symptom. The entry
+spends its length on why that fix did not hold (`cachedFetch(...).catch(() => {})` with no
+`onError`, dead per RV-84) and on a second defect in the same four lines — `setBalance(d ?? null)`
+makes the budget *disappear* rather than go stale on a null payload. An implementer who reads only
+"add onError" ships half of it.
+
+**Five entries carry a ⛔ or a check-this-first**, which is the material a shorter entry loses.
+RV-104 says fix the shape rather than the site, because BF-177 was patched site-by-site and its own
+comment admits to a third site it did not name. RV-110 says confirm the sub-tab query params survive
+a shell flip before converting 37 call sites. RV-111 names the ordering hazard — the scanner injects
+a global `visibility: hidden` and a double-pop would leave the app blank. RV-113 says try the
+one-line CSS variant first, because the cross-dissolve fights the animation-pausing the repo added
+after a device profile. RV-119 says do **not** collapse the illness and deload banners.
+
+**RV-120 exists only because of "No orphaned findings".** `aiVolume` is built, has a live render
+arm, is in no order array, and had zero backlog entries behind a comment promising a merge. The
+entry deliberately does not decide merge-vs-delete; it refuses to let the promise keep living in a
+code comment.
+
+## 2026-09-22 — `docs/agents/state/review.md` 205 → 202 (ratcheted down, Review sweep 53)
+
+The baton came in three lines under its baseline, so the check asked for the number to follow it
+down. That is the ratchet working as designed: a baton that shrinks and leaves its old ceiling in
+place has simply bought itself room to regrow.
+
+It shrank because §Now stopped re-narrating closed sweeps. Sweeps 47–52 are now one paragraph
+carrying only their *durable rules* — read which field a 4xx names, pair a refusal with a one-field
+control, `claude_ro` is the owner's rows only, rank visual findings by the resume telemetry — and
+the narrative lives in each sweep's own write-up, which the pillar indexes already link. State, not
+history, which is what the baton is for.
