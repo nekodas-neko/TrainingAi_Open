@@ -25,6 +25,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
+import { OBSERVED_WINDOW_DAYS } from '@trainingai/shared/health/hr-profile'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
@@ -184,10 +185,23 @@ describe('/api/cardio-week', () => {
     await getWeek()
 
     expect(getHrForWindow).toHaveBeenCalledTimes(1)
-    // And the one call is the profile's 90-day window, not either of the reported ones.
+
+    // And the one call is the profile's window, not either of the reported ones.
+    //
+    // ⚠ Asserted on the START, never on the span. The window is
+    // `[localMidnight − OBSERVED_WINDOW_DAYS, now]`, so its span is 90 days PLUS however far into
+    // the local day it currently is — `Math.round` of that reads 90 before local midday and **91
+    // after**. The first version of this case asserted the span and therefore passed for half of
+    // every Brisbane day and failed for the other half; it went red on `main` at 14:33 local, on a
+    // docs-only PR that had touched nothing near it.
+    //
+    // `todayMidnightUtc` is the same helper the resolver uses, so this compares two derivations of
+    // the same instant rather than a derivation against the wall clock.
     const [, from, to] = getHrForWindow.mock.calls[0] as [string, Date, Date]
-    const spanDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
-    expect(spanDays).toBe(90)
+    expect(from.getTime()).toBe(todayMidnightUtc(TZ).getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
+    // The end is "now", which is all that can be said about it without re-reading the clock.
+    expect(to.getTime()).toBeGreaterThanOrEqual(from.getTime())
+    expect(to.getTime()).toBeLessThanOrEqual(Date.now())
   })
 
   it('slices the two windows out of that one pull rather than merging them', async () => {
