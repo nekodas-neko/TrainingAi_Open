@@ -115,7 +115,18 @@ and never write code — which is what keeps the collision surface to Lane A aga
   device are not. **Never batch a migration or sync-push change** — its revert is a corrective
   migration. Batch native/Kotlin hardest, because each costs an APK cycle and an install can force
   the uninstall that destroys the ring key. A sweep across N files is already a batch: do not split
-  it. Assign batches when an entry is next touched, not in a bulk pass.
+  it. Assign batches when an entry is next touched, not in a bulk pass. To see which entries could
+  be cleared in one pick-up of the phone without writing anything down, run
+  `node scripts/next-item.js --sittings` — it groups the owed device checks by domain.
+- **A filing sweep ships as ONE PR, not one PR per entry** (owner decision, 2026-09-22). BugFix,
+  Review and Tuning write their findings in bursts — review sweep 53 was twenty entries — and every
+  PR touches `docs/doc-size/docs/implementation-backlog.md.size`, so N PRs from one sweep is N-1
+  guaranteed conflicts on a single line. **Measured 2026-09-20:** `main` took a commit roughly every
+  8 minutes against a ~6-minute CI run, and Q-1a needed **five rebases and four refused merges** to
+  land. This is a convention, not a code change, and it does not apply to implementer PRs — those
+  are already one change per PR for a reason. **Note `enable_pr_auto_merge` does NOT work on this
+  repo** (*"Protected branch rules not configured for this branch"*), so the auto-merge escape in
+  the CI/CD section below is unavailable and every merge is hand-driven against a moving base.
 - **`Needs:` / `Gate:` / `Reference:` are fields, not prose.** `Needs:` names another entry and clears
   when that entry leaves the queue — **an absent target counts as shipped**, because the protocol
   removes completed entries. `Gate:` takes only `owner` or `device`. **`Reference:` marks an entry other

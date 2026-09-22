@@ -15412,3 +15412,27 @@ the day, for a reason unrelated to their diff — which is the exact complaint t
 attribute itself in the first place. `check-doc-links` (818 files) and `check-index-doc-paths`
 (1,163 paths) both clean afterwards; the README is emphatic that one is not a substitute for the
 other, since a citation whose link *text* is also a path passes the first and fails the second.
+
+## 2026-09-22 — `CLAUDE.md` 816 → 827 and `docs/implementation-backlog.md` 26326 → 26410 (OR-125: six owner answers)
+
+**CLAUDE.md +11**: one new standing rule — a filing sweep ships as ONE PR, not one per entry — plus
+the `--sittings` pointer beside the batching rule and a note that `enable_pr_auto_merge` does not
+work on this repo. The rule is a convention with no code behind it; it costs eleven lines and
+removes N-1 guaranteed one-line conflicts per sweep.
+
+**Backlog +84**: four decisions recorded where the work is (LA-121, Q-28, BF-9, BF-7, Q-29),
+`OR-126` filed for the brief we now owe on the raw-archive drop, `LB-121` rewritten as a reference,
+and four of `LA-122`'s six items struck.
+
+Worth carrying, and it is about the ledger rather than any of the answers. **Four of these six had
+sat between one and nine days; a fifth had been noticed in an earlier session, recorded nowhere,
+and re-derived from scratch.** None was a hard question. They were questions nobody had been asked,
+because each lived in a session transcript that ended. Writing them into one entry an owner could
+read was the whole of the work — the answers took one sitting.
+
+The same day produced the opposite case, and the pair is the lesson. `LB-121` is now the **third**
+independent filing of the ⛔ parser bug, after `LA-49` (2026-09-01) and alongside `TN-59` and
+`OR-122`. LA-49 had the complete diagnosis and a two-step fix on day one and never surfaced, because
+it quotes the glyph as evidence and was parked by the bug it describes. **A finding that reaches a
+human gets answered; a finding that hides itself gets re-derived, and each re-derivation pays the
+investigation again.**
