@@ -1,7 +1,8 @@
 'use client'
 
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useInvalidationRefetch } from '@/lib/hooks/use-invalidation-refetch'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getActivityIcon } from '@trainingai/shared/constants/activity-icons'
 import dynamic from 'next/dynamic'
@@ -59,6 +60,8 @@ function formatActivityTitle(title: string): string {
     .replace('Stationary', '(Stationary)')
 }
 
+const ACTIVITY_KEYS = ['activity-logs', 'activity-types'] as const
+
 export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }: { userId?: string }) {
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [types, setTypes] = useState<ActivityType[]>([])
@@ -69,20 +72,22 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
   // response lands (the "my data disappeared" repaint).
   const pendingLocalRef = useRef<ActivityLog[]>([])
 
-  useEffect(() => {
-    // Seed from the cache mirror so the card paints from the last response
-    // before the network resolves. Done here, not in a useState lazy
-    // initializer, because this component is server-rendered — reading the
-    // client-only cache during render would cause a hydration mismatch.
-    const seedTypes = readCacheSync<{ activityTypes: ActivityType[] }>('activity-types')?.activityTypes
-    if (seedTypes?.length) setTypes(seedTypes)
-    const seedLogs = readCacheSync<{ activityLogs: ActivityLog[] }>('activity-logs')?.activityLogs
-    if (seedLogs?.length) setLogs(seedLogs)
-    cachedFetch<{ activityTypes: ActivityType[] }>(
+  // RV-109: an activity confirmed from Home never appeared here. All three Health sub-tabs render
+  // at once inside the `SwipeCarousel`, so this card is mounted for the life of the shell once
+  // Health is visited, and nothing in the `tabEpoch` pass fetches `activity-logs` — so a review from
+  // Home (`exercise-review-sheet.tsx` fires `invalidateActivityWrites()`) or a background sync
+  // landed in the cache and nothing asked for it. A walk logged through `/activity` self-healed only
+  // because that route change unmounts the shell, which is why this read as intermittent.
+  //
+  // ⚑ `activity-types` passes `freshWithinTtl: true`, so its invalidation is load-bearing in the
+  // strict sense (Q-262): the cached entry is a SETTLED value that survives until something clears
+  // it, not a first-paint accelerator that the next revalidation would correct anyway.
+  const load = useCallback(() => {
+    void cachedFetch<{ activityTypes: ActivityType[] }>(
       'activity-types', '/api/activity-types', TTL_LONG,
       d => setTypes(d?.activityTypes ?? []),
       { freshWithinTtl: true },
-    ).catch(() => {})
+    )
     // Local-first: the on-device store is the source of truth, so an activity
     // logged offline shows here immediately. The server fetch stays authoritative
     // (it also carries server-computed calories) and overwrites when it lands.
@@ -95,7 +100,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
         })
         .catch(() => {})
     }
-    cachedFetch<{ activityLogs: ActivityLog[] }>(
+    void cachedFetch<{ activityLogs: ActivityLog[] }>(
       'activity-logs', '/api/activity-logs?days=7', TTL_MEDIUM,
       d => {
         const server = d?.activityLogs ?? []
@@ -103,8 +108,22 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
         // Retain any local pending row the server hasn't yet acknowledged.
         setLogs([...server, ...pendingLocalRef.current.filter(p => !serverIds.has(p.id))])
       },
-    ).catch(() => {})
+    )
   }, [userId])
+
+  useEffect(() => {
+    // Seed from the cache mirror so the card paints from the last response
+    // before the network resolves. Done here, not in a useState lazy
+    // initializer, because this component is server-rendered — reading the
+    // client-only cache during render would cause a hydration mismatch.
+    const seedTypes = readCacheSync<{ activityTypes: ActivityType[] }>('activity-types')?.activityTypes
+    if (seedTypes?.length) setTypes(seedTypes)
+    const seedLogs = readCacheSync<{ activityLogs: ActivityLog[] }>('activity-logs')?.activityLogs
+    if (seedLogs?.length) setLogs(seedLogs)
+    load()
+  }, [load])
+
+  useInvalidationRefetch(ACTIVITY_KEYS, load)
 
   const weekStart = startOfWeekInTz()
   const weekLogs = logs.filter(l => l.date >= weekStart)
