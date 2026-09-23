@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
@@ -2531,6 +2531,18 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [heart-rate][nutrition][activity] ⚠️ Three shell-resident cards now subscribe to their own invalidation — NOT device-verified (RV-106, RV-107, RV-109, 2026-09-23, v1.465.7)
+
+Health's HR card kept pre-sync data after a ring sync while Home's strip had moved; Health's
+Activity History never showed an activity confirmed from Home; editing macro targets left the
+Nutrition rings banding against the old ones. All three were a `cachedFetch` in an effect with
+stable deps, inside the tab shell that never unmounts — the Q-402 shape, where the eviction lands
+and nothing asks for a new value. No invalidation was added: all five keys were already cleared,
+and are now checked against `lib/cache-groups.ts` in the test. Owed: the device check, which is the
+Device Verification agent's — and **RV-124's device probe settles this class by measurement**,
+these three included. Detail:
+[`docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md`](docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md).
 
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 

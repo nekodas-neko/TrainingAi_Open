@@ -15681,6 +15681,28 @@ sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to
 That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
 script's baseline recorded **0**, and a silent swap of one number for another would leave the next
 reader with no reason to trust the new one over their memory of the old.
+## 2026-09-23 — backlog 26780 → 26731, `projectOverview.md` 12376 → 12388 (RV-106/RV-107/RV-109)
+
+The backlog ratchets **down** 49 lines on this branch's own account — RV-106, RV-107 and RV-109
+shipped whole and left the queue, and the batch `stale-surface-subscribe` is now empty. The figures
+finally recorded are 26823 and 12359, because #1419 (BF-166 closed on the S25, DV-2 filed) and
+#1421 (Review sweep 54) both landed from `main` mid-CI — four re-merges on one PR, every one of
+them a `.size` conflict, which is the tax sweep 54 went and measured. Nothing was filed against them — the one
+finding the work turned up (that `useStressDay` was already correct, which RV-106 had left
+untraced) is an answer rather than new work, so it lives in the code as an asserted comment.
+
+The twelve lines on `projectOverview.md` are one Known-Issues entry, and it is there for the device
+check that is owed rather than the fix that landed. Its pointer to RV-124 is the part worth the
+space: that probe settles this whole class by measurement, so the next session reading the index
+learns where the answer is coming from instead of re-reasoning it from source — which is precisely
+what these three entries show cannot distinguish a working subscription from a missing one.
+
+---
+
+## 2026-09-23 — Device Verification baton → 57 (−10) (device/probe-tooling)
+
+Rewritten in full for the probe sitting; the per-entry results table moved out, since every row it
+held is now in the backlog entry it describes. Ratcheted to the new size.
 
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26303, `projectOverview.md` → 12389 (LA-128)
 

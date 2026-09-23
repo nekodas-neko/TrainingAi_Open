@@ -248,4 +248,4 @@ async function connect(opts = {}) {
   return { device, socket, target, session };
 }
 
-module.exports = { connect, systemBack, adb, requireOneDevice, findSocket, Session };
+module.exports = { connect, systemBack, adb, requireOneDevice, findSocket, forward, Session };
