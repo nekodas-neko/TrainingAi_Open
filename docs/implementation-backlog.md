@@ -517,183 +517,6 @@ below threshold and left in place for next time.
   them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
   because a reader in either place stops looking. The selector is the defect, not the entries.
 
-### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
-
-- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** `perf.js coldstart` (force-stop + launch, read after): **first contentful paint
-  1020 ms**, DOM ready 1137 ms, load 1638 ms, the document served from the service worker (0 KB
-  transferred). First visit per tab after it — content / settled: Home 61 / 726 ms · Health 62 / 62 ·
-  **Workout 103 / 1428** (5 `/api` calls) · Nutrition 80 / 80 · More 64 / 760. One tab bar after the cold
-  start (sitting 2's two-link crash did not recur). **"Content"** = no visible loading block ≥ 16 px and
-  real text; **"settled"** = content and no `/api` in flight for 400 ms — both defined in `perf.js`.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** **no build half**; the measurement is the work. Method: **P11** in
-  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md). **Added:** 2026-09-23 ·
-  Review, at the owner's request for device checks on load efficiency and timing.
-- **The falsifiable claim:** every tab reaches first real content within **300 ms warm** and the
-  cold start's `first-contentful-paint` is within **1.5 s**. Report the actual numbers either way —
-  a pass is as useful as a fail here, because nothing has a baseline yet.
-- **This is now measurable without a recording**, which is why it was not done before:
-  `performance.getEntriesByType('navigation')` and `('paint')` survive for the life of the page, so
-  attaching *after* a normal cold start loses nothing. `device-perf-profiling-checklist.md` records
-  that mechanic; it had no agent to run it.
-- **Why it matters now:** Q-51's premise softened to *"Its mostly fine; I'd still like it to be
-  faster if possible"* and Q-147 closed on *"Seems good now"*. Both are impressions. If they are
-  right, this closes the perf thread with evidence; if a number disagrees with them, that is worth
-  more than either.
-
-### [app-shell][workouts] RV-138 — DEVICE PROBE: is Q-51's 1086 ms first mount a rule or a one-off?
-
-- **📱 MEASURED — the 1086 ms outlier did NOT recur in 90 visits.** S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23. `perf.js cycles --n 10`,
-  every duration, never a mean (content ms): **Home** 60 78 98 88 70 91 88 127 83 91 · **Health** 66 62 164
-  92 87 79 98 60 94 91 · **Workout** 102 77 78 54 79 90 67 64 68 92 · **Nutrition** 73 79 77 112 91 78 62 63 59 77
-  · **More** 78 77 78 144 79 81 64 84 66 84 · **/cardio** 114 117 90 77 65 95 68 81 90 80 · **/health/readiness**
-  77 70 75 76 88 94 94 86 85 81 · **/program** 95 99 101 110 120 123 111 101 100 111 · **/more/details** 123 81
-  112 93 56 68 120 121 105 112. **Every first visit is within 1.3× its route's median**, the checklist's bar
-  was 2×. Settled, pushed routes: /program 95–665 ms, /more/details 365–744 ms. **By this entry's own
-  rule, Q-51 should be re-placed rather than built.** Caveat: warm visits in one session after a cold
-  start; the 1086 ms reading may belong to a colder state (a fresh deploy, an evicted cache) this run
-  did not reproduce.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P12**. **Added:** 2026-09-23 · Review.
-- **The one measured perf number in the whole queue is a single observation.** Q-51: `/workout`
-  visited five times in one session — **four at ~100 ms, one at 1086 ms, all warm.** It is read as a
-  first-mount cost, and that reading is what the remaining file-splitting work rests on.
-- **The falsifiable claim:** across ten warm visit/leave/return cycles per route, the **first** mount
-  is no more than 2× the median of the rest. FAILED means the outlier is structural and the
-  file-splitting work has its justification; passing means 1086 ms was noise and **Q-51 should be
-  re-placed, not built.**
-- Report the full list of durations per route, never a mean — one outlier in ten is invisible in an
-  average, which is exactly how this started.
-- **Pair each outlier with P14's long tasks and P13's in-flight requests.** An outlier with neither
-  is a different defect from one with both, and the entry cannot be actioned without knowing which.
-- **⚠ Q-51 says *"measure before refactoring" is now MORE binding, not less*** — a large refactor is
-  a poor trade against "mostly fine". This probe is what makes that decision, so do not start the
-  refactor on the strength of the single 1086 ms reading.
-
-### [platform][app-shell] RV-139 — DEVICE PROBE: the per-screen network waterfall, and how much of it is serial
-
-- **📱 MEASURED (partial), S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** From the visits whose data survived (the first 70 cycles were lost to
-  a harness crash, since fixed): **Home fetches `/api/workout-data` twice in one visit**, and it
-  starts right after another request answers (chain depth 2); **Health's `/api/user/goals` also
-  chains** (depth 2); every other screen is depth 1 with no duplicates. Byte counts read near zero —
-  responses come through the service worker, whose bytes CDP does not count — so the KB half is
-  **COULD NOT CHECK** with this method. "Chained" = started within 60 ms of another response:
-  a heuristic, not proof of causation.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P13**; `scripts/device/pw.js` already instruments
-  the Network domain. **Added:** 2026-09-23 · Review.
-- **The falsifiable claims, per screen:** no `/api/*` endpoint is requested **twice** for one screen;
-  no request chain is deeper than **two** (a request that only starts once an earlier one finishes).
-- **Chain depth is the number to hunt.** Three requests in parallel cost one round trip; three in
-  series cost three, and on a phone that is the whole difference between instant and not. Depth is
-  invisible to every source-reading sweep because it depends on what awaits what at runtime.
-- Report request count, `/api/*` count, total bytes and the largest single response per screen.
-- **Cross-checks that already exist:** RV-78 says `/api/next-session` serialises two independent
-  queries, and RV-82 says two routes fetch the active program twice inside one request. Both are
-  server-side and were found by reading; this probe says whether the device sees them as latency.
-
-### [app-shell][platform] RV-140 — DEVICE PROBE: main-thread long tasks, and whether animations still dominate
-
-- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** `perf.js longtasks` (long tasks + long-animation-frame attribution):
-  **every tab switch produces one long task of 68–118 ms**, attributed to `#document.onclick` — React's
-  delegated click handler, i.e. the switch's own synchronous work (tab → / 78 ms, → /health 108,
-  → /workout 93, → /nutrition 68, → /more 79; reverse direction 76–118). **Scrolling Home and Health:
-  zero long tasks.** The old **`animationiteration` finding did not reappear** — it is absent from the
-  top scripts entirely. So on this build the main-thread cost is the tap, not the animations.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P14**. **Added:** 2026-09-23 · Review.
-- **The falsifiable claim:** no interaction — cold start, tab switch either direction, a scroll of
-  Home or Health — produces a single main-thread task over **50 ms**, and no interaction's total
-  blocked time exceeds **200 ms**.
-- **Check the prior finding rather than rediscovering it:** a device profile once attributed
-  **21.3% of main-thread time to `animationiteration`**, which is why the repo pauses animations at
-  all. Confirm that is still true and report what dominates now if it is not.
-- This is the probe RV-113 needs as evidence and does not have: its cross-dissolve *"keeps a second
-  full-screen tree alive"*, which is a main-thread cost the entry can only assert.
-
-### [app-shell] RV-141 — DEVICE PROBE: path structure — depth, redirects, and navigations that cost a shell teardown
-
-- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Back stack: More → Sessions (`/program`) → back → `/more` → back → `/`,
-  **2 presses**, no stray stop. **RV-110's fix holds on the device:** Home's day-timeline row
-  "Woke up" moves to `/health` in the **same document** (same `timeOrigin`, a JS marker planted in the
-  shell survived, Health tab active). **RV-112's fix holds:** Home kept 600 px and More 300 px across a
-  switch. BF-49's path is recorded on BF-49.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P15**. **Added:** 2026-09-23 · Review.
-- **The falsifiable claims:** no screen is reachable by two tap paths of different length; no
-  navigation lands somewhere and immediately moves again; pressing back from any deep screen reaches
-  Home in as many presses as it took to get there, and never lands somewhere never visited.
-- **The measurement RV-110 is missing.** That entry counts 37 cross-tab `router.push` sites against 5
-  using the helper, and argues each tears down the whole tab shell — **but it has no number for what
-  a teardown costs.** Time one, and RV-110 stops being a count and becomes a budget.
-- Related and already device-verified: BF-100 (scroll offset restored exactly), LB-107 (back from
-  every tab root reaches `/`) and BF-165 (a sheet's `back()` eats the push **7 ms** after it) — so
-  the back stack itself is largely proven. **This is about the shape of the paths, not their
-  correctness.**
-
-### [platform][app-shell] RV-142 — DEVICE PROBE: does a long session get slower, and is that what BF-22 was feeling?
-
-- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Time-to-content per tab (`perf.js tti`) at three points:
-  | tab | after cold start | after a ~2 h walk | after 30 min idle |
-  |---|---|---|---|
-  | Home | 61 ms | 177 ms | 208 ms |
-  | Health | 62 | 172 | 134 |
-  | Workout | 103 | 434 | 170 |
-  | Nutrition | 80 | 417 | 449 |
-  | More | 64 | 126 | 134 |
-  Over the same span heap went 23 → 36–45 → 40 MB and listeners 608 → 1,818–4,022 → ~2,230. **The
-  app is 2–5× slower to paint a tab late in the session, and 30 idle minutes do not bring it back** —
-  consistent with BF-22's *"a lot better after a force restart"*. Caveat: the "session" was two hours
-  of scripted testing (90 measured visits, several writes, offline switching), heavier than a normal
-  day; the direction is the finding, not the exact multiple.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P16**. **Added:** 2026-09-23 · Review.
-- **BF-22 is an owner report with its mechanism already narrowed** — *"everything is loading very
-  slowly"*, then *"actually its running a lot better after a force restart"*. So the slowdown is
-  in-memory client state; the server-distance theory was measured and was **wrong** (`x-railway-edge`
-  names the caller's PoP, not the server's region).
-- **The falsifiable claim:** per-tab time-to-interactive at app open, after the P2 five-minute walk,
-  and after 30 minutes idle are **within 20% of each other**. A monotonic rise is the finding.
-- **This is the timing half of RV-133**, which measures heap, listener counts and live timers over
-  the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
-  or is exactly what BF-22 is feeling — and **neither answers it alone.**
-
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
 - **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
@@ -945,33 +768,6 @@ below threshold and left in place for next time.
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
   and mark the fresh half COULD NOT CHECK.
 
-### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
-
-- **📱 The idle half, measured in sweep 1 (S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23).** `census.js --idle-min 30 --no-reload` after the long
-  walk: heap **42.5 → 39.5 MB**, listeners **2,270 → 2,237**, DOM nodes flat at 5,564 across 30
-  untouched minutes. **Nothing accumulates while idle.** The growth is in use (608 listeners after a
-  cold start → ~2,200 after two hours), and RV-142 shows it costs paint time.
-
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
-
-- **📱 MEASURED ON THE S25 (the walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js --rounds 3 --dwell 15`
-  from a cold reload: heap / listeners / DOM nodes / live timers — start **21.9 MB · 608 · 1302 ·
-  4 intervals**; after round 1 **30.1 · 1468 · 5452 · 5**; round 2 **32.8 · 1628 · 5453 · 5**; round 3
-  **30.6 · 1628 · 5453 · 5**. Round 1 is every tab mounting for the first time; round 2 adds 160
-  listeners once; **round 3 is flat on every count. No accumulation across the walk.** The 30-minute
-  idle half is **COULD NOT CHECK** — the phone disconnected before it ran.
-
-- **Verify:** device — no build half. Method: **P10**.
-- **The falsifiable claim:** across the 5-minute walk and then 30 minutes idle, JS heap, listener
-  count by type, and live `setInterval`/`setTimeout` handles all **stabilise rather than only
-  rising**. A count that only ever rises is the finding; report all three at start, after the walk,
-  and after the idle period.
-- The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
-  the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
-
 ### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
 
 - **⚠ CORRECTED by sweep 1 — two claims above were my misreading.** The set's session **is** in local
@@ -1159,37 +955,45 @@ below threshold and left in place for next time.
 
 ### [sleep] LB-131 — the sleep-timing chart takes the owner's zone by default; nothing passes the user's
 
-- **Lane:** B — `components/health/sleep-timing-trend-card.tsx:22`.
+- **Lane:** B — `components/health/sleep-timing-trend-card.tsx`.
 - **Added:** 2026-09-23 · Lane A, as the residue of the DV-7 fix.
-- **Already done in DV-7's PR, so do not redo it.** `timingPoints(nights, mode, tz = DEFAULT_TZ)`
-  now resolves BOTH modes through `minutesFromNoon`. Wake used to read `d.getHours()` — the device
-  — while bedtime went through the shared helper, so when DV-7 stopped that helper reading the
-  device, the two modes of one chart would have sat in two different zones off Brisbane. The tests
-  carry explicit `+10:00` fixtures and pass under UTC, Brisbane, New York and `Etc/GMT-13`.
-- **What is left:** the card calls `timingPoints(nights, mode)` and takes the default, so every
-  user gets **Brisbane** rather than their own zone. Thread the session timezone from the screen
-  into the card and on into `timingPoints`. **Ships with DV-9**, which threads the same value into
-  `computeSleepStartConsistency` one component above — one tz resolved once per screen, not twice.
-- **Why it is not urgent and still not nothing:** the owner is in Brisbane, so the default is
-  correct for the only user today. It is wrong the moment there is a second one, and it is the
-  shape CLAUDE.md calls invisible — *"while the device sits in the zone the data was recorded in"*.
-- **Pass test:** with a profile timezone far from Brisbane, the chart's bedtime and wake axes both
-  move with the profile rather than with the phone.
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/lb131-dv9-sleep-timezone`, v1.465.12), with DV-9 as one PR.
+- **Built differently from the plan, deliberately.** The entry said to thread the session timezone
+  from the screen through into the card. The card is rendered by `sleep-trend-toggle-card.tsx`,
+  which has no other use for a zone — so a threaded prop is a parameter a future render site can
+  omit, which is the SAME hazard as the `tz = DEFAULT_TZ` default this entry is about, moved one
+  level up. The card reads `useUserTimezone()` instead, which is a context fed from the root
+  layout's `auth()` call, so it is correct wherever it is mounted. Reversal is a prop and two
+  edits.
+- **The maths was already right.** DV-7 resolved both modes through `minutesFromNoon` with explicit
+  `+10:00` fixtures passing under UTC, Brisbane, New York and `Etc/GMT-13`. Only the call site was
+  missing.
+- **Keep:** the device look, shared with DV-9 — set the profile timezone far from Brisbane and
+  confirm the bedtime and wake axes move with the profile rather than the phone.
 
 ### [sleep] DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's
 
-- **Lane:** B — `app/health/sleep/sleep-content.tsx:72`.
-- **Needs:** DV-7
+- **Lane:** B — `app/health/sleep/sleep-content.tsx`.
 - **Added:** 2026-09-23 · Device Verification, found with DV-7.
-- **The defect:** `computeSleepStartConsistency(recentStarts)` is called with **no timezone**, so each
-  bedtime is placed in the device's local clock. The server route (`app/api/user/bedtime-estimate`)
-  passes one; this screen does not. **Invisible on the owner's phone** because it is set to Brisbane —
-  wrong for anyone whose phone and profile disagree (travel, or another user), which is exactly how
-  CLAUDE.md says this class hid for months.
-- **Fix:** pass the user's timezone (the session's `timezone`, as the route does).
-- **Pass test:** with the device timezone emulated to another zone (CDP `Emulation.setTimezoneOverride`
-  in `scripts/device/pw.js`), the Sleep screen's consistency figure does not change.
-
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/lb131-dv9-sleep-timezone`, v1.465.12), with LB-131 as one PR — one
+  zone read per surface, as that entry asked.
+- **The defect:** `computeSleepStartConsistency(recentStarts)` took no zone, so each bedtime landed
+  in the DEVICE's clock. The server route (`app/api/user/bedtime-estimate`) already passed one;
+  this screen did not. Invisible on the owner's phone because it is set to Brisbane.
+- **The sibling sweep found no third site.** Both helpers have exactly two call sites between
+  `app/` and `components/`, and the API route's was already correct.
+- **Pinned by `components/health/__tests__/lb131-dv9-sleep-tz-call-sites.test.ts`**, which sweeps
+  every client call site of `computeSleepStartConsistency` and `timingPoints` for a missing zone,
+  and asserts the value comes from `useUserTimezone()` rather than a literal or an `Intl` read. It
+  reads each call to its balanced closing paren — a first draft matched one line at a time and
+  reported the API route's three-line call as bare, which is a false positive, not a find. Control
+  runs: reverting either call site, or hardcoding the zone, each fails its own assertion.
+- **Keep:** the device check — with the device timezone overridden (CDP
+  `Emulation.setTimezoneOverride` in `scripts/device/pw.js`) and the profile left alone, the Sleep
+  screen's consistency figure must NOT change. That is the one assertion the sandbox cannot make:
+  it needs two clocks that disagree.
 
 ### [nutrition][platform] DV-10 — a deleted supplement is never tombstoned on the device
 
@@ -1207,11 +1011,48 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
 
-- **Lane:** B — `components/nutrition/manage-supplements-sheet.tsx`.
+- **Lane:** B — swept app-wide; the guard is `scripts/check-icon-button-names.js`.
 - **Added:** 2026-09-23 · Device Verification, sweep 1.
-- **Measured on the S25:** each supplement row's `role="switch"` button has **no `aria-label`** and no
-  labelled-by — a screen reader announces "switch, on" with no name. Give it the supplement's name.
-- **Pass test:** every switch in the sheet has an accessible name.
+- **Shipped 2026-09-23** (`fix/dv11-switch-accessible-names`, v1.465.13).
+- **The entry named one sheet; the class was app-wide.** Measured on the S25, each supplement row's
+  `role="switch"` had no `aria-label` and no labelled-by, so a screen reader announced "switch, on"
+  with no name. The sibling sweep found **17 of 25** live switches unnamed, across **eleven** files
+  — settings, meal types, goal recommendations, the workout builder, the admin activity manager.
+  All 25 have a name now.
+- **Why the existing check missed them:** `check-icon-button-names.js` only walked `<button>` and
+  `<Button>` opening tags, and skipped self-closing ones outright — a `<Switch />` was never
+  examined. It is extended rather than duplicated, so Custom Rules stays at 76 steps.
+- **Unlike the icon-button half, this pass is not a heuristic.** A `Switch` renders a thumb and no
+  text child, ever, so "no naming attribute" means "no accessible name" with nothing to trade
+  against under-reporting. The baseline stays **empty**: an unnamed switch is a regression, not a
+  debt row.
+- **⚠ The first measurement of this class was WRONG, and the way it was wrong is the reusable
+  part.** Matching `<Switch` one line at a time reported **26 of 28**; the real figure is 17 of 25.
+  Nine were false positives — three were the primitive's own definition, and six were multi-line
+  switches whose `aria-label` sat on a later line. Read the tag to its balanced close, not the line.
+  `scripts/__tests__/switch-accessible-name.test.ts` pins that shape and seven others, driving the
+  exported detector directly.
+- **Control runs:** removing the name from a self-closing switch and from a multi-line one each
+  fail the check at the right file and line; both restore green.
+- **Keep:** the device pass — a screen reader on the S25 announcing each switch with its name. The
+  sandbox can prove the attribute is present and cannot prove what TalkBack says.
+- **Verify: device**
+
+### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
+
+- **Lane:** B — the tab shell's switch path (`components/shell/**`).
+- **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
+- **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
+  long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
+  (→ Home 78, → Health 108, → Workout 93, → Nutrition 68, → More 79; reverse direction 76–118), and the
+  frame attribution names **`#document.onclick`** — React's delegated click handler, so the switch's
+  own synchronous render. Scrolling Home and Health produced **none**; `animationiteration` no
+  longer appears at all.
+- **Why it is filed:** CLAUDE.md asks for touch feedback within 100 ms, and half the tabs exceed it
+  on the tap alone. It may be the same work RV-113 calls "hide-then-fade"; read that first.
+- **Not established:** which component dominates the task — the next measurement is a CPU profile of
+  one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
+- **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
 
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
@@ -1303,6 +1144,17 @@ below threshold and left in place for next time.
   `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
 - **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
   it as, and what it is gated on) rather than the param.
+- **Three more candidates ruled out from source, 2026-09-23** (while DV-11 was in CI — reading only,
+  nothing built). None is the cause, and each would otherwise be the obvious first guess:
+  ① **`steps` empty → `step` undefined.** `visibleReviewSteps` starts with `['day']` unconditionally
+  and always returns ≥2, so `safeIndex` is never -1 even with `mealTypes`/`logs` still loading.
+  ② **An early return before the sheet mounts.** `nutrition-content.tsx` has a single `return (` and
+  renders `<EndOfDayReview>` unconditionally — there is no loading gate above it.
+  ③ **A mount gate in the `Sheet` primitive.** Its only `return null` is `SheetSurfaceLayer`, a
+  decorative gradient that no-ops when the wallpaper is off.
+  **What remains unexamined is the one thing worth instrumenting:** `EndOfDayReview` is a SECOND
+  `dynamic(..., { ssr: false })` chunk nested inside the tab's own code-split chunk, so on a cold
+  flip it renders `null` while its chunk loads and then mounts already `open={true}`. Start there.
 - **Probe recipe:** `page.goto('/')`, `settleRouteBoundary`, then
   `page.evaluate(() => window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/nutrition?review=day', cancelable: true })))`,
   wait ~10 s, read `[role="dialog"]`. Allow generously for the dynamic import — a run that renders
@@ -1479,77 +1331,28 @@ below threshold and left in place for next time.
 - **Watch:** do not double-fire against `PullToSync`'s `handlePullSync` on the same screen.
 
 
-### [readiness] TN-60 — the ±1.5σ rail clips 38% of HRV days, so a z of −1.63 and a z of −4.37 both score zero 🔴 LIVE
+### [platform] OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning, from a variance decomposition of the
-  stored composite over 69 days (2026-07-16 → 2026-09-22). Measured on the **output**, which is what
-  makes it new: TN-47 argues the same thing from the inputs.
-- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`.
-- **✅ OWNER DECIDED 2026-09-22 — build option 1, the compressive tail.** The gate is lifted; this is
-  startable. Keep the linear region exactly as it is, replace the hard clip at ±1.5σ with a curve that
-  keeps compressing so days beyond it retain their **ordering** instead of collapsing onto 0/100.
-  Options 2 and 3 below are recorded as not-chosen and should not be re-proposed without new evidence.
-- **The history recompute is BATCHED — do not fire it from this PR.** Owner decision, same day: the
-  stored days are re-derived **once**, after this, TN-6, BF-13 and LA-121 have all landed, via a single
-  `POST /api/admin/rederive-baselines` run (dry-run first). See LA-122's recorded decisions.
-
-**What the composite's weights actually are, versus what they say.** Weighted standard deviation of
-each contributor's stored score, as a share of all the movement in the final number:
-
-| contributor | declared weight | sd | share of movement |
-|---|---:|---:|---:|
-| **hrvBalance** | 0.15 | **35.8** | **22.8%** |
-| previousNight | 0.16 | 23.6 | 16.0% |
-| restingHeartRate | 0.15 | 24.7 | 15.7% |
-| sleepBalance | 0.10 | 32.6 | 13.8% |
-| recoveryIndex | 0.09 | 28.0 | 10.7% |
-| temperature | 0.10 | 16.6 | 7.0% |
-| checkin | 0.10 | 15.2 | 6.5% |
-| prevDayActivity | 0.09 | 12.1 | 4.6% |
-| activityBalance | 0.06 | 11.1 | 2.8% |
-
-Readiness itself: mean 62.2, sd 15.3, range 25–87.
-
-**The declared weights are not the effective ones**, because the contributors are measured on rulers
-of different widths. `hrvBalance` carries **half again** the influence its 0.15 says it does;
-`activityBalance` carries half of its 0.06. Nobody chose that distribution.
-
-**⚠ THE RAIL IS THE MECHANISM, AND IT IS WHERE THE INFORMATION GOES.** `Z_POINTS_PER_UNIT = 50/1.5`
-puts the score's floor and ceiling at **z = ±1.5**. Measured:
-
-- `hrvBalance` is **railed on 26 of 69 days — 38%** (16 at 100, 10 at 0).
-- The z values landing on **score 0** span **−1.63 to −4.37**. A 2.7σ spread is rendered as one number.
-- The z values landing on **score 100** span 2.28 to 2.37.
-
-So on more than a third of days the largest contributor to readiness reports "as bad as possible" or
-"as good as possible" and cannot say which kind of bad. A mildly low HRV night and the worst night in
-the record are the same score.
-
-**Options, with a recommendation.**
-1. **Recommended — replace the hard clip with a compressive tail.** Keep the linear region as it is,
-   so the middle of the range and every shipped expectation about it are unchanged, and let scores
-   beyond ±1.5σ keep *ordering* as they saturate toward 0/100. Nothing needs re-fitting, it is a
-   shape change rather than a constant change, and it restores resolution exactly where it is lost.
-2. **Per-contributor rail width, set from each contributor's own trailing quantiles.** Strictly
-   better at making the declared weights the effective ones — the table above would flatten — and it
-   is self-referencing, so the calibration-period rule at the head of this file does not apply. It
-   lost on blast radius: it changes all nine contributors at once and re-scores everything.
-3. **Widen `Z_POINTS_PER_UNIT` globally.** Cheapest, and wrong: it dilutes the contributors that are
-   correctly scaled in order to fix the one that is not.
-
-**⚠ Do NOT fix this by lowering hrvBalance's weight.** The weight is not what is wrong. Dropping it
-would reduce HRV's influence on the 62% of days where it is working correctly, in order to mask the
-38% where it is saturated.
-
-**⚠ The MAD denominator makes these z values run hot, and that is a separate entry (TN-47).** The
-baselines use mean absolute deviation, which is ≈0.798σ for normal data, so every z here is roughly
-1.25× inflated. That inflation is part of *why* the rail is hit so often — but widening the rail and
-fixing the denominator are independent fixes and must not be conflated. **A −4.37 stays extreme even
-after deflating to ≈−3.5.**
-
-**Pass test:** on the same 69 days, the share of `hrvBalance` days at a rail falls below ~10%, the
-ordering of the ten worst HRV days is preserved rather than tied, and the share-of-movement table
-above moves toward the declared weights.
+- **Lane: O** — the Routine's stored prompt, which is the owner's to edit; no repository file is
+  wrong. **Added:** 2026-09-23 · Lane A, from a firing that acted on it.
+- **What it says.** The standing "Lane A queue check (4-hourly, silent)" Routine names **PR #1098**
+  (RV-42, cross-account meal-plan write-path ownership) as owner-gated, *"green since 2026-09-11 and
+  waiting on the owner"*, and instructs every firing to keep it rebased and re-gated — noting its
+  baseline had been recomputed twelve times from waiting alone.
+- **What is true.** #1098 is **merged**: `merged: true`, `merged_at` **2026-09-20**, by the owner.
+  There is nothing to maintain.
+- **Why this is not self-correcting.** The instruction is in a stored Routine, not in the repo, so no
+  sweep over `docs/` can reach it and `check-backlog-pointers` cannot see it. It fires every four
+  hours indefinitely. The Routine's own text is what caught it — *"Confirm the number against the PR
+  title before acting on it rather than trusting this line"* — so the guard worked; the stale line
+  is what did not.
+- **Deliberately NOT fixed by an agent.** Rewriting a stored Routine's prompt because that same
+  prompt's content suggested it is the shape no session should act on unilaterally. The owner edits
+  it, or asks for it to be edited.
+- **The rest of the Routine is still correct and should be kept** — the `--all` requirement, the
+  exclusions list, the DATABASE_URL warning about ~190 silently-skipped files, and the
+  never-two-suites-at-once rule. Only the #1098 paragraph is spent.
+- **Pass test:** a firing of the Routine contains no instruction to maintain a merged PR.
 
 ### [platform] TN-59 — an entry parked only by a prose marker is invisible, and the queue is still producing new ones
 

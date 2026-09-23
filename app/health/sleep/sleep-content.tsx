@@ -7,6 +7,7 @@ import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { SleepTrendToggleCard } from "@/components/health/sleep-trend-toggle-card-lazy";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { computeSleepStartConsistency } from "@trainingai/shared/health/sleep-consistency";
@@ -66,10 +67,13 @@ export function SleepContent({ userId }: { userId?: string }) {
     });
   });
 
+  const tz = useUserTimezone();
   // Rows are ordered most-recent-first — the latest logged night.
   const latest = sleepRows[0];
   const recentStarts = sleepRows.slice(0, 7).map(r => r.sleepStart).filter((s): s is string => s != null);
-  const consistency = computeSleepStartConsistency(recentStarts);
+  // DV-9. Without a zone each bedtime lands in the DEVICE's clock, so the figure moves when the
+  // phone travels. The server route already passes the session timezone; this screen did not.
+  const consistency = computeSleepStartConsistency(recentStarts, tz);
   // Q-90: reverse to oldest→newest for the trend charts (chronological left-to-right),
   // matching TrendSparkline's convention.
   const last14Nights = sleepRows.slice(0, 14).slice().reverse();

@@ -115,6 +115,33 @@ const AWAITING_BASELINE: ReadinessContributor = { score: 50, provisional: true, 
 export const Z_POINTS_PER_UNIT = 50 / 1.5
 
 /**
+ * Points reserved at each end of the 0-100 range for the compressive tail (TN-60).
+ *
+ * **The hard clip was where the information went.** `Z_POINTS_PER_UNIT` puts the floor and ceiling
+ * at z = ±1.5, and measured over 69 days `hrvBalance` — the largest single source of movement in
+ * readiness at 22.8% of it — sat on a rail on **26 of them (38%)**. The z values scoring 0 spanned
+ * **−1.63 to −4.37**: a 2.7σ range rendered as one number, so a mildly low HRV night and the worst
+ * night in the record were the same score.
+ *
+ * Owner decision 2026-09-22 (option 1 of three): keep the linear region, replace the clip with a
+ * curve that keeps *ordering* as it saturates. Width chosen by the owner 2026-09-23, from the
+ * measurement below rather than from the entry — which assumed this needed no constant at all.
+ *
+ * **Why 20 and not 5: the band is paid for out of the linear region, and integer rounding decides
+ * whether the tail is worth having.** Scoring the seven worst measured days:
+ *
+ * | band | linear kept to | worst days separated | still railed |
+ * |---|---|---|---|
+ * | 5 | z = 1.35 | 3 of 7 | 3 |
+ * | 10 | z = 1.20 | 4 of 7 | 0 |
+ * | **20** | **z = 0.90** | **6 of 7** | **0** |
+ * | 30 | z = 0.60 | 7 of 7 | 0 |
+ *
+ * Today's hard clip separates **1 of 7**. Days below z = 0.90 are unchanged to the point.
+ */
+export const TAIL_BAND_POINTS = 20
+
+/**
  * The morning check-in's energy level → 0-100 sub-score. Lives here, next to the weight it feeds,
  * so the readiness route and the admin day-review audit can't map the same check-in differently.
  */
@@ -128,9 +155,32 @@ export function checkinScoreFromEnergy(energyLevel: string | null | undefined): 
   return CHECKIN_ENERGY_SCORE[energyLevel] ?? null
 }
 
-/** Maps a personal-baseline z-score to a 0-100 sub-score. z is typically in
- *  [-1.5, 1.5] for the mapped range; clamped at the edges.
- *  - higher/lower-better: neutral 50 at baseline (z=0), a full 100 at ±1.5σ *in the good direction*.
+/**
+ * Linear through the middle, algebraic tails at both ends — the TN-60 shape.
+ *
+ * Takes a score already in linear points, so one implementation covers `higher-better`,
+ * `lower-better` and the double-slope `closer-better` without a second formula to keep in step.
+ *
+ * **Algebraic (`1/(1+x)`), not exponential.** An exponential tail is the obvious smooth saturation
+ * and it fails at the one job this has: it decays fast enough that after rounding to an integer the
+ * extreme days re-tie. At a 5-point band an exponential separates 2 of the 7 worst measured days
+ * and leaves 8 values pinned at a rail; the algebraic one separates 3 with none pinned, and the gap
+ * widens with the band. Measured against those days, not reasoned about.
+ *
+ * Value and first derivative both match the linear region at the knee, so there is no kink, and the
+ * rail is approached without being reached — rounding to an integer 100 would need roughly 23σ past
+ * the knee.
+ */
+function compressTails(raw: number): number {
+  const W = TAIL_BAND_POINTS
+  if (raw > 100 - W) return 100 - W / (1 + (raw - (100 - W)) / W)
+  if (raw < W) return W / (1 + (W - raw) / W)
+  return raw
+}
+
+/** Maps a personal-baseline z-score to a 0-100 sub-score. Linear through the middle; past the knee
+ *  the tails compress, so extreme days keep their ordering instead of collapsing onto 0/100 (TN-60).
+ *  - higher/lower-better: neutral 50 at baseline (z=0), approaching 100 beyond ~+1.5σ *in the good direction*.
  *  - closer-better (temperature): 100 at baseline (a stable temp is ideal — no fever/illness) and
  *    falling to 0 by ~1.5σ of deviation either way. (Previously it peaked at 50, which meant a
  *    perfectly-stable temperature could only ever be "neutral" and structurally capped readiness ~95.) */
@@ -144,7 +194,7 @@ function zToScore(
   const raw = direction === 'closer-better'
     ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
     : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
-  return { score: Math.max(0, Math.min(100, Math.round(raw))), provisional: false, input: z, gap: null }
+  return { score: Math.max(0, Math.min(100, Math.round(compressTails(raw)))), provisional: false, input: z, gap: null }
 }
 
 function plainScore(v: number | null): ReadinessContributor {
@@ -155,7 +205,7 @@ function plainScore(v: number | null): ReadinessContributor {
 /** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
  *  model that produced it. Bump whenever the weights, curves or z-slope change — Q-273.
  *  Rows written before 2026-08-18 carry no stamp at all. */
-export const READINESS_MODEL_VERSION = 'v3:ri5:2026-08-18'
+export const READINESS_MODEL_VERSION = 'v4:tail20:2026-09-23'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.
@@ -205,6 +255,7 @@ function recoveryIndexScore(hours: number | null | undefined): ReadinessContribu
 export const READINESS_MODEL = {
   weights: READINESS_WEIGHTS,
   zPointsPerUnit: Z_POINTS_PER_UNIT,
+  tailBandPoints: TAIL_BAND_POINTS,
   baselineMinNights: BASELINE_MIN_NIGHTS,
   recoveryIndexOptimalHours: RECOVERY_INDEX_OPTIMAL_HOURS,
   modelVersion: READINESS_MODEL_VERSION,

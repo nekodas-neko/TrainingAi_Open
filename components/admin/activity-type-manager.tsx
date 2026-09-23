@@ -71,7 +71,7 @@ function ActivityTypeForm({
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">Distance-based</p>
-        <Switch checked={isDistanceBased} onCheckedChange={setIsDistanceBased} />
+        <Switch checked={isDistanceBased} onCheckedChange={setIsDistanceBased} aria-label="Distance-based" />
       </div>
 
       <div>

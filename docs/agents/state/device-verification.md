@@ -4,7 +4,7 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-23 · **By:** the first-run session (`device/sweep-1`) · **Next ID:** `DV-12`
+**Updated:** 2026-09-23 · **By:** the first-run session (`device/sweep-2-plan`) · **Next ID:** `DV-13`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
@@ -20,13 +20,12 @@
 
 Nothing running; the phone is the owner's. I message him with 🔴 before the next sitting.
 
-## Next — sweep 2, from `docs/device-sweep-1-plan.md`
+## Next — sweep 2, `docs/device-sweep-2-plan.md`
 
-1. **Block 4** — the 53 automatable screen checks, screen by screen (table order).
-2. Blocks 6 (admin, read-only rows) and 7 (resume: RV-130, BF-80), then block 3 (frames/paint).
-3. **BF-22's next measurement:** listener count per tab visit, to find the component that never
-   releases (RV-142 showed 608 → ~2,200 in use, flat while idle).
-4. **LB-116** on a morning **before** the owner checks in.
+Eight stations (A Nutrition … H app-level), ~3 h 45 min, grouped by what one visit settles. The
+per-entry detail stays in sweep 1's table. Morning-only (LB-116, TN-50), owner-present, hardware and
+declined writes are listed there as out of this pass. **BF-22's next measurement** (listeners per tab
+visit) rides in station H.
 
 ## Rules for every message and every input
 

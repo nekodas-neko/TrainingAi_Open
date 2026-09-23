@@ -16120,6 +16120,65 @@ performance baseline (RV-137…RV-142, RV-133), the write checks (RV-108, BF-185
 DV-8 correction, and two new entries (DV-10, DV-11) — net of RV-45 and DV-4, which were verified and
 removed.
 
+## 2026-09-23 — backlog 27499 → 27507 (LB-131 + DV-9, +8)
+
+Both entries shipped and both stayed, each as `Verify: device` + `Keep:` — so two completed items
+cost eight lines rather than clearing thirty.
+
+That is the right direction here, and the reason is worth the space: **DV-9's pass test is one the
+sandbox cannot make at all.** It needs the device clock and the profile to disagree — override the
+handset's zone, leave the profile alone, and the consistency figure must not move. No amount of
+local testing produces two clocks, so deleting the entry would have recorded a check that nobody
+ran.
+
+The lines also carry why LB-131 was built against its own plan. It asked for the timezone to be
+threaded as a prop; the card is rendered through a toggle component that has no use for a zone, so
+the prop would be one a future render site can omit — the same hazard as the `tz = DEFAULT_TZ`
+default the entry exists to remove, moved up a level. It reads the context instead. A later session
+reading only the original entry would see a prop missing and "fix" it back.
+
+
+## 2026-09-23 — backlog → 27351 (DV-11 +31, against a 219-line clearance from `main`); baton held at 55
+
+**The number goes DOWN while this branch adds 31 lines**, which is worth stating plainly because the
+figure alone reads as a shrink this PR did not do: an Orchestrator sweep cleared 219 lines of
+completed entries from `main` while this sat in CI. The baseline is lowered to the truth rather than
+left at the 27538 this branch computed before that merge — a baseline 188 lines above reality is
+slack for the next growth to hide in, which is the failure the ratchet exists to prevent.
+
+The backlog grows because DV-11 turned out to be an app-wide class rather than one sheet, and the
+entry now carries the two things a later session would otherwise pay for again: why the existing
+`check-icon-button-names.js` could not see a `<Switch>` (it skipped self-closing tags), and that the
+**first measurement of the class was wrong** — 26 of 28 by line-matching, 17 of 25 read properly.
+Nine false positives, six of them multi-line switches whose `aria-label` sat on the next line.
+
+Most of the rest is LB-129's, which shipped nothing: three more candidates ruled out from source
+while this PR sat in CI, written into its entry so the next session starts from what is left rather
+than re-deriving what is not.
+
+**The baton was rewritten and came back to exactly 55 rather than raising its number.** `--fix`
+offered 56 and that was declined: a shrink-only file that grows by one whenever someone has a new
+lesson is not shrink-only, it is a slower ratchet. Room for the three new lessons came from cutting
+older narrative and from moving LB-129's findings to LB-129 — which is where they belonged anyway,
+since a baton carries state and an entry carries the investigation.
+
+## 2026-09-23 — `implementation-backlog.md` → 27302, `projectOverview.md` → 12521 (TN-60)
+
+The backlog **shrinks by 49**: TN-60 was a long entry — a variance-decomposition table, three
+options with reasons, and two standing warnings — and all of it leaves the queue. **OR-136 replaces
+a fraction of it**, filed because the 4-hourly Lane A Routine still instructs every firing to keep
+PR #1098 rebased; that PR merged on 2026-09-20. It is an entry rather than a fix because the stale
+text lives in a stored Routine, which no sweep over `docs/` can reach and which an agent should not
+rewrite on the say-so of its own contents.
+
+`projectOverview.md` gains 18 lines, and most of them buy one thing: the row says **readiness can no
+longer reach 100**, with the numbers (90/10 at ±1.5σ, 95 on a perfect day, ~23σ for an integer 100)
+and the reversal lever. That is a change to a figure the owner reads every morning, arrived at
+through a shape he chose rather than a number he was shown, so it is stated in the index instead of
+being left in the journal. The row also records what is **not** yet true — stored days keep their
+old scores until the batched re-derivation, so the pass test's share-of-movement claim is unproven
+rather than met.
+
 ## 2026-09-23 — `docs/implementation-backlog.md` 27458 → 27482 (OR-136)
 
 Three lines net. The three bare device gates each gained their reason and two lost the boilerplate

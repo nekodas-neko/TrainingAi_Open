@@ -212,7 +212,7 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
                   <span className="font-semibold text-foreground">{Math.round(row.suggested).toLocaleString()}{row.unit}</span>
                 </p>
               </div>
-              <Switch checked={checked[row.key] ?? false} onCheckedChange={v => setChecked(prev => ({ ...prev, [row.key]: v }))} />
+              <Switch checked={checked[row.key] ?? false} onCheckedChange={v => setChecked(prev => ({ ...prev, [row.key]: v }))} aria-label={row.label} />
             </div>
           ))}
 
@@ -226,7 +226,7 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
                   <span className="font-semibold text-foreground">{formatActivityLevel(data.recommended.activityLevel)}</span>
                 </p>
               </div>
-              <Switch checked={checked.activityLevel ?? false} onCheckedChange={v => setChecked(prev => ({ ...prev, activityLevel: v }))} />
+              <Switch aria-label="Activity Level" checked={checked.activityLevel ?? false} onCheckedChange={v => setChecked(prev => ({ ...prev, activityLevel: v }))} />
             </div>
           )}
         </div>
