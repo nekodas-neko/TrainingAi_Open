@@ -80,10 +80,20 @@ describe('the real queue classifies exactly as it did before', () => {
   // own title says so — which is exactly the "un-parks an entry" case this list exists to surface.
   // The entry is named here rather than the count being edited, so the next reader can tell an
   // intended change from a parser regression.
-  it('yields the same seventeen gates, by id', () => {
+  // **Q-317 dropped 2026-09-23, and this is the mechanism working rather than failing** — the same
+  // shape as Q-305 above. Device sweep 2 (#1471) verified it on the S25 and removed it from the
+  // backlog, so the `Keep:` carrying its device gate went with the entry. The entry is named here
+  // rather than the count being edited, for the reason the Q-305 note already gives: a future
+  // parser change that un-parks or newly parks an entry should name it.
+  //
+  // It went red on `main` rather than on the PR that caused it, because this list is pinned against
+  // the real queue while the queue is edited by every agent — so the cost lands on whoever pushes
+  // next. That is the accepted trade for a snapshot that names its change; it is not a reason to
+  // loosen the assertion to a count.
+  it('yields the same sixteen gates, by id', () => {
     expect(gated).toEqual([
       'BF-80:device', 'LB-53:owner', 'BF-10:device', 'Q-486:device', 'Q-499:device', 'Q-477:device',
-      'Q-467:device', 'LB-5:device', 'Q-317:device', 'Q-318:device', 'Q-316:device', 'Q-544:device',
+      'Q-467:device', 'LB-5:device', 'Q-318:device', 'Q-316:device', 'Q-544:device',
       'Q-538:device', 'Q-461:device', 'Q-319:device', 'Q-513:owner', 'Q-281:device',
     ])
   })
