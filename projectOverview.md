@@ -4064,28 +4064,6 @@ it is the only one with neither an id guard nor a not-found path, and its positi
 established** (`oura_workouts` has 0 rows locally). Sibling of RV-45, different cause.
 [Sweep 48](docs/reviews/2026-09-05-body-supplied-ids-skip-the-guard.md).
 
-### [platform][nutrition] 🟡 Q-556's 404 shipped on one delete route; six siblings still answer 200 (RV-45, 2026-09-05)
-
-`app/api/activity-logs/route.ts:70` answers 404 when a delete matches no row, and its comment says
-the change was made to *"Match every sibling delete: 404 for both a nonexistent id and someone
-else's."* **Six siblings answer 200 to both** — `supplements/[id]`, `supplements/[id]/log`,
-`injuries/[id]`, `nutrition/food-logs/[id]`, `nutrition/saved-meals/[id]`,
-`nutrition/meal-types/[id]`, plus `admin/activity-types`. Each was probed beside a malformed id
-returning `400 Invalid id`, so the route matched and its guard ran.
-
-**Ownership is enforced; the answer is what is wrong.** A second account deleting the first's
-supplement got `200 {"ok":true}` with the row still in Postgres, owner unchanged — a correct refusal
-reported as a success, so nothing distinguishes it and nothing reaches `error_events`. The clients
-(`manage-supplements-sheet.tsx:166`, `injury-sheet.tsx:179`) gate on `res.ok` alone, drop the row and
-toast "deleted"; it returns on the next pull.
-
-The 2026-08-18 review deliberately declined to file these on idempotency grounds, which is correct
-for the owner's own already-deleted row and false in the cross-account case. Q-556 later reached the
-opposite conclusion and shipped it on one route. Nothing blocks the rest: the outbox precondition
-Q-556 names holds identically for every sibling domain.
-**Not device-verified** — measured on the web build, where the offline-first clients take their API
-fallback. [Sweep 47](docs/reviews/2026-09-05-delete-reports-success-for-nothing.md).
-
 ### [platform] ⚠️ `PATCH /api/admin/activity-types` answers 500 with an empty body for a not-found (RV-46, 2026-09-05)
 
 The one route of thirteen calling a typed-throwing repository method that does not use the Q-463
