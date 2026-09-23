@@ -33,7 +33,13 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json(recommendation, {
+  // RV-82: `program` is server-internal — it exists so the two routes that used to re-fetch it can
+  // read it off the recommendation. This route serialises the recommendation WHOLESALE, so leaving
+  // it on would grow the home card's most-fetched response by the entire active program: every
+  // session, every exercise, the schedule. Stripped rather than made opt-in, because the default
+  // for a wholesale `NextResponse.json` has to be the safe one.
+  const { program: _program, ...body } = recommendation;
+  return NextResponse.json(body, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

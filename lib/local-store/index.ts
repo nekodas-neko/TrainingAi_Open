@@ -88,6 +88,8 @@ export interface LocalStore {
   deleteFoodLog(id: string): Promise<void>;
   upsertSupplement(record: LocalSupplement): Promise<void>;
   markSupplementSynced(id: string): Promise<void>;
+  /** Soft-delete: tombstone + hide, touching no other column (DV-10). */
+  deleteSupplement(id: string): Promise<void>;
   upsertSupplementLog(record: LocalSupplementLog): Promise<void>;
   deleteSupplementLog(supplementId: string, logDate: string): Promise<void>;
   upsertInjury(record: LocalInjury): Promise<void>;

@@ -995,20 +995,6 @@ below threshold and left in place for next time.
   screen's consistency figure must NOT change. That is the one assertion the sandbox cannot make:
   it needs two clocks that disagree.
 
-### [nutrition][platform] DV-10 — a deleted supplement is never tombstoned on the device
-
-- **Lane:** A — `lib/local-store/**` (the supplements delete path) and the pull mapping.
-- **Added:** 2026-09-23 · Device Verification, sweep 1 (RV-45's run).
-- **Measured on the S25:** deleting a supplement — online (`DV test supplement B`) and offline (`C`) —
-  showed "Supplement deleted", removed it from the server and from both lists, but **the local
-  `supplements` row kept `deleted_at: null`** (B `synced`, C `pending` until drained). An injury
-  deleted the same way **is** tombstoned (`deleted: 1`). So the lists filter supplements some other
-  way, and the local store holds rows it believes are live.
-- **Why it matters:** CLAUDE.md's offline rule is that a delete must leave a tombstone the delta can
-  carry; a row that is live locally and gone on the server is the "deleted item comes back" shape
-  (BF-47) waiting for a read path that does not filter it.
-- **Pass test:** delete a supplement on the S25; `SELECT deleted_at FROM supplements WHERE id=…` is set.
-
 ### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
 
 - **Lane:** B — swept app-wide; the guard is `scripts/check-icon-button-names.js`.
@@ -1507,30 +1493,6 @@ below threshold and left in place for next time.
 - **Fix:** one categorical series palette in `packages/shared/src/chart-colors.ts` beside
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
-
-### [platform] RV-82 — two routes fetch the active program twice inside a single request
-
-- **Lane:** A — `app/api/next-session/prescription/route.ts:57`,
-  `app/api/progress-summary/route.ts:35,37`. **Added:** 2026-09-20 · Review sweep 51.
-- Both call `repo.getActiveProgram(userId)` in the same `Promise.all` as `getNextSession`, and
-  `getNextSession` calls `getActiveProgram` itself (`lib/data/postgres/adapter.ts:1730`).
-  `getActiveProgram` is a fixed **5-query composite** (programs → program_sessions + schedules →
-  session_exercises + schedule_days).
-- **Measured on the wire** (local dev Postgres, `log_statement='all'`, idle baseline 0 statements in
-  25 s): `/api/next-session/prescription` = **22 statements**, of which `programs`,
-  `program_sessions`, `schedules`, `schedule_days` and `session_exercises` each appear exactly
-  **twice** — 5 wasted. `/api/progress-summary` = **19 statements**, same doubling.
-- **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
-  those two routes call `getNextSession` alone and read the program off its result. Risk-free —
-  same data, same request.
-- **⚠ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
-  program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
-  but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
-  wanted, it is its own entry with that trade stated.
-- **Not established:** no latency figure. Dev wall times were a flat ~350 ms/route regardless of
-  query count (dev-mode compile overhead), so the cost against Railway's private network is
-  unmeasured. On a single-user app this is server work the owner will not feel directly — filed as
-  shape, not as a latency emergency.
 
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
