@@ -473,6 +473,40 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [devices][platform] DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+
+- **Lane:** A — `app/api/oura-ble/device-metrics/route.ts` first; also `samples/summary`, `rollup-state`,
+  `samples/pack`.
+- **Added:** 2026-09-23 · Device Verification, sweep 2 (station G, the read-only admin checks).
+- **⚠ Placed at the top because it is production availability, and the cause is NOT proven.**
+- **What was measured.** Opening `/admin/oura-ble` in the APK (web v1.465.10) issued `db-stats` → 200,
+  `rekey` → 200, `pending-count` → 200, and **four requests that never answered**:
+  `device-metrics`, `samples/summary`, `rollup-state`, `samples/pack` — still pending after 15 s, and
+  a direct timed `fetch` of `device-metrics` and `rollup-state` **aborted at 90 s with no response**.
+  Minutes later the public, database-free `/api/version`, curled from a separate PC, took **30 s** at
+  20:04:40 AEST and then **timed out at 20–30 s on every attempt until 20:12:41**, when it answered in
+  0.5 s. So production was effectively down for **~8 minutes**, for every user.
+- **Why the admin routes are the suspect, and why it is only a suspicion.** The pool's
+  `statement_timeout` is 15 s (`lib/data/postgres/client.ts:40`), so a stuck **query** cannot hold a
+  connection for minutes — and `/api/version` does not touch the database at all. What stalls a
+  database-free route is a **blocked Node event loop**. `device-metrics` loops over every decoded raw
+  row in JavaScript (`route.ts:58` onward, parsing `decoded` arrays per row), and `rollup-state` —
+  documented as *"a single-row read"* — also hung, which is what a blocked process looks like rather
+  than a slow query. The raw store is large: the server's DB-footprint card read 142 MB / 176,125
+  `oura_raw_samples` rows at the time. **Not established:** that these routes were the cause (the
+  outage could be coincidental — Railway, a deploy, another client), whether the server restarted at
+  20:12, and what `error_events` holds for the window. **Read `error_events` and Railway's logs for
+  20:00–20:15 AEST on 2026-09-23 first.**
+- **Contributing:** the device agent issued two extra requests to the hung endpoints while measuring
+  them, and an earlier `page.reload()` of the same screen had already left the page unresponsive to
+  DevTools for ~3 minutes. Both are now forbidden in the harness (see `scripts/device/README.md`).
+- **Fix direction, if it confirms:** move the per-row work into SQL or a bounded window, cap the rows
+  a single admin request may decode, and put an explicit request timeout on these routes so one screen
+  cannot occupy the process.
+- **Pass test:** open `/admin/oura-ble` in the APK; every request answers within 5 s, and `/api/version`
+  stays under 1 s from another client throughout.
+
+
 ### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
 
 - **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
