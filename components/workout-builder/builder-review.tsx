@@ -423,7 +423,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                   Week 1 is an AMRAP session per exercise — sets your starting weights automatically.
                 </p>
               </div>
-              <Switch checked={includeBaseline} onCheckedChange={setIncludeBaseline} />
+              <Switch checked={includeBaseline} onCheckedChange={setIncludeBaseline} aria-label="Add baseline test week" />
             </div>
           </div>
         )}
@@ -441,7 +441,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                   On: AI adjusts load and volume automatically. Off: shows a card for your approval first.
                 </p>
               </div>
-              <Switch checked={autoApplyPrescriptions} onCheckedChange={setAutoApplyPrescriptions} />
+              <Switch checked={autoApplyPrescriptions} onCheckedChange={setAutoApplyPrescriptions} aria-label="Auto-apply AI changes" />
             </div>
           </div>
         )}

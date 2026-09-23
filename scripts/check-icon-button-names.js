@@ -42,9 +42,8 @@ function walk(dir, out = []) {
  * `{() => …}`, inside a quoted attribute, or inside a template literal does not end the tag. This
  * replaces a `[^>]*?` character class that ended the tag at the first `>` it met (PS-34).
  */
-function openingTags(src) {
+function openingTags(src, re = /<(button|Button)(?=[\s/>])/g, { allowSelfClosing = false } = {}) {
   const out = [];
-  const re = /<(button|Button)(?=[\s/>])/g;
   let m;
   while ((m = re.exec(src))) {
     let i = m.index + m[0].length;
@@ -63,7 +62,9 @@ function openingTags(src) {
       if (c === '>' && depth === 0) break;
     }
     if (i >= src.length) continue;             // unterminated tag — not ours to report
-    if (src[i - 1] === '/') continue;          // self-closing <button /> has no body
+    // A self-closing <button /> has no body, so the icon-only shape cannot apply. A <Switch /> is
+    // the opposite: self-closing is its ONLY shape, which is why that pass opts in.
+    if (src[i - 1] === '/' && !allowSelfClosing) continue;
     out.push({
       tag: m[1],
       attrs: src.slice(m.index + m[0].length, i),
@@ -97,8 +98,33 @@ function openingTags(src) {
  * `ArrowLeft`, `UserMinus` and `ChevronUpIcon` — every one an obvious name, no design decision in
  * any of them. A nineteenth will be the same.
  */
+/**
+ * DV-11 — every `<Switch>` with no accessible name, as 1-based line numbers.
+ *
+ * A `Switch` renders `role="switch"` with a thumb and NO text child, ever — so unlike the
+ * icon-button shape above there is no heuristic here and nothing to trade against under-reporting:
+ * a switch with no naming attribute has no accessible name, full stop. A screen reader announces it
+ * as "switch, on".
+ *
+ * Found on the S25 on the supplements sheet. The sweep that followed found **17 of 25** live
+ * switches unnamed across eleven files — the visible `<p>` beside each one names it on screen and
+ * to nothing else, which is why the class stays invisible until somebody listens.
+ *
+ * Exported so the detector can be driven directly; the multi-line shape is the one a line-at-a-time
+ * regex misses, and that mistake is what over-counted the original sweep by nine.
+ */
+function switchOffendersIn(src) {
+  const out = [];
+  for (const open of openingTags(src, /<(Switch)(?=[\s/>])/g, { allowSelfClosing: true })) {
+    if (NAMING_ATTR.test(open.attrs)) continue;
+    out.push(src.slice(0, open.start).split('\n').length);
+  }
+  return out;
+}
+
 const BASELINE = {};
 
+if (require.main === module) {
 const offenders = [];
 for (const file of ROOTS.flatMap(r => (fs.existsSync(r) ? walk(r) : []))) {
   const src = stripComments(fs.readFileSync(file, 'utf8'));
@@ -128,6 +154,10 @@ for (const file of ROOTS.flatMap(r => (fs.existsSync(r) ? walk(r) : []))) {
     const line = src.slice(0, m.index).split('\n').length;
     offenders.push(`${file}:${line}  <${loneChild[1]} /> alone in a button with no accessible name`);
   }
+
+  for (const line of switchOffendersIn(src)) {
+    offenders.push(`${file}:${line}  <Switch /> with no accessible name`);
+  }
 }
 
 const perFile = new Map();
@@ -155,11 +185,14 @@ for (const [rel, allowed] of Object.entries(BASELINE)) {
 }
 
 if (failures.length) {
-  console.error('Icon-only control with no accessible name (WCAG 4.1.2):');
+  console.error('Control with no accessible name (WCAG 4.1.2):');
   for (const f of failures) console.error(`  ${f}`);
   for (const o of offenders) console.error(`    ${o}`);
-  console.error('Add aria-label="…" to the button (or a title). A screen reader otherwise announces');
-  console.error('it as "button" with nothing to say what it does.');
+  console.error('Add aria-label="…" (or a title). A screen reader otherwise announces it as');
+  console.error('"button" or "switch, on" with nothing to say what it controls.');
   process.exit(1);
 }
-console.log(`check-icon-button-names: OK — ${offenders.length} baselined icon-only button(s), none new. Shrink-only; LA-62 clears them.`);
+console.log(`check-icon-button-names: OK — ${offenders.length} baselined unnamed control(s), none new. Baseline is empty: every icon-only button AND every Switch has a name.`);
+}
+
+module.exports = { switchOffendersIn };

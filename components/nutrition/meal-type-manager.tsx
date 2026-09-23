@@ -287,6 +287,7 @@ export function MealTypeManager() {
                   <span className="text-muted-foreground">Remind me if not logged</span>
                   <Switch
                     checked={editForm.remindersEnabled}
+                    aria-label="Remind me if not logged"
                     onCheckedChange={val => setEditForm(f => ({ ...f, remindersEnabled: val }))}
                   />
                 </div>
@@ -294,6 +295,7 @@ export function MealTypeManager() {
                   <span className="text-muted-foreground">Required (trigger end-of-day reminder)</span>
                   <Switch
                     checked={editForm.required}
+                    aria-label="Required (trigger end-of-day reminder)"
                     onCheckedChange={val => setEditForm(f => ({ ...f, required: val }))}
                   />
                 </div>
@@ -357,6 +359,7 @@ export function MealTypeManager() {
             <span className="text-muted-foreground">Required (trigger end-of-day reminder)</span>
             <Switch
               checked={newForm.required}
+                    aria-label="Required (trigger end-of-day reminder)"
               onCheckedChange={val => setNewForm(f => ({ ...f, required: val }))}
             />
           </div>
