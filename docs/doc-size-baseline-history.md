@@ -15859,7 +15859,19 @@ returned a bare background with no gradient, no border and no error for any non-
 session reading only the original entry would check for canvases, find none, and ship the silent
 regression.
 
-## 2026-09-23 — `implementation-backlog.md` 27165 → 27174, `projectOverview.md` 12422 → 12456 (DV-5)
+## 2026-09-23 — `CLAUDE.md` → 890 and `docs/implementation-backlog.md` → 27179 (OR-126)
+
+**CLAUDE.md +13**: the Oura raw-archive rule said `oura_raw_samples.body_hex` was the server's
+archival source of truth and had been wrong since the packer shipped. It names `oura_raw_packed`
+now, with the tier sizes measured, and carries the second correction beside it — the device's
+14-day window has not shipped, so the device cannot be cited as a surviving copy. Thirteen lines
+for a rule that was pointing every session at a 7-day scratch buffer and calling it the archive.
+
+**Backlog +5 net**: OR-126 left the queue after being built (a net shrink of about 25 lines) while Q-29
+gained the reconcile that the brief turned up, plus a third OR-121 occurrence recorded with its
+evidence explicitly marked lost — which is most of it back and then some.
+
+## 2026-09-23 — `implementation-backlog.md` 27170 → 27179, `projectOverview.md` 12422 → 12456 (DV-5)
 
 The backlog is up **nine net lines** across a removal and an addition, which is the shape worth
 recording rather than the number. DV-5 left the queue and **DV-8 replaced it**, carrying the half
