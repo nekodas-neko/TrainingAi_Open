@@ -117,3 +117,34 @@ describe('the diagnostic is written where its reader will actually see it (OR-13
     expect(out, 'a warning on stderr would leave this empty').toContain('no base branch resolved')
   })
 })
+
+// OR-137 — a file bigger than execFileSync's 1 MiB default is readable at base.
+//
+// `showAtBase` spawned git without a `maxBuffer`, so anything over 1 MiB failed with
+// `spawnSync git ENOBUFS`. That is not a path-absent message, so it was classified unreadable,
+// retried three times, and then treated as ABSENT — which is strict. The visible effect was a
+// doc-size failure naming a line count the branch had not caused, because the ratchet could no
+// longer tell "the base already has this" from "you added it".
+//
+// It was never intermittent: `docs/implementation-backlog.md` crossed 1 MiB and every base read of
+// it failed from then on, in CI and the sandbox alike. It read as a flake only because the ratchet
+// it broke reports a line count rather than the read behind it.
+//
+// The real backlog is the witness deliberately — a synthetic 2 MiB fixture would pin the buffer
+// size and not the thing that regressed, which is that the repo's largest tracked doc is readable.
+describe('a file over the default spawn buffer is readable at base (OR-137)', () => {
+  it('reads the backlog at base rather than reporting it absent', () => {
+    const baseRef = resolveBaseRef()
+    if (!baseRef) return // no base to read against; resolveBaseRef warns for itself
+
+    const rel = 'docs/implementation-backlog.md'
+    const onDisk = require('fs').statSync(
+      require('path').resolve(__dirname, '..', '..', rel),
+    ).size
+    expect(onDisk, 'the witness must exceed 1 MiB or it pins nothing').toBeGreaterThan(1024 * 1024)
+
+    const res = showAtBase(baseRef, rel)
+    expect(res.unreadable, `base read failed: ${res.reason ?? ''}`).toBe(false)
+    expect(res.content, 'a null here is the ENOBUFS path reporting the file as absent').not.toBeNull()
+  })
+})

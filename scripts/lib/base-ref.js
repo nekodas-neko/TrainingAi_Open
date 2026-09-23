@@ -58,16 +58,24 @@ function showAtBase(baseRef, relPath) {
   try {
     // Its own spawn rather than `git()`, which pipes stderr to `ignore` — and the whole of this
     // function is reading that stderr. Capturing it there instead would change every other caller.
+    // `maxBuffer` matches `materialiseBaseTree`'s. Without it this inherits execFileSync's **1 MiB**
+    // default, and a file larger than that fails with `spawnSync git ENOBUFS` — which is not a
+    // path-absent message, so it is classified unreadable, retried three times, and then treated as
+    // ABSENT, which is strict. The effect is a ratchet that can never answer "inherited" for its
+    // biggest file: `docs/implementation-backlog.md` crossed 1 MiB and is 2.03 MiB now, so every
+    // base read of it has been failing, deterministically and in both CI and the sandbox. It
+    // surfaced as a doc-size failure naming a line count the branch had not caused.
     const content = execFileSync('git', ['show', `${baseRef}:${relPath}`], {
-      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28,
     });
     return { content, unreadable: false };
   } catch (err) {
     const stderr = String((err && err.stderr) || '');
     if (PATH_ABSENT_RE.test(stderr)) return { content: null, unreadable: false };
-    // `reason` is git's own words, or node's when the spawn itself failed. It is the whole point of
-    // the warning below: the mechanism behind this failure has never been reproduced (see the note
-    // on `fileAtBase`), so the next occurrence has to identify itself.
+    // `reason` is git's own words, or node's when the spawn itself failed, and it is what made the
+    // ENOBUFS case above findable — the warning named `spawnSync git ENOBUFS` in a CI log and the
+    // cause followed from that one line. Keep it: the remaining unreproduced failure modes still
+    // have to identify themselves this way.
     const reason = (stderr.trim() || String((err && err.message) || 'unknown')).split('\n')[0];
     return { content: null, unreadable: true, reason };
   }

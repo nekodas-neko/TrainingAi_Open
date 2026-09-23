@@ -1216,9 +1216,18 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
 
-- **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
+- **Lane:** DV — reassigned 2026-09-23 (orchestrator sweep). **Already scheduled**: sweep 2
+  **station H**, *"barcode scanner open, then back — read-only"*
+  ([`device-sweep-2-plan.md`](device-sweep-2-plan.md)). This field records the lane the plan already
+  implies; it is not a second request. **The fix below is written and Lane B could type it
+  today; what is not established is whether it is the right fix.** This entry's own last bullet asks
+  whether the native barcode activity intercepts hardware back before the JS listener runs — if it
+  does, the reported defect does not exist on the APK and `useSheetBackDismiss` would be wiring a
+  second handler for a press JS never sees. That is a measurement with an objective answer that
+  nobody has taken, which is what puts it on the phone rather than in a lane. **VERIFIED (back
+  reaches JS, the flow is discarded) hands it to `B` with the fix below; FAILED (native intercepts)
+  closes it.** Was `Lane: B` — `components/nutrition/capture-actions.tsx:262-264`,
   `components/nutrition/ingredient-picker.tsx:302`. **Added:** 2026-09-22 · Review sweep 53.
-- **Gate: device** — the hardware back path only exists on the APK.
 - The scanner **replaces the sheet's body** rather than opening a surface of its own, and neither
   file registers a back-stack entry (`grep` for `useSheetBackDismiss`/`sheet-back-stack` in both →
   none). `SheetContent` renders `BackDismiss` once, so the native listener sees one open surface and
@@ -10387,6 +10396,17 @@ one. A swipe on the single Start button adds an affordance that does not current
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
+> **Reassigned `A` → `O`, `Gate: owner`, 2026-09-23 (orchestrator sweep).** The lane field below was
+> written when application code was still owed; that half shipped and the entry's own text now says
+> the device check *"is the only thing that proves this"*. **It does not follow that it goes to the
+> device agent.** [`device-sweep-2-plan.md`](device-sweep-2-plan.md) lists this entry separately
+> with its reason: the check is a **deliberate client-side throw in production**, and *"ask first —
+> it may page someone"*. So the next act is the owner's consent, not the phone. Once given, it is a
+> measurement with one objective answer and goes straight to `DV`. The remaining question is *does a client error raised
+> on the APK arrive in Sentry*, which has one objective answer and has never been asked on the
+> device. Nothing is owed by a building lane first: the tunnel shipped, so a FAILED here is a new
+> finding rather than a known gap.
+>
 > **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
 > whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
 > `tunnelRoute: '/monitoring'`, so the browser POSTs **same-origin** — which `connect-src 'self'`
@@ -10442,7 +10462,8 @@ one. A swipe on the single Start button adds an affordance that does not current
 > the `Gate: device` below, unchanged, and it is still the only thing that proves this.
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
-- **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
+- **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
+- **Gate: owner** — a live throw in production may page someone; ask before it is fired.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
@@ -10541,7 +10562,6 @@ experiment, not an inference.
 - **Do not treat this as a reason to distrust the integration.** `beforeSend: scrubEvent`,
   `sendDefaultPii: false`, `tracesSampleRate: 0` and no replay are all deliberate and all correct for
   a health app. The code is right; the environment and one header are not.
-- **Gate:** device
 - **Verification:** a deliberate client-side throw in production appears in Sentry within a minute,
   **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
   violation for the ingest host.
@@ -13248,8 +13268,13 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 ### [nutrition] BF-24 — artboard 1 parity: the header and the meal grouping shipped; the energy block and the tile row did not
 
 - **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
-- **Lane: B**
-- **Gate: device**
+- **Lane: O**
+- **Gate: owner** — reassigned 2026-09-23 (orchestrator sweep); was Lane `B` with a device gate. Every buildable item is
+  resolved below (② shipped, ③ ⑥ ⑦ each closed with a reason), so **what remains is a look at a
+  screen against a drawing, plus the owner's provisional ④ watching brief on grouped-section
+  backgrounds.** Artboard parity is a judgement about whether the result looks right, not a
+  measurement with a pass/fail — per CLAUDE.md that waits on the owner rather than going to the
+  device agent, even though the phone is where he will look at it.
 - **Spec:** BF-28 — read it first for the parity rules, chiefly that an artboard is one screenful and
   a section absent from it is not thereby deleted.
 - **Read first:** artboard **1 · Nutrition — the day** in
@@ -13371,13 +13396,17 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Gate:** device — see the ⚠ immediately below. Every phase has shipped and this is the completion
-  checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
-  never drawn, then leave the queue), but its own instruction is to **wait**, so it is gated rather
-  than READY: it printed second in the Lane B queue while telling any taker not to start it.
-- **⚠ Wait for the LB-16/BF-37 device pass before confirming parity** — the screen those two rebuilt
-  has never been seen on the S25, so a parity sweep run now would be signing off a drawing against a
-  screenshot nobody has taken.
+- **Lane: O**
+- **Gate: owner** — restated 2026-09-23 (orchestrator sweep), was `Gate: device`. The two halves were
+  welded together and only one of them was ever the phone's. *"Do the drawn screens match what
+  shipped"* is a judgement about whether it looks right, which per CLAUDE.md waits on the owner even
+  though the phone is where he will look at it — the device gate put that judgement on the device
+  agent, where it sat. **RV-143 reads this entry as mis-gated rather than device-blocked**, and
+  [`device-sweep-1-plan.md`](device-sweep-1-plan.md) and
+  [`device-sweep-2-plan.md`](device-sweep-2-plan.md) both exclude it for that reason.
+- **⚠ Still do not confirm parity from a session** — the screens LB-16/BF-37 rebuilt have never been
+  seen on the S25. **Sweep 2 visits them** (station A's meal-builder walk, station H's barcode-scanner
+  walk), so the look this entry needs comes out of that pass rather than a separate request.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
@@ -23742,6 +23771,15 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   The entry's own *What is actually left* section names it: `/coach` and `/coach/confirm/[toolCallId]`
   are navless full-screen routes with bottom-anchored controls, the shape that has regressed 11+
   times. Run the **AI Coach** section of `docs/device-smoke-checklist.md`.
+- **⚠ The device agent's own plan disagrees with this, and the disagreement is left standing rather
+  than resolved by whoever edited last.** Both sweep plans group this entry with the *"spec-sized"*
+  items (`BF-11`, `Q-395`, `Q-34`, `Q-545`) that `RV-143` reads as **mis-gated rather than
+  device-blocked** — a fair reading of the entry as a whole, which is large and mostly not a device
+  question. OR-136's counter is narrower: the **one** thing still owed is whether a bottom-anchored
+  control on two navless routes clears the gesture bar, and that is a number rather than a taste, so
+  it is the kind of thing the phone settles. **The device agent decides**, and may hand it back: it
+  owns the sitting, and a 45–60 minute sweep is not improved by an entry its owner reads as
+  mis-filed. If it goes back, it wants a `Gate: owner` and a note saying so — not a silent re-park.
 - **Lane: DV** — reassigned 2026-09-23 (OR-136) from B. The blocking work is that check, and it is
   one the phone ANSWERS: bottom-anchored controls either clear the gesture bar or they do not, and
   a safe-area inset is a number rather than a matter of taste. The **cardio-goals** half was
