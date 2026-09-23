@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — implementation-backlog → 27277 (restoring two entries PR #1481 deleted)
+
+**A raise that is really an undo.** #1481's auto-merge of `docs/implementation-backlog.md` silently
+dropped **RV-117** and **RV-118** — two Review-filed entries carrying owner-approved gates — and
+ratcheted the baseline DOWN to match the loss. Restoring them from `ef199122700` puts the lines back,
+so the number returns to roughly where it was rather than growing.
+
+The rest is the `Lane: O` handback bullet on RV-117/RV-118/RV-119 (the 2026-09-22 mockup lives in
+the Orchestrator's chat and needs exporting — LB-135), less the shipped RV-116 entry, removed
+because it owes nothing.
+
+**The lesson, recorded in the Lane B baton:** counting the headings you edited does not catch a
+merge that deleted a neighbour. Diff the FULL heading set against `origin/main` after any backlog
+merge, and require every line of that diff to be an add or remove you intended.
+
 ## 2026-09-23 — backlog → 27235 (RV-77 re-verified and moved, LA-131 filed, +33 on a shrunken base)
 
 Raising this number is also what surfaced **LA-132**, fixed in the same PR: the base comparison for

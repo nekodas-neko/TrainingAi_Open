@@ -196,8 +196,23 @@ export function HomeWidgetsSection() {
           <Divider />
           <div className="px-4 py-3">
             <p className="text-xs text-muted-foreground mb-2">Card Widgets</p>
+            {/* RV-116: the picker offered these as two additions when they answer one question —
+                both read `energy-balance:${today}` through the same hook, and the pair has already
+                shipped two budgets 271-274 kcal apart, both labelled "left" (Q-401/Q-415). Said in
+                a line under the heading rather than in the chip: a label long enough to carry it
+                wraps the chip row at 384 px, which is the width this screen is built for. */}
+            <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
+              Energy Balance is an alternative to Nutrition, not an addition — both show today&rsquo;s
+              budget.
+            </p>
             <div className="flex gap-2 flex-wrap">
               {CARD_WIDGET_DEFS.map(def => {
+                // Dimmed, never disabled: it is a real choice, just not one to make ON TOP of
+                // Nutrition. Disabling it would hide the alternative rather than rank it.
+                const supersededByNutrition = (key: CardWidgetKey) =>
+                  key === 'energyBalanceWidget'
+                  && !homeCardWidgets.includes('energyBalanceWidget')
+                  && homeCardWidgets.includes('nutritionDonut')
                 const currentColor = cardColors[def.key] ?? CARD_DEFAULT_COLORS[def.key]
                 return (
                   <div key={def.key} className="flex items-center gap-1">
@@ -218,7 +233,7 @@ export function HomeWidgetsSection() {
                         homeCardWidgets.includes(def.key)
                           ? 'border-brand bg-brand/10 text-brand'
                           : 'border-border bg-muted text-muted-foreground'
-                      }`}
+                      } ${supersededByNutrition(def.key) ? 'opacity-50' : ''}`}
                     >
                       <def.icon className="h-4 w-4" />
                       <span>{def.label}</span>

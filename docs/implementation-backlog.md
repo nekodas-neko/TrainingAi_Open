@@ -1569,34 +1569,43 @@ below threshold and left in place for next time.
 - **Keep:** the device look — a 150 ms crossfade on the owner's own screen is a feel judgement, and
   the sandbox can only prove the primitive is wired in.
 
-### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
+### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
 
-- **Lane:** B — `components/home/home-nutrition-card.tsx:48`,
-  `components/home/home-energy-balance-card.tsx:14`. **Added:** 2026-09-22 · Review sweep 53.
-  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise; see below.
-- **Batch:** `home-ia-merge`
-- **The original entry proposed folding the energy-balance card's provenance line into the nutrition
-  card. That was wrong: the nutrition card already has it.** `HomeNutritionZoneBar` renders
-  `CalorieZoneBar`, which prints the `N resting rate — no movement recorded yet today` line (Q-401),
-  so the running card already carries ring + totals + zone bar + provenance + macros.
-- **What remains** is structural: both call `useEnergyBalanceToday()` — same hook, same
-  `energy-balance:${today}` key — and both sit in the picker. `DEFAULT_CARD_WIDGETS` is `[]`, so
-  `energyBalanceWidget` is opt-in and off; the duplication is latent, not on screen.
-- **This shape already produced two live bugs:** Q-401/Q-415, two budgets 271–274 kcal apart, both
-  labelled "left" — they agree today only because `budgetProvenance` was centralised.
-- **Remaining delta, if the second card were enabled:** the large `remainingKcal` figure, the
-  `zoneLabel` word, and the `eaten · burned · maintenance` breakdown (no equivalent on the other).
-- **Fix, reduced:** merge and delete nothing. Relabel the picker entry so it reads as an alternative
-  to the nutrition card rather than an addition, and grey it out while that card is on if cheap.
-- **No owner gate** — the reduced fix changes picker copy, it does not rearrange a screen.
+- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
+- **RV-119, RV-117 and RV-118 all carry "Owner gate SATISFIED 2026-09-22 — mockup shown at 384 px
+  dark … Build to it; a departure from it needs a fresh yes."** The mockup is not in the repo.
+  Searched: nothing in `docs/design/` from that date, and the sweep write-up describes the problems
+  rather than the approved layouts.
+- **⚠ CORRECTED 2026-09-23 by the owner: the artefact is NOT lost — it is in the Orchestrator's
+  chat.** So this is an EXPORT gap, not a design to redo, and the recovery is cheap: that session
+  still holds what he approved. The three entries are re-channelled `Lane: O` asking the
+  Orchestrator to save it under `docs/design/` and hand them back to `B`.
+- **That makes the rule below more worth having, not less.** A mockup living only in one session's
+  transcript is invisible to every other agent, and to the owner himself later; the repo is the only
+  shared memory.
+- **So the instruction cannot be followed.** "Build to it" and "a departure needs a fresh yes" both
+  require knowing what *it* was. An implementer either invents a layout — the precise departure the
+  gate exists to prevent — or re-asks the owner something he already answered. **This blocked
+  RV-119's collapse today**, and will block RV-117 and RV-118 identically.
+- **The gate rule already says how to avoid it and does not say to keep it.** CLAUDE.md requires a
+  mockup "presented and a yes returned before any code", shown "at the real 384 px dark viewport,
+  not a description of it" — and `docs/design/` is where seven earlier rounds were kept
+  (`2026-08-07-score-row-mockups*.html`, `2026-08-18-nutrition-rework-mockups.html`, …). The habit
+  exists; this sweep skipped it.
+- **Proposed rule, Orchestrator's to accept:** a `Gate: owner` entry may only be marked satisfied
+  alongside a path to the artefact under `docs/design/`. An approval whose artefact is gone should
+  read as NOT satisfied, because that is the state an implementer is actually in.
+- **Cheap to fix going forward, and the reversal is nil** — it is one saved file per mockup round.
+  What it prevents is a lane building a Home layout the owner never saw and only finding out when he
+  opens the app.
 
 ### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
 
-- **Lane: O — the mockup exists, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
   owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
   saved to the repo, so no implementer can reach it. **Orchestrator: export it to
-  `docs/design/2026-09-22-home-health-ia-mockups.html` (or one file per entry), link it from this
-  bullet, and set the lane back to `B`.** Nothing else is blocking — the build is understood and
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
+  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
   ready the moment the artefact lands.
 - **Was Lane B** — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
   Review sweep 53.
@@ -1616,11 +1625,11 @@ below threshold and left in place for next time.
 
 ### [body] RV-118 — "Weight Trend" exists twice in Health, and the card with that title has no trend number
 
-- **Lane: O — the mockup exists, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
   owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
   saved to the repo, so no implementer can reach it. **Orchestrator: export it to
-  `docs/design/2026-09-22-home-health-ia-mockups.html` (or one file per entry), link it from this
-  bullet, and set the lane back to `B`.** Nothing else is blocking — the build is understood and
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
+  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
   ready the moment the artefact lands.
 - **Was Lane B** — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
   **Added:** 2026-09-22 · Review sweep 53.
@@ -1640,16 +1649,31 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
 
-- **Lane: O — the mockup exists, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
   owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
   saved to the repo, so no implementer can reach it. **Orchestrator: export it to
-  `docs/design/2026-09-22-home-health-ia-mockups.html` (or one file per entry), link it from this
-  bullet, and set the lane back to `B`.** Nothing else is blocking — the build is understood and
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
+  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
   ready the moment the artefact lands.
 - **Was Lane B** — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
   Review sweep 53.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **⚠ THE MOCKUP IT SAYS TO BUILD TO WAS NOT PRESERVED, so "build to it" is not actionable.**
+  Searched 2026-09-23: nothing in `docs/design/` from that date, and the sweep write-up
+  (`docs/reviews/2026-09-22-sweep-53-…`) describes the problem, not the approved layout. The
+  approval is recorded; the artefact it approved is not. **Any session that picks this up hits the
+  same wall** — filed as **LB-135**.
+- **PARTIALLY SHIPPED 2026-09-23** (`fix/home-ia-merge-part1`): **the APK banner is gone**, with its
+  `apkBannerDismissed` state, its `apk-banner-dismissed` key and the now-unused `Download` and `X`
+  imports. That half needed no design judgement — the entry states the reason outright and the
+  canonical runtime *is* the APK, with the same download row at More → About.
+- **STILL OWED — the collapse, and it needs the owner before code.** Two stay full-width (illness
+  advisory, early deload); four collapse (exercise-detected, goals check-in, day-review, weekly
+  recap — five in the entry, minus the APK banner now removed). What a "collapsed strip" LOOKS like
+  is the part the missing mockup specified, and inventing it is exactly the departure this entry
+  says needs a fresh yes. Re-make the mockup at 384 px dark, **save it under `docs/design/`**, and
+  get the yes before building.
 - **Batch:** `home-ia-merge`
 - Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
   weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
