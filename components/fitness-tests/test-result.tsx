@@ -16,6 +16,7 @@ import { buildTestActivity } from '@trainingai/shared/fitness-tests/test-activit
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import type { LocalFitnessTest } from '@/lib/local-store/types'
 import type { TestCapture } from './test-active'
+import { navigateToTab } from "@/lib/shell-nav";
 
 export interface TestResultProfile {
   age: number | null
@@ -163,7 +164,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
         revalidateBoth().catch(() => {})
         toast.success('Baseline saved')
         onDone()
-        router.push('/health?tab=training')
+        navigateToTab(router, '/health?tab=training')
         pushThenRevalidate(userId!, revalidateBoth)
         return
       } catch (e) {
@@ -192,7 +193,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
       await revalidateBoth()
       toast.success('Baseline saved')
       onDone()
-      router.push('/health?tab=training')
+      navigateToTab(router, '/health?tab=training')
     } catch {
       toast.error('Failed to save baseline')
       setSaving(false)
@@ -242,7 +243,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
       </div>
 
       <div className="mt-auto flex gap-3">
-        <Button variant="outline" className="flex-1 h-12" onClick={() => { onDone(); router.push('/health?tab=training') }} disabled={saving}>
+        <Button variant="outline" className="flex-1 h-12" onClick={() => { onDone(); navigateToTab(router, '/health?tab=training') }} disabled={saving}>
           Discard
         </Button>
         <Button className="flex-1 h-12" onClick={handleSave} disabled={saving}>

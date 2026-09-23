@@ -5,6 +5,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
+import { navigateToTab } from "@/lib/shell-nav";
 
 /**
  * Every personal detail, in one place (BF-79).
@@ -131,7 +132,7 @@ export function PersonalDetailsSection({
         when={latestWeightLabel}
         emptyLabel="No weigh-ins yet"
         action="Log a weigh-in"
-        onAction={() => router.push('/health?tab=body')}
+        onAction={() => navigateToTab(router, '/health?tab=body')}
       />
 
       <MeasurementRow
@@ -140,7 +141,7 @@ export function PersonalDetailsSection({
         when={latestBfLabel}
         emptyLabel="Not logged"
         action="Log body fat %"
-        onAction={() => router.push('/health?tab=body')}
+        onAction={() => navigateToTab(router, '/health?tab=body')}
       />
     </div>
   )

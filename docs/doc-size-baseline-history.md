@@ -15830,7 +15830,6 @@ the tweak is one `grep -vE` and the defect cost four abandoned PRs. The part wor
 discrimination: a shallow-grafted branch and a stale base produce the **same** observable —
 `get_check_runs` reading `total_count: 0` — and CLAUDE.md already documented the stale-base reading,
 so a session that hits this will reach for the wrong remedy first. It did.
-
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26303, `projectOverview.md` → 12389 (LA-128)
 
 The backlog shrinks by LA-128's whole entry; nothing is owed, so no `Keep:`. The
@@ -15871,7 +15870,51 @@ for a rule that was pointing every session at a 7-day scratch buffer and calling
 gained the reconcile that the brief turned up, plus a third OR-121 occurrence recorded with its
 evidence explicitly marked lost — which is most of it back and then some.
 
-## 2026-09-23 — `docs/implementation-backlog.md` +38 (27170 → 27208) (Review: RV-143)
+## 2026-09-23 — `CLAUDE.md` → 902 and `docs/implementation-backlog.md` → 27211 (OR-132a: four owner answers)
+
+**CLAUDE.md +7**: the device-sitting size, which the owner set at 45–60 minutes spanning two or
+three domains rather than ~20 minutes on one. It sits beside the batching rule because it is the
+same decision at a different granularity — what may be verified in one pick-up of the phone.
+
+**Backlog +60**: four decisions recorded on the entries that were waiting for them (DV-6, LA-126,
+LA-125, BF-137/BF-184), three `Gate: owner` fields released, and one measured table replacing an
+estimate. 104 gates → 102.
+
+Worth carrying, and it is about what a question is worth asking. **BF-137 asked the owner to supply
+a date that production already held** — it estimated the first Retatrutide dose at "around
+2026-09-04" from a window count, while `supplement_logs` recorded 2026-09-07 exactly. Reading the
+table before writing the prompt replaced a guess with a fact and turned a blocking owner action into
+a non-blocking one. The owner's answer then earned its place on a *different* question the data
+could not settle: whether the vial's stored open date or the dose log was the true one.
+
+**Ask for the fact nobody has, not the fact nobody looked up.**
+
+## 2026-09-23 — backlog 27230 → 27216, `projectOverview.md` 12422 → 12442 (RV-110/RV-112)
+
+The backlog nets down 14 on this branch's account. The absolute figures moved a long way while this
+PR sat open — SEVEN re-merges, and the last of them was not a re-merge at all but the first honest
+one: `git fetch origin main` had been returning a shallow pack, so every earlier merge was computed
+against a grafted history and produced a tree GitHub read as conflicted. `projectOverview.md` moves
++20 here and the rest of its growth is other branches', not this one's: RV-110 and RV-112 shipped
+and left the queue, against the new LB-129
+filed for the day-review sheet that does not open on a first flip — a finding from RV-110's probing
+that is not RV-110's subject, so it goes in the queue rather than into that PR's diff.
+
+The twenty lines on `projectOverview.md` are two entries, and both are there for something NOT
+done. LB-129 is found-but-not-fixed. The RV-110 row records that the entry's own mechanism — that a
+push to a tab href tears the shell down — is unverified: it follows from the code, the conversion is
+right either way, and the e2e written to prove it did not discriminate and was deleted rather than
+shipped. An index that said only "cross-tab navigation now flips the shell" would read as though
+that had been demonstrated.
+
+Also `docs/agents/state/implementation-lane-b.md` 65 → 55: the baton was rewritten in full, as the
+rule requires, and came back shorter. It is shrink-only, so the number follows it down. (51 at the
+first write, then +4 for the lesson that cost this PR a red CI — run the FULL vitest suite, never a
+subset scoped to the directories you changed, because a source-shape test asserting on your file
+can live anywhere. Still well under the 65 it inherited.)
+
+
+## 2026-09-23 — `docs/implementation-backlog.md` +44 (27216 → 27260) (Review: RV-143)
 
 One entry, most of it a triage of the 24 affected entries. That list is the point rather than
 padding: the fix is three lines in `next-item.js`, and the risk is that turning the selector on

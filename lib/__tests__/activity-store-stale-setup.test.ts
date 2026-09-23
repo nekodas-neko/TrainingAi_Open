@@ -134,8 +134,13 @@ describe('the walk no longer ends on a Start button', () => {
   it('Done leaves for a screen that shows the walk, not one that begins another', () => {
     const src = readFileSync(path.join(path.resolve(__dirname, '..', '..'), 'components/guided-walk/walk-summary.tsx'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
-    expect(src).toMatch(/onDone\(\); router\.push\('\/health'\)/)
+    // RV-110 converted the mechanism from `router.push` to `navigateToTab` (a tab href must flip
+    // the shell rather than tear it down). The DESTINATION is what this test is about, so it is
+    // asserted independently of how the navigation is performed — the previous version pinned
+    // `router.push` and went red on a change that kept its intent exactly.
+    expect(src).toMatch(/onDone\(\); navigateToTab\(router, '\/health'\)/)
     expect(src, 'the prefetch must follow the destination').toMatch(/router\.prefetch\('\/health'\)/)
-    expect(src, '/activity is the screen for STARTING one').not.toMatch(/router\.(push|prefetch)\('\/activity'\)/)
+    expect(src, '/activity is the screen for STARTING one')
+      .not.toMatch(/(router\.(push|prefetch)|navigateToTab\(router, )'\/activity'/)
   })
 })

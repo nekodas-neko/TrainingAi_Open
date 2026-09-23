@@ -922,7 +922,11 @@ below threshold and left in place for next time.
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
 - **Lane:** B
-- **Gate:** owner — a design call (whether to add a scrim), not a defect by a rule.
+- **✅ DECIDED BY THE OWNER, 2026-09-23 — gate released: a GRADIENT scrim, in the shell, once.**
+  Not a solid strip; the owner was offered one and took the fade, so the app stays edge-to-edge and
+  nothing loses the ~28 px a flat backing costs. **It belongs in the app shell, not per screen** —
+  a per-screen scrim is a rule every future screen can forget, which is how this defect reaches a
+  sweep in the first place. It fades in on scroll rather than sitting there at rest.
 - **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
 - **What the screen shows:** on Home, scrolled, the energy bar's caption (*"Energy left right now —
   opens at your readiness…"*) passes behind the status bar's clock and icons with nothing between
@@ -1102,29 +1106,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   for a body-metrics delta on the device that wrote it. If it does, the window is shorter than TTL
   but still non-deterministic.
 
-### [app-shell][platform] RV-110 — 37 cross-tab `router.push` sites tear down the whole tab shell; 5 use the helper that does not
-
-- **Lane:** B — `lib/shell-nav.ts` call sites across `app/` and `components/`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `tab-nav-shell`
-- Counted 2026-09-22: **37** `router.push('/health'|'/nutrition'|'/more'|'/workout')` sites against
-  **5** `navigateToTab(...)`. `app/(home)` and `app/health` are different route segments, so a push
-  unmounts the entire `TabShell` — every panel's component state, `state.mounted`, and every inner
-  `scrollTop` — and the four code-split tabs re-mount.
-- **The illustration is two adjacent lines on Home** (`session-select-content.tsx:436-437`):
-  `handleNavigateStats` uses `router.push("/health?tab=training")`, `handleNavigateHealthBody` uses
-  `navigateToTab(router, "/health?tab=body")`. Two taps on one screen, one slow and one instant, for
-  no reason the owner could infer.
-- `lib/view-transition.ts:118-126` deliberately declines to animate a tab href but still forwards it
-  to `router.push`, so `useTransitionRouter` does not save these sites.
-- **Fix:** route them through `navigateToTab`, which already falls back to `router.push` when no
-  shell is mounted (covering `done-activity-screen`, `walk-summary`, `test-result`). Then a grep
-  rule holds it.
-- **⚠ Check the query-param destinations before converting.** The shell's `show()` `replaceState`s
-  the full href, but whether Health/Nutrition read `?tab=`/`?review=` **on a flip** rather than only
-  on mount has to be confirmed per screen — a flip landing on the wrong sub-tab is a regression the
-  current full navigation does not have.
-
 ### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
 
 - **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
@@ -1145,20 +1126,29 @@ IS in the queue but below the cut-off no longer comes back empty without explana
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
 
-### [app-shell] RV-112 — Home and More share one scroll-restoration key and overwrite each other
+### [nutrition][app-shell] LB-129 — the day-review sheet does not open on a first flip into Nutrition
 
-- **Lane:** B — `app/session-select/session-select-content.tsx:1052-1055`,
-  `app/more/more-content.tsx:152-155`. **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `tab-nav-shell`
-- `use-scroll-restoration.ts:105` keys on `keySuffix ? pathname#suffix : pathname`. Health passes
-  three suffixes (`scrollKey="body"|"training"|"progress"`); **Home and More pass none**, and both
-  panels stay mounted, so while the URL reads `/more` both containers save and restore the same
-  `ta_scroll:/more` slot. The restore path has no owner check.
-- **Fix:** `scrollKey="home"` and `scrollKey="more"` — one prop each, copying what Health already
-  does. Keys are session-scoped, so nothing needs migrating.
-- **Not established:** the real magnitude. Restores need ≥40px and the takeover listeners cancel
-  aggressively, so the collision may often resolve to a no-op. The e2e spec
-  (`e2e/scroll-restoration.spec.ts`) was not run.
+- **Lane:** B — `app/nutrition/nutrition-content.tsx:191`. **Added:** 2026-09-23 · found while
+  shipping RV-110.
+- **Reproduced twice, driving the real app:** from Home, `navigateToTab` to `/nutrition?review=day`
+  when Nutrition has **not yet been mounted in this shell session** leaves the End of Day sheet
+  CLOSED. The same href on a later flip, into an already-mounted Nutrition, opens it. Home's
+  "review your day" (`session-select-content.tsx:1183`) takes exactly that path, so the first tap of
+  a session is the one that does nothing.
+- **⚠ It is NOT a param-delivery problem, and that is the part worth not re-deriving.** The obvious
+  theory — that a tab flip's `replaceState` does not reach `useSearchParams` — was tested and is
+  false: instrumenting the reader showed `searchParams` arriving as `review=day` at **both** the
+  `useState` initializer and the `[searchParams]` effect on the failing run. `setReviewOpen(true)`
+  runs. The sheet still does not appear, so the defect is downstream of the param, in what the
+  sheet renders or is gated on during a cold first render of that screen.
+- **Also ruled out:** the generic "effect-only reader misses the first mount" story. Health's
+  `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
+- **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
+  it as, and what it is gated on) rather than the param.
+- **Probe recipe:** `page.goto('/')`, `settleRouteBoundary`, then
+  `page.evaluate(() => window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/nutrition?review=day', cancelable: true })))`,
+  wait ~10 s, read `[role="dialog"]`. Allow generously for the dynamic import — a run that renders
+  nothing after 8 s is a probe artefact, not the defect.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
 
@@ -1781,6 +1771,23 @@ nothing structured saying why — and a human decides.
 
 - **Lane:** A — production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
   RV-66).
+- **✅ DECIDED BY THE OWNER, 2026-09-23 — gate released: *"we want the corrected/calculated numbers
+  only."*** He was offered the option of seeing both first and did not take it. So the computed
+  baseline is what the app should be serving him, and the live model-written figures are not to be
+  preserved.
+- **⚠ THIS DOES NOT AUTHORISE A WRITE TO HIS DATA, and the entry's own instruction stands.**
+  Rewriting `nutrition_targets` is a production data write; what the owner chose is the *outcome*,
+  not the mechanism. The path is unchanged: he applies a post-RV-66 recommendation from the sheet,
+  one tap, and the write is his. **Do not run this for him** — a decision recorded in a backlog
+  entry is not a hand on the database.
+- **⚠ `LA-125` MUST SHIP FIRST, and this is new as of the decision.** The recommendation route
+  serves **42 g fat / 143 g carbs** where `calculateBaseline` computes **39 / 150**, because the
+  clamp's 0.6 g/kg floor is applied after the baseline rather than inside it. Applying today would
+  hand him the clamp's numbers, not the baseline's — which is precisely the "corrected/calculated"
+  figure he asked for and would not be getting. Sequence: **LA-125 → RV-66 re-run → he applies.**
+- **The numbers he is moving to**, so nobody has to re-derive them: **1,359 kcal / 111 g protein /
+  143 g carbs / 38 g fat** at the DEXA-corrected body fat — down **259 kcal** and **39 g protein**
+  from the 1,660 / 150 he has been eating for three weeks. That is a real cut, not a correction.
 - **Gate:** owner
 - **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
   only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
@@ -1811,7 +1818,11 @@ nothing structured saying why — and a human decides.
 
 - **Lane:** A — `packages/shared/src/nutrition/goal-recommendation.ts:205,262-268`.
   **Added:** 2026-09-21 (Lane A, found while shipping RV-66).
-- **Gate:** owner — **added 2026-09-21 as a correction.** The entry always said the fix *"changes
+- **✅ GATE RELEASED 2026-09-23.** It existed so the owner saw the fat number before it shipped.
+  He has now chosen the computed targets outright (`LA-126`), and the number reaches him at the
+  point that matters anyway — the recommendation sheet shows 39 g before he taps apply, and the tap
+  is his. A gate whose protection is already built into the flow it guards is ceremony.
+- **Gate (historical):** owner — **added 2026-09-21 as a correction.** The entry always said the fix *"changes
   the computed fat target for real users, so it wants the owner's eye on the number before it
   ships"*, and that sentence was prose. `Gate:` is a FIELD; written inline it is ignored, so this sat
   at **READY position 1** describing its own owner gate in a form nothing reads. Its sibling LA-126
@@ -1831,6 +1842,18 @@ nothing structured saying why — and a human decides.
   calorie floor is load-bearing for every cutting user. `rv66-baseline-is-the-recommendation.test.ts`
   pins both the floor and this fat disagreement, the latter explicitly as current-behaviour-not-
   endorsed.
+- **✅ ON THE CRITICAL PATH AS OF 2026-09-23, and the structural half is decided.** The owner chose
+  the computed nutrition targets under `LA-126`, and **this entry is what makes "computed" mean one
+  thing.** Ship it before the RV-66 re-run, or he applies the clamp's 42/143 while being told it is
+  the baseline's 39/150.
+  **The call, and it is the Orchestrator's to make rather than the owner's** (structural — which
+  formula is authoritative, not what the app should do): **move the 0.6 g/kg floor INTO
+  `calculateBaseline`.** The baseline then computes a number that is already safe, every surface
+  reading it agrees, and `clampRecommendation` keeps the floor only as a redundant guard rather
+  than as a second opinion. The alternative — deleting the floor and letting the baseline's 25%
+  stand — is rejected outright by the warning below: the calorie floor beside it is load-bearing
+  for every cutting user. **Reversal cost: one function, one test file.** For the owner this moves
+  fat 39 → 42 g and carbs 150 → 143 g; he is told that number before he applies, not after.
 - **Fix:** decide which fat rule is the real one and make the other defer to it — most likely by
   moving the 0.6 g/kg floor *into* `calculateBaseline` so the baseline is already safe and the clamp
   becomes the no-op it reads as. **That changes the computed fat target for real users**, so it
@@ -2784,10 +2807,15 @@ why the count of affected entries always understated the harm.
   `supplement_logs.log_date` returns 15 of 15 rows populated. **Nothing needs building to make the
   data matchable — it already is.**
 - **⚠ THREE DATA GAPS, none fatal, all worth knowing before anyone fits a model:**
-  1. **Dose 1 has `taken_at = NULL`**, so its cycle cannot be anchored to a time of day. It also
-     predates the vial (opened 2026-09-10), so it carries no reconstitution record. **Find out why
-     the first log took the no-time path** — if the dose-prompt flow can still write a NULL
-     `taken_at`, every future first-of-vial dose loses its anchor the same way.
+  1. **Dose 1 has `taken_at = NULL`**, so its cycle cannot be anchored to a time of day. **Find out
+     why the first log took the no-time path** — if the dose-prompt flow can still write a NULL
+     `taken_at`, every future first-of-vial dose loses its anchor the same way. Still open, and it
+     is a code question rather than an owner one.
+     **✅ The "it predates the vial" half is resolved (2026-09-23).** It does not: the owner confirms
+     the vial was opened the same day as dose 1, **2026-09-07**, and the stored `opened_on` of
+     2026-09-10 is BF-136's auto-set artefact. So dose 1 has no reconstitution record because the
+     field is wrong, not because it came from somewhere else — one edit in the app fixes it, and the
+     0.5 mg titration caveat in (2) below is unaffected.
   2. **Dose 1 was 0.5 mg; doses 2 and 3 were 1 mg.** Cycle 1 is a titration step and is **not**
      comparable to cycles 2–3. Any response model must key on the dose, not just the cycle index.
   3. **Intervals are 6 days then 7** (09-07 → 09-13 → 09-20). Close to weekly but not weekly, so
@@ -7218,9 +7246,27 @@ the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
     the first dose around **2026-09-04** (23 pre-drug days + 6 on-drug within 2026-08-12 → 09-10).
     **A drug-start exclusion keyed on 09-10 would leave the six confounded days inside the window** —
     the exact span driving the 2,245. Building it now would ship a filter that does not filter.
-  - **The owner action, and it is one edit:** correct the Retatrutide vial's *Opened on* date to the
-    actual first dose. Then this entry is unblocked and the exclusion can be built and verified
-    against a window that is really the drug's.
+  - **✅ ANSWERED 2026-09-23 — gate released. The drug start is 2026-09-07, and it is no longer an
+    estimate.** This entry guessed *"around 2026-09-04"* from a window count; production says
+    otherwise. Measured that day against `claude_ro`:
+
+    | dose | log_date | taken_at (Brisbane) | amount |
+    |---|---|---|---|
+    | 1 | **2026-09-07** | — NULL — | 0.5 mg |
+    | 2 | 2026-09-13 | 20:00 | 1 mg |
+    | 3 | 2026-09-20 | 20:46 | 1 mg |
+
+    The owner confirms **the vial was opened the same day as the first dose**, so its stored
+    `opened_on` of 2026-09-10 is the auto-set value BF-136 was filed about and is wrong by three
+    days. **Build the exclusion on 2026-09-07.**
+  - **⚠ Build it against the DOSE LOG, not the vial — that is the durable half of this.** The
+    exclusion wants *when the drug started*; `opened_on` answers *when this vial was mixed*. They
+    coincide here and will not on the next vial, and keying on the vial would silently re-break the
+    window every time one is replaced. The dose log gave the right date while the vial field was
+    three days out, which is the argument in one line.
+  - **Owner action, not blocking:** correct the vial's *Opened on* to 7 Sep in the app (BF-136 made
+    the field editable, bounded 180 days back). It does not gate this entry any more — it affects
+    how dose concentration is reconstructed, which is `BF-184`'s half.
 - **⚠ This entry's `Needs:` says "nothing" while its body calls BF-136 "a prerequisite in fact if not
   in form".** That is the same prose-dependency shape TN-31 carried (fixed 2026-09-16) — invisible to
   `next-item.js`. BF-136 has since shipped so no `Needs:` is owed, but the owner data correction is,
