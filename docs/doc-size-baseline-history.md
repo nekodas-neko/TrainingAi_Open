@@ -16443,11 +16443,12 @@ Known-Issues row.
 
 ## 2026-09-23 — `docs/implementation-backlog.md` → LB-138 + a note on BF-188
 
-Two findings from gating PR #1489. LB-138 records two e2e regression tests failing on `main`
-itself, measured by a control run at the base commit rather than inferred; its length is the
-assertion text of both failures, and the paragraph separating what was measured (the tests are
-red) from what was not (that the user-facing bugs returned), which is the distinction that
-decides whether the first action is a bisect or a re-fix.
+Two findings from gating PR #1489, then bisected in the same session. LB-138 was rewritten rather
+than extended and came out the same 24 lines: the bisect replaced two red tests with one commit,
+one of the failures turned out to be the spec keying itself to a renamed storage slot and is fixed
+in this PR rather than queued, and what remains is a single real regression carrying the value that
+proves it (`about:blank`) plus the two device reports that corroborate it. Same length, and it now
+names a cause instead of a symptom.
 
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
