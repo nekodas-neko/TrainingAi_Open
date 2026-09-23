@@ -473,7 +473,62 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
+
+- **Update, 20:27 AEST:** production caught up to **v1.465.16** by itself (confirmed from a PC and
+  from the APK after a restart). **Something that stopped is not something that was fixed** — why six
+  merges sat undeployed for two hours is still unknown; Railway's deploy log is still the first step.
+
+- **Lane:** A — Railway's deploy for `main` (the build/start/health check), not application code.
+- **Added:** 2026-09-23 20:25 AEST · Device Verification, noticed while re-checking DV-13.
+- **Measured:** the public `/api/version` (from a PC, and from the APK) answers **`"version":"1.465.10"`**
+  at 20:22 AEST. `main` is at **1.465.16**. Not live: 1.465.11 (18:16, status-bar scrim — DV-6),
+  1.465.12 (18:55, sleep timing in the user's zone — DV-7/DV-9), 1.465.13 (19:11, switch names —
+  DV-11), 1.465.14 (19:38, weigh-in invalidation — RV-108), 1.465.15 (20:03, fat floor), 1.465.16
+  (20:18, #1467 — BF-177's post-push invalidation).
+- **Consequence for everyone:** every fix merged since 18:16 is **unverifiable on the device and
+  unshipped to the owner**, and any "merged, so it is live" reasoning since then is wrong. A deploy
+  that restarts and fails may also be DV-13's 8-minute outage (20:04, one minute after the 20:03
+  merge).
+- **First step:** Railway's deploy log for `main` from 18:16 — the first failing deploy names the
+  cause. Not established: whether deploys fail, are stuck queued, or are disabled.
+- **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
+
+
+### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
+
+- **Lane:** A — the pull/apply path (`applyDelta` food_logs branch, `lib/local-store/**`) against
+  the push that confirms a delete.
+- **Added:** 2026-09-23 · Device Verification, sweep 2 (station A, BF-177 recheck), web v1.465.16.
+- **Measured.** A test food (Cocoa powder, row `ff8f28c6…`) was logged and deleted within ~10 s at
+  20:30. Afterwards the **local** row read `deleted_at NULL`, `sync_status 'synced'`, `updated_at
+  10:30:55.419Z`; two other rows for the same day carried `updated_at 10:30:55.739Z` — a pull being
+  applied at that moment. **The server's `/api/nutrition/food-logs` no longer returned the row.** The
+  Lunch section showed *"Cocoa powder 11 kcal"* for over a minute, through tab swaps. A second delete
+  (traced) worked cleanly: local `deleted_at` set, `sync/push` processed 1, row gone.
+- **Why it matters:** the device shows food the server has deleted, and because the row is
+  `synced` nothing will push it again; unless a later pull carries the tombstone past the cursor, it
+  stays. It adds 11 kcal on the page that the server's budget does not count.
+- **Suspected shape, not established:** a pull that fetched the pre-delete row, applied after the
+  push confirmed the delete and flipped the row to `synced` — so the `sync_status === 'synced'` gate
+  let it overwrite. Needs one reproduction with the pull/push ordering captured.
+- **Pass test (device):** log and delete a food within 10 s, five times; the local row keeps
+  `deleted_at` every time.
+
+
 ### [devices][platform] DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+
+- **Update:** after production caught up (v1.465.16), `/api/oura-ble/rollup-state` answered 200
+  twice from `/health` at 20:33 with no slowdown. That does not clear the admin console's
+  `device-metrics`/`samples/pack` — the admin screen was **not** re-opened.
+
+- **⚠ A SECOND EXPLANATION, found 20:25 AEST the same evening — read before blaming the admin routes.**
+  Production was still serving **v1.465.10** (merged 15:13) while `main` had reached **v1.465.16**:
+  six merges between 18:16 and 20:18 had **not deployed** (DV-14). One of them, v1.465.15 (#1468),
+  merged at **20:03 — one minute before the outage began at 20:04**. A Railway deploy that fails its
+  health check and restarts the service would produce exactly this window. So the outage may be the
+  deploy, the admin requests, or both; `error_events` and Railway's deploy log decide it.
+
 
 - **Lane:** A — `app/api/oura-ble/device-metrics/route.ts` first; also `samples/summary`, `rollup-state`,
   `samples/pack`.
@@ -691,6 +746,9 @@ below threshold and left in place for next time.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
+- **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the inputs are labelled, but the ink is 21 px
+  and the vertical touch area measures **~33 px**, under the 44 px floor.
+
 - **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
   and its result is recorded above, so the device is no longer what it needs. What it needs now
   is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
@@ -899,6 +957,11 @@ below threshold and left in place for next time.
 
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
+- **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): the controller works on the device** — the scrim is in the DOM
+  (43 px), opacity **0 at rest → 1 at scrollTop 600 → 0 back at the top**. **The look is the
+  owner's call:** the gradient (background → transparent) is faint, and the streak card's top edge is
+  still visible behind the clock row. Dark theme only; light not checked.
+
 - **Lane:** B — `components/shell/status-bar-scrim.tsx`, `lib/shell/status-bar-scrim-controller.ts`,
   wired once in `tab-shell.tsx`.
 - **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
@@ -1061,6 +1124,10 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
 
+- **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): the names are there.** The accessibility tree for Manage Supplements
+  shows **3 switches, 0 unnamed** — *Fish Oil · Vitamin D · Retatrutide*. TalkBack itself was not
+  run (an OS setting the owner asked to skip); that listen is all that is left.
+
 - **Lane:** B — swept app-wide; the guard is `scripts/check-icon-button-names.js`.
 - **Added:** 2026-09-23 · Device Verification, sweep 1.
 - **Shipped 2026-09-23** (`fix/dv11-switch-accessible-names`, v1.465.13).
@@ -1112,6 +1179,11 @@ below threshold and left in place for next time.
 
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
+
+- **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** With `energy-balance` blocked at the network
+  (CDP `Network.setBlockedURLs`; 4 requests failed) a Cocoa powder log left the card on **"320 kcal
+  left"** for 7 s with **no failure line and no Retry** — a stale number shown as current. (Blocking
+  had to be at the network layer: `page.route` cannot see service-worker fetches.)
 
 - **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
   Review sweep 53. **Shipped:** 2026-09-22, `fix/rv103-rv104-nutrition-freshness`.
@@ -1183,6 +1255,12 @@ below threshold and left in place for next time.
 
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
+- **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): PASS for two of the three keys.** A same-value weigh-in (69.4 kg) was
+  followed **immediately** by `GET body-metadata` and `GET energy-balance` (plus readiness-score,
+  sleep-sessions, hr-profile), then `POST sync/push`, then a second round of both. `day-log:` has no
+  reader on `/health` and was not observed — that is what is left. Side effect: today's weight is
+  now manual-sourced.
+
 - **Lane:** B — `components/health/metric-log-sheet.tsx`. **Added:** 2026-09-22 · Review sweep 53.
 - **Verify: device**
 - **Shipped 2026-09-23** (`fix/rv108-weigh-in-invalidation`, v1.465.14). Both halves, copied from
@@ -1215,6 +1293,12 @@ below threshold and left in place for next time.
   prove the calls are present and cannot watch 202 keys on a phone.
 
 ### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
+
+- **📱 CONFIRMED on the device (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** Log Food → **Barcode**: `body.scanner-active` is set
+  and the app's own window keeps focus (the scanner is JS, not a native activity, so nothing
+  intercepts back first). **One** hardware back → **no dialog left** — the Log Food sheet is gone
+  with the scanner. The ordering risk did **not** fire: `scanner-active` was cleared, the page was not
+  left hidden.
 
 - **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
   `components/nutrition/ingredient-picker.tsx:302`. **Added:** 2026-09-22 · Review sweep 53.
@@ -2832,31 +2916,6 @@ why the count of affected entries always understated the harm.
   unchanged. Then confirm an intentional edit is still possible by whatever path the fix chooses.
   **Device look owed** — the toggle is the surface and the timing is what is being measured.
 
-### [nutrition] BF-186 — the vial sheet sent you to "Manage supplements", which is a 10 px "Manage" link on another screen
-
-- **✅ SHIPPED 2026-09-20** (`fix/bf186-manage-supplements-reachable`, **v1.460.4**). The note stopped
-  naming a destination and became one: *"Your saved dose is 0.5 mg. **Change it**"*, where "Change
-  it" closes the vial sheet and opens the manage sheet. The words that named nothing are gone.
-- **Verify:** device
-- **Keep:** the 44 px tap target on the header **Manage** control, which is the half a browser
-  cannot check. It now carries `.tap-target-44` — a `::before` hit box, so the header still reads as
-  a header — but `domClick` bypasses hit-testing entirely, so the spec proves the wiring and the
-  words and **not** the target. Thumb it on the S25.
-
-- **Why the note became the door rather than the wording being matched.** Three things stacked, and
-  fixing only the words fixes one of them: the note said "Manage supplements" where the control says
-  "Manage"; the control is a 10 px muted affordance beside a 10 px label it matches; and it is on
-  the screen *behind* the sheet giving the instruction. Making the note the control removes the
-  navigation instead of describing it.
-- **Closing one sheet and opening another in the same tick is deliberate, not a hazard.** That is
-  the sibling sequence `lib/hooks/sheet-back-stack.ts` handles — `pendingSelfPops` is module-level
-  for exactly this case (BF-34), with unit tests. Checked before wiring it.
-- **Verification.** `e2e/bf186-saved-dose-note-is-the-door.spec.ts` creates a mg-dosed supplement,
-  opens the vial sheet, taps the note, and asserts the manage sheet opens and the vial sheet closes;
-  it also asserts the dead phrase is absent from the rendered copy. Proven red with the callback
-  unwired: *"the saved-dose note carries no control, so the dose stays unreachable"*.
-- **Batch `supplement-dose-surface` is SPLIT — see BF-185**, which turned out not to be Lane B's.
-
 ### [body][readiness] BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after his third dose:
@@ -3287,6 +3346,13 @@ why the count of affected entries always understated the harm.
   owner sees, and only the APK proves it is gone.
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
+
+- **📱 Sweep 2 — STILL FAILS on v1.465.16 (after #1467 deployed).** A Cocoa powder log (11 kcal)
+  left *"320 kcal left"* unchanged for **8.2 s** on the tab; it moved (→ 309) only when the next
+  action fired a refetch. #1467's half is visible working — in a traced delete, `POST sync/push` was
+  followed by re-GETs of energy-balance, weekly-summary, adherence, day-timeline and food-logs — so
+  the remaining gap looks like **the push not firing promptly after a log**, not the invalidation.
+  Not established: when that log's push actually went.
 
 - **Still reproduces on web v1.465.10 (sweep 1):** card stayed at "867 kcal left" for 5 s while the
   post-push response carried 856 — the same one-shot refetch before the push.
@@ -4162,6 +4228,9 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ### [nutrition] BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506
 
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the assign step's **"/ 1308 kcal"** matches the energy card's
+  budget. The bar colour at the S25 width was not judged — still owed.
+
 - **Lane:** B — `components/nutrition/assign-step.tsx`, `components/nutrition/food-logger-sheet.tsx`,
   `app/nutrition/nutrition-content.tsx`, `components/nutrition/end-of-day/day-summary-card.tsx`.
   Restored 2026-09-17: cutting the entry down to its residue dropped this line, and `next-item.js`
@@ -4247,6 +4316,10 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   against intuition about muscle size.
 
 ### [nutrition] BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** expanded, the lone saved meal shows **P 48g · C 48g · F 9g once**
+  (one draw). The collapsed state was not reached: the section chevron carries no `aria-expanded`
+  (see Q-491), so the harness could not find it by role. Collapsed + mixed-section halves still owed.
 
 - **Verify:** device — on the S25, a meal section collapsed shows P/C/F; expanded shows them once,
   not twice; a section holding a meal plus a loose food still shows its combined footer with
@@ -4446,6 +4519,11 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   session.
 
 ### [workouts] BF-167 — the deload toggle read the phase flag, not the loads (fixed; device look owed)
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): PASS** — the deloaded Upper session reads *Deload — As prescribed* with
+  *Full — Override*; the other sessions are unchanged. The rationale-prose contradiction is still
+  owed. (BF-179's 52% was **not** reproduced as stale the same morning: it was a fresh prescription
+  generated 09:55Z, reasoning *"sore Back, Shoulders, Biceps"* from that day's check-in.)
 
 - **Batch:** `workout-completion-surface` — shipped with **BF-169** and **BF-168**.
 - **Verify:** device — on the S25, open a session whose prescription has any `deloaded: true`
@@ -5940,52 +6018,9 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **What's needed to start:** owner sign-off on the Apple Developer Program cost/enrollment, then an
   implementer follows the plan directly.
 
-### [workouts] BF-162 — the prescription card tells you to load 85 kg onto a Hanging Leg Raise
-
-- **Lane:** B — `components/workout/ai-prescription-card.tsx:283-310`. The data needed to fix it is
-  already a prop on this component.
-- **Added:** 2026-09-15 (BugFix intake). The owner, reading his Legs prescription: *"Is this right?"*
-- **Reproduced exactly from his stored values — this is arithmetic, not an anomaly:**
-
-  | exercise | stored `estimated_1rm` | × pct | card shows |
-  |---|---|---|---|
-  | Hanging Leg Raise | **128** | × 66% = 84.5 | **`@ 85kg (66%)`** |
-  | Pull-Up (14 Sept) | **124** | × 72.5% = 89.9 | **`@ 90kg (72.5%)`** |
-
-  Both are `exercise_type = 'bodyweight'` with `equipment = ['bodyweight']` in `exercise_library`.
-  There is no bar to load and no weight to add; the kg figure is a percentage of an internal index.
-- **The component already holds the answer and already documents the rule.** Its own prop comment:
-
-  ```ts
-  // Per session-exercise id: 'weighted' | 'bodyweight'. A bodyweight 1RM change in kg is a change
-  // in an internal index, not in weight lifted, so the rationale must not quote it (Q-19).
-  exerciseTypeById?: Record<string, string | undefined>;
-  ```
-
-  **Q-19 applied that rule to the RATIONALE and not to the exercise rows.** Line 283 computes
-  `weightKg` from `liveOneRm × pct` unconditionally and line 308 prints it, never consulting
-  `exerciseTypeById`.
-- **The fix is to take the branch that already exists.** Line 310 renders `` ` @ ${ex.pct}%` `` when
-  `oneRm` is null — visible on his own card as *Face Pull · 2×12 @ 66%*, which reads correctly. A
-  bodyweight exercise should take that same branch: percent, no kg.
-- **Do not render the number as "added weight" instead.** 85 is not 85 kg of added load — it is 66%
-  of a 128 index derived from bodyweight reps (BF-149's forward path). Relabelling it would turn a
-  visibly absurd number into a plausible wrong one, which is the trap BF-158 is filed against.
-- **Consider, not required:** for a bodyweight exercise the useful target is reps, and `avg_reps` is
-  stored (BF-151 is already about reading it rather than inverting). Showing *"2×12"* with the
-  percent and no kg is complete on its own; a rep target is a further improvement, not part of this.
-- **✅ SHIPPED 2026-09-15** (`fix/bf162-bodyweight-no-kg`).
-  [Journal](overview/history-2026-09-17-folded-1.md#2026-09-15-bf162-bodyweight-no-kg). One guard on `weightKg`, using
-  the **shared** `isBodyweightType` from `packages/shared/src/1rm.ts` rather than a ninth inline
-  `=== 'bodyweight'` — there were eight. A bodyweight exercise falls through to the `@ ${ex.pct}%`
-  branch the card already rendered when a 1RM was missing.
-- **Keep:** the device check, and only that — open a session containing a bodyweight exercise and
-  confirm no kg is shown for it while weighted exercises in the same list are unchanged. **The
-  harness cannot stand in for it:** `exercise_library` holds 27 bodyweight exercises and **none is in
-  any `session_exercises` row**, so a prescription row for one cannot be rendered without inventing
-  fixture state — which would test a situation built for the test rather than the one reported.
-
 ### [workouts] BF-163 — the intensity chip is computed from load alone (card half shipped; the blend rule is Lane A's)
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): the shipped half PASSES on the device.** ① is still Lane A's.
 
 - **Lane:** B for the card half — `components/workout/ai-prescription-card.tsx`. **The band table
   `packages/shared/src/workout/intensity-zone.ts` is Lane A by the path rule**, which the entry's
@@ -6648,6 +6683,9 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Needs:** nothing.
 
 ### [readiness] TN-35 — make stress answer "what stressed me", by joining the series to the day's events and letting the owner mark a moment
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): the device look PASSES** — 0 of 8 events carried a reading, each
+  read "no reading", and the list fits at 412 px. The marker half (①) is still owed.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"I'd like to get stress metric to be a usable value to determine what events stress me."*
 - **Lane: B** for the overlay (`app/api/day-timeline/route.ts` already assembles the events; `components/health/day-detail/**` renders them). **Lane A** for the marker's storage — a timestamped row is a migration.
@@ -8132,113 +8170,6 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   worst-case default for unknown equipment.
 - **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
   every budget except five exercises.
-### [body][app-shell] BF-133 — a full user overview: every metric the app has recorded, in one place
-
-- **Lane:** B — a new surface under `components/health/` or the User Information screen of **BF-118**; the assembler behind it may be Lane A if it needs a route.
-- **Added:** 2026-09-08 · owner: *"I'd like a full user overview card - having every metric we have for the user - like height/weight/body fat/ stride length/low-avg-high HR/ rmr/ essentially every metric we have recorded - such as avg sleep duration/time etc. just a massive user overview card with a good ui"*.
-- **Needs:** — nothing. It reads stores that are already populated.
-
-**⚠ FIRST: decide against BF-118, because both entries describe a screen called "user information".**
-BF-118 part 3 is *"a More → User Information screen showing what the app knows, per source,
-editable"*. **They are not the same screen and must not become two screens with the same name.** The
-honest split, and the recommendation: **BF-118's screen is what you TELL the app** (injuries,
-constraints, schedule, DEXA/RMR entry — editable, and it constrains AI generation); **this is what the
-app has MEASURED about you** — read-only, dense, no inputs. Build it as a section of BF-118's screen
-rather than a second destination, or the app grows two "about you" pages that each look incomplete.
-
-**The inventory, measured on the owner's live data 2026-09-08 — this is what "every metric" actually
-is, and it is not evenly populated.** `body_metrics` holds **132 rows**:
-
-| field | rows with a value | note |
-|---|---|---|
-| `steps` | **132 / 132** | the only complete series |
-| `weight_kg` · `body_fat_pct` | 96 · 91 | scale |
-| `resting_heart_rate` · `hrv_ms` · `spo2_pct` | 81 · 79 · 79 | ring |
-| `distance_km` | 50 | |
-| `skeletal_muscle_pct` · `muscle_mass_kg` · `body_water_pct` · `visceral_fat_index` · `bmr_kcal` · `metabolic_age` | **40 each** | all six arrive together from the smart scale |
-| `waist_cm` · `chest_cm` · `arm_cm` · `thigh_cm` · `hip_cm` · `neck_cm` | **0 · 0 · 0 · 0 · 0 · 0** | six tape-measure columns, never written by anything |
-
-Elsewhere: `sleep_sessions` **109** rows (mean duration **6.23 h**, mean efficiency **80.2**, mean
-sleep start **23:17**, `respiratory_rate` 91, `lowest_heart_rate` 92 — but **`sleep_score` is 0 of
-109**, a column that exists and has never been populated); `workout_hr_stats` 91; `oura_daily` 80;
-`body_battery_daily` 72; `personal_records` 33; `fitness_tests` **2** (a 6MWT giving
-`vo2max_est` 18.8 and a resting-HRR test giving RHR 94, both 2026-07-19); `measured_rmr` **1**;
-`dexa_scans` **1** (40+ columns of regional composition); `injuries` **1** (`lower back`, mild —
-recorded since 2026-09-06, when it was still empty); `blood_panels` and `blood_analytes` **0** — the
-stores exist and nothing has ever been written to them.
-
-**So "render every column" is the wrong spec, and would ship a card with at least seven permanently
-empty rows on it** (six tape measurements plus Sleep Score) plus two whole sections showing nothing
-(blood). **Rule for this card: a metric with no data is omitted, not shown blank** — the exception
-being where an empty state is itself an invitation ("no blood panel recorded — add one"), which is a
-deliberate choice per group rather than a default.
-
-**Three of the owner's named examples need answering before this is built, because each is not what it
-sounds like:**
-
-1. **Stride length is not measured.** `lib/activity/treadmill-utils.ts:3` computes
-   `(heightCm / 100) * 0.415` — a population constant applied to height. Rendering that as a *user
-   metric* presents an anthropometric assumption as a measurement. What IS measured is **stride
-   frequency** (`strideHz`, `lib/activity/cadence-tracker.ts:263`) from the ring. Show cadence, or
-   show stride length labelled as estimated-from-height; do not show it as recorded data.
-2. **"low / avg / high HR" is three different things from three stores**, not one range:
-   `sleep_sessions.lowest_heart_rate` and `avg_heart_rate` (overnight, 92 rows),
-   `workout_hr_stats` (per-session, 91 rows), and `body_metrics.resting_heart_rate` (daily, 81 rows).
-   A single "HR: low–avg–high" row silently merges a sleeping heart rate with a working one. Decide
-   the window it describes and label it.
-3. **There are already two RMR numbers and they disagree by construction.** `measured_rmr` holds the
-   owner's **one lab-measured value**; `body_metrics.bmr_kcal` holds **40 scale-estimated** ones. Both
-   are "RMR" to a reader. The card must show which is which — this is the same class as BF-33's
-   measured-vs-estimated split and should follow whatever it settled rather than inventing a second
-   convention.
-
-**Design, and the part that decides whether this is useful or just long:**
-- **Group by what a number is for, not by which table it came from** — Body composition · Vitals ·
-  Sleep · Training · Performance tests · Goals. The tables are an implementation detail and grouping
-  by them puts `bmr_kcal` next to `steps` because they share a row.
-- **Every value carries its date.** This is the difference between a useful card and a misleading
-  one: a DEXA from one scan and a lab RMR from one visit will sit beside today's step count, and
-  without "as of" they read as equally current. The owner's own examples are heavily weighted to
-  one-off measurements.
-- **Show a range or trend where the series supports it, a single value where it does not.** 132 step
-  days deserve a sparkline; one DEXA does not.
-- **Profile facts belong in it too** — height, date of birth, sex, activity level, fitness goal, and
-  the goals (`steps_goal` 7000, `target_weight_kg`, `target_bf_pct`). Note **`sleep_goal_hours` is
-  NULL** while a sleep goal is implied elsewhere in the app; surfacing that gap is one of the things
-  this card is for.
-- **Read-only.** Every field here has an existing editor somewhere; a second write path is how two
-  surfaces start disagreeing. Link to the editor, per the rule BF-118 already states — *"the
-  canonical editor lives in the user section; every other surface links to it"*.
-
-- **Check the existing Body tab first.** `components/health/body-cards/`, `body-fat-card.tsx`,
-  `body-muscle-card.tsx` and `hr-recovery-profile-card.tsx` already render parts of this. The value of
-  this entry is the *single dense view*; if it is built by duplicating those cards' internals rather
-  than reusing them, it becomes a second place every body metric is formatted. Reuse or extract.
-- **Reversal cost:** low — one read-only screen over existing stores. No migration, no new data.
-- **Keep:** the device check, and only that. Body composition, vitals, metabolism, daily movement
-  and sleep shipped in #1009; **`fitness_tests`, `dexa_scans` and `measured_rmr` shipped as the
-  "Tests and scans" section**, a second section on the same screen so that each half renders when
-  the other has nothing. `personal_records` is **not** in this view and is now **LB-95**: it needs a
-  route, which is Lane A's, exactly as this entry's `Lane:` line anticipated.
-- **Verify device:** the S25. `fitness_tests` is read local-first and the browser has no native
-  SQLite, so only the `cachedFetch` fallback ran — the `getFitnessTests` branch is unexercised, as is
-  how a now-noticeably longer dense list reads on the phone.
-- **⚠ The BF-118 decision is TAKEN, and it is not the one this entry proposed.** BF-118's screen does
-  not exist and is a large unbuilt entry. What does exist is **`/more/details` ("Profile details",
-  BF-79)** — name, biological sex, birth year, height, editable, one PATCH — which is precisely
-  BF-118's *"what you TELL the app"* half already built under another name. So this shipped as a
-  section of **that** screen: told above, measured below, one page about you. Do not add a second
-  destination when BF-118 is built; fold BF-118's intake into `/more/details` instead.
-- **The read is local-first, and that is required rather than preferred.** `/api/body-metadata`
-  returns **seven days**, and this card is about the LATEST reading of each metric — a scale session
-  or a DEXA figure is routinely older than that, so read from the server alone most of these read as
-  absent when they exist. `store.getBodyMetrics(cutoff)` returns the full local history, and
-  `body_metrics` is a domain the app writes locally, so CLAUDE.md's offline-first rule already
-  required this. The seven-day payload stays as the web fallback, where `getLocalStore` returns null.
-- **A device look is owed when it ships:** this is a long screen on a phone, and "good UI" for a dense
-  read-only list is mostly about scanning — group headers that stick, numbers aligned, and the S25's
-  fold not landing mid-group.
-
 ### [nutrition] BF-134 — the macro targets and the calorie budget on one card are anchored to different days, and disagree by 406 kcal before you move
 
 - **✅ THE OWNER SPECIFIED WHAT THEY WANT, 2026-09-13 — and it is a model change, not a display fix.**
@@ -8976,6 +8907,9 @@ present.
 
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the chip resolves (18°). The failure state **could not be checked** —
+  with the request blocked, the cached value painted instead.
+
 - **⚠ OWNER DIRECTED 2026-09-13, and it is a scope rule rather than an answer to this entry.**
   Verbatim: *"Let's not do any testing for the web ui app; only the apk."*
 - **What that removes from this entry:** ① the PWA `start_url`. A `manifest.json` launch is a
@@ -9261,6 +9195,10 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [readiness][app-shell] RV-38 — Body Battery printed 50 and called it "Good" for an empty account (treatment fixed; the NUMBER is Tuning's)
 
+- **📱 Sweep 2: COULD NOT CHECK** — the request is fetched by the service worker, which
+  `page.route` cannot intercept. Next attempt: CDP `Network.setBlockedURLs`, which did reach an SW
+  fetch for RV-103.
+
 - **⚠ TWO HALVES, AND ONLY ONE WAS EVER LANE B's.** The owner handed the **number** to Tuning on
   2026-09-14: *"This requires tuning still. Should be flagged for tuning with the tuning agent."*
   Tuning proposes, the owner signs off, Lane A implements — and a proposal must state how many other
@@ -9296,31 +9234,10 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   on it.
   ③ the device check on the S25.
 
-### [devices][app-shell] RV-39 — the `/more/devices` ring card flashes a skeleton on a warm repeat visit
-
-- **⚠ DEPRIORITISED BY THE OWNER, 2026-09-14** — not closed. *"Not sure where to check; we dont use
-  this screen much."* `/more/devices` is reached when a device needs attention, which is rare by
-  design, so a sub-second skeleton flash there is close to worthless to fix. **Left queued and
-  ranked low** rather than removed: the entry is correct, the cost is real, and it will be free to
-  fix the next time someone is in that file.
-
-- **Lane:** B — the ring card on `/more/devices`.
-- **Added:** 2026-09-03, Review sweep 42 —
-  [`write-up §3`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
-- Measured on a second visit to an already-compiled route, skeletons in the viewport at
-  250/600/1200/2500 ms: **`/more/devices` = `[1,1,0,0]`**. All 13 other sub-routes measured
-  `[0,0,0,0]`. The element is `rounded-2xl bg-muted/40 border border-border h-[68px] animate-pulse`
-  under the `RING` heading, resolving to *"Oura Ring 5 — No data yet"* in ~1.2 s.
-- **Under a second, and filed anyway** because `CLAUDE.md` states the rule without a threshold — *"A
-  skeleton flash on a repeat visit is a bug"* — and the fix is the one the rule names: seed from
-  `readCacheSync` before first paint.
-- **Note the existing guard cannot see this class.** `expectNoSkeleton` polls to a 20 s budget, so it
-  catches *never seeds* and is blind to *flashes for a second*. Sampling at fixed early offsets sees
-  both; if this is guarded, guard it that way.
-- **Verify:** device — the ring card's real state is BLE, which the web build cannot reach at all, so
-  a web-green paint says nothing about what the APK shows here.
-
 ### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
+
+- **📱 Sweep 2: COULD NOT CHECK** — the phone was on **three-button** navigation
+  (`navigation_mode` 0), so the gesture-bar inset this needs does not exist.
 
 - **Lane:** B — `app/health/day/day-detail-content.tsx:226`
 - **Added:** 2026-09-03, Review sweep 41 —
@@ -10201,40 +10118,6 @@ feature and not a deletion like LB-41:
   rather than a number; and the recommend-route prompt no longer implies the TDEE is activity-scaled.
 
 
-### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
-
-- **Lane:** A — the defect is in what the number MEANS — base against base-minus-deficit — which is the budget derivation, not the label that prints it. (Assigned 2026-09-15, OR-116 lane sweep.)
-
-- **⚠ NOT CHECKED 2026-09-13 — the checklist sent the owner to the wrong place, and the answer
-  recorded is about that, not about this entry.** Owner: *"nutrition + gear icon has no settings
-  except the meal time names"*. That is true and is my error: the goals form is not behind the
-  Nutrition gear. **Whoever re-asks this must name the real route first** — the `base` line lives on
-  the goals/targets surface, and an entry whose check cannot be found is an entry that collects
-  false passes (three did in this same pass).
-
-- **Keep:** one look on the S25. The line gained a clause and Home's copy of the bar is `compact`, so
-  whether it wraps at 412 dp is the only thing unverified.
-- **Verify:** device.
-- **✅ SHIPPED** (`fix/bf-99-base-label`, 2026-09-01, v1.423.0). The line separates the two figures
-  and they still sum to the same budget: `1,972 base − 200 for your goal + 1 earned from movement`,
-  collapsing to `1,972 base + …` on `maintain` — which is this entry's own check that a zero-delta
-  user sees the same number under both wordings. Split in the component, **not in
-  `budgetProvenance`**: that is shared and a single combined number is right for a caller that wants
-  one. Measured at all three goal shapes on `pnpm dev`, not reasoned.
-- **✅ The second half shipped too.** The measured RMR is re-scaled onto current lean mass rather than
-  used raw, and nothing said so, which made a measurement the owner paid for look ignored. The
-  measured-RMR form is the only place the number appears, so one line sits under the fat-free-mass
-  field saying what the app does with it.
-- **⚠ Neither the floor nor the goal maths was touched, and neither should be.** `restingBaseKcal` is
-  `Math.max(Math.round(bmr), …)` on **both** branches (`energy-balance-service.ts:284-286`); that is
-  what stops a base falling below measured resting metabolism, and the displayed number was under
-  1,325 only because the deficit is subtracted after the floor, which is also correct.
-- **Added:** 2026-09-01 · owner, with a Health screenshot: *"why is my base rate under the 1350 RMR
-  value."*
-- **The reconstruction that diagnosed this was arithmetic against live values, not a trace**, and it
-  is preserved in the journal entry rather than here. It matched the screen at three independent
-  points; the fix does not depend on it, because it relabels figures the component already holds.
-
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
 > **✅ THE ENGINE HALF SHIPPED 2026-09-01** (migration 252 + the `claude_ro` regeneration 253, local
@@ -10265,6 +10148,9 @@ feature and not a deletion like LB-41:
   the food well; but when scanning it doesnt."*
 
 ### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice (fixed; the reproduction is not understood)
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** expanded sections draw the macro line once (`pDraws` 1). The
+  collapse half could not be driven — the header chevron has **no `aria-expanded`** (Q-491).
 
 - **❌ FAILED ON THE S25, 2026-09-13, and the report is the INVERSE of the original defect.**
   Owner: *"if you add a meal to a section and minimize it, it shows no overview of the macros; but if
@@ -12438,6 +12324,9 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
 
+- **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** swipe-open then tapping the tray's own Delete worked **3 of 3**. The
+  owed variant — an immediate tap from a verified-closed tray — was not run.
+
 - **📱 PARTIAL ON THE S25, 2026-09-23 — the immediate tap is still COULD NOT CHECK.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Food
   rows only (Nutrition diary). Swiped with a real `adb shell input swipe` (300 ms): a tap **~1.5 s**
   after the swipe opens *"Delete food log?"* on the first press, four times out of four — so the slow
@@ -12475,37 +12364,6 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   the slow tap must keep working. **BF-29's 2026-08-30 pass is not evidence**: it was the meal list,
   tapped slowly.
 
-
-### [nutrition] BF-45 — the nutrition tab's UI uplift (all five shipped; device check owed)
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
-- **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
-
-**①②③④ shipped v1.397.0; ⑤ shipped v1.398.0.** Reasoning in the journal
-([①–④](overview/history-2026-09-10-folded-4.md#2026-08-30-nutrition-ui-uplift) ·
-[⑤](overview/history-2026-09-10-folded-4.md#2026-08-30-food-log-swipe-delete)). Two things worth carrying: ③'s gutter fix
-is **not** where this entry said to put it — it called for `SheetContent`'s bottom variant, and
-measured, **26 of 48** bottom sheets set their own `px-*`/`p-0` while most of the rest already pad
-inner content at 16, so a shared outer gutter would have doubled theirs. And ⑤ needed one thing the
-meal list did not: the nutrition scroll container owns a horizontal drag of its own that steps the
-day, so a row swipe fed both gestures. `SwipeActions` now marks itself `[data-swipe-actions]` and
-that handler defers, the way it already defers to a carousel.
-
-- **Keep — the device check, which is the whole of what is still owed.** On the S25: a food row
-  swipes to a tray whose Delete confirms, **and the row stays gone across a screen swap and a
-  force-close**. That last clause is BF-47's failure, whose fix is *reasoned rather than reproduced*
-  (`getLocalStore` is null in `pnpm dev` and in Playwright) — and a swipe is a faster route to
-  exactly that delete, which is why the two are checked in one pass. ①②④ are equally unverified: the
-  sandbox renders at desktop width and cannot judge a gutter or a ring.
-
-> **BF-46 VERIFIED and removed, 2026-09-14 — one trap in it is pinned by a test and worth naming.**
-> The meal photo save failed on the device and nowhere else because `MealPhotoTile`'s native branch
-> did `await fetch(photo.dataUrl)` on a `data:` URL — **a `fetch()` of a `data:` URL is governed by
-> `connect-src`**, which `lib/security/csp.ts` does not open to `data:`, so it rejected into a
-> `catch {}` written for picker cancellations. It asks the plugin for `Base64` now.
-> `lib/media/__tests__/no-data-url-fetch.test.ts` fails on the next one.
 
 ### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
 
@@ -13140,68 +12998,6 @@ revocation, a Play Store health-data implication — and D needs none of it.
   **Declined weigh-ins** with its time, claim it back, and confirm the weight files and the band
   re-anchors. The BLE scale is not reachable from the sandbox, so the list was driven from the route's
   shape rather than from a real declined reading.
-
-### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
-
-- **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
-- **Added:** 2026-08-30 · owner, device pass N1: *"Delete worked; when I click delete the item
-  vanishes then re-appears; then when you swap screens - it dissapears."*
-- **Keep:** the DEVICE check, and only that. The fix shipped 2026-08-30 — the loader reads the
-  outbox and drops queued deletes from the server copy before hydrating from it. **It is reasoned,
-  not reproduced:** `getLocalStore` returns null in `pnpm dev` and in Playwright, so the failure has
-  no sandbox analogue and neither does the fix. Delete a logged food on the S25, online and offline,
-  and confirm it goes and stays gone across a screen swap and a force-close.
-- **⚠ The trace below was CORRECTED on implementation** — see the boxed note. The fix direction it
-  proposed was right; the mechanism it named was not the whole story, and the difference decides
-  where the filter has to go.
-- **This is CLAUDE.md's own rule being broken**, the one written after the mood-checkin re-prompt and
-  the rest-day revert: *after an optimistic local write, never apply or cache a server response that
-  would replace it.*
-
-**Traced, and the sequence matches the report exactly.** `deleteLog` in `nutrition-content.tsx:405`
-removes the row optimistically, deletes it locally, queues the mutation, then calls
-`refreshAffected()` → `loadFoodLogs(today)`. That loader renders the local copy first (row gone —
-the flicker the owner sees) and then fetches the server copy, which **still has the row**, because
-the delete has only been *queued*; `pushMutations` has not run yet. When the push later lands, the
-next load returns a server copy without it — which is why swapping screens makes it disappear "for
-real".
-
-> **⚠ CORRECTED 2026-08-30, on implementation.** The entry said the loader "renders the server copy
-> unconditionally", and it does not: in the happy path it feeds the server copy to `applyDelta` and
-> then **re-reads locally**. All three links in that path hold — `handleConfirmDelete` really does
-> call `store.deleteFoodLog(id)` before queueing, `getFoodLogsWithItems` filters
-> `deleted_at IS NULL`, and `applyDelta`'s food_logs arm is gated `WHERE sync_status = 'synced'`, so
-> a server row cannot overwrite a pending local one. **On that path the row should not come back.**
->
-> Two mechanisms that DO fit the report, and the fix covers both:
-> 1. **The `catch` branch.** If `applyDelta` or the local re-read throws, the loader falls back to
->    `applyLogs(server)` — the raw server copy, deleted row included.
-> 2. **The local row was never there.** A log created on web or another device and not yet pulled
->    means `deleteFoodLog`'s UPDATE matches **zero rows**, so nothing is tombstoned or pending, and
->    `applyDelta` inserts the server row fresh as `'synced'`. This one survives a screen swap only
->    until the push lands, which matches the report exactly.
->
-> **Why it matters where the filter goes:** mechanism 2 is a local re-insert, so filtering after
-> `applyDelta` would still write the row back to the device. The shipped fix filters **before**
-> both uses, and a source-order test pins that.
-
-- **⚠ Do not fix this by inverting the authority.** That line's comment records the bug it exists to
-  prevent: a local read that threw left the page blank, so logged food *"vanished on reload"* even
-  though the server had it. Both failures are real and a naive swap trades one for the other.
-- **Fix direction:** the loader needs to know a delete is in flight and not resurrect it — filter the
-  server response against pending outbox mutations for the domain, which is information the local
-  store already holds, rather than choosing a winner globally. Equivalent to the `sync_status ===
-  'synced'` gate `applyDelta` already applies for pulls; this read path has no such gate.
-- **Sibling sweep — done, and the answer is one.** `grep -rn 'applyDelta(' app components lib packages`
-  returns exactly **one** call site outside the sync engine: this loader. It is the only screen-level
-  read that hydrates the local store from its own server fetch, which is the shape that can resurrect
-  a row. The mood, body-metric and activity deletes were checked: they read `day-log:` through
-  `cachedFetch`, a **server-assembled aggregate that never writes to the local store**, so a queued
-  delete shows briefly stale there and self-corrects on push — a flicker, not a resurrection, and a
-  different fix if it is ever worth making. `session-select-content.tsx` reads
-  `store.getActivityLogs` local-first, where the tombstone already excludes it.
-- **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
-  reappearance, and a force-close does not bring it back.
 
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
@@ -14453,6 +14249,10 @@ the day's move-hours total is below the goal.
 
 ### [heart-rate][app-shell] OR-116 — one metric name over two metrics (labels fixed; the third surface's CONTEXT is still open)
 
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): both labels PASS** — the detail screen reads *"Today so far"* and
+  Home's tile reads *"Resting HR"*, each fitting on one line. ① (what each surface is for) is still
+  owed.
+
 - **Lane:** B — `components/oura-score-chip-row.tsx` and `app/health/heart-rate/page.tsx`. Reached
   only from `components/**` / `app/**`; no storage, no derivation change. Shipped 2026-09-15.
 - **Added:** 2026-09-15 · owner, while checking TN-13: *"I dont see any other values that match that
@@ -14971,6 +14771,10 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
 - **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
   nothing was observed in production.
 ### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate
+
+- **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** HR recovery still plots **0-value points** (Thu,
+  Fri, Wed), and there is **no gap** over 09-15…09-20 even though data is present 15–17. Breaks do
+  render for a real gap elsewhere, so the break logic works; the zeros are the fault.
 
 - **Lane:** B for what is left — `components/health/**`, by the path rule. The engine half was
   Lane A's and is done; this entry carried no `Lane:` field at all, so it printed as UNCLASSIFIED
@@ -16371,6 +16175,8 @@ design decision. See the correction at the top of that entry.
 
 ### [devices][heart-rate] BF-10 — the admin Device Metrics sparklines plot by sample index, not by time, so a night-only signal renders as if it ran all day
 
+- **📱 Sweep 2: COULD NOT CHECK** — device metrics never loaded (DV-13).
+
 - **Batch:** `admin-console-sitting` — **seven entries, one screen** (2026-09-16, OR-118). Q-316,
   Q-317, Q-318, Q-544, Q-531, BF-10 and LB-5 all want a look at `/admin` → Devices / `/admin/oura-ble`
   **in the APK**, where the ring's real state is BLE and the web build reaches none of it. One visit
@@ -17187,6 +16993,10 @@ Measured against `lib/walk/segment-stats.ts`:
 
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
+- **📱 Seen on the device, sweep 2 (2026-09-23):** the Nutrition meal-section chevrons (^ at the
+  right of *PRE WORKOUT*, *POST WORKOUT*, *LUNCH*) expose no `aria-expanded` — a tenth site, or one of
+  the nine under a new path; check before counting.
+
 > **✅ THE TWO REAL VIOLATORS SHIPPED 2026-08-24 (Lane B), and the count of "9" was stale even at the
 > time this entry was re-checked — this is the fourth instance of the exact pattern the entry itself
 > flags below.** Re-verified each of the nine named files against `main` directly, one by one, rather
@@ -17781,57 +17591,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   sandbox), so it has never been seen rendering for real — only the inert web path and a locally
   forced state were verified. `Gate: device`.
 
-### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
-
-- **Batch:** `admin-console-sitting` — **seven entries, one screen** (2026-09-16, OR-118). Q-316,
-  Q-317, Q-318, Q-544, Q-531, BF-10 and LB-5 all want a look at `/admin` → Devices / `/admin/oura-ble`
-  **in the APK**, where the ring's real state is BLE and the web build reaches none of it. One visit
-  covers the card layouts, the Redecode button in its real home, the two cards' new position, the
-  section order, the sub-day-window rendering and the keyless branch. **OR-115's inventory should be
-  produced from the same visit** — the owner has asked for the surface to be reorganised, and
-  deciding that needs someone to have looked at it.
-
-> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.2).** `components/oura-ble/rekey-declaration-card.tsx` on
-> `/admin/oura-ble` — declare with an optional note, see the pending declaration and when it was
-> made, cancel one made by mistake. Cancel is offered only while `GET` reports something pending; a
-> consumed declaration offers none.
-> [`journal`](overview/history-2026-09-10-folded-2.md#2026-08-24-rekey-declaration-control).
->
-> **It sits OUTSIDE `OuraBleDebug`, as a sibling section on the page, and that is the load-bearing
-> decision.** `OuraBleDebug` returns the native-unavailable banner and renders nothing after it when
-> the plugin is absent — which is exactly the situation the laptop doing the re-key is in. Inside it,
-> the control would have been reachable only from the APK, i.e. only from the device that is not
-> being used at that moment. The declaration needs no ring present.
->
-> **Verified end to end on `pnpm dev`:** declare (row + note persisted), idempotency (a second POST
-> returned `alreadyPending` and the pending count stayed at 1), cancel (back to idle, 0 pending), and
-> a row carrying `consumed_at` offering no cancel. Zero page errors.
->
-> **NOT exercised:** the *effect* — a declaration being consumed by the next ingest batch needs a
-> real ring. That half was already proven by Lane A under Q-314; this item was the affordance.
-- **Keep:** an on-device look at the card's layout in the APK. `Gate: device`.
-
-- **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
-  Lane A's and already shipped (Q-314).
-- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
-- **Lane:** B
-- **Why it matters more than a convenience.** The whole point of Q-314 is that a re-key is
-  **declared** rather than inferred, because inferring it from counter shape re-timed the owner's
-  entire sleep history twice. A declaration nobody can make in the app is a declaration that will be
-  forgotten at exactly the moment it is needed — right after a re-key, on a laptop, mid-`open_oura`.
-- **What exists:** `GET /api/oura-ble/rekey` → `{ pending: { id, declaredAt } | null }`;
-  `POST` (optional `{note}`, idempotent — declaring twice returns the pending one and says so);
-  `DELETE` cancels an un-consumed one. Admin-gated, POST rate-limited 5/min.
-- **Shape:** a control in the BLE admin console. It must say plainly that **nothing happens until the
-  ring next reports** — the effect is deferred because the new ds is not knowable at declaration
-  time, and a button that looks like it acted immediately would invite a second press or a "did it
-  work?" Show `pending` from the `GET` so the waiting state is visible, and offer cancel while it is
-  pending.
-- ⚠️ **Do not offer cancel once it is consumed.** The API refuses, correctly: the epoch it opened
-  already exists and every timestamp derived from it depends on that row as the audit trail.
-- **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
-  idempotency and the 401). This item is the affordance only.
-
 ### [platform] LA-53 — split the two lane-drift cases a script cannot see
 
 > **✅ THE DETECTION SHIPPED 2026-09-01, advisory as this entry required.**
@@ -17978,6 +17737,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
 
+- **📱 Sweep 2: COULD NOT CHECK** — no Pack button rendered; `samples/pack` never answered
+  (DV-13). Do not retry until DV-13 is closed.
+
 - **Batch:** `admin-console-sitting` — **seven entries, one screen** (2026-09-16, OR-118). Q-316,
   Q-317, Q-318, Q-544, Q-531, BF-10 and LB-5 all want a look at `/admin` → Devices / `/admin/oura-ble`
   **in the APK**, where the ring's real state is BLE and the web build reaches none of it. One visit
@@ -18043,6 +17805,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): PARTIAL** — the cards sit above the native console and the DB
+  footprint loads (142 MB / 176,125 rows), but **device metrics stayed on "Loading…"**: that request
+  never answered (DV-13).
 
 - **Batch:** `admin-console-sitting` — **seven entries, one screen** (2026-09-16, OR-118). Q-316,
   Q-317, Q-318, Q-544, Q-531, BF-10 and LB-5 all want a look at `/admin` → Devices / `/admin/oura-ble`
@@ -18238,6 +18004,10 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   natural sitting to do it in — it owes one anyway, and it is the entry this unblocks.
 
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): the on-device read PASSES** — **1,582,493** rows, **0** rolled up,
+  **231.2 MB**, low disk *no*, and both "!" warnings (unbounded; past the 25 MB backup) render. The
+  bound is still owed.
 
 - **Lane:** A — `lib/local-store/**` pruning on the device — storage, so Lane A by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep.)
 
@@ -19703,6 +19473,9 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   anything, and it is a `Reference:` for Q-249 rather than an item of its own.
 
 ### [sleep][devices] Q-274 — fragment "nights" reach the sleep score, and on two dates the fragment is the ONLY record
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** 2026-08-22 renders an 8 h 15 m night; 2026-06-01 renders Sleep **"—"**
+  on the day screen. The convergence and the 0.00 h write path above are untouched.
 
 - **Lane:** A
 > **Fresh evidence, 2026-08-17.** After Q-536's clock repair the sleep table is clean apart from
@@ -21172,6 +20945,10 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [sleep] Q-519 — manual bedtime: both halves shipped; one route field is all that is left
 
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): PASS on the device** — `manual_sleep_start` is present in the local
+  table and the card reads *"Measured against"*. The route gap and the display decision above are
+  still owed.
+
 - **Lane:** A — **and the heading above used to say the UI half was Lane B's, which is why this
   needed classifying at all.** That was true when it was written and stopped being true when the UI
   shipped in #1011. What remains is one line in `app/api/sleep-sessions/route.ts`, and `app/api/**`
@@ -22269,6 +22046,9 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   signal it enters as.
 
 ### [app-shell][readiness] Q-281 — audit every surface that renders a score bare
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): COULD NOT CHECK** — the readiness screen showed no *"Final readiness"*
+  row at all that day (headline *44 Low*). Whether that is correct for the day is itself unverified.
 
 - **Branch:** `feat/score-contributor-presentation`
 - **Plan:** none yet
@@ -24282,37 +24062,6 @@ per-field merge where an AI write has no honest source rank to claim.
   composition, energy in/out, per-session volume, steps, scores, sleep and a day HR trace from
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
-
-### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment (SHIPPED; device check owed)
-
-- **Branch:** `feat/weekly-recap-uplift` → shipped as `feat/q112e-weekly-recap-trends` · **Lane: B**
-- **Keep:** the device check, and only that — **but its surface moved on 2026-09-16 and the
-  instruction below is rewritten to match (BF-5 PR 2b).** The banner no longer expands and
-  `/?review=week` no longer exists: `WeekTrendsSection` renders at the foot of **`/health/week`**,
-  reached from the banner, the weekly notification, or the permanent Health entry. On the S25: open
-  that page and confirm the four trend rows read at 412 dp under the week's own charts, that a week
-  with no reading says so rather than drawing a gap as zero, and that the sparklines line up
-  week-for-week with each other. **The component is unchanged** — only where it is mounted.
-- **The TTL note below has NOT triggered.** BF-5 mounts `WeekTrendsSection` in a second *place*, not
-  a second *call site*: there is still exactly one `useCachedValue` for
-  `weekly-review-month-window:`, inside that component. Promote the constant when a second file
-  reads the key, which has not happened.
-- **✅ SHIPPED 2026-09-12 (v1.451.0)** — `components/week-trends-section.tsx`, rendered inside the
-  expanded banner. Journal: `docs/overview/entries/2026-09-12-q112e-weekly-recap-trends.md`.
-  - The banner's silent-vanish error state shipped 2026-09-08; the trends half was unblocked by
-    LB-64 on 2026-09-09 and is what this closes.
-  - **The maths is the day review's, widened rather than copied.** `trendRowsFor`/`TrendRowCard` now
-    take a window (`points` + `priorAverages`) instead of a `WeekWindowResponse`, so the daily and
-    weekly surfaces share one implementation — a second copy of a formula is a bug by definition
-    here. What varies is passed in: the sparkline domain (`TREND_WEEK_TIME_DOMAIN` `[0,4]` against
-    the daily `[0,7]`), the phrase a delta is measured against, and the absent-reading label.
-  - Reads `GET /api/weekly-review/month-window`, not `/api/weekly-digest` — the digest is a POST
-    that runs an LLM and caches prose, and a chart wants the numbers on a different clock.
-  - **One TTL note for whoever adds the second call site:** it uses the shared `TTL_MEDIUM` tier
-    rather than a named key constant, because a named one belongs in
-    `packages/shared/src/cache-ttl.ts` beside its siblings and that file is **Lane A's**. Worth
-    promoting the day a second site reads `weekly-review-month-window:`.
-- **Needs:** nothing.
 
 ### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 
@@ -27005,6 +26754,9 @@ is still what the control defaults to, the picked length is what the plan is tri
 what the warm-up countdown shows, and dragging the control does not fire a prescription per step.
 
 ### [app-shell][platform] 🔵 BF-5 — the week in review is a page (both PRs shipped; the device look is what is left)
+
+- **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the page half PASSES (no trailing `*`). The banner half **could
+  not be checked** — no banner was showing on Home that day.
 
 - **Lane:** B — **reclassified 2026-09-15 when the engine half shipped.** It was A while the route
   was the blocker (*touches storage or `app/api/**` → A; both halves → A, engine first*). The route
