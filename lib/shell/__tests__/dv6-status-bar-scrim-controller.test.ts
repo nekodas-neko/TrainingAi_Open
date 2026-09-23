@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { describe, expect, it, afterEach, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createScrimController } from '../status-bar-scrim-controller'
@@ -8,13 +8,19 @@ import { createScrimController } from '../status-bar-scrim-controller'
  * DV-6. On the phone a missing scrim and a mis-scoped one look identical — nothing there — so the
  * device check cannot isolate any of this. Every case that can silently be wrong is driven here.
  */
-let paint: ReturnType<typeof vi.fn>
 let shown: boolean
+/** Counts the PAINTS, not the events — this runs on every scroll frame, so the difference matters. */
+let paints: number
+
+// Detached in afterEach. Without that every case's controller stays on `document` and keeps
+// painting — which a per-test `vi.fn` hides, because each assertion then reads only its own spy.
+// The shared counter is what surfaced it: six controllers, six paints, one expected.
+let attached: Array<(e: Event) => void> = []
 
 function controller() {
-  paint = vi.fn((v: boolean) => { shown = v })
-  const c = createScrimController(paint)
+  const c = createScrimController(v => { shown = v; paints += 1 })
   document.addEventListener('scroll', c.onScroll, true)
+  attached.push(c.onScroll)
   return c
 }
 
@@ -34,7 +40,11 @@ const scrollTo = (el: Element, top: number) => {
   el.dispatchEvent(new Event('scroll', { bubbles: false }))
 }
 
-beforeEach(() => { document.body.innerHTML = ''; shown = false })
+beforeEach(() => { document.body.innerHTML = ''; shown = false; paints = 0 })
+afterEach(() => {
+  for (const h of attached) document.removeEventListener('scroll', h, true)
+  attached = []
+})
 
 describe('DV-6 — when the status-bar scrim shows', () => {
   it('shows nothing until something scrolls', () => {
@@ -77,7 +87,7 @@ describe('DV-6 — when the status-bar scrim shows', () => {
     scrollTo(scroller, 100)
     scrollTo(scroller, 200)
     scrollTo(scroller, 300)
-    expect(paint).toHaveBeenCalledTimes(1)
+    expect(paints).toBe(1)
   })
 
   it('reappears on a flip back to a tab left scrolled down, with no scroll event', () => {
@@ -100,8 +110,7 @@ describe('DV-6 — when the status-bar scrim shows', () => {
   })
 
   it('forgets a scroller whose screen was torn down', () => {
-    const c = createScrimController(v => { shown = v })
-    document.addEventListener('scroll', c.onScroll, true)
+    const c = controller()
     const { p, scroller } = panel(true)
     scrollTo(scroller, 300)
     expect(shown).toBe(true)

@@ -92,3 +92,25 @@ adds under `docs/overview/` is its own journal entry.
 **The reusable part is the resolution, not the sweep.** Two sessions folding on the same day write
 the same `history-<date>-folded-N.md`, and `git` surfaces it as add/add rather than as anything
 resembling "you both did the chore". Take one side whole and re-run the script; never splice.
+
+## Two things the first CI run caught that the local gate did not
+
+**`npx tsc --noEmit` does not typecheck test files.** The Build job runs
+`scripts/check-test-typecheck.js` against `tsconfig.tests.json`, a separate project with its own
+per-file baseline (320 errors across 90 files, recorded). A clean `tsc --noEmit` says nothing about
+a spec, and this PR went red on one line in its own new test —
+`let paint: ReturnType<typeof vi.fn>` erases the signature, so passing it where a
+`(shown: boolean) => void` is wanted does not typecheck. **The local command is
+`node scripts/check-test-typecheck.js`**, and it belongs in the gate beside `check:rules`.
+
+**Fixing that surfaced a defect the mock had been hiding.** Replacing `vi.fn` with a plain counter
+turned "paints only on a change" from green to `expected 6 to be 1`: every case's controller was
+still attached to `document`, because nothing detached it, so six controllers painted on one
+scroll. A per-test spy hides this by construction — each assertion reads only its own mock — and
+the shared counter is what made it visible. The listeners are detached in `afterEach` now.
+
+Worth stating plainly: the earlier "12 passed" was partly luck. The leaked controllers all saw the
+same DOM and computed the same answer, so `shown` agreed and every other assertion held. The four
+control runs were re-done against the fixed harness for that reason — neutering `reevaluate`,
+zeroing the threshold, removing the active-panel scoping, and dropping the component's capture flag
+each fail their own test and restore green.
