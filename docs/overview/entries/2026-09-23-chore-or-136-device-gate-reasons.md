@@ -83,13 +83,88 @@ orphan is not evidence of one** — the rule says file what is unfiled, not file
 Scanning for the shape OR-136 caught live — the block glyph followed by *block* within forty
 characters — returns **5 entries**: `RV-99`, `Q-538`, `Q-1b`, `Q-34`, `PS-7`.
 
-They are **not one class**, which is why this stops at the scan. `RV-99`'s two are decorative
-emphasis on corrections. `Q-538`'s is a real block *by something outside the queue*, so it cannot
-become a dependency field. `Q-34`'s two are real blocks on device checks, which the new lane rule
-now has somewhere to send. `PS-7`'s mark deferred and sub-phase work. And `Q-1b` carries a **meta**
-mention — an entry describing the glyph being mis-parsed, which the parser then mis-parses.
+They are **not one class**, which is why the first pass stopped at the scan.
 
-Each needs its own read and a different remedy. Recorded here so the scan is not re-run.
+**⚠ That scan was wrong in two places, and re-running it before acting is what caught it.** It named
+five entries; the regex actually matches **seven locations, five of them queue entries**, and the
+membership differs. `PS-7` is **not** among them — the fifth is the `▶ Oura on-device models
+program`, whose *"activity detection (P3) ⛔ blocked — needs daytime raw motion"* is a genuine
+block. Two further hits are in the `## Protocol` and `## Queue` prose, where the marker is being
+**documented** rather than used, and must stay.
+
+**More importantly, the remedy count was wrong.** Only **one** of the five was actually parked *by
+the marker*: `Q-538`, `Q-1b` and `Q-34` each already carry a real `Gate:`/`Needs:`, so the tool
+never reported their glyph at all, and their prose is honest — `Q-538` and `Q-34` genuinely are
+blocked, and `Q-1b` is parked twice over (`Gate: owner`, plus a genuine marker further down; its
+meta mention is an accurate description, not a defect). **None of those three needed an edit.**
+
+The earlier reading came from `grep -B2`, which showed a `Gate: device` belonging to the *preceding*
+entry as though it were `RV-99`'s. Reading one entry's own output settled it.
+
+## TN-59, built
+
+`RV-99` was **a false park**: its only reason was *"⛔ The blocking hazard was NOT the one the entry
+named"* — a **correction** recording that the hazard the entry had originally named was the wrong
+one, which is the opposite of a reason not to build it. No `Gate:`, no `Needs:`. It had been
+startable the whole time, sitting in Lane B's PARKED list. Reworded to *"The real hazard"*; Lane B's
+READY went **23 → 24**.
+
+One entry is not worth a check on its own. What is, is that the shape regenerates: line 23892 of the
+backlog already predicted *"[the entry drops] under UNMIGRATED MARKER the moment its gate came
+off"* — which is exactly what `Q-538`, `Q-1b` and `Q-34` will do, since each is held today only by a
+gate that will one day clear. So the check earns its place on the three entries that are **currently
+passing**, not on the one that failed.
+
+- **`scripts/lib/backlog-entries.js`** — the queue parser, extracted from `next-item.js`. The tool's
+  own comments make this argument: `lane.js`, `keep.js`, `reference.js` and `queue-buckets.js` were
+  each pulled out to be testable, and the same file records the lane rule being briefly
+  re-implemented inline and drifting within a day. A second copy of the `⛔ block…` regex would fail
+  more quietly still — an entry parked in one reader and ready in the other.
+- **`scripts/check-prose-parked-entries.js`** — fails on an entry parked by the prose marker with no
+  `Gate:` and no unmet `Needs:`. **Baselined at zero**, the strongest baseline a shrink-only check
+  can have. It reports the *shape* and refuses to guess which kind of marker it is reading — TN-59's
+  own load-bearing caution, and the reason the bare-glyph rule was retired at a 75% false-positive
+  rate. Wired into Custom Rules: **Ran 77 of 77**.
+- **8 tests**, against synthetic queues, because the real backlog is at zero and therefore cannot
+  exercise a single judgement the check makes. The offender rule lives in the lib and is *imported*
+  by both the check and its tests — the first draft restated it in the test, which is the drift the
+  extraction existed to prevent.
+- Verified by reverting `RV-99`'s wording and watching the check fail with that entry named, then
+  restoring it. A check never observed failing is not a check.
+
+## The goals-route flake — occurrence six, and the first hard evidence
+
+`strict-schema-inert.test.ts` failed again mid-gate, reporting
+*"`app/api/user/goals/route.ts` has 1 non-strict request schema(s) and is not in the baseline"*. Run
+directly, seconds later, the same check printed **OK — 38 non-strict across 24 files (baseline
+held)**.
+
+**Why five occurrences produced nothing.** `execFileSync` returns stdout on success, but on a
+non-zero exit it throws an error carrying only the command and stderr — `err.stdout` is a separate
+property, and the test printed the error. The base-ref helpers warn on **stdout** by design, so if a
+warning had fired it would have been discarded. *"No warning fired"* was used as evidence in three
+of the five diagnoses, against a stream nothing was reading. This is the second time in two days
+that this property of `execFileSync` has produced a false finding.
+
+`run()` now re-throws with **both** streams labelled. It fired on this run — and the result
+**refuted the hypothesis it was added to confirm**:
+
+> **stdout was empty.** No base-ref warning at all.
+
+That eliminates the leading theory. `resolveBaseRef()` returning null warns; `fileAtBase` exhausting
+its retries on an unreadable read warns. Neither happened, so the base ref resolved and was read
+cleanly. What reached `verdict()` was therefore either **the file reported absent at base** or **a
+base count of 0** — and `verdict()` collapses absent, zero and a real number into one word, which is
+precisely why six occurrences could not be told apart.
+
+So the check now **reports what it saw**: `(base origin/main: 2 non-strict)` or `(base …: file
+absent)` on every failure. Measured immediately after, on a quiet tree: base ref `origin/main`,
+file present at 3,870 bytes, byte-identical to the working copy, check green.
+
+**Still undiagnosed, and the trigger is still unconfirmed.** What changed is that occurrence seven
+cannot be ambiguous: it will name the base ref and the count that produced the verdict. Two
+hypotheses remain open and the evidence does not yet separate them — a concurrent `git fetch` from
+another agent moving `origin/main` mid-run, or a genuine transient path-absent from `git show`.
 
 ## Not done
 
@@ -102,4 +177,5 @@ Each needs its own read and a different remedy. Recorded here so the scan is not
 
 ## Gate
 
-`pnpm ci:local` — exit 0, **Ran 76 of 76** Custom Rules steps. Full log kept, not tailed.
+`pnpm ci:local` — exit 0, **Ran 77 of 77** Custom Rules steps (76 before this branch added
+`check-prose-parked-entries`). Full log kept, not tailed.
