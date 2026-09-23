@@ -107,7 +107,7 @@ that both end at `atBase === null`. The goals flake remains undiagnosed; what th
 that one of the two paths into that state is now closed, so the next occurrence has one fewer
 explanation to rule out.
 
-## `main` was RED, and this PR fixes it — crossing the lane line on purpose
+## `main` was RED — found here, fixed in #1472, crossing the lane line on purpose
 
 Re-merging `main` turned this branch's gate red in
 `app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6. **It is not this diff**:
@@ -142,8 +142,20 @@ It is Lane A's path and this crosses the rule deliberately, so the reasoning is 
 - **The collision risk is the real cost** and it is not zero: Lane A may fix the same file in
   `#1467`. If both land, it is one test file to reconcile and the two fixes would be near-identical.
 
-Filed as `OR-138` at the top of Lane A's queue first, then removed from the queue when this PR fixed
-it — a finished entry must not sit in the queue.
+**It did NOT ship in this PR, and the first draft of this entry said it did.** The fix sat here
+through **five** successive lost merge races: this branch edits the shared doc-size baseline, `main`
+takes a commit every few minutes, and CI runs about seven — so it conflicted faster than it could go
+green, twice being refused at the merge call after all six checks had passed. It was cut onto a
+one-file branch with no shared-line edits and merged as **#1472** (`9a2fe4dfa8`). This branch then
+re-merged `main` and the file dropped out of its diff entirely.
+
+**The lesson is about bundling, not about the race.** Folding work into one branch was right earlier
+in the session, when CI cycles were the scarce resource. It became wrong the moment the branch
+carried something that blocked other people: **an urgent fix must have no conflict surface.** A PR
+that edits a shared baseline cannot land quickly, by construction.
+
+Filed as `OR-138` at the top of Lane A's queue first, then removed from the queue once the fix was
+in flight — a finished entry must not sit in the queue.
 
 **Worth checking next:** whether the other specs touching `getNextSession` seed a program the same
 way. Not done here.
