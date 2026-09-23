@@ -519,6 +519,13 @@ below threshold and left in place for next time.
 
 ### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
 
+- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** `perf.js coldstart` (force-stop + launch, read after): **first contentful paint
+  1020 ms**, DOM ready 1137 ms, load 1638 ms, the document served from the service worker (0 KB
+  transferred). First visit per tab after it — content / settled: Home 61 / 726 ms · Health 62 / 62 ·
+  **Workout 103 / 1428** (5 `/api` calls) · Nutrition 80 / 80 · More 64 / 760. One tab bar after the cold
+  start (sitting 2's two-link crash did not recur). **"Content"** = no visible loading block ≥ 16 px and
+  real text; **"settled"** = content and no `/api` in flight for 400 ms — both defined in `perf.js`.
+
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
   deliverable, and the phone answers it objectively. That is the owner's line for this lane —
@@ -541,6 +548,17 @@ below threshold and left in place for next time.
   more than either.
 
 ### [app-shell][workouts] RV-138 — DEVICE PROBE: is Q-51's 1086 ms first mount a rule or a one-off?
+
+- **📱 MEASURED — the 1086 ms outlier did NOT recur in 90 visits.** S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23. `perf.js cycles --n 10`,
+  every duration, never a mean (content ms): **Home** 60 78 98 88 70 91 88 127 83 91 · **Health** 66 62 164
+  92 87 79 98 60 94 91 · **Workout** 102 77 78 54 79 90 67 64 68 92 · **Nutrition** 73 79 77 112 91 78 62 63 59 77
+  · **More** 78 77 78 144 79 81 64 84 66 84 · **/cardio** 114 117 90 77 65 95 68 81 90 80 · **/health/readiness**
+  77 70 75 76 88 94 94 86 85 81 · **/program** 95 99 101 110 120 123 111 101 100 111 · **/more/details** 123 81
+  112 93 56 68 120 121 105 112. **Every first visit is within 1.3× its route's median**, the checklist's bar
+  was 2×. Settled, pushed routes: /program 95–665 ms, /more/details 365–744 ms. **By this entry's own
+  rule, Q-51 should be re-placed rather than built.** Caveat: warm visits in one session after a cold
+  start; the 1086 ms reading may belong to a colder state (a fresh deploy, an evicted cache) this run
+  did not reproduce.
 
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
@@ -566,6 +584,14 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-139 — DEVICE PROBE: the per-screen network waterfall, and how much of it is serial
 
+- **📱 MEASURED (partial), S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** From the visits whose data survived (the first 70 cycles were lost to
+  a harness crash, since fixed): **Home fetches `/api/workout-data` twice in one visit**, and it
+  starts right after another request answers (chain depth 2); **Health's `/api/user/goals` also
+  chains** (depth 2); every other screen is depth 1 with no duplicates. Byte counts read near zero —
+  responses come through the service worker, whose bytes CDP does not count — so the KB half is
+  **COULD NOT CHECK** with this method. "Chained" = started within 60 ms of another response:
+  a heuristic, not proof of causation.
+
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
   deliverable, and the phone answers it objectively. That is the owner's line for this lane —
@@ -586,6 +612,13 @@ below threshold and left in place for next time.
 
 ### [app-shell][platform] RV-140 — DEVICE PROBE: main-thread long tasks, and whether animations still dominate
 
+- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** `perf.js longtasks` (long tasks + long-animation-frame attribution):
+  **every tab switch produces one long task of 68–118 ms**, attributed to `#document.onclick` — React's
+  delegated click handler, i.e. the switch's own synchronous work (tab → / 78 ms, → /health 108,
+  → /workout 93, → /nutrition 68, → /more 79; reverse direction 76–118). **Scrolling Home and Health:
+  zero long tasks.** The old **`animationiteration` finding did not reappear** — it is absent from the
+  top scripts entirely. So on this build the main-thread cost is the tap, not the animations.
+
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
   deliverable, and the phone answers it objectively. That is the owner's line for this lane —
@@ -603,6 +636,12 @@ below threshold and left in place for next time.
   full-screen tree alive"*, which is a main-thread cost the entry can only assert.
 
 ### [app-shell] RV-141 — DEVICE PROBE: path structure — depth, redirects, and navigations that cost a shell teardown
+
+- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Back stack: More → Sessions (`/program`) → back → `/more` → back → `/`,
+  **2 presses**, no stray stop. **RV-110's fix holds on the device:** Home's day-timeline row
+  "Woke up" moves to `/health` in the **same document** (same `timeOrigin`, a JS marker planted in the
+  shell survived, Health tab active). **RV-112's fix holds:** Home kept 600 px and More 300 px across a
+  switch. BF-49's path is recorded on BF-49.
 
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
@@ -623,6 +662,20 @@ below threshold and left in place for next time.
   correctness.**
 
 ### [platform][app-shell] RV-142 — DEVICE PROBE: does a long session get slower, and is that what BF-22 was feeling?
+
+- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Time-to-content per tab (`perf.js tti`) at three points:
+  | tab | after cold start | after a ~2 h walk | after 30 min idle |
+  |---|---|---|---|
+  | Home | 61 ms | 177 ms | 208 ms |
+  | Health | 62 | 172 | 134 |
+  | Workout | 103 | 434 | 170 |
+  | Nutrition | 80 | 417 | 449 |
+  | More | 64 | 126 | 134 |
+  Over the same span heap went 23 → 36–45 → 40 MB and listeners 608 → 1,818–4,022 → ~2,230. **The
+  app is 2–5× slower to paint a tab late in the session, and 30 idle minutes do not bring it back** —
+  consistent with BF-22's *"a lot better after a force restart"*. Caveat: the "session" was two hours
+  of scripted testing (90 measured visits, several writes, offline switching), heavier than a normal
+  day; the direction is the finding, not the exact multiple.
 
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
@@ -842,6 +895,13 @@ below threshold and left in place for next time.
 
 ### [platform][nutrition] RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
 
+- **📱 Sweep 1 addition, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** The **"Offline — showing saved data"** banner **does** appear (on a
+  write while offline) — the sitting-1 "no banner" reading was from a tab walk with no write. But
+  **queued offline writes did not push on reconnect**: a supplement delete sat `pending`, `attempts: 0`,
+  for 40 s, through a tab switch and a pull-to-sync swipe, and drained only on the **next write**.
+  Under CDP emulation only — a real reconnect fires Capacitor's network event, which emulation does
+  not — so this needs real airplane mode before it is a finding.
+
 - **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
   and its result is recorded above, so the device is no longer what it needs. What it needs now
   is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
@@ -887,6 +947,11 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
 
+- **📱 The idle half, measured in sweep 1 (S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23).** `census.js --idle-min 30 --no-reload` after the long
+  walk: heap **42.5 → 39.5 MB**, listeners **2,270 → 2,237**, DOM nodes flat at 5,564 across 30
+  untouched minutes. **Nothing accumulates while idle.** The growth is in use (608 listeners after a
+  cold start → ~2,200 after two hours), and RV-142 shows it costs paint time.
+
 - **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
   and its result is recorded above, so the device is no longer what it needs. What it needs now
   is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
@@ -907,41 +972,14 @@ below threshold and left in place for next time.
 - The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
   the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
 
-### [sleep][app-shell] DV-4 — Home's Sleep card prints the Deep hours in the Deep stage colour, which is about 1:1 against the card
-
-- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend).
-- **Added:** 2026-09-23 · Device Verification, found during the P4 sweep (RV-127).
-- **Verify: device**
-- **Shipped 2026-09-23** (`fix/dv4-sleep-legend-contrast`, v1.465.10). The legend's hours now
-  inherit the foreground; the stage colour stays on the dot and the stacked bar.
-- **❌ The measurement that produced it, on the S25.** Web v1.465.4 / APK 1.460.4, dark theme.
-  The legend's value spans were coloured with `STAGE_COLOR.<stage>`
-  (`packages/shared/src/health/hypnogram.ts`): Deep's **"0.5h" computes to `rgb(30, 58, 112)`**.
-  The page root behind the card is `oklch(0.145 0.02 215)` (≈ `rgb(9,22,26)`), giving
-  **≈1.6:1**; against the card's purple paint in the screenshot it is **≈1:1** — the number was
-  effectively invisible. REM, Light and Awake passed only because their stage colours happen to be
-  light. CLAUDE.md's floor is 4.5:1 for body text.
-- **Why a palette fix would not have held:** the card's background is **owner-customisable**
-  (`ColorSwatchPicker`, `cardColors.sleepWidget`), so no stage colour is safe as text on every card
-  colour. Stage colours are fills.
-- **The sibling sweep answered the entry's own open question, and it inverted the fix.** DV-4 noted
-  `hypnogram.tsx` "was not read". All four `STAGE_COLOR` consumers were read: `hypnogram.tsx`
-  (SVG `fill` + a legend dot), `sleep-phase-trend-card.tsx` (Chart.js `backgroundColor`) and
-  `health-metric-sheet.tsx` are clean — and the last one renders the **identical** legend with a
-  coloured dot and the hours in the inherited foreground. So the target shape already existed in
-  the repo and Home was the only offender; nothing else needed changing.
-- **Pinned by `components/home/__tests__/dv4-stage-colour-is-never-text.test.ts`**, which sweeps
-  every `STAGE_COLOR` consumer for the palette reaching a CSS `color` inside a `style` object — the
-  durable rule rather than the one span. It also asserts the dot and bar are still coloured, so the
-  check cannot be satisfied by deleting the palette, and it pins the contrast ratio. Control run:
-  with the colour put back it fails naming `home-card-widget.tsx:166`. A first draft flagged the
-  two legitimate `{ label, color: STAGE_COLOR.deep }` **data** fields; the check is scoped to
-  `style=` lines for that reason.
-- **Keep:** the device look — on the S25, every legend value on the Sleep card reads ≥ 4.5:1
-  against the card, in dark and light, with the default card colour and one custom colour. The
-  sandbox can compute the ratio (and does, in the test) but cannot see the card.
-
 ### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
+
+- **⚠ CORRECTED by sweep 1 — two claims above were my misreading.** The set's session **is** in local
+  `workout_sessions` (`a1847680…`, started 2026-09-19T22:06:01.141Z, completed, synced); the
+  sitting-1 query that "found nothing" had failed silently. And `0a2afbf9…` is **not** a server
+  workout id: `/api/workout-sessions/day` returns the **program** session ("Upper") as `sessionId`.
+  **What remains true:** the set is still `pending` locally, and the server has it — the same
+  bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
 
 - **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
   SQLite file.
@@ -1157,6 +1195,29 @@ below threshold and left in place for next time.
   screen's consistency figure must NOT change. That is the one assertion the sandbox cannot make:
   it needs two clocks that disagree.
 
+### [nutrition][platform] DV-10 — a deleted supplement is never tombstoned on the device
+
+- **Lane:** A — `lib/local-store/**` (the supplements delete path) and the pull mapping.
+- **Added:** 2026-09-23 · Device Verification, sweep 1 (RV-45's run).
+- **Measured on the S25:** deleting a supplement — online (`DV test supplement B`) and offline (`C`) —
+  showed "Supplement deleted", removed it from the server and from both lists, but **the local
+  `supplements` row kept `deleted_at: null`** (B `synced`, C `pending` until drained). An injury
+  deleted the same way **is** tombstoned (`deleted: 1`). So the lists filter supplements some other
+  way, and the local store holds rows it believes are live.
+- **Why it matters:** CLAUDE.md's offline rule is that a delete must leave a tombstone the delta can
+  carry; a row that is live locally and gone on the server is the "deleted item comes back" shape
+  (BF-47) waiting for a read path that does not filter it.
+- **Pass test:** delete a supplement on the S25; `SELECT deleted_at FROM supplements WHERE id=…` is set.
+
+### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
+
+- **Lane:** B — `components/nutrition/manage-supplements-sheet.tsx`.
+- **Added:** 2026-09-23 · Device Verification, sweep 1.
+- **Measured on the S25:** each supplement row's `role="switch"` button has **no `aria-label`** and no
+  labelled-by — a screen reader announces "switch, on" with no name. Give it the supplement's name.
+- **Pass test:** every switch in the sheet has an accessible name.
+
+
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
 - **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
@@ -1180,9 +1241,17 @@ below threshold and left in place for next time.
 
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
+- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23** (weigh-in approved by the owner; logged today's own 69.4 kg so the value did not
+  change). **A weigh-in clears 3 of the 202 cached keys: `body-battery`, `muscle-recovery`,
+  `progress-summary`.** It then refetches `body-metadata`, `sleep-sessions`, `readiness-score` and
+  `body-battery/stress-day`. The Body Weight card showed 69.4 kg after. The local row kept body fat,
+  resting HR and HRV — `upsertBodyMetric` read-merges (`sqlite-backend.ts:1084`), so CLAUDE.md's "copy
+  water-log-sheet's pattern, not metric-log-sheet's" warning is out of date for this path. Now
+  buildable: compare those 3 keys against every surface that shows a weight.
+
 - **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
   Review sweep 53.
-- **Gate: device** — the broken branch is the local-store one, which does not run off the APK.
+- **Gate lifted — measured on the S25 in sweep 1 (see the first bullet).**
 - The sheet contains **no `invalidate*` call at all**. Its local-store branch ends at `onSaved(...)`
   with a bare `pushMutations(userId!)`. The consumer branches — `if (freshMeta) { setMetaToday(...);
   invalidateReadinessInputs() } else { invalidateBodyMetricWrite() }` — so on device only the
@@ -2829,6 +2898,11 @@ why the count of affected entries always understated the harm.
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
 ### [body][nutrition] BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
 
+- **📱 Evidence from the S25, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23** (not a verdict — the entry is open work). Fish Oil, not taken
+  today: **tick** → a log row with `taken_at` 07:39:28 · **untick** → that row tombstoned · **re-tick** →
+  a **new row with `taken_at: null`**, still null 2.5 s later and `synced` · final untick restored it.
+  So on the device a re-ticked dose has no taken time at all, not a rewritten one.
+
 - **Batch:** `supplement-dose-surface` — ships with **BF-186**. Both are Lane B edits in the
   supplements area and both are settled by one device pass: open the section, toggle a dose, reach
   Manage. Batched on the verification, per this file's rule. No migration in either.
@@ -3393,6 +3467,9 @@ why the count of affected entries always understated the harm.
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
+- **Still reproduces on web v1.465.10 (sweep 1):** card stayed at "867 kcal left" for 5 s while the
+  post-push response carried 856 — the same one-shot refetch before the push.
+
 - **❌ FAILED ON THE S25, 2026-09-23 — this is open work again, not verification debt.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23.
   Log *Cocoa powder, 5 g, 11 kcal* to Lunch from the Nutrition tab: the diary row appears, the ring
   moves, and **"857 kcal left" does not change — sampled every second for 6 s, and still 857 a
@@ -3862,6 +3939,10 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 
 
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
+
+- **📱 COULD NOT CHECK in sweep 1.** The check-in sheet opens only from Home's check-in card, which
+  disappears once today's check-in is logged, and the other entry point is a Home widget not on the
+  owner's layout. **Run it on a morning before the owner checks in.**
 
 - **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`, #1274).
   [Journal](overview/history-2026-09-21-folded-1.md#2026-09-17-fix-lb116-checkin-sends-suggested-sore), which carries the
@@ -4772,42 +4853,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ---
 
-### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
-
-- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
-  a navigation issued while a surface closes is eaten by that surface's own history entry.
-- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
-  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
-- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
-- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
-  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
-  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
-  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
-  the session just abandoned. `history` instrumented in the page:
-  ```
-  3229ms pushState()                              ← the dialog opens and pushes its surface entry
-  5055ms back()                                   ← ONE back for the Leave tap
-  5073ms replaceState(/workout?session=…)
-  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
-  ```
-  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
-  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
-  spent on the dialog's own entry. Reproduced twice.
-- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
-  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
-- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
-  verified. This is the prompt's *Leave* button, which BF-166 never touched.
-- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
-  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
-  device). The surface has to be told the close was superseded by a navigation.
-- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
-  `/workout?session=…` for wherever back would have gone before the workout, and one more back
-  does not return to the abandoned session.
-- **Production data:** nothing was written. The only non-GET the page sent was the
-  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
-  for 2026-09-23 returned `sessions: []` afterwards.
-
-
 ## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 
 **BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
@@ -4976,6 +5021,41 @@ helper the call site calls.
 - **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
   (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
 
+
+### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
+
+- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
+  a navigation issued while a surface closes is eaten by that surface's own history entry.
+- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
+  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
+- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
+- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
+  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
+  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
+  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
+  the session just abandoned. `history` instrumented in the page:
+  ```
+  3229ms pushState()                              ← the dialog opens and pushes its surface entry
+  5055ms back()                                   ← ONE back for the Leave tap
+  5073ms replaceState(/workout?session=…)
+  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
+  ```
+  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
+  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
+  spent on the dialog's own entry. Reproduced twice.
+- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
+  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
+- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
+  verified. This is the prompt's *Leave* button, which BF-166 never touched.
+- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
+  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
+  device). The surface has to be told the close was superseded by a navigation.
+- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
+  `/workout?session=…` for wherever back would have gone before the workout, and one more back
+  does not return to the abandoned session.
+- **Production data:** nothing was written. The only non-GET the page sent was the
+  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
+  for 2026-09-23 returned `sessions: []` afterwards.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
@@ -9256,83 +9336,6 @@ this is a future gap rather than a dead one.
 a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
 instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
-### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
-
-> **✅ SWEPT 2026-09-05.** All seven now answer **404** when a delete matched no row, matching the
-> Q-556 reference on `activity-logs`. Seven repository methods went from `Promise<void>` to
-> `Promise<boolean>` via `.returning()` — **the predicates are untouched**, so this reports on the
-> match rather than changing which rows match.
->
-> **The two throwing pre-checks are deliberately unaffected:** `MealTypeHasLogsError` still answers
-> 409 and `deleteActivityType`'s in-use guard still throws. *"This has entries"* is not *"this does
-> not exist"*.
->
-> **A test pinned the old behaviour and it did its job.** `not-found-status.test.ts` required 200
-> with the comment *"pinned so it does not get 'fixed' later"* — that is the 2026-08-18 decision this
-> entry reverses. It is reversed **with the cause written into the test**, not quietly flipped: the
-> idempotence argument holds for the owner re-deleting their own row and fails across accounts, where
-> the row is present and correctly so. `delete-404-parity.test.ts` now holds all seven together,
-> mutation-verified — reverting two routes fails exactly those two by name.
-- **Keep:** the device check, and it is the half this sweep could not reach. These deletes now make a
-  previously-silent no-op **loud**: `manage-supplements-sheet.tsx` and `injury-sheet.tsx` do
-  `if (!res.ok) throw`, so a 404 becomes an error toast where the user used to get a false success.
-  That is the point — but on device those two surfaces write locally first and take the API as a
-  **fallback**, which is a path the web build never exercises. **What closes it:** delete a
-  supplement and an injury on the APK, online and then offline, and confirm no error toast appears
-  for a delete that genuinely worked locally. The queued-but-unpushed race the 404 could otherwise
-  expose is reconciled by the push arm (Q-328) and every affected domain is in
-  `SYNCED_MUTATION_DOMAINS` — established, not assumed, but not observed on hardware either.
-- **Verify:** device
-- **Lane:** A — `app/api/**` delete handlers and the repository methods behind them.
-- **Added:** 2026-09-05, Review sweep 47 —
-  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
-
-`app/api/activity-logs/route.ts:70` answers `404` when a delete matches no row, and the comment
-above it says the change was made to *"Match every sibling delete: 404 for both a nonexistent id and
-someone else's."* **Six siblings answer `200` to both.** The direction is backwards: it is the only
-one of seven that does this, not the one catching up.
-
-Probed live, each beside a malformed-id control returning `400 Invalid id` — so the route matched,
-the handler ran and its guard fired:
-
-| Route | nonexistent id |
-|---|---|
-| `supplements/[id]` | `200 {"ok":true}` |
-| `supplements/[id]/log` | `200 {"ok":true}` |
-| `injuries/[id]` | `200 {"ok":true}` |
-| `nutrition/food-logs/[id]` | `200 {"success":true}` |
-| `nutrition/saved-meals/[id]` | `200 {"success":true}` |
-| `nutrition/meal-types/[id]` | `200 {"success":true}` |
-| `admin/activity-types` (`?id=`) | `200 {"ok":true}` |
-| `activity-logs` (Q-556) | `404` |
-| `nutrition/meal-plans/[id]`, `phase-sets/[id]` | `404` |
-
-**The "someone else's" half, measured.** A second account deleted the first's supplement and got
-`200 {"ok":true}`; the row was still in Postgres afterwards with its owner unchanged. Ownership is
-enforced — the *answer* is what is wrong. A correct refusal is reported as a success, so nothing
-distinguishes it and nothing reaches `error_events`.
-
-**Do not read this as reversing the 2026-08-18 decision without cause.** That review
-([§2](reviews/2026-08-18-write-surface-not-found.md)) deliberately declined to file these routes,
-arguing DELETE is idempotent and *"the desired end state (row absent) genuinely holds"*. That is
-correct for the owner deleting their own already-deleted row. It is false in the cross-account case,
-where the row is present and correctly so — the premise fails, and Q-556 subsequently reached the
-opposite conclusion and shipped it.
-
-**Nothing blocks aligning the rest.** Q-556's comment names the precondition that made a 404 unsafe
-before it — a row queued via `queueMutation` but not yet pushed, reconciled by the push arm since
-Q-328. That holds identically for the siblings: `supplements`, `supplement_logs`, `injuries`,
-`food_logs` and `saved_meals` are all in `SYNCED_MUTATION_DOMAINS`, as `activity_logs` is.
-`meal_types` and `admin/activity-types` have no outbox path, so no race exists there at all.
-
-**Why it is not cosmetic.** `manage-supplements-sheet.tsx:166` and `injury-sheet.tsx:179` both do
-`if (!res.ok) throw new Error()`, then drop the row and toast "deleted". A delete that removed
-nothing confirms itself to the user, and the row returns on the next pull.
-
-**Not established:** measured on the web build, where the offline-first clients take their API
-fallback. On device, supplements and injuries write locally and return before the fetch, so for
-those two surfaces this is the fallback path, not the primary.
-
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
 - **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
@@ -12913,6 +12916,11 @@ produces a label **only its author can scan** — which is the exact complaint B
 
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
+- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Home → the timeline's "Woke up" row → `/health` **with the Sleep Detail sheet
+  open** → back #1 closes the sheet (still `/health`) → back #2 → **`/`, where it started.** The one
+  residue: after the sheet closes the URL still carries `?openSleepDate=2026-09-23`, so a reload or
+  resume on that URL may reopen the sheet — not observed.
+
 - **Lane:** B
 - **Added:** 2026-08-30 · owner, device pass A2: *"tapping workout; then back -> leads to heath
   training not home. Same with tapping a food item from timeline -> takes to nutrtion -> then health
@@ -13860,6 +13868,9 @@ whether or not anyone draws them first.
   fallback if no device is available.
 
 ### [nutrition][devices] LA-36 — `food_items.image_data_uri` is written to the device and read back by nothing
+
+- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23:** 1 of 339 local `food_items` carries an `image_data_uri` (4.5 KB). The
+  column is real and unread, but the cost on this device is negligible.
 
 - **Lane:** A (the engine) — the miss is in the local-store read mappers; the visible half is Lane B.
 - **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38
@@ -16323,6 +16334,13 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 
 ### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **📱 Evidence from sweep 1 (RV-142 + RV-133).** Tab time-to-content rose from 61–103 ms after a cold
+  start to 126–434 ms after ~2 h of use, and stayed there (134–449 ms) after 30 idle minutes; listeners
+  608 → ~2,200 over the same span, flat while idle. So the slowdown is real on the device, builds with
+  use rather than time, and survives idling — what the owner describes. Still unattributed: which
+  component's listeners grow. Next measurement: the listener count per tab visit, to find the one
+  that never lets go.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
@@ -24617,6 +24635,10 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [app-shell] 🔴 Q-51 — the perf work is not aimed at the screen the owner actually uses
 
+- **📱 RV-138 has run (sweep 1): 90 warm visits, no outlier — every first visit within 1.3× its
+  median, slowest 164 ms.** The 1086 ms reading did not recur. Per this entry's own rule, re-place it
+  rather than build the refactor; the numbers are on RV-138.
+
 > **⚑ THE PREMISE SOFTENED, 2026-09-14 — the owner no longer reports this as pain.** On the S25
 > app-shell pass: *"Its mostly fine; I'd still like it to be faster if possible."* This entry was
 > placed high because it was *"the owner's stated felt pain"* (their words, below: *"it's the home
@@ -25935,6 +25957,11 @@ is essentially never worn for sleep, so there's no ground truth to calibrate
 against yet. Blocked on real-data capture, not code.
 
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
+
+- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23:** **eleven** device-owned columns are null on all 128 local rows —
+  `active_calories_est`, `training_load_ots`, `training_load_high`, `recovery_index_hours`,
+  `worn_hours_ble`, `night_hrv_baseline_ms`, `chronic_stress_score`, `chronic_stress_contributors`,
+  `vascular_age`, `pwv`, and `chronic_stress_granular_nights` (the eleventh, not in the entry's ten).
 
 - **Lane:** A
 - **Gate:** device

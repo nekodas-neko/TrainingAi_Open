@@ -16111,8 +16111,16 @@ the reason survives without reading the diff.
 The online gate is stated for the same reason. Reporting a failure when the user is merely offline
 is the opposite of what this codebase is built for, and nothing in the test suite would have caught
 it except the case written specifically for it.
+---
 
-## 2026-09-23 — backlog 27472 → 27480 (LB-131 + DV-9, +8)
+## 2026-09-23 — backlog → 27519 (sweep-1 results, measured after merging main) (device/sweep-1)
+
+Device sweep 1's results, quoted in the entries they settle as the probe checklist asks: the
+performance baseline (RV-137…RV-142, RV-133), the write checks (RV-108, BF-185, BF-177, LB-116), the
+DV-8 correction, and two new entries (DV-10, DV-11) — net of RV-45 and DV-4, which were verified and
+removed.
+
+## 2026-09-23 — backlog 27499 → 27507 (LB-131 + DV-9, +8)
 
 Both entries shipped and both stayed, each as `Verify: device` + `Keep:` — so two completed items
 cost eight lines rather than clearing thirty.
