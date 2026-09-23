@@ -16138,7 +16138,13 @@ default the entry exists to remove, moved up a level. It reads the context inste
 reading only the original entry would see a prop missing and "fix" it back.
 
 
-## 2026-09-23 — backlog 27507 → 27538 (DV-11, +31); Lane B baton held at 55
+## 2026-09-23 — backlog → 27351 (DV-11 +31, against a 219-line clearance from `main`); baton held at 55
+
+**The number goes DOWN while this branch adds 31 lines**, which is worth stating plainly because the
+figure alone reads as a shrink this PR did not do: an Orchestrator sweep cleared 219 lines of
+completed entries from `main` while this sat in CI. The baseline is lowered to the truth rather than
+left at the 27538 this branch computed before that merge — a baseline 188 lines above reality is
+slack for the next growth to hide in, which is the failure the ratchet exists to prevent.
 
 The backlog grows because DV-11 turned out to be an app-wide class rather than one sheet, and the
 entry now carries the two things a later session would otherwise pay for again: why the existing
