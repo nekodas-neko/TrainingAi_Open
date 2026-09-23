@@ -18,6 +18,33 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27334 (LA-129 rerouted, +21)
+
+Raised because the entry grew, which is the growth path doing its job — and worth noting that this
+is now the ONLY way an ordinary PR touches a `.size` file. `--fix` used to lower a baseline for any
+slack at all, including slack the check tolerates within its band, so every PR that struck a backlog
+entry rewrote this file and two concurrent PRs collided on a number neither needed to change. That
+was the whole of the conflict class LA-129 was filed against, and it was self-inflicted: a 40-line
+strike leaves the plain check at exit 0, reporting the slack, needing no edit.
+
+`--fix` now withholds within the band and prints what it withheld; `--tighten` lowers deliberately,
+for the compaction sweep. Growth still raises, and slack over the band still lowers, because there
+the check would otherwise fail.
+
+## 2026-09-23 — backlog → 27313 (DV-13 measured, +30), projectOverview → 12597 (+27)
+
+DV-13 stays in the queue and grew, which is the right direction for an entry whose cause was not
+proven: the measurement went in beside the hypothesis rather than replacing it. `error_events` put
+the window's only two server errors at the moment of recovery, and the merge timeline put a
+production deploy 70 seconds before the stall began — so the eight-minute outage reads as a deploy,
+while the per-row timezone formatting the entry suspected is real, measured and fixed. The `Keep:`
+lines are the four things still owed, including that the outage cause is NOT settled by the fix that
+shipped.
+
+`projectOverview.md` carries the owner-facing half: the app was unreachable for eight minutes, the
+likeliest cause is four merges in sixteen minutes each redeploying production, and the cadence is
+the thing to change.
+
 ## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27283 (LA-130, −26)
 
 The Git Workflow shallow-fetch rule told every session to fetch with `--unshallow` every time,
@@ -16289,3 +16316,19 @@ the same two edges, and neither is visible from the type.
 
 DV-13 filed at the top of the queue: a production outage (~8 min) coincided with the BLE admin
 console's hung requests during device sweep 2. Placed first because it is availability.
+
+---
+
+## 2026-09-23 — backlog → 27335 (device/sweep-2b)
+
+DV-14 (production has not deployed since 15:13) filed above DV-13, and DV-13 gains the deploy as a
+second explanation for its outage.
+
+---
+
+## 2026-09-23 — backlog → 27035, projectOverview → 12507 (device/sweep-2b, sweep 2 write-up)
+
+Both shrink. Sweep 2 removed nine device-verified backlog entries (Q-112e, BF-99, BF-162, RV-39,
+Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
+`known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
+back to its 52-line baseline rather than raised.

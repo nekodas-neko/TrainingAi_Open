@@ -164,6 +164,7 @@ class Device {
    * offset, not a component, unless source maps are served.
    */
   async recordNetwork({ bodies = null } = {}) {
+    if (bodies === true) bodies = /./;
     const t0 = Date.now();
     const byId = new Map();
     const entries = [];

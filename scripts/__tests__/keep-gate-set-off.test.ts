@@ -80,10 +80,15 @@ describe('the real queue classifies exactly as it did before', () => {
   // own title says so — which is exactly the "un-parks an entry" case this list exists to surface.
   // The entry is named here rather than the count being edited, so the next reader can tell an
   // intended change from a parser regression.
-  it('yields the same seventeen gates, by id', () => {
+  //
+  // **Q-317 dropped 2026-09-23, same mechanism again.** Device sweep 2 (#1471) closed its device
+  // check, so the entry left the queue and took its gate with it — the intended case, not a parser
+  // regression. It turned `main` red because the sweep did not update this list; named here for the
+  // same reason Q-305 is.
+  it('yields the same sixteen gates, by id', () => {
     expect(gated).toEqual([
       'BF-80:device', 'LB-53:owner', 'BF-10:device', 'Q-486:device', 'Q-499:device', 'Q-477:device',
-      'Q-467:device', 'LB-5:device', 'Q-317:device', 'Q-318:device', 'Q-316:device', 'Q-544:device',
+      'Q-467:device', 'LB-5:device', 'Q-318:device', 'Q-316:device', 'Q-544:device',
       'Q-538:device', 'Q-461:device', 'Q-319:device', 'Q-513:owner', 'Q-281:device',
     ])
   })

@@ -86,20 +86,26 @@ checkout), and unchanged with `DATABASE_URL` unset (so not environmental).
 already fetches it. The test still stubbed `getActiveProgram` and its `getNextSession` mock had no
 `program` field, so `program` was null and **every case fell into the rest-day branch** — including
 the two that still reported green. *"Never calls a prescription-mutating repo method"* was passing
-**vacuously**, because that branch returns before any of them are reachable.
+**vacuously**, because that branch returns before any of them is reachable.
 
-Fixed here rather than handed over, because a red `main` blocks every lane. The program moves onto
-the `getNextSession` mock to match `NextSessionRecommendation`, and one added assertion pins RV-82's
-actual point — the route must not fetch the program twice — so the stub cannot go stale in silence
-again. The entry is filed `Lane: A`, whose file it is.
+**⚠ Correction, made before this PR merged: the test fix is NOT this branch's.** #1472 fixed it
+concurrently on `main`, and an earlier draft of this entry and of LB-134 claimed it here. This
+branch keeps #1472's version and adds one line it lacks —
+`expect(getActiveProgram).not.toHaveBeenCalled()` — which pins RV-82's actual point, that the route
+must not fetch the program twice, so the stub cannot go stale in silence again.
 
-**The part that matters more than the test.** The failing `Tests` job did not block the merge:
-#1467 was squash-merged at 10:18 while `Tests` was failing on its head (`efb8ee295e6`, run
-35847259425), and `merge_pull_request` returned success. **`main` took a red commit.**
+**The part that is this session's, and matters more than the test.** The failing `Tests` job did not
+block the merge: #1467 was squash-merged at 10:18 while `Tests` was failing on its head
+(`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned success.
+**`main` took a red commit.**
 
 That falsifies a rule this repo leans on: *"attempting the merge is the reliable green test … it
 cannot merge a genuinely pending check."* It can. The likely reason is already recorded elsewhere in
 CLAUDE.md — `enable_pr_auto_merge` fails here with *"Protected branch rules not configured for this
-branch"* — meaning required checks are not actually enforced, which makes every "it merged,
-therefore it was green" inference unsound. Branch-protection configuration is the owner's call, not
-a lane's; until it is settled, read the `Tests` conclusion before merging.
+branch"* — meaning required checks are not actually enforced, which also makes the same file's claim
+that protection *"requires a PR with all CI checks passing"* wrong.
+
+Branch-protection configuration is the owner's call, not a lane's, so LB-134 is filed `Lane: O` with
+both decisions named: whether to enforce the checks, and correcting the two CLAUDE.md passages that
+currently instruct every agent to use an unsound gate. Until then, read the `Tests` conclusion
+explicitly before merging — `get_job_logs` with `failed_only: true` is the cheap form.
