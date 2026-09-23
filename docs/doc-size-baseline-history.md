@@ -16430,3 +16430,15 @@ BF-189, from the owner asking whether his sessions have enough content. The leng
 tables the entry exists to carry: the five-band decomposition of a 52-minute session (work is 9.8 of
 it) and weekly sets against all sixteen of his own configured volume targets. The second table is
 the answer to his question, so summarising it away would leave the entry unable to make its case.
+
+## 2026-09-23 — `docs/implementation-backlog.md` → LB-138 + a note on BF-188
+
+Two findings from gating PR #1489. LB-138 records two e2e regression tests failing on `main`
+itself, measured by a control run at the base commit rather than inferred; its length is the
+assertion text of both failures, and the paragraph separating what was measured (the tests are
+red) from what was not (that the user-facing bugs returned), which is the distinction that
+decides whether the first action is a bisect or a re-fix.
+
+The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
+that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
+dropping twelve entries of which two survived nowhere but git history.

@@ -1833,6 +1833,29 @@ below threshold and left in place for next time.
 - **Whoever takes it decides**: keep the route as a debug surface and drop just the two
   invalidations, or retire route + key + tests together. An invalidation aimed at nothing is the fix.
 
+### [app-shell][platform] LB-138 — two e2e regression tests are red on `main`, and the pipeline is built so nobody finds out
+
+- **Lane:** B — `e2e/bf100-touch-does-not-cancel-pending-restore.spec.ts:84`,
+  `e2e/la109-back-from-subroute.spec.ts:87`. **Added:** 2026-09-23 · found while gating PR #1489.
+- **⚑ MEASURED, on `main` itself.** Checked out `origin/main` detached at `ce200a3875b` and ran both
+  specs: **2 failed, 4 passed** — identical to the run on the feature branch, which is how #1489 was
+  cleared. They fail on the base branch, not because of any open PR.
+- The assertions:
+  - `bf100` — *"restored to 0 against a reachable 1019: 0 means a bare touchstart latched
+    done=true and cleared the timer, which is the BF-100 cancellation"*.
+  - `la109` — *"the URL half was never the bug"*.
+- **What is NOT established, and must not be assumed:** that the user-facing bugs are back. A red
+  regression test can also mean the test drifted from the code it guards. `bf100`'s message reads
+  like the original cancellation returning; `la109`'s does not settle it either way. **First action
+  is to bisect for the commit that turned each red**, not to re-fix BF-100 and LA-109 from their
+  old descriptions.
+- **The invisibility is half the finding, and it is structural.** E2E is **advisory**, so a red
+  never blocks a merge; and its *"Does this change touch the UI?"* step **skips the whole job on
+  docs-only PRs**, which is most PRs on this repo. So `main` can carry red e2e indefinitely with
+  every PR reporting green. Both of these were found only because #1489 happened to touch UI **and**
+  because its author waited for an advisory check. Whatever the fix, the pipeline question —
+  should E2E run on a schedule against `main`, given it cannot gate? — belongs with it.
+
 ### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
 
 - **Lane:** B — `components/home/home-card-widget.tsx:325`, `components/more/home-widgets-section.tsx`.
@@ -3196,6 +3219,13 @@ why the count of affected entries always understated the harm.
   measured — the rule named the hazard without naming the line that causes it.
 - **Verification:** fold N entries, then fold M more into the same day without deleting the file,
   and confirm the result holds N+M anchors. Today it holds M.
+- **⚑ IT HAS ALSO LANDED ON `main`, which the above does not cover — this entry was filed from a
+  conflict caught before merge; the same defect shipped.** PR #1484's fold was a same-day second
+  fold: it archived 40 entries and removed the **12** another session had archived an hour earlier.
+  Ten came back as loose files when #1488 dropped its own fold; **two existed nowhere** and were
+  restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
+  priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
+  is only in git history, and nothing reports which entries went missing.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
