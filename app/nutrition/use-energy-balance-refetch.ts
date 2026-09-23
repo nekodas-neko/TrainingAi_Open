@@ -81,27 +81,31 @@ export function useEnergyBalanceRefetch(
   const refetch = useCallback((date: string) => {
     lastDateRef.current = date
     setFailed(false)
-    // **Reported through `onExhausted`, not `onError`, and that is forced rather than chosen.**
-    // `cachedFetch` computes `const online = cached === null && navigator.onLine` and fires
-    // `onError` only when `online` — so BOTH its failure paths are gated on there being nothing
-    // cached (`lib/sqlite/cache.ts`). A caller therefore cannot be told that a revalidation failed
-    // whenever a cached value was painted, which is why RV-103's suggested fix — "pass `onError`" —
-    // does not by itself reach the case it was written for. `fetchWithRetry` has the mirror-image
-    // blind spot: a cached paint counts as a response, so the chain stops with the pre-write figure
-    // on screen. Both measured against the running screen with the balance route aborted.
+    // **Two channels, because one failure has two shapes and neither alone covers both.**
     //
-    // What that leaves is the post-write NORM, and it is the common case rather than a corner: the
-    // write awaited `invalidateNutritionWrite()`, so the key is normally empty when this runs, and
-    // with nothing cached the retries run and exhaustion is reported. The residue — a refresh that
-    // fails while a stale entry survives the invalidation — needs `lib/sqlite/cache.ts` to offer an
-    // ungated failure channel, which is Lane A's, and is filed as LB-128.
+    // `onExhausted` covers the post-write NORM: the write awaited `invalidateNutritionWrite()`, so
+    // the key is usually empty when this runs, the retries run against nothing, and exhaustion is
+    // the honest report. But `cachedFetch` gates `onError` on `cached === null` in BOTH failure
+    // paths, and `fetchWithRetry` treats a cached paint as a response and stops the ladder — so
+    // when a stale entry survives the invalidation, the pre-write figure sits on screen and NEITHER
+    // channel fires. That residue was measured against the running screen with the balance route
+    // aborted: the same code reported or stayed silent on consecutive runs, decided only by whether
+    // the entry happened to be in the cache. The flake was the finding.
+    //
+    // `onRevalidateError` (LB-128) is that missing half. It is deliberately NOT `onError`: every
+    // other caller reads `onError` as "I have nothing to show", and ungating it would replace good
+    // cached data with error cards app-wide. Here the caller knows the painted value is stale,
+    // because it just wrote.
+    //
+    // Both land on the same `setFailed(true)`, and `setFailed(false)` above makes that idempotent —
+    // `onRevalidateError` can fire on more than one attempt.
     fetchWithRetry<EnergyBalanceResponse>(
       `energy-balance:${date}`, `/api/nutrition/energy-balance?date=${date}`, ENERGY_BALANCE_TTL,
       d => { if (d) setBalance(d) },
       () => unmountedRef.current,
       0,
       cachedFetch,
-      { onExhausted: () => setFailed(true) },
+      { onExhausted: () => setFailed(true), onRevalidateError: () => setFailed(true) },
     )
   }, [setBalance])
 

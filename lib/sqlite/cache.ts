@@ -144,6 +144,8 @@ const inFlightRequests = new Map<string, Promise<void>>();
 interface PendingWaiter {
   onData: (data: unknown) => void;
   onError?: (info: CacheFetchErrorInfo) => void;
+  // LB-128: the complement of `onError` — fires only for a joiner that DID paint from cache.
+  onRevalidateError?: (info: CacheFetchErrorInfo) => void;
   hadCached: boolean;
 }
 const pendingWaiters = new Map<string, PendingWaiter[]>();
@@ -275,6 +277,15 @@ async function cachedFetchCore<T>(
   freshWithinTtl?: boolean,
   onError?: (info: CacheFetchErrorInfo) => void,
   shouldCache?: (data: T) => boolean,
+  // LB-128. `onError` is gated on `cached === null` in BOTH failure branches, and waiters skip on
+  // `hadCached`, so a failed revalidation of a key that painted from cache was unreportable — which
+  // is exactly the post-write case (RV-103), whenever the write's invalidation has not yet cleared
+  // the entry. This is the complement, not a relaxation: ungating `onError` would swap good cached
+  // data for error cards across the app, because every caller reads it as "I have nothing to show".
+  //
+  // Still gated on being ONLINE. Offline with saved data is the sanctioned offline-first case, not
+  // a failure, and the outbox carries the write; an error card there would be wrong.
+  onRevalidateError?: (info: CacheFetchErrorInfo) => void,
 ): Promise<boolean> {
   // SQLite reads can throw on native if the DB is locked or in an error state.
   // Treat a failed cache read as a miss — proceed to the network fetch.
@@ -311,7 +322,7 @@ async function cachedFetchCore<T>(
   // does on every render in dev).
   if (inFlightRequests.has(key)) {
     const waiters = pendingWaiters.get(key) ?? [];
-    waiters.push({ onData: onData as (data: unknown) => void, onError, hadCached: cached !== null });
+    waiters.push({ onData: onData as (data: unknown) => void, onError, onRevalidateError, hadCached: cached !== null });
     pendingWaiters.set(key, waiters);
     try {
       await inFlightRequests.get(key);
@@ -345,11 +356,15 @@ async function cachedFetchCore<T>(
         // since a joined waiter's own cached state can differ from the owner's.
         const info: CacheFetchErrorInfo = { status: res.status };
         if (cached === null) { try { onError?.(info); } catch { /* caller's onError threw */ } }
+        else { try { onRevalidateError?.(info); } catch { /* caller's onRevalidateError threw */ } }
         const waiters = pendingWaiters.get(key);
         if (waiters) {
           pendingWaiters.delete(key);
           for (const waiter of waiters) {
-            if (waiter.hadCached) continue;
+            if (waiter.hadCached) {
+              try { waiter.onRevalidateError?.(info); } catch { /* a joined caller's cb threw */ }
+              continue;
+            }
             try { waiter.onError?.(info); } catch { /* a joined caller's onError threw */ }
           }
         }
@@ -372,14 +387,21 @@ async function cachedFetchCore<T>(
     } catch {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
-      const online = cached === null && typeof navigator !== 'undefined' && navigator.onLine;
+      const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+      const online = cached === null && isOnline;
       if (online) { try { onError?.({ status: null }); } catch { /* caller's onError threw */ } }
+      else if (cached !== null && isOnline) {
+        try { onRevalidateError?.({ status: null }); } catch { /* caller's onRevalidateError threw */ }
+      }
       const waiters = pendingWaiters.get(key);
       if (waiters) {
         pendingWaiters.delete(key);
-        if (typeof navigator !== 'undefined' && navigator.onLine) {
+        if (isOnline) {
           for (const waiter of waiters) {
-            if (waiter.hadCached) continue;
+            if (waiter.hadCached) {
+              try { waiter.onRevalidateError?.({ status: null }); } catch { /* a joined caller's cb threw */ }
+              continue;
+            }
             try { waiter.onError?.({ status: null }); } catch { /* a joined caller's onError threw */ }
           }
         }
@@ -419,9 +441,12 @@ export async function cachedFetch<T>(
     // Return false to paint this response without storing it (RV-69). Called only on a fresh
     // network result — a cached value that is already stored is never re-judged.
     shouldCache?: (data: T) => boolean
+    // LB-128: the revalidation failed AFTER a cached value was painted. Use this, not `onError`,
+    // when the caller knows the cached value is out of date — e.g. it just wrote.
+    onRevalidateError?: (info: CacheFetchErrorInfo) => void
   },
 ): Promise<boolean> {
-  return cachedFetchCore<T>(key, url, ttlSeconds, onData, d => d, s => s as T, opts?.freshWithinTtl, opts?.onError, opts?.shouldCache);
+  return cachedFetchCore<T>(key, url, ttlSeconds, onData, d => d, s => s as T, opts?.freshWithinTtl, opts?.onError, opts?.shouldCache, opts?.onRevalidateError);
 }
 
 // { date, data } envelope for a cache key whose payload carries no date of its own
@@ -483,7 +508,10 @@ export async function cachedFetchToday<T>(
   url: string,
   ttlSeconds: number,
   onData: (data: T) => void,
-  opts?: { onError?: (info: CacheFetchErrorInfo) => void },
+  opts?: {
+    onError?: (info: CacheFetchErrorInfo) => void
+    onRevalidateError?: (info: CacheFetchErrorInfo) => void
+  },
 ): Promise<boolean> {
   return cachedFetchCore<T>(
     key, url, ttlSeconds, onData,
@@ -491,5 +519,7 @@ export async function cachedFetchToday<T>(
     unwrapToday<T>,
     undefined,
     opts?.onError,
+    undefined,
+    opts?.onRevalidateError,
   );
 }
