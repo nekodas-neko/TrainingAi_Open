@@ -1170,6 +1170,41 @@ below threshold and left in place for next time.
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
 
+### [platform] LB-134 — `main` merged red, and the merge call is not the gate CLAUDE.md says it is
+
+- **Lane: A** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133.
+- **Fixed here** (`fix/lb133-post-push-guard-blind-spot`) because a red `main` blocks every lane;
+  the file is `app/api/**`, so the ENTRY is Lane A's to review and own going forward.
+- **`app/api/next-session/prescription/__tests__/prescription.test.ts` was red on `main`**, 4 of 6,
+  deterministically — reproduced in a clean worktree at `main`'s HEAD, and confirmed byte-identical
+  to GitHub's copy so it was not a stale checkout. Not environmental: unchanged with `DATABASE_URL`
+  unset.
+- **Cause: #1466 (RV-82) changed the route and the test was not updated.** The route now reads
+  `recommendation.program` — `getNextSession` hands back the program it already fetched — while the
+  test still stubbed `getActiveProgram` and its `getNextSession` mock had no `program` field. So
+  `program` was null and **every case fell into the rest-day branch**, including the two that still
+  reported green: the rest-day test passes trivially, and *"never calls a prescription-mutating
+  repo method"* passed **vacuously**, asserting nothing, because that branch returns before any of
+  them. The test file had not been touched since the initial public snapshot.
+- **Fix:** the program moves onto the `getNextSession` mock, matching the type
+  (`NextSessionRecommendation.program`), and a one-line `expect(getActiveProgram).not.toHaveBeenCalled()`
+  pins RV-82's actual point — no second fetch — so the stub cannot go stale silently again. 6 of 6.
+- **⚠ The serious half, and it is not about this test.** The failing `Tests` job did **not** stop
+  the merge. PR #1467 was squash-merged at 10:18 while `Tests` was failing on its head
+  (`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned
+  *"Pull Request successfully merged"*. So **`main` took a red commit**.
+  **This falsifies a rule CLAUDE.md leans on heavily:** *"attempting the merge is the reliable green
+  test … it cannot merge a genuinely pending check."* It can, and it did. The likely reason is the
+  one already recorded two sections away — `enable_pr_auto_merge` fails here with *"Protected branch
+  rules not configured for this branch"* — i.e. the required checks are **not actually enforced**,
+  which makes every "the merge succeeded, therefore it was green" inference in this repo unsound.
+- **What to do about it is the owner's call, not a lane's** — it is branch-protection configuration
+  on a shared system. Until it is settled, **read the `Tests` conclusion before merging** rather
+  than treating a successful merge as proof, and do not rely on the merge call as a gate.
+- **Note the blast radius was small only by luck:** `main` was already red from #1466 before #1467
+  went near it, so nothing in #1467 caused this. But #1467 merged on top of it and a later PR would
+  have inherited a red base with no signal.
+
 ### [platform] LB-133 — the guard for the post-push class cannot see the class
 
 - **Lane: B** · **Added:** 2026-09-23 · Lane B, found while shipping LB-132.

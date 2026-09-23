@@ -74,3 +74,32 @@ documented bug where *"the dialog closed on the frame it opened"*. `handlePop` o
 `popstate`, and `tab-shell.tsx:103` navigates with `replaceState`, which does not emit one. The
 entry's claim that `<EndOfDayReview>` renders unconditionally was also re-checked and holds. That
 leaves the nested `dynamic({ ssr: false })` chunk as the only live hypothesis.
+
+## Also found here — `main` was red, and the merge call did not stop it (LB-134)
+
+Running the full suite for this change surfaced
+`app/api/next-session/prescription/__tests__/prescription.test.ts` failing 4 of 6 **on `main`** —
+reproduced in a clean worktree at `main`'s HEAD, byte-identical to GitHub's copy (so not a stale
+checkout), and unchanged with `DATABASE_URL` unset (so not environmental).
+
+**Cause:** #1466 (RV-82) changed the route to read `recommendation.program`, since `getNextSession`
+already fetches it. The test still stubbed `getActiveProgram` and its `getNextSession` mock had no
+`program` field, so `program` was null and **every case fell into the rest-day branch** — including
+the two that still reported green. *"Never calls a prescription-mutating repo method"* was passing
+**vacuously**, because that branch returns before any of them are reachable.
+
+Fixed here rather than handed over, because a red `main` blocks every lane. The program moves onto
+the `getNextSession` mock to match `NextSessionRecommendation`, and one added assertion pins RV-82's
+actual point — the route must not fetch the program twice — so the stub cannot go stale in silence
+again. The entry is filed `Lane: A`, whose file it is.
+
+**The part that matters more than the test.** The failing `Tests` job did not block the merge:
+#1467 was squash-merged at 10:18 while `Tests` was failing on its head (`efb8ee295e6`, run
+35847259425), and `merge_pull_request` returned success. **`main` took a red commit.**
+
+That falsifies a rule this repo leans on: *"attempting the merge is the reliable green test … it
+cannot merge a genuinely pending check."* It can. The likely reason is already recorded elsewhere in
+CLAUDE.md — `enable_pr_auto_merge` fails here with *"Protected branch rules not configured for this
+branch"* — meaning required checks are not actually enforced, which makes every "it merged,
+therefore it was green" inference unsound. Branch-protection configuration is the owner's call, not
+a lane's; until it is settled, read the `Tests` conclusion before merging.
