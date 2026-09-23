@@ -15659,12 +15659,35 @@ upgraded, and DV-3 (a CI flake in the migration-163 test) was filed. The Device 
 baton goes 66 → 67 for the DV-3 row it has to carry. Both baselines set to the
 measured sizes.
 
+
+## 2026-09-23 — `docs/implementation-backlog.md` +41 (26780 → 26821) (Review: RV-134)
+
+One entry, naming the mechanism behind the `.size` conflict tax that Tuning measured on 2026-09-20
+(§2c) and said needed its own entry. It is longer than a one-line finding because the recommendation
+has to say what it gives up: PS-34 removed slack from this ratchet for cause, and the fix proposed is
+**not** re-introducing it — it is giving the slack direction the same `inherited` escape the growth
+direction already has, so a branch is not blamed for a shrink another PR's merge caused.
+
+Filed against Lane O rather than an implementer lane: `scripts/check-doc-index-size.js` is repo
+tooling in the Custom Rules job, which is the OR-103 case.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +42 (26829 → 26872), `CLAUDE.md` 844 → 866 (Review sweep 54)
+
+RV-135, plus an amendment to RV-125 correcting figures it had inherited from a stale `CLAUDE.md`
+line. The entry carries a before/after table because the point is that the signal **grew** between
+sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to be comparable next time.
+
+`CLAUDE.md` grows because the corrected sentence says what the old one got wrong and for how long.
+That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
+script's baseline recorded **0**, and a silent swap of one number for another would leave the next
+reader with no reason to trust the new one over their memory of the old.
 ## 2026-09-23 — backlog 26780 → 26731, `projectOverview.md` 12376 → 12388 (RV-106/RV-107/RV-109)
 
 The backlog ratchets **down** 49 lines on this branch's own account — RV-106, RV-107 and RV-109
 shipped whole and left the queue, and the batch `stale-surface-subscribe` is now empty. The figures
-finally recorded are 26738 and 12359, because #1419 (BF-166 closed on the S25, DV-2 filed) landed
-from `main` mid-CI and moved both. Nothing was filed against them — the one
+finally recorded are 26823 and 12359, because #1419 (BF-166 closed on the S25, DV-2 filed) and
+#1421 (Review sweep 54) both landed from `main` mid-CI — four re-merges on one PR, every one of
+them a `.size` conflict, which is the tax sweep 54 went and measured. Nothing was filed against them — the one
 finding the work turned up (that `useStressDay` was already correct, which RV-106 had left
 untraced) is an answer rather than new work, so it lives in the code as an asserted comment.
 
