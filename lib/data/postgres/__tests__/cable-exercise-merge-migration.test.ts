@@ -9,7 +9,7 @@
 // Runs only against a real Postgres. NOTE: CI's "Tests" job DOES set DATABASE_URL, so these run
 // there; reproduce CI locally by setting it too, or vitest silently skips them.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -83,7 +83,7 @@ describe.skipIf(!canRun)('migration 164 — cable exercise merge (Q-5b follow-up
     [userId],
   )).rows
 
-  const run = () => pool.query(migrationSql())
+  const run = () => runMigrationSql(pool, migrationSql())
 
   // Mirrors the production shapes measured before the migration was written.
   async function seedProductionShape(userId: string) {
