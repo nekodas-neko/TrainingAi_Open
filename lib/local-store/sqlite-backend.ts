@@ -2980,8 +2980,53 @@ export class SQLiteLocalStore implements LocalStore {
    * filters `deleted_at IS NULL` so the row is never found, and `upsertActivityLog`'s column list
    * omits `deleted_at` entirely. Same shape and same reason as `markSavedMealSynced`.
    */
+  /**
+   * DV-5, and the same shape as `markActivityLogSynced` above for the same reason: a food-log
+   * DELETE cannot confirm through the read-then-upsert round-trip, because `getFoodLogs` filters
+   * `deleted_at IS NULL` and so never finds the row it is meant to mark. The outbox entry is
+   * removed either way, leaving the tombstone `pending` forever — and `applyDelta` refuses to
+   * touch a row that is not `synced`, so it becomes immune to every later server correction.
+   *
+   * Measured on the S25 (2026-09-23): 33 tombstoned rows dating to 2026-08-19, against an empty
+   * outbox, three of them from pushes that had returned 200.
+   */
+  async markFoodLogSynced(id: string): Promise<void> {
+    await runSQL(`UPDATE food_logs SET sync_status='synced' WHERE id=?`, [id]);
+  }
+
   async markActivityLogSynced(id: string): Promise<void> {
     await runSQL(`UPDATE activity_logs SET sync_status='synced' WHERE id=?`, [id]);
+  }
+
+  /**
+   * Same defect as `markFoodLogSynced` (DV-5), found by the sibling sweep: `getInjuries` filters
+   * `deleted_at IS NULL`, so an injury DELETE never confirms and its tombstone stays `pending`
+   * past every later pull, which prunes only `synced` rows.
+   */
+  async markInjurySynced(id: string): Promise<void> {
+    await runSQL(`UPDATE injuries SET sync_status='synced' WHERE id=?`, [id]);
+  }
+
+  /** As above for supplement logs, keyed the way `deleteSupplementLog` writes the tombstone. */
+  async markSupplementLogSynced(supplementId: string, logDate: string): Promise<void> {
+    await runSQL(
+      `UPDATE supplement_logs SET sync_status='synced'
+       WHERE supplement_id=? AND log_date=? AND source='manual'`,
+      [supplementId, logDate],
+    );
+  }
+
+  /**
+   * `plan_meal_answers` had no confirm arm at all, so EVERY answer — not only a delete — stayed
+   * `pending` after a successful push, and `applyDelta` gates each of its columns on
+   * `sync_status='synced'`. One mark keyed on (plan_meal_id, log_date) covers both arms, because
+   * that is the pair both `upsertPlanMealAnswer` and `deletePlanMealAnswer` address.
+   */
+  async markPlanMealAnswerSynced(planMealId: string, logDate: string): Promise<void> {
+    await runSQL(
+      `UPDATE plan_meal_answers SET sync_status='synced' WHERE plan_meal_id=? AND log_date=?`,
+      [planMealId, logDate],
+    );
   }
 
   async upsertActivityLog(record: LocalActivityLog): Promise<void> {
