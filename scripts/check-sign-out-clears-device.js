@@ -19,6 +19,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { relPosix } = require('./lib/repo-path');
 
 const root = path.join(__dirname, '..');
 const OWNER = 'lib/sign-out.ts';          // the one file allowed to reach the raw server action
@@ -44,7 +45,7 @@ for (const dir of ROOTS) {
   const abs = path.join(root, dir);
   if (!fs.existsSync(abs)) continue;
   for (const file of walk(abs)) {
-    const rel = path.relative(root, file);
+    const rel = relPosix(root, file);
     if (rel === OWNER || rel === 'app/actions.ts') continue;
     const src = fs.readFileSync(file, 'utf8');
     if (!/signOut/.test(src)) continue;

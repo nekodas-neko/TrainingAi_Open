@@ -41,9 +41,15 @@ const BASELINE = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
 // `tsc` exits non-zero when it reports errors, which is the normal case here — the errors are the
 // output, not a failure to run. A crash (no diagnostics at all) is different and must not be read
 // as "clean", so an empty result with a non-zero exit is reported rather than passed.
+// DV-1: `npx` is `npx.cmd` on Windows, and `execFileSync` does not consult PATHEXT — so this died
+// with `spawnSync npx ENOENT` on the machine the Device Verification agent runs on, before tsc was
+// ever reached. Naming the `.cmd` explicitly is preferred over `shell: true`, which would hand the
+// argument list to a shell for re-parsing.
+const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+
 function runTsc() {
   try {
-    return execFileSync('npx', ['tsc', '--noEmit', '-p', 'tsconfig.tests.json'], {
+    return execFileSync(NPX, ['tsc', '--noEmit', '-p', 'tsconfig.tests.json'], {
       cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
     });
   } catch (err) {

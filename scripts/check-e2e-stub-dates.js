@@ -34,6 +34,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { relPosix } = require('./lib/repo-path');
 const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
@@ -89,7 +90,7 @@ let scanned = 0;
 let stubbing = 0;
 
 for (const file of walk(E2E)) {
-  const rel = path.relative(root, file);
+  const rel = relPosix(root, file);
   const src = stripComments(fs.readFileSync(file, 'utf8'));
   scanned++;
   // Only a spec that hands the app a payload can hand it a date the app will compare.
