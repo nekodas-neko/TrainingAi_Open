@@ -15749,6 +15749,16 @@ independent filing of the ⛔ parser bug, after `LA-49` (2026-09-01) and alongsi
 it quotes the glyph as evidence and was parked by the bug it describes. **A finding that reaches a
 human gets answered; a finding that hides itself gets re-derived, and each re-derivation pays the
 investigation again.**
+
+## 2026-09-23 — `docs/implementation-backlog.md` → 27094 (DV-1 / OR-130)
+
+DV-1 gained a `Keep:` naming the one run that settles it — `pnpm ci:local` on the Windows machine,
+unpiped, exiting 0 — and `OR-130` was filed for the `base-ref.js` defect the gate run surfaced.
+
+This is the third re-merge on this branch and the number has moved every time, in both directions,
+without a line of this branch's own material changing. That is RV-134's tax rather than a signal:
+the figure recorded here is the merged tree's, not this branch's contribution, and reading it as
+growth caused by DV-1 would be wrong.
 ---
 
 ## 2026-09-23 — backlog → 27020 (+11 from this branch, measured after merging main), device-verification baton → 53 (−1) (device/probe-sitting-2)
