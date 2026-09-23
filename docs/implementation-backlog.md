@@ -1489,7 +1489,10 @@ nothing structured saying why — and a human decides.
   PRs landing between mine. **The fix that does is item 5's alternative — generate the baselines in CI
   rather than committing them — which needs its own entry and the owner's yes on changing the ratchet.**
 
-**3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
+**3. ~~Q-28, BF-9 and BF-7 carry NO `Gate:` field.~~ ✅ ANSWERED 2026-09-22: all three RELEASED.**
+  The owner chose release over gating, on this item's own argument — a rule living in a scheduled
+  prompt rather than in the file every agent reads goes stale unnoticed. **The Lane A prompt's
+  exclusion list should stop naming them.** Original text follows.
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
   exclusion list inside the Lane A routine prompt — a convention living in a scheduled prompt rather
   than in the file every agent reads, which is exactly the kind of thing that goes stale unnoticed.
@@ -1497,10 +1500,16 @@ nothing structured saying why — and a human decides.
   request and the cheapest of the three.
 
 **4. Q-29 Task 5 is a destructive drop of the server raw archive.** (unblocks Q-29)
+  **↳ Put to the owner 2026-09-22; they asked for the case before answering, which is the right
+  response to a one-line summary of an irreversible change. The ball is OURS now — tracked as
+  `OR-126`, and Q-29 carries a `Gate: owner` saying so. Do not re-ask until the brief is written.**
   Confirm-first per CLAUDE.md, and the entry's own gate language says so. Needs a yes on principle
   before anyone writes it, not a review after.
 
-**5. The `.size` conflict tax — a workflow question, not a defect.**
+**5. ~~The `.size` conflict tax — a workflow question, not a defect.~~ ✅ ANSWERED 2026-09-22:
+  a sweep ships as ONE PR.** The convention is in CLAUDE.md now, beside the batching rule. The
+  owner took the cheap option knowingly; generating the baselines in CI removes the conflict class
+  entirely and remains the better long-term answer, unfiled. Original text follows.
   Every merging PR touches `docs/doc-size/docs/implementation-backlog.md.size`, and so does every
   Lane A PR. On 2026-09-20 `main` took a commit roughly every 8 minutes against a ~6-minute CI run,
   and **Q-1a needed five rebases and four refused merges to land**. Cheapest fix: **BugFix batches a
@@ -1511,8 +1520,13 @@ nothing structured saying why — and a human decides.
   *"Protected branch rules not configured for this branch"*, so the CI/CD section's auto-merge
   option does not apply to this repo.
 
-**6. Six PRs are open and at least one is verifiably dead — closing a PR is confirm-first, so none
-  of them can be cleared by an agent.** (added 2026-09-21)
+**6. ~~Six PRs are open and at least one is verifiably dead.~~ ✅ CLEARED 2026-09-22: the owner
+  authorised closing, and #1250, #608, #265, #10 and #6 are closed.** #1341 had merged on its own.
+  **The item's own point stands and is why it was written down:** CLAUDE.md exempts pushing,
+  opening and merging-when-green from confirm-first and deliberately does not exempt **closing**, so
+  an agent that proves a PR dead still cannot clear it. That is correct, and it is also how six
+  accumulated. The answer is to put the list somewhere an owner will see it, which this ledger did.
+  Original text follows.
   **[#1250](https://github.com/nekodas-neko/TrainingAi_Open/pull/1250) is Lane A's and is
   superseded.** It was opened 2026-09-16 to unblock a red `main` by dropping `Q-305:device` from
   `keep-gate-set-off.test.ts`. Verified against `main` 2026-09-21: **that string is already gone from
@@ -1530,8 +1544,14 @@ nothing structured saying why — and a human decides.
   confirm-first, and deliberately does not exempt **closing**. So an agent that finds a dead PR can
   prove it dead and cannot clear it — which is correct, and is also how six of them accumulated.
 
-- **Keep:** this entry until all **six** are answered. Strike each item as it resolves; remove the
-  entry when the last one goes.
+- **Keep:** items **1** (a diagnostic look at *Why Upper?*) and **4** (Q-29 Task 5, now waiting on
+  `OR-126` rather than on the owner). Items 2, 3, 5 and 6 were answered on 2026-09-22 and are struck
+  above. Remove the entry when the last one goes.
+- **What four answers in one sitting says about the ledger.** Five of the six had sat between one
+  and nine days; the sixth had been noticed in an earlier session, recorded nowhere, and re-derived
+  from scratch. They were not hard questions — they were questions nobody had been asked, because
+  each lived in a session transcript that ended. **Writing them in one place was the whole of the
+  work.** That is the argument for this ledger continuing to exist after these six clear.
 ### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
 
 - **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.
@@ -2366,55 +2386,42 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 - **Do NOT delete `temp-penalty-suspension.test.ts` as part of any cleanup.** It is the only record
   of what the ladder did, and answering (1) needs it.
 
-### [platform] LB-121 — the queue parser's "blocked" marker is the same glyph the repo uses for emphasis
+### [platform] LB-121 — Reference: the queue parser's "blocked" marker, filed three times before it was fixed
 
-- **Lane: O** — `scripts/next-item.js:97` (and `lib/queue-buckets.js` for the ordering).
-  Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.
-- **Added:** 2026-09-18 · found by re-reading PARKED, which is where the damage hides.
-- **`if (!current.legacyBlocked && line.includes('⛔'))` treats a `⛔` ANYWHERE in an entry as the
-  legacy prose blocker.** That is right for the marker it was written for and wrong for the same
-  character used as emphasis — which this repo does constantly, CLAUDE.md included.
-- **The damage is not the bucket, it is the LOST RESIDUE.** A parked entry prints
-  `unmigrated marker — <first 90 chars of whatever line held the glyph>`, so an entry with a real
-  `Keep:` shows a prose fragment instead of what is owed. TN-25 printed
-  *"length the app already uses (30 min) deliberately…"* where its residue is a device walk and a
-  month of compliance data. A reader scanning PARKED cannot see the obligation at all.
-- **It has fired at least four times: LB-116, TN-3b, and — the same day the baton warned about it —
-  TN-25 and OR-116, both from my own edits.** One of the two was a `⛔` *inside backticks, quoting
-  the name of another warning*. Knowing the rule is demonstrably not enough to follow it, which is
-  the argument for a code fix over a prose one.
-- **A `Gate:` or `Needs:` already overrides the marker; a `Keep:` does not**, and that asymmetry is
-  the whole bug. The script's own comment says *"a structured field is authoritative"* — `Keep:` is
-  a structured field.
+- **✅ FIXED 2026-09-22 (#1390, OR-122). `Reference:` — kept for the pattern, not for the fix.**
+  `next-item.js` now matches the glyph followed within 40 characters by the word *block*, which is
+  the convention this file's own protocol documents. Entries parked by a prose marker alone: **0**,
+  against the 28 measured that morning. LB-121's recommendation — *let `Keep:` override the legacy
+  marker* — was not what shipped; narrowing the detector fixes the same defect at the source and
+  needs no per-field override. The `Keep:`-residue damage this entry identified goes with it: an
+  entry that is no longer parked prints its residue.
+- **Lane: O** — was `scripts/next-item.js:97`. Filed 2026-09-18 by Lane B.
 
-- **⚑ IT HAS NOW COST A SHIPPABLE ITEM, measured 2026-09-20.** **OR-118 sat startable and invisible
-  for four days.** Its engine half landed 2026-09-18, its `Needs:` was empty and the entry said in
-  words that it was *"now startable"* — and it printed under PARKED the whole time, because a `⛔`
-  three bullets up was emphasising a corrected premise. Lane B's READY read **0** across five
-  consecutive queue checks while a buildable card waited. It shipped the day someone read PARKED
-  instead of trusting READY.
-- **Two more are parked this way RIGHT NOW** — found in the same sweep, neither touched:
-  - **TN-3b** — its marker line is itself an argument that the entry should be UNparked
-    (*"the parking rationale was right for a score and is wrong for a chart"*).
-  - **Q-305** — marker reads *"the push:pull half is not done, deliberately"*, a note about scope
-    rather than a blocker. That half is what became OR-118 and is now shipped.
-  Whoever fixes the parser should re-run `next-item.js --lane B` immediately afterwards: the real
-  READY list on 2026-09-20 was not 0, and nobody could see it.
-- **⚑ PRIORITY ARGUMENT, 2026-09-20.** OR-118 shipped the day someone read PARKED instead of
-  trusting READY, and the audit that found it also established that **TN-3b and Q-305 are parked by
-  the same glyph right now** — one of them (TN-3b) blocking a buildable entry. So the defect is not
-  "an entry reads oddly in PARKED": it is **Lane B reporting an empty lane while holding work**.
-  Every session that trusts READY pays this again.
-- **Recommendation: let `Keep:` override the legacy marker, exactly as `Gate:` and `Needs:` do.**
-  One clause at `next-item.js:135`. It cannot hide a genuine block, because an entry whose residue
-  really is gated states `Gate:` in the `Keep:` line and that path already parks it.
-  - **Alternative considered — require the marker at line start.** Cheaper to reason about, but it
-    silently un-parks any legacy entry whose marker is mid-line, which is the population the field
-    exists to keep visible. Worse.
-  - **Alternative — ban `⛔` from the backlog and lint for it.** Honest, and it fights the house
-    style everywhere else in the repo for no gain once `Keep:` is authoritative.
-- **Reversal cost: low.** One conditional; the buckets are unit-tested in `lib/queue-buckets.js`.
-- **Branch:** _unassigned_
+**Why this is kept rather than deleted: it is the THIRD independent filing of one bug, and the
+count is the finding.**
+
+| filed | by | from |
+|---|---|---|
+| 2026-09-01 | `LA-49` | found while shipping BF-90, which fixed the same disease in the `Gate:` field |
+| 2026-09-18 | **LB-121** (this entry) | re-reading PARKED, "which is where the damage hides" |
+| 2026-09-22 | `TN-59` | having swept 17 markers by hand, then watching a new one arrive |
+| 2026-09-22 | `OR-122` | Lane B reporting zero startable entries |
+
+Four sessions, three weeks, no two aware of each other. **LA-49 had the complete diagnosis and the
+two-step fix on day one and never surfaced, because it quotes the glyph as evidence and so was
+parked by the bug it describes.** Everything after it is re-derivation paid for again.
+
+**The transferable rule: a self-parking finding does not stay found.** When an entry describes a
+mechanism that hides entries, check whether it hides itself — and if it does, that is the first
+thing to fix, ahead of the mechanism. The same shape produced BF-165's circular gate (*"ungate it
+the moment the fix lands"*, on work the gate prevented starting). Both cost more than the bug.
+
+**What this entry got right and is worth keeping:** the damage is not the bucket, it is the **lost
+residue**. A parked entry printed `unmigrated marker — <90 chars of whatever line held the glyph>`,
+so an entry with a real `Keep:` showed a prose fragment instead of what was owed — TN-25 printed
+*"length the app already uses (30 min) deliberately…"* where its residue is a device walk and a
+month of compliance data. **A reader scanning PARKED could not see the obligation at all**, which is
+why the count of affected entries always understated the harm.
 
 ### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
 
@@ -17926,6 +17933,31 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
   invalidates every clearance reading in step 4.
 
+### [devices][platform] OR-126 — write the case for dropping the server raw archive, so Q-29 Task 5 can be answered on evidence
+
+- **Lane: O** — a written brief for the owner, not code. **Added:** 2026-09-22 (OR-125).
+- **Why this exists.** Q-29 Task 5 drops `oura_raw_samples.body_hex`, the server-side archival source
+  of truth. It was put to the owner as a yes-on-principle and they asked for the case first. That is
+  the correct answer to a one-line summary of an irreversible change, and it makes the missing brief
+  our debt rather than their indecision.
+- **What it must contain**, each measured rather than asserted:
+  1. **What is dropped**, exactly — table, column, row count, span, and what reads it today.
+  2. **What survives on the device** — and that it is a **14-day rolling window** by deliberate
+     decision (the owner's, 2026-08-02), so it is input to the on-device rollup, not an archive.
+  3. **What becomes permanently unrecoverable.** The ring's history buffer only moves forward and the
+     sync cursor cannot be rewound, so a decoder fix written later can back-fill **only** from stored
+     hex. After the drop, every future protocol correction is bounded by what the device still holds.
+  4. **What keeping it costs**, in money and in legibility. Railway bills on use at $0.15/GB/month
+     against a ~227 MB database, so the honest framing is almost certainly *"this is not a cost
+     problem"* — and if so the brief should say that outright rather than implying a saving.
+  5. **The reversal cost**, stated plainly: there isn't one. That is the whole reason this needs a
+     brief instead of a yes.
+- **⛔ Do not write this as an argument for the drop.** The decision is the owner's and the brief's
+  job is to make it answerable, not to win it. If the measurement says keeping the archive is
+  cheap and the loss is real, the brief should recommend keeping it.
+- **Verification:** the owner answers Q-29 Task 5 one way or the other. An answer either way clears
+  this entry; a second "show me more" means the brief missed something and it stays.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A
@@ -25048,6 +25080,20 @@ millisecond count talk a future session out of it.
 ### [devices][readiness][app-shell] 🟠 Q-29 — Oura on-device rollup migration — Task 4 built, Task 5 next
 
 - **Lane:** A
+- **Gate: owner** — and the ball is **OURS**, not theirs. Put to the owner 2026-09-22 (OR-125) as a
+  yes-on-principle to Task 5's drop of the server raw archive. **They declined to answer against a
+  one-line summary and asked for the case first**, which is the right call and is now a debt on this
+  entry rather than on them. It is tracked as **OR-126**.
+  - **What the case has to state, because a yes here is not recoverable.** `oura_raw_samples.body_hex`
+    is the archival source of truth and the ring's history buffer only moves forward — the cursor
+    cannot be rewound, so a decoder written later can back-fill **only** by re-decoding stored hex.
+    Drop the server copy and every future protocol fix is bounded by whatever the device still holds,
+    which is a deliberate 14-day rolling window (the owner's 2026-08-02 retention decision), not an
+    archive. The case must say plainly what is dropped, what survives on the device, what can never
+    be recovered afterwards, and what the storage actually costs to keep — measured, not assumed,
+    since Railway bills on use at $0.15/GB/month and the whole database is ~227 MB.
+  - **Do not re-ask until that is written.** Asking twice for the same yes with no new evidence is
+    how a decision gets made on fatigue rather than on the facts.
 **Not a new planning item — this corrects a duplicate entry a different 2026-07-30 session
 nearly created.** [`docs/offline-first-target-architecture.md`](offline-first-target-architecture.md)
 names `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:4658–~5764`) as the load-bearing
@@ -26012,6 +26058,12 @@ degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
+- **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
+  instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
+  agent reads it (LA-122 item 3). The owner released all three of Q-28, BF-9 and BF-7 rather than
+  gating them, on the reasoning that a rule kept in a prompt rather than in this file goes stale
+  unnoticed. **It is ordinary queue work now; the exclusion list should stop naming it.**
+
 - **Lane:** A
 Plan: [`docs/superpowers/plans/2026-07-29-prefetch-remainder-and-applydelta-batching.md`](superpowers/plans/2026-07-29-prefetch-remainder-and-applydelta-batching.md),
 Gap 2. Found 2026-07-29 while auditing what Q-1 does not already cover; the sibling finding (prefetch
@@ -26369,6 +26421,12 @@ patch.
 
 ### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
 
+- **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
+  instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
+  agent reads it (LA-122 item 3). The owner released all three of Q-28, BF-9 and BF-7 rather than
+  gating them, on the reasoning that a rule kept in a prompt rather than in this file goes stale
+  unnoticed. **It is ordinary queue work now; the exclusion list should stop naming it.**
+
 - **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New tables, authorization and routes are the engine; the trainer UI follows as **B**. The planning session still splits the work — it does not re-decide the lane.
 
 
@@ -26498,6 +26556,13 @@ routes gain a trainer path, what a trainer may read about a trainee (a program i
 is a much larger consent question), and how revocation behaves for programs already assigned.
 
 ### [workouts] 🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
+
+- **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
+  instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
+  agent reads it (LA-122 item 3). The owner released all three of Q-28, BF-9 and BF-7 rather than
+  gating them, on the reasoning that a rule kept in a prompt rather than in this file goes stale
+  unnoticed. **It is ordinary queue work now; the exclusion list should stop naming it.**
+  **BF-7 is the owner's own request and the cheapest of the three.**
 
 - **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). The model in `packages/shared/**` is the engine; the picker in `components/**` follows as **B**.
 
