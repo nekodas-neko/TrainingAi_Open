@@ -833,10 +833,11 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   reported failures and verified on Linux, where three of the four bugs are invisible by
   construction. `pnpm ci:local` on the Windows machine, unpiped, exiting 0, is the only thing that
   settles it — and that is the Device Verification agent's to run.
-- **Found while fixing it, filed separately as `OR-130`:** `base-ref.js` cannot tell *"absent at
-  base"* from *"could not read the base"* and reports both as the branch's fault. It fires in this
-  shallow clone and failed one gate run on a file identical to `main`. That is also the second
-  instance under `OR-121`, and the only one of the two explained.
+- **Found while fixing it, filed as `OR-130` — SHIPPED 2026-09-23.** `base-ref.js` could not tell
+  *"absent at base"* from *"could not read the base"* and reported both as the branch's fault.
+  `showAtBase` now classifies git's own stderr, retries a read failure three times, and warns in
+  git's words; the strict outcome is unchanged on purpose, because in CI a failed base fetch leaves
+  no ref at all and the fallback there is *stricter*, not weaker.
 - **Node half resolved on the device machine, 2026-09-23:** upgraded to 22.23.2 (winget
   `OpenJS.NodeJS.22`) and `pnpm exec vitest run` starts. The `engines.node` floor is still worth
   setting so the next machine fails at install, not at test time.
@@ -18194,43 +18195,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   its batch count matches the `drain complete` log line. Incremental drains deliberately do not
   notify — hourly is too often to be worth a notification, and nobody is waiting on one.
 
-### [platform] OR-130 — a ratchet that cannot read its base blames the branch instead of saying so
-
-- **Lane: O** — `scripts/lib/base-ref.js`. **Added:** 2026-09-23, diagnosed while shipping DV-1.
-- **The conflation, confirmed by direct call rather than inferred.** `fileAtBase` returns `null` for
-  two different facts: *"the file does not exist at the base"* (which means the branch added it — a
-  real violation) and *"I could not read the base"* (which means nothing is known). `verdict` maps
-  `atBase === null` to **`fail`**, so the second becomes an accusation.
-  ```
-  fileAtBase('nosuchref', 'package.json')          -> null
-  verdict({ count: 1, limit: 0, atBase: null })    -> 'fail'
-  ```
-- **It fires here, intermittently, and it cost a gate run.** This clone is **shallow**, so
-  `git show origin/main:<path>` can fail when the blob is not in the pack. On 2026-09-23 a full
-  `pnpm ci:local` failed on `app/api/user/goals/route.ts` — a file **byte-identical to `main`** —
-  and the identical tree passed on a re-run. That is the second instance recorded under `OR-121`,
-  and the only one of the two that is explained.
-- **Why it matters more than one red run.** `base-ref.js` exists precisely so a branch is judged on
-  *what it changed*, not on what `main` already carries — its own header says a ratchet that asks
-  the wrong question *"read as 'your change was too big' when the change was eleven lines"*. This
-  defect reintroduces that failure through the back door, non-deterministically, which is worse: a
-  gate that accuses at random teaches the session reading it to stop believing it.
-- **The fix.** Distinguish the two cases — `fileAtBase` reports *unreadable* separately from
-  *absent* (a sentinel, or a second return) — and `verdict` refuses to return `fail` on unreadable,
-  returning `'unknown'` and letting the caller print *"could not read the base; not judged"*.
-  **Every caller of `countAtBase`/`lineCountAtBase`/`materialiseBaseTree` needs the same treatment**,
-  since they all funnel through the same `null`.
-- **⚠ Decide the CI case before writing it, because it inverts the argument.** CI checks out at
-  depth 1 (recorded in `CLAUDE.md`'s backlog-conflict rule), so if the base is unreadable *there*
-  too, "do not fail on unreadable" silently disables the ratchet everywhere rather than just
-  locally. **Measure what `resolveBaseRef`/`fileAtBase` actually return in a CI run first** — on a
-  `pull_request` `actions/checkout` gives the merge commit, which may make the base readable even at
-  depth 1. If CI can read it and only local cannot, the fix is safe and local stops lying. If
-  neither can, the honest fix is a louder failure with instructions, not a quieter one.
-- **Verification:** force the failure (`fileAtBase` against an unreachable ref) and confirm the
-  check prints "could not read the base" rather than naming an innocent file; then confirm on a
-  real CI run that the ratchet still fails a branch that genuinely adds one.
-
 ### [platform] OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away
 
 - **Lane:** O — the local gate and how it is invoked, not product code.
@@ -18251,8 +18215,13 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
     transiently when the blob is not in the pack — and a transient read failure is reported as
     *"your branch added this"*. Verified directly: `fileAtBase('nosuchref', 'package.json')` → `null`,
     and `verdict({count:1, limit:0, atBase:null})` → `'fail'`.
-  - **Filed as `OR-130` with the fix.** A ratchet that cannot read its base must say so, not blame
-    the branch.
+  - **`OR-130` shipped 2026-09-23** — a ratchet that cannot read its base now says so rather than
+    blaming the branch. **But the mechanism above is a hypothesis that did NOT survive testing:**
+    24 concurrent runs of `check-strict-request-schemas.js` reproduced nothing, with and without
+    the fix, and `git show origin/main:<path>` succeeds for every path when asked directly. So the
+    shallow-pack story is unconfirmed, the retry is a guess, and the diagnostic is the part that
+    earns its place — the next occurrence prints git's own reason, which is the evidence this
+    instance never produced.
   - **⛔ It does NOT close the first instance.** That one was `check-tz-aware-cache-guards.js`, which
     does not use `base-ref` at all — a grep for `resolveBaseRef` across both scripts matches only
     `check-strict-request-schemas.js`. Two flakes of similar *shape* are not evidence of one cause,
