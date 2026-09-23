@@ -171,3 +171,61 @@ describe('fetchWithRetry', () => {
     expect(fetchFn).toHaveBeenCalledTimes(4)
   })
 })
+
+/**
+ * LB-128 — the case `onExhausted` structurally cannot reach.
+ *
+ * `responded` is set by ANY `onData`, and a cached paint is an `onData`. So a cached value plus a
+ * failed revalidation stops the ladder on attempt 0 and leaves `onExhausted` silent forever: from
+ * inside this helper that is indistinguishable from success. It is the post-write case — the
+ * caller has just written and knows the painted value is stale.
+ */
+describe('fetchWithRetry — onRevalidateError (LB-128)', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers(); vi.clearAllMocks() })
+
+  /** cachedFetch's shape, but it paints from cache AND reports a failed revalidation. */
+  function stubCachedThenFails() {
+    return vi.fn(async (
+      _k: string, _u: string, _t: number,
+      onData: (d: never) => void,
+      opts?: { onRevalidateError?: (i: { status: number | null }) => void },
+    ) => {
+      onData({ cached: true } as never)
+      opts?.onRevalidateError?.({ status: 503 })
+      return true
+    })
+  }
+
+  it('forwards the failure even though the cached paint stopped the retry ladder', async () => {
+    const onRevalidateError = vi.fn()
+    const onExhausted = vi.fn()
+    const onData = vi.fn()
+    fetchWithRetry('k', '/u', 60, onData, () => false, 0, stubCachedThenFails(),
+      { onExhausted, onRevalidateError })
+    await flush()
+    await runOutRetries()
+
+    expect(onData).toHaveBeenCalledWith({ cached: true })
+    expect(onRevalidateError).toHaveBeenCalledWith({ status: 503 })
+    // The point of the entry: this is the channel that stays silent, and must.
+    expect(onExhausted).not.toHaveBeenCalled()
+  })
+
+  it('does not fire it after the caller is cancelled', async () => {
+    const onRevalidateError = vi.fn()
+    fetchWithRetry('k', '/u', 60, vi.fn(), () => true, 0, stubCachedThenFails(),
+      { onRevalidateError })
+    await flush()
+    expect(onRevalidateError).not.toHaveBeenCalled()
+  })
+
+  it('is not fired when the fetch simply succeeds', async () => {
+    const onRevalidateError = vi.fn()
+    fetchWithRetry('k', '/u', 60, vi.fn(), () => false, 0, stubFetch([0]),
+      { onRevalidateError })
+    await flush()
+    await runOutRetries()
+    expect(onRevalidateError).not.toHaveBeenCalled()
+  })
+})

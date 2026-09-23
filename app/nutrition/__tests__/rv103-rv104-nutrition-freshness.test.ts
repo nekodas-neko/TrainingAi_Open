@@ -30,6 +30,17 @@ describe('RV-103 — the balance refetch can report its own failure', () => {
       .toMatch(/onExhausted:/);
   });
 
+  it('also takes the channel that reaches a FAILED revalidation of a cached value (LB-128)', () => {
+    // `onExhausted` covers the post-write norm, where the invalidation emptied the key and the
+    // retries run against nothing. It structurally cannot cover the residue: a stale entry that
+    // survived the invalidation paints, `fetchWithRetry` counts that paint as a response and stops
+    // the ladder, and `cachedFetch` gates `onError` on `cached === null`. Taking only one of the
+    // two channels leaves the pre-write figure on screen with nothing said — which is what RV-103
+    // measured, reporting or staying silent on consecutive runs by cache state alone.
+    expect(hook, 'onExhausted alone cannot see a failure behind a cached paint')
+      .toMatch(/onRevalidateError:/);
+  });
+
   it('never writes null into the balance on an empty payload', () => {
     // `balanceForDate` is gated on `energyBalance?.date === selectedDate`, so a null makes the
     // budget and the macro targets DISAPPEAR rather than go stale — worse than what it replaced.
