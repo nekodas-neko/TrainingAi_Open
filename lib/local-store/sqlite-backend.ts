@@ -1372,7 +1372,7 @@ export class SQLiteLocalStore implements LocalStore {
              bmr_kcal=excluded.bmr_kcal, metabolic_age=excluded.metabolic_age,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
-           WHERE body_metrics.sync_status='synced'
+           WHERE body_metrics.sync_status='synced' AND body_metrics.deleted_at IS NULL
              AND excluded.updated_at > body_metrics.updated_at`,
           [r.date, r.weightKg, r.bodyFatPct, r.steps, r.calories, r.proteinG, r.carbsG,
            r.fatG, r.waterMl, r.restingHeartRate, r.hrvMs, r.spo2Pct, r.distanceKm,
@@ -1398,7 +1398,7 @@ export class SQLiteLocalStore implements LocalStore {
              body_state=excluded.body_state, sore_muscles=excluded.sore_muscles,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
-           WHERE mood_logs.sync_status='synced'
+           WHERE mood_logs.sync_status='synced' AND mood_logs.deleted_at IS NULL
              AND excluded.updated_at > mood_logs.updated_at`,
           [r.logDate, r.energyLevel, r.sleepQuality, JSON.stringify(r.bodyState),
            JSON.stringify(r.soreMuscles), r.updatedAt, r.deletedAt],
@@ -1741,7 +1741,7 @@ export class SQLiteLocalStore implements LocalStore {
            vo2max_est=excluded.vo2max_est, method=excluded.method, notes=excluded.notes,
            updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
            sync_status='synced'
-         WHERE fitness_tests.sync_status='synced'`,
+         WHERE fitness_tests.sync_status='synced' AND fitness_tests.deleted_at IS NULL`,
         [r.id, r.testType, r.date, r.durationSec, r.distanceM, r.avgHr, r.maxHr,
          r.restingHr, r.hrr1Bpm, r.vo2maxEst, r.method, r.notes, r.updatedAt, r.deletedAt],
       );
@@ -1768,7 +1768,7 @@ export class SQLiteLocalStore implements LocalStore {
            gate_action=excluded.gate_action, status=excluded.status,
            activity_log_id=excluded.activity_log_id, updated_at=excluded.updated_at,
            deleted_at=excluded.deleted_at, sync_status='synced'
-         WHERE prescribed_runs.sync_status='synced'`,
+         WHERE prescribed_runs.sync_status='synced' AND prescribed_runs.deleted_at IS NULL`,
         [r.id, r.planId, r.date, r.runType, r.durationMin, r.distanceKm, r.targetHrLow,
          r.targetHrHigh, JSON.stringify(r.targetZoneIds ?? []), r.rationale, r.gateAction,
          r.status, r.activityLogId, r.updatedAt, r.deletedAt],
@@ -1903,7 +1903,21 @@ export class SQLiteLocalStore implements LocalStore {
              logged_at=excluded.logged_at,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
-           WHERE food_logs.sync_status='synced'`,
+           -- DV-15: the "deleted_at IS NULL" half is what stops a stale pull RESURRECTING a
+           -- delete, and the sync_status half cannot do it. Measured on the S25 and reproduced
+           -- exactly against real SQLite: log a food, delete it within ~10 s, and the push confirms
+           -- while a pull fetched BEFORE the server delete is still in flight. markFoodLogSynced
+           -- flips the tombstone to 'synced' without removing the row, so by the time that pull
+           -- lands the clobber guard is satisfied -- and this SET writes deleted_at=NULL back over
+           -- it. The row ends deleted_at NULL and sync_status 'synced', so nothing will ever push
+           -- it again and the food reappears in the day's list, adding calories the server does
+           -- not count.
+           --
+           -- A timestamp comparison would also work and is deliberately NOT used: the local
+           -- tombstone's updated_at is device-set and the incoming row's is server-set, so clock
+           -- skew would decide it. "We hold a tombstone, so a row without one is stale" needs no
+           -- clock. Eight sibling arms carry the same clause for the same reason.
+           WHERE food_logs.sync_status='synced' AND food_logs.deleted_at IS NULL`,
           [r.id, r.date, r.mealTypeId, r.foodItemId,
            r.savedMealId ?? null, r.mealGroupId ?? null, r.mealGroupName ?? null, r.quantityMultiplier,
            r.loggedAt, r.updatedAt, r.deletedAt],
@@ -1934,7 +1948,7 @@ export class SQLiteLocalStore implements LocalStore {
              sort_order=excluded.sort_order, active=excluded.active,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
-           WHERE supplements.sync_status='synced'`,
+           WHERE supplements.sync_status='synced' AND supplements.deleted_at IS NULL`,
           [
             r.id, r.name, r.dose, r.defaultAmount ?? null, r.unit ?? null,
             r.startedOn ?? null, r.stoppedOn ?? null, r.dosePrompt ? 1 : 0,
@@ -1985,7 +1999,7 @@ export class SQLiteLocalStore implements LocalStore {
              source=excluded.source, source_ref=excluded.source_ref,
              updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
-           WHERE supplement_logs.sync_status='synced'`,
+           WHERE supplement_logs.sync_status='synced' AND supplement_logs.deleted_at IS NULL`,
           [r.id, r.supplementId, r.logDate, r.amount ?? null, r.unit ?? null, r.doseText ?? null,
            r.takenAt ?? null, r.vialStrengthMg ?? null, r.vialWaterMl ?? null, r.vialUnitsPerMl ?? null,
            isMeal ? 'meal' : 'manual', r.sourceRef ?? null,
@@ -2031,7 +2045,7 @@ export class SQLiteLocalStore implements LocalStore {
              severity=excluded.severity, started_date=excluded.started_date,
              resolved_date=excluded.resolved_date, updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
-           WHERE injuries.sync_status='synced'`,
+           WHERE injuries.sync_status='synced' AND injuries.deleted_at IS NULL`,
           [r.id, r.muscleName, r.notes, r.severity, r.startedDate, r.resolvedDate,
            r.createdAt, r.updatedAt, r.deletedAt],
         );
@@ -2065,7 +2079,7 @@ export class SQLiteLocalStore implements LocalStore {
              food_logging_completed_at=excluded.food_logging_completed_at,
              updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
-           WHERE day_checkins.sync_status='synced'
+           WHERE day_checkins.sync_status='synced' AND day_checkins.deleted_at IS NULL
              AND excluded.updated_at > day_checkins.updated_at`,
           [r.logDate, r.phase, r.physicalTiredness, r.mentalDrain, r.barelyMoved,
            r.hydration, r.lateHeavyMeal, r.wakeMood, r.perceivedRecovery, r.motivation,

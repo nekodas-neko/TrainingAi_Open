@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.23",
+    date: "2026-09-24",
+    changes: [
+      "A food you delete can no longer come back. If you deleted something within a few seconds of logging it, a refresh that had already started could bring it back and leave it there \u2014 still showing in the day's list, still counting toward your intake, and never syncing again. The same gap existed for supplements and their logs, injuries, mood, body metrics, fitness tests, prescribed runs and daily check-ins; all nine are fixed.",
+    ],
+  },
+  {
     version: "1.465.22",
     date: "2026-09-23",
     changes: [

@@ -18,6 +18,13 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-24 — backlog → 27294 (DV-15 reproduced and fixed), projectOverview → 12638
+
+DV-15 stays queued for its device pass test, and grew because the entry now carries the
+reproduction, the nine-arm classification, the rejected timestamp alternative, and the one window
+deliberately left open. `projectOverview.md` gains the owner-facing row: a food you deleted could
+come back and keep counting, it is fixed on nine surfaces, and the phone check is still owed.
+
 ## 2026-09-24 — backlog → 27265 (DV-14 re-measured, DV-13 corrected), projectOverview → 12614
 
 DV-14 recurred and is worse: production serves 1.465.17 against a `main` at 1.465.22, stuck roughly
