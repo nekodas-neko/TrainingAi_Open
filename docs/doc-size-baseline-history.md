@@ -15681,3 +15681,10 @@ sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to
 That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
 script's baseline recorded **0**, and a silent swap of one number for another would leave the next
 reader with no reason to trust the new one over their memory of the old.
+
+---
+
+## 2026-09-23 — Device Verification baton → 57 (−10) (device/probe-tooling)
+
+Rewritten in full for the probe sitting; the per-entry results table moved out, since every row it
+held is now in the backlog entry it describes. Ratcheted to the new size.
