@@ -561,6 +561,39 @@ below threshold and left in place for next time.
   the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
   or is exactly what BF-22 is feeling — and **neither answers it alone.**
 
+### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
+  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
+  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
+  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
+- **The conflict class, measured on this session rather than argued.** Every merging PR touches
+  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
+  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
+  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
+  being mergeable at the moment it was green. Another session's commit messages that day read
+  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
+- **What the owner already decided, and why this does not reopen it.** He took the cheap option
+  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
+  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
+  touched, it cannot stop two PRs touching them at once.
+- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
+  without losing the shrink-only property, which is the whole point of the check. That is the design
+  question to answer first, and it decides whether this is small or not.
+
+### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
+
+- **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
+  did for item 6 on 2026-09-22. **Added:** 2026-09-23 · Lane A, who created and then abandoned them.
+- **#1405 (RV-99), #1426 + #1435 (LA-128), #1428 + #1430 (RV-105).** Every one carries a sound,
+  gated diff; none is mergeable, and none can be repaired in place.
+- **Why, and it is not their diffs:** each was built in a repo the sandbox git proxy had shallowed,
+  so GitHub reads their history as unrelated to `main`, marks them conflicted, and **never gives
+  them a CI run**. The full mechanism and the `--unshallow` remedy are now in CLAUDE.md's Git
+  Workflow section. The work itself shipped from clean rebuilds: RV-105 as #1432, LA-128 as #1436.
+- **RV-99 is the one that still owes work** — its rebuild is not done, and #1405 is where its diff
+  lives until it is. Close that one last, or keep it until the replacement is open.
+
 ### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
 
 - **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
@@ -1467,29 +1500,6 @@ nothing structured saying why — and a human decides.
 - **Fix:** one categorical series palette in `packages/shared/src/chart-colors.ts` beside
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
-
-### [platform] LA-128 — the check-in route strips an unknown key instead of rejecting it, so the next field lands silently
-
-- **Lane:** A — `app/api/day-checkin/route.ts:14`. **Added:** 2026-09-22, Lane A while shipping
-  LB-124, which exists because of this shape.
-- **The hazard, in the words of the entry it cost:** `Body` is built with `.extend()` and is **not
-  `.strict()`**, so Zod drops a key it does not know rather than refusing the body. A client posting
-  a field the server has not learned yet gets **201 and writes nothing**. LB-124 was filed rather
-  than attempted for exactly this reason, and it says why it matters: *"a control that looks like it
-  works and stores nothing is worse than a 400"* — it would have burned TN-58's two-week pass test
-  and reported "no self-report available" when the truth was a dropped field.
-- **LB-124 did not close this.** It closed it for `vsYesterday` by making the key known. The next
-  field added to a check-in sheet before its server half lands hits the same silence.
-- **Fix:** `.strict()` on `Body`, so an unknown key is a 400 naming it.
-- **⚠ Why this is its own entry rather than a line in LB-124's diff.** `.strict()` starts REJECTING
-  bodies that succeed today. Every current client must be checked first — the morning sheet, the
-  evening review, and `pushMutations`, which parses the same two shared schemas. A sheet sending one
-  stale key would go from silently-ignored to a hard failure on every save, and on the outbox path
-  that is a no-retry poison pill. This is a small change with a real blast radius, which is the
-  argument for measuring it rather than for skipping it.
-- **Not established:** whether any current client actually sends an unknown key. Nobody looked —
-  the shape was found by reading the schema, not from a failure. Start there: it decides whether
-  this is a one-line change or a three-file one.
 
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 
