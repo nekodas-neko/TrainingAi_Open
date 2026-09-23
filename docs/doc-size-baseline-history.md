@@ -15648,3 +15648,16 @@ landed from `main` across three re-merges while this branch was open. What this 
 the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
 above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
 read as genuinely given back rather than absorbed into someone else's sweep.
+
+## 2026-09-23 — backlog 26780 → 26731, `projectOverview.md` 12376 → 12388 (RV-106/RV-107/RV-109)
+
+The backlog ratchets **down** 49 lines: RV-106, RV-107 and RV-109 shipped whole and left the queue,
+and the batch `stale-surface-subscribe` is now empty. Nothing was filed against them — the one
+finding the work turned up (that `useStressDay` was already correct, which RV-106 had left
+untraced) is an answer rather than new work, so it lives in the code as an asserted comment.
+
+The twelve lines on `projectOverview.md` are one Known-Issues entry, and it is there for the device
+check that is owed rather than the fix that landed. Its pointer to RV-124 is the part worth the
+space: that probe settles this whole class by measurement, so the next session reading the index
+learns where the answer is coming from instead of re-reasoning it from source — which is precisely
+what these three entries show cannot distinguish a working subscription from a missing one.
