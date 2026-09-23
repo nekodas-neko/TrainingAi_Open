@@ -16,6 +16,23 @@
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
   Anything new gets a `projectOverview.md` Known-Issues row or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
+- **The Orchestrator reads the owner's in-app reports at session start** — *Report an Issue* on
+  `/more` writes to `feedback_submissions`, and the read is one query on the same endpoint:
+  ```
+  curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \
+    -H "Authorization: Bearer $CLAUDE_DB_QUERY_SECRET" -H 'Content-Type: application/json' \
+    -d '{"sql":"SELECT id, type, title, description, created_at, screenshot_bytes FROM claude_ro.feedback_submissions ORDER BY created_at DESC LIMIT 25"}'
+  ```
+  **The capability has existed since migration 142 and nobody was using it.** The loop is **read →
+  review → file a backlog entry at the right priority with a lane → move the watermark** in
+  `docs/agents/state/orchestrator.md`, which is what stops the same report being re-read forever
+  (owner decision 2026-09-23: a watermark, deliberately no status column and nothing the reporter
+  sees in the app). A report is never answered by replying to it — it becomes a queue entry, or it
+  is recorded as not-a-defect with the reason, per **No orphaned findings**.
+  **Two things this read cannot tell you.** The view is **row-scoped to the owner**, so a zero means
+  *none of the owner's*, never *nobody has reported anything*. And **`screenshot_bytes` is a size,
+  not an image** — the view withholds `screenshot_data`, so a UI bug arrives with its most
+  informative half missing (`OR-137`).
 - **Also at session start, read the database size** — one query, same endpoint, beside the `error_events` read:
   ```
   curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \

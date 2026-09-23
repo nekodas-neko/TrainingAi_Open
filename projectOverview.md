@@ -2771,7 +2771,7 @@ supplement and confirm `SELECT deleted_at FROM supplements WHERE id=…` is set.
 source-level scans, because `getLocalStore` returns null under node and there is no local SQLite to
 drive. Rows blanked by an earlier delete are not repaired in place; the next pull replaces them.
 Detail:
-[`docs/overview/entries/2026-09-23-lane-a-dv10-supplement-delete-tombstone.md`](docs/overview/entries/2026-09-23-lane-a-dv10-supplement-delete-tombstone.md).
+[`2026-09-23-lane-a-dv10-supplement-delete-tombstone`](docs/overview/history-2026-09-23-folded-1.md#2026-09-23-lane-a-dv10-supplement-delete-tombstone).
 
 ### [readiness] ⚠️ Readiness no longer reaches 100, and that is the price of TN-60 — stored days unchanged until the batched recompute
 
@@ -2838,7 +2838,7 @@ uncommitted, and fail with `exercise_estimates_user_id_fkey` when it commits —
 first. **Both exposed files are fixed; the underlying shared-database hazard is not.** The other
 162 files are untouched, and a test that deleted a user *and* wrote a migration-touched table in
 one explicit transaction could still deadlock — none does today. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-dv3-migration-user-race.md`](docs/overview/entries/2026-09-23-lane-a-dv3-migration-user-race.md).
+[`2026-09-23-lane-a-dv3-migration-user-race`](docs/overview/history-2026-09-23-folded-1.md#2026-09-23-lane-a-dv3-migration-user-race).
 
 ### [platform][nutrition] ⚠️ Four sync confirm arms could not mark a pushed row synced — NOT device-verified (DV-5, 2026-09-23)
 
@@ -2856,7 +2856,7 @@ SQLite file. **DV-5's other half is deliberately not claimed:** one `set_logs` r
 2026-09-19 whose `exercise_logs.workout_session_id` is absent from the local `workout_sessions`
 table is *not* explained by this fix (`workout_log` confirms with a keyed `UPDATE`, not a
 read-back), and is carved out as **DV-8**, `Gate: device`. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-dv5-pending-after-push.md`](docs/overview/entries/2026-09-23-lane-a-dv5-pending-after-push.md).
+[`2026-09-23-lane-a-dv5-pending-after-push`](docs/overview/history-2026-09-23-folded-1.md#2026-09-23-lane-a-dv5-pending-after-push).
 
 ### [nutrition][app-shell] 🟠 Home's "review your day" does nothing on the first tap of a session (LB-129, 2026-09-23) · found, not fixed
 
@@ -3384,20 +3384,6 @@ code path from the system gesture. What CI does hold is the premise:
 unchanged while a sub-route push grows it. **Check on device:** from Health/Workout/Nutrition/More
 the back gesture lands on Home; from Home it minimises; from a meal or day opened on top of a tab it
 returns to that tab, not Home.
-
-### [nutrition] ⚠️ The meal builder adds saved meals, and the arithmetic is not device-verified (BF-161, 2026-09-14)
-
-Shipped in v1.456.8. The owner asked for it — *"For the meal builder it should let you add
-meals/saved items as part of the meal builder"* — and chose flattening over real nesting, which
-`saved_meal_items.food_item_id` being NOT NULL would have made a migration: *"Okay lets go with
-flatten for now."*
-
-**Two things are owed on the S25.** ① Build a meal from **two** saved meals and confirm the
-ingredient rows, their quantities and the macro total match the sum of the sources — the harness
-reaches the tab and proves the wiring, but cannot judge the arithmetic against a real library.
-② That the snapshot behaviour is not surprising in use: a meal built from a saved meal does **not**
-change when the source is edited later, which is the accepted cost of not paying for a nullable
-`food_item_id` and recursive macro computation.
 
 ### [nutrition] ⚠️ The vial sheet's rewrite is not device-verified (BF-153, 2026-09-13)
 

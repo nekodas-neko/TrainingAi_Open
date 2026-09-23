@@ -2342,3 +2342,19 @@ across a screen swap and a force-close. Then delete a food logged on the web on 
 which is the case the filed trace did not cover.
 
 - **📱 Device-verified 2026-09-23 (sweep 2, S25, APK 1.460.4, web v1.465.10): PASS — a food deleted OFFLINE queued (outbox food_logs pending), drained on reconnect, stayed gone across a tab swap and a force-stop, and the server list no longer holds it. (A separate race resurrected a different deleted row the same evening — DV-15.)** Moved here by the Device Verification agent.
+
+### [nutrition] ⚠️ The meal builder adds saved meals, and the arithmetic is not device-verified (BF-161, 2026-09-14)
+
+Shipped in v1.456.8. The owner asked for it — *"For the meal builder it should let you add
+meals/saved items as part of the meal builder"* — and chose flattening over real nesting, which
+`saved_meal_items.food_item_id` being NOT NULL would have made a migration: *"Okay lets go with
+flatten for now."*
+
+**Two things are owed on the S25.** ① Build a meal from **two** saved meals and confirm the
+ingredient rows, their quantities and the macro total match the sum of the sources — the harness
+reaches the tab and proves the wiring, but cannot judge the arithmetic against a real library.
+② That the snapshot behaviour is not surprising in use: a meal built from a saved meal does **not**
+change when the source is edited later, which is the accepted cost of not paying for a nullable
+`food_item_id` and recursive macro computation.
+
+- **📱 Device-verified 2026-09-24 (sweep 3, S25, APK 1.460.4, web v1.465.17): PASS.** Build a Meal → Your meals → Protein Granola (1 row, 45 g, 163 kcal) + Nachos (3 rows, 175 g, 488 kcal, matching its source) → header *"651 kcal each"* = 163 + 488. The builder shows no macro total, so there was none to compare. Moved here by the Device Verification agent.

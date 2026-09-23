@@ -1,22 +1,20 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-23 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-136 (LB-135 filed 2026-09-23). ⚠ The grep counts THIS LINE, so it reads one high —
-check the journal too and take what the grep returns, not +1.
+**Next ID:** LB-138 (LB-137 filed 2026-09-23) — ⚠ the grep counts THIS LINE, so take what it returns, not +1.
 
 ## Now
 
-`home-ia-merge` part 1 in flight (RV-116 + RV-119's APK banner). Fifteen shipped today.
+RV-120 shipped — deleted the `aiVolume` card, already superseded server-side. 7 PRs merged today.
 
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; do
 not cut a branch until there is something to commit, or the stop-hook flags a scratch branch.
 
-**⚠ RV-117 and RV-118 (`health-ia-merge`) CARRY THE SAME BROKEN GATE as RV-119 — see LB-135.** All
-three say "Owner gate SATISFIED … mockup shown at 384 px dark … Build to it", and the mockup is not
-in the repo. Do not invent the layout and do not re-ask what he already answered: re-make the
-mockup, SAVE IT under `docs/design/`, get the yes. Read the gate line before planning either.
+**RV-117/118/119 are `Lane: O` — leave them.** Their owner gate IS satisfied; the mockup lives in
+the Orchestrator's chat and it is exporting it to `docs/design/`. Do not take them back, do not
+re-ask him, do not re-make the mockup.
 
 **BF-177's plan (scratchpad) is AMENDED** — LB-128 shipped as #1456, so its premise that
 `cachedFetch` gates `onError` on `cached === null` may no longer hold. Re-read `lib/sqlite/cache.ts`.
@@ -25,9 +23,8 @@ mockup, SAVE IT under `docs/design/`, get the yes. Read the gate line before pla
 
 - **LB-134 is the owner's** — branch protection. Until he rules, read the `Tests` job CONCLUSION
   before every merge.
-- **LB-129 shipped an UNPROVEN fix** (`Gate: device`). Do not reopen it here: `pnpm dev` compiles
-  cold chunks on demand and `next start` cannot reach the local Postgres, so the harness provably
-  cannot discriminate. The entry has the measurement.
+- **LB-129 shipped an UNPROVEN fix** (`Gate: device`) — do not reopen here; the harness provably
+  cannot discriminate (dev compiles cold chunks; `next start` can't reach local PG). Entry has it.
 - Device checks are DV's to RUN, mine to RECORD. A FAILED check comes BACK as work.
 
 ## Claimed paths — none.
@@ -37,15 +34,21 @@ mockup, SAVE IT under `docs/design/`, get the yes. Read the gate line before pla
 - **⚠ THE MERGE CALL IS NOT A GATE HERE.** #1467 squash-merged with `Tests` FAILING and returned
   success. Confirm run completed+success, or `list_workflow_jobs` once for the five required jobs.
   `get_job_logs failed_only:true` returning 0 only rules OUT failure. E2E is advisory (~31 min).
-- **READ THE ENTRY BEFORE ACTING ON ITS TITLE.** I told the owner the IA batches needed mockups; the
-  entries already recorded the gate as satisfied. One read would have saved re-asking him.
-- **`main` is red more often than anyone notices** — twice on 2026-09-23, both a pinned snapshot not
-  updated by the change that invalidated it. Reproduce at `origin/main` in a worktree before
-  assuming a suite failure is yours.
-- **Another lane may be fixing the same thing right now** — three of mine were superseded mid-PR.
-- **NEVER pipe merge or gate output through `tail`, and never read `$?` through a pipe** — the pipe's
-  status is not the script's. Both hid real failures. After a merge: `git grep -l "^<<<<<<< " -- .`
+- **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481's merge silently deleted RV-117
+  and RV-118; I checked only the three headings I had edited and shipped the loss. Every line of
+  `diff <(git show origin/main:docs/implementation-backlog.md|grep '^### '|sort) <(grep '^### '
+  docs/implementation-backlog.md|sort)` must be an add or remove you INTENDED.
+- **A `docs/overview/` conflict is TWO FOLDS on one `history-<date>-folded-N.md`, and the archive
+  PRE-EXISTS, so it conflicts as ordinary appended content.** Never splice: take origin/main's
+  `docs/overview/` whole, then re-run `fold-journal-entries.js` once over the merged tree.
+- **READ THE ENTRY BEFORE ACTING ON ITS TITLE, and the CODE before acting on the entry.** I told
+  the owner the IA batches needed mockups (they did not), and RV-120's own comment promised a merge
+  that `weekly-muscle-sets/route.ts` had already shipped. Both were one read away.
+- **A gate's exit code must be read DIRECTLY — not through a `tail` pipe, not via `$?` after a
+  pipe, not via `&&` into `git commit` (an intervening `echo` succeeds, so a RED gate still
+  commits).** All three shipped a red push today. Gates to a file, read the code, THEN commit.
+- **An auth-gated page never compiles from a dev-server GET** — `curl -L /health` follows to
+  `/sign-in`, so only that compiles. `pnpm build` is what exercises the change; say so honestly.
 - **A spec that passes with AND without the fix is worse than none** — delete it. Always control-run.
 - **`npx tsc --noEmit` DOES NOT typecheck test files** — Build runs `check-test-typecheck.js`.
-- **Match a call/tag to its balanced close, never a line window** — four false findings in one day.
 - **`total_count: 0` is a stale base or a conflicted PR, never slow CI.** Re-merge and push.
