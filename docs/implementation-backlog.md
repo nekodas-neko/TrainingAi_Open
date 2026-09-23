@@ -475,9 +475,31 @@ below threshold and left in place for next time.
 
 ### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
 
-- **Update, 20:27 AEST:** production caught up to **v1.465.16** by itself (confirmed from a PC and
-  from the APK after a restart). **Something that stopped is not something that was fixed** — why six
-  merges sat undeployed for two hours is still unknown; Railway's deploy log is still the first step.
+- **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
+  "caught up by itself" update below was the lull, not the end.** Live `/api/version` answers
+  **`1.465.17`**; `main`'s `package.json` is **`1.465.22`**. 1.465.17 landed with **#1473 at
+  20:36 AEST on 09-23**, so production has been stuck for roughly **TEN HOURS**, against the two
+  the entry was filed for.
+  **Five merges are unshipped:** #1474 (23:32, post-push guard), #1477 (00:40, nutrition chunk
+  nesting), #1478 (01:07, route animations), #1479 (01:35, More sub-tabs), #1481 (03:34, Home's
+  APK banner). Every one is a UI change nobody can see and nobody can device-verify.
+  **The shape is a long stall, then a catch-up, then another stall** — not a single stuck deploy.
+  That distinction matters for the diagnosis: a deploy that is *failing* would stay failed, so
+  something is either batching, throttling, or intermittently succeeding.
+  **Still not established, and still the first step: Railway's deploy log.** It is not reachable
+  from the sandbox — no Railway API or CLI here — so this needs the owner or the device agent's
+  machine. Nothing else in this entry can move until someone reads it.
+- **⚠ This weakens DV-13's conclusion, and the correction belongs on both entries.** DV-13 records
+  that the 8-minute outage at 20:04 correlated with a production deploy from the 20:03 merge
+  (#1468). **That attribution assumed merges were deploying promptly, which this entry shows they
+  were not** — at 20:22 production was still serving 1.465.10, six versions behind. The outage is
+  still deploy-SHAPED (a database-free route down for minutes, then instantly healthy), but *which*
+  deploy, and whether it was a batched catch-up rather than #1468's, is **not** established. The
+  merge-cadence advice that came out of DV-13 stands on its own footing regardless.
+- **Historical, 20:27 AEST 09-23:** production caught up to **v1.465.16** by itself (confirmed from
+  a PC and from the APK after a restart). **Something that stopped is not something that was fixed**
+  — and it has now stopped and restarted twice, which is the evidence for that rule rather than
+  against it.
 
 - **Lane:** A — Railway's deploy for `main` (the build/start/health check), not application code.
 - **Added:** 2026-09-23 20:25 AEST · Device Verification, noticed while re-checking DV-13.
@@ -563,6 +585,15 @@ below threshold and left in place for next time.
   and both read `[cause: timeout exceeded when trying to connect]` (`/api/day-timeline`,
   `/api/body-battery`), which is a POOL-ACQUISITION failure as a new container warms, not a slow
   query and not a blocked loop. Railway's own logs are still unread (no access from the sandbox).
+- **⚠ CORRECTED 2026-09-24 by DV-14's re-measurement — the deploy ATTRIBUTION above is weaker than
+  it reads.** The correlation argument assumed a merge deploys promptly. DV-14 measured that it does
+  not: at 20:22 AEST production was still serving **1.465.10** while `main` was at **1.465.16**, so
+  the 20:03 merge (#1468) had almost certainly NOT deployed by 20:04. The outage remains
+  deploy-shaped — a database-free route unreachable for minutes, then instantly healthy, which is a
+  container being replaced — but **"#1468's deploy, 70 seconds later" is not established**, and a
+  batched catch-up of several queued merges fits the same evidence. Read the two entries together.
+  The merge-cadence conclusion is unaffected: several merges in a few minutes is still several
+  restarts, whenever they land.
 - **⚠ The routes are nevertheless doing real unbounded work, and that half is now fixed.**
   `device-metrics` called `toAestDay` — `formatInTimeZone` — **once per raw row**. Measured: the
   owner's default `?days=3` window really holds **58,856 rows**, and the formatter costs **11.2 us**
