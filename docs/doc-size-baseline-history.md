@@ -15800,3 +15800,18 @@ sites went into the baseline, four of them the sync provider's sanctioned warm p
 still need judging by where they mount. Recording that here matters because the next reader will see
 25 tracked sites and a green check and conclude the ground is covered. It is not; RV-104, RV-106,
 RV-107 and RV-109 are the entries that own those verdicts.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26340, `projectOverview.md` → 12391 (RV-99, half)
+
+The backlog GROWS on an entry that shipped half its work, which is the right direction here. RV-99
+was one heading covering two jobs of very different size — retargeting `scoreBand()` (11 consumer
+files, done) and migrating 183 hardcoded hexes across 68 files (not done). The rewritten entry costs
+lines because it now carries three things the original did not: the corrected file count, the four
+modules whose hex is an identity colour and must NOT be migrated, and the hazard that actually
+blocked the work.
+
+That last one is why this is worth the space. The entry warned about Chart.js canvas and
+`resolveColor()`; no consumer touches a canvas. What would have broken is `accentCardStyle`, which
+returned a bare background with no gradient, no border and no error for any non-hex input. A future
+session reading only the original entry would check for canvases, find none, and ship the silent
+regression.
