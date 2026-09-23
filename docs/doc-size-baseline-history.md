@@ -15931,3 +15931,28 @@ spend most of their length on what is **not** claimed: the pass test is on-devic
 run, and DV-5's `set_logs` half is explicitly excluded. That is the expensive half of an honest
 entry, and it is the half that stops the next reader treating "DV-5 shipped" as "the device is
 clean".
+
+## 2026-09-23 — `implementation-backlog.md` 27225 → 27227 for LA-130 and the LA-129 correction
+
+LA-130 records a sandbox defect whose whole danger is that it points somewhere else: a bare
+`git fetch origin main` re-shallows this clone, the branch loses its ancestry, GitHub marks the PR
+conflicted, and **a conflicted PR is never given a workflow run** — so the symptom is
+`total_count: 0`, which reads as slow CI. Four PRs were abandoned to that before the mechanism was
+found. Most of the entry's length is the part that stops it being re-diagnosed: the frequency
+measurement (four fetches, four re-shallows), the reason a documented rule is not enough, and the
+three fix options with the one unestablished question named.
+
+LA-129's note grew because the first correction was **wrong and had to be recorded as wrong**. It
+moved the entry below the DEVICE PROBE block, which changed nothing — those entries are gated and
+never reach READY, so LA-129 was still position 1. The lesson is in the entry now: queue position
+is verified with `next-item.js --lane A --all`, not by reading the file, because the file's order
+and READY's order are different things.
+
+**The number is +2 for a change that added 34 lines, and that is worth explaining rather than
+enjoying.** `main` carries a baseline of **27225** against a file of **27192** — 33 lines of slack,
+left behind when a merge resolution recomputed the baseline on a working tree larger than the
+squash that actually landed. So this change fitted almost entirely inside slack the ratchet had
+already granted. The mechanism is RV-134's (the ratchet attributing a size to the wrong branch),
+seen from the other side: there it blames a branch for a shrink it did not cause, here it quietly
+funds a branch's growth from one. Recorded here rather than "corrected" — dropping the baseline to
+27192 in this PR would be exactly the unattributed ratchet move RV-134 is about.
