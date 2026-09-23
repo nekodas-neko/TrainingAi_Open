@@ -15800,3 +15800,17 @@ sites went into the baseline, four of them the sync provider's sanctioned warm p
 still need judging by where they mount. Recording that here matters because the next reader will see
 25 tracked sites and a green check and conclude the ground is covered. It is not; RV-104, RV-106,
 RV-107 and RV-109 are the entries that own those verdicts.
+
+## 2026-09-23 — `projectOverview.md` and the backlog both rise (E2E path filter + the shallow-fetch rule)
+
+The backlog grows by two entries rather than shrinking, which is the right direction here: LA-129
+files what owner decision item 5 named as the better answer and explicitly left unfiled, and OR-132
+hands the Orchestrator five PRs that need the owner's authorisation to close. Neither is new work
+invented — one is an orphaned finding given a queue entry, the other is cleanup Lane A created and
+cannot authorise itself.
+
+`projectOverview.md` spends its block on the git-proxy defect rather than on the CI tweak, because
+the tweak is one `grep -vE` and the defect cost four abandoned PRs. The part worth the lines is the
+discrimination: a shallow-grafted branch and a stale base produce the **same** observable —
+`get_check_runs` reading `total_count: 0` — and CLAUDE.md already documented the stale-base reading,
+so a session that hits this will reach for the wrong remedy first. It did.
