@@ -1084,12 +1084,21 @@ below threshold and left in place for next time.
 - **Found by reading every `pushMutations` call site** in `app/`, `components/` and `lib/` — the
   sweep RV-108 prompted. RV-108 itself was the only site with NO invalidation; these are the weaker
   version of the same defect, and they split into two groups that need different judgements.
-- **① No invalidation at all, different domains — the same class as RV-108:**
-  `components/health/sleep/manual-bedtime-card.tsx:69` (domain `manual_bedtime`, and the file
-  contains no `invalidate` call of any kind), and `app/nutrition/use-plan-meal-logging.ts:231` (the
-  decline/delete branch; the file's own comment at line 61 says the *other* path fires
-  `pushThenRevalidate` behind itself, so this branch looks like an omission rather than a decision —
-  **verify before treating it as one**).
+- **① IS EMPTY — both candidates were checked and are CORRECT.** They were filed as "no
+  invalidation at all, same class as RV-108" and that was wrong; corrected the same session, before
+  the entry could send anyone to patch a working file.
+  **`app/nutrition/use-plan-meal-logging.ts:231`** — nothing in `cache-groups.ts` or
+  `cache-ttl.ts` mentions `plan-meal`/`plan_meal`, the only reader is the hook itself going straight
+  to `store.getPlanMealAnswers(date)`, and the screen repaints optimistically from React state.
+  There is nothing to evict. (The file's line-61 comment about a sibling firing `pushThenRevalidate`
+  is about `logPlanMeal`, which writes `food_logs` — a domain that IS cached. Different domain,
+  different answer.)
+  **`components/health/sleep/manual-bedtime-card.tsx:69`** — no cached key holds a manual bedtime,
+  and the derivative it feeds is not cached either: `/api/sleep-sessions` does **not** return
+  `manualSleepStart` (Q-519), and `/api/user/bedtime-estimate`, its only consumer, is fetched by no
+  client code. Nothing a cache holds changes.
+- **So RV-108 really was the only genuine missed invalidation in the app**, which is worth more than
+  the two entries this one nearly created.
 - **② Immediate half only, missing `pushThenRevalidate`:**
   `app/session-select/components/log-value-sheet.tsx`, `components/mood-checkin-sheet.tsx`,
   `components/morning-checkin-sheet.tsx`, `components/nutrition/end-of-day/end-of-day-review.tsx`,
@@ -1100,6 +1109,10 @@ below threshold and left in place for next time.
   the payload is the whole of what any reader wants, the immediate call is sufficient and adding
   the second is noise. **Decide it per site against what the group's keys actually feed**, and do
   not sweep ② mechanically; that is how a correct file gets a redundant call.
+- **The test that emptied ① is the one to apply to ②:** a bare `pushMutations` is only a defect if
+  some CACHED key holds what the write changed. Check `cache-groups.ts`/`cache-ttl.ts` for a key,
+  then check whether the readers go through `cachedFetch` or straight to the local store. Four sites
+  looked like the defect from their call line today and were correct once read that way.
 - **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
   on the device that wrote the row. RV-108 left the same question open, and it bounds how much
   group ② is worth.

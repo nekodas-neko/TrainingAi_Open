@@ -16179,7 +16179,7 @@ being left in the journal. The row also records what is **not** yet true — sto
 old scores until the batched re-derivation, so the pass test's share-of-movement claim is unproven
 rather than met.
 
-## 2026-09-23 — backlog 27302 → 27347 (RV-108 + LB-132 + two re-channellings, +45)
+## 2026-09-23 — backlog 27302 → 27360 (RV-108 + LB-132 + two re-channellings, +58)
 
 Three things, and the largest is the one that shipped no code.
 
@@ -16188,6 +16188,18 @@ expensive part. `log-value-sheet.tsx` writes the same domain through the same sh
 invalidation within ten lines of its push; it calls the group 39 lines later inside the same `try`.
 A future session reading only the fix would see the same window and "finish the job", producing a
 double invalidation on a correct file. That warning is worth more lines than the fix itself.
+
+**LB-132 was filed wrong and corrected in the same PR, which is where the extra lines went.** Its
+group ① named two sites as "no invalidation at all, the same class as RV-108". Both are correct.
+Neither write touches anything a cache holds — plan-meal answers have no cached key and are read
+straight from the local store; a manual bedtime feeds only `/api/user/bedtime-estimate`, which no
+client fetches, and `/api/sleep-sessions` does not return `manualSleepStart` at all. Left as filed,
+the entry would have sent the next session to patch two working files — the same harm the
+`log-value-sheet` warning three paragraphs above exists to prevent, committed by the very entry
+warning about it.
+
+The correction is worth its lines twice over: group ① being empty means **RV-108 really was the only
+genuine missed invalidation in the app**, which is a stronger claim than the fix itself.
 
 **LB-132** is new and holds the rest of the sweep, split by how wrong each site is: two with no
 invalidation at all, five with the immediate half and no post-push half. It says explicitly not to
