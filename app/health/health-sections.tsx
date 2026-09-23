@@ -27,7 +27,6 @@ import { RhrHrvSpo2Card } from "@/components/health/body-cards/rhr-hrv-spo2-card
 import { MeasureHrNow } from "@/components/health/measure-hr-now";
 import { HrDayCard } from "@/components/health/hr-day-card";
 import { HrRecoveryProfileCard } from "@/components/health/hr-recovery-profile-card";
-import { AiWeeklyVolumeCard } from "@/components/health/ai-weekly-volume-card";
 import { StrengthProgressCard } from "@/components/health/strength-progress-card";
 import { StrengthTrendCard } from "@/components/health/strength-trend-card";
 import { GoalsProgressCard } from "@/components/health/goals-progress-card";
@@ -689,7 +688,6 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} sessions={activeSessions} />;
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
-      case "aiVolume":        return <AiWeeklyVolumeCard key="aiVolume" />;
       case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
       case "movementBalance": return <MovementBalanceCard key="movementBalance" />;
       case "muscleMap":       return <BodyMuscleCard key="muscleMap" muscleSets={muscleSets} recoveryMuscles={recoveryMuscles} />;

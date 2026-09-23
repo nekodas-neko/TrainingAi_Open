@@ -64,7 +64,6 @@ const BASELINE = {
   'components/checkin/readiness-checkin-card.tsx': 1,
   'components/exercise-history-sheet.tsx': 1,
   'components/google-sign-in.tsx': 4,
-  'components/health/ai-weekly-volume-card.tsx': 1,
   'components/health/body-cards/rhr-hrv-spo2-card.tsx': 15,
   'components/health/body-cards/sleep-card.tsx': 5,
   'components/health/body-muscle-card.tsx': 1,
