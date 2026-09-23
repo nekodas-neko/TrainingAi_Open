@@ -74,6 +74,9 @@ const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baselin
 // `limit` (60, on FOLDABLE entries) remains the finer trigger; this one catches a window that has
 // stopped being recent regardless of what is cited.
 const FIX = process.argv.includes('--fix');
+// LA-129: a deliberate compaction sweep lowers baselines that carry tolerated slack. Ordinary
+// `--fix` no longer does — see the FIX branch below for why that was the whole conflict class.
+const TIGHTEN = process.argv.includes('--tighten');
 const fixed = [];
 
 const BASELINE = loadBaselines(path.join(root, BASELINE_DIR));
@@ -109,6 +112,9 @@ const slack = [];
 const tolerated = [];
 
 const inherited = [];
+// `--fix` results it deliberately did NOT write, reported so the choice is visible rather than
+// looking like the flag silently did nothing.
+const withheld = [];
 
 // Q-424: the ratchet asks whether THIS BRANCH grew the file, not whether the file is over its number.
 // Those are different questions the moment two PRs are open at once, and only the first one has an
@@ -137,12 +143,25 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
   // one (Q-424) because the fix there is moving prose, not editing a number.
   const call = verdict({ count: lines, limit, atBase: null });
   if (FIX) {
-    // Both directions: over the number and under it. The slack case is a failure too, so a `--fix`
-    // that only ever raised would leave the gate red and look broken.
-    if (call !== 'ok') {
-      fs.writeFileSync(path.join(root, baselinePathFor(rel)), `${lines}\n`);
-      fixed.push(`${baselinePathFor(rel)}: ${limit} → ${lines}`);
+    // Both directions: over the number and under it. A `--fix` that only ever raised would leave
+    // the gate red on slack that FAILS, and look broken.
+    //
+    // **But it must not lower a baseline for slack the check TOLERATES (LA-129).** RV-134 gave
+    // every file a `max(25, 2%)` band precisely so an ordinary PR need not touch its `.size` file;
+    // `--fix` then lowered it anyway, so every PR that struck a backlog entry — which is nearly
+    // every PR — wrote to `docs/doc-size/docs/implementation-backlog.md.size`, and two concurrent
+    // PRs conflicted there. Measured 2026-09-23: three consecutive base races on one branch in
+    // forty minutes, every one of them on that file and every one self-inflicted by this line.
+    // Lowering is still right, it is just a deliberate act — `--tighten`, or the compaction sweep.
+    if (call === 'ok') continue;
+    if (call === 'slack' && !TIGHTEN && limit - lines <= slackBand(limit)) {
+      withheld.push(
+        `${baselinePathFor(rel)}: left at ${limit} (file is ${lines}, within its ${slackBand(limit)}-line band).`,
+      );
+      continue;
     }
+    fs.writeFileSync(path.join(root, baselinePathFor(rel)), `${lines}\n`);
+    fixed.push(`${baselinePathFor(rel)}: ${limit} → ${lines}`);
     continue;
   }
   if (call === 'ok') continue;
@@ -231,8 +250,14 @@ if (FIX) {
     fixed.forEach((f) => console.log('  • ' + f));
     console.log('  Add a note to docs/doc-size-baseline-history.md saying WHY the document moved —');
     console.log('  the number is arithmetic, the reason is not, and the reason is the point.');
-  } else {
+  } else if (!withheld.length) {
     console.log('check-doc-index-size --fix: every baseline already matches its document.');
+  }
+  if (withheld.length) {
+    console.log(`check-doc-index-size --fix: left ${withheld.length} baseline(s) alone — slack within band (LA-129):`);
+    withheld.forEach((w) => console.log('  • ' + w));
+    console.log('  This is what stops every PR touching a .size file and colliding there. Pass');
+    console.log('  --tighten to lower them deliberately, which is the compaction sweep\'s job.');
   }
   process.exit(0);
 }
