@@ -716,9 +716,19 @@ said nothing, because both had skipped inside it.
   `total_count: 0` forever while CI runs normally for every other branch. That looks exactly like
   the stale-base tell above and is a different thing — chasing the wrong one cost four PRs
   (#1426, #1428, #1430, #1435, all abandoned with sound diffs).
-  **So: fetch with `git fetch --unshallow origin` (or `--deepen=N`) EVERY time, and re-check
-  `test -f .git/shallow` after — a plain fetch re-grafts at the new tip, so one unshallow does not
-  immunise the next fetch.** Two things distinguish this from a stale base, and both are cheap:
+  **⚠ The "every time" version of this rule was WRONG and is corrected here (LA-130, 2026-09-23).**
+  It said a plain fetch re-grafts at the new tip, so one unshallow does not immunise the next fetch.
+  **Measured on a purpose-built `--depth=1` clone: it does.** After one `git fetch --unshallow
+  origin`, three bare `git fetch origin main` calls and two fetches of branch tips the clone had
+  never seen all left `.git/shallow` absent, one root, and a valid merge-base. What a bare fetch
+  cannot do is *deepen* a clone that is still shallow — so the four fetches that looked like
+  "it came back" were four fetches on a clone that had never successfully been unshallowed. It never
+  left.
+  **So: `git fetch --unshallow origin` ONCE per clone, and every fetch after it is ordinary.** It
+  fatals with *"on a complete repository does not make sense"* if the clone is already whole, so
+  guard it with `test -f .git/shallow` rather than running it blind. The session-start hook now does
+  this for `$CLAUDE_PROJECT_DIR`; a clone you make yourself in the scratchpad is yours to unshallow.
+  Two things distinguish this from a stale base, and both are cheap:
   `git rev-list --max-parents=0 HEAD | wc -l` returning more than 1, and
   `git merge-base HEAD origin/main` returning empty. When a local repo has already been poisoned,
   `git clone` (no `--depth`) into the scratchpad gives a sound history — that is what unblocked it,

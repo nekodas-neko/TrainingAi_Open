@@ -18,6 +18,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — CLAUDE.md → 942 (+10, a rule that was wrong), backlog → 27198 (LA-130 shipped, −26)
+
+The Git Workflow shallow-fetch rule said to fetch with `--unshallow` on **every** fetch, because
+"a plain fetch re-grafts at the new tip". Measured on a purpose-built `--depth=1` clone, that is
+false: one unshallow immunises the clone permanently, including against branch tips it has never
+seen. The ten lines are the correction plus the measurement, kept because the wrong version of this
+rule is what the four abandoned PRs were diagnosed under, and a reader who has seen it needs to know
+which way it went.
+
+The backlog falls by LA-130's entry, whose own filing carried the same false claim.
+
 ## 2026-09-23 — backlog → 27224 (LA-125 shipped, −38), projectOverview → 12564 (+5)
 
 LA-125's entry left the queue, which is the whole of the backlog's fall; the same edit amended

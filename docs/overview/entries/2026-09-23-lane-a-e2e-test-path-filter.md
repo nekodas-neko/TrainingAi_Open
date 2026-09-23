@@ -46,6 +46,10 @@ refuses, the conflict is real rather than a reporting lag. That call is what fin
 The remedy is `--unshallow`/`--deepen` on **every** fetch, and a plain `git clone` into the
 scratchpad when a repo is already poisoned (`pnpm install --frozen-lockfile` there takes 30 s).
 
+> **⚠ Corrected the same day by LA-130 — "every fetch" is wrong.** One `--unshallow` immunises the
+> clone permanently; a bare fetch cannot *deepen* a still-shallow clone, which is what looked like
+> re-shallowing. See `docs/overview/entries/2026-09-23-lane-a-la130-unshallow-once.md`.
+
 ## The entries: one orphaned finding, one for the Orchestrator
 
 **LA-129** files what owner decision item 5 explicitly left unfiled — generating the `.size`
