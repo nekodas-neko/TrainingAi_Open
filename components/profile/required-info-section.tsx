@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { ACTIVITY_LEVELS, type ActivityLevel } from '@trainingai/shared/types/user'
+import { navigateToTab } from "@/lib/shell-nav";
 
 /**
  * The goal-side half of what used to be "Required Information".
@@ -92,7 +93,7 @@ export function RequiredInfoSection({
         </div>
         <button
           type="button"
-          onClick={() => router.push('/health?tab=body')}
+          onClick={() => navigateToTab(router, '/health?tab=body')}
           className="text-[10px] text-muted-foreground underline mt-1.5"
         >
           Log a new weigh-in on the Health page
@@ -131,7 +132,7 @@ export function RequiredInfoSection({
         </div>
         <button
           type="button"
-          onClick={() => router.push('/health?tab=body')}
+          onClick={() => navigateToTab(router, '/health?tab=body')}
           className="text-[10px] text-muted-foreground underline mt-1.5"
         >
           Log body fat % on the Health page
