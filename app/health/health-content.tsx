@@ -54,10 +54,6 @@ const BODY_GROUPS: BodyGroup[] = [
   // "injury" (the Muscle Status body-map card) is intentionally NOT here — it's pinned first
   // at the top of the Body panel as the tab's main attraction (see the pinned hero below).
 ];
-// "aiVolume" (Weekly Volume vs Target) is intentionally omitted: it duplicates the
-// "Muscle Volume This Week" card and, being scoped to the active program, reads 0.0 on a
-// freshly-created program. The seeded per-muscle targets still drive the AI engine; the
-// visualisation is deferred until it's merged into a single volume card.
 const TRAINING_ORDER = ["calendar","weekInReview","weeklyStats","aiPeriodization","muscleSets","movementBalance","activityHistory","workoutDensity"];
 const PROGRESS_ORDER = ["strengthTrend","trends","strengthProgress","goalsProgress","weightTrendProgress"];
 
