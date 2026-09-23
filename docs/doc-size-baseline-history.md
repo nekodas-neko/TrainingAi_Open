@@ -15759,10 +15759,21 @@ This is the third re-merge on this branch and the number has moved every time, i
 without a line of this branch's own material changing. That is RV-134's tax rather than a signal:
 the figure recorded here is the merged tree's, not this branch's contribution, and reading it as
 growth caused by DV-1 would be wrong.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27094 → 27063 (OR-130)
+
+OR-130 left the queue after being built, which is the whole of the 31 lines; the two entries that
+referenced it gained a sentence each and lost none, so the file shrank by slightly less than the
+entry's own length.
+
+A genuine shrink caused by this branch — the case the ratchet is right to make someone lower, as
+distinct from the tax RV-134 describes, where a branch is forced to lower a number because
+*someone else's* merge shrank the file. Five of five re-merges on #1423 were that other case in one
+night.
 ## 2026-09-23 — backlog 26794 → 26780, `projectOverview.md` 12359 → 12379 (RV-110/RV-112)
 
-The backlog nets down 14 on this branch's account (recorded at 27080, after #1408, #1429 and #1423 landed
-from `main` mid-CI across three re-merges): RV-110 and RV-112 shipped and left the queue, against the new LB-129
+The backlog nets down 14 on this branch's account (recorded at 27049, after #1408, #1429, #1423 and #1434 landed
+from `main` mid-CI across four re-merges): RV-110 and RV-112 shipped and left the queue, against the new LB-129
 filed for the day-review sheet that does not open on a first flip — a finding from RV-110's probing
 that is not RV-110's subject, so it goes in the queue rather than into that PR's diff.
 
