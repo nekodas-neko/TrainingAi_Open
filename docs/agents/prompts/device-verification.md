@@ -28,7 +28,9 @@ can see the real app on the real phone; every other session runs in a cloud cont
    intent; name the surfaces you did NOT exercise) and No orphaned findings.
 4. `scripts/device/README.md` — the runbook, **including "What the first run corrected"** at the
    bottom.
-5. `node scripts/next-item.js --sittings` — the device checks owed, grouped by screen.
+5. `node scripts/next-item.js --lane DV` — work other agents have assigned you (`Lane: DV`, OR-129).
+   Then `node scripts/next-item.js --sittings` — the device checks owed, grouped by screen and
+   ordered by queue position. A defect you find goes out the same way: write `Lane: A` or `Lane: B`.
 
 **Your job: verify, report, and keep the harness working.** You do not implement product fixes —
 Lane A owns the engine, Lane B the surface. The one code path you own is `scripts/device/**`.

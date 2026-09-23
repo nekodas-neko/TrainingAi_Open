@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
@@ -2519,6 +2519,20 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
+
+The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,
+says so and offers a Retry instead of presenting the pre-write figure as current; it also stopped
+writing null on an empty payload, which made the budget and macro targets vanish rather than go
+stale. **But `cachedFetch` fires `onError` only when `cached === null` on both its failure paths,
+and `fetchWithRetry` counts a cached paint as a response — so no caller can be told a revalidation
+failed while a cached value is present.** Driving `/nutrition` with the balance route aborted, the
+same code both reported and stayed silent on consecutive runs; exhaustion fired **once in five**.
+The report path is wired and strictly additive, and is recorded as unproven rather than done.
+`LB-128` carries the fix (Lane A's, and **not** ungating `onError`, which every caller reads as "I
+have nothing to show"). Owed: the device check at the S25 width. Detail:
+[`docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md`](docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md).
+
 ### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
 
 The shared `Button` had **no `active:` state at all** across 129 importers on a touch-only product —
@@ -4057,35 +4071,6 @@ time scales with the tree behind the route. **There is no second dead button; Gu
 elimination table (which came from reading, not the harness). **The sheet's `history.back()` theory is
 back to unproven** — that experiment also ran cold.
 ([retraction](docs/overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-retraction-cold-route))
-
-### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
-
-**Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**
-
-Owner: *"If you have a nutrition meal creator menu open and you press the back button - it makes the
-page behind it go back to main."*
-
-**The entry proposed building an overlay registry, on the grounds that none existed. One does** —
-`lib/hooks/sheet-back-stack.ts`, reached via `BackDismiss`, which `SheetContent` and `DialogContent`
-both already render (BF-27 put it there). The grep that found nothing searched for
-`overlayStack`/`topOverlay`; the real names are `openSurface`/`closeSurface`. **Building the proposed
-one would have left two stacks disagreeing about what is open** — worse than the bug.
-
-**The real defect:** `openSurface` pushes with `pushState(state, '')` — no URL — so the pathname
-never moves, and `backActionForPath` reads nothing else. On a tab route it answers `"home"` and the
-listener navigates; on `/` it answers `"minimize"` and the app backgrounds. **Neither touches
-history, so the pushed entry is never consumed.** Only `"pop"` worked, and only because
-`history.back()` is coincidentally what consumes it. The `"minimize"` case is a second symptom the
-report did not name.
-
-**The fix** exports `hasOpenSurface()` and pops when it is true, which reaches `handlePop` and closes
-the topmost surface through Radix's own `onOpenChange` — the same path as the X button, so every
-guard on a sheet's close still runs. It sits **after** the three mode guards, because each raises a
-dialog that is itself on this stack.
-
-**NOT verified on device, and no harness run can help.** Android's hardware back is a Capacitor
-channel Playwright cannot fire, and in a browser Radix closes on Escape so the bug never appears. The
-unit tests (4 of 5 red against `main`) cover the stack and the listener's ordering, not the gesture.
 
 ### [heart-rate][app-shell] ⚠️ One metric name covered two heart rates; labelled, but the third surface's context is still undecided (OR-116, 2026-09-15)
 

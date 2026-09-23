@@ -15626,6 +15626,62 @@ code. Verified rather than assumed: 10 of 10 reach `--sittings`, 0 leak into eit
 **Two were parked by their own emphasis glyph** — `next-item.js` treats `⛔ …block` within 40
 characters as the legacy blocked marker, and *"⛔ The clearance half is BLOCKED"* matches it exactly.
 Same trap as sweep 52's eight parked entries. Swapped to `⚠`.
+## 2026-09-22 — `projectOverview.md` 12399 → 12413, backlog 26690 → 26682 (RV-103/RV-104)
+
+The fourteen lines on `projectOverview.md` are one Known-Issues entry, and it is there for the half
+that did **not** ship rather than the half that did. RV-103's report path is wired and only fired in
+one of five sandbox runs, because `cachedFetch` gates `onError` on `cached === null` on both its
+failure paths and `fetchWithRetry` counts a cached paint as a response — so a failed revalidation is
+unreportable by any caller while anything is cached. An entry that said only "the refetch now
+reports failures" would be the kind of claim the never-mark-fixed-from-intent rule exists to stop,
+and the next session would build on it. The mechanism, the measurement and the flake that was the
+finding are in the journal entry; what stays in the index is the caveat and the pointer, which is
+the split that keeps this file from regrowing.
+
+First draft of that entry ran 21 lines over the baseline and was cut to 14 rather than granted the
+space — the detail belongs in `docs/overview/entries/`, and the index carries the warning only.
+
+Both recorded figures move on arithmetic that is not this branch's doing alone: the final numbers
+are 26780 and 12376, after TN-61, DV-1, #1417's archiving sweep and #1418's RV-124…RV-133 all
+landed from `main` across three re-merges while this branch was open. What this branch contributed is −8 to the backlog
+— RV-104 shipped whole and left the queue, and RV-103 came back shorter as a `Keep:` entry, against
+the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
+above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
+read as genuinely given back rather than absorbed into someone else's sweep.
+---
+
+## 2026-09-23 — backlog → 26672, projectOverview → 12333 (−29) (device/bf166-mid-workout)
+
+BF-166's mid-workout half ran on the S25 and the entry left the queue whole; **DV-2** (*Leave* on the
+leave-workout prompt does not leave) was filed beside BF-165 in its place. BF-166's Known-Issues row
+moved to the resolved archive. DV-1 gained the two Windows test failures found once Node was
+upgraded, and DV-3 (a CI flake in the migration-163 test) was filed. The Device Verification
+baton goes 66 → 67 for the DV-3 row it has to carry. Both baselines set to the
+measured sizes.
+
+
+## 2026-09-23 — `docs/implementation-backlog.md` +41 (26780 → 26821) (Review: RV-134)
+
+One entry, naming the mechanism behind the `.size` conflict tax that Tuning measured on 2026-09-20
+(§2c) and said needed its own entry. It is longer than a one-line finding because the recommendation
+has to say what it gives up: PS-34 removed slack from this ratchet for cause, and the fix proposed is
+**not** re-introducing it — it is giving the slack direction the same `inherited` escape the growth
+direction already has, so a branch is not blamed for a shrink another PR's merge caused.
+
+Filed against Lane O rather than an implementer lane: `scripts/check-doc-index-size.js` is repo
+tooling in the Custom Rules job, which is the OR-103 case.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +42 (26829 → 26872), `CLAUDE.md` 844 → 866 (Review sweep 54)
+
+RV-135, plus an amendment to RV-125 correcting figures it had inherited from a stale `CLAUDE.md`
+line. The entry carries a before/after table because the point is that the signal **grew** between
+sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to be comparable next time.
+
+`CLAUDE.md` grows because the corrected sentence says what the old one got wrong and for how long.
+That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
+script's baseline recorded **0**, and a silent swap of one number for another would leave the next
+reader with no reason to trust the new one over their memory of the old.
+
 
 
 ## 2026-09-22 — `CLAUDE.md` → 836 and `docs/implementation-backlog.md` → 26772 (OR-125: six owner answers)

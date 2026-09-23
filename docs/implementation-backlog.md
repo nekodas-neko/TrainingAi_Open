@@ -473,6 +473,84 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell][platform] RV-135 — BF-110's reading arrived five days ago, and its own `Keep:` still parks it as waiting for one
+
+- **Lane: B** — no file yet; the fix BF-110 points at is native (`android/**`), which makes it
+  **Lane A**, and that reassignment is part of the work. **Added:** 2026-09-23 · Review sweep 54.
+- **The contradiction is inside one entry.** BF-110's body opens *"✅ THE READING IS IN, and it says
+  NATIVE — measured 2026-09-18. This entry is no longer waiting on data."* Its `Keep:` line, below
+  that, still reads *"the READING, and only that … Still do not write a fix before that row
+  exists."* `next-item.js` reads the `Keep:`, so the entry sits in the **KEEP** bucket, whose
+  heading is *"shipped; only the stated residue is owed. **Not new work.**"*
+- **So the native fix is owned by nobody.** An implementer scanning either lane sees an entry
+  explicitly labelled not-new-work, waiting on a measurement that has been in the table for five
+  days. The `✅` block is only visible to someone who opens the entry and reads past its status line.
+- **Re-measured 2026-09-23, and it has grown rather than gone quiet** — `error_events` over the full
+  retained window:
+
+  | | sweep 50 (2026-09-18) | now | change |
+  |---|---:|---:|---:|
+  | `recheck stuck` at `h=667` | 3 | **9** | ×3 |
+  | `recheck stuck` at `h=826` (healthy) | 12 | 16 | — |
+  | first readings at `h=667`, `children≤2` | 22 | **28** | +6 |
+  | `recheck resized` | 0 | **0** | — |
+  | `dom-lost` | 0 | **0** | — |
+
+- **Twenty-five rechecks, twenty-five `stuck`, zero `resized`.** By the module's own stated criterion
+  (`lib/resume-repaint.ts`: *"If it still reads 667, the viewport is genuinely stuck and the fix is
+  in the native layer"*) that answer is not marginal, and **`dom-lost` has never once fired in 62
+  reported resumes** — so BF-80's renderer-death is disproven for every sample, and the compositor
+  reading is the one standing.
+- **Fix:** rewrite BF-110's `Keep:` to name what is actually owed (the native viewport fix) or drop
+  the `Keep:` so the entry returns to READY, and move it to Lane A. **Nothing else about the entry
+  needs changing** — its analysis is right, which is what makes the filing error costly.
+- **⚠ The telemetry's own caveats still apply and are already written into BF-110:** `stuck` fires on
+  healthy resumes too (16 of 25 rows are 826→826, a viewport that was never wrong), and `w=384`
+  appears on every row, so only the **height** discriminates.
+
+### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
+
+- **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
+  neither implementer lane's paths (the OR-103 case). **Added:** 2026-09-23 · Review.
+- **The mechanism, which has not been stated before.** The ratchet runs the absolute check first
+  (`verdict({count, limit, atBase: null})`, `:136`). Growth over the baseline then gets an
+  `inherited` escape at `:157` — *"over the number, but no bigger than what the base already holds,
+  so the branch did not do this"*. **The slack direction gets no such escape, deliberately** (PS-34,
+  quoted in the file: *"Failing on slack rather than reporting it, and with no `inherited` escape
+  hatch"*). So the two directions are asymmetric, and the unprotected one is the one concurrency
+  triggers constantly: **every implementer PR that completes an entry SHRINKS the backlog**, the
+  merged file falls under the committed number, and the next branch must lower it — even when the
+  shrink was entirely someone else's merge.
+- **Measured twice, independently.** Tuning, 2026-09-20 → 2026-09-22: *"five of seven PRs hit a
+  `docs/doc-size/docs/implementation-backlog.md.size` conflict"*, two also needing the append-only
+  history file resolved by hand. Review, 2026-09-22/23 night: **four of four** (#1389 twice, #1418,
+  and then THIS ENTRY'S OWN PR, which conflicted on the two files it was filed to describe), each a
+  fetch, merge, recount, note edit and re-push. Every one mechanical. Nine of eleven across two
+  agents in three days.
+- **Fix: give the slack direction the same `inherited` escape the growth direction has.** If the doc
+  is under its baseline *and* the base branch is under it too, the shrink is not this branch's — report
+  it, do not fail. Then only a branch that itself shrank a doc has to lower the number, and two PRs
+  stop contending over one exact integer. Roughly five lines, in the file that already computes
+  `lineCountAtBase(baseRef, rel)` for the other direction.
+- **What that gives up, honestly, and why it is acceptable.** PS-34's concern was real — CLAUDE.md sat
+  **429 lines** under its number, free to regrow silently. Under this change a shrink that lands on
+  `main` without its baseline following stays unlowered until someone touches that doc. The residue is
+  covered by two things that already exist: any later branch that grows the doc back is still caught by
+  the absolute check, and `--fix` (LA-99) rewrites every stale baseline in one pass, which suits the
+  Orchestrator's weekly sweep.
+- **⚠ This does NOT need the owner** — Tuning's note (§2c) says it wants *"the owner's yes on changing
+  the ratchet"*, which was written before the 2026-09-22 narrowing in CLAUDE.md handing structural,
+  tooling and process calls to the agents. It is tooling, it is reversible in one commit, and no
+  number a human reads changes. Recorded here rather than asked.
+- **Rejected alternative — slack in the baseline** (round the number up so small deltas do not move
+  it). It is the obvious fix and it is the one PS-34 already removed for cause: slack is exactly the
+  room a document regrows into unwatched. Do not re-introduce it.
+- **Not the same as generating baselines in CI**, the other alternative in Tuning §2c. That removes
+  the committed file entirely and is a larger change to how the ratchet is read and audited; this one
+  keeps the file, the history note and the deliberate act of raising a number, and only stops blaming
+  the wrong branch. If both are wanted, this one first — it is cheap and it settles whether the tax
+  was ever about the committed file at all.
+
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
 - **Verify:** device — **and there is no build half.** This entry's entire work is the measurement;
@@ -496,10 +574,17 @@ below threshold and left in place for next time.
   twice round, one write per tab), every `/api/*` endpoint belonging to a revisited tab shows a
   request count **greater than one**. FAILED for any endpoint fetched exactly once on a tab visited
   four times — name the component.
-- `check-fetch-once-effects.js` freezes 36 sites and calls 19 of them "permanently mounted and can
-  bite". **That split was reasoned, never observed.** The script also cannot see
-  `useEffect(…, [userId])` — a dep array that never changes inside a shell that never unmounts —
-  which is how four of sweep 53's findings got past it.
+- **⚠ Corrected 2026-09-23 — this entry's original figures were wrong, inherited from a CLAUDE.md
+  line that had been stale since 2026-08-19.** It said the script freezes 36 sites with 19 that
+  "can bite". The script's own baseline says **11 sites across 9 files, and the can-bite group is
+  EMPTY** — the over-counting was corrected in the script on 2026-08-19 (25 across 16 were really
+  15 across 12), the can-bite group was two sites rather than eight, and both were converted.
+- **The premise survives the correction, and that is why the entry stays.** The script skips any
+  non-empty dep array by design (`:164` — *"a different (and usually correct) shape"*), so it
+  cannot see `useEffect(…, [userId])` inside a shell where `userId` never changes. Its baseline
+  confirms this from the other side: `workout-screen`'s two sites were dropped from the count for
+  being `[userId]`-deps. That is how four of sweep 53's findings got past it, and it is unaffected
+  by the count being 11 rather than 36.
 - Needs a `window.fetch` wrapper installed at app start; that is a harness change under
   `scripts/device/**`, which the role owns.
 
@@ -649,58 +734,77 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   walk; spawn `npx` portably. For the Node floor, set `engines.node` to `>=22.12` so the mismatch
   fails at `pnpm install` with a message instead of at test time with a missing binding. The local
   machine's own upgrade is the owner's.
+- **Node half resolved on the device machine, 2026-09-23:** upgraded to 22.23.2 (winget
+  `OpenJS.NodeJS.22`) and `pnpm exec vitest run` starts. The `engines.node` floor is still worth
+  setting so the next machine fails at install, not at test time.
+- **With the tests running (Node 22.23.2, 2026-09-23), two more show up** in `scripts/__tests__`
+  (25 of 27 files pass, 258 of 259 tests): `strict-schema-inert.test.ts` shells out to step 50's
+  script and inherits its path bug; `check-comment-blindness.test.ts`'s `check-hex-literals` case
+  times out at 30 s — three full scans of `app/` + `components/`, which Windows' filesystem makes
+  slower. Measure before raising the timeout.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
+### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
 
-### [nutrition][platform] RV-103 — the owner re-reported BF-177, and the fix BF-177 shipped cannot report its own failure
+- **Lane:** A — `lib/data/postgres/__tests__/personal-records-reconcile-migration.test.ts`.
+- **Added:** 2026-09-23 · Device Verification — seen on PR #1419's CI, a docs-only change.
+- **Observed once:** `Tests` failed with `insert or update on table "exercise_estimates" violates
+  foreign key constraint "exercise_estimates_user_id_fkey"` at the test's `await run()` (line 130),
+  1 of 997 files. **Re-run of the same commit: green.** `main`'s last four CI runs were green.
+- **Why it can happen (read from the test, not reproduced):** `run()` applies migration 163, which
+  reconciles `personal_records` into `exercise_estimates` for **every** user, not only this file's
+  `USER_A`/`USER_B`. All of `lib/data/postgres/__tests__` shares one database, and many files create
+  a user in `beforeAll` and `DELETE FROM users` in `afterAll`. If one of those users is deleted
+  mid-migration, the migration inserts an estimate for a user that no longer exists.
+- **Fix direction:** scope what the test asserts *and* what it runs to its own users — run the
+  migration's statements under a `WHERE user_id = ANY(…)` test harness, or take the same advisory
+  lock the migration runner uses, or move it to the `rollup`-style serial project. Do not add a
+  retry: that hides the next genuine failure in this file.
+- **Pass test:** the file cannot see another test's users — e.g. inserting and deleting a foreign
+  user in a parallel file during `run()` leaves it green.
+- **Not a device check.**
 
-- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts:41-45`. **Added:** 2026-09-22 ·
-  Review sweep 53.
-- **Batch:** `nutrition-freshness`
-- **Owner report, 2026-09-22:** *"nutrition calorie macro not updating on screen when food added -
-  requires page swap"*. **BF-177 already quotes him saying the same thing** — *"The kcal left in the
-  top right; doesnt load on the same page: it requires page switching to show."* So this is a
-  RE-REPORT of a bug that was fixed once, not a new one.
-- **The mechanism BF-177 left open.** Its refetch is
-  `void cachedFetch(...).catch(() => {})` with **no `onError`**. Per RV-84 `cachedFetch` never
-  rejects, so that `.catch` is dead code. A 500, or bad signal, or offline, and the refetch silently
-  does nothing: `energyBalance` keeps the object fetched **before** the meal, "kcal left" and the
-  macro targets stay stale, **nothing on screen says so, and there is no retry**. A page swap
-  re-runs `fetchData`, which is exactly the recovery the owner describes — both times.
-- **⚠ Do not add another cache bust.** BF-177 establishes eviction was never the problem:
-  `invalidateNutritionWrite()` clears `energy-balance:` and always has. This is the Q-402 shape.
-- **Fix:** pass `onError` and render a retry affordance, or reuse `fetchWithRetry` — but see RV-85,
-  which is the same "retries then gives up silently" gap in that helper, so fix the helper first or
-  this inherits it.
-- **⚠ Second defect in the same callback, and it is worse than staleness:**
-  `d => setBalance(d ?? null)` sets **null** on an empty payload, and `balanceForDate` is gated on
-  `energyBalance?.date === selectedDate` (`nutrition-content.tsx:453`). So a null or wrong-date
-  payload makes the budget and macro targets **disappear** rather than go stale.
-- **Not established:** neither failure was reproduced — no device, and the sandbox cannot drive the
-  real write path. The mechanism is read from source; the owner's report is the evidence it fires.
+### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
-### [nutrition][app-shell] RV-104 — deleting a food refetches the weekly chart; adding one does not
+- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
+  Review sweep 53. **Shipped:** 2026-09-22, `fix/rv103-rv104-nutrition-freshness`.
+- Both of the entry's defects are fixed. The dead `.catch(() => {})` is gone; the refetch runs
+  through `fetchWithRetry`, so a transient failure self-heals and a persistent one reports through
+  `onExhausted`; and `d => setBalance(d ?? null)` — which made the budget and macro targets
+  **disappear** rather than go stale, because `balanceForDate` is gated on the payload's date — is
+  now `if (d) setBalance(d)`. `EnergyCard` renders the failure line and a Retry.
+- **A third defect was found while reproducing it, and it would have made the whole mechanism
+  inert:** the unmount ref was set in a cleanup and never reset, so StrictMode's simulated unmount
+  latched it `true` for the life of the screen and `isCancelled()` killed every retry. One aborted
+  request was observed where four were due.
+- **Keep:** ① the device check — the failure line and its Retry at the S25 width, in the card that
+  carries "kcal left". ② the reporting path is **wired but only observed firing once in five
+  sandbox runs**, because of LB-128 below; it is strictly additive (absent the flag nothing renders,
+  which is today's behaviour) but it is not proven in the common case and must not be written up as
+  though it were.
 
-- **Lane:** B — `app/nutrition/nutrition-content.tsx:303-312` (add) vs `:390-396` (delete).
-  **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `nutrition-freshness`
-- The delete path explicitly refetches `nutrition-weekly-summary`. `handleFoodLogged` does
-  `setLogs` + `refetchBalance` and **nothing else**. Both `nutrition-weekly-summary` and
-  `nutrition-adherence` are otherwise fetched **only** from `fetchMountData`, whose effect deps are
-  stable (`[fetchMountData, userId]`), on a screen the tab shell never unmounts.
-- **So: the 7-day calorie bar chart and the adherence percentages below it hold their launch-time
-  values until the app is restarted.** A tab switch does not fix them — `useRefreshOnTabShow`
-  re-runs `fetchData` (logs + balance), never `fetchMountData`.
-- **The asymmetry is the finding**: same screen, same quantity, delete updates it and add does not.
-  Both keys *are* in `invalidateNutritionWrite()` — this is Q-402 again, a missed re-render rather
-  than a missed eviction.
-- **⚑ The delete site's own comment names the cause:** *"BF-177's third site, which that entry did
-  not name"*. BF-177 was patched site-by-site, so a fourth site was always likely. **Fix the shape,
-  not the site** — subscribe both keys via `useCachedValue` or `useInvalidationRefetch` so no future
-  write path has to remember.
-- **Not established:** whether a single ~300 kcal add visibly moves a 7-day bar. The adherence
-  figures are unambiguous text and do not have that excuse.
+### [platform] LB-128 — `cachedFetch` cannot tell a caller that a revalidation failed
+
+- **Lane:** A — `lib/sqlite/cache.ts:374`. **Added:** 2026-09-22 · found while shipping RV-103.
+- `cachedFetchCore`'s network-throw branch computes
+  `const online = cached === null && navigator.onLine` and fires `onError` only when `online`; the
+  `!res.ok` branch is gated the same way (`if (cached === null)`). So **both** failure paths are
+  silent whenever anything was painted from cache. `fetchWithRetry` has the mirror-image blind
+  spot: a cached paint sets `responded`, so the retry chain stops and `onExhausted` never fires.
+- **Together they mean no caller can report a failed refresh of a key that has a cached value** —
+  exactly the post-write case RV-103 was about, whenever the write's invalidation has not (yet)
+  cleared the entry. RV-103's suggested fix, *"pass `onError`"*, cannot reach it.
+- **Measured, not read:** driving `/nutrition` with `/api/nutrition/energy-balance` aborted, the
+  same code both reported and stayed silent on consecutive runs, decided by whether the entry was
+  in the cache when the refetch ran. The flake was the finding.
+- **Fix:** an ungated channel — an `onRevalidateError` that fires when a cached value was painted
+  and the revalidation then failed. The existing gate is right for what it guards (offline with
+  saved data is not an error); what is missing is the case where the caller *knows* the cached
+  value is out of date, because it just wrote.
+- **⚠ Do not simply ungate `onError`** — every existing caller reads it as "I have nothing to
+  show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
+  cached data with error cards across the app.
 
 ### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
 
@@ -4104,64 +4208,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
   session and confirm the labels are unchanged from today.
 
-### [app-shell] BF-166 — the back listener ignored the overlay stack the app already had (fixed; device check owed)
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `lib/hooks/sheet-back-stack.ts` and `components/mobile-auth-handler.tsx`. Shipped
-  2026-09-15. **`components/ui/sheet.tsx` and `dialog.tsx` needed NO change**, and neither did the 52
-  call sites.
-- **Added:** 2026-09-15 (BugFix intake). Owner: *"If you have a nutrition meal creator menu open and
-  you press the back button - it makes the page behind it go back to main."*
-- **⚠ THIS ENTRY'S PREMISE WAS WRONG, and acting on it would have made things worse.** It stated
-  *"no overlay registry exists"* and proposed building a module-level stack that `SheetContent` and
-  `DialogContent` push to. **One already exists**: `lib/hooks/sheet-back-stack.ts`, reached via
-  `useSheetBackDismiss` → `BackDismiss`, which **both** primitives already render (BF-27 put it
-  there, deliberately central, for this exact reason). The grep that found nothing looked for
-  `openOverlay|overlayStack|topOverlay`; the real names are `openSurface`/`closeSurface`. **Building
-  the proposed registry would have left two stacks disagreeing about what is open.**
-- **The real defect is one line and narrower than described.** `openSurface` pushes with
-  `pushState(state, '')` — **no URL** — so `window.location.pathname` never moves. And
-  `backActionForPath` reads nothing but the pathname. So on a tab route it answers `"home"` and the
-  listener calls `navigateToTab`; on `/` it answers `"minimize"`. **Neither touches history**, so the
-  surface's pushed entry is never consumed and the page moves out from under an open sheet.
-  **Only `"pop"` ever worked, and only by coincidence** — `history.back()` happens to be the thing
-  that consumes the entry.
-- **So `"minimize"` is a second symptom the entry did not name:** a sheet open on Home and the app
-  goes to the background instead of closing it.
-- **The fix:** export `hasOpenSurface()` from the existing stack, and have the listener
-  `history.back()` when it is true. That reaches `handlePop`, which closes the topmost surface
-  through Radix's own `onOpenChange` — the identical path as the X button, so every guard already on
-  a sheet's close still runs.
-- **The entry's ordering instruction was right and is kept.** The overlay check sits **after** the
-  three mode guards, because each of them *raises* a dialog (`LeaveWorkoutDialog` and siblings) that
-  is itself on this stack; checking overlays first would make a mid-workout back press close the
-  confirmation instead of answering it. A test pins that order.
-- **Proven load-bearing:** `components/__tests__/bf166-back-closes-overlay.test.ts` — **4 of its 5
-  assertions fail against `main`**. The fifth deliberately passes on both sides: it records that the
-  primitives were already wired, which is the finding that stopped a duplicate registry being built.
-- **✅ VERIFIED ON THE S25, 2026-09-23 (Device Verification Agent, `device/first-run`)** — every
-  part except the mid-workout one. v1.465.4 web / APK 1.460.4, portrait, **three-button navigation**
-  (`adb shell input keyevent 4`, the same `KEYCODE_BACK` the gesture delivers), path read from
-  `location.pathname` in the page. Back with a sheet open: `/nutrition` *My Foods* and *Add food* →
-  sheet closed, still `/nutrition`; Home's mood check-in sheet → closed, still `/`, app **not**
-  minimised; `/program` *New Program* sheet (a sub-route) → closed, still `/program`. That last one
-  takes **two** presses, and correctly: the sheet autofocuses its name field, so the first back
-  dismisses the keyboard (`mInputShown=true→false`) — standard Android IME behaviour, not a defect.
-- **The rest of `back-gesture-sitting` left the queue the same day:** **LA-109**, **LB-107** and
-  **BF-100** all VERIFIED ON THE S25 and removed — evidence in
-  `docs/overview/entries/2026-09-23-device-first-run.md`. **BF-165** reproduced and stays open.
-- **Keep:** the mid-workout half only — start a workout, press back, confirm the leave prompt is
-  raised rather than a sheet closing or the route moving. **Not run** because starting a workout on
-  the owner's production account creates a real session; it needs the owner's go-ahead or a
-  workout the owner is doing anyway.
-
 ### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
 
 - **Lane:** B — `components/workout/log-activity-sheet.tsx`,
@@ -4170,9 +4216,10 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   elimination list.
 - **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
   activity' nothing actually happens."* Reported on the APK.
-- **Batch:** `back-gesture-sitting` — with **BF-166**, **LB-107**, **LA-109** and **BF-100**. A fix
-  here changes history handling for every sheet that navigates, which is the same Android back
-  gesture those four already need one sitting for. Added by OR-122 in place of the gate below.
+- **Batch:** `back-gesture-sitting` — now with **DV-2** only: BF-166, LB-107, LA-109 and BF-100 were
+  verified on the S25 on 2026-09-23 and left the queue. DV-2 (*Leave* on the leave-workout prompt
+  does not leave) is the same mechanism in a dialog, so one fix covers both. Added by OR-122 in
+  place of the gate below.
 - **Verification:** device. The Android system back gesture arrives over a Capacitor channel
   Playwright cannot fire, so the look is owed on the S25 — but the fix is written first.
 - **⚠ This entry carried `Gate: device` from 2026-09-17 until OR-122, and the gate was CIRCULAR.**
@@ -4298,6 +4345,42 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   so whatever it is only bites on the push path.
 
 ---
+
+### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
+
+- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
+  a navigation issued while a surface closes is eaten by that surface's own history entry.
+- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
+  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
+- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
+- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
+  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
+  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
+  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
+  the session just abandoned. `history` instrumented in the page:
+  ```
+  3229ms pushState()                              ← the dialog opens and pushes its surface entry
+  5055ms back()                                   ← ONE back for the Leave tap
+  5073ms replaceState(/workout?session=…)
+  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
+  ```
+  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
+  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
+  spent on the dialog's own entry. Reproduced twice.
+- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
+  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
+- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
+  verified. This is the prompt's *Leave* button, which BF-166 never touched.
+- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
+  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
+  device). The surface has to be told the close was superseded by a navigation.
+- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
+  `/workout?session=…` for wherever back would have gone before the workout, and one more back
+  does not return to the abandoned session.
+- **Production data:** nothing was written. The only non-GET the page sent was the
+  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
+  for 2026-09-23 returned `sessions: []` afterwards.
+
 
 ## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 
