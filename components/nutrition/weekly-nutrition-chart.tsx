@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { formatDateDisplay } from '@trainingai/shared/date-utils'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -46,8 +47,7 @@ const METRIC_CONFIG: Record<Metric, { label: string; color: string; unit: string
 }
 
 function fmtDayLabel(date: string) {
-  const d = new Date(date + 'T12:00:00')
-  return d.toLocaleDateString('en-AU', { weekday: 'short' })
+  return formatDateDisplay(date, 'weekday')
 }
 
 export function WeeklyNutritionChart({ data, calorieTarget, adherence , grouped}: Props) {

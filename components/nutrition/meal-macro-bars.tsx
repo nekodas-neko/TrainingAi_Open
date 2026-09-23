@@ -44,7 +44,7 @@ function Bar({ fit, label, color }: {
       </span>
       <span
         className={cn('w-11 shrink-0 text-right text-[10px] font-semibold tabular-nums',
-          off ? '' : 'text-muted-foreground/60')}
+          off ? '' : 'text-muted-foreground/70')}
         style={off ? { color: OFF_TARGET } : undefined}
       >
         {off ? `${fit.delta > 0 ? '+' : '−'}${Math.abs(Math.round(fit.delta)).toLocaleString()}` : '✓'}

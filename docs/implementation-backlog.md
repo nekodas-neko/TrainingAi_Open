@@ -473,14 +473,672 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell][platform] RV-135 — BF-110's reading arrived five days ago, and its own `Keep:` still parks it as waiting for one
+
+- **Lane: B** — no file yet; the fix BF-110 points at is native (`android/**`), which makes it
+  **Lane A**, and that reassignment is part of the work. **Added:** 2026-09-23 · Review sweep 54.
+- **The contradiction is inside one entry.** BF-110's body opens *"✅ THE READING IS IN, and it says
+  NATIVE — measured 2026-09-18. This entry is no longer waiting on data."* Its `Keep:` line, below
+  that, still reads *"the READING, and only that … Still do not write a fix before that row
+  exists."* `next-item.js` reads the `Keep:`, so the entry sits in the **KEEP** bucket, whose
+  heading is *"shipped; only the stated residue is owed. **Not new work.**"*
+- **So the native fix is owned by nobody.** An implementer scanning either lane sees an entry
+  explicitly labelled not-new-work, waiting on a measurement that has been in the table for five
+  days. The `✅` block is only visible to someone who opens the entry and reads past its status line.
+- **Re-measured 2026-09-23, and it has grown rather than gone quiet** — `error_events` over the full
+  retained window:
+
+  | | sweep 50 (2026-09-18) | now | change |
+  |---|---:|---:|---:|
+  | `recheck stuck` at `h=667` | 3 | **9** | ×3 |
+  | `recheck stuck` at `h=826` (healthy) | 12 | 16 | — |
+  | first readings at `h=667`, `children≤2` | 22 | **28** | +6 |
+  | `recheck resized` | 0 | **0** | — |
+  | `dom-lost` | 0 | **0** | — |
+
+- **Twenty-five rechecks, twenty-five `stuck`, zero `resized`.** By the module's own stated criterion
+  (`lib/resume-repaint.ts`: *"If it still reads 667, the viewport is genuinely stuck and the fix is
+  in the native layer"*) that answer is not marginal, and **`dom-lost` has never once fired in 62
+  reported resumes** — so BF-80's renderer-death is disproven for every sample, and the compositor
+  reading is the one standing.
+- **Fix:** rewrite BF-110's `Keep:` to name what is actually owed (the native viewport fix) or drop
+  the `Keep:` so the entry returns to READY, and move it to Lane A. **Nothing else about the entry
+  needs changing** — its analysis is right, which is what makes the filing error costly.
+- **⚠ The telemetry's own caveats still apply and are already written into BF-110:** `stuck` fires on
+  healthy resumes too (16 of 25 rows are 826→826, a viewport that was never wrong), and `w=384`
+  appears on every row, so only the **height** discriminates.
+
+### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
+
+- **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
+  neither implementer lane's paths (the OR-103 case). **Added:** 2026-09-23 · Review.
+- **The mechanism, which has not been stated before.** The ratchet runs the absolute check first
+  (`verdict({count, limit, atBase: null})`, `:136`). Growth over the baseline then gets an
+  `inherited` escape at `:157` — *"over the number, but no bigger than what the base already holds,
+  so the branch did not do this"*. **The slack direction gets no such escape, deliberately** (PS-34,
+  quoted in the file: *"Failing on slack rather than reporting it, and with no `inherited` escape
+  hatch"*). So the two directions are asymmetric, and the unprotected one is the one concurrency
+  triggers constantly: **every implementer PR that completes an entry SHRINKS the backlog**, the
+  merged file falls under the committed number, and the next branch must lower it — even when the
+  shrink was entirely someone else's merge.
+- **Measured twice, independently.** Tuning, 2026-09-20 → 2026-09-22: *"five of seven PRs hit a
+  `docs/doc-size/docs/implementation-backlog.md.size` conflict"*, two also needing the append-only
+  history file resolved by hand. Review, 2026-09-22/23 night: **four of four** (#1389 twice, #1418,
+  and then THIS ENTRY'S OWN PR, which conflicted on the two files it was filed to describe), each a
+  fetch, merge, recount, note edit and re-push. Every one mechanical. Nine of eleven across two
+  agents in three days.
+- **Fix: give the slack direction the same `inherited` escape the growth direction has.** If the doc
+  is under its baseline *and* the base branch is under it too, the shrink is not this branch's — report
+  it, do not fail. Then only a branch that itself shrank a doc has to lower the number, and two PRs
+  stop contending over one exact integer. Roughly five lines, in the file that already computes
+  `lineCountAtBase(baseRef, rel)` for the other direction.
+- **What that gives up, honestly, and why it is acceptable.** PS-34's concern was real — CLAUDE.md sat
+  **429 lines** under its number, free to regrow silently. Under this change a shrink that lands on
+  `main` without its baseline following stays unlowered until someone touches that doc. The residue is
+  covered by two things that already exist: any later branch that grows the doc back is still caught by
+  the absolute check, and `--fix` (LA-99) rewrites every stale baseline in one pass, which suits the
+  Orchestrator's weekly sweep.
+- **⚠ This does NOT need the owner** — Tuning's note (§2c) says it wants *"the owner's yes on changing
+  the ratchet"*, which was written before the 2026-09-22 narrowing in CLAUDE.md handing structural,
+  tooling and process calls to the agents. It is tooling, it is reversible in one commit, and no
+  number a human reads changes. Recorded here rather than asked.
+- **Rejected alternative — slack in the baseline** (round the number up so small deltas do not move
+  it). It is the obvious fix and it is the one PS-34 already removed for cause: slack is exactly the
+  room a document regrows into unwatched. Do not re-introduce it.
+- **Not the same as generating baselines in CI**, the other alternative in Tuning §2c. That removes
+  the committed file entirely and is a larger change to how the ratchet is read and audited; this one
+  keeps the file, the history note and the deliberate act of raising a number, and only stops blaming
+  the wrong branch. If both are wanted, this one first — it is cheap and it settles whether the tax
+  was ever about the committed file at all.
+
+### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
+
+- **Verify:** device — **and there is no build half.** This entry's entire work is the measurement;
+  nothing is waiting to be implemented and nothing is blocked on it. Method: **P1** in
+  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
+- **The falsifiable claim:** for each of the seven write→surface rows in P1, the surface issues at
+  least one request for its endpoint within 3 s of the write, **before any navigation**. FAILED on
+  any row where the count is zero before a tab switch and non-zero after — that is the Q-402 shape,
+  decided mechanically rather than reasoned from source.
+- **Why it is worth a sitting:** missed invalidation is this project's most repeated bug class (12+
+  incidents, sessions 5→176), and every sweep finds it by *reading* code, which cannot tell an
+  evicted-but-never-refetched key from a working one. One run settles RV-103, RV-104, RV-106,
+  RV-107 and RV-109 and tells RV-105 which shapes actually matter.
+- **⚠ Production writes on the owner's real data** — get his go-ahead per write type, prefer the
+  reversible rows (log then delete a food), and record a refused row as COULD NOT CHECK.
+
+### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
+
+- **Verify:** device — no build half; the measurement is the work. Method: **P2**.
+- **The falsifiable claim:** over a fixed 5-minute walk (Home → Nutrition → Health → Workout → More,
+  twice round, one write per tab), every `/api/*` endpoint belonging to a revisited tab shows a
+  request count **greater than one**. FAILED for any endpoint fetched exactly once on a tab visited
+  four times — name the component.
+- **⚠ Corrected 2026-09-23 — this entry's original figures were wrong, inherited from a CLAUDE.md
+  line that had been stale since 2026-08-19.** It said the script freezes 36 sites with 19 that
+  "can bite". The script's own baseline says **11 sites across 9 files, and the can-bite group is
+  EMPTY** — the over-counting was corrected in the script on 2026-08-19 (25 across 16 were really
+  15 across 12), the can-bite group was two sites rather than eight, and both were converted.
+- **The premise survives the correction, and that is why the entry stays.** The script skips any
+  non-empty dep array by design (`:164` — *"a different (and usually correct) shape"*), so it
+  cannot see `useEffect(…, [userId])` inside a shell where `userId` never changes. Its baseline
+  confirms this from the other side: `workout-screen`'s two sites were dropped from the count for
+  being `[userId]`-deps. That is how four of sweep 53's findings got past it, and it is unaffected
+  by the count being 11 rather than 36.
+- Needs a `window.fetch` wrapper installed at app start; that is a harness change under
+  `scripts/device/**`, which the role owns.
+
+### [body][devices] RV-126 — DEVICE PROBE: the local-store write path, which no sandbox can execute
+
+- **Verify:** device — no build half. Method: **P3**.
+- **The falsifiable claim, three parts.** (a) A weigh-in evicts the body-metric cache keys **and**
+  `invalidateBiometrics` fires from the `pushMutations` → `pullDelta` round trip on the device that
+  wrote it — **RV-108 turns entirely on this.** (b) For each offline-first domain (food,
+  supplements, activity, mood, body metrics, injuries) the local row holds everything needed to
+  **render** it offline, not just a foreign key. (c) Every delete in those domains writes a
+  tombstone rather than hard-deleting.
+- **This is the project's largest blind spot and it is structural:** `getLocalStore` returns null in
+  the web sandbox, so *every* local-first write path is untested by construction in `pnpm dev`. The
+  food-disappearing bug was exactly (b) — a `food_item_id` with no name or macros.
+- **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
+
+### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
+
+- **Verify:** device — no build half. Method: **P4**. `tour.js` already emits part of this digest.
+- **The falsifiable claims:** no element overflows horizontally at 384 px (`scrollWidth >
+  clientWidth`); no interactive element renders under 44 × 44 px; no element carrying `truncate`
+  computes to `display: flex` (the class does nothing there — RV-92 is one, the question is whether
+  the source grep missed others applied conditionally); no `button`/`a` contains another.
+- **⚠ The clearance half is BLOCKED and must not be reported as passing.** The baton records the
+  phone on **three-button navigation**, where the inset is generous and a broken floored utility
+  passes anyway. Until the owner switches to gesture nav, clearance is COULD NOT CHECK; the four
+  claims above are unaffected and can run today.
+
+### [app-shell] RV-128 — DEVICE PROBE: does the tab switch drop a frame showing neither panel?
+
+- **Verify:** device — no build half. Method: **P5**; `record.js --tap` is the instrument.
+- **The falsifiable claim:** across a tab switch, no captured compositor frame shows **neither** the
+  outgoing nor the incoming panel. Report the count and duration of any such frames, and separately
+  what `bg-page` resolves to mid-switch — **if it is transparent the blink shows the wallpaper**,
+  which is a different severity from showing the page colour.
+- **These are RV-113's two stated open questions**, and it says outright that they decide whether the
+  work is worth doing at all. Also covers RV-114 (the gap in ms for six untransitioned pushed
+  routes) and RV-115 (whether More's Profile ↔ Friends swap inherits the other view's scroll).
+- While there: toggle the OS reduce-motion setting and confirm `MotionConfig reducedMotion="user"`
+  actually takes effect.
+
+### [app-shell] RV-129 — DEVICE PROBE: is a warm visit ever painting a skeleton?
+
+- **Verify:** device — no build half. Method: **P6**.
+- **The falsifiable claim:** on a tab already visited this session, no skeleton is painted between
+  navigation and first real content. FAILED anywhere one is — that means the synchronous
+  `readCacheSync` seed is missing, or is in a `useState` initializer rather than a `useEffect`.
+  Report ms-to-first-real-content per tab, warm and cold.
+- **The repo's own rule is that a skeleton flash on a repeat visit is a bug**, and it has never been
+  measured. RV-39 claims the `/more/devices` ring card does it — confirm or kill that claim.
+
+### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
+
+- **Verify:** device — no build half. Method: **P7**.
+- **The falsifiable claim:** a full walk produces no repeated console error, and no `/api/*` request
+  returns non-2xx. Send the **grouped counts**, not a summary — a warning firing 400 times is a
+  different finding from one firing once. `cachedFetch` swallows `!res.ok` unless the caller passes
+  `onError`, so these are invisible on screen by design.
+- **The part only this phone can answer:** production `error_events` carries `bf110 resume
+  dom-intact` rows by URL — **Home 22 · Nutrition 14 · Health 11 · More 7 · Workout 2**. Background
+  the app on each of those screens for 30 s, 5 min and 30 min, and report what the DOM looks like on
+  return. The counts say Home is where this bites and **nobody has ever watched it happen.**
+
+### [platform][nutrition] RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
+
+- **Verify:** device — no build half. Method: **P8**. Use CDP's network override rather than
+  airplane mode, so it can flip mid-action.
+- **The falsifiable claims:** an offline write renders immediately and **survives a force-stop and
+  reopen while still offline**; no surface goes **blank** offline (stale is acceptable and blank is
+  not — `cachedFetch` cannot revalidate offline, so anything needing a fresh payload is a hole); on
+  reconnect every row reconciles and **none flickers away and returns** (the outbox-versus-server
+  race in BF-47); the offline shell serves every route, not only ones visited that session.
+- Offline-first is the architecture's central claim and **no instrumented offline pass has ever
+  been run.** Pair with RV-126 — same writes, network flipped.
+
+### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
+
+- **Verify:** device — no build half. Method: **P9**; `tour.js` already walks routes.
+- **The falsifiable claim:** every route in the build is reachable **by tapping only**, from a fresh
+  install and from a warm one, and no picker or menu label names a different metric from what its
+  target screen shows. RV-121 says `/collection` fails the first half and one widget label fails the
+  second — confirm both and find the rest.
+- **⚠ Never uninstall to get a fresh install** — an uninstall destroys the Oura ring's BLE key,
+  which nothing in this repo, the server or any log can recover. Use a fresh profile or clear app
+  data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
+  and mark the fresh half COULD NOT CHECK.
+
+### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
+
+- **Verify:** device — no build half. Method: **P10**.
+- **The falsifiable claim:** across the 5-minute walk and then 30 minutes idle, JS heap, listener
+  count by type, and live `setInterval`/`setTimeout` handles all **stabilise rather than only
+  rising**. A count that only ever rises is the finding; report all three at start, after the walk,
+  and after the idle period.
+- The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
+  the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
+
+### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`
+  (`TOP_N = showAll ? Infinity : 10`).
+- **Background:** found twice in two days while verifying my own filings. Prose, not a `Reference:`
+  field — that field files an entry under *read, do not build*.
+
+**Lane A's READY list is 31 entries and the tool prints 10, with no line saying so.** Two entries I had
+just edited (`TN-55`, `LA-121`) appeared **nowhere** in the output, which reads exactly like *removed
+from the queue* — the failure mode the backlog's own two-deletions rule exists to catch. I only
+established they were fine by parsing their fields directly, which is the thing `next-item.js` exists to
+save everyone from doing.
+
+**The fix is one line of output, not a behaviour change.** Keep printing 10; add the count that was
+withheld and how to see them — *"showing 10 of 31 — `--all` for the rest"* — on every bucket it
+truncates, READY and PARKED alike. A tool whose silence is indistinguishable from absence is the same
+class of defect as the prose marker in TN-59: correct output, wrong conclusion drawn from it.
+
+**⚠ Do not raise `TOP_N` instead.** The cap is right — an implementer wants the next few items, not
+thirty-one. What is wrong is that the truncation is invisible.
+
+**Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
+IS in the queue but below the cut-off no longer comes back empty without explanation.
+
+### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Device Verification · **Lane: O** — the rule
+  scripts under `scripts/`, `scripts/check-test-typecheck.js`, and `package.json` `engines`.
+- **Why it matters now:** the role that runs next to the phone is a **local Windows** session, and
+  its prompt makes `pnpm ci:local` the pre-push gate. On 2026-09-23 it could not produce a clean
+  run for reasons that have nothing to do with the diff, so the gate was CI alone.
+- **Measured on Windows 11, Node 22.9.0, `device/first-run` — `Ran 75 of 75`, four FAIL, none
+  touching the diff:**
+
+  | step | cause |
+  |---|---|
+  | 27 *Sign-out wipes the device* | compares `lib\sign-out.ts` against an allowance written `lib/sign-out.ts` |
+  | 30 *An e2e stub does not hand the app a literal date* | same — `EXEMPT` keys use `/`, the walk yields `\` |
+  | 50 *Non-strict request schemas do not increase* | same — baseline keyed `app/api/…`, lookup `app\api\…` |
+  | 68 *No async function resolves to a Capacitor plugin proxy* | `execSync("grep -rl … 2>/dev/null | grep -v …")` runs under `cmd.exe` → *"The system cannot find the path specified."* |
+
+  Then `typecheck:tests` dies with `spawnSync npx ENOENT` (`npx` is `npx.cmd` on Windows, so it
+  needs `shell: true` or the `.cmd` name), and `pnpm test` cannot start at all:
+  `rolldown@1.0.3` declares `engines.node ^20.19.0 || >=22.12.0`, so its
+  `@rolldown/binding-win32-x64-msvc` is skipped at install on 22.9 and vitest throws
+  `Cannot find module './rolldown-binding.win32-x64-msvc.node'`.
+- **The fix:** normalise every walked path with `.split(path.sep).join('/')` before comparing (one
+  helper, reused — three scripts carry the same bug); replace step 68's shell pipeline with a Node
+  walk; spawn `npx` portably. For the Node floor, set `engines.node` to `>=22.12` so the mismatch
+  fails at `pnpm install` with a message instead of at test time with a missing binding. The local
+  machine's own upgrade is the owner's.
+- **Node half resolved on the device machine, 2026-09-23:** upgraded to 22.23.2 (winget
+  `OpenJS.NodeJS.22`) and `pnpm exec vitest run` starts. The `engines.node` floor is still worth
+  setting so the next machine fails at install, not at test time.
+- **With the tests running (Node 22.23.2, 2026-09-23), two more show up** in `scripts/__tests__`
+  (25 of 27 files pass, 258 of 259 tests): `strict-schema-inert.test.ts` shells out to step 50's
+  script and inherits its path bug; `check-comment-blindness.test.ts`'s `check-hex-literals` case
+  times out at 30 s — three full scans of `app/` + `components/`, which Windows' filesystem makes
+  slower. Measure before raising the timeout.
+- **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
+- **Not a device check** — nothing here needs the phone.
+
+### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
+
+- **Lane:** A — `lib/data/postgres/__tests__/personal-records-reconcile-migration.test.ts`.
+- **Added:** 2026-09-23 · Device Verification — seen on PR #1419's CI, a docs-only change.
+- **Observed once:** `Tests` failed with `insert or update on table "exercise_estimates" violates
+  foreign key constraint "exercise_estimates_user_id_fkey"` at the test's `await run()` (line 130),
+  1 of 997 files. **Re-run of the same commit: green.** `main`'s last four CI runs were green.
+- **Why it can happen (read from the test, not reproduced):** `run()` applies migration 163, which
+  reconciles `personal_records` into `exercise_estimates` for **every** user, not only this file's
+  `USER_A`/`USER_B`. All of `lib/data/postgres/__tests__` shares one database, and many files create
+  a user in `beforeAll` and `DELETE FROM users` in `afterAll`. If one of those users is deleted
+  mid-migration, the migration inserts an estimate for a user that no longer exists.
+- **Fix direction:** scope what the test asserts *and* what it runs to its own users — run the
+  migration's statements under a `WHERE user_id = ANY(…)` test harness, or take the same advisory
+  lock the migration runner uses, or move it to the `rollup`-style serial project. Do not add a
+  retry: that hides the next genuine failure in this file.
+- **Pass test:** the file cannot see another test's users — e.g. inserting and deleting a foreign
+  user in a parallel file during `run()` leaves it green.
+- **Not a device check.**
+
+### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
+
+- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
+  Review sweep 53. **Shipped:** 2026-09-22, `fix/rv103-rv104-nutrition-freshness`.
+- Both of the entry's defects are fixed. The dead `.catch(() => {})` is gone; the refetch runs
+  through `fetchWithRetry`, so a transient failure self-heals and a persistent one reports through
+  `onExhausted`; and `d => setBalance(d ?? null)` — which made the budget and macro targets
+  **disappear** rather than go stale, because `balanceForDate` is gated on the payload's date — is
+  now `if (d) setBalance(d)`. `EnergyCard` renders the failure line and a Retry.
+- **A third defect was found while reproducing it, and it would have made the whole mechanism
+  inert:** the unmount ref was set in a cleanup and never reset, so StrictMode's simulated unmount
+  latched it `true` for the life of the screen and `isCancelled()` killed every retry. One aborted
+  request was observed where four were due.
+- **Keep:** ① the device check — the failure line and its Retry at the S25 width, in the card that
+  carries "kcal left". ② the reporting path is **wired but only observed firing once in five
+  sandbox runs**, because of LB-128 below; it is strictly additive (absent the flag nothing renders,
+  which is today's behaviour) but it is not proven in the common case and must not be written up as
+  though it were.
+
+### [platform] LB-128 — `cachedFetch` cannot tell a caller that a revalidation failed
+
+- **Lane:** A — `lib/sqlite/cache.ts:374`. **Added:** 2026-09-22 · found while shipping RV-103.
+- `cachedFetchCore`'s network-throw branch computes
+  `const online = cached === null && navigator.onLine` and fires `onError` only when `online`; the
+  `!res.ok` branch is gated the same way (`if (cached === null)`). So **both** failure paths are
+  silent whenever anything was painted from cache. `fetchWithRetry` has the mirror-image blind
+  spot: a cached paint sets `responded`, so the retry chain stops and `onExhausted` never fires.
+- **Together they mean no caller can report a failed refresh of a key that has a cached value** —
+  exactly the post-write case RV-103 was about, whenever the write's invalidation has not (yet)
+  cleared the entry. RV-103's suggested fix, *"pass `onError`"*, cannot reach it.
+- **Measured, not read:** driving `/nutrition` with `/api/nutrition/energy-balance` aborted, the
+  same code both reported and stayed silent on consecutive runs, decided by whether the entry was
+  in the cache when the refetch ran. The flake was the finding.
+- **Fix:** an ungated channel — an `onRevalidateError` that fires when a cached value was painted
+  and the revalidation then failed. The existing gate is right for what it guards (offline with
+  saved data is not an error); what is missing is the case where the caller *knows* the cached
+  value is out of date, because it just wrote.
+- **⚠ Do not simply ungate `onError`** — every existing caller reads it as "I have nothing to
+  show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
+  cached data with error cards across the app.
+
+### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
+
+- **Lane:** A — `scripts/check-fetch-once-effects.js:164`. **Added:** 2026-09-22 · Review sweep 53.
+- The gate is `if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(...)) continue;` — **only an empty dependency
+  array counts.** Its comment states the rationale: *"a non-empty one re-runs when its deps change,
+  which is a different (and usually correct) shape."*
+- **That reasoning is sound in general and wrong for this app.** Inside the persistent tab shell,
+  `[userId]`, `[today]` and `[trendsProp]` never change either, so those effects are fetch-once in
+  every way that matters. **Four of the five freshness findings in this sweep (RV-104, RV-106,
+  RV-107, RV-109) are that shape, and all four are invisible to the ratchet.**
+- **⚠ Widening the pattern is NOT a one-line change, and the file says why.** Its header records
+  that the first version used a non-greedy regex, swallowed unrelated code between effects, and
+  **inflated its own baseline by 11 of 25**. The brace-matching it uses now is the fix for that.
+  Extending to stable-deps needs a judgement about *which* deps are stable — `[userId]` on a
+  persistent screen is, `[date]` on a sheet that remounts per open is not (`week-day-sheet.tsx` is
+  the legitimate counter-example).
+- **Fix, narrowly:** treat a dep array containing **only** identifiers known to be shell-stable
+  (`userId`, `tz`, `today`) as fetch-once, re-baseline, and leave everything else alone.
+- **Not established:** how many *new* sites a widened pattern would surface — the four above were
+  found by hand, not by a candidate scan.
+
+### [heart-rate][app-shell] RV-106 — a ring sync updates Home's HR strip and leaves Health's HR card on pre-sync data
+
+- **Lane:** B — `components/health/hr-day-card.tsx:39-51`. **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `stale-surface-subscribe`
+- `invalidateOuraSync()` clears `oura-hr-day:` and Home's reader is gated on `refreshTick`, which the
+  `ta:oura-ble-synced` listener bumps. Health's reader is `cachedFetch` in a `useEffect(…, [today])`
+  on a card the shell mounts once and never unmounts, and `health-content`'s invalidation
+  subscription covers `body-metadata`/`sleep-sessions`/`readiness-score` — **not this key**. Neither
+  `fetchSharedHealthData` nor `fetchActiveTabHealthData` fetches it, so the `tabEpoch` pass does not
+  reach it either.
+- **Two surfaces, same quantity, one updates.** A tab switch does **not** fix it; recovery needs a
+  shell remount (a non-tab route and back), midnight rollover, or a restart.
+- **Fix:** `useInvalidationRefetch(['oura-hr-day:', 'workout-sessions-day:'], load)` — the in-repo
+  escape hatch for a read that also seeds and sets several pieces of state.
+- **Not established:** whether `useStressDay(today)` in the same card shares the gap — not traced.
+
+### [nutrition][app-shell] RV-107 — editing macro targets leaves the Nutrition screen banding against the old numbers
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx:262-265`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Batch:** `stale-surface-subscribe`
+- `macro-targets-pane.tsx:101-107` POSTs and then awaits `invalidateGoalRecommendations()`, which
+  clears `nutrition-targets`. Nutrition reads that key inside the same mount-scoped `fetchMountData`
+  as RV-104, at `TTL_LONG`, and nothing subscribes — so the macro rings keep banding against the
+  previous target for the life of the app. Applying a goal recommendation from Home routes through
+  the same group and has the same result.
+- **⚑ The proof the refetch is needed is already in the file:** the TDEE card's `onApplied`
+  (`:637`) refetches — a different write path that *did* get the treatment. One path was fixed, its
+  siblings were not.
+- **Fix:** `useInvalidationRefetch('nutrition-targets', …)` rather than `useCachedValue` here —
+  `targets` is currently set from two places, and the repo's one-fetch-expression-per-key rule
+  (`packages/shared/src/cache-ttl.ts`) makes the hook the smaller change.
+
+### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
+
+- **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Gate: device** — the broken branch is the local-store one, which does not run off the APK.
+- The sheet contains **no `invalidate*` call at all**. Its local-store branch ends at `onSaved(...)`
+  with a bare `pushMutations(userId!)`. The consumer branches — `if (freshMeta) { setMetaToday(...);
+  invalidateReadinessInputs() } else { invalidateBodyMetricWrite() }` — so on device only the
+  **readiness** subset is cleared. **Not cleared:** `body-metadata`, `energy-balance:`, `day-log:`,
+  `health-trends-summary`, `hr-profile`, `training-stress`, `achievements:`, `collection`, and both
+  review-window keys.
+- **⚑ Its sibling two files away does it correctly:** `components/profile/water-log-sheet.tsx:78-82`
+  calls `pushThenRevalidate(userId!, invalidateBodyMetricWrite)` **and** an immediate
+  `invalidateBodyMetricWrite()` on the same local branch. Copy that exactly.
+- **This is a missed invalidation, not a missed re-render** — the other findings in this sweep are
+  the opposite, and the fixes are different. Recovery today is TTL expiry or an incidental
+  `pullDelta`, i.e. a delay rather than a repaint.
+- **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
+  for a body-metrics delta on the device that wrote it. If it does, the window is shorter than TTL
+  but still non-deterministic.
+
+### [activity][app-shell] RV-109 — Health's Activity History never shows an activity confirmed from Home
+
+- **Lane:** B — `components/health/activity-history-card.tsx:72-107`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Batch:** `stale-surface-subscribe`
+- Seed plus two `cachedFetch` calls in a `useEffect(…, [userId])`. All three Health sub-tabs render
+  simultaneously inside the `SwipeCarousel`, so the card is mounted for the life of the shell once
+  Health is visited, and nothing in the `tabEpoch` pass fetches `activity-logs`.
+- So an activity reviewed from Home (`exercise-review-sheet.tsx:219` fires
+  `invalidateActivityWrites()`) or arriving via background sync never appears until a shell remount.
+  A walk logged through `/activity` self-heals **only because that route change unmounts the shell**
+  — which is why this looks intermittent rather than broken.
+- **Fix:** `useInvalidationRefetch(['activity-logs','activity-types'], load)` — the card seeds from
+  the local store and merges pending rows, the case that hook's docblock says `useCachedValue`
+  cannot own.
+
+### [app-shell][platform] RV-110 — 37 cross-tab `router.push` sites tear down the whole tab shell; 5 use the helper that does not
+
+- **Lane:** B — `lib/shell-nav.ts` call sites across `app/` and `components/`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `tab-nav-shell`
+- Counted 2026-09-22: **37** `router.push('/health'|'/nutrition'|'/more'|'/workout')` sites against
+  **5** `navigateToTab(...)`. `app/(home)` and `app/health` are different route segments, so a push
+  unmounts the entire `TabShell` — every panel's component state, `state.mounted`, and every inner
+  `scrollTop` — and the four code-split tabs re-mount.
+- **The illustration is two adjacent lines on Home** (`session-select-content.tsx:436-437`):
+  `handleNavigateStats` uses `router.push("/health?tab=training")`, `handleNavigateHealthBody` uses
+  `navigateToTab(router, "/health?tab=body")`. Two taps on one screen, one slow and one instant, for
+  no reason the owner could infer.
+- `lib/view-transition.ts:118-126` deliberately declines to animate a tab href but still forwards it
+  to `router.push`, so `useTransitionRouter` does not save these sites.
+- **Fix:** route them through `navigateToTab`, which already falls back to `router.push` when no
+  shell is mounted (covering `done-activity-screen`, `walk-summary`, `test-result`). Then a grep
+  rule holds it.
+- **⚠ Check the query-param destinations before converting.** The shell's `show()` `replaceState`s
+  the full href, but whether Health/Nutrition read `?tab=`/`?review=` **on a flip** rather than only
+  on mount has to be confirmed per screen — a flip landing on the wrong sub-tab is a regression the
+  current full navigation does not have.
+
+### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
+
+- **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
+  `components/nutrition/ingredient-picker.tsx:302`. **Added:** 2026-09-22 · Review sweep 53.
+- **Gate: device** — the hardware back path only exists on the APK.
+- The scanner **replaces the sheet's body** rather than opening a surface of its own, and neither
+  file registers a back-stack entry (`grep` for `useSheetBackDismiss`/`sheet-back-stack` in both →
+  none). `SheetContent` renders `BackDismiss` once, so the native listener sees one open surface and
+  pops the **Log Food sheet**, throwing away the capture flow instead of stepping back one level.
+- Adjacent to, not a repeat of, BF-166 / BF-95 / BF-34, which are all handled.
+- **Fix:** `useSheetBackDismiss(scanning, () => setScanning(false))` in both files. The stack is
+  already depth-aware and already handles a surface opening inside another.
+- **⚠ The ordering risk is the thing to test, and it is not cosmetic.** The scanner injects a global
+  `body.scanner-active > *:not([data-scanner-overlay]) { visibility: hidden !important }`
+  (`barcode-scanner.tsx:73-76`) and removes it in `stopNative()` on unmount. **If one back press
+  ever closed both surfaces in a single pop, the app would be left with every body child hidden.**
+  The existing `pendingSelfPops` accounting is what prevents that.
+- **Not established:** whether the native barcode activity intercepts hardware back before the JS
+  listener runs — device-only, and it may already mask this.
+
+### [app-shell] RV-112 — Home and More share one scroll-restoration key and overwrite each other
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1052-1055`,
+  `app/more/more-content.tsx:152-155`. **Added:** 2026-09-22 · Review sweep 53.
+- **Batch:** `tab-nav-shell`
+- `use-scroll-restoration.ts:105` keys on `keySuffix ? pathname#suffix : pathname`. Health passes
+  three suffixes (`scrollKey="body"|"training"|"progress"`); **Home and More pass none**, and both
+  panels stay mounted, so while the URL reads `/more` both containers save and restore the same
+  `ta_scroll:/more` slot. The restore path has no owner check.
+- **Fix:** `scrollKey="home"` and `scrollKey="more"` — one prop each, copying what Health already
+  does. Keys are session-scoped, so nothing needs migrating.
+- **Not established:** the real magnitude. Restores need ≥40px and the takeover listeners cancel
+  aggressively, so the collision may often resolve to a no-op. The e2e spec
+  (`e2e/scroll-restoration.spec.ts`) was not run.
+
+### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
+
+- **Lane:** B — `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- The incoming panel gets `tab-panel-enter` and the outgoing one gets
+  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
+  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
+  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
+  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
+  content fading out first; **that half is not implemented.**
+- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
+  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
+  so there is nothing to hide and the blink cannot happen.
+- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
+  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
+  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
+  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
+- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
+  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
+  they decide whether this is worth doing at all.**
+
+### [app-shell] RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed
+
+- **Lane:** B — `components/more/friend-leaderboard.tsx:111`, `components/more/friend-feed.tsx:28`,
+  `app/nutrition/nutrition-content.tsx:140`, `app/coach/**`, `app/collection/**`,
+  `app/register/register-form.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- The transition router is used in 30 files and a plain `useRouter` in 16. The asymmetric pair:
+  both friends surfaces push `/profile/${userId}` with a plain router while that screen's own back
+  runs the `"back"` keyframes — **open hard, close animated**, the exact inversion
+  `lib/hooks/use-back-or-fallback.ts:30-34` was written to prevent. Transition-less both ways:
+  Nutrition → `/coach` (Nutrition is the #2 screen), the coach confirm route, `/collection` back,
+  and register.
+- **Fix:** swap `useRouter` for `useTransitionRouter` — same call signature, and it already no-ops
+  for tab hrefs and same-URL pushes, so it is import-only.
+- **⚠ Known hazard:** `lib/view-transition.ts:36`'s 300ms cap freezes the outgoing screen if the
+  destination never commits. `/coach` and `/coach/confirm/[toolCallId]` are dynamic routes and a
+  cold compile could hit it — a 300ms hold rather than a break, but check it on those two.
+
+### [app-shell] RV-115 — More's Profile ↔ Friends swap is a hard `display:none` toggle that carries the other view's scroll
+
+- **Lane:** B — `app/more/more-content.tsx:157-163`. **Added:** 2026-09-22 · Review sweep 53.
+- Two `<div style={{display: …}}>` inside one shared scroller: no motion, and the scroll offset
+  carries across. Meanwhile Health's sub-tabs slide via `SwipeCarousel` and **the Friends tab's own
+  child view crossfades** via `TabPanels` — the single call site of that primitive.
+- **Fix:** wrap both panels in the existing `<TabPanels value={tab}>` and reset `scrollTop` in
+  `onValueChange`. Opacity-only, already inherits the global `MotionConfig`.
+- **⚠ `mode="wait"` unmounts the outgoing panel**, discarding Profile's and Friends' state on every
+  switch — confirm both re-seed from cache, or the swap trades a hard cut for a skeleton. That
+  caveat plus More's traffic (7) is why this ranks last of the navigation set.
+
+### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
+
+- **Lane:** B — `components/home/home-nutrition-card.tsx:48`,
+  `components/home/home-energy-balance-card.tsx:14`. **Added:** 2026-09-22 · Review sweep 53.
+  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise; see below.
+- **Batch:** `home-ia-merge`
+- **The original entry proposed folding the energy-balance card's provenance line into the nutrition
+  card. That was wrong: the nutrition card already has it.** `HomeNutritionZoneBar` renders
+  `CalorieZoneBar`, which prints the `N resting rate — no movement recorded yet today` line (Q-401),
+  so the running card already carries ring + totals + zone bar + provenance + macros.
+- **What remains** is structural: both call `useEnergyBalanceToday()` — same hook, same
+  `energy-balance:${today}` key — and both sit in the picker. `DEFAULT_CARD_WIDGETS` is `[]`, so
+  `energyBalanceWidget` is opt-in and off; the duplication is latent, not on screen.
+- **This shape already produced two live bugs:** Q-401/Q-415, two budgets 271–274 kcal apart, both
+  labelled "left" — they agree today only because `budgetProvenance` was centralised.
+- **Remaining delta, if the second card were enabled:** the large `remainingKcal` figure, the
+  `zoneLabel` word, and the `eaten · burned · maintenance` breakdown (no equivalent on the other).
+- **Fix, reduced:** merge and delete nothing. Relabel the picker entry so it reads as an alternative
+  to the nutrition card rather than an addition, and grey it out while that card is on if cheap.
+- **No owner gate** — the reduced fix changes picker copy, it does not rearrange a screen.
+
+### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
+
+- **Lane:** B — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `health-ia-merge`
+- The "Balance" tile renders `netKcal` `vs TDEE est.` in group **Body**; `CalorieBalanceBar` renders
+  `remainingKcal` + zone band in group **Activity & intake**. Same payload, two different numbers,
+  both presented as today's energy answer, with the Sleep group and eight Heart-&-recovery cards in
+  between.
+- `use-health-calcs.ts:44-47` records that these two surfaces **already disagreed once**, each
+  deriving its own TDEE. The data was unified; the presentation was not.
+- **Fix:** fold `netKcal` and `maintenance` in as a secondary line of `CalorieBalanceBar`, **behind a
+  prop** — that component is shared with Nutrition and `/health/day`, which did not ask for the extra
+  number.
+- **Fold, do not delete:** surplus/deficit and remaining-to-eat are genuinely different framings.
+
+### [body] RV-118 — "Weight Trend" exists twice in Health, and the card with that title has no trend number
+
+- **Lane:** B — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `health-ia-merge`
+- Body has a "Trend" tile with the kg/wk regression slope and **no chart**; Progress has a card
+  **titled "Weight Trend"** with a sparkline and two goal bars and **no slope number**. One question
+  — am I losing weight, how fast, how far to target — split across two sub-tabs the owner must swipe
+  between.
+- **Fix:** one card with sparkline + slope + goal bars. Body is the better home (it holds the
+  weight, body-fat and lean-mass cards it derives from). Both are plain JSX in one file sharing one
+  context, so the mechanical risk is low.
+- **What is lost:** the goal bars are Progress's subject, so **Progress becomes a 4-card tab.** Say
+  that out loud before doing it.
+- Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
+
+### [app-shell] RV-119 — seven independent banners stack above Home's first real content
+
+- **Lane:** B — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `home-ia-merge`
+- Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
+  weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
+  a Monday after a detected walk with an early-deload flag, the owner scrolls past five cards to
+  reach the recommendation — which is why he opens Home.
+- **⚠ Do NOT collapse all seven.** The illness advisory and early-deload are things he should see
+  *today*; putting them in a dismissible strip beside an APK banner makes them easy to miss. Split
+  by severity: those two stay full-width, the other five collapse.
+- **The APK banner should simply go** — the canonical runtime *is* the APK, and the same download
+  row already exists at More → About.
+- **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
+  `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
+  whoever takes it should do both rather than extract twice.
+
+### [platform] RV-120 — `aiVolume` is built, rendered nowhere, and has no backlog entry
+
+- **Lane:** B — `app/health/health-sections.tsx:30,692`, `app/health/health-content.tsx:58-61`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- `AiWeeklyVolumeCard` is imported and has a live `case "aiVolume"` render arm, but the key is in
+  **no order array**, so nothing mounts it. The comment says it is *"intentionally omitted: it
+  duplicates the 'Muscle Volume This Week' card… the visualisation is deferred until it's merged
+  into a single volume card."*
+- **That deferred merge has no entry.** `grep -rn "aiVolume\|Weekly Volume vs Target"
+  docs/implementation-backlog.md projectOverview.md` → **0 hits**. Under CLAUDE.md's **No orphaned
+  findings** this is a dropped finding that has been sitting in a code comment instead of the queue.
+- **This entry does not decide the outcome** — merge into the volume card, or delete the component
+  and the render arm. Either is fine; leaving a built-but-unreachable card with a comment promising
+  work nobody queued is not.
+
+### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
+
+- **Lane:** B — `components/home/home-card-widget.tsx:325`, `components/more/home-widgets-section.tsx`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- `/collection` has **exactly one** in-app link, inside `case 'card_collectionWidget'`, which returns
+  null unless the widget is enabled — and `DEFAULT_CARD_WIDGETS` is `[]`
+  (`lib/home/home-prefs.ts:110`). So on a fresh install the route exists and nothing can reach it.
+  Not dead; hidden behind a preference. Decide whether that is intended.
+- Separately: the picker labels `moodWidget` **"Readiness"**, which collides with the chip row's
+  actual Readiness score, while the widget renders **"Exercise Readiness"** — the subjective
+  check-in. One word, and it stops two different numbers sharing a name in the place where the owner
+  chooses between them.
+- **Also noted, not filed separately:** three step readings can be on Home at once
+  (`stepsWidget`, the Steps metric tile, and the chip row's Activity score).
+
+### [platform][app-shell] RV-122 — the sync-failure card cannot trigger the sync that clears it
+
+- **Lane:** B — `components/more/sync-health-card.tsx:85`,
+  `components/more/data-sync-panel.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- The More tab's nav dot points at the sync-failure card, which lists pending and dead-lettered
+  mutations with a per-item retry. The global **"Sync now"** that usually clears them is one tap
+  deeper at `/more/data`. One task, two screens.
+- **Fix:** render "Sync now" on the failure card (or `DataSyncPanel` beneath it) when it is non-null.
+- **Keep it scoped — this is promoting one button, not merging a screen.** Restore and Export stay at
+  `/more/data`: they are rare and destructive-adjacent and do not belong on a card that appears
+  unprompted.
+- **Watch:** do not double-fire against `PullToSync`'s `handlePullSync` on the same screen.
+
+
 ### [readiness] TN-60 — the ±1.5σ rail clips 38% of HRV days, so a z of −1.63 and a z of −4.37 both score zero 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning, from a variance decomposition of the
   stored composite over 69 days (2026-07-16 → 2026-09-22). Measured on the **output**, which is what
   makes it new: TN-47 argues the same thing from the inputs.
 - **Lane: A** — `packages/shared/src/health/readiness-composite.ts`.
-- **Gate: owner** — this is a scoring change and re-scores history, so it needs sign-off on the shape
-  before Lane A builds it. The measurement below does not.
+- **✅ OWNER DECIDED 2026-09-22 — build option 1, the compressive tail.** The gate is lifted; this is
+  startable. Keep the linear region exactly as it is, replace the hard clip at ±1.5σ with a curve that
+  keeps compressing so days beyond it retain their **ordering** instead of collapsing onto 0/100.
+  Options 2 and 3 below are recorded as not-chosen and should not be re-proposed without new evidence.
+- **The history recompute is BATCHED — do not fire it from this PR.** Owner decision, same day: the
+  stored days are re-derived **once**, after this, TN-6, BF-13 and LA-121 have all landed, via a single
+  `POST /api/admin/rederive-baselines` run (dry-run first). See LA-122's recorded decisions.
 
 **What the composite's weights actually are, versus what they say.** Weighted standard deviation of
 each contributor's stored score, as a share of all the movement in the final number:
@@ -627,54 +1285,6 @@ nothing structured saying why — and a human decides.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
-### [platform] LB-126 — five date call sites still hand-roll their own option bag
-
-- **Lane:** B — `components/calendar-widget.tsx:109`,
-  `components/nutrition/weekly-nutrition-chart.tsx:50`,
-  `app/session-select/components/recommendation-card.tsx:36`,
-  `app/session-select/components/week-day-sheet.tsx:13`,
-  `app/nutrition/nutrition-content.tsx:88`. **Added:** 2026-09-22 · the Lane B half of LB-125.
-- **LB-125 has landed — every style this needs now exists.** `formatDateDisplay(raw, style)` takes
-  `short` · `long` · `weekday` · `weekday-date` · `weekday-date-long`, each pinned to its exact
-  output in `packages/shared/src/__tests__/date-utils.test.ts`.
-- **⛔ Corrected while landing LB-125 — this entry's counts were wrong, measured 2026-09-22.**
-  **TWO of the five are a bare `{ weekday: 'short' }`**, not three: `recommendation-card.tsx:36`
-  and `weekly-nutrition-chart.tsx:50`. The two the entry called one-offs are the same shape with
-  different weekday widths, and each has a style: `week-day-sheet.tsx:13` →
-  **`weekday-date-long`**, `nutrition-content.tsx:88` → **`weekday-date`**.
-- **⛔ `calendar-widget.tsx:109` is NOT convertible, and is the reason this is four sites, not
-  five.** It is a `{ month: 'long', year: 'numeric' }` MONTH-AND-YEAR label built from
-  `(viewYear, viewMonth)` **numbers** — `formatDateDisplay` takes a `YYYY-MM-DD` string and
-  renders a day, so routing it would mean inventing a day-of-month to throw away. Leave it, or
-  file a separate month-label helper; do not force it.
-- **Check the rendered string before and after, do not assume it is unchanged.** `en-AU` emits a
-  comma after a SHORT weekday and none after a long one, so `weekday-date` gives `Tue, 15 Sept` —
-  which is what `nutrition-content` already renders, making that one a true no-op. Confirm the
-  same for the other three rather than trusting it.
-- **Also duplicated, outside this entry's list:** `components/admin/time-audit-card.tsx:200`
-  spells the `'short'` bag by hand. It takes a timestamp rather than a date string, so it needs a
-  `toAestDay` first; admin surfaces are timezone-exempt per CLAUDE.md, so this is optional.
-
-### [app-shell] RV-98 — opacity-modified text falls below AA, and the contrast check cannot see it
-
-- **Lane:** B — the call sites, plus extending `scripts/check-contrast.js`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- `scripts/check-contrast.js:149-160` validates ten **bare token pairs** and has no opacity handling,
-  so `text-muted-foreground/60` and below are entirely unguarded. Measured over `--card`:
-  `/70` 4.64:1 (passes, 17 sites) · **`/60` 3.73:1 (26 sites)** · **`/50` 2.97:1 (6)** ·
-  **`/40` 2.34:1 (8)** · **`/30` 1.83:1 (7)**. AA is 4.5:1 for body text.
-- **The one that carries meaning:** `components/calendar-widget.tsx:187` renders the literal word
-  "rest" at **`text-[7px]` with `/50` = 2.97:1** — and that label is the *only* marker distinguishing
-  a past rest day from a past untracked day in the month grid. At low brightness the calendar reads
-  as if nothing was logged.
-- **Fix:** raise the floor to `/70` for text; use full-opacity `muted-foreground` (8.36:1) for the
-  calendar marker. Then extend the check to parse `text-<token>/<n>` and composite before comparing,
-  with today's offenders as shrink-only `GRANDFATHERED` rows — the script's existing structure
-  already supports that.
-- **Not established:** each site's background was assumed to be `--card`; some sit on `--background`
-  (±0.05) or `--muted` (slightly worse). Icon-only uses were not checked against the 3:1 UI floor,
-  where `/60` and `/70` pass.
-
 ### [platform][app-shell] RV-99 — good/warning/bad exists as two parallel palettes, and only one can follow the theme
 
 - **Lane:** A — `packages/shared/src/health/score-band.ts` first. **Added:** 2026-09-21 ·
@@ -688,27 +1298,10 @@ nothing structured saying why — and a human decides.
 - **Fix:** make `scoreBand()` return the tokens (the only half that can follow the theme) and have the
   hex sites import it. **Chart.js callers must pass the result through the existing `resolveColor()`**
   (`packages/shared/src/chart-colors.ts`) — canvas cannot resolve `var()` and silently paints black.
-- **⛔ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
+- **⚠ Do not migrate blind.** Not all 173 are band colours: `accentCardStyle('#22c55e')` as a card's
   identity tint, `rarity-colors.ts`, and `hr-zones.ts`'s deliberate blue→red ramp are legitimate
   one-off uses. Audit before replacing, then a check script banning the three literals outside
   `score-band.ts` holds it.
-
-### [workouts][app-shell] RV-100 — "Deload" is green on one screen and red on another
-
-- **Lane:** B — `components/health/ai-periodization-status-card.tsx:36-41`,
-  `app/session-select/components/deload-banner.tsx:21-26`. **Added:** 2026-09-21 · Review sweep 52.
-- `PHASE_COLORS` has `deload: "text-green-500"`; the banner paints the same concept `#ef4444` /
-  `#f97316` / `#fbbf24` by strength. Glance at the phase card and green reads "all good"; glance at
-  the banner and it reads "act now". Neither is wrong alone; the pair cannot both be right.
-- **Two riders in the same file:** `realisation` — the peak-output phase — is `text-red-500`, the
-  app's failure colour everywhere else; and the banner introduces a **third** amber (`#fbbf24`)
-  alongside `#f59e0b` and `--accent-amber`.
-- **Fix:** separate the axes. Phase identity is *categorical* — give `PHASE_COLORS` a non-semantic set
-  (`packages/shared/src/session-palette.ts` is already the repo's categorical palette) and keep
-  green/amber/red exclusively for state.
-- **Not established:** whether both surfaces are reachable in one session. If the phase card only
-  shows `deload` while the banner is suppressed, the collision is theoretical — **check that before
-  sizing the work.**
 
 ### [workouts][app-shell] RV-101 — the muscle heatmap paints two incompatible colour scales into one silhouette
 
@@ -762,7 +1355,7 @@ nothing structured saying why — and a human decides.
 - **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
   those two routes call `getNextSession` alone and read the program off its result. Risk-free —
   same data, same request.
-- **⛔ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
+- **⚠ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
   program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
   but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
   wanted, it is its own entry with that trade stated.
@@ -794,17 +1387,49 @@ nothing structured saying why — and a human decides.
   now. The look is diagnostic either way — gone means post-mortem, still there means a stale client
   cache specifically, since the only other candidate is ruled out.
 
-**2. LA-121 — port the temperature ladder, or let `tempZ` stand?** (unblocks LA-121, now `Gate: owner`)
-  `computeBlendedScore`'s penalty ladder (dev 0.4 → 70, 0.7 → 60, 1.2 → 40 from a base of 80) has
-  had no reachable call site since 2026-07-07. Temperature still reaches readiness through
-  `computeReadinessComposite`'s `tempZ`, so nothing is missing — but the ladder was the sharper
-  penalty. **Either answer re-scores stored days, which is why an implementer must not pick.**
-  Adjacent to TN-6 and BF-13, both open on the same baseline.
-  **Re-verified 2026-09-20 and LA-121 was gated then** — it had been printing as Lane A's READY #1
-  while saying in its own text not to start it, which is item 3's defect wearing this entry's name.
-  The measurement also firmed up: last non-null `readiness_score` is **2026-07-07, the re-key date
-  itself**, and the dead condition has **five** sites rather than four (the fifth a live gate with a
-  dead disjunct, so it needs different treatment from the other four).
+**2. ✅ ANSWERED 2026-09-22 — LA-121: do NOT port the temperature ladder; let `tempZ` stand.**
+  The reason, which is the part worth keeping: TN-6 has measured the temperature baseline **0.36 °C
+  too low**, so porting the *sharper* penalty on top of a wrong baseline amplifies the error instead
+  of adding signal. Temperature already reaches readiness through `computeReadinessComposite`. If it
+  looks under-weighted after TN-6's rebuild, that is a new question with data behind it. LA-121's gate
+  is lifted and its remaining work should be behaviour-preserving dead-code removal — see the entry.
+
+**2a. ✅ NEW DECISION 2026-09-22 — the readiness history is re-derived ONCE, not per change.**
+  Four entries each rewrite stored readiness days: **TN-60** (the ±1.5σ rail), **TN-6** + **BF-13**
+  (the temperature baseline) and **LA-121**. Shipped separately the owner's history would visibly
+  shift four times over a few weeks with no way to attribute what he was looking at. So the code
+  changes land in their own PRs as normal, and **`POST /api/admin/rederive-baselines` fires once,
+  after the last of them**, dry-run first.
+  **⚠ Do NOT express this as a `Batch:` field.** `Batch:` means one PR, and one PR here would bundle
+  three code changes with an owner-fired production data write — which the standing rules forbid
+  batching. The shared thing is the *recompute run*, not the diff. Whoever ships the last of the four
+  states plainly in its PR that the recompute is now owed, so it is not silently skipped.
+  **The Body Battery (TN-55) is NOT in this batch** — it writes `body_battery_daily`, a different
+  table, and the owner accepted two re-scores there to get the fix sooner.
+
+**2b. 🔴 OPEN — is a contributor worth 2.8% of readiness's movement worth keeping?** (added 2026-09-23,
+  Tuning; would unblock a narrowing of TN-60 and of the composite generally)
+  The variance decomposition in TN-60 measured what each of the nine readiness contributors actually
+  moves. **`activityBalance` carries 2.8%** of all movement on a declared weight of 0.06, and
+  `prevDayActivity` 4.6% on 0.09 — so the two activity terms together are **7.4%** of the number while
+  holding 15% of the weight. Three answers and none is obviously right: **keep** them (they are real
+  signals and thin movement may be correct for a rest-heavy period), **re-weight** them up so the
+  declared weight matches the effect, or **drop** one and redistribute. Each re-scores history, so it
+  is the owner's, and it should wait until TN-60's rail fix has landed — the rail is part of why the
+  effective weights diverge from the declared ones, so the table will move on its own first.
+  **Not urgent, and deliberately not asked yet:** asking before the rail fix would get an answer to a
+  question whose numbers are about to change.
+
+**2c. 🔴 STILL OPEN — item 5's `.size` conflict tax, now with a measured cost.** (unblocks nothing; it
+  taxes everything)
+  Recorded here because it was raised on 2026-09-20 as item 5 and has not been answered while the cost
+  kept accruing. **Measured across this Tuning session alone: five of seven PRs hit a
+  `docs/doc-size/docs/implementation-backlog.md.size` conflict**, each needing a fetch, a merge, a
+  recount, a baseline-note edit and a re-push — and two of those also had to resolve the append-only
+  `doc-size-baseline-history.md` by hand. Every one was mechanical. Item 5's own cheapest fix (BugFix
+  batches a sweep into one PR) does not help here, because the conflicts came from *different agents'*
+  PRs landing between mine. **The fix that does is item 5's alternative — generate the baselines in CI
+  rather than committing them — which needs its own entry and the owner's yes on changing the ratchet.**
 
 **3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
@@ -863,7 +1488,7 @@ nothing structured saying why — and a human decides.
   3 more fetches) and `fetchActiveTabHealthData()` believing they are cache hits. Home does the same.
 - **This is the Q-262 rule read in the direction nobody wrote down:** the TTL constants govern how
   long a *seed* survives, not how often the app touches the network.
-- **⛔ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
+- **⚠ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
   staleness if any writer is missed, and CLAUDE.md requires a **written invalidation proof** per key:
   list every write that changes the payload and show each one's group contains the key. Candidates,
   all already `TTL_LONG` and already in a group: `workout-data:meta`, `muscle-recovery`,
@@ -1334,6 +1959,22 @@ already a pure function of its inputs (LA extracted it for exactly this), so the
 against production reads. TN-56 is still worth building for the 25 sleep-staging constants, whose
 inputs are never persisted — but it does **not** gate this entry.
 
+**⚠ TN-55 IS Q-272's MISSING PROPOSAL, and the plan was REVISED 2026-09-23 after reading it.** Q-272
+(`[readiness][body]`, filed 2026-08-15) is the pre-existing entry for this defect and had been waiting
+for a Tuning proposal the whole time; TN-55 did not check for it before filing. Two things changed as a
+result, both in the plan's **§6a**: **overnight charging is OUT** (Q-272 is right that the wake anchor
+already accounts for the night, and the re-fit without it is strictly better — 0% of days ending at zero
+against 5%), and **Q-272's `r = +0.67` acceptance test does not replicate** (0.252 over 70 days, below
+readiness's own 0.361 autocorrelation), so it must not be used to sign this off. **Build from the plan,
+not from this entry's first version.**
+
+**✅ OWNER DECIDED 2026-09-22 — ship the four structural changes NOW with the provisional constants,
+and re-sweep after 2026-10-04.** He accepted that the battery re-scores twice as the price of not
+leaving it a countdown for another fortnight. So: build it, note in the changelog that the numbers are
+provisional, and re-run `scripts/tuning/body-battery-replay.cjs` once the window opens — the gain is a
+single dial, so the second pass is small. **The battery's recompute is NOT part of the batched
+readiness re-score** (LA-122): it writes `body_battery_daily`, a different table, so it stands alone.
+
 **⚠ THE CONSTANTS CANNOT BE FINALISED BEFORE 2026-10-04.** The dose stepped 0.5 mg → 1 mg on
 **2026-09-13**, so the calibration-period rule at the head of this file puts the earliest honest fit
 three weeks after that. The four **structural** changes do not depend on the window and can ship now;
@@ -1609,11 +2250,18 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
 - **Lane: A** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
-- **Gate: owner** — added 2026-09-20 on re-verification. The entry's own step (2) says *"Not
-  before"* (1) is answered, and LA-122 item 2 says an implementer must not pick. Without the
-  field this printed as Lane A's **READY #1**, so the queue tool told every implementer to
-  start the one entry that says not to. Same defect LA-122 item 3 names for Q-28/BF-9/BF-7;
-  recording what the entry already said is not the owner's call, so it was not left for them.
+- **✅ OWNER DECIDED 2026-09-22 — DO NOT port the temperature ladder. Let `tempZ` stand.** The gate
+  that stood here from 2026-09-20 is lifted and this is startable. Temperature already reaches
+  readiness through `computeReadinessComposite`, so nothing is missing; the reason for the answer is
+  that **TN-6 has measured the temperature baseline 0.36 °C too low**, and porting a *sharper* penalty
+  on top of a baseline that is already wrong amplifies the error rather than adding signal. If
+  temperature still looks under-weighted once TN-6's rebuild has run, that is a fresh question with
+  real data behind it — not this one.
+- **So the remaining work is dead-code removal, and it should be behaviour-preserving.** The four
+  dead branches keep the fallback arm that already runs on every call, and the fifth site's dead
+  disjunct simplifies away (`a || false` is `a`). **Lane A confirms that before assuming it** — if it
+  turns out to change any stored value, it joins the batched recompute described in LA-122 rather than
+  firing its own.
 - **What was filed was one branch and a guess. The measurement found four, and answered the guess.**
   - `oura_daily.readiness_score` is **NULL on 35 of 35 days** in the last five weeks — the frozen
     Cloud column, exactly as the re-key implies.
@@ -3530,55 +4178,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
   session and confirm the labels are unchanged from today.
 
-### [app-shell] BF-166 — the back listener ignored the overlay stack the app already had (fixed; device check owed)
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `lib/hooks/sheet-back-stack.ts` and `components/mobile-auth-handler.tsx`. Shipped
-  2026-09-15. **`components/ui/sheet.tsx` and `dialog.tsx` needed NO change**, and neither did the 52
-  call sites.
-- **Added:** 2026-09-15 (BugFix intake). Owner: *"If you have a nutrition meal creator menu open and
-  you press the back button - it makes the page behind it go back to main."*
-- **⚠ THIS ENTRY'S PREMISE WAS WRONG, and acting on it would have made things worse.** It stated
-  *"no overlay registry exists"* and proposed building a module-level stack that `SheetContent` and
-  `DialogContent` push to. **One already exists**: `lib/hooks/sheet-back-stack.ts`, reached via
-  `useSheetBackDismiss` → `BackDismiss`, which **both** primitives already render (BF-27 put it
-  there, deliberately central, for this exact reason). The grep that found nothing looked for
-  `openOverlay|overlayStack|topOverlay`; the real names are `openSurface`/`closeSurface`. **Building
-  the proposed registry would have left two stacks disagreeing about what is open.**
-- **The real defect is one line and narrower than described.** `openSurface` pushes with
-  `pushState(state, '')` — **no URL** — so `window.location.pathname` never moves. And
-  `backActionForPath` reads nothing but the pathname. So on a tab route it answers `"home"` and the
-  listener calls `navigateToTab`; on `/` it answers `"minimize"`. **Neither touches history**, so the
-  surface's pushed entry is never consumed and the page moves out from under an open sheet.
-  **Only `"pop"` ever worked, and only by coincidence** — `history.back()` happens to be the thing
-  that consumes the entry.
-- **So `"minimize"` is a second symptom the entry did not name:** a sheet open on Home and the app
-  goes to the background instead of closing it.
-- **The fix:** export `hasOpenSurface()` from the existing stack, and have the listener
-  `history.back()` when it is true. That reaches `handlePop`, which closes the topmost surface
-  through Radix's own `onOpenChange` — the identical path as the X button, so every guard already on
-  a sheet's close still runs.
-- **The entry's ordering instruction was right and is kept.** The overlay check sits **after** the
-  three mode guards, because each of them *raises* a dialog (`LeaveWorkoutDialog` and siblings) that
-  is itself on this stack; checking overlays first would make a mid-workout back press close the
-  confirmation instead of answering it. A test pins that order.
-- **Proven load-bearing:** `components/__tests__/bf166-back-closes-overlay.test.ts` — **4 of its 5
-  assertions fail against `main`**. The fifth deliberately passes on both sides: it records that the
-  primitives were already wired, which is the finding that stopped a duplicate registry being built.
-- **Keep: the device check, and only that.** Android's hardware back is a Capacitor channel that
-  Playwright cannot fire, so **no harness run can exercise this** — the unit tests cover the stack's
-  behaviour and the listener's ordering, not the gesture. On the S25: open a sheet over a tab route
-  (`/nutrition` meal builder) and over a sub-route, press back, confirm the overlay closes and the
-  page does not move; open one on Home and confirm back closes it rather than minimising the app;
-  then mid-workout, confirm back still raises the leave prompt.
-
 ### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
 
 - **Lane:** B — `components/workout/log-activity-sheet.tsx`,
@@ -3587,9 +4186,10 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   elimination list.
 - **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
   activity' nothing actually happens."* Reported on the APK.
-- **Batch:** `back-gesture-sitting` — with **BF-166**, **LB-107**, **LA-109** and **BF-100**. A fix
-  here changes history handling for every sheet that navigates, which is the same Android back
-  gesture those four already need one sitting for. Added by OR-122 in place of the gate below.
+- **Batch:** `back-gesture-sitting` — now with **DV-2** only: BF-166, LB-107, LA-109 and BF-100 were
+  verified on the S25 on 2026-09-23 and left the queue. DV-2 (*Leave* on the leave-workout prompt
+  does not leave) is the same mechanism in a dialog, so one fix covers both. Added by OR-122 in
+  place of the gate below.
 - **Verification:** device. The Android system back gesture arrives over a Capacitor channel
   Playwright cannot fire, so the look is owed on the S25 — but the fix is written first.
 - **⚠ This entry carried `Gate: device` from 2026-09-17 until OR-122, and the gate was CIRCULAR.**
@@ -3716,6 +4316,42 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ---
 
+### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
+
+- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
+  a navigation issued while a surface closes is eaten by that surface's own history entry.
+- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
+  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
+- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
+- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
+  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
+  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
+  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
+  the session just abandoned. `history` instrumented in the page:
+  ```
+  3229ms pushState()                              ← the dialog opens and pushes its surface entry
+  5055ms back()                                   ← ONE back for the Leave tap
+  5073ms replaceState(/workout?session=…)
+  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
+  ```
+  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
+  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
+  spent on the dialog's own entry. Reproduced twice.
+- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
+  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
+- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
+  verified. This is the prompt's *Leave* button, which BF-166 never touched.
+- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
+  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
+  device). The surface has to be told the close was superseded by a navigation.
+- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
+  `/workout?session=…` for wherever back would have gone before the workout, and one more back
+  does not return to the abandoned session.
+- **Production data:** nothing was written. The only non-GET the page sent was the
+  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
+  for 2026-09-23 returned `sessions: []` afterwards.
+
+
 ## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 
 **BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
@@ -3818,8 +4454,29 @@ variable, and it is the opposite of what the pre-retraction table claimed.
   sweep before a fix is called complete.
 - **⛔ Still do NOT lengthen `NAVIGATION_TIMEOUT_MS`** and do not touch `animate()`: the push is
   fine, and app-wide navigation must not change for a call-site ordering bug.
-- **Device check is still owed** — this is measured in the harness at one viewport, and the report
-  was on the APK.
+- **❌ REPRODUCED ON THE S25, 2026-09-23 (Device Verification Agent)** — the harness finding holds on
+  the APK, and the device is **faster** than the harness at undoing it. v1.465.4 web / APK 1.460.4,
+  portrait, three-button nav. Workout → Cardio → *Other activity* (sheet opens, `pushState()` of its
+  own entry) → *Treadmill*, `history` instrumented in the page:
+  ```
+  1741ms startViewTransition @/cardio
+  1754ms pushState(/activity) @/cardio
+  1761ms back() @/activity        ← 7 ms later on the S25, vs 415–428 ms in the harness
+  1764ms replaceState(/cardio) @/cardio
+  1779ms popstate @/cardio
+  ```
+  Screen stays on `/cardio` with the sheet closed, sampled for 2 s. So a fix that relies on any
+  timing window is refuted on the canonical runtime before it is written.
+- **Scope sweep (the correction above asked for it):** the only other close-then-push site is
+  `components/cardio/time-picker-sheet.tsx` `start()` — `onOpenChange(false)` then
+  `router.push('/running' | '/activity/guided-walk')`, the identical shape. **COULD NOT CHECK on
+  the device:** its trigger ("How much time do you have?") renders only `!hasRunningPlan`, and the
+  owner has a running plan. Fix it with this one. (`nutrition-content.tsx` navigates, but not from
+  inside a sheet.)
+- **Residue of every failed tap:** `selectType` runs `startActivity` *before* the push, so each dead
+  tap leaves `localStorage.ta_activity_state` at `mode: "pre"`, `activityType: "treadmill"` with a
+  fresh `activitySessionId`. Nothing reaches the server in `pre`, but the fix should decide whether a
+  navigation that never lands should leave the selection behind.
 
 - **⛔ THE OBVIOUS FIX DOES NOT WORK, and this was measured rather than reasoned (2026-09-17).
   Do not spend the attempt again.** The natural reading of the trace is *"a self-pop is in flight
@@ -3863,41 +4520,6 @@ helper the call site calls.
 - **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
   (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
 
-
-### [app-shell][platform] LA-109 — a tab flip leaves the PREVIOUS tab's route tree on the history entry (fixed; device check owed)
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `components/shell/tab-shell.tsx`.
-- **Added:** 2026-09-15 · owner, live report: *"Going to more; then going to profile details and
-  pressing back gets me to the home page again."*
-- **Shipped 2026-09-15.** The cause held up: `show()` flips tabs with
-  `window.history.replaceState(null, "", href)`, and Next's patched `replaceState` re-injects its own
-  current tree — still the previous tab's, because no Next navigation happened. Popping back to that
-  entry restores the stale tree, so the URL reads `/more` and Home renders.
-- **The fix reads the address bar at mount instead of reaching into Next's internals.** `TabShell`'s
-  `useState` became a lazy initializer that prefers `tabKeyForHref(window.location.pathname)` over
-  the `initialTab` the stale tree produced. `usePathname()` would not work — it reads from the very
-  tree that is wrong. Nothing touches `__PRIVATE_NEXTJS_INTERNALS_TREE`, and all three things a fix
-  had to preserve still hold: the flip adds no history entry, the URL stays honest, and LB-107's
-  back-to-Home from a tab root is unchanged (both specs re-run green).
-- **Proven load-bearing, not merely green.** `e2e/la109-back-from-subroute.spec.ts` was run against
-  `main`'s unfixed `tab-shell.tsx` and goes **red** there. This is the check the first draft of the
-  spec failed: it used `goto('/more/details')`, a full document load that rebuilds history, and
-  passed while the bug was untouched.
-- **⚑ The BF-49 link is REFUTED — see BF-49's entry.** The trial this entry demanded was run and came
-  back negative. Do not re-run it.
-- **⚑ BF-100 is now re-testable.** This entry blocked it: if back rendered Home there was no `/more`
-  scroll position to restore. That blocker is gone, so BF-100's own cause can be read on its own.
-- **Keep:** the device check, and only that. On the S25: from Home flip to More, open Profile
-  details, press the system back gesture — arrive on **More** with the More tab active. The harness
-  cannot speak for the Android back gesture or the WebView's history handling.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
@@ -4218,7 +4840,7 @@ composite reports which of its inputs were inferred.
   data**, and the two are not the same state — `hasData: false` and `anchorSource: "default"` both say
   so in the same payload. **Recommended:** `sufficient` is false when `sampleCount === 0`, whatever
   the window; keep the grace for a genuinely young day that has *some* readings. One condition.
-- **⛔ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
+- **⚠ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
   nothing must qualify the 50 it prints — and it is the whole point of the entry. The card
   (`components/body-battery-card.tsx`) is also correct and unchanged since #1214: its guard is
   `conf != null && !conf.sufficient`, which is right; it is being told `true`.
@@ -5087,53 +5709,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   confirm the ingredient rows, their quantities, and the resulting macro total match the sum of the
   sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
   real library.
-
-### [app-shell] LB-107 — back on a tab with nothing to pop should land on Home, not leave the app
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-- **Lane:** B — the tab shell's history handling; `app/**` and `components/shell/**`.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found while clearing RV-36 from the queue.
-- **The owner asked for this by name** during the 2026-09-13 app-shell pass: *"Just need to make
-  sure when you press back on a tab and there is no where to go it should go to the home screen."*
-- **It had no entry.** It was recorded inside **RV-36's body** — an entry that had already shipped
-  and been verified — and in that session's journal. RV-36's removal is what surfaced it; left
-  there, it would have been deleted with the entry that was done.
-- **This is a separate requirement from scroll restoration** and shares nothing with it but the
-  sitting they were reported in. RV-36 was about restoring an offset; this is about where the back
-  gesture goes when the stack is empty.
-- **✅ Measured 2026-09-14, and the guess in the line this replaces was wrong.** It is **wrong**
-  handling, not absent, and **all four non-home tabs** reach an empty stack — not an edge case.
-  `mobile-auth-handler.tsx` registers a Capacitor `backButton` listener, which **suppresses the
-  Android default**, then called `window.history.back()` for every path but `/`. `tab-shell.tsx`
-  flips tabs with `history.replaceState` (*"tabs are peers, not a history trail"*), so a tab route
-  has nothing to pop and that call was a **silent no-op**. Back was dead on Health, Workout,
-  Nutrition and More — it did not exit the app, it did nothing.
-- **The stack behaviour is now pinned in a real browser**, not inferred:
-  `e2e/tab-flip-leaves-nothing-to-pop.spec.ts` measures `history.length` across a tab flip
-  (unchanged) against a sub-route push (grows). That contrast is the premise the fix rests on.
-- **Shipped 2026-09-14** (`fix/lb107-back-on-tab-goes-home`): `backActionForPath` in
-  `components/shell/tabs.ts` returns `minimize` on `/`, `home` on a tab route, `pop` otherwise, and
-  the listener switches on it. Home is reached via `navigateToTab`, not a location assignment —
-  the latter reloads the WebView and discards every mounted tab. Sub-routes are untouched because
-  `tabKeyForHref` matches the path **exactly**, so `/nutrition/meal/123` still pops.
-- **Keep:** the device check, and only that. On the S25, from Health/Workout/Nutrition/More press
-  the system back gesture — Home, not the launcher and not a dead press. Then from Home press it
-  again — the app minimizes. The harness cannot send that gesture (`page.goBack()` is a different
-  path), so this is the one part no CI run can close.
-- **⚠ The harness cannot send the system back gesture**, which is what the owner is pressing.
-  `page.goBack()` is not it, and `e2e/scroll-restoration.spec.ts`'s header records that
-  `page.goto()` is a hard navigation that skips React cleanup entirely. Expect to need the S25.
-- **Pass test:** on the S25, open a tab with nothing pushed on top of it and press the system back
-  gesture — Home, not the launcher.
-- **Reversal cost:** low, but it changes what a hardware gesture does, so it wants the device before
-  it is called done.
 
 > **✅ LB-109 DONE and removed, 2026-09-15 (OR-116).** All three cleared. **BF-141** and **BF-135**
 > were verified and left the queue; **LB-47** was handled as this entry insisted — not swept with
@@ -8310,6 +8885,37 @@ those two surfaces this is the fallback path, not the primary.
 - The `Gate: owner` above **is** the decision: which of the two definitions of the estimate they want.
   Nothing here can start until that is answered, so there is no separate verify.
 
+### [devices] PS-47 — the Colmi runs flat in about five days, and a flat ring is indistinguishable from a broken one
+
+- **Lane:** A — `lib/colmi-ble/**` and the pairing card's copy; no schema change
+- **Added:** 2026-09-22 · found while confirming the ring still worked before it was handed to a
+  second wearer
+- **Reference:** the battery series is already in `colmi_readings` (`kind = 'battery'`), so this is
+  answerable without the device
+
+**Measured from the stored battery series, not estimated.** 100% on 26 Aug → 30% on 30 Aug is
+**~19 points/day**; after a recharge, 69% on 1 Sept → **1% on 4 Sept** is ~18/day. So the ring holds
+roughly **five days** from full. It then went flat: **no sensor data at all between 5 Sept 19:35 and
+7 Sept**, and the next reading was 19% on the charger. Two days of a baseline week, lost to a
+battery nobody was watching.
+
+**Why this is a product problem and not just a fact about the hardware.** A flat Colmi presents
+exactly like a broken one — the sync returns `reason: 'silent'`, the card says the ring did not
+respond, and the suggested action ("put it on or place it on the charger") is buried in the same
+message used for a sleeping radio. A second wearer reading that concludes the integration is broken.
+The ring reports its own battery on every sync and we already store it, so the card can say
+**"12% — charge it"** instead.
+
+**A second, smaller oddity in the same series, unexplained:** the value sat at **exactly 70% for
+~40 hours** (30 Aug 12:02 → 1 Sept 04:14) across eight syncs, then resumed falling normally. Either
+the ring quantises its reporting or it returns a stale value after a charge. Worth one look while
+the series is open — a battery readout that freezes is worse than one that is coarse, because a
+warning built on it would not fire.
+
+**Scope:** surface the battery on the pairing card with a low threshold, and split the "silent ring"
+copy so a known-low battery names the real cause. Does not require the device — the decode and the
+stored series are both already there.
+
 ### [devices] PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync
 
 - **Lane:** A — `lib/colmi-ble/frames-to-payload.ts`, decode only; no schema change
@@ -8967,18 +9573,26 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 
 - **❌ FAILED ON THE S25, 2026-09-13** (owner, no note). The card returns early off-native, so this is
   the first time any of its three states has been on a screen — and it did not survive that.
-  **Ask for the screenshot before starting:** the entry's whole difficulty is that the failure is
-  which-number-where, and a bare fail does not say which of the three states was wrong.
+  The screenshot this asked for was taken on 2026-09-23 — see the ❌ bullet below: it is the **date**.
 
 - **✅ SHIPPED 2026-09-03** (`fix/bf-111-version-labels`, v1.436.4). Both numbers labelled, and every
   state now names the **installed** build rather than only the newest one — the update state used to
   name a version the phone does not have and say nothing about the one it does. The date came from
   `nativeBuiltAt`, which `/api/version` was already returning and the card was dropping.
-- **Gate:** owner — **the screenshot**. Corrected from `Gate: device` by OR-122: the device check
-  already happened and **failed**, so a device gate now describes debt that is settled and hides the
-  thing actually blocking this. What is owed is the owner's screenshot of the failing card, because
-  a bare fail does not say which of the three states was wrong and the entry's whole difficulty is
-  which-number-where. Once that arrives this is ordinary Lane B work.
+- **❌ THE SCREENSHOT, FROM THE S25, 2026-09-23 (Device Verification Agent) — the gate it waited on
+  is answered.** More → About on v1.465.4 web / APK 1.460.4 reads: badge **`App v1.465.4`** ✓;
+  *ANDROID BUILD* **"Up to date — v1.460.4, built 23 Aug"**; tick green. **The two numbers and the
+  tick are right** — `dumpsys package` gives `versionName=1.460.4`, `/api/version` gives
+  `nativeVersion: "1.460.4"`, so "up to date" is true. **The date is wrong.** 1.460.4 is dated
+  2026-09-20 in `changelog.ts` and its APK asset on `apk-latest` was uploaded
+  `2026-09-20T22:32:10Z`; **23 Aug is the rolling release's own `published_at`**
+  (`2026-08-23T12:33:06Z`), which never moves when `android.yml` re-uploads the asset.
+  `lib/github-release.ts:86` maps `publishedAt: release.published_at`, and every build since the
+  first will print that same date.
+  **Fix:** take the date from the `app-debug.apk` asset's `updated_at` (fall back to
+  `published_at` only when no asset). Whether the 2026-09-13 owner fail was this same date or a
+  different state then is **not knowable now** — this is what is wrong today.
+- **Lane:** A — `lib/github-release.ts` (serves `app/api/version`). The card is fine.
 - **Verification** after the re-fix: on a phone whose APK is behind the web app, About names both
   numbers, says which is which, and the tick refers unambiguously to the Android build. The card
   returns early unless `Capacitor.isNativePlatform()`, so on web and in every e2e harness it renders
@@ -9301,198 +9915,6 @@ feature and not a deletion like LB-41:
 - **The reconstruction that diagnosed this was arithmetic against live values, not a trace**, and it
   is preserved in the journal entry rather than here. It matched the screen at three independent
   points; the fix does not depend on it, because it relabels figures the component already holds.
-
-### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
-
-- **Batch:** `back-gesture-sitting` — **four entries, one gesture** (2026-09-16, OR-118). BF-166,
-  LB-107, LA-109 and BF-100 all need the **Android system back gesture**, which Playwright cannot
-  fire because it arrives over a Capacitor channel. One sitting answers all four: press back from a
-  tab with nothing to pop (→ Home, not the launcher), from a sheet (→ the sheet closes, not the app),
-  from a deep route after a tab flip (→ the tab you flipped to, not the one you left), and from a
-  scrolled screen (→ the same offset, and `/more` is where it failed). **Never re-derive the six
-  traps in BF-100's hook** — they are paid for and written into it.
-
-- **Lane:** B — `lib/hooks/use-scroll-restoration.ts` and `components/pull-to-sync.tsx` — reached only from `components/**`, and it stores nothing. (Assigned 2026-09-15, OR-116 lane sweep.)
-
-- **Verify:** device
-- **Keep:** the S25 pass, and it is the whole of what is left *if the fix holds*. Press back from a
-  scrolled `/more` onto *Profile details* and back again, and read whether the offset returns.
-  **If it still lands at the top, this is buildable work again** — say so plainly rather than
-  re-filing it as a check, because that mis-filing is what hid this entry for a day once already.
-  **The one-tap experiment survives as the fallback and is still the thing that settles causation:**
-  come back from *Profile details* with a **UI back control** instead of the gesture. If that
-  restores while the gesture does not, the cause is elsewhere in the gesture path.
-
-- **⚑ THE `touchstart` CANDIDATE IS NOW CONFIRMED AS A REAL, REPRODUCIBLE MECHANISM, AND FIXED —
-  2026-09-19, `fix/bf100-touch-cancels-pending-restore`.** It was a source reading before this; it is
-  a measurement now.
-  **What was measured.** Instrumenting `addEventListener` and `sessionStorage` on a live `/more`
-  back-navigation: the takeover listeners attach at 15681 ms and the restore lands at 15863 ms — a
-  **182 ms window in which `done` is false and the listeners are live.** The window is real and
-  non-empty, which nothing had established before.
-  **Why the 2026-09-15 probe came back null, settled.** Not the element and not the dispatch site —
-  `page.goBack()` does not resolve until *after* the mount and the restore, so any touch dispatched
-  after it is on the wrong side of the window by construction. Arming the dispatcher *before*
-  `goBack()` does not help either: the container only matches a selector once it has mounted, which
-  is the same instant the restore lands. **The 182 ms window cannot be hit from the test side at
-  all** — that is a limit of the instrument, and reading the null result as evidence against the
-  hypothesis would have been wrong.
-  **What made it testable.** Seeding an offset the container can never reach widens the pending
-  window from 182 ms to the whole of `RESTORE_WINDOW_MS`, because `attempt()` never lands and the
-  restore stays pending until the timer fires at `min(target, gap)`. The touch then places trivially.
-  Against the unfixed hook that reproduces the cancellation outright:
-  `restored to 0 against a reachable 1019`.
-  **The fix** is the takeover event, `touchstart` → **`touchmove`**, via a single `TAKEOVER_EVENTS`
-  constant so the add and remove lists cannot drift apart. `stop` latches `done = true` and clears
-  the timer with **no re-arm**, so whichever event is listed abandons a pending restore permanently —
-  and a finger going down has scrolled nothing. Trap (4) is intact: takeover is still an **input
-  event**, not a scroll delta. `e2e/bf100-touch-does-not-cancel-pending-restore.spec.ts` pins both
-  directions and **both arms were proven red against the pre-fix hook** — `touchstart` cancelled when
-  it should not have, and `touchmove` was not listened for so it failed to cancel when it should.
-  All three existing `scroll-restoration.spec.ts` cases stay green.
-  **⚠ This is NOT confirmed as the S25 symptom, and must not be read as one.** The harness fires no
-  touch on a back navigation, so it cannot say whether the S25's gesture delivers one into that
-  window — only the device can. What is now established is that *if* it does, this was fatal, and it
-  no longer is.
-  **Why `Verify: device` is the right field here when it was the wrong one before.** Until
-  2026-09-14 this entry carried a check while the check had **already been taken and failed** with
-  nothing new since — work filed as *"nothing is blocked"*. The device has never seen this change,
-  so the field now says what it means. The `Keep:` above states the reversal condition outright so a
-  second failure cannot hide behind it again.
-
-- **❌ FAILED ON THE S25 TWICE — most recently 2026-09-13** (both *before* the 2026-09-19 fix above;
-  neither pass saw it). Owner: *"Checked on more - and still
-  doesnt work"*. **This was buildable work rather than a pending check, and stayed so until
-  2026-09-19**, and the `Keep:`/`Verify: device`
-  this entry carried until 2026-09-14 said the opposite — it printed under *"shipped; a look is owed,
-  nothing is blocked"* while the look had already been taken and failed. That is the trap the
-  `Verify:` field's own documentation names (OR-105), and it hid this for a day.
-- **RV-36 passed in the same sitting, which narrows this rather than contradicting it.** Owner
-  there: *"Mostly works."* Scroll restoration largely works; **`/more` specifically does not.**
-- **⚠ It is a DEVICE-ONLY failure, and the harness says the opposite.** Measured in Playwright,
-  `/more` → *Profile details* → back restores **840**. So a green `e2e/scroll-restoration.spec.ts` is
-  not evidence here, and the next attempt must not read it as any. Whatever differs is the S25's
-  system back gesture or the WebView's restore timing — neither reachable from the sandbox.
-- **⚑ LA-109 SHIPPED 2026-09-15, so the block this carried is lifted — re-test on the next device
-  pass before reading anything below as still open.** LA-109 is the owner's same-day report on the
-  **same route**: *"Going to more; then going to profile details and pressing back gets me to the
-  home page again."* It is measured — after a tab flip the history entry reads `/more` while carrying
-  Next's route tree for `/`, so popping back restores the Home tree and Home renders under the right
-  URL.
-  **If back lands on Home, there is no `/more` scroll position to restore, because you are not on
-  `/more`.** That is a different failure wearing the same description, and it would look exactly like
-  "back always lands at the top" to someone checking the screen rather than the URL.
-  **This does not retire BF-100.** Scroll restoration genuinely works elsewhere (RV-36, same
-  sitting: *"Mostly works"*), and the `use-scroll-restoration.ts:158` finding — takeover cancelled on
-  `touchstart` with no re-arm, which the S25's gesture triggers and `page.goBack()` does not — is a
-  real mechanism on its own. **The point is sequencing:** only one of the two can be confirmed while
-  the other stands, so fixing LA-109 first tells you whether anything is left here. It also explains
-  the harness disagreement without needing the WebView: the spec's route never goes through a tab
-  flip, so it never carries a stale tree.
-  **Status 2026-09-15:** LA-109's fix is on `main` and is proven load-bearing (its spec goes red
-  against the unfixed file). So the sequencing condition is satisfied and this entry is unblocked —
-  what it now needs is a device pass to say whether anything is left, not more reading.
-- **Do not re-derive the six traps below to explain it.** They are paid for and in the hook. The
-  question is what `/more` does that `health-content` and `session-select-content` do not, given all
-  three take the same `PullToSync` path.
-- **⚠ THE `touchstart` CANDIDATE WAS PROBED IN THE HARNESS ON 2026-09-15 AND THE RESULT IS
-  INCONCLUSIVE — read this before re-running it, because the obvious probe does not work.**
-  The mechanism is real *in source*: `stop()` latches `done = true` and disconnects the observer, and
-  it is registered for `wheel`/`touchstart`/`keydown` with **no re-arm**. What is not established is
-  that the back gesture's touch reaches it in time.
-  **What was run:** the existing `/more` push-and-back, twice in one test with equal settle windows —
-  once plain, once dispatching `new Event('touchstart', {bubbles:true})` on the scroll container
-  immediately after `goBack()`. **Control restored. The touch arm ALSO restored, to 840.**
-  **That refutes the PROBE, not the hypothesis**, and the two reasons are specific:
-  (a) the element was picked as *"first node whose `scrollHeight` exceeds `clientHeight`"*, which is
-  not necessarily the `ref` the hook attached its listener to; and (b) the dispatch may land after the
-  restore has already completed, since it fires as soon as the URL settles.
-  **The next attempt must instrument, not guess:** confirm which element carries the listener and
-  that the event arrives *inside* the restore window, before reading anything into the outcome.
-  `__scrollRestorationInternals` exports `RESTORE_WINDOW_MS`, which is where that timing comes from.
-- **✅ THE SECOND FINDING FROM THAT RUN IS FIXED (2026-09-17).** `scroll-restoration.spec.ts`
-  asserted `toBe(before)` — an **exact** offset — and an exact assertion cannot tell *cancelled* from
-  *imprecise*, which is the distinction this entry turns on. Reproduced before changing it: saved
-  **718**, restored **1019**, red while restoration was working, because these screens seed from
-  cache and revalidate so the content grows between the save and the restore.
-  Both assertions now go through `expectRestoredNear`, a **floor** at 90% of the saved offset with no
-  upper bound (capping would re-introduce the same flake from the other side). Proven both ways: it
-  passes on content growth, and with the restore neutered (`el.scrollTop = 0`) both cases fail
-  naming the cancellation — *"restored to 0 against a saved 879"*. **So this file can now answer the
-  device question when the S25 pass happens**, which it could not before: a red here means cancelled,
-  not merely imprecise.
-- **⚠ A CANDIDATE CAUSE, found 2026-09-14 by reading the hook rather than the screens — and it
-  explains the harness/device split outright, which no previous hypothesis did.**
-  `use-scroll-restoration.ts:158` attaches `stop` to **`touchstart`** on the scroll container, and
-  `stop` sets `done = true` with **no re-arm**: one touch abandons the pending restore permanently.
-  **The S25's system back gesture IS a touch**, delivered to the WebView as the new screen mounts.
-  `page.goBack()` in Playwright fires no touch at all — which is exactly why the harness restores 840
-  and the device does not, and why a green `scroll-restoration.spec.ts` was never going to see this.
-- **Why `/more` and not the other two, on the same hypothesis:** the cancel only matters while the
-  restore is still PENDING — the hook waits for the container to grow tall enough to hold the saved
-  offset. A screen whose content reaches full height immediately has already restored before any
-  touch can arrive. `/more` mounts both tab panels (`display:none` on the inactive one) plus
-  `SyncHealthCard`, so it is the slowest of the three to reach height. That also fits RV-36's
-  *"Mostly works"* in the same sitting: the fast screens are fine.
-- **THE DISCRIMINATING EXPERIMENT, and it is one tap:** on the S25, scroll `/more` down, tap into
-  *Profile details*, and come back with a **UI back control** rather than the system gesture. If the
-  offset restores that way and not with the gesture, the `touchstart` cancel is the cause and this
-  stops being a mystery. Every device check so far has used the gesture — the entry's own
-  verification step says to — so this path has never been tried.
-- **Proposed fix if it confirms, recorded so it is not re-derived:** move the takeover from
-  `touchstart` to `touchmove`. That keeps the principle the hook already argues for in its own
-  comment — *"user takeover is an INPUT event, not a scroll delta"* — while distinguishing a stray
-  touch from an actual drag, which is what a takeover means. A time-based grace after mount is the
-  weaker alternative: it picks a number, and the number is what breaks on a slower cold start.
-  **Not built, because it must not be shipped on a hypothesis** — it changes takeover behaviour on
-  every screen, and the experiment above costs one tap.
-- **Verification:** on the S25, scroll `/more` well down, tap into *Profile details*, press the
-  **system back gesture** (not a UI back button), on a cold cache and a warm one; and confirm
-  reaching the same screen forward still starts at the top.
-- **⚠ Q-93-followup asked for the same back behaviour on `/health/day`** — whether its back control
-  returns to Home rather than stranding the user on a navless route. That entry left the queue on
-  2026-09-14 (its taps were verified on the S25); the back half is **LB-107**, which generalises it,
-  so nothing was dropped when it went.
-- **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
-  `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
-  the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
-  against a cold harness server.
-- **⚠ "every screen using the shell inherits it" is WRONG — corrected 2026-09-03 (Review sweep 41).**
-  Every screen using **`PullToSync`** inherits it, and three screens use it: `health-content`,
-  `more-content`, `session-select-content`. The **Nutrition tab owns its own scroller**
-  (`nutrition-content.tsx:563`) and inherits nothing — measured, `/nutrition` → `/coach` → back saves
-  no `ta_scroll:` key and returns 0, against `/more`'s 840. Filed as **RV-36**, which also records why
-  the live gap is only that one path. The hook itself is fine and takes a ref; it is simply not called
-  anywhere else.
-- **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
-  loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
-  unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
-  "evidence" was a red run whose real cause was `page.goBack()` landing on **`about:blank`** after a
-  bottom-nav Link click.
-- **⚠ SIX implementation traps are paid for and written into the hook. Do not re-derive them:**
-  (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked effect
-  consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has already
-  detached the node — track it from a `scroll` listener; (3) setting the offset once lands
-  **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it down,
-  so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to what you
-  set treats that settling as a finger and yields every time — takeover is an **input event**;
-  (5) **consuming the saved value on read** is eaten by StrictMode a second way — pass one takes it,
-  finds the container too short, waits; pass one's cleanup writes 0 over the pending target; pass two
-  reads 0 and discards it. Read without consuming; clear when the restore lands; and never write 0
-  over a target that has not landed. (6) A screen can come back **shorter** than it was, so the
-  window must land at `min(target, available)` rather than abandon the restore.
-- **⚠ And four SPEC traps, which cost more than the code did.** All four reported
-  `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
-  opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
-  screens navigate from `router.push` **buttons**; the bottom nav makes `goBack()` land on
-  `about:blank`. **`/more` → *Profile details* → back is the verified path**, and the spec's
-  precondition assertions are what separate a fixture problem from a regression — keep them.
-- **The timer was NOT the cause of the cold-server failure**, though it looked like it twice. Raised
-  to 120 s as a controlled experiment: still red. That is what forced the instrumented run that found
-  trap (5).
-- **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
-  to a new page; when I press back I want to go back to that page at the same scroll level I was at.
-  It usually starts me at the top of the page. This is on many pages if not all pages."*
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
@@ -10724,7 +11146,9 @@ statistics when two units differ and names them in `unitsDiffer`, and `spearman`
 
 - **Lane:** A (the engine)
 - **Added:** 2026-08-27
-- **Gate:** device
+- **Gate:** device — ⚠ **re-scoped 2026-09-22: the ring is with a second wearer, so the OWNER cannot
+  run this walk.** It is blocked on whoever holds the ring, or on its return. Do not read the gate as
+  "the owner has not got round to it" — PS-15's steps half waits behind it via `Needs:`.
 
 The four buckets 07:00–10:00 on 2026-08-27 read 485 → 876 → 1128 → 1524, then 11:00 reads 55. Read
 per-bucket the day totals **4562** steps; read as a running total that resets, **2073**. Oura says
@@ -17285,6 +17709,117 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
 
+### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
+
+- **Lane: O** — `scripts/device/**`. **Added:** 2026-09-22, owner-requested.
+- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
+  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
+  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
+  what it takes to make it connect is the finding worth writing down.
+- **Keep:** the first real run, and the fix it will probably need. Until a phone has answered,
+  nothing here is verified — including the claim that it connects at all.
+
+**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
+build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
+Three classes of check are unreachable as a consequence, and they are precisely the ones the
+backlog is full of:
+
+| class | why no sandbox reaches it |
+|---|---|
+| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
+| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
+| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
+
+Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
+cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
+thing.
+
+- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
+  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
+  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
+- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
+  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
+  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
+  needs a *browser* target and an Android WebView commonly exposes only page targets
+  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
+  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
+  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
+- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
+  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
+  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
+  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
+  real differential when it was a coordinate artifact.
+- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
+  navigation reports a bottom inset of `0` and a broken clearance looks correct.
+- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
+  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
+  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
+  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
+  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
+  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
+  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
+  property or a layout one). Frames are written named by their offset from the start.
+  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
+  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
+  exactly that reason.
+- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
+  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
+  anything needing the owner physically present, or any *"does this feel instant"* judgement.
+  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
+  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
+  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
+  whether a sync button does anything. That is most of the `devices` group and all of
+  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
+  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
+  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
+  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
+  unambiguous ones and leave a shorter, harder list - not an empty one.
+- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
+  substitute. It narrows what the gate has to cover.
+
+**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
+instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
+answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
+
+1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
+   else is worthless until it passes.
+2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
+   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
+   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
+   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
+   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
+   first.**
+3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
+   returns null off the APK, so these have never been exercised. Highest value per check.
+4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
+   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
+   and the floored-utility rule it enforces has never been checkable at all.
+5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
+   for the reason the correction above records: this is the phone the ring and scale are paired to.
+   Mostly *"does this button do anything"*, which is binary.
+6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
+   sheet 300 ms or the stock 500.
+7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
+   those, and pretending otherwise is how a green run starts meaning less than it says.
+
+- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
+  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
+  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
+  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
+  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
+  a repository, which is a cost accepted only because it is bounded and auditable.
+  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
+    *in the page*: the real route, the active tab, visible error text, the button count, whether the
+    page scrolls horizontally, and the lowest action row's computed bottom padding against the
+    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
+    *"is this feature working"* questions are answerable from the digest alone.
+  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
+    the question); a live view (impossible — the reviewing session is a container with no path to a
+    USB device).
+- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
+  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
+  invalidates every clearance reading in step 4.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A
@@ -18907,14 +19442,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
 
-- **⚠ NOT OWNER-READY — `Gate: owner` is premature here (marked 2026-09-16, OR-117 triage).** This is
-  a scoring change, so the route is **Tuning proposes → the owner signs → Lane A implements**, and
-  **no proposal exists**. The entry's own text says so. Until a proposal with numbers is written,
-  putting this in front of the owner asks them to sign a blank page — and it has been counting as
-  owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
-
-- **Gate:** owner — changing the Body Battery model re-scores every day, so it is a scoring change
-  and wants an owner-signed proposal first. No proposal is written yet.
+- **✅ THE PROPOSAL EXISTS NOW, AND THE OWNER HAS SIGNED IT (2026-09-22).** This entry waited from
+  2026-08-15 for a Tuning proposal. It is
+  [`2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md),
+  filed as **TN-55**, fitted offline against 64 days with a committed harness
+  (`scripts/tuning/body-battery-replay.cjs`). **Q-272 and TN-55 are one line of work — build from the
+  plan, and read §6a first.** Gate lifted.
+- **⚠ THIS ENTRY'S OWN ACCEPTANCE TEST DOES NOT REPLICATE — do not use it.** The *"v5 end-of-day
+  battery → next-day readiness is r = +0.67 (n = 11)"* below, and the instruction to re-run it after
+  the change, were re-measured 2026-09-23 over **70 days**: **r = +0.252**, against readiness's own
+  day-to-day autocorrelation of **+0.361**. The battery's end value predicts tomorrow's readiness
+  *worse than yesterday's readiness does*. So the conclusion drawn from it — *"v5's level carries real
+  signal; its shape within the day is wrong"* — keeps its second half (the four defects are measured
+  independently) and **loses its first**. Use the plan's distributional pass test instead; a change
+  cannot be validated against a relationship that is not there.
+- **⚠ Direction 1 below is refuted twice over and direction 2 is the survivor.** Q-502 refuted raising
+  `CHARGE_RATE` alone; TN-55 additionally found that overnight charging must **not** be added, because
+  this entry is right that the wake anchor already accounts for the night — re-fitting without it is
+  strictly better (0% of days ending at zero, against 5% with it). Direction 2 (feed daytime HRV into
+  the charge term, from `rr_intervals`) remains open and unmeasured.
 
 - **Branch:** `fix/body-battery-daytime-recovery`
 - **Plan:** none yet · tuning notes live in [`docs/body-battery-tuning.md`](body-battery-tuning.md)

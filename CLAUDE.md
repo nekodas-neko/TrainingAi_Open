@@ -7,7 +7,7 @@
 - **Always test on the local dev server before merging.** Before merging (or presenting work for confirmation on a destructive change), spin up `pnpm dev` and exercise every changed API route and UI flow against the local non-prod database. TypeScript and lint passing is not sufficient — runtime errors, broken validation, and cache bugs only surface when the server actually runs. If something breaks during testing, fix it before asking to merge.
 - **The local custom-rules gate is `pnpm check:rules` — nothing else counts as "custom rules pass".** It parses `.github/workflows/ci.yml`, runs every step of the job named *Custom Rules*, and prints how many it ran (`Ran N of N …`); quote that count rather than the word "pass". **Do not hardcode N anywhere** — it was 31 on 2026-08-13 and 33 by the end of the same day; the runner reads it from the YAML, which is the point. Globbing `scripts/check-*.js` reaches only the steps that invoke a script — the difference between that and `Ran N of N` is the count it misses — and `pnpm ci:local` used to run 3, and both report clean while the inline grep rules — UTC date slicing, hardcoded session names, safe-area stacking, local-SQLite PRAGMAs, nested buttons, `JSON.parse` of LLM output, hand-rolled `invalidateCache` — never execute. That gap shipped a component-level `invalidateCache()` call through a green local gate (#1279). `pnpm ci:local` now runs it.
 - **Docs/plans/low-risk changes merge with zero ceremony.** **Documentation-only** changes (`.md` files like `projectOverview.md`, `CLAUDE.md`), **implementation plans / planning docs** (`docs/superpowers/plans/`), and **bug fixes for features already on `main`** never need confirmation and are exempt even from the destructive-change carve-out above (they can't be destructive by nature). They still need a feature branch + green CI — that's the only path now. Note: a *markdown-only* PR still runs CI (the `pull_request` trigger has no `paths-ignore`) so required checks report and it can merge.
-- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Five roles run against this repo (Orchestrator, Implementation in two lanes, BugFix, Tuning, Review), up to six sessions concurrently, and that file is the contract between them: who owns which files, which letter your entry IDs come from, and what you may merge without asking. **A standing agent is meant to run as one continuous session per role** — rely on Claude Code's automatic context compaction rather than writing a handoff and spawning a successor just because context is getting long; that keeps cached tokens working for you instead of resetting them. Handing off to a successor is now the exception (owner reset, or a session lost outside your control), not the routine end of a generation — see `docs/agents/README.md` §4. If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor (or your own earlier self, after a reset) left you.
+- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Six roles run against this repo (Orchestrator, Implementation in two lanes, BugFix, Tuning, Review, Device Verification), up to seven sessions concurrently — **and one of them, Device Verification, runs on the owner's own machine rather than in a container**, and that file is the contract between them: who owns which files, which letter your entry IDs come from, and what you may merge without asking. **A standing agent is meant to run as one continuous session per role** — rely on Claude Code's automatic context compaction rather than writing a handoff and spawning a successor just because context is getting long; that keeps cached tokens working for you instead of resetting them. Handing off to a successor is now the exception (owner reset, or a session lost outside your control), not the routine end of a generation — see `docs/agents/README.md` §4. If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor (or your own earlier self, after a reset) left you.
 - **At the start of every session**, read `projectOverview.md` first — it is a lean index holding current status, the live Known Issues & Risks tables, and the **What's Left To Do** list. Use it to orient before doing anything. The session journal lives in `docs/overview/entries/` (recent, one file per PR) and the batched `docs/overview/history-*.md` archives (see the Document Map at the bottom of `projectOverview.md`) — only open those when you need history.
 - **Also at session start, read `error_events` in production** — it is the only view of faults that never reach a human. **It DOES prune at 30 days — the 2026-09-01 amendment claiming otherwise was wrong and is retracted (BF-93).** The `DELETE` is in `insertErrorEvent` (`lib/data/postgres/adapter.ts`), throttled to once a day by the shared `shouldPrune`, and it has been there since the initial public snapshot. **The evidence that convinced a session otherwise is what a working prune looks like:** a prune fired from a write path only runs when something is written, and errors are now rare, so the oldest row ages past 30 days between faults. Measured 2026-09-01 — last write **2026-08-30**, oldest row **2026-07-31**, span **exactly 30 days**, matching the cutoff computed from the last write to the day. Reading "oldest row is 32 days old" against *today* rather than against the *last write* is what produced the false finding. So: read the table early, because a fault that stops on its own goes unnoticed and then expires. The table is the second-largest object in the database at 52 MB — **and that 52 MB is BLOAT, not payload; the earlier reading of it as "30 days of retained payload rather than unbounded growth" is corrected here (RV sweep 50, 2026-09-18).** Measured that day: **12 MB heap + 39 MB TOAST + 752 kB index behind 115 live rows.** The figure was written when the table held 7,331 rows, and the prune removed the rows without reclaiming the space. So the size is real and the *conclusion* drawn from it was not: a 52 MB `error_events` is not evidence that faults are being retained, and shrinking it is a `VACUUM FULL`/rewrite question, not a retention question. The first read of that table (2026-08-04) found three faults, **two of which had already stopped before anyone looked**. One query via the admin endpoint:
   ```
@@ -66,6 +66,15 @@
   below. The standing agents come up 🟢 from their own prompts; everything else sets its own.
 - **When the user says the session is wrapping up** — "let's wrap this session", "let's close this session", "we're finishing up", or anything equivalent — that is a request for the three-part wrap-up ritual below (handoff doc → documentation cleanup → next-agent prompt), not just an acknowledgement. See **Session Wrap-Up** immediately after this list.
 - **Tick off roadmap items immediately when pushed to `main`** — as soon as any planned feature or fix lands on `main` (even for testing), mark it as ✅ in `projectOverview.md`. If it still needs testing or has known gaps, add a ⚠️ note inline rather than leaving it unchecked. Never leave a shipped item unchecked because it "isn't fully verified yet".
+- **Large UI changes are mocked up first — the owner sees it before it is built.** Any change that
+  visibly rearranges a screen he uses daily (merging or removing a card or widget, collapsing a
+  banner stack, moving a card between tabs, changing what the tab bar or Home shows) gets a **mockup
+  presented and a yes returned before any code is written**. It is cheap to render a static page and
+  expensive to implement an information-architecture change he then dislikes — and a lane can build
+  the change *correctly* and still produce a Home he does not want, which is the failure this
+  prevents. **Such entries carry `Gate: owner`**, with the mockup named as what is owed; an entry
+  that merely restyles a component or fixes a layout bug does not. Show before/after at the real
+  384 px dark viewport, not a description of it.
 - **Decisions come with a recommendation attached, and cheap reversible ones don't come at all.** Recommendation first, why it wins long-term, alternatives and what each is better at, reversal cost, plain English. Full rule: **Decisions That Come Back To Me**, below.
 - **Break things into components** — where possible, split code into smaller components and avoid creating very long files.
 - **Keep plan-generation prompts small.** When turning a design spec into an implementation plan (`docs/superpowers/plans/`), don't hand a sub-agent the entire spec plus the full task breakdown in one massive prompt — it can time out. Investigate the relevant files first (small, scoped Explore calls), then write the plan directly. If a spec covers many independent areas (DB/backend, sync, UI, admin), consider splitting it into multiple smaller plan documents rather than one giant one.
@@ -74,7 +83,7 @@
 
 ---
 
-## The Standing Agents — six sessions, one repo
+## The Standing Agents — seven sessions, one repo, one of them not in a container
 
 Full contract: [`docs/agents/README.md`](docs/agents/README.md). The rules below are the ones that
 must bind even if that file is never opened.
@@ -87,8 +96,11 @@ owns the engine (`lib/data/**` including every migration, `lib/local-store/**`, 
 device pipelines, auth/security, `android/**`), Lane B owns the surface (`app/**` except
 `app/api/**`, `components/**`, `app/globals.css`, `lib/hooks/**`, `lib/stores/**`). **BugFix** turns
 owner reports into backlog entries. **Tuning** turns lived feedback into calibration proposals.
-**Review** sweeps the running app weekly and files what it finds. Those four end at a docs-only PR
-and never write code — which is what keeps the collision surface to Lane A against Lane B.
+**Review** sweeps the running app weekly and files what it finds. **Device Verification** runs
+**locally, on the owner's machine with the S25 on USB** — the only role that can see the real app in
+the real APK, driving it over the DevTools protocol (`scripts/device/**`). Those five end at a
+docs-only PR and never write product code, which keeps the collision surface to Lane A against
+Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
 
 - **Lane ownership is decided by a rule, not a list.** Reached by `app/api/**` or touching storage
   → Lane A. Reached only from `app/**` or `components/**` → Lane B. Both → Lane A, engine half
@@ -98,7 +110,9 @@ and never write code — which is what keeps the collision surface to Lane A aga
   releases the claim when that branch merges.
 - **Entry IDs come from your own letter and count up forever — there is no band and no pointer.**
   Lane A `LA-` · Lane B `LB-` · BugFix `BF-` · Review `RV-` · Tuning `TN-` · Orchestrator `OR-` ·
-  one-off sessions `PS-`. Find
+  Device Verification `DV-` · one-off sessions `PS-`. **Adding a role means adding its letter to
+  `scripts/lib/entry-id.js` in the same PR** — that was missed for `OR-` and again for `DV-`, and
+  the failure is silent deletion, not a wrong label: the entry vanishes from the queue entirely. Find
   your next number with `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. A shared
   next-free pointer is a floor, not an authority — it cannot see an unmerged PR, which caused six
   collisions in three days and two live duplicates. Reserved bands fixed that and ran out instead
@@ -121,6 +135,23 @@ and never write code — which is what keeps the collision surface to Lane A aga
   removes completed entries. `Gate:` takes only `owner` or `device`. **`Reference:` marks an entry other
   entries READ rather than build**, so it prints in its own section, never heading the work list.
   `check-backlog-pointers.js` enforces all of it — cycles, an invented `Needs:`, a prose-only reference.
+- **`Lane:` is how any agent hands work to any other — it is the channel, not a label.** `A`/`B`
+  are decided by §3's path rule; `O` is the queue, the docs and anything needing the owner or a
+  round of thinking first; `DV` is work whose deliverable needs the phone. Review can put something
+  in `DV`, the device agent can put a defect in `B`, anyone can put a question in `O`. **No message
+  and no two sessions awake at once — the queue outlives the session that wrote the entry.**
+  **`O` and `DV` see only what is tagged for them**, because an unstated lane means "the path rule
+  answers it" and that rule only resolves to an implementer.
+- **The entry's LETTER and its LANE are different things.** The letter records who found it and
+  never changes; the lane records who builds it. `DV-1` was found by the device agent and carries
+  `Lane: O`.
+- **A device check answers VERIFIED / FAILED / COULD NOT CHECK, and never a fourth thing.** A
+  **FAILED is work, not verification debt** — it goes back to the lane that owns the surface with
+  what reproduces it, not into a `Keep:` that reads as finished. **COULD NOT CHECK is a real
+  answer.** And a result that does not name its screen, orientation and navigation mode is not a
+  result: three-button navigation reports every safe-area inset as `0`, which makes a broken
+  clearance look correct — measured on the S25 on 2026-09-23, where it invalidated the largest
+  group of owed checks outright.
 - **Postgres migration numbers and local SQLite versions belong to Lane A alone.** Any other agent
   that finds it needs a schema change stops and hands the item to Lane A.
 - **Tuning proposes; it never ships a scoring change.** Scoring drives every recommendation the app
@@ -139,7 +170,7 @@ and never write code — which is what keeps the collision surface to Lane A aga
   `- **Keep:** <what is owed>` rather than being deleted or left to look finished.
 - **The session titles are fixed, and a successor reuses its predecessor's exactly** — `🚧 Implementation
   Agent (A) 🟢` · `🚧 Implementation Agent (B) 🟢` · `🪲 BugFix Intake Agent 🟢` · `🎶 Tuning Agent 🟢` ·
-  `📖 Review Agent 🟢` · `🪐 Orchestrator 🟢`. Leading emoji = role; **trailing = this session's status, and
+  `📖 Review Agent 🟢` · `🪐 Orchestrator 🟢` · `📱 Device Verification Agent 🟢`. Leading emoji = role; **trailing = this session's status, and
   the outgoing session flips 🟢 to 🔴 as its last act** so the owner archives the reds. A renamed successor
   is a lost thread even with a perfect baton; every handoff states its successor's title outright.
 - **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a
@@ -304,7 +335,7 @@ todayInTz(session.user.timezone)                 // dynamic, respects user's Pro
 - Never call `invalidateCache()` with an ad-hoc list of keys at a write site. Every mutation (API write or local write) invalidates via a named group helper in `lib/cache-groups.ts` — add a group if one doesn't exist. Hand-rolled lists at call sites are how `calendar-data:`/`home-day-timeline` got missed (session 173) after the same class was "fixed" in sessions 104, 125, 166 and 171.
 - When introducing a new `cachedFetch`/`readCacheSync` key, register it in the invalidation group of **every** write that affects it, in the same commit. Search for all writers — not just the screen you're working on.
 - Never rely on TTL expiry to surface fresh data after a write.
-- **Invalidating a key and re-rendering the component that reads it are two different things.** A component reading a cached key uses **`useCachedValue(key, url, ttl)`** (`lib/hooks/use-cached-value.ts`), never a hand-rolled `useEffect(() => { cachedFetch(…) }, [])` — that shape never re-runs, so anything in the **persistent tab shell** (it does not unmount) holds its first payload until the app is killed. Home's energy-balance card did exactly that and the owner reported it as "requires a restart of the app" (Q-402), while all six write groups were evicting the key correctly the whole time. The signal is `subscribeToInvalidation` in `lib/sqlite/cache.ts`, and `useCachedValue` takes an `onError` because `cachedFetch` swallows `!res.ok`. **Do not reach for a shorter TTL** — an effect that never runs never consults one; it adds load and hides the defect. `scripts/check-fetch-once-effects.js` freezes the 36 remaining sites (Q-359, shrink-only per file): **19 are permanently mounted and can bite**, 1 is a deliberate warm pass, 16 unmount and are latent. Judge a site by where it is MOUNTED, not by its filename — the tab screens render their sheets unconditionally with a null prop, so a "sheet" is usually persistent here too.
+- **Invalidating a key and re-rendering the component that reads it are two different things.** A component reading a cached key uses **`useCachedValue(key, url, ttl)`** (`lib/hooks/use-cached-value.ts`), never a hand-rolled `useEffect(() => { cachedFetch(…) }, [])` — that shape never re-runs, so anything in the **persistent tab shell** (it does not unmount) holds its first payload until the app is killed. Home's energy-balance card did exactly that and the owner reported it as "requires a restart of the app" (Q-402), while all six write groups were evicting the key correctly the whole time. The signal is `subscribeToInvalidation` in `lib/sqlite/cache.ts`, and `useCachedValue` takes an `onError` because `cachedFetch` swallows `!res.ok`. **Do not reach for a shorter TTL** — an effect that never runs never consults one; it adds load and hides the defect. `scripts/check-fetch-once-effects.js` freezes the remaining sites (Q-359, shrink-only per file): **11 across 9 files, and the can-bite group is EMPTY.** ⚠ This line said *"36 sites, 19 permanently mounted and can bite"* until 2026-09-23 and had been wrong since **2026-08-19**, when the scanner's over-counting was corrected in the script's own baseline: 25 sites across 16 files were really 15 across 12, the can-bite group was **two** sites rather than eight, and both were then converted. The script's baseline is the authority, not this sentence — run it. Judge a site by where it is MOUNTED, not by its filename — the tab screens render their sheets unconditionally with a null prop, so a "sheet" is usually persistent here too.
 - Any cache holding "today's" data must embed the local date in its key (or validate the date on read) — a 30-min TTL happily serves yesterday's data across midnight (session 52).
 - Client GETs of `/api/*` use `cachedFetch` with a `readCacheSync` seed, never bare `fetch`. Before adding a cache key, grep for an existing key for the same endpoint and reuse it — duplicate keys for the same data cause stale/blank first paints.
 - After an optimistic local write, never apply or **cache** a server response that would replace it with null/absent data (the mood-checkin re-prompt and rest-day revert bugs, session 167). Invalidate caches **before** firing refetch callbacks (session 164). Submit/complete buttons need an in-flight guard — 5 rapid taps once fired 4 `complete-workout` POSTs (session 86).
@@ -633,6 +664,25 @@ said nothing, because both had skipped inside it.
 ---
 
 ## Decisions That Come Back To Me — answer the whole question the first time
+
+**⚑ STRUCTURAL QUESTIONS ARE YOURS — owner, 2026-09-22: *"I'd like it if you could take a lot of
+these structural questions."*** That is a standing narrowing of everything below, not a one-off.
+**Architecture, tooling, process, file layout, naming, which mechanism to use, how to test
+something, how the queue and the docs are organised — decide them, state the call in one line, and
+continue.** Bringing one of those back reads as caution and is not: it hands the work back, and the
+owner has said so outright.
+
+**What is still theirs, and the list is short:** anything that **destroys or rewrites data**
+(a data-dropping migration, a non-reversible one, a production write); **money**; **auth, sessions,
+secrets**; **scoring calibration**, because a bad one is hard to notice from inside and it changes
+numbers they read daily; and a **genuine product preference** that cannot be derived from the repo —
+what the app should *do*, not how it should be built. When a structural choice would quietly change
+one of those, it is that one, not a structural question.
+
+**A structural call you make still gets written down** — in the entry, the journal or the rule it
+becomes, with the reason and what it would cost to reverse. Delegated is not undocumented: the
+owner is trading *being asked* for *being able to read it later*, and the second half is the part
+that makes the first safe.
 
 **First, don't ask.** A decision is the owner's only if it is **hard to reverse** (migration, auth,
 external contract, public surface), **expensive to reverse** (it seeds a pattern the codebase will

@@ -24,6 +24,11 @@ interface Props {
   goalCalories: number | null
   /** The `earned` term inside that same budget — the movement addend, from the same call. */
   earnedKcal: number | null
+  /** RV-103: every bounded attempt to refresh the balance after a write produced nothing, so the
+   *  budget on screen predates the entry just logged. The card says so rather than presenting a
+   *  stale subtraction as current — which is the report that came back twice. */
+  balanceStale?: boolean
+  onRetryBalance?: () => void
   /** The **effective** targets: the caller has already substituted the burn-aware calorie budget and
    *  Q-323's earned-scaled macro grams. Passing the raw stored targets would report fat over on a
    *  day with 551 kcal earned when it was well under. */
@@ -59,7 +64,7 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  */
 export const EnergyCard = memo(function EnergyCard({
   data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
-  targets,
+  targets, balanceStale, onRetryBalance,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -161,6 +166,23 @@ export const EnergyCard = memo(function EnergyCard({
         </div>
       </div>
 
+      {/* RV-103. The figure above is the one fetched before the last entry, and nothing else on the
+          screen would say so — the owner's recovery, both times he reported it, was to leave the
+          page and come back, which is this refetch happening by accident. */}
+      {balanceStale && (
+        <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
+          <p className="min-w-0 flex-1 text-[11px] leading-snug text-muted-foreground">
+            Couldn&apos;t refresh — this budget is from before your last entry.
+          </p>
+          <button
+            type="button"
+            onClick={onRetryBalance}
+            className="-my-2 -mr-1 flex-none rounded-full px-3 py-2.5 text-[11.5px] font-semibold text-foreground"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Below the drawing, inside the same card. Artboard 1 stops at the two rows above, but the
           band is the only thing that says whether "left" is on track or merely arithmetic — and
@@ -178,7 +200,7 @@ export const EnergyCard = memo(function EnergyCard({
               onClick={() => setShowInfo(v => !v)}
               aria-label="How energy balance is calculated"
               aria-expanded={showInfo}
-              className="-m-1 rounded-full p-2.5 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+              className="-m-1 rounded-full p-2.5 text-muted-foreground/70 transition-colors hover:text-muted-foreground"
             >
               <Info className="h-3.5 w-3.5" />
             </button>

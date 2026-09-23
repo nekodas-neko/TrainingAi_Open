@@ -164,7 +164,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
       {/* Readiness contributors — detail on dedicated page */}
       <button
         onClick={() => router.push('/health/readiness')}
-        className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
         Readiness contributors →
       </button>
@@ -172,7 +172,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
       {/* Sleep contributors — detail on dedicated page */}
       <button
         onClick={() => router.push('/health/sleep')}
-        className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
         Sleep contributors →
       </button>

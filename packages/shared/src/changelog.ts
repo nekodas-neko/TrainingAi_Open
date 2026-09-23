@@ -6,6 +6,35 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.6",
+    date: "2026-09-22",
+    changes: [
+      "The Nutrition screen's 7-day calorie chart and the adherence figures under it now update when you log a food. They only updated when you deleted one \u2014 same screen, same numbers, and adding a meal left them showing whatever they held when the app started, until it was restarted. Switching tabs did not help.",
+      "If the calorie budget beside the ring cannot be refreshed after you log something, the card now says so and offers a Retry instead of quietly showing you the figure from before your entry. It also no longer blanks the budget and macro targets outright when the server answers with nothing.",
+    ],
+  },
+  {
+    version: "1.465.5",
+    date: "2026-09-22",
+    changes: [
+      "Training phases are no longer coloured like warnings. The AI periodization card painted Realise \u2014 your peak output phase \u2014 in the same red the app uses for something going wrong, and painted Deload green while the home screen calls a deload recommendation amber or red. A phase is a category, not a verdict, so the five now use a cool range and green, amber and red are kept for telling you how something is going. The home deload banner also had a third shade of amber of its own; it uses the shared one now.",
+    ],
+  },
+  {
+    version: "1.465.4",
+    date: "2026-09-22",
+    changes: [
+      "Four more day labels \u2014 the weekly nutrition chart, the recommendation card, the week-day sheet and the nutrition date header \u2014 now come from the one place that decides how a date reads, instead of each spelling out its own format. The text is unchanged; this is the groundwork that stops screens drifting apart, which is what had the activity list printing a raw 2026-09-15 next to a properly formatted time.",
+    ],
+  },
+  {
+    version: "1.465.3",
+    date: "2026-09-22",
+    changes: [
+      "Faint grey text across the app is now readable. Forty-five labels were dimmed past the point where they meet the accessibility floor for body text, and the contrast check could not see them because it only looked at the colours themselves, not at how transparent they were drawn. The worst was the word \"rest\" in the calendar at 7 pixels and half-faded \u2014 the only thing marking a past rest day apart from a day you logged nothing at all, so at low screen brightness the month read as empty. That one is now at full strength.",
+    ],
+  },
+  {
     version: "1.465.2",
     date: "2026-09-22",
     changes: [

@@ -5,13 +5,13 @@ import { MoonStarIcon, WeightIcon, FootprintsIcon, FlameIcon, BeefIcon, BarChart
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache"
 import { DAY_LOG_TTL } from "@trainingai/shared/cache-ttl"
+import { formatDateDisplay } from "@trainingai/shared/date-utils"
 import type { DayLogResult, DayExercise } from "@/app/api/day-log/route"
 import { displayBodyFat } from "@/components/health/body-fat-display"
 import { formatKg } from '@trainingai/shared/format/units'
 
 function formatOverlayDate(dateKey: string): string {
-  const [y, m, d] = dateKey.split("/").map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "short" })
+  return formatDateDisplay(dateKey, "weekday-date-long")
 }
 
 interface WeekDaySheetProps {

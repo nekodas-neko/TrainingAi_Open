@@ -34,14 +34,14 @@ function SortableMealTypeRow({
       className={`rounded-xl border border-border/50 bg-muted/20 transition-opacity ${isDragging ? 'opacity-40' : ''}`}
     >
       <div className="flex items-center gap-2 px-3 py-2.5">
-        <GripVertical className="w-4 h-4 text-muted-foreground/40 shrink-0 cursor-grab active:cursor-grabbing" />
+        <GripVertical className="w-4 h-4 text-muted-foreground/70 shrink-0 cursor-grab active:cursor-grabbing" />
         <span className="text-lg shrink-0">{mt.emoji}</span>
         <span className="text-sm font-medium flex-1">{mt.name}</span>
         {mt.required && <StarIcon className="w-3 h-3 text-amber-500/70 shrink-0" />}
         {mt.remindersEnabled ? (
-          <Bell className="w-3.5 h-3.5 text-muted-foreground/60" />
+          <Bell className="w-3.5 h-3.5 text-muted-foreground/70" />
         ) : (
-          <BellOff className="w-3.5 h-3.5 text-muted-foreground/30" />
+          <BellOff className="w-3.5 h-3.5 text-muted-foreground/70" />
         )}
         <span className="text-[10px] text-muted-foreground">{mt.timeStartHour}–{mt.timeEndHour}h</span>
         <button onClick={() => onEdit(mt)} aria-label="Edit meal type" className="p-4 text-muted-foreground hover:text-foreground">

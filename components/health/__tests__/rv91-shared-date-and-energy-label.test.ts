@@ -62,9 +62,12 @@ describe('RV-91 — one energy label', () => {
     // says "Cal" four times. It passed locally while untracked and went red on the first CI run
     // that saw it committed, which is the sharpest possible demonstration that a repo-wide source
     // scan must exclude the file making the claim.
-    const files = execFileSync('git', ['ls-files', 'app', 'components', '--', '*.tsx'], {
-      cwd: ROOT, encoding: 'utf8',
-    }).split('\n').filter(Boolean).filter(f => !f.includes('__tests__'))
+    // The `-- '*.tsx'` this used to carry did NOT filter: git unions pathspecs, so `app` and
+    // `components` matched every file beneath them, `.ts` included. Found while writing RV-98's
+    // equivalent sweep, which has the same shape.
+    const files = execFileSync('git', ['ls-files', 'app', 'components'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n')
+      .filter(f => f.endsWith('.tsx') && !f.includes('__tests__'))
 
     const offenders = files.filter(f => /\bCal\b/.test(code(read(f))))
     expect(offenders, `"Cal" is a food calorie and so is "kcal" — the defect is the disagreement`)

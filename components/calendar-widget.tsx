@@ -184,7 +184,14 @@ export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
                     </>
                   )
                   : data !== null && dateStr <= todayStr
-                  ? <span className="text-[7px] font-medium text-muted-foreground/50 leading-none uppercase tracking-wide">rest</span>
+                  ? (
+                    // RV-98: FULL opacity, not the /70 floor the rest of this sweep uses. At
+                    // `text-[7px]` this is the only thing distinguishing a past REST day from a
+                    // past UNTRACKED one in the month grid, so it gets the 8.36:1 rather than the
+                    // 4.64:1 that merely clears AA — at low screen brightness the /50 it had
+                    // (2.97:1) made the calendar read as if nothing had been logged at all.
+                    <span className="text-[7px] font-medium text-muted-foreground leading-none uppercase tracking-wide">rest</span>
+                  )
                   : null
                 }
               </div>

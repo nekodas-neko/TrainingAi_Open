@@ -231,7 +231,7 @@ export function PhaseEditor({
             <div className="flex items-center gap-2">
               <div className="w-24 shrink-0">
                 <p className="text-xs text-muted-foreground leading-none">Supporting</p>
-                <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-none">holds during Peak</p>
+                <p className="text-[9px] text-muted-foreground/70 mt-0.5 leading-none">holds during Peak</p>
               </div>
               <select
                 value={phase.secondaryStyleId ?? ''}

@@ -26,9 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.465.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.465.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
@@ -44,6 +42,36 @@ no save. That path is already gated by the local SQLite column list (LB-124 need
 which the POST path is not. Reasoning is written beside both. Driven over HTTP on `pnpm dev`, and
 the pre-fix 201-writes-nothing was **observed**, not assumed. No user-visible change.
 
+**A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
+`realisation` — the PEAK-output phase — as `text-red-500`, the app's failure colour, and `deload` as
+`text-green-500` while Home's banner paints a deload *recommendation* amber or red. **Both are live,
+which the entry asked to establish before sizing the work:** the active program is `ai_dynamic` and
+production carries 2 sessions in each of those phases. The five phases now use a cool ramp, leaving
+green/amber/red for state. **The entry's suggested source was wrong** — `SESSION_PALETTE` is indexed
+by session position and contains green and red itself, so borrowing it would have re-randomised the
+collision. Home's banner also had a third amber of its own; it takes `--accent-amber` now, and the
+hex baseline drops 3 → 2.
+
+**Four more date labels moved onto the shared formatter (LB-126, v1.465.4).** LB-125 (#1404, Lane A)
+gave `formatDateDisplay` the `weekday`, `weekday-date` and `weekday-date-long` styles; these are the
+call sites RV-91 closed with as *"noted, not filed"*. Output is byte-identical — checked before the
+swap, not after. **The fifth site that entry named is not one:** `calendar-widget` renders a MONTH
+and YEAR, which the helper cannot take, and the test asserts it stays as it is. **An unpredicted
+consequence:** all four were `REVIEWED_BENIGN` rows in `check-timezone-rendering.js`, and routing
+them through the helper means they no longer call `toLocale*String` at all — the gate failed until
+their rows were deleted, which is that script's own rule working.
+
+**Opacity-modified text was below AA and the contrast check could not see it (RV-98, v1.465.3).**
+`check-contrast.js` validated ten BARE token pairs and had no opacity handling, so everything from
+`text-muted-foreground/60` down was unguarded: over `--card`, 70% opacity gives 4.64:1 and passes,
+60% gives 3.73, 50% 2.97, 40% 2.34, 30% 1.83 — against 4.5:1 for body text. **45 call sites raised
+to 70%**, four exempted with written reasons (an inactive future day, two ring *tracks* where the
+class is a fill colour rather than text, a separator glyph). The calendar's `rest` marker went to
+**full** opacity rather than the floor: it is `text-[7px]` and the only thing distinguishing a past
+rest day from a past untracked one. The check now composites alpha **in gamma-encoded sRGB** —
+blending the linear values put 40% at 3.93:1 instead of 2.34:1, and a wrong number in an error
+message is worse than no number. **RV-98's own measurements reproduced independently to ±0.01**,
+which given this sweep's record with entry claims is worth recording.
 
 **A doc comment was quoted as evidence of what a screen rendered; it was wrong, and so was its
 neighbour (LB-125).** `formatDateDisplay`'s header claimed `'short'` gave `Jan 5` and `'long'` gave
@@ -96,8 +124,6 @@ this caller since it was written. **The entry's one-line fix does not compile:**
 booleans rather than type predicates, so the key is narrowed explicitly and the unreachable arm
 inherits the text colour instead of inventing one.
 
-**Version:** v1.464.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-22.
 
 **Home's score row said nothing when it failed to load (RV-85, v1.464.9).** `{readiness && <row>}`
 gated the whole row — and with it the illness advisory and the early-deload banner — so a failed
@@ -1767,7 +1793,6 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 **A logged meal stops breaking apart, and two nutrition controls stop meaning the wrong thing (BF-72/73/74/76).** The owner's *"it starts as the meal with the image, then breaks into its ingredients"* was the diary hydrating from the server and **omitting `savedMealId`/`mealGroupId`** — a local upsert overwrites every column it is given, so the screen stripped its own grouping and then rendered the stripped copy. There are exactly two `applyDelta` callers and the sync engine's was already correct, so this was the one site BF-39's audit did not reach. The meal photo's ✕ **sat where the sheet's close button would be** — and the sheet passes `hideCloseButton`, so it was the only ✕ on screen: a reach for dismiss deleted the photo. It is a bin at the bottom-right now, with undo. Capture tiles went **60 px → 79 px** and `New` now outranks a small delete bin. **Two findings came out of it that outlive the batch.** `min-h-[Npx]` **does nothing on a `<button>`** — a bare `button { min-height: 48px }` in `globals.css` beats the utility (measured: 48 px on a button, 84 px on a div), so BF-50's documented "62 px" tile actually measured 60; filed as LB-32. And **BF-76's safe-area sweep found the opposite of what it expected** — nothing in nutrition is under-padded, three sheets are *over*-padded by declaring the inset on both the content and the footer, and the `vh`→`dvh` hypothesis is not the mechanism at all, since a bottom sheet is `fixed bottom-0` and its height moves only its top edge. No padding changed: every available fix costs more than the 12–24 px it saves ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-nutrition-uplift)).
 
 
-
 **A red check took an hour to prove innocent, and the hour is the finding (LB-31).** `body-battery`'s anchor-precedence test failed on CI in code this branch does not touch. It did **not** reproduce: the failed job re-run on the identical commit passed, and the full suite passes locally against a freshly migrated database — so it is a flaky test, **not** the red `main` the first reading suggested. The mechanism is still worth fixing: those three assertions are cumulative on one user, and the route under test calls `buildReadinessPayload`, **which persists**, so step 2's own sleep insert can land the readiness step 3 is meant to establish. The durable half is that `ci.yml` has no `push: [main]` trigger — correctly, and for reasons written into the workflow — so nothing verifies the *combination* after several independently-green PRs land together, and there is no signal that separates "flaky test" from "main is broken". That is what cost the hour.
 
 **CI caught the defect LB-30 was filed to describe, on the exact line the fix was already written for.** `food-log-swipe-delete`'s *"the first tap on Delete opens the confirmation, **even mid-animation**"* went red: the spec read `boundingBox()` while the row was still sliding to its resting offset, then dispatched a CDP touch at that coordinate — and `Input.dispatchTouchEvent` performs none of the actionability checks `locator.tap()` does. **It passes three times over locally without the fix, which is the race's signature rather than a reason to dismiss it**; the window only opens when the runner is slow enough for the animation to outlast the read. `stableBox` is exported now with `tapCentre` beside it. The audit that came with it corrects the entry's own framing: of 32 coordinate taps, **21 sit inside a `toPass` retry and are safe**, 11 had a single measure, and **6 more feed a geometry *assertion*** — a class the entry did not cover, and worse, because a moving box gives a wrong verdict rather than a missed tap ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-stable-box-coordinate-reads)).
@@ -2507,6 +2532,20 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
+
+The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,
+says so and offers a Retry instead of presenting the pre-write figure as current; it also stopped
+writing null on an empty payload, which made the budget and macro targets vanish rather than go
+stale. **But `cachedFetch` fires `onError` only when `cached === null` on both its failure paths,
+and `fetchWithRetry` counts a cached paint as a response — so no caller can be told a revalidation
+failed while a cached value is present.** Driving `/nutrition` with the balance route aborted, the
+same code both reported and stayed silent on consecutive runs; exhaustion fired **once in five**.
+The report path is wired and strictly additive, and is recorded as unproven rather than done.
+`LB-128` carries the fix (Lane A's, and **not** ungating `onError`, which every caller reads as "I
+have nothing to show"). Owed: the device check at the S25 width. Detail:
+[`docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md`](docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md).
+
 ### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
 
 The shared `Button` had **no `active:` state at all** across 129 importers on a touch-only product —
@@ -2942,43 +2981,6 @@ in and it saves with no prompt; the partner weighs in on his phone and **no** *"
 Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
-
-### [app-shell][platform] ⚠️ A tab flip left the previous tab's route tree on the history entry, so back rendered the wrong screen (LA-109, 2026-09-15)
-
-**Fixed — and the fix is proven, not merely green. The device gesture is what is still owed.** Owner:
-*"Going to more; then going to profile details and pressing back gets me to the home page again."*
-
-**Cause, measured by dumping `history.state` rather than reasoned.** After the More tab flip the URL
-reads `/more` while Next's recorded route tree for that entry is still `(home)` → `/`. `show()`
-(`tab-shell.tsx`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
-address bar; Next's patched `replaceState` re-injects its own current tree, still Home's, because no
-Next navigation happened. Popping back restores the Home tree — right URL, wrong screen.
-
-**The fix reads the address bar at mount.** `TabShell`'s `useState` is now a lazy initializer that
-prefers `tabKeyForHref(window.location.pathname)` over the `initialTab` the stale tree produced.
-`usePathname()` would not do — it reads from the very tree that is wrong. Nothing reaches into
-`__PRIVATE_NEXTJS_INTERNALS_TREE`, which the entry had flagged as the risky shape. All three
-invariants hold: the flip still adds no history entry, the URL stays honest for refresh and deep
-links, and LB-107's back-to-Home from a tab root is unchanged.
-
-**Why "proven" is the right word.** `e2e/la109-back-from-subroute.spec.ts` was run against `main`'s
-unfixed `tab-shell.tsx` and goes **red** there. This check was not ceremony: the spec's first draft
-used `goto('/more/details')`, a full document load that rebuilds history, and passed while the bug
-was untouched.
-
-**⚑ The BF-49 link is REFUTED.** LA-109's entry held that BF-49 (*"tapping a workout, then back,
-leads to health training not home"*) was very likely the same defect, and that neither should be
-fixed before one was tried against the other's repro. That trial ran: the same spec's second test
-drives BF-49's shape with the stale tree supplied deliberately, and it **passes against the unfixed
-file** in the same run where LA-109's test fails. BF-49 stays open on its own device repro, and the
-test is kept as a regression guard labelled as not being a BF-49 reproduction.
-
-**⚑ BF-100 is unblocked.** It could not be read while this stood — if back rendered Home there was
-no `/more` scroll position to restore. It needs a device pass now, not more reading.
-
-**NOT verified on device.** The Android system back gesture and the WebView's history handling are
-not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
-gesture. Kept as LA-109's `Keep:`.
 
 ### [workouts] ⚠️ The intensity chip now claims only the load it measures; judging load AND reps is still owed (BF-163, 2026-09-15)
 
@@ -4083,35 +4085,6 @@ elimination table (which came from reading, not the harness). **The sheet's `his
 back to unproven** — that experiment also ran cold.
 ([retraction](docs/overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-retraction-cold-route))
 
-### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
-
-**Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**
-
-Owner: *"If you have a nutrition meal creator menu open and you press the back button - it makes the
-page behind it go back to main."*
-
-**The entry proposed building an overlay registry, on the grounds that none existed. One does** —
-`lib/hooks/sheet-back-stack.ts`, reached via `BackDismiss`, which `SheetContent` and `DialogContent`
-both already render (BF-27 put it there). The grep that found nothing searched for
-`overlayStack`/`topOverlay`; the real names are `openSurface`/`closeSurface`. **Building the proposed
-one would have left two stacks disagreeing about what is open** — worse than the bug.
-
-**The real defect:** `openSurface` pushes with `pushState(state, '')` — no URL — so the pathname
-never moves, and `backActionForPath` reads nothing else. On a tab route it answers `"home"` and the
-listener navigates; on `/` it answers `"minimize"` and the app backgrounds. **Neither touches
-history, so the pushed entry is never consumed.** Only `"pop"` worked, and only because
-`history.back()` is coincidentally what consumes it. The `"minimize"` case is a second symptom the
-report did not name.
-
-**The fix** exports `hasOpenSurface()` and pops when it is true, which reaches `handlePop` and closes
-the topmost surface through Radix's own `onOpenChange` — the same path as the X button, so every
-guard on a sheet's close still runs. It sits **after** the three mode guards, because each raises a
-dialog that is itself on this stack.
-
-**NOT verified on device, and no harness run can help.** Android's hardware back is a Capacitor
-channel Playwright cannot fire, and in a browser Radix closes on Escape so the bug never appears. The
-unit tests (4 of 5 red against `main`) cover the stack and the listener's ordering, not the gesture.
-
 ### [heart-rate][app-shell] ⚠️ One metric name covered two heart rates; labelled, but the third surface's context is still undecided (OR-116, 2026-09-15)
 
 **Labels shipped in v1.456.18. Two things remain open and one of them may be a real defect.**
@@ -4252,17 +4225,15 @@ evening sync. BLE does not exist in the sandbox, so the timer, the visibility li
 where Sync is not pressed and that day's stress still reaches the database past 18:00 — the previous
 days stop dead at 06:30 and 17:30.
 
-### [devices] ⚠️ The Colmi ring's decode moved to the server and has not run on the device (PS-21 Stage A, 2026-09-03)
-
-v1.436.4 posts the ring's raw frames and decodes them server-side. Proved equivalent to the old
-client decode over a real 31-frame sync — 209 received, 167 accepted, **166 stored rows identical
-field for field** between the two paths — but against the local dev database, over frames replayed
-from the archive rather than a ring.
-- **What has not run:** an actual sync from the phone. The pairing card's counts now come from
-  response fields (`received`, `decodedBy`) that did not exist before, so a WebView holding an older
-  bundle than the deploy would show zeros while the rows still land. `decodedBy` says which side read
-  the bytes, which is how to tell those apart rather than guessing from counts.
-- **The check:** one Sync on the S25. Readings stored > 0, and `decodedBy` reads `server`.
+**Amended 2026-09-22 — strong circumstantial evidence, and the stated check still cannot be run.**
+Production holds **16 syncs over 3–8 September** at 06:13, 06:27, 06:33, 06:48, 07:29, 08:40, 08:58,
+11:48, 13:07, 13:33, 17:10, 17:34, 19:03, 20:37 and 21:13 Brisbane — three of them evening, and a
+scatter no one presses by hand. That is consistent with the timer and the resume listener working.
+**It is not proof, and cannot be made proof from the database**, because nothing distinguishes an
+automatic sync from a pressed one once it arrives: `attemptAutoSync` records its last run in
+`localStorage`, and the ingest route stores no trigger. So this row stays open on a technicality
+worth naming — the cheapest way to close it is a `trigger: 'auto' | 'manual'` field on the ingest
+body, after which one query answers it forever.
 
 ### [nutrition][devices] ⚠️ The Coach plan card's save took the web fallback, not the offline-first path (LA-47, 2026-09-02)
 

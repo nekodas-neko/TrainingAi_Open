@@ -87,7 +87,7 @@ export function FactorBar({
     <div className="flex items-center gap-2">
       <span className="flex w-32 flex-none items-center gap-0.5 text-[11px] leading-tight text-foreground">
         {label}
-        {linked && <ChevronRightIcon className="h-3 w-3 flex-none text-muted-foreground/60" />}
+        {linked && <ChevronRightIcon className="h-3 w-3 flex-none text-muted-foreground/70" />}
       </span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted/60">
         <ProgressFill pct={value} color={color} />

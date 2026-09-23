@@ -58,7 +58,7 @@ export function TitlePickerSheet({ open, onOpenChange, unlockedAchievementIds, c
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-muted-foreground">No Title</p>
-                <p className="text-xs text-muted-foreground/60">Remove equipped title</p>
+                <p className="text-xs text-muted-foreground/70">Remove equipped title</p>
               </div>
             </button>
           )}

@@ -12,7 +12,7 @@ import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { CARD_DEFAULT_COLORS } from "../constants";
 import { readableOn } from "@trainingai/shared/utils";
 import { readCacheSync } from "@/lib/sqlite/cache";
-import { daysBetweenDateStrs } from "@trainingai/shared/date-utils";
+import { daysBetweenDateStrs, formatDateDisplay } from "@trainingai/shared/date-utils";
 import { DeloadExplanation } from "./deload-explanation";
 
 function lastSessionDay(
@@ -30,10 +30,9 @@ function lastSessionDay(
     const days = daysBetweenDateStrs(maxDate, todayKey);
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
-    // Component-wise: `new Date(iso + 'T00:00:00Z')` is UTC midnight, which renders the previous
-    // weekday on any device behind UTC (Q-130).
-    const [y, mo, dd] = maxDate.replace(/\//g, "-").split("-").map(Number);
-    return new Date(y, mo - 1, dd).toLocaleDateString("en-AU", { weekday: "short" });
+    // `formatDateDisplay` constructs component-wise for the same Q-130 reason this used to
+    // spell out, and accepts either separator, so the slash-stripping goes with it.
+    return formatDateDisplay(maxDate, "weekday");
   } catch { return "—"; }
 }
 

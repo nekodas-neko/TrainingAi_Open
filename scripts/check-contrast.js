@@ -196,4 +196,100 @@ if (fixed.length) {
   process.exit(1);
 }
 
-console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum).`);
+// ── RV-98: opacity-modified text ──────────────────────────────────────────────────────────────
+//
+// Everything above validates BARE token pairs. `text-muted-foreground/60` is a different colour
+// from `muted-foreground` and was entirely unguarded: measured over `--card`, /70 is 4.64:1 and
+// passes, but /60 is 3.73:1, /50 2.97:1, /40 2.34:1 and /30 1.83:1 — against an AA floor of 4.5:1
+// for body text. Forty-nine call sites sat below /70, including the word "rest" at `text-[7px]`
+// with /50, which is the ONLY marker distinguishing a past rest day from a past untracked one in
+// the calendar's month grid.
+//
+// Tailwind's `/n` composites the foreground onto whatever is behind it at n% alpha, so the check is
+// a source scan plus an alpha blend — not something the token pairs above can express.
+//
+// **Assumed background is `--card`.** Sites on `--background` differ by about ±0.05 and on
+// `--muted` are slightly worse, so this is the common case rather than the worst one. It is stated
+// because a floor derived from the wrong background is the kind of number that later gets quoted.
+const OPACITY_FLOOR = 70;
+
+// Sites below the floor that are NOT text, each read in context. WCAG 1.4.3 exempts inactive
+// components and decorative content; these are those. Shrink-only in spirit — a NEW entry needs
+// the same kind of reason written beside it, not just a path.
+const OPACITY_EXEMPT = new Map([
+  ['app/session-select/components/week-strip-card.tsx', 'a FUTURE day in the week strip — inactive by design'],
+  ['components/nutrition/energy-card.tsx', 'the ring TRACK: `currentColor` behind a mask, a fill colour rather than text'],
+  ['components/home/home-nutrition-card.tsx', 'the same ring track'],
+  ['components/weather-chip.tsx', 'the "·" between chips — the values either side carry the meaning'],
+]);
+
+function opacityFailures() {
+  const roots = ['app', 'components'];
+  const files = [];
+  const walk = d => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules') walk(full); }
+      else if (e.name.endsWith('.tsx')) files.push(full);
+    }
+  };
+  for (const r of roots) if (fs.existsSync(r)) walk(r);
+
+  const RE = /text-(muted-foreground|foreground|card-foreground)\/([0-9]{1,3})\b/g;
+  const bad = [];
+  for (const f of files) {
+    const rel = f.replace(/\\/g, '/');
+    for (const line of fs.readFileSync(f, 'utf8').split('\n').entries()) {
+      const [i, text] = line;
+      for (const m of text.matchAll(RE)) {
+        const pct = parseInt(m[2], 10);
+        if (pct >= OPACITY_FLOOR) continue;
+        if (OPACITY_EXEMPT.has(rel)) continue;
+        bad.push({ file: rel, line: i + 1, cls: m[0], pct });
+      }
+    }
+  }
+  return bad;
+}
+
+// The composite ratio at a given alpha, so the message carries the number rather than just the rule.
+//
+// **Blended in GAMMA-ENCODED sRGB, not linear.** This is the whole correctness of the function and
+// it was wrong on the first pass: compositing the linear values put `/40` at 3.93:1 where it is
+// really 2.34:1 — a difference that would have made the error message quote a number nobody could
+// reproduce in a browser. CSS alpha-composites in the encoded space, so the round trip is
+// linear → encoded → blend → linear → luminance.
+const toGamma = c => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+const toLinear = c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const relLum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+function alphaRatio(fgToken, bgToken, pct, T) {
+  if (!T[fgToken] || !T[bgToken]) return null;
+  const a = pct / 100;
+  const f = oklchToLinearSrgb(...T[fgToken]).map(clamp).map(toGamma);
+  const b = oklchToLinearSrgb(...T[bgToken]).map(clamp).map(toGamma);
+  const mixed = f.map((v, i) => v * a + b[i] * (1 - a)).map(toLinear);
+  return ratioFromLum(relLum(mixed), relLum(b.map(toLinear)));
+}
+
+const opacityBad = opacityFailures();
+if (opacityBad.length) {
+  console.error(`Opacity-modified text below the /${OPACITY_FLOOR} floor (WCAG AA is 4.5:1 for body text):`);
+  for (const b of opacityBad) {
+    const r = alphaRatio('muted-foreground', 'card', b.pct, dark);
+    const at = r === null ? '' : ` — about ${r.toFixed(2)}:1 over --card`;
+    console.error(`  ${b.file}:${b.line}  ${b.cls}${at}`);
+  }
+  console.error(`Raise it to /${OPACITY_FLOOR}, or to full opacity where the text is the only thing carrying a distinction.`);
+  console.error('If a site is genuinely decorative or an inactive control, add it to OPACITY_EXEMPT here WITH the reason.');
+  process.exit(1);
+}
+
+const staleExempt = [...OPACITY_EXEMPT.keys()].filter(f => !fs.existsSync(f));
+if (staleExempt.length) {
+  console.error('OPACITY_EXEMPT names files that no longer exist — delete the rows:');
+  for (const f of staleExempt) console.error(`  ${f}`);
+  process.exit(1);
+}
+
+console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt).`);

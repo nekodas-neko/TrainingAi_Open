@@ -99,3 +99,7 @@ docs/oura-models-inventory.md
 !/*.config.mjs
 !/*.config.cjs
 
+
+# Device harness captures (scripts/device) — screenshots of the owner's real account.
+# This repository is public: they are never committed. See scripts/device/README.md.
+/device-probe/

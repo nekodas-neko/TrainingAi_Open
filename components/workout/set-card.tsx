@@ -220,7 +220,7 @@ function SetCardComponent({
                 </div>
 
                 {/* × separator */}
-                <span className="text-2xl text-muted-foreground/30 font-light">×</span>
+                <span className="text-2xl text-muted-foreground/70 font-light">×</span>
 
                 {/* Reps counter */}
                 <div className="flex items-center justify-center px-3 flex-1">
