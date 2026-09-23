@@ -29,6 +29,55 @@
 **Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
+`Body` was `.extend()`-built and never `.strict()`, so a sheet posting a field whose server half had
+not landed got **201 and wrote nothing** — the failure LB-124 was filed over rather than attempted,
+and the one that would have burned TN-58's pass test. **Checked before flipping it: no current
+client sends an unknown key** (morning sheet 13, evening review 9, all known; the retired
+`motivation`/`restingSoreness`/`wakeMood` are still in the schema and sent as null on purpose).
+**⛔ The outbox stays LENIENT deliberately — do not "fix" the mismatch.** It never touches the
+route's `Body`; it is `adapter.ts` parsing the two shared schemas non-strictly, and stricting them
+would reject a queued check-in outright rather than surface a mistake, turning a partial save into
+no save. That path is already gated by the local SQLite column list (LB-124 needed a migration),
+which the POST path is not. Reasoning is written beside both. Driven over HTTP on `pnpm dev`, and
+the pre-fix 201-writes-nothing was **observed**, not assumed. No user-visible change.
+**A test file under `app/` was buying the 34-minute browser suite, and a plain `git fetch` was
+producing PRs CI never ran (2026-09-23).** Two independent CI/tooling findings from one session.
+**E2E's path gate now drops `__tests__/` the way it already drops `app/api/**`** — a vitest file is
+not loaded by any browser, and PR #1405 touched exactly one of them and bought **four** full runs,
+reaching all-six-green on the fourth and still failing to merge because `main` moved each time.
+⛔ **The expensive one: this sandbox's git proxy returns a SHALLOW pack on every `git fetch origin
+main`**, grafting the tip as a root, so `git merge origin/main` fails with *"refusing to merge
+unrelated histories"* and the resulting tree reads as conflicted to GitHub — **and a conflicted PR
+is never given a workflow run**, which presents as `total_count: 0` forever while every other branch
+builds fine. Four PRs with sound diffs died that way (#1426, #1428, #1430, #1435). The rule, the two
+cheap discriminators and the `--unshallow` remedy are in CLAUDE.md's Git Workflow section; the
+decisive test is `update_pull_request_branch`, which merges server-side and so distinguishes a real
+conflict from a reporting lag. Also filed: **LA-129** (generate the `.size` baselines in CI — the
+answer owner decision item 5 named and left unfiled) and **OR-132** (the five dead PRs, which need
+the owner's authorisation to close).
+
+
+**The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
+to it (RV-105).** ⛔ **The entry claims four; two survive checking** — RV-106 and RV-109 are this
+shape, while RV-104 and RV-107 are `nutrition-content.tsx:318`'s `useCallback` shape
+(`}, [fetchMountData, userId]`, no `cachedFetch` in the effect body), which the script excludes on
+purpose: counting it is what inflated its baseline by 11 of 25 in the first version. `check-fetch-once-effects.js` gated on an empty dep array; inside the
+persistent tab shell `[userId]`, `[tz]` and `[today]` never change either, so those effects re-run
+never. **The entry's open question is answered by a scan rather than by hand: widening takes the
+tracked population from 11 to 25 across 20 files** — a re-baseline, not a tweak. **⛔ The entry
+contradicts itself on `trendsProp`** — its diagnosis names it, its narrow fix list omits it; the fix
+list is right, because `trendsProp` is a prop the parent resolves from `undefined`, so it genuinely
+changes and `oura-section.tsx` already carries a second effect to adopt it. Excluded, with the
+reason in the code. ⚠ **This widened the lens, it did not audit what it revealed** — all 14 new
+sites predate it and went into the baseline. `sync-provider.tsx` is 4 of them and is the sanctioned
+warm pass; `workout-screen` still needs judging by where it MOUNTS. **Two of the fourteen proved the
+gate immediately** — Lane B converted `hr-day-card` and `activity-history-card` in #1422 while this
+branch was open, and the shrink-only rule failed the check on the first run after the merge and
+demanded their rows go; both were `[today]`/`[userId]`, invisible to the old gate, which is why
+RV-106 and RV-109 had to be found by hand. Baseline is 23 across 18. All four motivating findings
+(RV-104/106/107/109) have since shipped. Mutation-checked in both directions, six cases.
+
 **A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
 `realisation` — the PEAK-output phase — as `text-red-500`, the app's failure colour, and `deload` as
 `text-green-500` while Home's banner paints a deload *recommendation* amber or red. **Both are live,

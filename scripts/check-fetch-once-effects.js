@@ -27,6 +27,12 @@ const { stripComments } = require('./lib/strip-comments');
 const root = path.join(__dirname, '..');
 const DIRS = ['app', 'components', 'lib'];
 
+// RV-105. Identifiers that do not change for the life of a mount in the tab shell, so an effect
+// depending only on them is fetch-once in every way that matters. Keep this list SHORT: every
+// addition silently enlarges what the ratchet tracks, and the header below records what happened
+// the last time this file's matching got looser than its authors intended.
+const SHELL_STABLE_DEPS = new Set(['userId', 'tz', 'today']);
+
 // Recorded 2026-08-19 (Q-359). Every one of these predates the check.
 //
 // **36, not the 37 the Q-402 journal reported, and not for the reason you would guess.** That figure
@@ -104,6 +110,37 @@ const BASELINE = {
   'components/nutrition/my-meals-picker.tsx': 1,             // conditional, inside a sheet
   'components/running/running-plan-content.tsx': 3,
   'components/workout/done-screen.tsx': 1,
+
+  // ── RV-105: the stable-dep sites. **14 across 11 files**, added when the gate widened past
+  // `[]` — every one of them predates the widening, so none is a regression this change found.
+  // Grouped by what the site actually is, because the count alone invites the wrong conclusion.
+  //
+  // DELIBERATE, and the header already says so: the sync provider's warm pass. Four effects, not
+  // one — it was recorded as a single site in 2026-08-19's correction, which was looking only at
+  // `[]` deps and so could not see these. Converting them would add refetches with no reader
+  // waiting, which is the thing this rule is NOT for.
+  'components/sync-provider.tsx': 4,
+
+  // Unmount on navigate — their next mount refetches, same category as the block above.
+  'app/health/heart-rate/page.tsx': 1,                       // route
+  'app/health/sleep/sleep-content.tsx': 1,                   // route
+  'app/year-review/year-review-content.tsx': 1,              // route
+  'components/more/details/performance-overview-section.tsx': 1, // route
+  'components/fitness-tests/latest-baseline-card.tsx': 1,    // inside /baselines
+  'components/fitness-tests/test-select.tsx': 1,             // inside /baselines
+  'components/nutrition/recent-foods-panel.tsx': 1,          // conditional, inside a sheet
+
+  // **`hr-day-card` and `activity-history-card` were here and are gone** — Lane B converted both in
+  // #1422 while this branch was open, and the shrink-only rule made the check demand their removal
+  // on the first run after the merge. That is the widened gate doing the job it was widened for:
+  // both were `[today]`/`[userId]` deps, invisible to the `[]`-only version, and RV-106 and RV-109
+  // were filed against them by hand because nothing could see them.
+  //
+  // **⚠ `workout-screen` still needs judging by where it MOUNTS**, and was not checked here — this
+  // change widened the lens, it did not audit what it revealed. It is not one of the five tab
+  // screens, so it plausibly unmounts — but "plausibly" is exactly the reasoning the group above
+  // has been got wrong three times.
+  'components/workout-screen.tsx': 1,
 };
 
 
@@ -161,7 +198,22 @@ function countFetchOnce(src) {
       if (src[j] === '{') depth++;
       else if (src[j] === '}' && --depth === 0) break;
     }
-    if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(src.slice(j, j + 30))) continue;
+    // RV-105: an empty dep array is not the only fetch-once shape here. Inside the persistent tab
+    // shell `[userId]`, `[tz]` and `[today]` never change either, so those effects re-run never —
+    // four of Review sweep 53's five freshness findings were that shape and invisible to this check.
+    // An empty array still qualifies: `[].every(...)` is true, so the original behaviour is a
+    // special case of this one rather than a branch beside it.
+    //
+    // **The set is deliberately tiny, and `trendsProp` is deliberately NOT in it** even though the
+    // entry's diagnosis named it. That one is a PROP the parent resolves from `undefined` to a
+    // value, so it genuinely changes — `oura-section.tsx` carries a second effect whose only job is
+    // to adopt it when it lands. Counting it would flag three sites that already handle the change.
+    // Anything with a real dep (`[date]` on a sheet that remounts per open — `week-day-sheet.tsx`)
+    // stays out, which is the distinction the old comment was reaching for.
+    const depMatch = /^\}\s*,\s*\[([^\]]*)\]\s*\)/.exec(src.slice(j, j + 200));
+    if (!depMatch) continue;
+    const deps = depMatch[1].split(',').map((d) => d.trim()).filter(Boolean);
+    if (!deps.every((d) => SHELL_STABLE_DEPS.has(d))) continue;
     if (!src.slice(bodyStart, j).includes('cachedFetch')) continue;
     lines.push(src.slice(0, m.index).split('\n').length);
   }

@@ -473,6 +473,127 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
+
+- **Verify:** device — **no build half**; the measurement is the work. Method: **P11** in
+  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md). **Added:** 2026-09-23 ·
+  Review, at the owner's request for device checks on load efficiency and timing.
+- **The falsifiable claim:** every tab reaches first real content within **300 ms warm** and the
+  cold start's `first-contentful-paint` is within **1.5 s**. Report the actual numbers either way —
+  a pass is as useful as a fail here, because nothing has a baseline yet.
+- **This is now measurable without a recording**, which is why it was not done before:
+  `performance.getEntriesByType('navigation')` and `('paint')` survive for the life of the page, so
+  attaching *after* a normal cold start loses nothing. `device-perf-profiling-checklist.md` records
+  that mechanic; it had no agent to run it.
+- **Why it matters now:** Q-51's premise softened to *"Its mostly fine; I'd still like it to be
+  faster if possible"* and Q-147 closed on *"Seems good now"*. Both are impressions. If they are
+  right, this closes the perf thread with evidence; if a number disagrees with them, that is worth
+  more than either.
+
+### [app-shell][workouts] RV-138 — DEVICE PROBE: is Q-51's 1086 ms first mount a rule or a one-off?
+
+- **Verify:** device — no build half. Method: **P12**. **Added:** 2026-09-23 · Review.
+- **The one measured perf number in the whole queue is a single observation.** Q-51: `/workout`
+  visited five times in one session — **four at ~100 ms, one at 1086 ms, all warm.** It is read as a
+  first-mount cost, and that reading is what the remaining file-splitting work rests on.
+- **The falsifiable claim:** across ten warm visit/leave/return cycles per route, the **first** mount
+  is no more than 2× the median of the rest. FAILED means the outlier is structural and the
+  file-splitting work has its justification; passing means 1086 ms was noise and **Q-51 should be
+  re-placed, not built.**
+- Report the full list of durations per route, never a mean — one outlier in ten is invisible in an
+  average, which is exactly how this started.
+- **Pair each outlier with P14's long tasks and P13's in-flight requests.** An outlier with neither
+  is a different defect from one with both, and the entry cannot be actioned without knowing which.
+- **⚠ Q-51 says *"measure before refactoring" is now MORE binding, not less*** — a large refactor is
+  a poor trade against "mostly fine". This probe is what makes that decision, so do not start the
+  refactor on the strength of the single 1086 ms reading.
+
+### [platform][app-shell] RV-139 — DEVICE PROBE: the per-screen network waterfall, and how much of it is serial
+
+- **Verify:** device — no build half. Method: **P13**; `scripts/device/pw.js` already instruments
+  the Network domain. **Added:** 2026-09-23 · Review.
+- **The falsifiable claims, per screen:** no `/api/*` endpoint is requested **twice** for one screen;
+  no request chain is deeper than **two** (a request that only starts once an earlier one finishes).
+- **Chain depth is the number to hunt.** Three requests in parallel cost one round trip; three in
+  series cost three, and on a phone that is the whole difference between instant and not. Depth is
+  invisible to every source-reading sweep because it depends on what awaits what at runtime.
+- Report request count, `/api/*` count, total bytes and the largest single response per screen.
+- **Cross-checks that already exist:** RV-78 says `/api/next-session` serialises two independent
+  queries, and RV-82 says two routes fetch the active program twice inside one request. Both are
+  server-side and were found by reading; this probe says whether the device sees them as latency.
+
+### [app-shell][platform] RV-140 — DEVICE PROBE: main-thread long tasks, and whether animations still dominate
+
+- **Verify:** device — no build half. Method: **P14**. **Added:** 2026-09-23 · Review.
+- **The falsifiable claim:** no interaction — cold start, tab switch either direction, a scroll of
+  Home or Health — produces a single main-thread task over **50 ms**, and no interaction's total
+  blocked time exceeds **200 ms**.
+- **Check the prior finding rather than rediscovering it:** a device profile once attributed
+  **21.3% of main-thread time to `animationiteration`**, which is why the repo pauses animations at
+  all. Confirm that is still true and report what dominates now if it is not.
+- This is the probe RV-113 needs as evidence and does not have: its cross-dissolve *"keeps a second
+  full-screen tree alive"*, which is a main-thread cost the entry can only assert.
+
+### [app-shell] RV-141 — DEVICE PROBE: path structure — depth, redirects, and navigations that cost a shell teardown
+
+- **Verify:** device — no build half. Method: **P15**. **Added:** 2026-09-23 · Review.
+- **The falsifiable claims:** no screen is reachable by two tap paths of different length; no
+  navigation lands somewhere and immediately moves again; pressing back from any deep screen reaches
+  Home in as many presses as it took to get there, and never lands somewhere never visited.
+- **The measurement RV-110 is missing.** That entry counts 37 cross-tab `router.push` sites against 5
+  using the helper, and argues each tears down the whole tab shell — **but it has no number for what
+  a teardown costs.** Time one, and RV-110 stops being a count and becomes a budget.
+- Related and already device-verified: BF-100 (scroll offset restored exactly), LB-107 (back from
+  every tab root reaches `/`) and BF-165 (a sheet's `back()` eats the push **7 ms** after it) — so
+  the back stack itself is largely proven. **This is about the shape of the paths, not their
+  correctness.**
+
+### [platform][app-shell] RV-142 — DEVICE PROBE: does a long session get slower, and is that what BF-22 was feeling?
+
+- **Verify:** device — no build half. Method: **P16**. **Added:** 2026-09-23 · Review.
+- **BF-22 is an owner report with its mechanism already narrowed** — *"everything is loading very
+  slowly"*, then *"actually its running a lot better after a force restart"*. So the slowdown is
+  in-memory client state; the server-distance theory was measured and was **wrong** (`x-railway-edge`
+  names the caller's PoP, not the server's region).
+- **The falsifiable claim:** per-tab time-to-interactive at app open, after the P2 five-minute walk,
+  and after 30 minutes idle are **within 20% of each other**. A monotonic rise is the finding.
+- **This is the timing half of RV-133**, which measures heap, listener counts and live timers over
+  the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
+  or is exactly what BF-22 is feeling — and **neither answers it alone.**
+
+### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
+  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
+  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
+  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
+- **The conflict class, measured on this session rather than argued.** Every merging PR touches
+  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
+  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
+  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
+  being mergeable at the moment it was green. Another session's commit messages that day read
+  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
+- **What the owner already decided, and why this does not reopen it.** He took the cheap option
+  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
+  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
+  touched, it cannot stop two PRs touching them at once.
+- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
+  without losing the shrink-only property, which is the whole point of the check. That is the design
+  question to answer first, and it decides whether this is small or not.
+
+### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
+
+- **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
+  did for item 6 on 2026-09-22. **Added:** 2026-09-23 · Lane A, who created and then abandoned them.
+- **#1405 (RV-99), #1426 + #1435 (LA-128), #1428 + #1430 (RV-105).** Every one carries a sound,
+  gated diff; none is mergeable, and none can be repaired in place.
+- **Why, and it is not their diffs:** each was built in a repo the sandbox git proxy had shallowed,
+  so GitHub reads their history as unrelated to `main`, marks them conflicted, and **never gives
+  them a CI run**. The full mechanism and the `--unshallow` remedy are now in CLAUDE.md's Git
+  Workflow section. The work itself shipped from clean rebuilds: RV-105 as #1432, LA-128 as #1436.
+- **RV-99 is the one that still owes work** — its rebuild is not done, and #1405 is where its diff
+  lives until it is. Close that one last, or keep it until the replacement is open.
+
 ### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
 
 - **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
@@ -919,27 +1040,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
 - **⚠ Do not simply ungate `onError`** — every existing caller reads it as "I have nothing to
   show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
   cached data with error cards across the app.
-
-### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
-
-- **Lane:** A — `scripts/check-fetch-once-effects.js:164`. **Added:** 2026-09-22 · Review sweep 53.
-- The gate is `if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(...)) continue;` — **only an empty dependency
-  array counts.** Its comment states the rationale: *"a non-empty one re-runs when its deps change,
-  which is a different (and usually correct) shape."*
-- **That reasoning is sound in general and wrong for this app.** Inside the persistent tab shell,
-  `[userId]`, `[today]` and `[trendsProp]` never change either, so those effects are fetch-once in
-  every way that matters. **Four of the five freshness findings in this sweep (RV-104, RV-106,
-  RV-107, RV-109) are that shape, and all four are invisible to the ratchet.**
-- **⚠ Widening the pattern is NOT a one-line change, and the file says why.** Its header records
-  that the first version used a non-greedy regex, swallowed unrelated code between effects, and
-  **inflated its own baseline by 11 of 25**. The brace-matching it uses now is the fix for that.
-  Extending to stable-deps needs a judgement about *which* deps are stable — `[userId]` on a
-  persistent screen is, `[date]` on a sheet that remounts per open is not (`week-day-sheet.tsx` is
-  the legitimate counter-example).
-- **Fix, narrowly:** treat a dep array containing **only** identifiers known to be shell-stable
-  (`userId`, `tz`, `today`) as fetch-once, re-baseline, and leave everything else alone.
-- **Not established:** how many *new* sites a widened pattern would surface — the four above were
-  found by hand, not by a candidate scan.
 
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
@@ -1404,29 +1504,6 @@ nothing structured saying why — and a human decides.
 - **Fix:** one categorical series palette in `packages/shared/src/chart-colors.ts` beside
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
-
-### [platform] LA-128 — the check-in route strips an unknown key instead of rejecting it, so the next field lands silently
-
-- **Lane:** A — `app/api/day-checkin/route.ts:14`. **Added:** 2026-09-22, Lane A while shipping
-  LB-124, which exists because of this shape.
-- **The hazard, in the words of the entry it cost:** `Body` is built with `.extend()` and is **not
-  `.strict()`**, so Zod drops a key it does not know rather than refusing the body. A client posting
-  a field the server has not learned yet gets **201 and writes nothing**. LB-124 was filed rather
-  than attempted for exactly this reason, and it says why it matters: *"a control that looks like it
-  works and stores nothing is worse than a 400"* — it would have burned TN-58's two-week pass test
-  and reported "no self-report available" when the truth was a dropped field.
-- **LB-124 did not close this.** It closed it for `vsYesterday` by making the key known. The next
-  field added to a check-in sheet before its server half lands hits the same silence.
-- **Fix:** `.strict()` on `Body`, so an unknown key is a 400 naming it.
-- **⚠ Why this is its own entry rather than a line in LB-124's diff.** `.strict()` starts REJECTING
-  bodies that succeed today. Every current client must be checked first — the morning sheet, the
-  evening review, and `pushMutations`, which parses the same two shared schemas. A sheet sending one
-  stale key would go from silently-ignored to a hard failure on every save, and on the outbox path
-  that is a no-retry poison pill. This is a small change with a real blast radius, which is the
-  argument for measuring it rather than for skipping it.
-- **Not established:** whether any current client actually sends an unknown key. Nobody looked —
-  the shape was found by reading the schema, not from a failure. Start there: it decides whether
-  this is a one-line change or a three-file one.
 
 ### [platform] RV-82 — two routes fetch the active program twice inside a single request
 
@@ -12272,6 +12349,17 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   button's centre** and refused to dispatch, which fits the defect still being there but does not
   prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
   tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
+- **📱 Second attempt, 2026-09-23 (sitting 2) — still COULD NOT CHECK, and why, so the next try
+  does not repeat it.** Three "immediate tap" runs showed no confirmation, but **none of them is
+  evidence**: the row's tray was **already open** before the swipe (a tray left open by an earlier
+  step stays open — the row sat at `translateX(-64px)`), and the tap aimed 32 px inside the *row's*
+  right edge, which is x=271 with the tray open — the row, not Delete (x 303–367). A 1.5 s control
+  tap at that point opened *Edit Serving*, confirming it hit the row. Measured once correctly: from
+  an **open** tray, a further left swipe overshoots to −134 px and settles back at −64 px by 300 ms,
+  with Delete on top throughout. **What the next attempt needs:** a verified-closed tray first
+  (`translateX(0)`; a right swipe starting inside the navigator's 24 px edge strip does not close it,
+  and neither did a raw tap on the row), then swipe and `input tap` at **Delete's own rect** in one
+  `adb shell` call. Note the tray is `aria-hidden` while closed, so a visibility filter hides it.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
