@@ -33,7 +33,7 @@ const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, lineCountAtBase, dirNamesAtBase, verdict } = require('./lib/base-ref');
 const { entriesVerdict } = require('./lib/entries-verdict');
-const { BASELINE_DIR, loadBaselines, baselinePathFor } = require('./lib/doc-size-baselines');
+const { BASELINE_DIR, loadBaselines, baselinePathFor, slackBand } = require('./lib/doc-size-baselines');
 
 const root = path.join(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baseline.json'), 'utf8'));
@@ -106,6 +106,8 @@ function linkedEntryNames(rootDir, entriesAbs) {
 
 const failures = [];
 const slack = [];
+const tolerated = [];
+
 const inherited = [];
 
 // Q-424: the ratchet asks whether THIS BRANCH grew the file, not whether the file is over its number.
@@ -145,8 +147,14 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
   }
   if (call === 'ok') continue;
   if (call === 'slack') {
+    const gap = limit - lines;
+    if (gap <= slackBand(limit)) {
+      // Under the band: reported, not failed. RV-134 — see slackBand.
+      tolerated.push(`${rel}: ${gap} line${gap === 1 ? '' : 's'} of slack (band ${slackBand(limit)}) — lower it when you are next editing this file anyway.`);
+      continue;
+    }
     slack.push(
-      `${rel} is ${lines} lines against a ${limit}-line baseline — ${limit - lines} line${limit - lines === 1 ? '' : 's'} of slack.\n` +
+      `${rel} is ${lines} lines against a ${limit}-line baseline — ${gap} line${gap === 1 ? '' : 's'} of slack, over its ${slackBand(limit)}-line band.\n` +
         `      Lower the number in ${baselinePathFor(rel)} to ${lines}, in this PR, with a note in\n` +
         `      docs/doc-size-baseline-history.md. Left as it is, the document can regrow into that\n` +
         `      slack without the ratchet saying anything.`,
@@ -173,6 +181,14 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
 }
 
 failures.push(...slack);
+
+// Tolerated slack is REPORTED, never silent. A check that quietly accepts drift is how the 429-line
+// gap accumulated in the first place; the band changes who has to act and when, not whether anyone
+// can see it.
+if (tolerated.length) {
+  console.log(`check-doc-index-size: ${tolerated.length} file(s) carry slack within their band — not a failure:`);
+  tolerated.forEach((t) => console.log(`    ${t}`));
+}
 
 const entriesAbs = path.join(root, ENTRIES_DIR);
 if (fs.existsSync(entriesAbs)) {

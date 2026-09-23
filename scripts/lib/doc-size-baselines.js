@@ -63,4 +63,32 @@ function baselinePathFor(trackedRelPath) {
   return `${BASELINE_DIR}/${trackedRelPath}${SUFFIX}`;
 }
 
-module.exports = { BASELINE_DIR, SUFFIX, loadBaselines, parseBaseline, baselinePathFor };
+/**
+ * How much slack is tolerated before the ratchet makes someone lower the number (RV-134).
+ *
+ * **The measured problem.** The slack rule failed on ANY gap, so every PR that shrank a tracked doc
+ * by even one line had to edit `docs/doc-size/<path>.size` — and that is a one-line file two
+ * concurrent PRs cannot both write. Measured on 2026-09-23: **23 re-merge commits across five
+ * branches in one night**, nearly every one of them resolving a `.size` file where neither side was
+ * wrong and the merged tree's own count was the answer. One branch paid it twelve times.
+ *
+ * So the conflicts were not caused by the ceiling. They were caused by SLACK DETECTION firing on
+ * every PR, which made a shared one-line file part of almost every diff.
+ *
+ * **Why a band rather than removing the check.** Slack detection is the half that stops silent
+ * regrowth: CLAUDE.md once sat **429 lines** under its number, meaning the most-read file in the
+ * repo could grow by half its own length with nothing complaining. A band keeps that — 429 against
+ * a ~900-line baseline is far outside any band — while a one-line shrink stops being everyone's
+ * problem.
+ *
+ * **Why max(25, 2%) and not a flat number.** The tracked docs span 54 lines (a baton) to 27,000
+ * (the backlog). A flat 25 would fail the backlog on 0.1% drift; a flat 500 would let a baton
+ * double. The floor of 25 matters for the small files, the 2% for the large ones.
+ *
+ * Growth is unchanged and still fails at the first line over. The asymmetry is deliberate: growing
+ * past the ceiling is the thing the ratchet exists to catch, and the fix there is moving prose.
+ * Slack is a stale number, and a stale number that is 0.08% stale is not worth a merge conflict.
+ */
+const slackBand = (limit) => Math.max(25, Math.round(limit * 0.02));
+
+module.exports = { BASELINE_DIR, SUFFIX, loadBaselines, parseBaseline, baselinePathFor, slackBand };
