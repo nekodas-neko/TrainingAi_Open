@@ -286,3 +286,21 @@ was the reading, not the connection:
 - **After a cold reload `nav a[href="/"]` matched two elements** and Playwright's strict mode threw.
   Tab-bar locators are now scoped `.filter({ visible: true }).first()`. Whether the shell really mounts
   two tab bars after a reload was not checked.
+
+### Sweep 1 — S25, 2026-09-23
+
+- **Git Bash rewrites any argument that starts with `/` into a Windows path** (MSYS path
+  conversion), so `perf.js cycles --routes /more/details,/program` silently ran only `/program`. Prefix
+  such commands with `MSYS_NO_PATHCONV=1`.
+- **`perf.js cycles` saves after every route** and records a page reload mid-visit as
+  `hardNavigation` instead of crashing — the first 70 visits of sweep 1 were lost to exactly that
+  crash, which happened while the phone had dropped off USB.
+- **The app is often not in front when a sitting starts** — the owner's reply to "go" is typed in
+  the Claude app on the same phone. `am start -n com.trainingai.app/.MainActivity` brings it back
+  without a tap; then check `mCurrentFocus`. A Samsung system pop-up (`easysetup`) took focus once and
+  cleared on its own — wait it out, never tap it.
+- **A queued offline mutation may not push on reconnect under CDP emulation** — drain it with the
+  next write (a supplement tick/untick pushes the whole outbox), and prove the server is clean after.
+- **The long-session method (P16 + P10):** `perf.js tti --label walk` → `census.js --rounds 1
+  --idle-min 30 --no-reload` → `perf.js tti --label idle`, with `keyevent 224` every 4 min. No reload,
+  or the accumulation being measured is thrown away.
