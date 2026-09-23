@@ -16226,3 +16226,16 @@ at the head of the lane blocked on their own next action — one needs a CPU pro
 agent can take, the other needs two looks judgements that decide whether to build it at all. Lines
 spent saying why are lines no future Lane B session spends rediscovering it.
 
+## 2026-09-23 — `implementation-backlog.md` → 27286, `projectOverview.md` → 12540 (DV-10)
+
+The backlog shrinks by 14 — DV-10 leaves and nothing replaces it, because the second defect found
+underneath it was fixed in the same change rather than filed.
+
+`projectOverview.md` gains 19 lines, and they are doing two different jobs. The first is to
+**correct the entry's own conclusion while keeping its finding**: the missing tombstone was real, but
+`getSupplements` filters on `active` as well, and the pull hard-deletes the row, so nothing came
+back — a future session reading "deleted item comes back" would go hunting for a live bug that is
+not there. The second is to record the defect the entry did not find: the delete blanked five
+columns, including BF-69's presence window, where a nulled date silently converts an UNKNOWN into a
+TRUE ZERO. That is the part worth the lines, because it is invisible in the UI and the row it
+corrupts is replaced by the next pull — so it leaves no trace to find later.

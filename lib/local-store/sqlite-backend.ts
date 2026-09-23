@@ -2747,6 +2747,33 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(`UPDATE supplements SET sync_status='synced' WHERE id=?`, [id]);
   }
 
+  /**
+   * DV-10. The delete used to be `upsertSupplement({ ...fields the sheet happened to hold,
+   * active: false })`, which had two faults and this fixes both.
+   *
+   * **It left no tombstone.** `deleted_at` stayed null, so the local row read as live while the
+   * server's was gone — CLAUDE.md's offline rule is that a delete must leave a tombstone the delta
+   * can carry. `deleteInjury` above is the shape; supplements were the odd one out. Not currently
+   * user-visible, because `getSupplements` filters `active=1 AND deleted_at IS NULL` and the next
+   * pull hard-deletes the row anyway, so this closes the gap before a read path that checks only
+   * `deleted_at` finds it.
+   *
+   * **It also wiped columns, which is the part nobody was looking for.** The call site rebuilt a
+   * partial `LocalSupplement` — no `defaultAmount`, `unit`, `startedOn`, `stoppedOn` or
+   * `dosePrompt` — and `upsertSupplement` writes every one of those with `?? null`, so deleting a
+   * supplement blanked them on the local row. `startedOn`/`stoppedOn` are BF-69's presence window,
+   * where a date outside the window is a TRUE ZERO and a date inside it with no contribution is
+   * UNKNOWN: nulling them turns one into the other in any local aggregate read before the next
+   * pull. An UPDATE touching only the delete columns cannot do that.
+   */
+  async deleteSupplement(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await runSQL(
+      `UPDATE supplements SET deleted_at=?, active=0, sync_status='pending', updated_at=? WHERE id=?`,
+      [now, now, id],
+    );
+  }
+
   async getSupplementLogs(date: string): Promise<LocalSupplementLog[]> {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT * FROM supplement_logs WHERE log_date = ? AND deleted_at IS NULL`,
