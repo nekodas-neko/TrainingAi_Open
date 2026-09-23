@@ -2825,11 +2825,16 @@ the scale's 25.7%, which lowers lean mass and so lowers the calculated targets t
 111 g protein**. Against the 1,660 / 150 you are eating to, that is **+19% calories and +35%
 protein**, not the +18%/+30% first written here.
 
-**Two smaller things came out of measuring it**, both queued: `calculateBaseline` and the clamp
-disagree about fat (25% of calories vs 0.6 g/kg — 39 g against 42 g for you), so the recommendation
-is the baseline *made safe* rather than the baseline exactly (LA-125); and `user_goals` and
-`body_fat_calibration` have no `claude_ro` view, so your steps goal could not be read at all while
-measuring this (LA-127).
+**Two smaller things came out of measuring it.** `calculateBaseline` and the clamp disagreed about
+fat — 25% of calories against 0.6 g/kg, 39 g against 42 g for you — so the recommendation was the
+baseline *made safe* rather than the baseline exactly. **Fixed 2026-09-23 (LA-125): the 0.6 g/kg
+floor now lives inside the baseline**, so one formula answers the question and every screen reading
+it agrees with the route serving it. It settled on **42 g, not 39** — the floor outranks the 25%
+share, and the alternative (dropping the floor) was rejected because the calorie floor beside it is
+what stops a cutting target falling under your resting rate. For you that is **fat 39 → 42 g and
+carbs 150 → 143 g**, and you see both on the recommendation sheet before you tap apply. The other:
+`user_goals` and `body_fat_calibration` have no `claude_ro` view, so your steps goal could not be
+read at all while measuring this (LA-127).
 
 ### [readiness] ⚠️ A past day now says what you were doing when stress spiked — the marker half is unbuilt (TN-35, 2026-09-21, v1.462.0) · needs: device
 

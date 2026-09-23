@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.15",
+    version: "1.465.16",
     date: "2026-09-23",
     changes: [
       "Morning check-ins, the end-of-day review, readiness quick-logs and saved activities now refresh what the app works out from them once the entry reaches the server \u2014 your readiness, next session and health trends could previously keep showing the pre-save figures until they expired on their own.",
+    ],
+  },
+  {
+    version: "1.465.15",
+    date: "2026-09-23",
+    changes: [
+      "Your recommended fat and carb targets now match the figures every other screen works out. Two formulas disagreed: the baseline set fat at 25% of your calorie budget, then the recommendation raised it to a 0.6 g per kg floor \u2014 so the suggestion sheet and the rest of the app could quote different numbers for the same profile. The floor is now part of the baseline, so there is one answer. If you are cutting, this can move fat up a few grams and carbs down to match.",
     ],
   },
   {

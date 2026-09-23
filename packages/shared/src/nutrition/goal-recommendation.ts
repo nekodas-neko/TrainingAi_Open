@@ -48,6 +48,40 @@ export const CALORIE_ADJUSTMENT_BY_GOAL: Record<FitnessGoal, number> = {
   lose_weight: -500, maintain: 0, build_muscle: 300, recomp: -200,
 }
 
+/**
+ * Fat as a share of the calorie budget, and the floor that outranks it.
+ *
+ * **LA-125: these bounds live here, above `calculateBaseline`, because the floor used to live only
+ * inside `clampRecommendation`.** The baseline computed fat at 25% of calories and the route then
+ * raised it to 0.6 g/kg — for the owner, 39 g against 42 g, with carbs falling out of the remainder
+ * at 150 against 143. So "the recommendation is the baseline" (RV-66) was true of calories,
+ * protein, water and steps and false of the two macros a person actually adjusts, and a surface
+ * reading `calculateBaseline` directly disagreed with the route serving it.
+ *
+ * The floor is the authoritative rule and the 25% share is the target, so the baseline now applies
+ * both and `clampRecommendation` keeps them as a redundant guard over a number it did not compute.
+ * Deleting the clamp instead was rejected: its CALORIE floor is load-bearing for every cutting user
+ * (`CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500, and `bmr × 1.2 − 500 < bmr` for any BMR under 2,500).
+ */
+const FAT_TARGET_CALORIE_FRACTION = 0.25
+const FAT_MAX_CALORIE_FRACTION = 0.4
+const FAT_G_PER_KG_FLOOR = 0.6
+
+/** The 40%-of-calories ceiling, in grams. */
+export function fatCeilingG(calories: number): number {
+  return Math.floor(calories * FAT_MAX_CALORIE_FRACTION / KCAL_PER_G.fat)
+}
+
+/**
+ * The 0.6 g/kg floor, in grams, capped by the ceiling above.
+ *
+ * For a very heavy, short or older person the weight-based floor can exceed the calorie-derived
+ * ceiling; capping keeps the floor from pushing fat past 40% of the budget.
+ */
+export function fatFloorG(weightKg: number, calories: number): number {
+  return Math.min(Math.round(FAT_G_PER_KG_FLOOR * weightKg), fatCeilingG(calories))
+}
+
 const PROTEIN_G_PER_KG_BY_GOAL: Record<FitnessGoal, number> = {
   lose_weight: 1.8, maintain: 1.6, build_muscle: 2.0, recomp: 2.2,
 }
@@ -202,7 +236,12 @@ export function calculateBaseline(input: BaselineInput): BaselineResult {
   const proteinBase = leanMassKg ?? input.weightKg
   const proteinG = Math.round(proteinBase * PROTEIN_G_PER_KG_BY_GOAL[input.fitnessGoal])
 
-  const fatG = Math.round(calories * 0.25 / 9)
+  // LA-125: the floor outranks the 25% target and is applied HERE, so the number this returns is
+  // already the number the route serves. See FAT_TARGET_CALORIE_FRACTION above.
+  const fatG = Math.max(
+    Math.round(calories * FAT_TARGET_CALORIE_FRACTION / KCAL_PER_G.fat),
+    fatFloorG(input.weightKg, calories),
+  )
   const carbsG = carbsFromRemainder(calories, proteinG, fatG)
   const waterMl = Math.round(input.weightKg * 33) + WATER_BUMP_BY_ACTIVITY[input.activityLevel]
   const stepsGoal = STEP_GOAL_BY_ACTIVITY[input.activityLevel]
@@ -260,10 +299,10 @@ export function clampRecommendation(
     notes.push(`Protein adjusted to maximum (${proteinMax}g).`)
   }
 
-  const fatMax = Math.floor(calories * 0.4 / 9)
-  // For very heavy + short + older users, the weight-based floor can exceed the
-  // calorie-derived ceiling — cap it so fatMin never exceeds fatMax.
-  const fatMin = Math.min(Math.round(0.6 * weightKg), fatMax)
+  // The same two bounds `calculateBaseline` already applied (LA-125) — a no-op on a baseline
+  // figure, and still a real guard on any number this function did not compute.
+  const fatMax = fatCeilingG(calories)
+  const fatMin = fatFloorG(weightKg, calories)
   let fatG = ai.recommendedFatG
   if (fatG < fatMin) {
     fatG = fatMin

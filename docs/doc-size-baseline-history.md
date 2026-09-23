@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27224 (LA-125 shipped, −38), projectOverview → 12564 (+5)
+
+LA-125's entry left the queue, which is the whole of the backlog's fall; the same edit amended
+LA-126 to record that its blocker cleared and that it cleared in the *other* direction — the fat
+rule settled on the 0.6 g/kg floor's 42 g, not the baseline's 39 g, which LA-126 had been written
+expecting. That amendment is longer than the entry removed, so the net is smaller than a deletion
+would suggest, and deliberately: LA-126 quotes the numbers the owner is moving to, and two of them
+moved.
+
+`projectOverview.md` grew by five lines turning a "both queued" note into a fixed one that states
+which way it resolved and what the owner will see on the sheet.
+
 ## 2026-09-20 — backlog → 24984 (TN-54, the strap is dark and nothing says so)
 
 **+12.** The owner wore the strap overnight and asked whether it recorded. It did not, and the
