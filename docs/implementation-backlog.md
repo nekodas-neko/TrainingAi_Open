@@ -3088,6 +3088,151 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake, found while resolving a real
+  conflict). **Lane: O** — this is tooling for the compaction chore, not product code, and the right
+  answer may be a convention rather than a patch.
+- **⚑ MEASURED, not reasoned.** Two agents folded on 2026-09-23. Both wrote
+  `docs/overview/history-2026-09-23-folded-1.md` — the name is derived from the date, so a same-day
+  second fold always collides. On resolving the conflict by restoring `origin/main`'s file and
+  re-running the fold for the ten local entries, the result held **11 anchors where 51 were
+  expected**: `scripts/fold-journal-entries.js:177` writes with **`fs.writeFileSync`**, so it
+  rebuilds the file from the entries it is folding and **drops every section already in it**.
+- **⚠ The failure is silent and survives the checks that exist.** No error, no warning, and
+  `check-doc-links` passed over 819 files afterwards — the folded-away entries were not cited, so
+  nothing dangled. The count was only visible by grepping `<a id=` before and after. A conflict
+  resolved by splicing the hunks would look correct and lose nothing visible, which is the part that
+  makes this worth a queue entry rather than a comment.
+- **Fix: make the write additive, or make the filename unique per fold.** Reading an existing
+  same-named file and merging its sections in is the durable answer, because the collision is
+  structural — the name is `<date>-folded-1.md` and two folds on one day is exactly the case the
+  compaction chore invites. Appending a `-2` suffix when the file exists is the cheaper answer and
+  leaves the archive in two files per day; that is a real cost, but a smaller one than deleting
+  another agent's sweep.
+- **Note the existing rule this sits under.** CLAUDE.md already warns that two sessions running the
+  same compaction chore *"once cost a whole PR's work"*. This is the mechanism behind that sentence,
+  measured — the rule named the hazard without naming the line that causes it.
+- **Verification:** fold N entries, then fold M more into the same day without deleting the file,
+  and confirm the result holds N+M anchors. Today it holds M.
+
+### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Can we somehow get the
+  sleep data to sync as soon as the app is opened? I know the oura app did it so we should be able
+  to request/pull it."*
+- **Lane: A** — the trigger lands in `components/sync-provider.tsx` (Lane B) but the cooldown that
+  has to guard it is ring-radio policy in `lib/oura-ble/**`, which §3 assigns to Lane A. Both → Lane A.
+- **Yes, we can request it — we already do, from two places, neither of which is app open.**
+  `syncOuraRing()` (`lib/oura-ble/sync.ts`) is exactly the "request/pull" the owner is describing:
+  it calls the plugin's `drainHistory()`, waits for the drain to settle *and* for the server rollup
+  watermark to move, then invalidates the Oura caches and fires `ta:oura-ble-synced` so mounted
+  screens refetch. It is wired to the **pull-to-refresh gesture** (`components/pull-to-sync.tsx:79`)
+  and the **Refresh button on session-select** (`session-select-content.tsx:1083`). Nothing else
+  calls it. The whole of this entry is one missing caller.
+- **Otherwise the ring is drained on a timer.** `OuraRingService.kt:64` — `DRAIN_INTERVAL_MS =
+  3_600_000` (60 min), checked by the 5-min keepalive, plus one auto-drain 3 s after each connect.
+  So between gestures, freshness is bounded by an hour and nothing the app does shortens it.
+- **⚑ MEASURED — drain cadence in production, 40 h of `oura_raw_samples.recorded_at` to
+  2026-09-24 06:19 Brisbane.** Scheduled gaps ran **57–91 min** (the spread is the 5-min keepalive
+  granularity on top of the 60-min interval), interleaved with short off-cycle batches. That is the
+  policy working as designed, not a fault — it is the size of the window the owner is asking to close.
+- **⚑ MEASURED — how late the night's tail arrives, the seven nights still resident in
+  `oura_raw_samples`.** First batch to land after `sleep_end`:
+
+  | night | wake | first batch after wake | lag |
+  |---|---|---|---|
+  | 09-17 | 06:01 | 06:05 | **4 min** |
+  | 09-19 | 07:23 | 07:36 | 13 min |
+  | 09-22 | 06:56 | 07:11 | 15 min |
+  | 09-21 | 06:34 | 06:59 | 25 min |
+  | 09-24 | 02:42 | 03:08 | 26 min |
+  | 09-23 | 06:01 | 06:32 | 31 min |
+  | 09-18 | 19:00 | 19:33 | **34 min** |
+
+  **Median 25 min, range 4–34.** Nights older than these read as multi-day lags and are an
+  **artifact, not a finding**: `oura_raw_samples` holds roughly eight days before the packer
+  reclaims into `oura_raw_packed`, so "first row after wake" for an older night matches the oldest
+  surviving row rather than a real batch. Only the resident window can answer this question.
+- **⚠ The screenshot that prompted this is NOT the defect — say so before building.** It was taken
+  at 06:57 and shows the night 21:22–02:42 rendered correctly; that night's tail landed with the
+  **03:08** drain, nearly four hours earlier. The owner woke at 02:42 and opened the app at 06:57,
+  which is far outside the window. **The window is real and this screenshot is not inside it** — the
+  case where it bites is opening the app within ~half an hour of waking, and (every day, all day)
+  the same-day metrics that keep accumulating: steps, HR, SpO₂, temperature.
+- **The tab the app opens on is the one tab with no manual escape either.** `PullToSync` is mounted
+  by `health-content`, `nutrition-content`, `more-content` and `session-select-content` — **not by
+  Home**. So on a cold open the owner lands on the one screen from which no drain can be requested
+  at all, by gesture or otherwise.
+- **This is a regression window, and the comment that opened it is still in the file.**
+  `sync-provider.tsx:228` records that the throttled background Oura **Cloud** sync was removed
+  2026-08-13 and that it *"fired on app open and native resume"*. Removing it was right — it could
+  not succeed on our own BLE key — but its **trigger** was never replaced. The comment says fresh
+  biometrics come from the BLE ingest pipeline instead, which is true of the data and not of the
+  cadence: the BLE pipeline has no open/resume trigger to this day.
+- **⚑ THIS DUPLICATES A LINK OF Q-529, WHICH FILED IT FIRST — read that entry before building.**
+  Found after filing, and recorded rather than quietly reconciled. **Q-529** carries an owner
+  requirement from **2026-08-20** that is this entry's requirement in different words: *"Ideally I
+  want the score and sleep time to be accurate on first open of the day without needing time to
+  'adjust'."* Its link 1 is **"Drain on app open / wake detection — closes the ≤62-min data gap, the
+  dominant term. Native Kotlin ⇒ new APK."** That is BF-187. It has sat unbuilt for a month for
+  exactly the reason the owner removed on 2026-09-23.
+- **The split between the two entries, so neither waits on the other.** **Q-529 keeps the display
+  half** — its link 3, *"do not render a number that will change"*, shipped 2026-09-02 and its
+  remaining scope is sleep-specific. **BF-187 owns link 1**, the trigger, because a drain on open is
+  not a sleep feature: it moves steps, HR, SpO₂ and temperature on every open of the day. Q-529's
+  link 2 (roll up and re-score immediately after the drain, a measured ~4-minute lag) stays with
+  Q-529 and is the natural follow-on once this lands.
+- **⚑ TWO INDEPENDENT MEASUREMENTS, A MONTH APART, AGREE — which is itself the finding.** Q-529's
+  review measured **214 ingest batches over 7 days: median gap 62.0 min, p90 71, max 306**
+  (2026-08-20). This entry measured **57–91 min over 40 h** (2026-09-24), without having seen that
+  number. Nothing has drifted in a month, the cadence is the constant the policy says it is, and the
+  ≤62-min gap is not a one-week artifact. **Do not re-measure it a third time** — build the trigger.
+- **Fix: call `syncOuraRing()` on app open and on native resume, behind a cooldown.** A Capacitor
+  `App` `resume` listener plus the mount pass, in `sync-provider.tsx` beside the four reconcilers
+  that already run on exactly that pair of events. Everything downstream — waiting for the rollup
+  watermark, invalidating, telling screens to refetch — `syncOuraRing()` already does.
+- **The cooldown is the whole design decision, and the plugin cannot currently inform it.**
+  `syncOuraRing()` has no throttle, which is correct for a deliberate gesture and wrong for a
+  listener that fires every time the owner tabs back. `status()` (`OuraRingService.kt:744`) exposes
+  `draining` and `cursorDs` but **not** `lastDrainCompletedAt`, so JS cannot ask the native side how
+  stale it is. Two ways out:
+  - **⚑ RECOMMENDATION FLIPPED 2026-09-23 — the owner lifted the APK cost: *"Happy for new apk
+    builds if thats more effecient."* Do it natively.** Add a `drainIfStale(maxAgeMs)` plugin method
+    that makes the staleness decision **inside the service**, against the real
+    `lastDrainCompletedAt`, and have JS call it unconditionally on open and resume. The cooldown is
+    a fact about the ring's radio, and the service is the only thing that knows it — putting the
+    clock in JS means guessing at state the native side holds.
+  - **Why it is worth the APK rather than merely allowed by it.** A JS cooldown is wrong in three
+    ways that the native one is not: it resets when the WebView reloads, so a reload re-drains; it
+    cannot see the autonomous hourly drains, so it fires redundantly against a ring that was drained
+    ninety seconds ago; and it races the `draining` flag it would have to poll to avoid overlapping
+    an in-flight drain. The native version has all three facts locally and needs roughly ten lines.
+  - **The JS-side cooldown remains the fallback and is a real option**, not a strawman — it ships
+    through Railway alone, so it is the right answer if this ever needs to land without a build. It
+    is strictly worse, not unusable; the redundant drains it causes are cheap.
+  - **Reversal cost either way is near zero.** The trigger is one listener and one call; removing it
+    restores today's behaviour exactly. The APK cost is the build, not the commitment.
+  **Suggested starting value: 10 minutes.** Not tuned — it makes the first open of the morning
+  always drain while a burst of tab-switches costs one. If it reads wrong in use, that is a finding
+  about the number, not a reason to remove the cooldown.
+- **⚠ "As soon as the app is opened" will mean ~10–40 seconds, not instantly — tell the owner
+  before he judges it.** The chain is drain → POST → server rollup (3 s trailing debounce, then a
+  worker thread) → cache invalidation, and `afterDrainSettles` deliberately waits for the rollup
+  watermark to move rather than invalidating early, because a refetch that lands pre-rollup caches a
+  stale read for the full TTL (Q-91-followup). The card will fill in shortly after open, not on the
+  first paint. Anything faster is a different and much larger change.
+- **Do not raise `DRAIN_INTERVAL_MS` as the fix.** Draining every 15 min instead of 60 would shrink
+  the window without a trigger, and §2 lists it as a legitimate lever — but it costs ring radio time
+  around the clock to serve a moment that happens a handful of times a day, and it still cannot make
+  *opening the app* mean anything. The trigger is the cheaper instrument. They compose if the window
+  is still too wide afterwards.
+- **Verification:** with the service connected, note `cursorDs`, background the app, wait past the
+  cooldown, resume, and confirm a drain starts without a gesture and the Oura-derived cards refresh
+  on their own. Then tab away and back three times inside the cooldown and confirm **one** drain,
+  not three. **Device look owed** — none of this path exists on web (`getOuraBle()` no-ops) and the
+  resume listener is native-only.
+
 ### [body][nutrition] BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
 
 - **📱 Evidence from the S25, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23** (not a verdict — the entry is open work). Fish Oil, not taken
@@ -21619,7 +21764,13 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   could have helped.
 - **Three links, and all three are needed. Order matters.**
   1. **Drain on app open / wake detection** — closes the ≤62-min data gap, the dominant term.
-     **Native Kotlin ⇒ new APK**, not a Railway deploy.
+     **Native Kotlin ⇒ new APK**, not a Railway deploy. **→ This link is now BF-187 and left this
+     entry 2026-09-23.** The owner asked for it again in his own words (*"Can we somehow get the
+     sleep data to sync as soon as the app is opened?"*), BugFix traced it independently, and the
+     cadence re-measured at 57–91 min against the 62.0-min median recorded here — unchanged in a
+     month. It moved out because a drain on open is not a sleep feature: it moves steps, HR, SpO2
+     and temperature too. **The APK that blocked it was unblocked the same day** (owner: *"Happy for
+     new apk builds if thats more effecient"*).
   2. **Roll up and re-score immediately after that drain** — this morning the last upload landed 06:50
      and the score settled 06:54:41, a **~4-minute** processing lag.
   3. **Until 1 and 2 land, do not render a number that will change** — this entry's existing scope,

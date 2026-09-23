@@ -16401,3 +16401,25 @@ withholds `screenshot_data` and exposes only its byte length, so a reported UI b
 the picture that is most of it. `OR-138` for reading the reporting user's own data — an auth/security
 widening the owner asked for, so it carries its reasoning, its recommended restriction and one
 explicitly unverified claim rather than a one-line instruction.
+## 2026-09-23 — `docs/implementation-backlog.md` → 27531 (+123 from this branch)
+
+BF-187, filed from an owner report asking whether sleep data can sync on app open. The length is
+mostly two measured tables that the entry exists to carry: 40 h of drain cadence (57–91 min between
+scheduled drains) and the per-night post-wake lag across the seven nights still resident in
+`oura_raw_samples` (4–34 min, median 25). The second table also records which nights had to be
+discarded as a packer-window artifact rather than read as multi-day lags — the kind of thing that
+gets re-derived wrongly if only the conclusion survives.
+
+Amended the same day, +33 on top of the original +91. The owner lifted the APK constraint
+(*"Happy for new apk builds if thats more effecient"*), which flipped BF-187's recommendation from a
+JS-side cooldown to a native `drainIfStale` — and the sweep that answer prompted found the entry
+duplicates **Q-529's link 1**, filed 2026-08-20 and parked ever since on the APK cost. Both halves
+of that are recorded in the entry rather than reconciled quietly: the duplicate disclosure with the
+split between the two entries, and the two independent cadence measurements (62.0-min median then,
+57–91 min now) that agree a month apart.
+
+Amended again: BF-188, the fold-script clobber found while resolving this branch's own merge
+conflict. Filed rather than left in the journal, per **No orphaned findings** — it has a silent
+data-loss mode (41 archived entries deleted with no error and no dangling link) and the existing
+CLAUDE.md warning about two sessions running the same compaction chore names the hazard without
+naming the line that causes it.
