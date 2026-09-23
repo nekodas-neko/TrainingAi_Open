@@ -18,6 +18,32 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27313 (DV-13 measured, +30), projectOverview → 12597 (+27)
+
+DV-13 stays in the queue and grew, which is the right direction for an entry whose cause was not
+proven: the measurement went in beside the hypothesis rather than replacing it. `error_events` put
+the window's only two server errors at the moment of recovery, and the merge timeline put a
+production deploy 70 seconds before the stall began — so the eight-minute outage reads as a deploy,
+while the per-row timezone formatting the entry suspected is real, measured and fixed. The `Keep:`
+lines are the four things still owed, including that the outage cause is NOT settled by the fix that
+shipped.
+
+`projectOverview.md` carries the owner-facing half: the app was unreachable for eight minutes, the
+likeliest cause is four merges in sixteen minutes each redeploying production, and the cadence is
+the thing to change.
+
+## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27283 (LA-130, −26)
+
+The Git Workflow shallow-fetch rule told every session to fetch with `--unshallow` every time,
+because "a plain fetch re-grafts at the new tip". The real cause is `pnpm check:rules`: it replays
+every step of the Custom Rules job against the local clone, and one step was `git fetch --depth=1
+origin main`, which truncated the clone to 2 commits on every run — immediately before every push,
+which is when ancestry matters. The lines are the correction, the measurement, and the reason a
+fatal from `--unshallow` read as a success through `| tail -1` and sent the diagnosis the wrong way
+twice.
+
+The backlog falls by LA-130's entry, whose own filing carried the wrong cause.
+
 ## 2026-09-23 — backlog → 27224 (LA-125 shipped, −38), projectOverview → 12564 (+5)
 
 LA-125's entry left the queue, which is the whole of the backlog's fall; the same edit amended

@@ -497,6 +497,36 @@ below threshold and left in place for next time.
   outage could be coincidental — Railway, a deploy, another client), whether the server restarted at
   20:12, and what `error_events` holds for the window. **Read `error_events` and Railway's logs for
   20:00–20:15 AEST on 2026-09-23 first.**
+- **✅ MEASURED 2026-09-23 by Lane A, and the headline finding is that the 8-minute outage was
+  almost certainly A DEPLOY, not these routes.** `main` took four merges in sixteen minutes —
+  19:47:07 (#1463), 19:51:20 (#1466), **20:03:30 (#1468)** and later 20:18:18 (#1467) — and each one
+  auto-deploys to Railway production. **#1468 landed 70 seconds before `/api/version` first went
+  slow at 20:04:40, and the recovery at 20:12:41 is an ordinary build-and-swap later.** A container
+  being replaced is exactly what makes a database-free route time out for minutes and then answer in
+  0.5 s; a blocked event loop is not required to explain it. `error_events` for the window holds
+  precisely two server rows, both at **20:12:36–37** — the moment of recovery, not the stall —
+  and both read `[cause: timeout exceeded when trying to connect]` (`/api/day-timeline`,
+  `/api/body-battery`), which is a POOL-ACQUISITION failure as a new container warms, not a slow
+  query and not a blocked loop. Railway's own logs are still unread (no access from the sandbox).
+- **⚠ The routes are nevertheless doing real unbounded work, and that half is now fixed.**
+  `device-metrics` called `toAestDay` — `formatInTimeZone` — **once per raw row**. Measured: the
+  owner's default `?days=3` window really holds **58,856 rows**, and the formatter costs **11.2 us**
+  a call, so that was **656 ms of synchronous work** before any decoding began, and **~3.1 s at
+  `?days=14`** — on sandbox CPU, so worse on Railway. Nothing else runs on the process while it
+  does, which DOES explain the admin console's other requests hanging: `samples/summary`,
+  `rollup-state` and `samples/pack` have **no such loop** (checked), so a single-row read appearing
+  to hang is the signature of the process being occupied, not of that route being slow. The memo is
+  now keyed by minute — exact for every timezone, since no UTC offset is finer than a minute — and
+  pinned by `dv13-minute-keyed-day-bucketing.test.ts`, whose zone set includes Kathmandu and Chatham
+  because an hour-keyed memo passes every whole-hour zone and is silently wrong in those two.
+- **Still NOT established, and this entry stays queued for it:** that `device-metrics` caused the
+  **outage**. 656 ms — or even 3 s — does not account for a 90-second abort, and the deploy
+  correlation above is the better explanation for that window. Do not close this by pointing at the
+  fix that shipped.
+- **Keep:** ① the row cap and the explicit per-request timeout from the fix direction below — the
+  memo makes the loop ~100x cheaper but leaves it unbounded, so a large enough window still occupies
+  the process; ② the device pass test, which needs the phone; ③ Railway's logs for 20:00–20:15 AEST,
+  which nobody has read.
 - **Contributing:** the device agent issued two extra requests to the hung endpoints while measuring
   them, and an earlier `page.reload()` of the same screen had already left the page unresponsive to
   DevTools for ~3 minutes. Both are now forbidden in the harness (see `scripts/device/README.md`).
@@ -1995,32 +2025,6 @@ below threshold and left in place for next time.
 - **Watch, unchanged:** a faster sheet gives its content less time to paint, so a sheet that fetches
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
-
-### [platform] LA-130 — a bare `git fetch origin main` re-shallows the sandbox clone every time, and a shallow clone silently kills CI
-
-- **Lane:** A — sandbox/workflow tooling and the CLAUDE.md Git Workflow rule.
-- **Added:** 2026-09-23 · Lane A, measured across PR #1445's three base races.
-- **What CLAUDE.md already says, and what is new.** The Git Workflow section documents the
-  shallow-fetch defect and says to re-check `test -f .git/shallow` **after** each fetch. What was
-  not established is the frequency: this session ran `git fetch origin main` in a clone it had
-  already unshallowed, **four separate times, and `.git/shallow` came back on every one**. So it is
-  not an occasional relapse to watch for — a bare fetch re-shallows deterministically, which makes
-  `--unshallow` part of every fetch rather than a recovery step.
-- **Why it is worth tooling rather than vigilance.** The failure is silent and its symptom points
-  somewhere else: the branch loses its ancestry, GitHub reads the PR as conflicted, and **a
-  conflicted PR is never given a workflow run** — so `get_check_runs` returns `total_count: 0`
-  forever and reads exactly like slow CI. Four PRs were abandoned to this before the mechanism was
-  found (OR-132), and the rule that now exists only helps a session that remembers to run the check
-  after every fetch, which is the kind of discipline that fails under exactly the time pressure
-  that makes people fetch quickly.
-- **The options, none of them chosen here.** A git alias or wrapper that always fetches with
-  `--unshallow`; a `fetch.depth`/`remote.origin.fetch` config written by the session-start hook; or
-  a `scripts/` helper that fetches and asserts. The config route is the only one that survives a
-  session forgetting, which is the point — but whether the session-start hook can set it, and
-  whether the proxy re-imposes the shallow on the next fetch regardless, is **not established** and
-  is the thing to test first.
-- **Pass test:** after the fix, `git fetch origin main` followed by `test -f .git/shallow` finds no
-  shallow file, repeated three times in one session.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
 
