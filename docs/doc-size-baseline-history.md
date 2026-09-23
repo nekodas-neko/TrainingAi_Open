@@ -16001,3 +16001,16 @@ rather than half-built inside it.
 DV-1's pass test was run on the device machine for the first time and failed (`npx.cmd` → EINVAL since
 Node's CVE-2024-27980 patch), so the entry gains the measured result; and DV-7 / DV-9 are new — bedtime
 consistency computed in the phone's timezone, which only shows on a machine not set to UTC.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27151 → 27128 (TN-61 / the starved DV lane)
+
+TN-61 left the queue after being built, which is the whole of the 23 lines.
+
+A genuine shrink caused by this branch — the case the ratchet is right to make someone lower, as
+distinct from the tax RV-134 describes where a branch is forced to lower a number because someone
+else's merge shrank the file.
+
+Worth recording beside it: this failure is the first one today that arrived **legible**. Two earlier
+gate runs exited 1 with their evidence piped away to `tail -5`; this one was kept whole and named
+its own cause in the first line of the failure block. `pnpm ci:local > /tmp/gate.log 2>&1; echo $?`
+costs nothing and is the difference between a fix and a third OR-121 entry.

@@ -913,29 +913,6 @@ below threshold and left in place for next time.
   scroll event, because nothing re-reads its offset on activation.
 
 
-### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`
-  (`TOP_N = showAll ? Infinity : 10`).
-- **Background:** found twice in two days while verifying my own filings. Prose, not a `Reference:`
-  field — that field files an entry under *read, do not build*.
-
-**Lane A's READY list is 31 entries and the tool prints 10, with no line saying so.** Two entries I had
-just edited (`TN-55`, `LA-121`) appeared **nowhere** in the output, which reads exactly like *removed
-from the queue* — the failure mode the backlog's own two-deletions rule exists to catch. I only
-established they were fine by parsing their fields directly, which is the thing `next-item.js` exists to
-save everyone from doing.
-
-**The fix is one line of output, not a behaviour change.** Keep printing 10; add the count that was
-withheld and how to see them — *"showing 10 of 31 — `--all` for the rest"* — on every bucket it
-truncates, READY and PARKED alike. A tool whose silence is indistinguishable from absence is the same
-class of defect as the prose marker in TN-59: correct output, wrong conclusion drawn from it.
-
-**⚠ Do not raise `TOP_N` instead.** The cap is right — an implementer wants the next few items, not
-thirty-one. What is wrong is that the truncation is invisible.
-
-**Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
-IS in the queue but below the cut-off no longer comes back empty without explanation.
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
 
@@ -2078,6 +2055,24 @@ nothing structured saying why — and a human decides.
   shallow file, repeated three times in one session.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
+  REJECTED this one with a reason.** The two were filed hours apart by different sessions and
+  neither could see the other. Read this before starting:
+  - **The conflicts were not caused by the committed baseline.** They were caused by **slack
+    detection failing on any gap**, which forced every PR that shrank a tracked doc by one line to
+    edit `.size` — and striking a completed entry is what almost every PR does. RV-134 tolerates
+    slack within `max(25, 2%)`, and the tax it was measured against (23 re-merge commits across
+    five branches in one night) should now be mostly gone. **Measure it again before assuming the
+    class still exists.**
+  - **Generating baselines in CI removes the CEILING, which is the part worth keeping.** A derived
+    baseline makes every increment "inherited", so a file can grow ten lines per PR forever with
+    nothing objecting. Slack detection exists because CLAUDE.md once sat **429 lines** under its
+    number. Any design here has to say how growth is still caught and how slack is still surfaced —
+    if it cannot, it is trading a merge conflict for the thing the ratchet is for.
+  - **A merge driver was also considered and rejected**: `merge.<name>.driver` must be configured in
+    every clone (CI, this sandbox, the Windows device machine) and silently does nothing where it is
+    missing, which is the old behaviour wearing a disguise.
 
 - **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
   **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
