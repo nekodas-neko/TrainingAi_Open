@@ -15913,8 +15913,30 @@ first write, then +4 for the lesson that cost this PR a red CI — run the FULL 
 subset scoped to the directories you changed, because a source-shape test asserting on your file
 can live anywhere. Still well under the 65 it inherited.)
 
+## 2026-09-23 — `implementation-backlog.md` 27216 → 27225, `projectOverview.md` 12442 → 12476 (DV-5)
 
-## 2026-09-23 — backlog 27216 → 27250 (DV-4, +34)
+The backlog is up **nine net lines** across a removal and an addition, which is the shape worth
+recording rather than the number. DV-5 left the queue and **DV-8 replaced it**, carrying the half
+that was never explained — one `set_logs` row pending since 2026-09-19 whose
+`exercise_logs.workout_session_id` is absent from the local `workout_sessions` table. The cost is
+the paragraph saying **why the DV-5 fix does not cover it** (`workout_log` confirms with a keyed
+`UPDATE` and reads nothing back, so a filtered getter cannot be the cause), plus the hypothesis
+named as a hypothesis. Without that, the next session reads a `pending` row next to a shipped
+"pending rows" fix and either re-chases the confirm arms or assumes it was covered. LA-129 also
+gained four lines recording why it moved down the queue; it was filed beside the entry it argued
+with rather than at its priority, and queue position *is* priority here.
+
+`projectOverview.md` is up **34 lines** for one Known-Issues row and one status paragraph. Both
+spend most of their length on what is **not** claimed: the pass test is on-device only and was not
+run, and DV-5's `set_logs` half is explicitly excluded. That is the expensive half of an honest
+entry, and it is the half that stops the next reader treating "DV-5 shipped" as "the device is
+clean".
+
+## 2026-09-23 — backlog 27225 → 27227 (DV-4, +2 net)
+
+**The +2 is not the size of this change — it is +34 from DV-4 against −52 from RV-134**, which
+landed while this branch was open and struck a completed entry. Worth stating because the number
+alone would read as a trivial edit, and the paragraphs below are what actually moved.
 
 The backlog GROWS on an entry that shipped, and both halves of the growth are for things NOT in the
 diff.
@@ -15933,3 +15955,4 @@ listen to (five inner containers, so the shell needs a capture-phase listener), 
 needed, and the floored height already exists as `--pt-safe-value`. Writing them into the entry is
 the alternative to a second session rediscovering them, and it is why DV-6 was left out of the PR
 rather than half-built inside it.
+
