@@ -1756,10 +1756,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
     const sessions = [...program.sessions].sort((a, b) => a.position - b.position)
     const schedule = program.schedule
-    const rem = {
+    // Kept separate from `common` on purpose: these two are INPUTS to the ai_dynamic scorer, which
+    // destructures named fields and rebuilds its own result. Anything added to `common` would not
+    // survive that call, so the scorer is given the reminder pair alone.
+    const reminders = {
       reminderEnabled: schedule?.reminderEnabled ?? false,
       reminderTime: schedule?.reminderTime ?? null,
     }
+    // Spread into every recommendation this method returns directly. RV-82 adds the program so a
+    // caller need not run `getActiveProgram` — a fixed 5-query composite — a second time in the
+    // same request. Every return past this point is after the `!program` guard, so it is never
+    // null here.
+    //
+    // ⚠ The ai_dynamic branch returns the SCORER's object, not this one, so it attaches `program`
+    // itself. `program` is optional on the type, so TypeScript cannot catch a path that forgets —
+    // `next-session-carries-program.test.ts` covers every return instead.
+    const common = { ...reminders, program }
 
     // Fetch recent workout sessions with their stored session name.
     // Using session name (not FK) avoids mismatches after program edits/renames.
@@ -1783,7 +1795,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // Always show today's actual session first — overrides rest-day rules
     if (lastWs && toAestDay(lastWs.startedAt, timezone) === todayAest) {
       const todaySession = sessions.find(sess => sess.name.toLowerCase() === lastWs.sessionName?.toLowerCase())
-      if (todaySession) return { isRestDay: false, session: todaySession, reason: `Already trained: ${todaySession.name}`, ...rem }
+      if (todaySession) return { isRestDay: false, session: todaySession, reason: `Already trained: ${todaySession.name}`, ...common }
     }
 
     // BF-84 — a rest day the user CHOSE outranks every inference below it, because it is the one
@@ -1795,7 +1807,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // having said earlier that you would rest, and the row stays put so the choice is still there
     // tomorrow if the session is later deleted.
     if (restChosen) {
-      return { isRestDay: true, reason: 'Rest day — you chose to rest today', ...rem }
+      return { isRestDay: true, reason: 'Rest day — you chose to rest today', ...common }
     }
 
     // Compute most-overdue session using name-based last-done lookup
@@ -1923,11 +1935,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         illnessFlag,
         stressHighMinutes: todayDerived?.stressHighMinutes ?? null,
         timezone,
-        ...rem,
+        ...reminders,
       })
 
       return {
         ...result,
+        // RV-82: the scorer rebuilds its own result from named fields, so `program` cannot ride in
+        // on the input — it is attached here, on the one return that is not this method's own.
+        program,
         signals: {
           muscleRecovery,
           ouraReadiness: liveReadiness,
@@ -1957,16 +1972,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           return age < 7 * 86_400_000
         })
         if (hasTrainedRecently) {
-          return { isRestDay: true, reason: 'Rest day — not a scheduled training day', ...rem }
+          return { isRestDay: true, reason: 'Rest day — not a scheduled training day', ...common }
         }
         // Fall through to rotation logic below (shows next session)
       } else if (todayEntry.sessionId) {
         const pinned = sessions.find(sess => sess.id === todayEntry.sessionId)
         return pinned
-          ? { isRestDay: false, session: pinned, reason: `Scheduled: ${pinned.name}`, ...rem }
-          : { isRestDay: false, session: nextSession, reason: `Scheduled day — rotate: ${nextSession.name}`, ...rem }
+          ? { isRestDay: false, session: pinned, reason: `Scheduled: ${pinned.name}`, ...common }
+          : { isRestDay: false, session: nextSession, reason: `Scheduled day — rotate: ${nextSession.name}`, ...common }
       }
-      return { isRestDay: false, session: nextSession, reason: `Scheduled day — rotate: ${nextSession.name}`, ...rem }
+      return { isRestDay: false, session: nextSession, reason: `Scheduled day — rotate: ${nextSession.name}`, ...common }
     }
 
     // Build a per-day map of session names done (for rest-day detection)
@@ -2011,12 +2026,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const reason = allSessionsDone
         ? `Rest day — full ${sessions.length}-session cycle complete`
         : `Rest day — ${consecutiveDays} days in a row`
-      return { isRestDay: true, reason, ...rem }
+      return { isRestDay: true, reason, ...common }
     }
 
-    if (!lastWs) return { isRestDay: false, session: nextSession, reason: `Starting with ${nextSession.name}`, ...rem }
+    if (!lastWs) return { isRestDay: false, session: nextSession, reason: `Starting with ${nextSession.name}`, ...common }
 
-    return { isRestDay: false, session: nextSession, reason: `Next up: ${nextSession.name}`, ...rem }
+    return { isRestDay: false, session: nextSession, reason: `Next up: ${nextSession.name}`, ...common }
   }
 
   // ── Body & Activity ────────────────────────────────────────────────────────

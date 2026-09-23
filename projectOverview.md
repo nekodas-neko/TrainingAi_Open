@@ -2598,6 +2598,25 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ⚠️ Two routes fetched the active program twice per request (RV-82, 2026-09-23)
+
+`getNextSession` already calls `getActiveProgram` — a fixed 5-query composite — inside its own
+`Promise.all`, and two routes asked for it again in the same `Promise.all`, so `programs`,
+`program_sessions`, `schedules`, `schedule_days` and `session_exercises` each ran twice (5 wasted
+statements of 22 on `/api/next-session/prescription`, of 19 on `/api/progress-summary`). The
+recommendation now carries the program it was derived from. **The entry's two suggested fixes are
+not equivalent:** passing a pre-fetched program IN would serialise two calls that currently run in
+parallel, so reading it off the result is what shipped. **Two things the entry did not mention, both
+found by checking:** `/api/next-session` serialises the recommendation WHOLESALE, so it now strips
+the field — otherwise the home card's most-fetched response would grow by the entire program; and
+`computeAiDynamicNextSession` destructures named fields and rebuilds its own result, so a `program`
+spread into its input is silently dropped on the **ai_dynamic path**, which is the live one. That
+would have made both routes behave as though there were no active program, and `tsc` cannot see it
+because the field is optional. **No latency figure** — the entry could not measure one and neither
+could this; filed as shape, not speed. **No per-user memo was added**, per the entry's own
+prohibition: it trades against config-save freshness and needs its own decision. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md`](docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md).
+
 ### [readiness] ⚠️ Readiness no longer reaches 100, and that is the price of TN-60 — stored days unchanged until the batched recompute
 
 The hard clip at z = ±1.5 was where the information went: over 69 days `hrvBalance` (22.8% of all

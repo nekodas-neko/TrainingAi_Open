@@ -1498,30 +1498,6 @@ below threshold and left in place for next time.
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
 
-### [platform] RV-82 — two routes fetch the active program twice inside a single request
-
-- **Lane:** A — `app/api/next-session/prescription/route.ts:57`,
-  `app/api/progress-summary/route.ts:35,37`. **Added:** 2026-09-20 · Review sweep 51.
-- Both call `repo.getActiveProgram(userId)` in the same `Promise.all` as `getNextSession`, and
-  `getNextSession` calls `getActiveProgram` itself (`lib/data/postgres/adapter.ts:1730`).
-  `getActiveProgram` is a fixed **5-query composite** (programs → program_sessions + schedules →
-  session_exercises + schedule_days).
-- **Measured on the wire** (local dev Postgres, `log_statement='all'`, idle baseline 0 statements in
-  25 s): `/api/next-session/prescription` = **22 statements**, of which `programs`,
-  `program_sessions`, `schedules`, `schedule_days` and `session_exercises` each appear exactly
-  **twice** — 5 wasted. `/api/progress-summary` = **19 statements**, same doubling.
-- **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
-  those two routes call `getNextSession` alone and read the program off its result. Risk-free —
-  same data, same request.
-- **⚠ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
-  program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
-  but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
-  wanted, it is its own entry with that trade stated.
-- **Not established:** no latency figure. Dev wall times were a flat ~350 ms/route regardless of
-  query count (dev-mode compile overhead), so the cost against Railway's private network is
-  unmeasured. On a single-user app this is server work the owner will not feel directly — filed as
-  shape, not as a latency emergency.
-
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).

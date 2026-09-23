@@ -30,15 +30,17 @@ export async function GET() {
   const sevenDaysAgo = shiftDateStr(today, -7);
   const fourteenDaysAgo = shiftDateStr(today, -13);
 
-  const [sleepSessions, program, dayExercises, nextSession, bodyBaseline, weekSessionsAll, weightHistory] = await Promise.all([
+  // RV-82: the program comes off `nextSession` below, which already fetched it — this route used
+  // to run `getActiveProgram`, a fixed 5-query composite, a second time in the same request.
+  const [sleepSessions, dayExercises, nextSession, bodyBaseline, weekSessionsAll, weightHistory] = await Promise.all([
     repo.listSleepSessions(userId, sevenDaysAgo, today),
-    repo.getActiveProgram(userId),
     repo.getDayExerciseNames(userId, today.replace(/-/g, '/'), tz),
     repo.getNextSession(userId, tz),
     repo.getBodyMetricsBaseline(userId),
     repo.getWorkoutSessionsFrom(userId, mondayUtc),
     repo.listBodyMetrics(userId, fourteenDaysAgo, today),
   ]);
+  const program = nextSession.program ?? null;
 
   // Dated points, not bare numbers (LB-67): rows exist only on days carrying a metric, so a fit
   // against array position reports a slope per READING as though it were per day. The sort and the
