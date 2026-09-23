@@ -2288,25 +2288,6 @@ below threshold and left in place for next time.
   describes. That is a cost trend the owner should see, not a mandate to promote it back — the
   decision to take the cheap option was his and stands until he says otherwise.
 
-### [nutrition][platform] RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
-
-- **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts:355-380`,
-  `lib/nutrition/meal-top-up.ts:88`. **Added:** 2026-09-20 · Review sweep 51.
-- The route maps day-variants with `Promise.all`, then meals within each, then calls
-  `scaleWithTopUp` per (variant × meal). The comment at `:376` states the intent — *"One ingredient
-  list serves both variants"* — but the top-up is invoked per variant, so on a training/rest split
-  the same meal with a near-identical shortfall asks the model twice. A plan can pay up to
-  `2 × mealCount` extra calls on top of the one generate call.
-- **The pattern to reuse already exists:** `createDedupCache`
-  (`packages/shared/src/ai-periodization/generation-dedup.ts`), written for exactly this failure on
-  the prescription path.
-- **Fix:** key the top-up on (meal name, rounded shortfall) and reuse across variants — or run it
-  once on the training variant and re-scale its merged ingredient list for the rest variant, which is
-  what the comment already claims happens.
-- **Not established — and this is the reason it is low in the queue:** there is **no
-  `meal-plan-top-up` row in `ai_call_log` at all**, so this call site has never fired in production.
-  Read from source only; it was not confirmed that both variants reach a shortfall on the same meal.
-
 ### [platform] RV-76 — two program routes make the model emit muscle arrays that the code provably discards
 
 - **Lane:** A — `app/api/generate-program/route.ts:85-86,183`, `app/api/builder-chat/route.ts:251`,
@@ -2342,6 +2323,24 @@ below threshold and left in place for next time.
   card or convert it to `useCachedValue`.
 - **Not established:** neither query was timed, so on a dataset this size the saving may be
   single-digit milliseconds. Filed for the shape, not a measured win.
+
+### [nutrition][platform] LA-131 — the rest-day carb reduction is a four-line formula copied into two routes
+
+- **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts:98,356-359` and
+  `app/api/nutrition/meal-plans/[id]/structure/route.ts:47,128-131`.
+  **Added:** 2026-09-23 · Lane A, found while re-verifying RV-77.
+- `const REST_DAY_CARB_REDUCTION = 0.15` is **declared separately in both files**, and so is the
+  derivation that uses it — `carbShift = round(carbs × REDUCTION)`, `carbsG = carbs − carbShift`,
+  `calories = calories − carbShift × 4`. Two copies of one rule about what a rest day means.
+- **Why it matters rather than being tidy:** these two routes are the *generate* and *restructure*
+  paths for the same plan. If one copy is tuned and the other is not, restructuring a plan silently
+  re-targets every rest-day meal against a different definition of a rest day than the one that
+  generated it — and the drift is invisible, because both numbers look plausible.
+- **They agree today** (0.15, identical arithmetic), verified 2026-09-23. This is the cheap moment.
+- **Fix:** one exported helper beside the other nutrition math in `packages/shared/src/nutrition/`
+  taking the daily macros and a day type and returning the adjusted targets; both routes import it.
+- **Verification:** both routes produce byte-identical variant targets for the same input before and
+  after; `grep -rn REST_DAY_CARB_REDUCTION app/` returns one definition.
 
 ### [platform] LB-123 — `cachedFetch` caches any 2xx body, so a route that can answer `null` cannot use it
 
@@ -3728,6 +3727,40 @@ existing 65 days moves by less than 5 points on every one of them.
 - **Pass test:** every stored `readiness_score` reproduces from its own stored contributors, and
   every row carries a model stamp. **Currently: 62 of 65 reproduce** (58 nine-key + 4 of the seven),
   three are 1 point out, and 25 of 65 are stamped.
+
+### [nutrition][platform] RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
+
+- **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts:355-380`,
+  `lib/nutrition/meal-top-up.ts:88`. **Added:** 2026-09-20 · Review sweep 51.
+- **⚠ RE-VERIFIED 2026-09-23 (Lane A) — the STRUCTURE is real, the DUPLICATE is not, and the path
+  still has never run. Do not build the fix as written.**
+- **What holds.** The route really does `Promise.all` over day-variants and then over meals within
+  each, calling `scaleWithTopUp` per (variant × meal). `loggedGenerateObject`'s `fingerprint` is a
+  **diagnostic only** — `lib/ai/instrument.ts` hashes it for the log row and never dedups on it — so
+  nothing collapses two calls today. That much of the entry is correct.
+- **What does not hold — the two calls are NOT duplicates.** The rest variant subtracts
+  `REST_DAY_CARB_REDUCTION` (0.15) of carbs and `carbShift × 4` calories, so the two variants scale
+  the same ingredient list toward **different targets** and therefore reach **different shortfalls**.
+  The proposed key — *(meal name, rounded shortfall)* — would collapse them only when the shortfalls
+  happen to round together, which is not the common case. A fix built to this description would be a
+  near-no-op that reads as done.
+- **The comment is also not contradicted.** `:376` says *"One ingredient list serves both variants"*,
+  and that is exactly what happens — `names[i].ingredients` is shared and the **scaling** is
+  deliberately per variant, which the same comment spells out (*"same meal, more rice on a training
+  day"*). The entry read a contradiction into a comment that agrees with the code.
+- **And it still has never executed.** Re-measured 2026-09-23, three days after filing: `ai_call_log`
+  holds **zero** `meal-plan-top-up` rows, and `meal-plan-generate` has fired **twice in total, ever**
+  — last on **2026-09-01**. So this optimises a second call on a path that has not run in three
+  weeks, at a measured saving of nothing.
+- **Moved down the queue accordingly**, below the entries whose code paths actually execute. It rose
+  to position 1 only because everything above it shipped, which is the queue working correctly and
+  not a signal that this is worth building.
+- **If it is ever built**, the honest fix is the entry's *second* option — run the top-up once on the
+  training variant and re-scale its merged ingredient list for the rest variant — because that is the
+  only one that removes a call the targets genuinely differ on. It changes plan output, so it needs a
+  before/after on a real plan, which needs the feature to be in use first.
+- **The pattern to reuse if so:** `createDedupCache`
+  (`packages/shared/src/ai-periodization/generation-dedup.ts`).
 
 ### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
 

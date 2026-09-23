@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27235 (RV-77 re-verified and moved, LA-131 filed, +33 on a shrunken base)
+
+Raising this number is also what surfaced **LA-132**, fixed in the same PR: the base comparison for
+this file had been failing with `spawnSync git ENOBUFS` because the document passed **2.11 MB**
+against node's 1 MB default `maxBuffer`. The read was then treated as absent, which is the STRICT
+path — so the `inherited` escape hatch had silently stopped working for the one file most likely to
+be grown by somebody else's merge. `base-ref.js`'s own comment said that mechanism had never been
+reproduced. It is this, and it arrives the day a tracked file crosses a megabyte.
+
+
+Growth, and the growth is the deliverable: RV-77 was NOT built. Its structural claim holds, but the
+two top-up calls it calls duplicates target different macros (the rest variant drops 15% of carbs),
+so the fix as written would collapse almost nothing — and `ai_call_log` still holds zero
+`meal-plan-top-up` rows against a feature that has run twice in total, last on 2026-09-01. The entry
+now carries all three findings and sits at position 8 instead of 1. LA-131 is the duplicate
+`REST_DAY_CARB_REDUCTION` found while reading it.
+
 ## 2026-09-23 — backlog → 27334 (LA-129 rerouted, +21)
 
 Raised because the entry grew, which is the growth path doing its job — and worth noting that this

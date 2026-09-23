@@ -60,6 +60,13 @@ function showAtBase(baseRef, relPath) {
     // function is reading that stderr. Capturing it there instead would change every other caller.
     const content = execFileSync('git', ['show', `${baseRef}:${relPath}`], {
       cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      // LA-132: node's default maxBuffer is 1 MB and `docs/implementation-backlog.md` passed
+      // 2.11 MB, so this spawn failed with ENOBUFS and the base read was treated as absent —
+      // STRICT, per the note below, which means the `inherited` escape hatch stopped working for
+      // the single file most likely to be grown by somebody else's merge. That is the mechanism
+      // the comment below says had never been reproduced; it is this, and it arrives silently the
+      // day a tracked file crosses a megabyte.
+      maxBuffer: 256 * 1024 * 1024,
     });
     return { content, unreadable: false };
   } catch (err) {
