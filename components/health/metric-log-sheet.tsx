@@ -8,7 +8,8 @@ import { toast } from "sonner"
 import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils"
 import { useUserTimezone } from "@/components/shell/user-timezone-provider"
 import { getLocalStore } from "@/lib/local-store"
-import { pushMutations } from "@/lib/local-store/sync-engine"
+import { invalidateBodyMetricWrite } from "@/lib/cache-groups"
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate"
 import type { BodyMetaRow } from "@/app/api/body-metadata/route"
 import { metricBoundError } from "@/components/health/metric-bounds"
 
@@ -99,7 +100,15 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
             syncStatus:       'pending',
           })
           await store.queueMutation({ userId: userId!, domain: 'body_metrics', date, payload: leanPayload })
-          pushMutations(userId!).catch(() => {})
+          // RV-108. Measured on the S25: this branch cleared 3 of 202 cached keys, because the only
+          // invalidation was the consumer's — and `onSaved` with a fresh row takes its readiness
+          // arm, so the body-metric keys were never evicted at all. Recovery was TTL expiry.
+          //
+          // Both halves, as `water-log-sheet.tsx` does: immediately so THIS device repaints, and
+          // again once the server has the row, because an offline write's push never resolves
+          // usefully and a push-only invalidation would repaint nothing.
+          pushThenRevalidate(userId!, invalidateBodyMetricWrite)
+          invalidateBodyMetricWrite().catch(() => {})
           toast.success(`${logState.label} saved`)
           onClose()
           const cutoff = new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000)

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.14",
+    date: "2026-09-23",
+    changes: [
+      "Logging a weight now refreshes the screens that use it straight away. It cleared almost nothing before, so your calorie budget, day log and health trends could keep showing the old figure until they happened to expire on their own.",
+    ],
+  },
+  {
     version: "1.465.13",
     date: "2026-09-23",
     changes: [

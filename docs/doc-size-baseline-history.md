@@ -16161,3 +16161,23 @@ offered 56 and that was declined: a shrink-only file that grows by one whenever 
 lesson is not shrink-only, it is a slower ratchet. Room for the three new lessons came from cutting
 older narrative and from moving LB-129's findings to LB-129 — which is where they belonged anyway,
 since a baton carries state and an entry carries the investigation.
+
+## 2026-09-23 — backlog 27351 → 27396 (RV-108 + LB-132 + two re-channellings, +45)
+
+Three things, and the largest is the one that shipped no code.
+
+**RV-108's entry** records what the sweep RULED OUT, not just the fix — because the near-miss is the
+expensive part. `log-value-sheet.tsx` writes the same domain through the same shape and shows no
+invalidation within ten lines of its push; it calls the group 39 lines later inside the same `try`.
+A future session reading only the fix would see the same window and "finish the job", producing a
+double invalidation on a correct file. That warning is worth more lines than the fix itself.
+
+**LB-132** is new and holds the rest of the sweep, split by how wrong each site is: two with no
+invalidation at all, five with the immediate half and no post-push half. It says explicitly not to
+sweep the second group mechanically — the post-push half only earns its place where something
+server-derived changes, and adding it everywhere is noise dressed as consistency.
+
+**DV-12 and RV-113 were re-channelled out of Lane B**, with the reason written into each. Both sat
+at the head of the lane blocked on their own next action — one needs a CPU profile only the device
+agent can take, the other needs two looks judgements that decide whether to build it at all. Lines
+spent saying why are lines no future Lane B session spends rediscovering it.
