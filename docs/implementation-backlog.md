@@ -561,26 +561,6 @@ below threshold and left in place for next time.
   the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
   or is exactly what BF-22 is feeling — and **neither answers it alone.**
 
-### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
-
-- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
-  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
-  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
-  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
-- **The conflict class, measured on this session rather than argued.** Every merging PR touches
-  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
-  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
-  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
-  being mergeable at the moment it was green. Another session's commit messages that day read
-  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
-- **What the owner already decided, and why this does not reopen it.** He took the cheap option
-  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
-  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
-  touched, it cannot stop two PRs touching them at once.
-- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
-  without losing the shrink-only property, which is the whole point of the check. That is the design
-  question to answer first, and it decides whether this is small or not.
-
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
 - **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
@@ -812,26 +792,31 @@ below threshold and left in place for next time.
 - **Pass test:** on the S25, every legend value on the Sleep card reads ≥ 4.5:1 against the card, in
   dark and light, with the default card colour and one custom colour.
 
-### [platform] DV-5 — pushed rows are left at `sync_status='pending'`, so every later pull skips them
+### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
 
-- **Lane:** A — `lib/local-store/**` (whatever confirms a pushed mutation), `lib/data/postgres/adapter.ts` if the confirm depends on the push response.
-- **Added:** 2026-09-23 · Device Verification, from the first read of the on-device store (RV-126).
-- **Measured on the S25 (read-only `localQuery`).** `mutations_outbox` is **empty**, yet
-  **all 33 tombstoned `food_logs` rows (2026-08-19 → today) are `sync_status='pending'`** and none
-  is `synced`; three of them are this sitting's test deletes, whose pushes returned **200**. One
-  `set_logs` row (set 4, Chest-Supported Dumbbell Row, 10 kg × 12, 2026-09-20) has been `pending`
-  since 2026-09-19 22:41 UTC — and **the server has that set** (`/api/exercise-history` lists it), so
-  nothing was lost. Its local `exercise_logs.workout_session_id` (`a1847680…`) is not in the local
-  `workout_sessions` table, while the server's session that day is `0a2afbf9…` — worth reading in
-  the same pass.
-- **Why it matters even though no data was lost:** CLAUDE.md's pull rule is that `applyDelta` never
-  overwrites a row unless it is `synced`, which protects pending local edits. A row that is
-  *permanently* pending is therefore **immune to every later server correction** — harmless for a
-  tombstone, not harmless for a live row like that set.
-- **Not established:** whether live (non-deleted) food rows ever stay pending — none did today — or
-  what the confirm step keys on. Read the confirm path before assuming the cause.
-- **Pass test:** after a push drains the outbox, no row the push carried is still `pending`
-  (`SELECT count(*) … WHERE sync_status='pending'` against an empty outbox returns 0).
+- **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
+  SQLite file.
+- **Gate:** device
+- **Added:** 2026-09-23 · Lane A, carved out of DV-5 when the rest of it shipped. The confirm-arm
+  half of DV-5 is fixed and merged; **this half was never explained**, and DV-5 itself said so
+  (*"Not established: ... Read the confirm path before assuming the cause"*).
+- **What Device Verification measured on the S25.** One `set_logs` row (set 4, Chest-Supported
+  Dumbbell Row, 10 kg × 12, 2026-09-20) has been `sync_status='pending'` since 2026-09-19 22:41
+  UTC, against an **empty** outbox. Its local `exercise_logs.workout_session_id` is `a1847680…`,
+  which **is not a row in the local `workout_sessions` table**, while the server's session for that
+  day is `0a2afbf9…`. The server has the set (`/api/exercise-history` lists it) — nothing was lost.
+- **Why the DV-5 fix does not cover it.** That fix was four confirm arms whose read-back getter
+  filters `deleted_at IS NULL`. `workout_log` is not one of them: its arm calls
+  `markWorkoutSynced(wsId, exerciseLogId)`, which is a keyed `UPDATE` and reads nothing back, so a
+  filtered getter cannot be the cause here. Read at source 2026-09-23 — the arm is correct as
+  written, which is what makes the orphaned session id the thing to chase.
+- **The hypothesis to test first, not to assume:** the session was written locally under one id and
+  the server assigned another, so `markWorkoutSynced` updated `set_logs WHERE exercise_log_id=?`
+  for an exercise log that hangs off a session id the local store no longer has. That is an
+  id-reconciliation question, not a confirm question.
+- **Pass test:** on the device, after a workout push drains the outbox, every `set_logs` row the
+  push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
+  the local `workout_sessions` table.
 
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
@@ -1942,6 +1927,64 @@ nothing structured saying why — and a human decides.
 - **Watch, unchanged:** a faster sheet gives its content less time to paint, so a sheet that fetches
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
+
+### [platform] LA-130 — a bare `git fetch origin main` re-shallows the sandbox clone every time, and a shallow clone silently kills CI
+
+- **Lane:** A — sandbox/workflow tooling and the CLAUDE.md Git Workflow rule.
+- **Added:** 2026-09-23 · Lane A, measured across PR #1445's three base races.
+- **What CLAUDE.md already says, and what is new.** The Git Workflow section documents the
+  shallow-fetch defect and says to re-check `test -f .git/shallow` **after** each fetch. What was
+  not established is the frequency: this session ran `git fetch origin main` in a clone it had
+  already unshallowed, **four separate times, and `.git/shallow` came back on every one**. So it is
+  not an occasional relapse to watch for — a bare fetch re-shallows deterministically, which makes
+  `--unshallow` part of every fetch rather than a recovery step.
+- **Why it is worth tooling rather than vigilance.** The failure is silent and its symptom points
+  somewhere else: the branch loses its ancestry, GitHub reads the PR as conflicted, and **a
+  conflicted PR is never given a workflow run** — so `get_check_runs` returns `total_count: 0`
+  forever and reads exactly like slow CI. Four PRs were abandoned to this before the mechanism was
+  found (OR-132), and the rule that now exists only helps a session that remembers to run the check
+  after every fetch, which is the kind of discipline that fails under exactly the time pressure
+  that makes people fetch quickly.
+- **The options, none of them chosen here.** A git alias or wrapper that always fetches with
+  `--unshallow`; a `fetch.depth`/`remote.origin.fetch` config written by the session-start hook; or
+  a `scripts/` helper that fetches and asserts. The config route is the only one that survives a
+  session forgetting, which is the point — but whether the session-start hook can set it, and
+  whether the proxy re-imposes the shallow on the next fetch regardless, is **not established** and
+  is the thing to test first.
+- **Pass test:** after the fix, `git fetch origin main` followed by `test -f .git/shallow` finds no
+  shallow file, repeated three times in one session.
+
+### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
+  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
+  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
+  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
+- **The conflict class, measured on this session rather than argued.** Every merging PR touches
+  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
+  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
+  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
+  being mergeable at the moment it was green. Another session's commit messages that day read
+  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
+- **What the owner already decided, and why this does not reopen it.** He took the cheap option
+  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
+  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
+  touched, it cannot stop two PRs touching them at once.
+- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
+  without losing the shrink-only property, which is the whole point of the check. That is the design
+  question to answer first, and it decides whether this is small or not.
+- **Queue position, corrected twice (2026-09-23, Lane A).** This was filed beside the entry it
+  argued with rather than at its priority, which put it at the top of READY and silently promoted a
+  change the owner had chosen to defer. The first correction moved it below the DEVICE PROBE block
+  and **changed nothing**: those entries are gated, so they never appear in READY, and LA-129 was
+  still position 1. Verified with `node scripts/next-item.js --lane A --all` rather than by reading
+  the file, which is the only way to see it. It now sits below the startable defects (DV-3, LB-128,
+  RV-82, LA-125). Reversing it is one cut-and-paste.
+- **New evidence FOR it, recorded rather than acted on (2026-09-23).** PR #1445 lost **three**
+  consecutive base races to `.size` churn in forty minutes, each costing a full local gate; one
+  drift was a real collision with a Lane B PR, the other two were the conflict class this entry
+  describes. That is a cost trend the owner should see, not a mandate to promote it back — the
+  decision to take the cheap option was his and stands until he says otherwise.
 
 ### [nutrition][platform] RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
 

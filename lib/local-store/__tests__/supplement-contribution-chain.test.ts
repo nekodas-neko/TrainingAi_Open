@@ -131,8 +131,15 @@ describe('the pull carries the contribution (BF-69)', () => {
   it('the push path narrows to the manual contribution', () => {
     const enrich = engine.slice(engine.indexOf('async function enrichPayload'))
     expect(enrich.slice(0, enrich.indexOf('\n}\n'))).toContain("=== 'manual'")
-    const confirm = engine.slice(engine.indexOf("} else if (m.domain === 'supplement_logs') {"))
-    expect(confirm.slice(0, 400)).toContain("=== 'manual'")
+    // Scoped to the arm's real extent rather than a fixed character window — DV-5 added a delete
+    // branch ahead of the read-then-upsert and a 400-char slice stopped reaching the narrowing.
+    const armStart = engine.indexOf("} else if (m.domain === 'supplement_logs') {")
+    const confirm = engine.slice(armStart, engine.indexOf("} else if (m.domain === 'supplements') {", armStart))
+    expect(confirm).toContain("=== 'manual'")
+    // The delete branch cannot use that filter — it never reads a row back — so it must carry the
+    // same narrowing in SQL, or confirming one supplement's delete would also mark a meal
+    // contribution for the same supplement and day as synced.
+    expect(fnBody(backend, 'async markSupplementLogSynced(')).toContain("source='manual'")
   })
 
   it('applyDelta addresses a meal contribution by id and a manual one by its natural key', () => {
