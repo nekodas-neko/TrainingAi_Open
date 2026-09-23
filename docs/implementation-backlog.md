@@ -971,40 +971,74 @@ below threshold and left in place for next time.
   push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
   the local `workout_sessions` table.
 
+### [platform] LB-130 — the doc-size HISTORY file is now the guaranteed-conflict line that `.size` used to be
+
+- **Lane: O** — queue/docs infrastructure; the fix is a convention plus a sweep, not a surface change.
+- **Added:** 2026-09-23 · Lane B, measured across five re-merges of #1449 in one hour.
+- **It is a clean natural experiment, not an impression.** LA-33 split the shared doc-size map into
+  one `docs/doc-size/<path>.size` per tracked doc; RV-134 then tolerated slack within
+  `max(25, 2%)`. Both landed. **The `.size` files duly stopped conflicting** — across the last
+  three re-merges of #1449 the backlog `.size` conflicted only when the change genuinely grew the
+  file, which is the check working. **`docs/doc-size-baseline-history.md` conflicted on all five**,
+  including the merges where nothing else did.
+- **Why it must, structurally:** every PR that moves a tracked doc appends a note to the END of one
+  shared file, so two open PRs write at the same offset. That is a conflict by construction rather
+  than a disagreement about anything. It is the same defect LA-33 fixed, in the file that records
+  LA-33's fix.
+- **Measured cost:** #1449 took five re-merges, four against docs-only PRs that landed mid-CI
+  (#1442, #1445+#1446, #1448, #1444). `main` takes a commit every ~3-5 min against a ~5m30s CI run,
+  so a feature PR cannot win the race by being quick, and every lost race costs a full CI cycle
+  rather than just the resolve.
+- **The fix the repo has already used twice:** per-entry files, exactly like
+  `docs/overview/entries/` — `docs/doc-size/history/YYYY-MM-DD-<branch-slug>.md` — folded into the
+  batched file by the same periodic compaction sweep. **No code needed:**
+  `check-doc-index-size.js` only PRINTS the reminder to write a note, it never reads the file, so
+  this is a directory plus a line in CLAUDE.md plus the sweep.
+- **Do not instead drop the note.** The number carries no reason and the note is the half that
+  does — RV-134's own history entry is the argument for keeping it.
+- **Reversal cost: near zero.** A directory and a convention line; the batched file stays and keeps
+  every existing entry.
+
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
-- **Lane:** B
+- **Lane:** B — `components/shell/status-bar-scrim.tsx`, `lib/shell/status-bar-scrim-controller.ts`,
+  wired once in `tab-shell.tsx`.
+- **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
+- **Verify: device**
 - **✅ DECIDED BY THE OWNER, 2026-09-23 — gate released: a GRADIENT scrim, in the shell, once.**
   Not a solid strip; the owner was offered one and took the fade, so the app stays edge-to-edge and
-  nothing loses the ~28 px a flat backing costs. **It belongs in the app shell, not per screen** —
-  a per-screen scrim is a rule every future screen can forget, which is how this defect reaches a
-  sweep in the first place. It fades in on scroll rather than sitting there at rest.
-- **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
-- **What the screen shows:** on Home, scrolled, the energy bar's caption (*"Energy left right now —
-  opens at your readiness…"*) passes behind the status bar's clock and icons with nothing between
-  them. Edge-to-edge apps usually put a gradient or blur behind the status bar once content is
-  scrolled under it. The app's full-screen headers use `pt-safe`; the tab roots scroll to the top.
-- **The owner's question:** a scrim behind the status bar on scroll, or leave it. If yes, it belongs
-  in the shell once, not per screen.
-- **Three findings from the DV-4 session, which looked at building this and did not** (2026-09-23).
-  They are the reason it is not a ten-line component:
-  ① **There is no document scroll to listen to.** Every tab scrolls its own inner container — three
-  through `PullToSync`, and Nutrition owns a separate one — so a shell-level listener must be
-  `document.addEventListener('scroll', fn, true)`; `scroll` does not bubble, but it does reach a
-  capture listener on an ancestor. That keeps this in the shell once, with no per-screen opt-in,
-  which is what the owner asked for.
-  ② **`var(--page-bg)` is the wrong colour to fade from.** `DynamicBackground` sets
-  `--page-bg: transparent` on `<html>` when it is active, so a gradient built from it is invisible
-  in exactly the case the scrim exists for. `var(--background)` holds the theme base either way;
-  how that composes with the dynamic sky is the thing to look at on device.
-  ③ **Height is `--pt-safe-value`** (`max(1rem, calc(env(safe-area-inset-top,0px) + 0.5rem))`),
-  already defined in `globals.css`. It floors at 1rem, which matters because three-button
-  navigation reports insets as 0.
-  Also: `z-[60]` is taken by `local-store-dead-banner` (fixed, top) and the offline pill, so the
-  scrim sits below them or it covers a warning.
-  **The open question is the tab flip** — a panel left scrolled down shows no scrim until the next
-  scroll event, because nothing re-reads its offset on activation.
-
+  nothing loses the ~28 px a flat backing costs. It fades in on scroll rather than sitting at rest.
+- **Shipped 2026-09-23** (`fix/dv6-status-bar-scrim`, v1.465.11). One capture-phase listener in the
+  shell covers all five panels; no screen opts in, so no future screen can forget it.
+- **What the screen showed:** on Home, scrolled, the energy bar's caption (*"Energy left right now
+  — opens at your readiness…"*) passed behind the status bar's clock and icons with nothing between
+  them.
+- **The three findings that shaped it**, recorded before it was built:
+  ① **There is no document scroll to listen to** — every tab scrolls its own inner container (three
+  through `PullToSync`, Nutrition its own) and `scroll` does not bubble, so the shell listens in the
+  CAPTURE phase. ② **`var(--page-bg)` is the wrong colour to fade from**: `DynamicBackground` sets
+  it to `transparent`, so a gradient built from it vanishes in exactly the case the scrim exists
+  for — it fades from `var(--background)`. ③ **Height is the `pt-safe` utility**, not a hand-written
+  `--pt-safe-value`: an empty `pt-safe` div is exactly inset-height, and referencing the var
+  directly FAILS the Custom Rules check that every safe-area utility be a defined class (measured).
+  It floors at 1rem, which matters because three-button navigation reports the inset as 0.
+  `z-40` keeps it under `local-store-dead-banner` and the offline pill at `z-[60]` — a scrim over a
+  warning is worse than the defect.
+- **The open question is answered.** A panel keeps its offset while hidden, so a flip back to a tab
+  left scrolled down fires no scroll event. The controller remembers every element that has
+  scrolled (a handful) and re-reads the ones inside the newly active panel on each activation;
+  a tab never scrolled is absent and correctly shows nothing.
+- **Why the logic is not in the component.** Every vitest project here is `environment: 'node'` and
+  **cannot transform `.tsx` at all** — measured: importing the component fails at parse. Logic left
+  inside it is logic nothing can drive, and on the phone a dead scrim and a mis-scoped one look
+  identical. So the decision lives in a plain `.ts` controller with 12 tests
+  (`lib/shell/__tests__/dv6-status-bar-scrim-controller.test.ts`, jsdom via a per-file docblock),
+  and the component's four wiring constraints are pinned by reading its source. Control runs: with
+  `reevaluate` neutered the tab-flip test fails; with the component's `true` capture flag removed
+  the wiring test fails.
+- **Keep:** the device look — on the S25, scroll Home and confirm the caption no longer runs through
+  the clock, that the scrim is absent at rest, and **how the gradient composes with
+  `DynamicBackground`'s sky**, which is the one thing the sandbox cannot judge. Check both themes.
 
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
