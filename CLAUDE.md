@@ -132,6 +132,13 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   it. Assign batches when an entry is next touched, not in a bulk pass. To see which entries could
   be cleared in one pick-up of the phone without writing anything down, run
   `node scripts/next-item.js --sittings` — it groups the owed device checks by domain.
+  **Size a device sitting at 45–60 minutes — clear a whole area, not one domain** (owner decision,
+  2026-09-23, offered ~20 min single-domain and ~45–60 min multi-domain). So a sitting spans two or
+  three adjacent domain groups rather than stopping at the first. The owner took the larger batch
+  knowing the trade: fewer interruptions overall, at the cost that a failure partway through means
+  picking the phone up again anyway. **Order the domains inside a sitting so the ones most likely to
+  FAIL come first** — that is what makes the trade pay, because a failure found at minute 5 can be
+  handed to a lane while the rest of the sitting continues.
 - **A filing sweep ships as ONE PR, not one PR per entry** (owner decision, 2026-09-22). BugFix,
   Review and Tuning write their findings in bursts — review sweep 53 was twenty entries — and every
   PR touches `docs/doc-size/docs/implementation-backlog.md.size`, so N PRs from one sweep is N-1
