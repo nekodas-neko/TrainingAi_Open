@@ -198,26 +198,40 @@ async function cycles() {
   const n = Number(arg('n', 10));
   const dev = await attach(); await installObservers(dev);
   const net = await dev.recordNetwork();
-  const routes = [...TABS.map((t) => [t, null, null]), ...PUSHED];
+  const only = arg('routes', null)?.split(',');
+  const routes = [...TABS.map((t) => [t, null, null]), ...PUSHED].filter(([r]) => !only || only.includes(r));
   const result = {};
+  const stamp = Date.now();
   for (const [route, fromTab, text] of routes) {
     const rows = [];
     for (let i = 0; i < n; i++) {
-      await dev.home();
-      let v;
-      if (!fromTab) {
-        // Leave to another tab, then return by tapping this one.
-        await dev.tab(route === '/more' ? '/health' : '/more', 700);
-        v = await measureVisit(dev, net, () => dev.tab(route, 0));
-      } else {
-        await dev.tab(fromTab, 900);
-        v = await measureVisit(dev, net, () => dev.tap({ text }));
+      try {
+        await dev.home();
+        let v;
+        if (!fromTab) {
+          // Leave to another tab, then return by tapping this one.
+          await dev.tab(route === '/more' ? '/health' : '/more', 700);
+          v = await measureVisit(dev, net, () => dev.tab(route, 0));
+        } else {
+          await dev.tab(fromTab, 900);
+          v = await measureVisit(dev, net, () => dev.tap({ text }));
+        }
+        rows.push(summarise(`${route} #${i + 1}`, v));
+      } catch (err) {
+        // A destroyed execution context means the page RELOADED — a hard navigation where the app
+        // should push client-side. That is a finding, not a harness failure: record it and carry on.
+        const hard = /Execution context was destroyed|navigation/i.test(err.message);
+        rows.push({ label: `${route} #${i + 1}`, error: err.message.split(String.fromCharCode(10))[0], hardNavigation: hard });
+        await dev.page.waitForLoadState('load').catch(() => {});
+        await sleep(3000);
+        await installObservers(dev);
       }
-      rows.push(summarise(`${route} #${i + 1}`, v));
     }
-    const c = rows.map((r) => r.contentMs);
+    const c = rows.map((r) => (r.error ? (r.hardNavigation ? 'RELOAD' : 'ERR') : r.contentMs));
+    const s = rows.map((r) => (r.error ? '-' : r.settledMs ?? 'T/O'));
     result[route] = rows;
-    console.log(`  ${route.padEnd(18)} content ms: ${c.join(', ')}`);
+    console.log(`  ${route.padEnd(18)} content ms: ${c.join(', ')}${String.fromCharCode(10)}  ${''.padEnd(18)} settled ms: ${s.join(', ')}`);
+    saveResult(`perf-cycles-${stamp}`, { takenAt: new Date().toISOString(), n, partial: true, result });
   }
   net.stop();
   const file = saveResult('perf-cycles', { takenAt: new Date().toISOString(), n, result });

@@ -16062,3 +16062,12 @@ test files. Two of three locked runs were slow and one was not, with a confound 
 direction. That is not enough to claim the lock costs CI time, and filing it as a finding would send
 the next session chasing a number that may be someone else's tests. Worth re-reading if `Tests`
 stays above six minutes over the next several PRs.
+
+---
+
+## 2026-09-23 — backlog → 27400 (+28) (device/sweep-1)
+
+Device sweep 1's results, quoted in the entries they settle as the probe checklist asks: the
+performance baseline (RV-137…RV-142, RV-133), the write checks (RV-108, BF-185, BF-177, LB-116), the
+DV-8 correction, and two new entries (DV-10, DV-11) — net of RV-45 and DV-4, which were verified and
+removed.
