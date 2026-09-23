@@ -838,21 +838,37 @@ below threshold and left in place for next time.
 
 ### [sleep][app-shell] DV-4 — Home's Sleep card prints the Deep hours in the Deep stage colour, which is about 1:1 against the card
 
-- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend, ~line 143).
+- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend).
 - **Added:** 2026-09-23 · Device Verification, found during the P4 sweep (RV-127).
-- **❌ Measured on the S25.** Web v1.465.4 / APK 1.460.4, dark theme. The legend's value spans are
-  coloured with `STAGE_COLOR.<stage>` (`packages/shared/src/health/hypnogram.ts`): Deep's
-  **"0.5h" computes to `rgb(30, 58, 112)`**. The page root behind the card is `oklch(0.145 0.02 215)`
-  (≈ `rgb(9,22,26)`), giving **≈1.6:1**; against the card's purple paint in the screenshot it is
-  **≈1:1** — the number is effectively invisible. REM, Light and Awake pass only because their stage
-  colours happen to be light. CLAUDE.md's floor is 4.5:1 for body text.
-- **Why a palette fix will not hold:** the card's background is **owner-customisable**
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/dv4-sleep-legend-contrast`, v1.465.10). The legend's hours now
+  inherit the foreground; the stage colour stays on the dot and the stacked bar.
+- **❌ The measurement that produced it, on the S25.** Web v1.465.4 / APK 1.460.4, dark theme.
+  The legend's value spans were coloured with `STAGE_COLOR.<stage>`
+  (`packages/shared/src/health/hypnogram.ts`): Deep's **"0.5h" computes to `rgb(30, 58, 112)`**.
+  The page root behind the card is `oklch(0.145 0.02 215)` (≈ `rgb(9,22,26)`), giving
+  **≈1.6:1**; against the card's purple paint in the screenshot it is **≈1:1** — the number was
+  effectively invisible. REM, Light and Awake passed only because their stage colours happen to be
+  light. CLAUDE.md's floor is 4.5:1 for body text.
+- **Why a palette fix would not have held:** the card's background is **owner-customisable**
   (`ColorSwatchPicker`, `cardColors.sleepWidget`), so no stage colour is safe as text on every card
-  colour. Stage colours are fills — keep them on the dot and the stacked bar, and render the hours in
-  a foreground token. Sibling check: `hypnogram.tsx` and `sleep-phase-trend-card.tsx` also import
-  `STAGE_COLOR`; the latter uses it as a bar fill (fine), the former was not read.
-- **Pass test:** on the S25, every legend value on the Sleep card reads ≥ 4.5:1 against the card, in
-  dark and light, with the default card colour and one custom colour.
+  colour. Stage colours are fills.
+- **The sibling sweep answered the entry's own open question, and it inverted the fix.** DV-4 noted
+  `hypnogram.tsx` "was not read". All four `STAGE_COLOR` consumers were read: `hypnogram.tsx`
+  (SVG `fill` + a legend dot), `sleep-phase-trend-card.tsx` (Chart.js `backgroundColor`) and
+  `health-metric-sheet.tsx` are clean — and the last one renders the **identical** legend with a
+  coloured dot and the hours in the inherited foreground. So the target shape already existed in
+  the repo and Home was the only offender; nothing else needed changing.
+- **Pinned by `components/home/__tests__/dv4-stage-colour-is-never-text.test.ts`**, which sweeps
+  every `STAGE_COLOR` consumer for the palette reaching a CSS `color` inside a `style` object — the
+  durable rule rather than the one span. It also asserts the dot and bar are still coloured, so the
+  check cannot be satisfied by deleting the palette, and it pins the contrast ratio. Control run:
+  with the colour put back it fails naming `home-card-widget.tsx:166`. A first draft flagged the
+  two legitimate `{ label, color: STAGE_COLOR.deep }` **data** fields; the check is scoped to
+  `style=` lines for that reason.
+- **Keep:** the device look — on the S25, every legend value on the Sleep card reads ≥ 4.5:1
+  against the card, in dark and light, with the default card colour and one custom colour. The
+  sandbox can compute the ratio (and does, in the test) but cannot see the card.
 
 ### [platform] DV-5 — pushed rows are left at `sync_status='pending'`, so every later pull skips them
 
@@ -890,6 +906,24 @@ below threshold and left in place for next time.
   scrolled under it. The app's full-screen headers use `pt-safe`; the tab roots scroll to the top.
 - **The owner's question:** a scrim behind the status bar on scroll, or leave it. If yes, it belongs
   in the shell once, not per screen.
+- **Three findings from the DV-4 session, which looked at building this and did not** (2026-09-23).
+  They are the reason it is not a ten-line component:
+  ① **There is no document scroll to listen to.** Every tab scrolls its own inner container — three
+  through `PullToSync`, and Nutrition owns a separate one — so a shell-level listener must be
+  `document.addEventListener('scroll', fn, true)`; `scroll` does not bubble, but it does reach a
+  capture listener on an ancestor. That keeps this in the shell once, with no per-screen opt-in,
+  which is what the owner asked for.
+  ② **`var(--page-bg)` is the wrong colour to fade from.** `DynamicBackground` sets
+  `--page-bg: transparent` on `<html>` when it is active, so a gradient built from it is invisible
+  in exactly the case the scrim exists for. `var(--background)` holds the theme base either way;
+  how that composes with the dynamic sky is the thing to look at on device.
+  ③ **Height is `--pt-safe-value`** (`max(1rem, calc(env(safe-area-inset-top,0px) + 0.5rem))`),
+  already defined in `globals.css`. It floors at 1rem, which matters because three-button
+  navigation reports insets as 0.
+  Also: `z-[60]` is taken by `local-store-dead-banner` (fixed, top) and the offline pill, so the
+  scrim sits below them or it covers a warning.
+  **The open question is the tab flip** — a panel left scrolled down shows no scrim until the next
+  scroll event, because nothing re-reads its offset on activation.
 
 
 ### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest

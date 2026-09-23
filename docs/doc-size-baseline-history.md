@@ -15913,3 +15913,23 @@ first write, then +4 for the lesson that cost this PR a red CI — run the FULL 
 subset scoped to the directories you changed, because a source-shape test asserting on your file
 can live anywhere. Still well under the 65 it inherited.)
 
+
+## 2026-09-23 — backlog 27216 → 27250 (DV-4, +34)
+
+The backlog GROWS on an entry that shipped, and both halves of the growth are for things NOT in the
+diff.
+
+DV-4 stays in the queue as a `Verify: device` + `Keep:` rather than being deleted: the fix is a
+contrast change and the sandbox can compute the ratio but cannot see the card, let alone a custom
+card colour. Its entry also gains the sibling sweep it asked for — all four `STAGE_COLOR` consumers
+read, three already correct, and the sleep detail sheet rendering the identical legend the right
+way. That is worth the lines because it inverts how the fix reads: not a judgement call about
+colour, but one surface out of step with three.
+
+The larger share is **DV-6, which this session did not build**. It looked at building it and found
+three things that would each have cost the next session an hour: there is no document scroll to
+listen to (five inner containers, so the shell needs a capture-phase listener), `--page-bg` goes
+`transparent` under `DynamicBackground` so a gradient built from it is invisible exactly when it is
+needed, and the floored height already exists as `--pt-safe-value`. Writing them into the entry is
+the alternative to a second session rediscovering them, and it is why DV-6 was left out of the PR
+rather than half-built inside it.
