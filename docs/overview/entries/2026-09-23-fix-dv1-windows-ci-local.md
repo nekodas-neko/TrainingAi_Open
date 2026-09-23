@@ -68,6 +68,21 @@ a **different script** — the first instance was `check-tz-aware-cache-guards.j
 `base-ref` at all. Two flakes of similar shape are not evidence of one cause, and recording them as
 one would retire an open question on a resemblance. **The first instance stays unexplained.**
 
+## The device machine answered while this was being written
+
+Two things landed on `main` from that side, and both change the picture:
+
+**The Node half is resolved by the owner** — 22.23.2 via winget, so `vitest` starts. The
+`engines.node` floor still ships: the point is that the *next* machine fails at install with a
+message rather than at test time with a missing rolldown binding.
+
+**With the tests actually running, two more failures surfaced.** One of them —
+`strict-schema-inert.test.ts` — shells out to `check-strict-request-schemas.js` and inherits its
+path bug, so **the work here fixes it**. The other does not: `check-hex-literals` times out at 30 s,
+three full scans of `app/` + `components/` against a filesystem that makes them slower. That stays
+open on DV-1, with the instruction attached — **measure before raising the timeout.** A scan three
+times slower than it needs to be is the finding, and a bigger number would hide it.
+
 ## Not done — and this is the honest headline
 
 **None of this is verified where it matters.** Three of the four bugs are invisible on Linux by

@@ -15648,3 +15648,36 @@ landed from `main` across three re-merges while this branch was open. What this 
 the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
 above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
 read as genuinely given back rather than absorbed into someone else's sweep.
+---
+
+## 2026-09-23 — backlog → 26672, projectOverview → 12333 (−29) (device/bf166-mid-workout)
+
+BF-166's mid-workout half ran on the S25 and the entry left the queue whole; **DV-2** (*Leave* on the
+leave-workout prompt does not leave) was filed beside BF-165 in its place. BF-166's Known-Issues row
+moved to the resolved archive. DV-1 gained the two Windows test failures found once Node was
+upgraded, and DV-3 (a CI flake in the migration-163 test) was filed. The Device Verification
+baton goes 66 → 67 for the DV-3 row it has to carry. Both baselines set to the
+measured sizes.
+
+
+## 2026-09-23 — `docs/implementation-backlog.md` +41 (26780 → 26821) (Review: RV-134)
+
+One entry, naming the mechanism behind the `.size` conflict tax that Tuning measured on 2026-09-20
+(§2c) and said needed its own entry. It is longer than a one-line finding because the recommendation
+has to say what it gives up: PS-34 removed slack from this ratchet for cause, and the fix proposed is
+**not** re-introducing it — it is giving the slack direction the same `inherited` escape the growth
+direction already has, so a branch is not blamed for a shrink another PR's merge caused.
+
+Filed against Lane O rather than an implementer lane: `scripts/check-doc-index-size.js` is repo
+tooling in the Custom Rules job, which is the OR-103 case.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +42 (26829 → 26872), `CLAUDE.md` 844 → 866 (Review sweep 54)
+
+RV-135, plus an amendment to RV-125 correcting figures it had inherited from a stale `CLAUDE.md`
+line. The entry carries a before/after table because the point is that the signal **grew** between
+sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to be comparable next time.
+
+`CLAUDE.md` grows because the corrected sentence says what the old one got wrong and for how long.
+That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
+script's baseline recorded **0**, and a silent swap of one number for another would leave the next
+reader with no reason to trust the new one over their memory of the old.
