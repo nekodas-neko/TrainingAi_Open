@@ -2461,6 +2461,12 @@ correctly and too early: subscribers refetched a server that lacked the log and 
 figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one entry. The
 engine write paths now invalidate on **both** sides of the push (`pushThenRevalidate`); the immediate
 call stays because offline it is the only one that fires. Six `components/**` sites carry the same shape — filed as **LB-6**, audit done.
+The surface sweep that followed it (RV-108, **LB-132**) is complete: RV-108's weigh-in sheet was the only
+site missing invalidation outright, and five more had the immediate half without the post-push one —
+all shipped 2026-09-23. **The open question is answered:** `sync-engine.ts` fires no cache
+invalidation at all, so the pull path never closes the window and the far-side call is the only
+thing that does. Six further sites that looked identical were verified correct and are named in the
+entries, so a later sweep does not patch them. **Owed: the device pass on both.**
 
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
 Three GET routes answered a parameter or configuration question before establishing the caller was anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-route-hardening-batch)).

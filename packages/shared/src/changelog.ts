@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.15",
+    date: "2026-09-23",
+    changes: [
+      "Morning check-ins, the end-of-day review, readiness quick-logs and saved activities now refresh what the app works out from them once the entry reaches the server \u2014 your readiness, next session and health trends could previously keep showing the pre-save figures until they expired on their own.",
+    ],
+  },
+  {
     version: "1.465.14",
     date: "2026-09-23",
     changes: [

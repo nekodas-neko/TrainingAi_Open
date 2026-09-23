@@ -1082,12 +1082,25 @@ below threshold and left in place for next time.
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
 
-### [platform] LB-132 — six write paths invalidate for this device but not after the push
+### [platform] LB-132 — write paths that invalidate for this device but not after the push
 
 - **Lane: B** · **Added:** 2026-09-23 · Lane B, from RV-108's sibling sweep.
 - **Found by reading every `pushMutations` call site** in `app/`, `components/` and `lib/` — the
   sweep RV-108 prompted. RV-108 itself was the only site with NO invalidation; these are the weaker
-  version of the same defect, and they split into two groups that need different judgements.
+  version of the same defect, and they split into two groups that needed different judgements.
+- **Shipped 2026-09-23** (`fix/lb132-post-push-invalidation`) — group ② only. The five sites now
+  pair their immediate invalidation with `pushThenRevalidate`, carrying each group's own
+  invalidator(s): `log-value-sheet.tsx` (body-metric + readiness), `mood-checkin-sheet.tsx`
+  (prescription), `morning-checkin-sheet.tsx` (prescription + health trends),
+  `end-of-day-review.tsx` (health trends), `exercise-review-sheet.tsx` (activity + Oura review).
+- **The open question is ANSWERED, and it is why ② was worth doing.** `pullDelta` fires no cache
+  invalidation at all — there is no `invalidateBiometrics`, and no `invalidateCache(` anywhere in
+  `lib/local-store/sync-engine.ts`. So nothing downstream closes the window, and
+  `pushThenRevalidate`'s own docblock names the cost precisely: invalidating only *before* the push
+  makes every `useCachedValue` subscriber refetch while the server still holds the pre-write state
+  and **re-cache the stale payload**, which then stands for the key's full TTL. That is LB-4, the
+  42 kcal Energy Balance reading. Each of the five groups clears a server-computed aggregate, so
+  each had a real window.
 - **① IS EMPTY — both candidates were checked and are CORRECT.** They were filed as "no
   invalidation at all, same class as RV-108" and that was wrong; corrected the same session, before
   the entry could send anyone to patch a working file.
@@ -1103,23 +1116,20 @@ below threshold and left in place for next time.
   client code. Nothing a cache holds changes.
 - **So RV-108 really was the only genuine missed invalidation in the app**, which is worth more than
   the two entries this one nearly created.
-- **② Immediate half only, missing `pushThenRevalidate`:**
-  `app/session-select/components/log-value-sheet.tsx`, `components/mood-checkin-sheet.tsx`,
-  `components/morning-checkin-sheet.tsx`, `components/nutrition/end-of-day/end-of-day-review.tsx`,
-  `components/activity/exercise-review-sheet.tsx`. Each repaints the writing device correctly and
-  never re-invalidates once the server has the row.
-- **Group ② is a smaller bug than it looks, and might be none.** The second half only matters where
-  something SERVER-derived changes as a result — a recomputed score, an aggregate, a streak. Where
-  the payload is the whole of what any reader wants, the immediate call is sufficient and adding
-  the second is noise. **Decide it per site against what the group's keys actually feed**, and do
-  not sweep ② mechanically; that is how a correct file gets a redundant call.
-- **The test that emptied ① is the one to apply to ②:** a bare `pushMutations` is only a defect if
-  some CACHED key holds what the write changed. Check `cache-groups.ts`/`cache-ttl.ts` for a key,
+- **The test that emptied ① is the one that justified ②:** a bare `pushMutations` is only a defect
+  if some CACHED key holds what the write changed. Check `cache-groups.ts`/`cache-ttl.ts` for a key,
   then check whether the readers go through `cachedFetch` or straight to the local store. Four sites
-  looked like the defect from their call line today and were correct once read that way.
-- **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
-  on the device that wrote the row. RV-108 left the same question open, and it bounds how much
-  group ② is worth.
+  looked like the defect from their call line and were correct once read that way — including
+  `log-value-sheet.tsx`, whose own invalidation sits **39 lines below** its push, inside the same
+  `try`. Read the enclosing block, never a window.
+- **Pinned by `components/__tests__/lb132-post-push-invalidation.test.ts`** — for each of the five:
+  the far-side call with its exact invalidator, the immediate call still present, and no bare
+  `pushMutations` left on the write path. It also asserts each group really clears a server-computed
+  key, and that `sync-engine.ts` still invalidates nothing, so the far-side calls are not later
+  removed as redundant. Control run: reverting one site fails 2 of its 3.
+- **Keep:** the device pass. Log a morning check-in and an end-of-day review on the S25 and confirm
+  the prescription and health-trends surfaces move once the push lands, rather than at TTL. The
+  sandbox can prove the calls are present and cannot watch the eviction on a phone.
 
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
