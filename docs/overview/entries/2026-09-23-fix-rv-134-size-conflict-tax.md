@@ -62,6 +62,13 @@ forced a `.size` edit on this branch, conflicting with the two PRs already in fl
 
 Both of the night's real cases fall inside their bands: 23 lines under 27,128, and 7 under 877.
 
+**Then it was verified rather than predicted.** This branch had to be re-merged onto a `main` that
+had moved twice while it was open — exactly the situation that produced the 23 commits. The merge
+came back clean, the check exited 0 reporting **32 lines of slack inside a 545-line band**, and
+**no baseline edit was required**. Under the old rule that same re-merge would have demanded the
+backlog number be lowered 27,230 → 27,198, in a one-line file that another PR was holding open at
+that moment.
+
 ## What remains, correctly
 
 Two PRs that both **grow** past the same ceiling on the same day still conflict. That is a genuine
