@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.15",
+    date: "2026-09-23",
+    changes: [
+      "Your recommended fat and carb targets now match the figures every other screen works out. Two formulas disagreed: the baseline set fat at 25% of your calorie budget, then the recommendation raised it to a 0.6 g per kg floor \u2014 so the suggestion sheet and the rest of the app could quote different numbers for the same profile. The floor is now part of the baseline, so there is one answer. If you are cutting, this can move fat up a few grams and carbs down to match.",
+    ],
+  },
+  {
     version: "1.465.14",
     date: "2026-09-23",
     changes: [
