@@ -945,7 +945,11 @@ below threshold and left in place for next time.
 
 - **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
   SQLite file.
-- **Gate:** device
+- **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
+  is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
+  PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
+  gate name the same actor there is nothing to wait for, and the entry is simply that actor's
+  work. Filed by the device agent itself, which is how easily the shape hides.
 - **Added:** 2026-09-23 · Lane A, carved out of DV-5 when the rest of it shipped. The confirm-arm
   half of DV-5 is fixed and merged; **this half was never explained**, and DV-5 itself said so
   (*"Not established: ... Read the confirm path before assuming the cause"*).
@@ -11709,13 +11713,7 @@ the connection and to try again shortly, rather than implying the ring is absent
 
 - **Lane:** A
 - **Gate:** device
-- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
-  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
-  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
-  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
-  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
-  released here**: un-gating on the assumption it is circular would be the same unchecked move that
-  created the problem. Whoever next touches PS-12 writes the reason or removes the gate.
+
 - **Needs:** PS-11
 - **Plan:** [`multi-device-comparison.md`](multi-device-comparison.md) — read it before running this;
   most of the ways to get a wrong number here are listed in it.
@@ -23902,15 +23900,18 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
-- **Lane:** B
-- **Gate:** device
-- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
-  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
-  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
-  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
-  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
-  released here**: un-gating on the assumption it is circular would be the same unchecked move that
-  created the problem. Whoever next touches Q-168 writes the reason or removes the gate.
+- **The check that was gating this, now stated as the work (OR-136, 2026-09-23).** The gate is
+  removed because it named the same actor as the lane — a `Lane: DV` entry gated on `device` parks
+  the one agent who can discharge it. **The reason was always written, just not beside the field.**
+  The entry's own *What is actually left* section names it: `/coach` and `/coach/confirm/[toolCallId]`
+  are navless full-screen routes with bottom-anchored controls, the shape that has regressed 11+
+  times. Run the **AI Coach** section of `docs/device-smoke-checklist.md`.
+- **Lane: DV** — reassigned 2026-09-23 (OR-136) from B. The blocking work is that check, and it is
+  one the phone ANSWERS: bottom-anchored controls either clear the gesture bar or they do not, and
+  a safe-area inset is a number rather than a matter of taste. The **cardio-goals** half was
+  dropped rather than built, so nothing here is waiting on Lane B. A FAILED result goes back to B
+  with what reproduces it.
+
 
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
   entry is removed per this file's own rule that a finished item must never linger.
@@ -23923,7 +23924,11 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 #### What is actually left
 
-- **⛔ Device verification** — the blocking one. `/coach` and `/coach/confirm/[toolCallId]` are both
+- **Device verification — this is the work, and it is `Lane: DV`'s (OR-136, 2026-09-23).** The
+  decorative ⛔ that used to open this line is removed: the queue parser reads that glyph followed
+  by *block* within forty characters as a real block marker, so *"the blocking one"* parked the
+  entry under UNMIGRATED MARKER the moment its gate came off. That is `TN-59`'s class, caught
+  live. Say what blocks in words; keep the glyph for a field. `/coach` and `/coach/confirm/[toolCallId]` are both
   navless full-screen routes with bottom-anchored controls, the shape that has regressed 11+ times.
   Run the **AI Coach** section of [`docs/device-smoke-checklist.md`](device-smoke-checklist.md) and
   strike the Known-Issues row in `projectOverview.md`.
@@ -25915,14 +25920,12 @@ against yet. Blocked on real-data capture, not code.
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
 
 - **Lane:** A
-- **Gate:** device
-- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
-  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
-  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
-  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
-  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
-  released here**: un-gating on the assumption it is circular would be the same unchecked move that
-  created the problem. Whoever next touches Q-7b writes the reason or removes the gate.
+- **⚠ THE DEVICE GATE WAS WRONG AND IS REMOVED (OR-136, 2026-09-23).** Nothing in this entry is a
+  question the phone answers. Ten columns have no producer — that is engine work, and the producer
+  these columns are waiting for is the on-device rollup, which is `Q-545`'s build rather than a
+  check anybody can run. Recorded as a dependency below instead of a gate nobody could discharge.
+- **Needs:** Q-545
+
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
 > every column in the table against 82 rows rather than spot-checking: **`active_calories_est`,

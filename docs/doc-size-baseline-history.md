@@ -16075,3 +16075,9 @@ field to gain visibility.
 marked as waiting on hardware rather than on the device agent, and Q-253 struck on the owner's
 answer. The lane bullets are verbose on purpose — an assignment with no reason attached is what
 produced the circular gates, and this file is read by agents who cannot ask.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27458 → 27461 (OR-136)
+
+Three lines net. The three bare device gates each gained their reason and two lost the boilerplate
+flag OR-134 had left on them, so the additions and removals nearly cancel — which is the shape a
+triage pass should have, as against the filing passes that grew this file earlier today.

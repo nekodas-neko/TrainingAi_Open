@@ -41,15 +41,24 @@ describe('next-item does not stay silent about what it withheld (TN-61)', () => 
     }
   })
 
-  // Asserted on the truncation LINE, not the bare word: this originally searched for "showing"
-  // anywhere in the output and went red the day the DV lane gained entries, because RV-128 is titled
-  // "does the tab switch drop a frame showing neither panel?". A substring assertion over a report
-  // that prints user-written titles is a false positive waiting for someone to write the word.
-  it('does not claim truncation when everything fits', () => {
-    const out = run('--lane', 'DV')
-    const ready = Number(/READY \((\d+)\)/.exec(out)?.[1])
-    expect(ready).toBeLessThanOrEqual(10)
-    expect(out).not.toMatch(/showing \d+ of \d+/)
+  // The truncation line appears IF AND ONLY IF the cap hid something — asserted across every lane,
+  // because this case has now broken twice for the same reason: it encoded a fact about the DATA
+  // rather than the behaviour. First it searched for the bare word "showing" and went red when
+  // RV-128 ("does the tab switch drop a frame showing neither panel?") entered the lane; then it
+  // hard-wired DV as the everything-fits lane and went red when DV grew past the cap. A test that
+  // names a lane is a test that expires.
+  it('claims truncation exactly when the cap hid something, in every lane', () => {
+    for (const lane of ['A', 'B', 'O', 'DV']) {
+      const out = run('--lane', lane)
+      const ready = Number(/READY \((\d+)\)/.exec(out)?.[1])
+      const line = /showing (\d+) of (\d+)/.exec(out)
+      if (ready > 10) {
+        expect(line, `lane ${lane} shows ${ready} READY and must say what it withheld`).not.toBeNull()
+        expect(Number(line![2])).toBe(ready)
+      } else {
+        expect(line, `lane ${lane} fits in the cap and must not claim truncation`).toBeNull()
+      }
+    }
   })
 })
 
