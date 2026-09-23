@@ -15696,3 +15696,14 @@ check that is owed rather than the fix that landed. Its pointer to RV-124 is the
 space: that probe settles this whole class by measurement, so the next session reading the index
 learns where the answer is coming from instead of re-reasoning it from source — which is precisely
 what these three entries show cannot distinguish a working subscription from a missing one.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 26823 → 26794 (RV-135)
+
+RV-135 left the queue after being built, which is most of the 29 lines; BF-110's `Keep:` was
+replaced by a slightly longer paragraph and its lane line by a slightly longer one, so the entry
+itself grew a little while the file shrank.
+
+Worth noting against RV-134, which is the open entry about this exact number: this is a **genuine**
+shrink caused by this branch, the case the ratchet is right to make someone lower. The tax RV-134
+describes is the other case — a branch forced to lower a number because *someone else's* merge
+shrank the file. Four of four re-merges on #1422 were that case in one night.
