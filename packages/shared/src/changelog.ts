@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.7",
+    date: "2026-09-23",
+    changes: [
+      "Three screens that held stale numbers until the app was restarted now update when the thing behind them changes. Health's heart-rate card kept showing pre-sync data after a ring sync while the home screen's strip had already moved; Health's Activity History never showed an activity you confirmed from the home screen; and editing your macro targets left the Nutrition rings measuring against the old ones. A tab switch did not fix any of them.",
+    ],
+  },
+  {
     version: "1.465.6",
     date: "2026-09-22",
     changes: [
