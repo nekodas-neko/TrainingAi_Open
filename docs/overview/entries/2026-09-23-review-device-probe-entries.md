@@ -72,3 +72,38 @@ Filed as a structural call rather than an owner question, per the 2026-09-22 nar
 
 Nothing in the checklist has been run. It is a specification, and the first pass against a real device
 is what turns it into findings.
+
+---
+
+# Sweep 54 — reading the instruments (same PR)
+
+Write-up: [`docs/reviews/2026-09-23-sweep-54-reading-the-instruments.md`](../../reviews/2026-09-23-sweep-54-reading-the-instruments.md).
+
+A different angle from 50–53, which all read source: this one reads what the app and its guards have
+already **recorded**, and asks whether anyone acted on it. Both findings are the same shape — an
+instrument gave its answer and the document directing people still states the question.
+
+- **RV-135.** `lib/resume-repaint.ts` shipped a measurement pass to decide native-vs-JS and wrote the
+  criterion into its header. The answer is **25 `recheck stuck`, 0 `resized`, 0 `dom-lost`** — native,
+  unambiguously. BF-110's body already records that (sweep 50, 2026-09-18); its **`Keep:` still says
+  the reading is what is owed**, and `next-item.js` reads the `Keep:`, so the entry sits in KEEP under
+  *"not new work"* while the native fix is unowned. Re-measured: `stuck` at `h=667` has gone 3 → 9 and
+  first readings at `h=667` 22 → 28 since sweep 50, so it is growing, not fading.
+- **CLAUDE.md corrected in place, not queued.** Its cache-invalidation rule claimed
+  `check-fetch-once-effects.js` freezes 36 sites with **19 that can bite**. The script's baseline says
+  **11 across 9 files** and `CAN BITE … 0 sites. Emptied 2026-08-19` — wrong for five weeks, in the
+  file every session reads first, inside the project's most repeated bug class.
+- **It had already propagated.** RV-125, filed earlier in this same session, quoted the stale split
+  and called it *"reasoned, never observed"* — itself wrong, since it **was** re-observed and that
+  observation is what emptied the group. Amended. Its premise stands: the script skips non-empty dep
+  arrays by design, so `useEffect(…, [userId])` inside the persistent shell is still invisible to it.
+
+**Healthy, and recorded so a later change has a baseline:** DB **232 MB**, **1.53 MB/day** over three
+days against the ~1.71 expectation; `error_events` 52 MB behind 172 rows, unchanged bloat, already
+owner-gated; the other three shrink-only ratchets clean with current baselines; and no fault of the
+owner's in seven days that is not `bf110 resume` — phrased that way because `claude_ro` is row-scoped
+and cannot support the stronger claim.
+
+**Not established:** nothing was rendered or run on a device. Why a 384×667 resume paints two children
+instead of seven is the module's reading of its own data, not an observation — which is what RV-130
+asks the device agent for.

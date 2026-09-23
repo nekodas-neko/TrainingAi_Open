@@ -15659,3 +15659,14 @@ direction already has, so a branch is not blamed for a shrink another PR's merge
 
 Filed against Lane O rather than an implementer lane: `scripts/check-doc-index-size.js` is repo
 tooling in the Custom Rules job, which is the OR-103 case.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +42 (26821 → 26863), `CLAUDE.md` 844 → 866 (Review sweep 54)
+
+RV-135, plus an amendment to RV-125 correcting figures it had inherited from a stale `CLAUDE.md`
+line. The entry carries a before/after table because the point is that the signal **grew** between
+sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to be comparable next time.
+
+`CLAUDE.md` grows because the corrected sentence says what the old one got wrong and for how long.
+That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
+script's baseline recorded **0**, and a silent swap of one number for another would leave the next
+reader with no reason to trust the new one over their memory of the old.

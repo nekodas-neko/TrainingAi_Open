@@ -473,6 +473,41 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell][platform] RV-135 — BF-110's reading arrived five days ago, and its own `Keep:` still parks it as waiting for one
+
+- **Lane: B** — no file yet; the fix BF-110 points at is native (`android/**`), which makes it
+  **Lane A**, and that reassignment is part of the work. **Added:** 2026-09-23 · Review sweep 54.
+- **The contradiction is inside one entry.** BF-110's body opens *"✅ THE READING IS IN, and it says
+  NATIVE — measured 2026-09-18. This entry is no longer waiting on data."* Its `Keep:` line, below
+  that, still reads *"the READING, and only that … Still do not write a fix before that row
+  exists."* `next-item.js` reads the `Keep:`, so the entry sits in the **KEEP** bucket, whose
+  heading is *"shipped; only the stated residue is owed. **Not new work.**"*
+- **So the native fix is owned by nobody.** An implementer scanning either lane sees an entry
+  explicitly labelled not-new-work, waiting on a measurement that has been in the table for five
+  days. The `✅` block is only visible to someone who opens the entry and reads past its status line.
+- **Re-measured 2026-09-23, and it has grown rather than gone quiet** — `error_events` over the full
+  retained window:
+
+  | | sweep 50 (2026-09-18) | now | change |
+  |---|---:|---:|---:|
+  | `recheck stuck` at `h=667` | 3 | **9** | ×3 |
+  | `recheck stuck` at `h=826` (healthy) | 12 | 16 | — |
+  | first readings at `h=667`, `children≤2` | 22 | **28** | +6 |
+  | `recheck resized` | 0 | **0** | — |
+  | `dom-lost` | 0 | **0** | — |
+
+- **Twenty-five rechecks, twenty-five `stuck`, zero `resized`.** By the module's own stated criterion
+  (`lib/resume-repaint.ts`: *"If it still reads 667, the viewport is genuinely stuck and the fix is
+  in the native layer"*) that answer is not marginal, and **`dom-lost` has never once fired in 62
+  reported resumes** — so BF-80's renderer-death is disproven for every sample, and the compositor
+  reading is the one standing.
+- **Fix:** rewrite BF-110's `Keep:` to name what is actually owed (the native viewport fix) or drop
+  the `Keep:` so the entry returns to READY, and move it to Lane A. **Nothing else about the entry
+  needs changing** — its analysis is right, which is what makes the filing error costly.
+- **⚠ The telemetry's own caveats still apply and are already written into BF-110:** `stuck` fires on
+  healthy resumes too (16 of 25 rows are 826→826, a viewport that was never wrong), and `w=384`
+  appears on every row, so only the **height** discriminates.
+
 ### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
 
 - **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
@@ -537,10 +572,17 @@ below threshold and left in place for next time.
   twice round, one write per tab), every `/api/*` endpoint belonging to a revisited tab shows a
   request count **greater than one**. FAILED for any endpoint fetched exactly once on a tab visited
   four times — name the component.
-- `check-fetch-once-effects.js` freezes 36 sites and calls 19 of them "permanently mounted and can
-  bite". **That split was reasoned, never observed.** The script also cannot see
-  `useEffect(…, [userId])` — a dep array that never changes inside a shell that never unmounts —
-  which is how four of sweep 53's findings got past it.
+- **⚠ Corrected 2026-09-23 — this entry's original figures were wrong, inherited from a CLAUDE.md
+  line that had been stale since 2026-08-19.** It said the script freezes 36 sites with 19 that
+  "can bite". The script's own baseline says **11 sites across 9 files, and the can-bite group is
+  EMPTY** — the over-counting was corrected in the script on 2026-08-19 (25 across 16 were really
+  15 across 12), the can-bite group was two sites rather than eight, and both were converted.
+- **The premise survives the correction, and that is why the entry stays.** The script skips any
+  non-empty dep array by design (`:164` — *"a different (and usually correct) shape"*), so it
+  cannot see `useEffect(…, [userId])` inside a shell where `userId` never changes. Its baseline
+  confirms this from the other side: `workout-screen`'s two sites were dropped from the count for
+  being `[userId]`-deps. That is how four of sweep 53's findings got past it, and it is unaffected
+  by the count being 11 rather than 36.
 - Needs a `window.fetch` wrapper installed at app start; that is a harness change under
   `scripts/device/**`, which the role owns.
 
