@@ -100,7 +100,7 @@ Live at the time of writing (2026-08-05):
 
 ## History
 
-- [`2026-09-21-tn3b-stress-on-hr-chart`](../../overview/entries/2026-09-21-tn3b-stress-on-hr-chart.md)
+- [`2026-09-21-tn3b-stress-on-hr-chart`](../../overview/history-2026-09-23-folded-1.md#2026-09-21-tn3b-stress-on-hr-chart)
   — **TN-3b's HR-chart overlay (2026-09-21): stress drawn against heart rate on one clock.** The
   day's stress series now renders on `hr-day-chart.tsx` on a hidden second scale fixed to [−1,+1],
   on `/health/heart-rate` and the Health tab's HR card; Home's compact widget is deliberately
