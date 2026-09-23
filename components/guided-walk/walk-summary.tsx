@@ -28,6 +28,7 @@ import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import type { PhaseBand } from '@/components/activity/activity-hr-chart'
 import type { WalkHrSample } from './walk-active'
 import { cadenceFieldsForSave, type CadenceSummary } from '@trainingai/shared/health/cadence'
+import { navigateToTab } from "@/lib/shell-nav";
 
 const ActivityHrChart = dynamic(
   () => import('@/components/activity/activity-hr-chart').then(m => m.ActivityHrChart),
@@ -318,7 +319,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
       <p className="text-[10px] text-muted-foreground">
         {saved ? 'Saved to your activity history.' : 'Saving…'}
       </p>
-      <Button className="h-12" onClick={() => { onDone(); router.push('/health') }}>Done</Button>
+      <Button className="h-12" onClick={() => { onDone(); navigateToTab(router, '/health') }}>Done</Button>
     </div>
   )
 }

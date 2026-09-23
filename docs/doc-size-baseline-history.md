@@ -15830,7 +15830,6 @@ the tweak is one `grep -vE` and the defect cost four abandoned PRs. The part wor
 discrimination: a shallow-grafted branch and a stale base produce the **same** observable —
 `get_check_runs` reading `total_count: 0` — and CLAUDE.md already documented the stale-base reading,
 so a session that hits this will reach for the wrong remedy first. It did.
-
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26303, `projectOverview.md` → 12389 (LA-128)
 
 The backlog shrinks by LA-128's whole entry; nothing is owed, so no `Keep:`. The
@@ -15889,6 +15888,30 @@ a non-blocking one. The owner's answer then earned its place on a *different* qu
 could not settle: whether the vial's stored open date or the dose log was the true one.
 
 **Ask for the fact nobody has, not the fact nobody looked up.**
+
+## 2026-09-23 — backlog 27230 → 27216, `projectOverview.md` 12422 → 12442 (RV-110/RV-112)
+
+The backlog nets down 14 on this branch's account. The absolute figures moved a long way while this
+PR sat open — SEVEN re-merges, and the last of them was not a re-merge at all but the first honest
+one: `git fetch origin main` had been returning a shallow pack, so every earlier merge was computed
+against a grafted history and produced a tree GitHub read as conflicted. `projectOverview.md` moves
++20 here and the rest of its growth is other branches', not this one's: RV-110 and RV-112 shipped
+and left the queue, against the new LB-129
+filed for the day-review sheet that does not open on a first flip — a finding from RV-110's probing
+that is not RV-110's subject, so it goes in the queue rather than into that PR's diff.
+
+The twenty lines on `projectOverview.md` are two entries, and both are there for something NOT
+done. LB-129 is found-but-not-fixed. The RV-110 row records that the entry's own mechanism — that a
+push to a tab href tears the shell down — is unverified: it follows from the code, the conversion is
+right either way, and the e2e written to prove it did not discriminate and was deleted rather than
+shipped. An index that said only "cross-tab navigation now flips the shell" would read as though
+that had been demonstrated.
+
+Also `docs/agents/state/implementation-lane-b.md` 65 → 55: the baton was rewritten in full, as the
+rule requires, and came back shorter. It is shrink-only, so the number follows it down. (51 at the
+first write, then +4 for the lesson that cost this PR a red CI — run the FULL vitest suite, never a
+subset scoped to the directories you changed, because a source-shape test asserting on your file
+can live anywhere. Still well under the 65 it inherited.)
 
 ## 2026-09-23 — `docs/implementation-backlog.md` 27230 → 27274 (OR-134)
 
