@@ -888,29 +888,6 @@ below threshold and left in place for next time.
   in the shell once, not per screen.
 
 
-### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`
-  (`TOP_N = showAll ? Infinity : 10`).
-- **Background:** found twice in two days while verifying my own filings. Prose, not a `Reference:`
-  field — that field files an entry under *read, do not build*.
-
-**Lane A's READY list is 31 entries and the tool prints 10, with no line saying so.** Two entries I had
-just edited (`TN-55`, `LA-121`) appeared **nowhere** in the output, which reads exactly like *removed
-from the queue* — the failure mode the backlog's own two-deletions rule exists to catch. I only
-established they were fine by parsing their fields directly, which is the thing `next-item.js` exists to
-save everyone from doing.
-
-**The fix is one line of output, not a behaviour change.** Keep printing 10; add the count that was
-withheld and how to see them — *"showing 10 of 31 — `--all` for the rest"* — on every bucket it
-truncates, READY and PARKED alike. A tool whose silence is indistinguishable from absence is the same
-class of defect as the prose marker in TN-59: correct output, wrong conclusion drawn from it.
-
-**⚠ Do not raise `TOP_N` instead.** The cap is right — an implementer wants the next few items, not
-thirty-one. What is wrong is that the truncation is invisible.
-
-**Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
-IS in the queue but below the cut-off no longer comes back empty without explanation.
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
 

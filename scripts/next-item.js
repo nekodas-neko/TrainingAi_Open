@@ -143,6 +143,12 @@ const unmetNeeds = (e) => e.needs.filter((n) => inQueue.has(n));
 // to both implementer lanes is the safe failure it was designed as, while showing the same entry to
 // the Orchestrator or the device agent is noise: their work is ASSIGNED, never derived from a path.
 // With 400+ entries untagged, the few genuinely theirs would be unfindable.
+/** An entry owing a look on the phone, in either of the two shapes the queue writes it. */
+const owesDeviceCheck = (e) => {
+  if (e.verify?.value === 'device') return true;
+  return /\bdevice\b|\bS25\b|\bAPK\b|on-device/i.test(e.keep?.text ?? '');
+};
+
 const ASSIGNED_ONLY = new Set(['O', 'DV']);
 const wantLane = (e) => {
   if (!laneArg) return true;
@@ -220,10 +226,7 @@ const fmt = (e) => {
 // the device. Both shapes are counted — BF-90 found eleven entries writing the same debt in both
 // places, so keying on either alone undercounts.
 if (sittingsOnly) {
-  const owed = entries.filter((e) => {
-    if (e.verify?.value === 'device') return true;
-    return /\bdevice\b|\bS25\b|\bAPK\b|on-device/i.test(e.keep?.text ?? '');
-  });
+  const owed = entries.filter(owesDeviceCheck);
   const groups = new Map();
   for (const e of owed) {
     const key = e.tags[0] ?? '(untagged)';
@@ -265,10 +268,32 @@ console.log(
 );
 if (!ready.length) console.log('  nothing startable — everything is parked or unclassified');
 
+// The device agent's work is almost never a `Lane: DV` entry. `Lane:` says who BUILDS a thing, and
+// a check owed on the phone sits on the entry that built it — a Lane B screen fix with a device
+// check owed is still Lane B's entry. So `--lane DV` is correctly near-empty, and correctly empty
+// is indistinguishable from *there is nothing for me* unless the tool says otherwise. It read
+// "nothing startable" against 110 owed checks, which is the same starvation that hit Lane B for a
+// different reason, and the same class as the silent truncation above: right output, wrong
+// conclusion. `--lane O` gets the same line, because Review and BugFix hand it device work too.
+if (ASSIGNED_ONLY.has(laneArg)) {
+  const owedCount = entries.filter(owesDeviceCheck).length;
+  if (owedCount) {
+    console.log(`\n  ${owedCount} device check(s) are owed across the whole queue and are NOT listed above —`);
+    console.log('  they sit on the entries that built them, whatever lane those are. `--sittings` groups them.');
+  }
+}
+
 // Entries sharing a Batch: ship as one PR, so the first member to appear pulls its siblings up with
 // it. Position still decides priority — the batch inherits its highest member's place in the queue.
 const shownBatches = new Set();
 let rank = 0;
+// TN-61: entries actually PRINTED. The old count was `ready.filter(e => !e.batch || shown)`, which
+// counts every unbatched entry whether or not the TOP_N cut reached it — so the "… and N more" line
+// fired only when a BATCH collapsed rows and never when the cap hid them. Lane A's 31-entry READY
+// printed 10 in silence, and two entries edited minutes earlier appeared nowhere, which reads
+// exactly like removed-from-the-queue. A tool whose silence is indistinguishable from absence is
+// the defect; the cap itself is right and stays.
+let printed = 0;
 for (const e of ready) {
   if (rank >= TOP_N) break;
   if (e.batch) {
@@ -280,14 +305,18 @@ for (const e of ready) {
     for (const m of members) {
       const warn = m.schemaRisk ? '  ⚠ mentions a schema change — do not batch a migration' : '';
       console.log(`        ${fmt(m)}${warn}`);
+      printed++;
     }
     continue;
   }
   rank++;
+  printed++;
   console.log(`  ${String(rank).padStart(2)}. ${fmt(e)}`);
 }
-const shown = ready.filter((e) => !e.batch || shownBatches.has(e.batch)).length;
-if (ready.length > shown) console.log(`      … and ${ready.length - shown} more (--all)`);
+if (printed < ready.length) {
+  console.log(`      … showing ${printed} of ${ready.length} — \`--all\` for the rest.`);
+  console.log('      An entry you cannot see here is BELOW THE CUT, not gone from the queue.');
+}
 
 if (keeps.length) {
   console.log(`\nKEEP (${keeps.length}) — shipped; only the stated residue is owed. Not new work.`);
