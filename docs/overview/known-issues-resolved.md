@@ -2240,3 +2240,32 @@ unit tests (4 of 5 red against `main`) cover the stack and the listener's orderi
   `warmup`) back raised *Leave workout?*, a second back kept it up, *Stay* kept the workout. The one
   defect seen — *Leave* does not leave — is the dialog's own entry absorbing `onLeave`'s
   `history.back()`, filed as **DV-2**, not a regression of this fix.
+
+### [platform][nutrition] ✅ The 404 shipped on one delete route; six siblings still answered 200 (RV-45, 2026-09-05)
+
+*(Follows the change Q-556 made to `activity-logs`; Q-556's own cross-user row is separate and still live.)*
+
+`app/api/activity-logs/route.ts:70` answers 404 when a delete matches no row, and its comment says
+the change was made to *"Match every sibling delete: 404 for both a nonexistent id and someone
+else's."* **Six siblings answer 200 to both** — `supplements/[id]`, `supplements/[id]/log`,
+`injuries/[id]`, `nutrition/food-logs/[id]`, `nutrition/saved-meals/[id]`,
+`nutrition/meal-types/[id]`, plus `admin/activity-types`. Each was probed beside a malformed id
+returning `400 Invalid id`, so the route matched and its guard ran.
+
+**Ownership is enforced; the answer is what is wrong.** A second account deleting the first's
+supplement got `200 {"ok":true}` with the row still in Postgres, owner unchanged — a correct refusal
+reported as a success, so nothing distinguishes it and nothing reaches `error_events`. The clients
+(`manage-supplements-sheet.tsx:166`, `injury-sheet.tsx:179`) gate on `res.ok` alone, drop the row and
+toast "deleted"; it returns on the next pull.
+
+The 2026-08-18 review deliberately declined to file these on idempotency grounds, which is correct
+for the owner's own already-deleted row and false in the cross-account case. Q-556 later reached the
+opposite conclusion and shipped it on one route. Nothing blocks the rest: the outbox precondition
+Q-556 names holds identically for every sibling domain.
+**Not device-verified** — measured on the web build, where the offline-first clients take their API
+fallback. [Sweep 47](../reviews/2026-09-05-delete-reports-success-for-nothing.md).
+- **RESOLVED 2026-09-23 — VERIFIED ON THE S25** (Device Verification, sweep 1; web v1.465.10). Deleted a
+  throwaway supplement and injury online and offline: every delete toasted success with **no error**,
+  the offline ones queued and reached the server when the outbox drained. RV-45 left the queue. Two
+  side findings filed separately: supplements are not tombstoned locally (DV-10); an offline queue
+  drained on the next write rather than on reconnect under CDP emulation (RV-131).

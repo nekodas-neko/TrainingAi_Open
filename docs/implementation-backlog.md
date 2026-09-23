@@ -517,130 +517,6 @@ below threshold and left in place for next time.
   them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
   because a reader in either place stops looking. The selector is the defect, not the entries.
 
-### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** **no build half**; the measurement is the work. Method: **P11** in
-  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md). **Added:** 2026-09-23 ·
-  Review, at the owner's request for device checks on load efficiency and timing.
-- **The falsifiable claim:** every tab reaches first real content within **300 ms warm** and the
-  cold start's `first-contentful-paint` is within **1.5 s**. Report the actual numbers either way —
-  a pass is as useful as a fail here, because nothing has a baseline yet.
-- **This is now measurable without a recording**, which is why it was not done before:
-  `performance.getEntriesByType('navigation')` and `('paint')` survive for the life of the page, so
-  attaching *after* a normal cold start loses nothing. `device-perf-profiling-checklist.md` records
-  that mechanic; it had no agent to run it.
-- **Why it matters now:** Q-51's premise softened to *"Its mostly fine; I'd still like it to be
-  faster if possible"* and Q-147 closed on *"Seems good now"*. Both are impressions. If they are
-  right, this closes the perf thread with evidence; if a number disagrees with them, that is worth
-  more than either.
-
-### [app-shell][workouts] RV-138 — DEVICE PROBE: is Q-51's 1086 ms first mount a rule or a one-off?
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P12**. **Added:** 2026-09-23 · Review.
-- **The one measured perf number in the whole queue is a single observation.** Q-51: `/workout`
-  visited five times in one session — **four at ~100 ms, one at 1086 ms, all warm.** It is read as a
-  first-mount cost, and that reading is what the remaining file-splitting work rests on.
-- **The falsifiable claim:** across ten warm visit/leave/return cycles per route, the **first** mount
-  is no more than 2× the median of the rest. FAILED means the outlier is structural and the
-  file-splitting work has its justification; passing means 1086 ms was noise and **Q-51 should be
-  re-placed, not built.**
-- Report the full list of durations per route, never a mean — one outlier in ten is invisible in an
-  average, which is exactly how this started.
-- **Pair each outlier with P14's long tasks and P13's in-flight requests.** An outlier with neither
-  is a different defect from one with both, and the entry cannot be actioned without knowing which.
-- **⚠ Q-51 says *"measure before refactoring" is now MORE binding, not less*** — a large refactor is
-  a poor trade against "mostly fine". This probe is what makes that decision, so do not start the
-  refactor on the strength of the single 1086 ms reading.
-
-### [platform][app-shell] RV-139 — DEVICE PROBE: the per-screen network waterfall, and how much of it is serial
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P13**; `scripts/device/pw.js` already instruments
-  the Network domain. **Added:** 2026-09-23 · Review.
-- **The falsifiable claims, per screen:** no `/api/*` endpoint is requested **twice** for one screen;
-  no request chain is deeper than **two** (a request that only starts once an earlier one finishes).
-- **Chain depth is the number to hunt.** Three requests in parallel cost one round trip; three in
-  series cost three, and on a phone that is the whole difference between instant and not. Depth is
-  invisible to every source-reading sweep because it depends on what awaits what at runtime.
-- Report request count, `/api/*` count, total bytes and the largest single response per screen.
-- **Cross-checks that already exist:** RV-78 says `/api/next-session` serialises two independent
-  queries, and RV-82 says two routes fetch the active program twice inside one request. Both are
-  server-side and were found by reading; this probe says whether the device sees them as latency.
-
-### [app-shell][platform] RV-140 — DEVICE PROBE: main-thread long tasks, and whether animations still dominate
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P14**. **Added:** 2026-09-23 · Review.
-- **The falsifiable claim:** no interaction — cold start, tab switch either direction, a scroll of
-  Home or Health — produces a single main-thread task over **50 ms**, and no interaction's total
-  blocked time exceeds **200 ms**.
-- **Check the prior finding rather than rediscovering it:** a device profile once attributed
-  **21.3% of main-thread time to `animationiteration`**, which is why the repo pauses animations at
-  all. Confirm that is still true and report what dominates now if it is not.
-- This is the probe RV-113 needs as evidence and does not have: its cross-dissolve *"keeps a second
-  full-screen tree alive"*, which is a main-thread cost the entry can only assert.
-
-### [app-shell] RV-141 — DEVICE PROBE: path structure — depth, redirects, and navigations that cost a shell teardown
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P15**. **Added:** 2026-09-23 · Review.
-- **The falsifiable claims:** no screen is reachable by two tap paths of different length; no
-  navigation lands somewhere and immediately moves again; pressing back from any deep screen reaches
-  Home in as many presses as it took to get there, and never lands somewhere never visited.
-- **The measurement RV-110 is missing.** That entry counts 37 cross-tab `router.push` sites against 5
-  using the helper, and argues each tears down the whole tab shell — **but it has no number for what
-  a teardown costs.** Time one, and RV-110 stops being a count and becomes a budget.
-- Related and already device-verified: BF-100 (scroll offset restored exactly), LB-107 (back from
-  every tab root reaches `/`) and BF-165 (a sheet's `back()` eats the push **7 ms** after it) — so
-  the back stack itself is largely proven. **This is about the shape of the paths, not their
-  correctness.**
-
-### [platform][app-shell] RV-142 — DEVICE PROBE: does a long session get slower, and is that what BF-22 was feeling?
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P16**. **Added:** 2026-09-23 · Review.
-- **BF-22 is an owner report with its mechanism already narrowed** — *"everything is loading very
-  slowly"*, then *"actually its running a lot better after a force restart"*. So the slowdown is
-  in-memory client state; the server-distance theory was measured and was **wrong** (`x-railway-edge`
-  names the caller's PoP, not the server's region).
-- **The falsifiable claim:** per-tab time-to-interactive at app open, after the P2 five-minute walk,
-  and after 30 minutes idle are **within 20% of each other**. A monotonic rise is the finding.
-- **This is the timing half of RV-133**, which measures heap, listener counts and live timers over
-  the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
-  or is exactly what BF-22 is feeling — and **neither answers it alone.**
-
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
 - **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
@@ -842,6 +718,13 @@ below threshold and left in place for next time.
 
 ### [platform][nutrition] RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
 
+- **📱 Sweep 1 addition, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** The **"Offline — showing saved data"** banner **does** appear (on a
+  write while offline) — the sitting-1 "no banner" reading was from a tab walk with no write. But
+  **queued offline writes did not push on reconnect**: a supplement delete sat `pending`, `attempts: 0`,
+  for 40 s, through a tab switch and a pull-to-sync swipe, and drained only on the **next write**.
+  Under CDP emulation only — a real reconnect fires Capacitor's network event, which emulation does
+  not — so this needs real airplane mode before it is a finding.
+
 - **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
   and its result is recorded above, so the device is no longer what it needs. What it needs now
   is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
@@ -885,63 +768,14 @@ below threshold and left in place for next time.
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
   and mark the fresh half COULD NOT CHECK.
 
-### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
-
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
-
-- **📱 MEASURED ON THE S25 (the walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js --rounds 3 --dwell 15`
-  from a cold reload: heap / listeners / DOM nodes / live timers — start **21.9 MB · 608 · 1302 ·
-  4 intervals**; after round 1 **30.1 · 1468 · 5452 · 5**; round 2 **32.8 · 1628 · 5453 · 5**; round 3
-  **30.6 · 1628 · 5453 · 5**. Round 1 is every tab mounting for the first time; round 2 adds 160
-  listeners once; **round 3 is flat on every count. No accumulation across the walk.** The 30-minute
-  idle half is **COULD NOT CHECK** — the phone disconnected before it ran.
-
-- **Verify:** device — no build half. Method: **P10**.
-- **The falsifiable claim:** across the 5-minute walk and then 30 minutes idle, JS heap, listener
-  count by type, and live `setInterval`/`setTimeout` handles all **stabilise rather than only
-  rising**. A count that only ever rises is the finding; report all three at start, after the walk,
-  and after the idle period.
-- The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
-  the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
-
-### [sleep][app-shell] DV-4 — Home's Sleep card prints the Deep hours in the Deep stage colour, which is about 1:1 against the card
-
-- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend).
-- **Added:** 2026-09-23 · Device Verification, found during the P4 sweep (RV-127).
-- **Verify: device**
-- **Shipped 2026-09-23** (`fix/dv4-sleep-legend-contrast`, v1.465.10). The legend's hours now
-  inherit the foreground; the stage colour stays on the dot and the stacked bar.
-- **❌ The measurement that produced it, on the S25.** Web v1.465.4 / APK 1.460.4, dark theme.
-  The legend's value spans were coloured with `STAGE_COLOR.<stage>`
-  (`packages/shared/src/health/hypnogram.ts`): Deep's **"0.5h" computes to `rgb(30, 58, 112)`**.
-  The page root behind the card is `oklch(0.145 0.02 215)` (≈ `rgb(9,22,26)`), giving
-  **≈1.6:1**; against the card's purple paint in the screenshot it is **≈1:1** — the number was
-  effectively invisible. REM, Light and Awake passed only because their stage colours happen to be
-  light. CLAUDE.md's floor is 4.5:1 for body text.
-- **Why a palette fix would not have held:** the card's background is **owner-customisable**
-  (`ColorSwatchPicker`, `cardColors.sleepWidget`), so no stage colour is safe as text on every card
-  colour. Stage colours are fills.
-- **The sibling sweep answered the entry's own open question, and it inverted the fix.** DV-4 noted
-  `hypnogram.tsx` "was not read". All four `STAGE_COLOR` consumers were read: `hypnogram.tsx`
-  (SVG `fill` + a legend dot), `sleep-phase-trend-card.tsx` (Chart.js `backgroundColor`) and
-  `health-metric-sheet.tsx` are clean — and the last one renders the **identical** legend with a
-  coloured dot and the hours in the inherited foreground. So the target shape already existed in
-  the repo and Home was the only offender; nothing else needed changing.
-- **Pinned by `components/home/__tests__/dv4-stage-colour-is-never-text.test.ts`**, which sweeps
-  every `STAGE_COLOR` consumer for the palette reaching a CSS `color` inside a `style` object — the
-  durable rule rather than the one span. It also asserts the dot and bar are still coloured, so the
-  check cannot be satisfied by deleting the palette, and it pins the contrast ratio. Control run:
-  with the colour put back it fails naming `home-card-widget.tsx:166`. A first draft flagged the
-  two legitimate `{ label, color: STAGE_COLOR.deep }` **data** fields; the check is scoped to
-  `style=` lines for that reason.
-- **Keep:** the device look — on the S25, every legend value on the Sleep card reads ≥ 4.5:1
-  against the card, in dark and light, with the default card colour and one custom colour. The
-  sandbox can compute the ratio (and does, in the test) but cannot see the card.
-
 ### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
+
+- **⚠ CORRECTED by sweep 1 — two claims above were my misreading.** The set's session **is** in local
+  `workout_sessions` (`a1847680…`, started 2026-09-19T22:06:01.141Z, completed, synced); the
+  sitting-1 query that "found nothing" had failed silently. And `0a2afbf9…` is **not** a server
+  workout id: `/api/workout-sessions/day` returns the **program** session ("Upper") as `sessionId`.
+  **What remains true:** the set is still `pending` locally, and the server has it — the same
+  bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
 
 - **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
   SQLite file.
@@ -1117,36 +951,84 @@ below threshold and left in place for next time.
 
 ### [sleep] LB-131 — the sleep-timing chart takes the owner's zone by default; nothing passes the user's
 
-- **Lane:** B — `components/health/sleep-timing-trend-card.tsx:22`.
+- **Lane:** B — `components/health/sleep-timing-trend-card.tsx`.
 - **Added:** 2026-09-23 · Lane A, as the residue of the DV-7 fix.
-- **Already done in DV-7's PR, so do not redo it.** `timingPoints(nights, mode, tz = DEFAULT_TZ)`
-  now resolves BOTH modes through `minutesFromNoon`. Wake used to read `d.getHours()` — the device
-  — while bedtime went through the shared helper, so when DV-7 stopped that helper reading the
-  device, the two modes of one chart would have sat in two different zones off Brisbane. The tests
-  carry explicit `+10:00` fixtures and pass under UTC, Brisbane, New York and `Etc/GMT-13`.
-- **What is left:** the card calls `timingPoints(nights, mode)` and takes the default, so every
-  user gets **Brisbane** rather than their own zone. Thread the session timezone from the screen
-  into the card and on into `timingPoints`. **Ships with DV-9**, which threads the same value into
-  `computeSleepStartConsistency` one component above — one tz resolved once per screen, not twice.
-- **Why it is not urgent and still not nothing:** the owner is in Brisbane, so the default is
-  correct for the only user today. It is wrong the moment there is a second one, and it is the
-  shape CLAUDE.md calls invisible — *"while the device sits in the zone the data was recorded in"*.
-- **Pass test:** with a profile timezone far from Brisbane, the chart's bedtime and wake axes both
-  move with the profile rather than with the phone.
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/lb131-dv9-sleep-timezone`, v1.465.12), with DV-9 as one PR.
+- **Built differently from the plan, deliberately.** The entry said to thread the session timezone
+  from the screen through into the card. The card is rendered by `sleep-trend-toggle-card.tsx`,
+  which has no other use for a zone — so a threaded prop is a parameter a future render site can
+  omit, which is the SAME hazard as the `tz = DEFAULT_TZ` default this entry is about, moved one
+  level up. The card reads `useUserTimezone()` instead, which is a context fed from the root
+  layout's `auth()` call, so it is correct wherever it is mounted. Reversal is a prop and two
+  edits.
+- **The maths was already right.** DV-7 resolved both modes through `minutesFromNoon` with explicit
+  `+10:00` fixtures passing under UTC, Brisbane, New York and `Etc/GMT-13`. Only the call site was
+  missing.
+- **Keep:** the device look, shared with DV-9 — set the profile timezone far from Brisbane and
+  confirm the bedtime and wake axes move with the profile rather than the phone.
 
 ### [sleep] DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's
 
-- **Lane:** B — `app/health/sleep/sleep-content.tsx:72`.
-- **Needs:** DV-7
+- **Lane:** B — `app/health/sleep/sleep-content.tsx`.
 - **Added:** 2026-09-23 · Device Verification, found with DV-7.
-- **The defect:** `computeSleepStartConsistency(recentStarts)` is called with **no timezone**, so each
-  bedtime is placed in the device's local clock. The server route (`app/api/user/bedtime-estimate`)
-  passes one; this screen does not. **Invisible on the owner's phone** because it is set to Brisbane —
-  wrong for anyone whose phone and profile disagree (travel, or another user), which is exactly how
-  CLAUDE.md says this class hid for months.
-- **Fix:** pass the user's timezone (the session's `timezone`, as the route does).
-- **Pass test:** with the device timezone emulated to another zone (CDP `Emulation.setTimezoneOverride`
-  in `scripts/device/pw.js`), the Sleep screen's consistency figure does not change.
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/lb131-dv9-sleep-timezone`, v1.465.12), with LB-131 as one PR — one
+  zone read per surface, as that entry asked.
+- **The defect:** `computeSleepStartConsistency(recentStarts)` took no zone, so each bedtime landed
+  in the DEVICE's clock. The server route (`app/api/user/bedtime-estimate`) already passed one;
+  this screen did not. Invisible on the owner's phone because it is set to Brisbane.
+- **The sibling sweep found no third site.** Both helpers have exactly two call sites between
+  `app/` and `components/`, and the API route's was already correct.
+- **Pinned by `components/health/__tests__/lb131-dv9-sleep-tz-call-sites.test.ts`**, which sweeps
+  every client call site of `computeSleepStartConsistency` and `timingPoints` for a missing zone,
+  and asserts the value comes from `useUserTimezone()` rather than a literal or an `Intl` read. It
+  reads each call to its balanced closing paren — a first draft matched one line at a time and
+  reported the API route's three-line call as bare, which is a false positive, not a find. Control
+  runs: reverting either call site, or hardcoding the zone, each fails its own assertion.
+- **Keep:** the device check — with the device timezone overridden (CDP
+  `Emulation.setTimezoneOverride` in `scripts/device/pw.js`) and the profile left alone, the Sleep
+  screen's consistency figure must NOT change. That is the one assertion the sandbox cannot make:
+  it needs two clocks that disagree.
+
+### [nutrition][platform] DV-10 — a deleted supplement is never tombstoned on the device
+
+- **Lane:** A — `lib/local-store/**` (the supplements delete path) and the pull mapping.
+- **Added:** 2026-09-23 · Device Verification, sweep 1 (RV-45's run).
+- **Measured on the S25:** deleting a supplement — online (`DV test supplement B`) and offline (`C`) —
+  showed "Supplement deleted", removed it from the server and from both lists, but **the local
+  `supplements` row kept `deleted_at: null`** (B `synced`, C `pending` until drained). An injury
+  deleted the same way **is** tombstoned (`deleted: 1`). So the lists filter supplements some other
+  way, and the local store holds rows it believes are live.
+- **Why it matters:** CLAUDE.md's offline rule is that a delete must leave a tombstone the delta can
+  carry; a row that is live locally and gone on the server is the "deleted item comes back" shape
+  (BF-47) waiting for a read path that does not filter it.
+- **Pass test:** delete a supplement on the S25; `SELECT deleted_at FROM supplements WHERE id=…` is set.
+
+### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
+
+- **Lane:** B — `components/nutrition/manage-supplements-sheet.tsx`.
+- **Added:** 2026-09-23 · Device Verification, sweep 1.
+- **Measured on the S25:** each supplement row's `role="switch"` button has **no `aria-label`** and no
+  labelled-by — a screen reader announces "switch, on" with no name. Give it the supplement's name.
+- **Pass test:** every switch in the sheet has an accessible name.
+
+
+### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
+
+- **Lane:** B — the tab shell's switch path (`components/shell/**`).
+- **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
+- **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
+  long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
+  (→ Home 78, → Health 108, → Workout 93, → Nutrition 68, → More 79; reverse direction 76–118), and the
+  frame attribution names **`#document.onclick`** — React's delegated click handler, so the switch's
+  own synchronous render. Scrolling Home and Health produced **none**; `animationiteration` no
+  longer appears at all.
+- **Why it is filed:** CLAUDE.md asks for touch feedback within 100 ms, and half the tabs exceed it
+  on the tap alone. It may be the same work RV-113 calls "hide-then-fade"; read that first.
+- **Not established:** which component dominates the task — the next measurement is a CPU profile of
+  one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
+- **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
 
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
@@ -1172,9 +1054,17 @@ below threshold and left in place for next time.
 
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
+- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23** (weigh-in approved by the owner; logged today's own 69.4 kg so the value did not
+  change). **A weigh-in clears 3 of the 202 cached keys: `body-battery`, `muscle-recovery`,
+  `progress-summary`.** It then refetches `body-metadata`, `sleep-sessions`, `readiness-score` and
+  `body-battery/stress-day`. The Body Weight card showed 69.4 kg after. The local row kept body fat,
+  resting HR and HRV — `upsertBodyMetric` read-merges (`sqlite-backend.ts:1084`), so CLAUDE.md's "copy
+  water-log-sheet's pattern, not metric-log-sheet's" warning is out of date for this path. Now
+  buildable: compare those 3 keys against every surface that shows a weight.
+
 - **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
   Review sweep 53.
-- **Gate: device** — the broken branch is the local-store one, which does not run off the APK.
+- **Gate lifted — measured on the S25 in sweep 1 (see the first bullet).**
 - The sheet contains **no `invalidate*` call at all**. Its local-store branch ends at `onSaved(...)`
   with a bare `pushMutations(userId!)`. The consumer branches — `if (freshMeta) { setMetaToday(...);
   invalidateReadinessInputs() } else { invalidateBodyMetricWrite() }` — so on device only the
@@ -2772,6 +2662,11 @@ why the count of affected entries always understated the harm.
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
 ### [body][nutrition] BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
 
+- **📱 Evidence from the S25, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23** (not a verdict — the entry is open work). Fish Oil, not taken
+  today: **tick** → a log row with `taken_at` 07:39:28 · **untick** → that row tombstoned · **re-tick** →
+  a **new row with `taken_at: null`**, still null 2.5 s later and `synced` · final untick restored it.
+  So on the device a re-ticked dose has no taken time at all, not a rewritten one.
+
 - **Batch:** `supplement-dose-surface` — ships with **BF-186**. Both are Lane B edits in the
   supplements area and both are settled by one device pass: open the section, toggle a dose, reach
   Manage. Batched on the verification, per this file's rule. No migration in either.
@@ -3336,6 +3231,9 @@ why the count of affected entries always understated the harm.
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
+- **Still reproduces on web v1.465.10 (sweep 1):** card stayed at "867 kcal left" for 5 s while the
+  post-push response carried 856 — the same one-shot refetch before the push.
+
 - **❌ FAILED ON THE S25, 2026-09-23 — this is open work again, not verification debt.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23.
   Log *Cocoa powder, 5 g, 11 kcal* to Lunch from the Nutrition tab: the diary row appears, the ring
   moves, and **"857 kcal left" does not change — sampled every second for 6 s, and still 857 a
@@ -3805,6 +3703,10 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 
 
 ### [workouts][app-shell] LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
+
+- **📱 COULD NOT CHECK in sweep 1.** The check-in sheet opens only from Home's check-in card, which
+  disappears once today's check-in is logged, and the other entry point is a Home widget not on the
+  owner's layout. **Run it on a morning before the owner checks in.**
 
 - **✅ SHIPPED 2026-09-17 (v1.457.10)** (`fix/lb116-checkin-sends-suggested-sore`, #1274).
   [Journal](overview/history-2026-09-21-folded-1.md#2026-09-17-fix-lb116-checkin-sends-suggested-sore), which carries the
@@ -4715,42 +4617,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ---
 
-### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
-
-- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
-  a navigation issued while a surface closes is eaten by that surface's own history entry.
-- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
-  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
-- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
-- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
-  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
-  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
-  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
-  the session just abandoned. `history` instrumented in the page:
-  ```
-  3229ms pushState()                              ← the dialog opens and pushes its surface entry
-  5055ms back()                                   ← ONE back for the Leave tap
-  5073ms replaceState(/workout?session=…)
-  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
-  ```
-  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
-  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
-  spent on the dialog's own entry. Reproduced twice.
-- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
-  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
-- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
-  verified. This is the prompt's *Leave* button, which BF-166 never touched.
-- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
-  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
-  device). The surface has to be told the close was superseded by a navigation.
-- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
-  `/workout?session=…` for wherever back would have gone before the workout, and one more back
-  does not return to the abandoned session.
-- **Production data:** nothing was written. The only non-GET the page sent was the
-  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
-  for 2026-09-23 returned `sessions: []` afterwards.
-
-
 ## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 
 **BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
@@ -4919,6 +4785,41 @@ helper the call site calls.
 - **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
   (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
 
+
+### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
+
+- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
+  a navigation issued while a surface closes is eaten by that surface's own history entry.
+- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
+  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
+- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
+- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
+  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
+  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
+  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
+  the session just abandoned. `history` instrumented in the page:
+  ```
+  3229ms pushState()                              ← the dialog opens and pushes its surface entry
+  5055ms back()                                   ← ONE back for the Leave tap
+  5073ms replaceState(/workout?session=…)
+  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
+  ```
+  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
+  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
+  spent on the dialog's own entry. Reproduced twice.
+- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
+  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
+- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
+  verified. This is the prompt's *Leave* button, which BF-166 never touched.
+- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
+  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
+  device). The surface has to be told the close was superseded by a navigation.
+- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
+  `/workout?session=…` for wherever back would have gone before the workout, and one more back
+  does not return to the abandoned session.
+- **Production data:** nothing was written. The only non-GET the page sent was the
+  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
+  for 2026-09-23 returned `sessions: []` afterwards.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
@@ -9199,83 +9100,6 @@ this is a future gap rather than a dead one.
 a migration and an owner call on whether a deload becomes first-class stored state. Deriving it
 instead is the option that loses: a replay with no window gets one wrong answer and keeps it forever.
 
-### [platform][nutrition] 🟡 RV-45 — the six sibling deletes now 404; the device path is unchecked
-
-> **✅ SWEPT 2026-09-05.** All seven now answer **404** when a delete matched no row, matching the
-> Q-556 reference on `activity-logs`. Seven repository methods went from `Promise<void>` to
-> `Promise<boolean>` via `.returning()` — **the predicates are untouched**, so this reports on the
-> match rather than changing which rows match.
->
-> **The two throwing pre-checks are deliberately unaffected:** `MealTypeHasLogsError` still answers
-> 409 and `deleteActivityType`'s in-use guard still throws. *"This has entries"* is not *"this does
-> not exist"*.
->
-> **A test pinned the old behaviour and it did its job.** `not-found-status.test.ts` required 200
-> with the comment *"pinned so it does not get 'fixed' later"* — that is the 2026-08-18 decision this
-> entry reverses. It is reversed **with the cause written into the test**, not quietly flipped: the
-> idempotence argument holds for the owner re-deleting their own row and fails across accounts, where
-> the row is present and correctly so. `delete-404-parity.test.ts` now holds all seven together,
-> mutation-verified — reverting two routes fails exactly those two by name.
-- **Keep:** the device check, and it is the half this sweep could not reach. These deletes now make a
-  previously-silent no-op **loud**: `manage-supplements-sheet.tsx` and `injury-sheet.tsx` do
-  `if (!res.ok) throw`, so a 404 becomes an error toast where the user used to get a false success.
-  That is the point — but on device those two surfaces write locally first and take the API as a
-  **fallback**, which is a path the web build never exercises. **What closes it:** delete a
-  supplement and an injury on the APK, online and then offline, and confirm no error toast appears
-  for a delete that genuinely worked locally. The queued-but-unpushed race the 404 could otherwise
-  expose is reconciled by the push arm (Q-328) and every affected domain is in
-  `SYNCED_MUTATION_DOMAINS` — established, not assumed, but not observed on hardware either.
-- **Verify:** device
-- **Lane:** A — `app/api/**` delete handlers and the repository methods behind them.
-- **Added:** 2026-09-05, Review sweep 47 —
-  [write-up](reviews/2026-09-05-delete-reports-success-for-nothing.md).
-
-`app/api/activity-logs/route.ts:70` answers `404` when a delete matches no row, and the comment
-above it says the change was made to *"Match every sibling delete: 404 for both a nonexistent id and
-someone else's."* **Six siblings answer `200` to both.** The direction is backwards: it is the only
-one of seven that does this, not the one catching up.
-
-Probed live, each beside a malformed-id control returning `400 Invalid id` — so the route matched,
-the handler ran and its guard fired:
-
-| Route | nonexistent id |
-|---|---|
-| `supplements/[id]` | `200 {"ok":true}` |
-| `supplements/[id]/log` | `200 {"ok":true}` |
-| `injuries/[id]` | `200 {"ok":true}` |
-| `nutrition/food-logs/[id]` | `200 {"success":true}` |
-| `nutrition/saved-meals/[id]` | `200 {"success":true}` |
-| `nutrition/meal-types/[id]` | `200 {"success":true}` |
-| `admin/activity-types` (`?id=`) | `200 {"ok":true}` |
-| `activity-logs` (Q-556) | `404` |
-| `nutrition/meal-plans/[id]`, `phase-sets/[id]` | `404` |
-
-**The "someone else's" half, measured.** A second account deleted the first's supplement and got
-`200 {"ok":true}`; the row was still in Postgres afterwards with its owner unchanged. Ownership is
-enforced — the *answer* is what is wrong. A correct refusal is reported as a success, so nothing
-distinguishes it and nothing reaches `error_events`.
-
-**Do not read this as reversing the 2026-08-18 decision without cause.** That review
-([§2](reviews/2026-08-18-write-surface-not-found.md)) deliberately declined to file these routes,
-arguing DELETE is idempotent and *"the desired end state (row absent) genuinely holds"*. That is
-correct for the owner deleting their own already-deleted row. It is false in the cross-account case,
-where the row is present and correctly so — the premise fails, and Q-556 subsequently reached the
-opposite conclusion and shipped it.
-
-**Nothing blocks aligning the rest.** Q-556's comment names the precondition that made a 404 unsafe
-before it — a row queued via `queueMutation` but not yet pushed, reconciled by the push arm since
-Q-328. That holds identically for the siblings: `supplements`, `supplement_logs`, `injuries`,
-`food_logs` and `saved_meals` are all in `SYNCED_MUTATION_DOMAINS`, as `activity_logs` is.
-`meal_types` and `admin/activity-types` have no outbox path, so no race exists there at all.
-
-**Why it is not cosmetic.** `manage-supplements-sheet.tsx:166` and `injury-sheet.tsx:179` both do
-`if (!res.ok) throw new Error()`, then drop the row and toast "deleted". A delete that removed
-nothing confirms itself to the user, and the row returns on the next pull.
-
-**Not established:** measured on the web build, where the offline-first clients take their API
-fallback. On device, supplements and injuries write locally and return before the fetch, so for
-those two surfaces this is the fallback path, not the primary.
-
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
 - **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
@@ -12856,6 +12680,11 @@ produces a label **only its author can scan** — which is the exact complaint B
 
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
+- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Home → the timeline's "Woke up" row → `/health` **with the Sleep Detail sheet
+  open** → back #1 closes the sheet (still `/health`) → back #2 → **`/`, where it started.** The one
+  residue: after the sheet closes the URL still carries `?openSleepDate=2026-09-23`, so a reload or
+  resume on that URL may reopen the sheet — not observed.
+
 - **Lane:** B
 - **Added:** 2026-08-30 · owner, device pass A2: *"tapping workout; then back -> leads to heath
   training not home. Same with tapping a food item from timeline -> takes to nutrtion -> then health
@@ -13803,6 +13632,9 @@ whether or not anyone draws them first.
   fallback if no device is available.
 
 ### [nutrition][devices] LA-36 — `food_items.image_data_uri` is written to the device and read back by nothing
+
+- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23:** 1 of 339 local `food_items` carries an `image_data_uri` (4.5 KB). The
+  column is real and unread, but the cost on this device is negligible.
 
 - **Lane:** A (the engine) — the miss is in the local-store read mappers; the visible half is Lane B.
 - **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38
@@ -16266,6 +16098,13 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 
 ### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **📱 Evidence from sweep 1 (RV-142 + RV-133).** Tab time-to-content rose from 61–103 ms after a cold
+  start to 126–434 ms after ~2 h of use, and stayed there (134–449 ms) after 30 idle minutes; listeners
+  608 → ~2,200 over the same span, flat while idle. So the slowdown is real on the device, builds with
+  use rather than time, and survives idling — what the owner describes. Still unattributed: which
+  component's listeners grow. Next measurement: the listener count per tab visit, to find the one
+  that never lets go.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
@@ -24560,6 +24399,10 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [app-shell] 🔴 Q-51 — the perf work is not aimed at the screen the owner actually uses
 
+- **📱 RV-138 has run (sweep 1): 90 warm visits, no outlier — every first visit within 1.3× its
+  median, slowest 164 ms.** The 1086 ms reading did not recur. Per this entry's own rule, re-place it
+  rather than build the refactor; the numbers are on RV-138.
+
 > **⚑ THE PREMISE SOFTENED, 2026-09-14 — the owner no longer reports this as pain.** On the S25
 > app-shell pass: *"Its mostly fine; I'd still like it to be faster if possible."* This entry was
 > placed high because it was *"the owner's stated felt pain"* (their words, below: *"it's the home
@@ -25878,6 +25721,11 @@ is essentially never worn for sleep, so there's no ground truth to calibrate
 against yet. Blocked on real-data capture, not code.
 
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
+
+- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23:** **eleven** device-owned columns are null on all 128 local rows —
+  `active_calories_est`, `training_load_ots`, `training_load_high`, `recovery_index_hours`,
+  `worn_hours_ble`, `night_hrv_baseline_ms`, `chronic_stress_score`, `chronic_stress_contributors`,
+  `vascular_age`, `pwv`, and `chronic_stress_granular_nights` (the eleventh, not in the entry's ten).
 
 - **Lane:** A
 - **Gate:** device
