@@ -304,3 +304,16 @@ was the reading, not the connection:
 - **The long-session method (P16 + P10):** `perf.js tti --label walk` → `census.js --rounds 1
   --idle-min 30 --no-reload` → `perf.js tti --label idle`, with `keyevent 224` every 4 min. No reload,
   or the accumulation being measured is thrown away.
+
+### ⛔ Sweep 2 — the admin console and production (2026-09-23)
+
+- **Do not open `/admin/oura-ble` in a sweep until DV-13 is fixed.** Opening it issued four requests
+  (`device-metrics`, `samples/summary`, `rollup-state`, `samples/pack`) that never answered, and
+  production stopped answering **every** client for ~8 minutes (20:04–20:12 AEST). Cause unproven —
+  but the harness does not repeat it to find out.
+- **Never `page.reload()` in a probe.** It left the page unresponsive to DevTools for ~3 minutes; a
+  restart (`am force-stop` + `am start`) was the only recovery.
+- **Never re-request an endpoint that is already hanging** to "measure" it — that adds load to a
+  server that may already be stuck. Time it from the page's own requests (`recordNetwork`) instead.
+- **Watch production during a sweep:** a `curl` of the public `/api/version` from this PC is a
+  database-free liveness check. If it slows, stop the sweep before doing anything else.
