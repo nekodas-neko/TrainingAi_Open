@@ -448,6 +448,12 @@ jobs:
       - name: Backlog pointers and Q numbers are accurate
         run: node scripts/check-backlog-pointers.js
 
+      # TN-59. A `Gate:`/`Needs:` is a field a tool can read; a prose block marker is a sentence.
+      # An entry parked only by the sentence sits invisible for a reason nothing can act on, and
+      # RV-99 sat that way behind a marker that was a CORRECTION, not a block. Baselined at zero.
+      - name: No entry is parked by prose alone
+        run: node scripts/check-prose-parked-entries.js
+
       # LA-26. A repository method nothing calls is invisible to tsc (an unused export is not an
       # error), to lint, and to the tests. It has shipped three times (Q-301, Q-270, Q-231) and was
       # only ever caught by someone asking why a production table was empty.

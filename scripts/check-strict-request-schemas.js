@@ -228,17 +228,23 @@ for (const [file, n] of Object.entries(found)) {
   const limit = BASELINE[file];
   // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. `countNonStrict` is
   // already a pure per-file counter, so the base is that same function over the base's copy.
-  const v = verdict({ count: n, limit: limit ?? 0, atBase: countAtBase(baseRef, file, countNonStrict) });
+  // `atBase` is held rather than inlined so a failure can REPORT it. This check has failed
+  // intermittently on one file six times; `verdict` turns three different base readings — absent,
+  // zero, and a real number — into one word, and only the absent case warns, so five of those six
+  // occurrences left nothing behind that could tell them apart.
+  const atBase = countAtBase(baseRef, file, countNonStrict);
+  const v = verdict({ count: n, limit: limit ?? 0, atBase });
+  const seen = `(base ${baseRef ?? 'unresolved'}: ${atBase === null ? 'file absent' : `${atBase} non-strict`})`;
   if (v === 'inherited') {
     inherited.push(`${file}: ${n} non-strict request schema(s) against a baseline of ${limit ?? 0}, but the base branch is already there.`);
   } else if (limit === undefined) {
     failures.push(
-      `${file} has ${n} non-strict request schema(s) and is not in the baseline.\n` +
+      `${file} has ${n} non-strict request schema(s) and is not in the baseline. ${seen}\n` +
       `      Add .strict() so an unknown key is a 400 instead of a silent drop — or, if this schema\n` +
       `      parses outbox payloads or an external client's body, add a row here WITH the reason.`);
   } else if (n > limit) {
     failures.push(
-      `${file} has ${n} non-strict request schema(s), over its baseline of ${limit}.\n` +
+      `${file} has ${n} non-strict request schema(s), over its baseline of ${limit}. ${seen}\n` +
       `      Add .strict() to the new one, or raise this file's number here in the same PR.`);
   }
 }

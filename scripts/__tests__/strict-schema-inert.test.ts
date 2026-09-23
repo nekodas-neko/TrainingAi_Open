@@ -14,10 +14,27 @@ import { describe, expect, it } from 'vitest'
  * request keys reach the schema.
  */
 const repoRoot = path.resolve(__dirname, '..', '..')
-const run = () =>
-  execFileSync('node', [path.join(repoRoot, 'scripts', 'check-strict-request-schemas.js')], {
-    cwd: repoRoot, encoding: 'utf8',
-  })
+// `execFileSync` returns stdout on success, but on a NON-ZERO exit it throws an error whose message
+// carries only the command and stderr — `err.stdout` is a separate property that nothing prints. The
+// base-ref helpers this check depends on deliberately warn on **stdout** ("no base ref could be
+// resolved", "unreadable at base"), so for five occurrences of an intermittent failure here the one
+// line naming the cause was captured and then discarded, and three diagnoses were written from its
+// absence. Absence of a warning was never evidence; it was a stream nobody was reading.
+const run = () => {
+  try {
+    return execFileSync('node', [path.join(repoRoot, 'scripts', 'check-strict-request-schemas.js')], {
+      cwd: repoRoot, encoding: 'utf8',
+    })
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; message?: string }
+    throw new Error(
+      `check-strict-request-schemas exited non-zero.\n` +
+        `--- stdout (where base-ref warnings go) ---\n${e.stdout ?? '(empty)'}\n` +
+        `--- stderr ---\n${e.stderr ?? '(empty)'}\n` +
+        `--- message ---\n${e.message ?? '(none)'}`,
+    )
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { countInertStrict } = require('../lib/inert-strict')
