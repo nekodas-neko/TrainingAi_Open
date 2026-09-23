@@ -1318,46 +1318,99 @@ below threshold and left in place for next time.
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
 
+### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
+
+- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133.
+- **⚠ The test half of this entry was NOT fixed here — `#1472` fixed it concurrently on `main`,
+  and this entry originally claimed the fix as its own. Corrected before merge.** What this branch
+  carries is one added assertion on top of #1472's fix (below); the substantive finding is the
+  merge-gate one, which is untouched by #1472 and is why the entry stays open.
+- **What was red:** `app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6,
+  deterministically on `main` — reproduced in a clean worktree, confirmed byte-identical to
+  GitHub's copy so it was not a stale checkout, and unchanged with `DATABASE_URL` unset.
+- **Cause:** #1466 (RV-82) changed the route to read `recommendation.program` — `getNextSession`
+  hands back the program it already fetched — while the test still stubbed `getActiveProgram` and
+  its `getNextSession` mock had no `program`. So `program` was null and **every case fell into the
+  rest-day branch**, including the two still reporting green: the rest-day test passed trivially,
+  and *"never calls a prescription-mutating repo method"* passed **vacuously**, asserting nothing,
+  because that branch returns before any of them is reachable.
+- **This branch adds one line to #1472's fix:** `expect(getActiveProgram).not.toHaveBeenCalled()`,
+  which pins RV-82's actual point — the route must not fetch the program a second time — so the
+  stub cannot go stale in silence again. #1472 restored the mock but not the guard against a repeat.
+- **⚠ THE FINDING THAT MATTERS, and it is not about this test.** The failing `Tests` job did **not**
+  stop the merge. PR #1467 was squash-merged at 10:18 while `Tests` was failing on its head
+  (`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned
+  *"Pull Request successfully merged"*. **`main` took a red commit.**
+  **This falsifies a rule CLAUDE.md leans on heavily**, in the CI/CD section: *"attempting the merge
+  is the reliable green test … it cannot merge a genuinely pending check."* It can, and it did.
+  The likely reason is already recorded in the standing-agents section — `enable_pr_auto_merge`
+  fails here with *"Protected branch rules not configured for this branch"* — i.e. the required
+  checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
+  inference in this repo unsound. The same section's opening claim that branch protection *"requires
+  a PR with all CI checks passing"* is then also wrong.
+- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
+  change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
+  way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
+  unsound gate.
+- **Until it is settled, the workaround is cheap and every lane should use it:** before merging,
+  read the `Tests` job conclusion explicitly rather than trusting the merge call —
+  `get_job_logs` with `failed_only: true` returns only failed jobs, so an empty list is the green
+  signal, and it does not flood context the way `list_workflow_jobs` does (Custom Rules alone is 79
+  steps). Note the RUN stays `in_progress` for ~31 minutes because E2E is advisory; that is not a
+  failure.
+- **⚠ `main` went red a SECOND time the same day, from the same shape — found and fixed here too.**
+  `scripts/__tests__/keep-gate-set-off.test.ts` pins the queue's gate classification by id. Device
+  sweep 2 (#1471) closed Q-317's device check and removed its entry — legitimate — but did not
+  update the pinned list, so the snapshot read 16 where it expected 17 and `main` was red on every
+  branch. Fixed by dropping `Q-317:device` and naming the reason in place, which is exactly what
+  that test's own comment instructs (the Q-305 precedent, 2026-09-16).
+  **Two independent red-`main` events in one day, both snapshot-vs-change mismatches, neither
+  signalled anywhere** — that is the argument for enforcing the checks rather than for fixing two
+  tests.
+- **Blast radius was small only by luck:** `main` was already red from #1466 before #1467 went near
+  it, so nothing in #1467 caused it — but #1467 merged on top, and the next PR would have inherited
+  a red base with no signal. #1472 has since cleared it.
+
 ### [platform] LB-133 — the guard for the post-push class cannot see the class
 
 - **Lane: B** · **Added:** 2026-09-23 · Lane B, found while shipping LB-132.
-- **`scripts/check-invalidate-after-push.js` reported `no write invalidates around its push` while
-  five live sites carried exactly that defect.** It is CI step 37 in Custom Rules, it has no
-  baseline and no allowlist, and it exits 0. The green tick is read as evidence, which is what makes
-  this worse than having no check.
-- **Measured, by reverting one fixed site and re-running:** the ratchet still reported clean. So it
-  is blind to the shape, not merely to a formatting variant of it.
-- **The blind spot is `WINDOW = 12`** — a ±12-line text window around the `pushMutations` call.
-  Every one of LB-132's five sites puts its invalidation further away than that:
-
-  | Site | push → invalidate |
-  |------|-------------------|
-  | `end-of-day-review.tsx` | 14 lines |
-  | `mood-checkin-sheet.tsx` | 26 |
-  | `morning-checkin-sheet.tsx` | 35 |
-  | `log-value-sheet.tsx` | 39 |
-  | `exercise-review-sheet.tsx` | 53 |
-
-- **Widening the window is the fix that already failed once, and must not be tried again.** The
-  script's own docblock records it: LB-6 looked at the six lines ABOVE each call and missed five
-  written below, so the window was widened to ±12 both ways. That is how it reached today's state.
-  A window of 60 would catch these five and miss the sixth, and would start matching an unrelated
-  `invalidate*` in a neighbouring function.
-- **Fix: match the ENCLOSING BLOCK, not a line window** — walk to the balanced close of the function
-  or `try` containing the push, and ask whether any `invalidate*(` occurs inside it.
-  `check-admin-guard-catch.js` learned the same lesson under Q-548, where one regex requiring the
-  try's brace on the next line let twelve live sites through; `scripts/__tests__/admin-guard-catch.test.ts`
-  pins its blind spots as cases so a later narrowing fails. Copy that shape, test included.
-- **⚠ The evidence disappears when LB-132 merges.** All five instances are fixed there, so the
-  detector cannot be tested against live offenders afterwards. The distances are recorded above for
-  exactly that reason, and the regression test must construct the shapes as fixtures rather than
-  pointing at files.
-- **Expect new hits when it is fixed, and triage rather than sweep them.** The same rule LB-132
-  established applies: a bare `pushMutations` is only a defect where some CACHED key holds what the
-  write changed. Six sites that look like the class are already verified correct and named in LB-132
-  and its predecessors — `use-plan-meal-logging.ts`, `manual-bedtime-card.tsx`, `more-content.tsx`,
-  `sync-health-card.tsx` and the two group-① candidates. A tightened detector will flag some of
-  them; they are not regressions.
+- **Shipped 2026-09-23** (`fix/lb133-post-push-guard-blind-spot`). `check-invalidate-after-push.js`
+  now brace-matches the enclosing **handler** instead of scanning a ±12-line text window, exports
+  `offendersIn(src)` with the CLI behind `require.main === module`, and scans `lib/` as well — which
+  the old version never did.
+- **The defect it had:** it reported `no write invalidates around its push` while five live sites
+  carried the defect, with no baseline, so the clean line read as proof. Reverting a fixed site and
+  re-running still reported clean.
+- **Measured, and this is the part worth keeping:** the five real pre-fix sources were recovered
+  from git (`git show 66c04c3fdf0:<path>`) and run through both detectors. **The old one missed all
+  five. The new one catches all five at their exact pre-fix lines and is clean on the fixed
+  versions.** The five sat 14, 26, 35, 39 and 53 lines from their invalidation.
+- **Why the scope is the HANDLER, not the immediately-enclosing block.** Three of the five put the
+  push and the invalidation in *different* blocks of one handler — two sibling async IIFEs, or a
+  nested `try` and its parent — so brace-matching the nearest block (what `check-admin-guard-catch.js`
+  does for its own class) still misses them. The scope is the function block just inside the
+  component/hook body: wide enough to span those siblings, narrow enough that an unrelated handler
+  in the same file is out of scope. `app/more/more-content.tsx` is the case that proves it matters —
+  it contains an `invalidate*` call AND a bare push, in different handlers, and is correctly clean.
+- **Widening the window was never an option:** LB-6 looked six lines ABOVE each call, missed five
+  written below, and the window became ±12 both ways. That is how it reached the state above. A
+  bigger number catches today's five, misses the sixth, and starts matching a neighbouring function.
+- **It found a sixth offender immediately — `lib/home/rest-day.ts:65`, fixed in the same PR.**
+  `chooseRestDay` queued the mutation, fired a bare `pushMutations`, then `await`ed
+  `invalidateRestDayChoice()` — which clears `next-session`, `next-session-prescription` and
+  `collection`, all server-computed, and the file's own docblock says `getNextSession` prefers the
+  stored `rest_days` row. So the recomputed recommendation only arrives after the push lands. The
+  old scanner never looked at `lib/` at all.
+  **Lane call (structural, mine):** `lib/home/rest-day.ts` is in neither lane's path list; it is
+  reached only from `app/**` and `components/**`, so the §3 rule puts it in **B**. Reversal cost is
+  nil — it is a three-line change in one file.
+- **Pinned by `scripts/__tests__/invalidate-after-push.test.ts`** — ten cases, written as SHAPES
+  rather than distances, taken from the real pre-fix sources: the far-below invalidation, the
+  sibling IIFEs, the nested try, the module-scope helper, and five that must NOT be flagged (two
+  handlers, a bare flush, an awaited push, a `.then` chain, the import line).
+- **Keep:** the device look at the rest-day surface, folded into LB-132's device pass — choose a
+  rest day on the S25 and confirm Home's recommendation settles on the pushed row rather than at
+  TTL. The sandbox proves the call is present and cannot watch the eviction.
 
 ### [nutrition][app-shell] LB-129 — the day-review sheet does not open on a first flip into Nutrition
 
@@ -1378,6 +1431,19 @@ below threshold and left in place for next time.
   `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
 - **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
   it as, and what it is gated on) rather than the param.
+- **RULED OUT from source, 2026-09-23 (Lane B, while LB-133 was in CI — reading only):** the
+  **back-dismiss machinery cannot be the cause**, and it is the most tempting candidate because
+  `sheet-back-stack.ts` carries a documented bug in which *"the dialog closed on the frame it
+  opened"* (BF-34) — the exact symptom. `SheetContent` mounts `BackDismiss`, which calls
+  `useSheetBackDismiss` → `openSurface`, and `handlePop` closes every surface whose depth exceeds
+  the arriving state's. **But `handlePop` only runs on a `popstate`, and a tab flip never emits
+  one:** `tab-shell.tsx:103` navigates with `window.history.replaceState(null, "", href)`, and
+  `replaceState` does not fire `popstate`. Do not spend a probe on it.
+- **Also VERIFIED rather than assumed** (the entry's own claim ②, re-checked): `<EndOfDayReview>`
+  really is rendered unconditionally at the tail of `nutrition-content.tsx`'s single `return`, with
+  `open={reviewOpen}`. There is no gate above it.
+- **So the dynamic-chunk hypothesis below is now the ONLY live one** — which makes instrumenting it
+  the first action, not one option among several.
 - **Three more candidates ruled out from source, 2026-09-23** (while DV-11 was in CI — reading only,
   nothing built). None is the cause, and each would otherwise be the obvious first guess:
   ① **`steps` empty → `step` undefined.** `visibleReviewSteps` starts with `['day']` unconditionally

@@ -1,7 +1,7 @@
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { getLocalStore } from "@/lib/local-store";
-import { pushMutations } from "@/lib/local-store/sync-engine";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { invalidateRestDayChoice } from "@/lib/cache-groups";
 
 /**
@@ -62,7 +62,7 @@ export function chooseRestDay(userId: string | undefined, opts: { tz?: string; r
     if (store) {
       try {
         await store.queueMutation({ userId: userId!, domain: 'rest_days', date, payload: { resting } });
-        pushMutations(userId!).catch(() => {});
+        pushThenRevalidate(userId!, invalidateRestDayChoice);
         await invalidateRestDayChoice();
         return;
       } catch (err) {
