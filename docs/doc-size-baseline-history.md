@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27249 (LA-130, −26)
+## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27283 (LA-130, −26)
 
 The Git Workflow shallow-fetch rule told every session to fetch with `--unshallow` every time,
 because "a plain fetch re-grafts at the new tip". The real cause is `pnpm check:rules`: it replays
@@ -16282,3 +16282,10 @@ the ai_dynamic path, which is the live one. `tsc` cannot see either, because the
 
 Those are worth index space because the next person to touch `NextSessionRecommendation` will hit
 the same two edges, and neither is visible from the type.
+
+---
+
+## 2026-09-23 — backlog → 27258 (device/sweep-2)
+
+DV-13 filed at the top of the queue: a production outage (~8 min) coincided with the BLE admin
+console's hung requests during device sweep 2. Placed first because it is availability.
