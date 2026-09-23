@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateHealthTrends } from '@/lib/cache-groups'
 import { usePageGradient, useHeroColorScheme } from '@/components/health/detail-hero'
 import { cachedFetch, readCacheSync, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from '@/lib/sqlite/cache'
@@ -197,7 +197,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
           syncStatus: 'pending',
         })
         await store.queueMutation({ userId: userId!, domain: 'day_checkins', date, payload })
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateHealthTrends)
         savedLocally = true
         } catch (e) {
           console.error('Day check-in SQLite write failed, falling back to API:', e)
