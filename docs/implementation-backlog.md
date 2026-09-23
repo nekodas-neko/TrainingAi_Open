@@ -497,6 +497,36 @@ below threshold and left in place for next time.
   outage could be coincidental — Railway, a deploy, another client), whether the server restarted at
   20:12, and what `error_events` holds for the window. **Read `error_events` and Railway's logs for
   20:00–20:15 AEST on 2026-09-23 first.**
+- **✅ MEASURED 2026-09-23 by Lane A, and the headline finding is that the 8-minute outage was
+  almost certainly A DEPLOY, not these routes.** `main` took four merges in sixteen minutes —
+  19:47:07 (#1463), 19:51:20 (#1466), **20:03:30 (#1468)** and later 20:18:18 (#1467) — and each one
+  auto-deploys to Railway production. **#1468 landed 70 seconds before `/api/version` first went
+  slow at 20:04:40, and the recovery at 20:12:41 is an ordinary build-and-swap later.** A container
+  being replaced is exactly what makes a database-free route time out for minutes and then answer in
+  0.5 s; a blocked event loop is not required to explain it. `error_events` for the window holds
+  precisely two server rows, both at **20:12:36–37** — the moment of recovery, not the stall —
+  and both read `[cause: timeout exceeded when trying to connect]` (`/api/day-timeline`,
+  `/api/body-battery`), which is a POOL-ACQUISITION failure as a new container warms, not a slow
+  query and not a blocked loop. Railway's own logs are still unread (no access from the sandbox).
+- **⚠ The routes are nevertheless doing real unbounded work, and that half is now fixed.**
+  `device-metrics` called `toAestDay` — `formatInTimeZone` — **once per raw row**. Measured: the
+  owner's default `?days=3` window really holds **58,856 rows**, and the formatter costs **11.2 us**
+  a call, so that was **656 ms of synchronous work** before any decoding began, and **~3.1 s at
+  `?days=14`** — on sandbox CPU, so worse on Railway. Nothing else runs on the process while it
+  does, which DOES explain the admin console's other requests hanging: `samples/summary`,
+  `rollup-state` and `samples/pack` have **no such loop** (checked), so a single-row read appearing
+  to hang is the signature of the process being occupied, not of that route being slow. The memo is
+  now keyed by minute — exact for every timezone, since no UTC offset is finer than a minute — and
+  pinned by `dv13-minute-keyed-day-bucketing.test.ts`, whose zone set includes Kathmandu and Chatham
+  because an hour-keyed memo passes every whole-hour zone and is silently wrong in those two.
+- **Still NOT established, and this entry stays queued for it:** that `device-metrics` caused the
+  **outage**. 656 ms — or even 3 s — does not account for a 90-second abort, and the deploy
+  correlation above is the better explanation for that window. Do not close this by pointing at the
+  fix that shipped.
+- **Keep:** ① the row cap and the explicit per-request timeout from the fix direction below — the
+  memo makes the loop ~100x cheaper but leaves it unbounded, so a large enough window still occupies
+  the process; ② the device pass test, which needs the phone; ③ Railway's logs for 20:00–20:15 AEST,
+  which nobody has read.
 - **Contributing:** the device agent issued two extra requests to the hung endpoints while measuring
   them, and an earlier `page.reload()` of the same screen had already left the page unresponsive to
   DevTools for ~3 minutes. Both are now forbidden in the harness (see `scripts/device/README.md`).
