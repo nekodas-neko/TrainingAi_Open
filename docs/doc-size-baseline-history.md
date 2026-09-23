@@ -16119,3 +16119,21 @@ Device sweep 1's results, quoted in the entries they settle as the probe checkli
 performance baseline (RV-137…RV-142, RV-133), the write checks (RV-108, BF-185, BF-177, LB-116), the
 DV-8 correction, and two new entries (DV-10, DV-11) — net of RV-45 and DV-4, which were verified and
 removed.
+
+## 2026-09-23 — backlog 27499 → 27507 (LB-131 + DV-9, +8)
+
+Both entries shipped and both stayed, each as `Verify: device` + `Keep:` — so two completed items
+cost eight lines rather than clearing thirty.
+
+That is the right direction here, and the reason is worth the space: **DV-9's pass test is one the
+sandbox cannot make at all.** It needs the device clock and the profile to disagree — override the
+handset's zone, leave the profile alone, and the consistency figure must not move. No amount of
+local testing produces two clocks, so deleting the entry would have recorded a check that nobody
+ran.
+
+The lines also carry why LB-131 was built against its own plan. It asked for the timezone to be
+threaded as a prop; the card is rendered through a toggle component that has no use for a zone, so
+the prop would be one a future render site can omit — the same hazard as the `tz = DEFAULT_TZ`
+default the entry exists to remove, moved up a level. It reads the context instead. A later session
+reading only the original entry would see a prop missing and "fix" it back.
+
