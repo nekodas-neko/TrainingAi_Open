@@ -16188,3 +16188,41 @@ triage pass should have, as against the filing passes that grew this file earlie
 The other twenty are one pointer: Q-7b's body carried a paragraph that reads like an unfiled
 finding and is `Q-270`, which is 🔴 and far past it. Twenty lines saying so is cheap against a
 duplicate of a well-developed entry, which is what nearly happened.
+
+## 2026-09-23 — backlog → 27300 (RV-108 + LB-132 + two re-channellings, +58 against a clearance)
+
+**The number falls while this branch adds 58 lines** — Orchestrator sweeps cleared completed entries
+from `main` twice while this sat in CI. Stated because the figure alone reads as a shrink this PR
+did not do, and because the baseline is set to the real count rather than left where this branch
+computed it: a baseline above reality is slack for the next growth to hide in.
+
+Three things, and the largest is the one that shipped no code.
+
+**RV-108's entry** records what the sweep RULED OUT, not just the fix — because the near-miss is the
+expensive part. `log-value-sheet.tsx` writes the same domain through the same shape and shows no
+invalidation within ten lines of its push; it calls the group 39 lines later inside the same `try`.
+A future session reading only the fix would see the same window and "finish the job", producing a
+double invalidation on a correct file. That warning is worth more lines than the fix itself.
+
+**LB-132 was filed wrong and corrected in the same PR, which is where the extra lines went.** Its
+group ① named two sites as "no invalidation at all, the same class as RV-108". Both are correct.
+Neither write touches anything a cache holds — plan-meal answers have no cached key and are read
+straight from the local store; a manual bedtime feeds only `/api/user/bedtime-estimate`, which no
+client fetches, and `/api/sleep-sessions` does not return `manualSleepStart` at all. Left as filed,
+the entry would have sent the next session to patch two working files — the same harm the
+`log-value-sheet` warning three paragraphs above exists to prevent, committed by the very entry
+warning about it.
+
+The correction is worth its lines twice over: group ① being empty means **RV-108 really was the only
+genuine missed invalidation in the app**, which is a stronger claim than the fix itself.
+
+**LB-132** is new and holds the rest of the sweep, split by how wrong each site is: two with no
+invalidation at all, five with the immediate half and no post-push half. It says explicitly not to
+sweep the second group mechanically — the post-push half only earns its place where something
+server-derived changes, and adding it everywhere is noise dressed as consistency.
+
+**DV-12 and RV-113 were re-channelled out of Lane B**, with the reason written into each. Both sat
+at the head of the lane blocked on their own next action — one needs a CPU profile only the device
+agent can take, the other needs two looks judgements that decide whether to build it at all. Lines
+spent saying why are lines no future Lane B session spends rediscovering it.
+
