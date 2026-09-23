@@ -57,8 +57,12 @@ describe('calculateBaseline', () => {
     // 2136 sedentary tdee − 500. Was 2259 (× 1.55 moderate).
     expect(result.calories).toBe(1636)
     expect(result.proteinG).toBe(144)
-    expect(result.fatG).toBe(45)
-    expect(result.carbsG).toBe(164)
+    // LA-125: 25% of 1,636 kcal is 45 g, which is UNDER the 0.6 g/kg floor of 48 g — this is the
+    // cutting case where the two fat rules disagreed, and the floor is now applied by the baseline
+    // rather than only by `clampRecommendation` further down the route. Was 45 g / 164 g carbs.
+    expect(result.fatG).toBe(Math.round(0.6 * 80))
+    expect(result.fatG).toBe(48)
+    expect(result.carbsG).toBe(157)
   })
 
   it('applies the build_muscle calorie surplus and protein target', () => {

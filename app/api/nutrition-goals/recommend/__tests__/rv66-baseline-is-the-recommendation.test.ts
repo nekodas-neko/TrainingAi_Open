@@ -156,28 +156,38 @@ describe('/api/nutrition-goals/recommend', () => {
     expect(body.dataQualityNote).toContain('safe minimum')
   })
 
-  // ⚠ Pinned as CURRENT BEHAVIOUR, not endorsed — filed as LA-125.
+  // LA-125 closed the disagreement this test used to pin as current-behaviour-not-endorsed.
   //
-  // `calculateBaseline` sets fat at 25% of calories; `clampRecommendation` floors it at 0.6 g/kg of
-  // body weight. For this profile those are 39 g and 42 g, so the clamp raises fat and carbs fall
-  // out of the remainder at 143 instead of the baseline's 150. The recommendation is therefore "the
-  // baseline, made safe" rather than the baseline byte-for-byte, and a surface reading
-  // `calculateBaseline` directly will not match this one.
+  // `calculateBaseline` set fat at 25% of calories while `clampRecommendation` floored it at
+  // 0.6 g/kg — for this profile 39 g against 42 g, with carbs at 150 against 143. The floor now
+  // lives in `calculateBaseline`, so the baseline is already safe and the clamp is a no-op over a
+  // number it did not compute. This is what makes RV-66's claim true of every macro rather than
+  // four of five: a surface reading `calculateBaseline` directly now agrees with this route.
   //
-  // The clamp cannot simply be dropped to close the gap: `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500
-  // for `lose_weight`, and `bmr × 1.2 − 500 < bmr` for any BMR under 2,500 — which is most people —
-  // so its calorie floor is load-bearing for every cutting user.
-  it('applies the clamp floors to the baseline, and derives carbs from what is left', async () => {
+  // The clamp itself is still load-bearing and must not be deleted — see the cutting-calorie case
+  // above, which is the reason.
+  it('serves the baseline field-for-field, fat and carbs included', async () => {
     const base = baselineFor('moderate')
     const fatFloor = Math.round(0.6 * WEIGHT_KG)
-    expect(base.fatG).toBeLessThan(fatFloor)  // the disagreement this test exists to pin
+    // The floor is what governs for this profile: 25% of the budget is under it.
+    expect(Math.round(base.calories * 0.25 / 9)).toBeLessThan(fatFloor)
+    expect(base.fatG).toBe(fatFloor)
 
     const { body } = await call()
 
-    expect(body.recommended.fatG).toBe(fatFloor)
-    // Carbs are the remainder of the CLAMPED figures, never a value anyone chose.
-    const expectedCarbs = Math.round((base.calories - body.recommended.proteinG * 4 - fatFloor * 9) / 4)
-    expect(body.recommended.carbsG).toBe(expectedCarbs)
+    expect(body.recommended).toMatchObject({
+      calories: base.calories,
+      proteinG: base.proteinG,
+      carbsG: base.carbsG,
+      fatG: base.fatG,
+      waterMl: base.waterMl,
+      stepsGoal: base.stepsGoal,
+    })
+    // Carbs are still the remainder of the served figures, never a value anyone chose.
+    expect(body.recommended.carbsG)
+      .toBe(Math.round((base.calories - base.proteinG * 4 - base.fatG * 9) / 4))
     expect(body.recommended.carbsG).not.toBe(MODEL_NUMBERS.recommendedCarbsG)
+    // The clamp had nothing left to say about fat, so it reported nothing.
+    expect(body.dataQualityNote).not.toContain('Fat adjusted')
   })
 })
