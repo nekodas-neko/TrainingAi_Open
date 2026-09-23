@@ -15770,3 +15770,10 @@ A genuine shrink caused by this branch — the case the ratchet is right to make
 distinct from the tax RV-134 describes, where a branch is forced to lower a number because
 *someone else's* merge shrank the file. Five of five re-merges on #1423 were that other case in one
 night.
+---
+
+## 2026-09-23 — backlog → 27020 (+11 from this branch, measured after merging main), device-verification baton → 53 (−1) (device/probe-sitting-2)
+
+BF-61 gains the second attempt's bullet: why three "failed" immediate taps were not evidence (the tray
+was already open; the tap aimed at the row), so the next attempt does not repeat them. The baton
+shrank by a line on its rewrite.
