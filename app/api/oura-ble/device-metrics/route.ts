@@ -54,10 +54,30 @@ export async function GET(req: Request) {
   const rows = await repo.getOuraRawSamplesForTags(userId, BIOMETRIC_TAGS, days)
 
   // Bucket by user-local day using the already-stamped measured_at.
+  //
+  // DV-13: `toAestDay` is `formatInTimeZone`, measured at 11.2 us per call. This window really holds
+  // 58,856 rows for the owner at the default `?days=3`, so calling it per row was 656 ms of
+  // SYNCHRONOUS work before any decoding began, and ~3.1 s at `?days=14` — and nothing else can run
+  // on this process while it does, which is why sibling routes with no such loop (a single-row
+  // `rollup-state`, the database-free `/api/version`) appeared to hang alongside it.
+  //
+  // A zone's UTC offset is never finer than a minute, so keying the lookup by minute returns exactly
+  // what a per-row call returns, for every timezone, while collapsing tens of thousands of calls to
+  // at most 1,440 per day of window. Correctness is pinned in the sibling test rather than argued.
+  const dayByMinute = new Map<number, string>()
+  const localDay = (ms: number): string => {
+    const key = Math.floor(ms / 60_000)
+    const hit = dayByMinute.get(key)
+    if (hit !== undefined) return hit
+    const day = toAestDay(new Date(ms), tz)
+    dayByMinute.set(key, day)
+    return day
+  }
+
   const byDay = new Map<string, OuraRawSampleRow[]>()
   for (const r of rows) {
     if (!r.measuredAt) continue
-    const day = toAestDay(new Date(r.measuredAt), tz)
+    const day = localDay(new Date(r.measuredAt).getTime())
     const bucket = byDay.get(day) ?? []
     if (!byDay.has(day)) byDay.set(day, bucket)
     bucket.push(r)

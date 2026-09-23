@@ -2604,6 +2604,33 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][devices] ⚠️ The app was unreachable for ~8 minutes, and the likeliest cause is how fast we were merging (DV-13, 2026-09-23)
+
+At **20:04:40 AEST** the public `/api/version` — which does not touch the database — took 30 s, then
+timed out on every attempt until **20:12:41**, when it answered in half a second. For those eight
+minutes the app was effectively down for anyone using it. The device agent was on the Oura BLE admin
+console at the time and four of its requests never answered, so the console was the first suspect.
+
+**It probably was not the console. It was a deploy.** `main` took four merges in sixteen minutes and
+every merge redeploys production — the third of them landed **70 seconds before the stall began**,
+and the recovery is an ordinary build-and-swap later. A container being replaced is exactly what
+makes a database-free route hang for minutes and then answer instantly. The only two server errors
+recorded in the window are at 20:12:36, the moment of recovery rather than the stall, and both say
+the app could not get a database connection — a new container warming up.
+
+**So the thing to change is the merge cadence, not just the code**: several merges in a few minutes
+means several production restarts in a few minutes. Spacing them out is free.
+
+**One real defect did come out of it and is fixed.** The admin console's `device-metrics` worked out
+the local calendar day separately for *every* raw sample — 58,856 of them in the default window,
+about 0.65 s of the server doing nothing else, and roughly 3 s over a fortnight's window. While it
+does that the whole app stops responding, which is why unrelated screens looked frozen too. It now
+does that work once a minute instead of once a row — the same answer, about 100× cheaper.
+
+**Still open:** nobody has read Railway's own logs for the window, the console's requests are still
+unbounded (a big enough window can still occupy the server), and none of this has been re-checked on
+the phone.
+
 ### [platform] ⚠️ Two routes fetched the active program twice per request (RV-82, 2026-09-23)
 
 `getNextSession` already calls `getActiveProgram` — a fixed 5-query composite — inside its own

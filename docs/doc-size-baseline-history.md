@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27313 (DV-13 measured, +30), projectOverview → 12597 (+27)
+
+DV-13 stays in the queue and grew, which is the right direction for an entry whose cause was not
+proven: the measurement went in beside the hypothesis rather than replacing it. `error_events` put
+the window's only two server errors at the moment of recovery, and the merge timeline put a
+production deploy 70 seconds before the stall began — so the eight-minute outage reads as a deploy,
+while the per-row timezone formatting the entry suspected is real, measured and fixed. The `Keep:`
+lines are the four things still owed, including that the outage cause is NOT settled by the fix that
+shipped.
+
+`projectOverview.md` carries the owner-facing half: the app was unreachable for eight minutes, the
+likeliest cause is four merges in sixteen minutes each redeploying production, and the cadence is
+the thing to change.
+
 ## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27283 (LA-130, −26)
 
 The Git Workflow shallow-fetch rule told every session to fetch with `--unshallow` every time,
