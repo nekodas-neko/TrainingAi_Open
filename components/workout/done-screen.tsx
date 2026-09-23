@@ -21,6 +21,7 @@ import { aggregateHrRecoveryByExercise, formatRecoveryRate } from "@trainingai/s
 import { WORKOUT_RECAP_TTL, WORKOUT_ENERGY_TTL, WORKOUT_HR_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
 import { COMMON_WORKOUT_ACTIVITIES, DEFAULT_ACTIVITY_ID } from "@trainingai/shared/health/workout-activities";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { navigateToTab } from "@/lib/shell-nav";
 
 
 // Leaf-scoped so the ~60fps rAF count-up re-renders only this stat cell, not the
@@ -516,7 +517,7 @@ export function DoneScreen({
               <ShareIcon className="h-4 w-4 mr-1.5" />
               Share
             </Button>
-            <Button variant="outline" className="h-12 flex-1" onClick={() => router.push("/workout")}>
+            <Button variant="outline" className="h-12 flex-1" onClick={() => navigateToTab(router, "/workout")}>
               Done
             </Button>
           </div>

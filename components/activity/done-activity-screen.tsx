@@ -22,6 +22,7 @@ import { cachedFetch } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { formatPace } from '@trainingai/shared/health/vdot'
 import { formatMinutes } from '@trainingai/shared/format/units'
+import { navigateToTab } from "@/lib/shell-nav";
 
 const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
@@ -263,7 +264,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         invalidateActivityWrites().catch(() => {})
         toast.success('Activity saved')
         resetSession()
-        router.push('/workout')
+        navigateToTab(router, '/workout')
         pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
         if (activityType === 'run' && prescribedRunId) {
@@ -309,7 +310,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
       await invalidateActivityWrites()
       toast.success('Activity saved')
       resetSession()
-      router.push('/workout')
+      navigateToTab(router, '/workout')
     } catch {
       toast.error('Failed to save activity')
     } finally {
@@ -319,7 +320,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
 
   function handleDiscard() {
     resetSession()
-    router.push('/workout')
+    navigateToTab(router, '/workout')
   }
 
   return (

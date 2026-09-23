@@ -409,6 +409,9 @@ jobs:
       - name: Day windows take the user's timezone
         run: node scripts/check-aest-midnight-timezone.js
 
+      - name: A cross-tab navigation flips the shell rather than tearing it down
+        run: node scripts/check-tab-navigation.js
+
       - name: A click-toggled disclosure declares its ARIA state
         run: node scripts/check-toggle-aria.js
 

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.8",
+    date: "2026-09-23",
+    changes: [
+      "Moving between the main tabs from inside a screen \u2014 finishing a walk, saving a fitness test, tapping a day on the timeline \u2014 now switches tabs the way the tab bar does, instead of rebuilding all five screens from scratch. Fifteen places did it the slow way, including two on the home screen that sat on adjacent lines and behaved differently for no reason you could see.",
+      "Home and More no longer overwrite each other's scroll position. Both stay loaded at once and were saving to the same slot, so returning to one could drop you where you had been in the other.",
+    ],
+  },
+  {
     version: "1.465.7",
     date: "2026-09-23",
     changes: [

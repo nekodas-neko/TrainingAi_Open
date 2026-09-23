@@ -15713,3 +15713,19 @@ Worth noting against RV-134, which is the open entry about this exact number: th
 shrink caused by this branch, the case the ratchet is right to make someone lower. The tax RV-134
 describes is the other case — a branch forced to lower a number because *someone else's* merge
 shrank the file. Four of four re-merges on #1422 were that case in one night.
+
+## 2026-09-23 — backlog 26794 → 26780, `projectOverview.md` 12359 → 12379 (RV-110/RV-112)
+
+The backlog nets down 14: RV-110 and RV-112 shipped and left the queue, against the new LB-129
+filed for the day-review sheet that does not open on a first flip — a finding from RV-110's probing
+that is not RV-110's subject, so it goes in the queue rather than into that PR's diff.
+
+The twenty lines on `projectOverview.md` are two entries, and both are there for something NOT
+done. LB-129 is found-but-not-fixed. The RV-110 row records that the entry's own mechanism — that a
+push to a tab href tears the shell down — is unverified: it follows from the code, the conversion is
+right either way, and the e2e written to prove it did not discriminate and was deleted rather than
+shipped. An index that said only "cross-tab navigation now flips the shell" would read as though
+that had been demonstrated.
+
+Also `docs/agents/state/implementation-lane-b.md` 65 → 51: the baton was rewritten in full, as the
+rule requires, and came back shorter. It is shrink-only, so the number follows it down.
