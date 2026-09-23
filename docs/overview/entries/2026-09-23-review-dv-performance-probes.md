@@ -58,3 +58,14 @@ Nothing was run. Every threshold in the entries (300 ms warm, 1.5 s FCP, 50 ms l
 2, 20% drift over a session) is a **stated expectation to be falsified**, not a measured budget — the
 app has never had one. A probe that comes back green against these is as useful as one that fails,
 because it is the first baseline either way.
+
+## A fifth datapoint for RV-134, collected by accident
+
+This PR conflicted on `docs/doc-size/docs/implementation-backlog.md.size` and the append-only
+history file — **five of five merges tonight**, after RV-134 recorded four of four and Tuning
+recorded five of seven. That entry argues the mechanism is the ratchet's missing `inherited` escape
+on the *slack* direction, and this merge is another instance: `main` had shrunk the backlog below
+the number on this branch, so the branch was required to lower a figure it never moved.
+
+Not re-filed — RV-134 already holds it. Recorded here because the count is the evidence, and a PR
+that demonstrates the defect it is not even about is worth one line.

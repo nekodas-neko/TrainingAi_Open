@@ -15770,6 +15770,37 @@ A genuine shrink caused by this branch — the case the ratchet is right to make
 distinct from the tax RV-134 describes, where a branch is forced to lower a number because
 *someone else's* merge shrank the file. Five of five re-merges on #1423 were that other case in one
 night.
+---
+
+## 2026-09-23 — backlog → 27020 (+11 from this branch, measured after merging main), device-verification baton → 53 (−1) (device/probe-sitting-2)
+
+BF-61 gains the second attempt's bullet: why three "failed" immediate taps were not evidence (the tray
+was already open; the tap aimed at the row), so the next attempt does not repeat them. The baton
+shrank by a line on its rewrite.
+
+## 2026-09-22 — `projectOverview.md` → 12403 (RV-105)
+
+The backlog shrinks by RV-105's entry and the overview gains a block. Most of that block is spent on
+two things the diff cannot say for itself.
+
+The first is a correction that cost nothing to make and would have cost a lot to inherit: the entry
+says four of sweep 53's five freshness findings are this shape, and **two are**. RV-104 and RV-107
+are `nutrition-content.tsx`'s `useCallback` shape, which this script excludes deliberately — and
+counting it is exactly what inflated its baseline by 11 of 25 the first time. A later session
+reading "four of five" would treat the remaining two as a gap in the check rather than as a
+different bug class.
+
+The second is the number: widening the fetch-once gate takes the tracked population from 11 sites to
+25. The entry could not state that — it said outright that its four motivating findings were found
+by hand and that no candidate scan had been run — and without it the change reads as a one-line
+regex tweak rather than a re-baseline of twenty files.
+
+The third is the limit. This widened the lens; it did not audit what the lens revealed. All 14 new
+sites went into the baseline, four of them the sync provider's sanctioned warm pass, and three more
+still need judging by where they mount. Recording that here matters because the next reader will see
+25 tracked sites and a green check and conclude the ground is covered. It is not; RV-104, RV-106,
+RV-107 and RV-109 are the entries that own those verdicts.
+
 
 ## 2026-09-23 — `docs/implementation-backlog.md` and the probe checklist (Review: DV performance probes)
 
