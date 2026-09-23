@@ -93,7 +93,7 @@ export function SettingsPanel() {
                   <p className="text-[10px] text-muted-foreground">Add a calendar event after each completed workout</p>
                 </div>
               </div>
-              <Switch checked={calendarSync} onCheckedChange={toggleCalendarSync} />
+              <Switch checked={calendarSync} onCheckedChange={toggleCalendarSync} aria-label="Sync to Google Calendar" />
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export function SettingsPanel() {
                   <p className="text-[10px] text-muted-foreground">Wind-down nudge before bed, weekly recap on Sunday</p>
                 </div>
               </div>
-              <Switch checked={dayReviewRemindersEnabled} onCheckedChange={toggleDayReviewReminders} />
+              <Switch checked={dayReviewRemindersEnabled} onCheckedChange={toggleDayReviewReminders} aria-label="Day & Week Review Reminders" />
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
@@ -117,7 +117,7 @@ export function SettingsPanel() {
                   <p className="text-[10px] text-muted-foreground">Notify me when illness signs, high stress, or low readiness show up</p>
                 </div>
               </div>
-              <Switch checked={healthAlertsEnabled} onCheckedChange={toggleHealthAlerts} />
+              <Switch checked={healthAlertsEnabled} onCheckedChange={toggleHealthAlerts} aria-label="Health Anomaly Alerts" />
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
@@ -129,7 +129,7 @@ export function SettingsPanel() {
                   <p className="text-[10px] text-muted-foreground">Live rest countdown in the status-bar pill while resting</p>
                 </div>
               </div>
-              <Switch checked={restChipEnabled} onCheckedChange={toggleRestChip} />
+              <Switch checked={restChipEnabled} onCheckedChange={toggleRestChip} aria-label="Rest Timer in Status Bar" />
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
@@ -141,7 +141,7 @@ export function SettingsPanel() {
                   <p className="text-[10px] text-muted-foreground">Live distance/time progress in the status-bar pill during a run or guided walk</p>
                 </div>
               </div>
-              <Switch checked={runChipEnabled} onCheckedChange={toggleRunChip} />
+              <Switch checked={runChipEnabled} onCheckedChange={toggleRunChip} aria-label="Run/Walk in Status Bar" />
             </div>
           </div>
         </CollapsibleContent>

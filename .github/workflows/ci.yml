@@ -325,7 +325,7 @@ jobs:
       - name: Theme tokens meet WCAG AA contrast
         run: node scripts/check-contrast.js
 
-      - name: Icon-only controls have accessible names
+      - name: Controls have accessible names (icon buttons, switches)
         run: node scripts/check-icon-button-names.js
 
       - name: No stray backticks in an AI route prompt

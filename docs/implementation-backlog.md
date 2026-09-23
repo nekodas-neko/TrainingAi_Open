@@ -1007,12 +1007,32 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
 
-- **Lane:** B — `components/nutrition/manage-supplements-sheet.tsx`.
+- **Lane:** B — swept app-wide; the guard is `scripts/check-icon-button-names.js`.
 - **Added:** 2026-09-23 · Device Verification, sweep 1.
-- **Measured on the S25:** each supplement row's `role="switch"` button has **no `aria-label`** and no
-  labelled-by — a screen reader announces "switch, on" with no name. Give it the supplement's name.
-- **Pass test:** every switch in the sheet has an accessible name.
-
+- **Shipped 2026-09-23** (`fix/dv11-switch-accessible-names`, v1.465.13).
+- **The entry named one sheet; the class was app-wide.** Measured on the S25, each supplement row's
+  `role="switch"` had no `aria-label` and no labelled-by, so a screen reader announced "switch, on"
+  with no name. The sibling sweep found **17 of 25** live switches unnamed, across **eleven** files
+  — settings, meal types, goal recommendations, the workout builder, the admin activity manager.
+  All 25 have a name now.
+- **Why the existing check missed them:** `check-icon-button-names.js` only walked `<button>` and
+  `<Button>` opening tags, and skipped self-closing ones outright — a `<Switch />` was never
+  examined. It is extended rather than duplicated, so Custom Rules stays at 76 steps.
+- **Unlike the icon-button half, this pass is not a heuristic.** A `Switch` renders a thumb and no
+  text child, ever, so "no naming attribute" means "no accessible name" with nothing to trade
+  against under-reporting. The baseline stays **empty**: an unnamed switch is a regression, not a
+  debt row.
+- **⚠ The first measurement of this class was WRONG, and the way it was wrong is the reusable
+  part.** Matching `<Switch` one line at a time reported **26 of 28**; the real figure is 17 of 25.
+  Nine were false positives — three were the primitive's own definition, and six were multi-line
+  switches whose `aria-label` sat on a later line. Read the tag to its balanced close, not the line.
+  `scripts/__tests__/switch-accessible-name.test.ts` pins that shape and seven others, driving the
+  exported detector directly.
+- **Control runs:** removing the name from a self-closing switch and from a multi-line one each
+  fail the check at the right file and line; both restore green.
+- **Keep:** the device pass — a screen reader on the S25 announcing each switch with its name. The
+  sandbox can prove the attribute is present and cannot prove what TalkBack says.
+- **Verify: device**
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
 
@@ -1120,6 +1140,17 @@ below threshold and left in place for next time.
   `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
 - **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
   it as, and what it is gated on) rather than the param.
+- **Three more candidates ruled out from source, 2026-09-23** (while DV-11 was in CI — reading only,
+  nothing built). None is the cause, and each would otherwise be the obvious first guess:
+  ① **`steps` empty → `step` undefined.** `visibleReviewSteps` starts with `['day']` unconditionally
+  and always returns ≥2, so `safeIndex` is never -1 even with `mealTypes`/`logs` still loading.
+  ② **An early return before the sheet mounts.** `nutrition-content.tsx` has a single `return (` and
+  renders `<EndOfDayReview>` unconditionally — there is no loading gate above it.
+  ③ **A mount gate in the `Sheet` primitive.** Its only `return null` is `SheetSurfaceLayer`, a
+  decorative gradient that no-ops when the wallpaper is off.
+  **What remains unexamined is the one thing worth instrumenting:** `EndOfDayReview` is a SECOND
+  `dynamic(..., { ssr: false })` chunk nested inside the tab's own code-split chunk, so on a cold
+  flip it renders `null` while its chunk loads and then mounts already `open={true}`. Start there.
 - **Probe recipe:** `page.goto('/')`, `settleRouteBoundary`, then
   `page.evaluate(() => window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/nutrition?review=day', cancelable: true })))`,
   wait ~10 s, read `[role="dialog"]`. Allow generously for the dynamic import — a run that renders

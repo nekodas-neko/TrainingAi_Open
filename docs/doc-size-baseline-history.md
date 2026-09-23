@@ -16137,3 +16137,27 @@ the prop would be one a future render site can omit — the same hazard as the `
 default the entry exists to remove, moved up a level. It reads the context instead. A later session
 reading only the original entry would see a prop missing and "fix" it back.
 
+
+## 2026-09-23 — backlog → 27351 (DV-11 +31, against a 219-line clearance from `main`); baton held at 55
+
+**The number goes DOWN while this branch adds 31 lines**, which is worth stating plainly because the
+figure alone reads as a shrink this PR did not do: an Orchestrator sweep cleared 219 lines of
+completed entries from `main` while this sat in CI. The baseline is lowered to the truth rather than
+left at the 27538 this branch computed before that merge — a baseline 188 lines above reality is
+slack for the next growth to hide in, which is the failure the ratchet exists to prevent.
+
+The backlog grows because DV-11 turned out to be an app-wide class rather than one sheet, and the
+entry now carries the two things a later session would otherwise pay for again: why the existing
+`check-icon-button-names.js` could not see a `<Switch>` (it skipped self-closing tags), and that the
+**first measurement of the class was wrong** — 26 of 28 by line-matching, 17 of 25 read properly.
+Nine false positives, six of them multi-line switches whose `aria-label` sat on the next line.
+
+Most of the rest is LB-129's, which shipped nothing: three more candidates ruled out from source
+while this PR sat in CI, written into its entry so the next session starts from what is left rather
+than re-deriving what is not.
+
+**The baton was rewritten and came back to exactly 55 rather than raising its number.** `--fix`
+offered 56 and that was declined: a shrink-only file that grows by one whenever someone has a new
+lesson is not shrink-only, it is a slower ratchet. Room for the three new lessons came from cutting
+older narrative and from moving LB-129's findings to LB-129 — which is where they belonged anyway,
+since a baton carries state and an entry carries the investigation.

@@ -744,7 +744,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                     Get a notification if a meal window ends with nothing logged
                   </p>
                 </div>
-                <Switch checked={mealRemindersEnabled} onCheckedChange={toggleMealReminders} />
+                <Switch checked={mealRemindersEnabled} onCheckedChange={toggleMealReminders} aria-label="Remind me to log meals" />
               </div>
             </div>
             <div>
