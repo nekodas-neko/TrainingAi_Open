@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.19",
+    date: "2026-09-23",
+    changes: [
+      "The end-of-day review should now open the first time you tap \u201creview your day\u201d in a session. It previously needed the Nutrition tab to have been opened once already, so the first tap of the day often did nothing.",
+    ],
+  },
+  {
     version: "1.465.18",
     date: "2026-09-23",
     changes: [

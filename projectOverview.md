@@ -2612,6 +2612,26 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] ⚠️ The day review may still not open on the first tap of a session — fix NOT verified (LB-129, 2026-09-23)
+
+Home's "review your day" flips to `/nutrition?review=day`. On a Nutrition the shell has not mounted
+yet, the sheet stays closed; the same tap later opens it, so the first tap of a session is the one
+that does nothing.
+
+**Measured:** the param is fine (`reviewOpen` goes true, no error) — `EndOfDayReview`'s component
+body never runs, because its chunk has not resolved. Flip immediately and the sheet does not appear
+within 12 s; wait 1500 ms and it opens.
+
+**Shipped speculatively:** `EndOfDayReview` is now a static import instead of a `dynamic` nested
+inside the tab's own lazy chunk. **Nothing demonstrates this fixes it.** The harness drives
+`pnpm dev`, where a cold chunk is compiled on demand, so the measurement cannot be separated from a
+dev-compiler artefact — and a production-mode run is impossible in the sandbox (`next start` turns
+the pg pool's SSL on and the local Postgres speaks none).
+
+**Owed — the only thing that can close it:** on the S25, from a cold app start, tap "review your
+day" as the first action of the session. If it opens, the chunk boundary was the cause; if not, that
+reading was a red herring and the entry says where to resume. Reversal is one line.
+
 ### [platform] ⚠️ A merge went through on a FAILING required check — the merge call is not a gate (LB-134, 2026-09-23)
 
 **Read this before merging anything.** PR #1467 was squash-merged at 10:18 while its `Tests` job
