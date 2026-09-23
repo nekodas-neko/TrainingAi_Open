@@ -73,12 +73,26 @@ function showAtBase(baseRef, relPath) {
   }
 }
 
+/**
+ * Both warnings go to **stdout**, and that is measured rather than stylistic (OR-134, 2026-09-23).
+ *
+ * `execFileSync`'s return value is **stdout only** — verified: a child writing to stderr does not
+ * appear in it. The ratchet scripts are spawned that way by their own tests
+ * (`strict-schema-inert.test.ts` asserts on exactly that return value), so a warning written to
+ * stderr **cannot appear in anything the test sees or reports**.
+ *
+ * That is not a cosmetic detail. Across five occurrences of the goals-route flake, "no warning
+ * fired" was taken as evidence three times — including the conclusion that the no-base path must be
+ * the one firing. It was never evidence: the diagnostic was being written where the observer
+ * structurally could not look. **A diagnostic in the wrong stream is worse than none, because its
+ * silence reads as information.**
+ */
 const warned = new Set();
 function warnUnreadable(baseRef, relPath, reason) {
   const key = `${baseRef}:${relPath}`;
   if (warned.has(key)) return;
   warned.add(key);
-  process.stderr.write(
+  process.stdout.write(
     `  base-ref: could not read ${relPath} at ${baseRef} after ${ATTEMPTS} attempts.\n` +
     `            git said: ${reason}\n` +
     `            Treating it as absent, which is STRICT. If this file is unchanged from the base,\n` +
@@ -124,7 +138,7 @@ let noBaseWarned = false;
 function warnNoBase(refs) {
   if (noBaseWarned) return;
   noBaseWarned = true;
-  process.stderr.write(
+  process.stdout.write(
     `  base-ref: no base branch resolved (tried ${refs.join(', ')}) — the ratchets are\n` +
     '            comparing against their BASELINE only, with no "is this the branch\'s growth?"\n' +
     '            check. That is STRICTER, not weaker: a file already over its number on main will\n' +

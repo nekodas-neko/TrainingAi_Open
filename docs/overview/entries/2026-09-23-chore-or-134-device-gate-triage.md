@@ -78,11 +78,48 @@ The ref list is injectable so the path is testable; callers pass nothing.
 **This does not belong in a docs-only triage PR** and is here because it blocked it: the gate could
 not go green without it. Said plainly rather than filed as a tidy coincidence.
 
+### Then the flake hit a fifth time, and the reason no warning ever fired is measured
+
+`execFileSync`'s return value is **stdout only** — verified: a child writing to stderr does not
+appear in it. The ratchet scripts are spawned that way by their own tests, and
+`strict-schema-inert.test.ts` asserts on exactly that return value. **So a warning written to
+stderr cannot appear in anything that test sees or reports.**
+
+Across five occurrences, *"no warning fired"* was taken as evidence **three times** — including the
+conclusion earlier in this very entry that the no-base path must be the one firing. It was never
+evidence. The diagnostic was being written where the observer structurally could not look.
+
+Both warnings move to stdout, with two tests pinning it: one proving `execFileSync` drops stderr,
+one proving a spawned `base-ref` run reports its warning. **No verdict changes** — this is where the
+message is written, not what the ratchet decides.
+
+**A diagnostic in the wrong stream is worse than none, because its silence reads as information.**
+That is the lesson of OR-130 and OR-134 together: OR-130 built the warning and this is the first
+occurrence where anyone could have read it.
+
+**The flake itself is still undiagnosed** at five occurrences. What changes is that the sixth will
+say something.
+
 ## Not done
 
 - **The other 18 of the 24 are not individually classified.** The three kinds are now named and the
   clearest cases of each are fixed; the rest need the same read and it is real work, not a sweep.
 - **No product code**, no device run, nothing to exercise on the S25.
+
+## The compaction sweep rode along, because the gate said it was mine
+
+The entries directory hit **61 against a 60-file runaway limit**, and the check named the reason
+this PR had to deal with it: *"This branch adds 1 of them, so the sweep is yours: you are already
+here."* A threshold that lands on whoever happens to cross it is the right design — it cannot
+accumulate into a chore nobody owns.
+
+`node scripts/fold-journal-entries.js --limit=25` (dry-run first) folded 25 entries into
+`history-2026-09-23-folded-1.md`, held back 6 cited by an agent baton, and rewrote citations in two
+domain indexes. 73 → 48 loose entries.
+
+The script's closing instruction is worth repeating because it is the right instinct: *"now run
+`check-doc-links.js` and fix what it names — do not reason about which links moved."* Run: **OK, 838
+files checked.**
 
 ## Gate
 

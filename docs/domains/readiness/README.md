@@ -291,7 +291,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- [`2026-09-21-tn35-stress-against-events`](../../overview/entries/2026-09-21-tn35-stress-against-events.md)
+- [`2026-09-21-tn35-stress-against-events`](../../overview/history-2026-09-23-folded-1.md#2026-09-21-tn35-stress-against-events)
   — **TN-35's overlay half (2026-09-21): a past day now says what you were doing when stress
   spiked.** `/health/day?date=` places the day timeline's typed, timestamped events on the stress
   chart's axis and prints the measured level beside each. **An event with no bucket prints

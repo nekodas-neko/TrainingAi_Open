@@ -90,3 +90,30 @@ describe('a run with no base at all says so (OR-130, the missed half)', () => {
     expect(verdict({ count: 1, limit: 0, atBase: null })).toBe('fail')
   })
 })
+
+
+// OR-134 — the stream the diagnostic is written to, pinned because getting it wrong is invisible.
+//
+// `execFileSync` returns STDOUT ONLY. The ratchet scripts are spawned that way by their own tests,
+// so a warning on stderr cannot appear in anything those tests see or report. Across five
+// occurrences of the goals-route flake, "no warning fired" was read as evidence three times — and
+// it was never evidence, because the diagnostic was written where the observer could not look.
+describe('the diagnostic is written where its reader will actually see it (OR-134)', () => {
+  it('execFileSync captures stdout and not stderr — the fact the choice rests on', () => {
+    const { execFileSync } = require('child_process')
+    const out = execFileSync('node', ['-e', 'process.stdout.write("OUT");process.stderr.write("ERR")'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    expect(out).toContain('OUT')
+    expect(out).not.toContain('ERR')
+  })
+
+  it('base-ref writes its warnings to stdout, so a spawned run reports them', () => {
+    const { execFileSync } = require('child_process')
+    const lib = require.resolve('../lib/base-ref.js')
+    const out = execFileSync('node', ['-e', `require(${JSON.stringify(lib)}).resolveBaseRef(['or134-a','or134-b'])`], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    expect(out, 'a warning on stderr would leave this empty').toContain('no base branch resolved')
+  })
+})
