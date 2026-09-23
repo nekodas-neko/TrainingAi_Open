@@ -473,7 +473,33 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
+
+- **Lane:** A — Railway's deploy for `main` (the build/start/health check), not application code.
+- **Added:** 2026-09-23 20:25 AEST · Device Verification, noticed while re-checking DV-13.
+- **Measured:** the public `/api/version` (from a PC, and from the APK) answers **`"version":"1.465.10"`**
+  at 20:22 AEST. `main` is at **1.465.16**. Not live: 1.465.11 (18:16, status-bar scrim — DV-6),
+  1.465.12 (18:55, sleep timing in the user's zone — DV-7/DV-9), 1.465.13 (19:11, switch names —
+  DV-11), 1.465.14 (19:38, weigh-in invalidation — RV-108), 1.465.15 (20:03, fat floor), 1.465.16
+  (20:18, #1467 — BF-177's post-push invalidation).
+- **Consequence for everyone:** every fix merged since 18:16 is **unverifiable on the device and
+  unshipped to the owner**, and any "merged, so it is live" reasoning since then is wrong. A deploy
+  that restarts and fails may also be DV-13's 8-minute outage (20:04, one minute after the 20:03
+  merge).
+- **First step:** Railway's deploy log for `main` from 18:16 — the first failing deploy names the
+  cause. Not established: whether deploys fail, are stuck queued, or are disabled.
+- **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
+
+
 ### [devices][platform] DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+
+- **⚠ A SECOND EXPLANATION, found 20:25 AEST the same evening — read before blaming the admin routes.**
+  Production was still serving **v1.465.10** (merged 15:13) while `main` had reached **v1.465.16**:
+  six merges between 18:16 and 20:18 had **not deployed** (DV-14). One of them, v1.465.15 (#1468),
+  merged at **20:03 — one minute before the outage began at 20:04**. A Railway deploy that fails its
+  health check and restarts the service would produce exactly this window. So the outage may be the
+  deploy, the admin requests, or both; `error_events` and Railway's deploy log decide it.
+
 
 - **Lane:** A — `app/api/oura-ble/device-metrics/route.ts` first; also `samples/summary`, `rollup-state`,
   `samples/pack`.

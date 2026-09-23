@@ -16277,3 +16277,10 @@ the same two edges, and neither is visible from the type.
 
 DV-13 filed at the top of the queue: a production outage (~8 min) coincided with the BLE admin
 console's hung requests during device sweep 2. Placed first because it is availability.
+
+---
+
+## 2026-09-23 — backlog → 27335 (device/sweep-2b)
+
+DV-14 (production has not deployed since 15:13) filed above DV-13, and DV-13 gains the deploy as a
+second explanation for its outage.
