@@ -64,6 +64,32 @@ walk, the camera, midnight) are **outside this sweep** and listed at the end of 
   Home's compact bar, not behind the gear.
 - **TN-54 / TN-51** need the strap Kotlin from ~2026-09-21; check the installed APK's build date first.
 
+## Also in the sweep: entries gated on the device (RV-143)
+
+`--sittings` selects only shipped work owing a look, so **`Gate: device` entries never reached this
+plan's table** — work *blocked on* the device agent and invisible to it (RV-143, Lane O owns the
+`next-item.js` fix). Read here by hand against their entries; the ones this sweep can move:
+
+| ID | block | what the sitting does |
+|---|---|---|
+| **DV-8** (Lane DV) | 5 | `localQuery` the stuck `set_logs` row and its parent: why its `workout_session_id` is not in local `workout_sessions` while the server holds the set under another session |
+| **BF-22** | 9 | *"slow loads clear on a force restart"* — this is P16/RV-142 plus P10/RV-133; the long-session block answers it |
+| **Q-51** | 2 | the perf thread — P11/P12 (RV-137, RV-138) produce the numbers it is gated on; **do not start its refactor before they exist** |
+| **BF-49** | 4 | back from a Home timeline row: record where it lands (Health vs the start), path read in the page |
+| **RV-111** | 4 | back while the barcode scanner is open in Log Food — does the whole flow discard? Scanner open is read-only |
+| **BF-92** | 7 | Sentry receiving nothing from the client: a deliberate client-side throw via CDP `Runtime.evaluate`, then check it arrived — ask the owner first if it pages anyone |
+| **LA-36** | 5 | `localQuery`: is `food_items.image_data_uri` populated on the device, and does any screen read it |
+| **LA-115** | 5 | Health Connect's three unparseable record types: read the device console/logcat during a sync for the silent failures |
+| **Q-7b** | 5 | `localQuery` the ten device-owned `oura_daily_derived` columns: null on every row, or produced |
+| **Q-418** | owner | the free walk's Android pill — needs a walk started; ask |
+| **PS-7** | owner | pose landmarker in the WebView — needs the camera; ask |
+| **TN-44** | 5 | Health Connect record types available on the phone — read-only enumeration |
+
+**Not movable in this sweep:** the Colmi R09 items (PS-8, PS-9, PS-12, PS-16, PS-21 — the ring is with a
+second wearer), Q-388 (multi-day wear + an owner decision), Q-529 and Q-533 (a morning mid-upload; a
+real re-sync), Q-104 and Q-114 (the scale), and the large specs BF-11, Q-395, Q-168, Q-34, which RV-143
+reads as mis-gated rather than device-blocked.
+
 ## The table
 
 Bucket = what this sweep can settle. AUTO rows are block 4; WRITE-OK are block 5; the rest are

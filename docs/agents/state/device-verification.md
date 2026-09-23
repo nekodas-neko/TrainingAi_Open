@@ -14,12 +14,13 @@
   bucketed (53 automatable, 9 approved writes, 9 writes needing the owner, 18 hardware, 6 judgement,
   21 not really device checks), plus P11–P16 (RV-137…142). **Stale for your sweep:** BF-107 and
   LA-57 print as owed but are closed/refuted; BF-95's failure note reads like BF-61's.
-- Open from sitting 1: **BF-177** (B), **DV-4** (B), **DV-5** (A), **DV-6** (B, owner-gated).
+- **Gated entries (RV-143) are in the plan too** (DV-8, BF-22, Q-51, BF-49, RV-111, BF-92, LA-36 …).
+  Open: **BF-177**, **DV-4**, **DV-6** (owner), **DV-1 FAILED here** (`npx.cmd` EINVAL), **DV-7/DV-9**
+  (bedtime consistency in the phone's timezone).
 
 ## Now
 
-Waiting on the owner's go-ahead **and** his four decisions (plan §"Decisions"): weigh-in overwrite,
-mood one-per-day, the nine unapproved writes (default skip), the optional owner-present OS block.
+Waiting on the owner's go-ahead and his four decisions (plan §"Decisions" — weigh-in, mood, 9 writes, OS block).
 
 ## Next — sweep 1, in the plan's order
 

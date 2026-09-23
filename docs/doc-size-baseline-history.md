@@ -15974,3 +15974,11 @@ seventeen gates by id, failed with an eighteenth: `RV-143:device`.
 
 The entry now writes the names as prose and carries the incident, because an entry about the gate
 parser being mis-parsed by it is LA-103's bug one level deeper and the best evidence the entry has.
+
+---
+
+## 2026-09-23 — backlog → 27316 (+45) (device/sweep-prep)
+
+DV-1's pass test was run on the device machine for the first time and failed (`npx.cmd` → EINVAL since
+Node's CVE-2024-27980 patch), so the entry gains the measured result; and DV-7 / DV-9 are new — bedtime
+consistency computed in the phone's timezone, which only shows on a machine not set to UTC.
