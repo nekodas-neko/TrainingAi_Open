@@ -3029,6 +3029,24 @@ why the count of affected entries always understated the harm.
   not succeed on our own BLE key — but its **trigger** was never replaced. The comment says fresh
   biometrics come from the BLE ingest pipeline instead, which is true of the data and not of the
   cadence: the BLE pipeline has no open/resume trigger to this day.
+- **⚑ THIS DUPLICATES A LINK OF Q-529, WHICH FILED IT FIRST — read that entry before building.**
+  Found after filing, and recorded rather than quietly reconciled. **Q-529** carries an owner
+  requirement from **2026-08-20** that is this entry's requirement in different words: *"Ideally I
+  want the score and sleep time to be accurate on first open of the day without needing time to
+  'adjust'."* Its link 1 is **"Drain on app open / wake detection — closes the ≤62-min data gap, the
+  dominant term. Native Kotlin ⇒ new APK."** That is BF-187. It has sat unbuilt for a month for
+  exactly the reason the owner removed on 2026-09-23.
+- **The split between the two entries, so neither waits on the other.** **Q-529 keeps the display
+  half** — its link 3, *"do not render a number that will change"*, shipped 2026-09-02 and its
+  remaining scope is sleep-specific. **BF-187 owns link 1**, the trigger, because a drain on open is
+  not a sleep feature: it moves steps, HR, SpO₂ and temperature on every open of the day. Q-529's
+  link 2 (roll up and re-score immediately after the drain, a measured ~4-minute lag) stays with
+  Q-529 and is the natural follow-on once this lands.
+- **⚑ TWO INDEPENDENT MEASUREMENTS, A MONTH APART, AGREE — which is itself the finding.** Q-529's
+  review measured **214 ingest batches over 7 days: median gap 62.0 min, p90 71, max 306**
+  (2026-08-20). This entry measured **57–91 min over 40 h** (2026-09-24), without having seen that
+  number. Nothing has drifted in a month, the cadence is the constant the policy says it is, and the
+  ≤62-min gap is not a one-week artifact. **Do not re-measure it a third time** — build the trigger.
 - **Fix: call `syncOuraRing()` on app open and on native resume, behind a cooldown.** A Capacitor
   `App` `resume` listener plus the mount pass, in `sync-provider.tsx` beside the four reconcilers
   that already run on exactly that pair of events. Everything downstream — waiting for the rollup
@@ -3038,14 +3056,22 @@ why the count of affected entries always understated the harm.
   listener that fires every time the owner tabs back. `status()` (`OuraRingService.kt:744`) exposes
   `draining` and `cursorDs` but **not** `lastDrainCompletedAt`, so JS cannot ask the native side how
   stale it is. Two ways out:
-  - **Recommended — a JS-side cooldown, no APK.** Keep a last-drain timestamp in the web layer and
-    skip the resume drain inside it. Ships via Railway, which is the entire reason to prefer it. The
-    cost is that it is blind to the autonomous hourly drains, so the first open after one can fire a
-    redundant drain — cheap, because the foreground service is already connected and §2 of the
-    operations doc is explicit that a drain on a held connection is near-free.
-  - **Expose `lastDrainCompletedAt` in `status()`** and cool down against the real clock. Strictly
-    better information, but it is a Kotlin change and therefore an APK cycle. Not worth one on its
-    own; fold it into the next native batch if one comes along.
+  - **⚑ RECOMMENDATION FLIPPED 2026-09-23 — the owner lifted the APK cost: *"Happy for new apk
+    builds if thats more effecient."* Do it natively.** Add a `drainIfStale(maxAgeMs)` plugin method
+    that makes the staleness decision **inside the service**, against the real
+    `lastDrainCompletedAt`, and have JS call it unconditionally on open and resume. The cooldown is
+    a fact about the ring's radio, and the service is the only thing that knows it — putting the
+    clock in JS means guessing at state the native side holds.
+  - **Why it is worth the APK rather than merely allowed by it.** A JS cooldown is wrong in three
+    ways that the native one is not: it resets when the WebView reloads, so a reload re-drains; it
+    cannot see the autonomous hourly drains, so it fires redundantly against a ring that was drained
+    ninety seconds ago; and it races the `draining` flag it would have to poll to avoid overlapping
+    an in-flight drain. The native version has all three facts locally and needs roughly ten lines.
+  - **The JS-side cooldown remains the fallback and is a real option**, not a strawman — it ships
+    through Railway alone, so it is the right answer if this ever needs to land without a build. It
+    is strictly worse, not unusable; the redundant drains it causes are cheap.
+  - **Reversal cost either way is near zero.** The trigger is one listener and one call; removing it
+    restores today's behaviour exactly. The APK cost is the build, not the commitment.
   **Suggested starting value: 10 minutes.** Not tuned — it makes the first open of the morning
   always drain while a burst of tab-switches costs one. If it reads wrong in use, that is a finding
   about the number, not a reason to remove the cooldown.
@@ -21597,7 +21623,13 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   could have helped.
 - **Three links, and all three are needed. Order matters.**
   1. **Drain on app open / wake detection** — closes the ≤62-min data gap, the dominant term.
-     **Native Kotlin ⇒ new APK**, not a Railway deploy.
+     **Native Kotlin ⇒ new APK**, not a Railway deploy. **→ This link is now BF-187 and left this
+     entry 2026-09-23.** The owner asked for it again in his own words (*"Can we somehow get the
+     sleep data to sync as soon as the app is opened?"*), BugFix traced it independently, and the
+     cadence re-measured at 57–91 min against the 62.0-min median recorded here — unchanged in a
+     month. It moved out because a drain on open is not a sleep feature: it moves steps, HR, SpO2
+     and temperature too. **The APK that blocked it was unblocked the same day** (owner: *"Happy for
+     new apk builds if thats more effecient"*).
   2. **Roll up and re-score immediately after that drain** — this morning the last upload landed 06:50
      and the score settled 06:54:41, a **~4-minute** processing lag.
   3. **Until 1 and 2 land, do not render a number that will change** — this entry's existing scope,

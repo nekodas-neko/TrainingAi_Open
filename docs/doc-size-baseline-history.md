@@ -16367,7 +16367,7 @@ Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
 `known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
 back to its 52-line baseline rather than raised.
 
-## 2026-09-23 — `docs/implementation-backlog.md` 27294 → 27385 (+91)
+## 2026-09-23 — `docs/implementation-backlog.md` 27294 → 27417 (+123)
 
 BF-187, filed from an owner report asking whether sleep data can sync on app open. The length is
 mostly two measured tables that the entry exists to carry: 40 h of drain cadence (57–91 min between
@@ -16375,3 +16375,11 @@ scheduled drains) and the per-night post-wake lag across the seven nights still 
 `oura_raw_samples` (4–34 min, median 25). The second table also records which nights had to be
 discarded as a packer-window artifact rather than read as multi-day lags — the kind of thing that
 gets re-derived wrongly if only the conclusion survives.
+
+Amended the same day, +33 on top of the +91. The owner lifted the APK constraint
+(*"Happy for new apk builds if thats more effecient"*), which flipped BF-187's recommendation from a
+JS-side cooldown to a native `drainIfStale` — and the sweep that answer prompted found the entry
+duplicates **Q-529's link 1**, filed 2026-08-20 and parked ever since on the APK cost. Both halves
+of that are recorded in the entry rather than reconciled quietly: the duplicate disclosure with the
+split between the two entries, and the two independent cadence measurements (62.0-min median then,
+57–91 min now) that agree a month apart.

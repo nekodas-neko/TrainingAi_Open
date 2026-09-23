@@ -31,3 +31,33 @@ ring-radio policy in `lib/oura-ble/**`. The entry recommends a JS-side cooldown 
 exposing `lastDrainCompletedAt` from the plugin, and states plainly that "as soon as the app opens"
 will mean ten to forty seconds, because `afterDrainSettles` waits for the rollup rather than
 invalidating early.
+
+## Amended the same day — the APK constraint came off, and the entry turned out to be a duplicate
+
+The owner lifted the build cost: *"Happy for new apk builds if thats more effecient."* That flips
+BF-187's recommendation. The entry had recommended a JS-side cooldown purely to avoid an APK; the
+native answer is a `drainIfStale(maxAgeMs)` plugin method that makes the staleness decision inside
+the service against the real `lastDrainCompletedAt`. A JS cooldown resets on WebView reload, cannot
+see the autonomous hourly drains, and races the `draining` flag — three facts the service holds and
+the web layer can only guess at. The JS version stays recorded as the fallback, since it is what
+ships if this ever has to land without a build.
+
+Sweeping the queue for other work shaped by that constraint turned up something the original filing
+missed: **BF-187 duplicates link 1 of Q-529**, filed 2026-08-20, which already carries the owner's
+requirement in his earlier words — *"Ideally I want the score and sleep time to be accurate on first
+open of the day without needing time to 'adjust'"* — and already names "Drain on app open / wake
+detection" as the dominant term, blocked on Kotlin. It has sat a month for exactly the reason that
+was just removed.
+
+Recorded rather than reconciled quietly. Q-529 keeps the display half and the re-score follow-on;
+BF-187 owns the trigger, because a drain on open moves steps, HR, SpO₂ and temperature as well as
+sleep. Q-529's link 1 now points at BF-187 and says why it left.
+
+The two measurements are worth keeping side by side: Q-529's review found a **62.0-minute median
+gap across 214 batches over 7 days**; this entry found **57–91 minutes over 40 hours**, a month
+later and without having seen the first. Nothing drifted. That is the argument for building the
+trigger rather than measuring the cadence a third time.
+
+Four other entries were parked on the same constraint and are now unblocked as a batch: **BF-80**
+(blank-screen handling in `MainActivity.java`), **BF-105** (spoken walk cues), **Q-111** (the scale
+battery chip), and **TN-51** (overnight strap wear landing in ambient mode).
