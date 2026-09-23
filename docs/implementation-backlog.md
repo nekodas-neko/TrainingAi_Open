@@ -517,7 +517,65 @@ below threshold and left in place for next time.
 - **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
 
 
+### [workouts][app-shell] DV-16 — "Leave workout? Your workout is in progress" after the day's workout is already done
+
+- **Lane:** B — `components/shell/bottom-nav.tsx` (`handleNavClick`), `lib/stores/workout-store.ts`.
+- **Added:** 2026-09-24 · Device Verification, sweep 3.
+- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** The owner finished **Push** that morning: persisted `ta_workout_state` read
+  `mode: "done"`, `workoutStartMs` and `workoutEndMs` set, `storedDate 2026-09-24`, and the Workout
+  tab showed the card stamped **COMPLETED** with *Start Again*. After an app restart, tapping another
+  tab from `/workout` raised **"Leave workout? Your workout is in progress. Leaving now will end the
+  session and unsaved sets will be lost."** — **2 of 2**. *Stay* was pressed both times; nothing was
+  reset.
+- **Why it is odd:** `isWorkoutActive` is `!!workoutStartMs && mode !== 'done'`, which is **false**
+  for the persisted state. So either the in-memory `mode` differs from what is persisted after a
+  restart, or a different guard raised the same dialog. **Not established which.**
+- **Cost to the owner:** after every workout, leaving the Workout tab asks to "end" a session that
+  is over, and *Leave* calls `resetSession` on the completed day.
+- **Pass test (device):** with a completed workout today, restart the app, open Workout, tap another
+  tab — it switches with no dialog.
+
+### [nutrition][app-shell] DV-17 — Nutrition paints a meal-plan skeleton on every warm visit when there is no plan
+
+- **Lane:** B — `components/nutrition/meal-plan-section.tsx:99`.
+- **Added:** 2026-09-24 · Device Verification, sweep 3 — RV-129's answer (RV-129 closed with this filed).
+- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame scan of the active panel for `.animate-pulse`/`[aria-busy]` over
+  3 warm rounds of Health, Nutrition, More, Home: Health, More and Home **never** painted a skeleton
+  (9 of 9). **Nutrition painted one on every visit (3 of 3)** — a 338×108 card at y=512, from
+  ~85 ms to 392–543 ms after the tap. It is `MealPlanSection`'s
+  `if (loading && plan == null) return <div className="h-28 … animate-pulse" aria-label="Loading meal plan" />`.
+  The owner has **no meal plan**, so `null` is the settled answer, and every visit repaints the pulse
+  until the refetch lands — the instant-paint rule's "skeleton flash on a repeat visit is a bug".
+- **Fix direction:** tell "no plan (cached)" apart from "not loaded yet" — seed from the cache and
+  only pulse when there is no cached answer at all.
+- **Pass test (device):** three warm Nutrition visits on an account with no plan paint zero skeleton
+  frames.
+
+### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
+
+- **Lane:** B to look first (`components/admin/exercise-manager.tsx`); A if the stored asset is gone.
+- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147).
+- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Admin → Exercises → **AI style reference** renders the WebView's broken-image
+  icon and the alt text *"Reference figure"*. This is the anchor the AI GIF generator styles from, so a
+  missing one may affect generations too. **Not established:** whether the stored URL 404s or the
+  reference was never set.
+- **Pass test:** the card shows the reference image on the S25.
+
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
+
+- **📱 Reproduced twice more in sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24) — 3 in about 9 food deletes so far.** (1) A Lite
+  Cheese row logged, then deleted **~1.5 min later**, came back `live/synced` (updated_at
+  22:31:10.652Z) while the server's list for the day was empty — so this is not only a quick
+  log→delete. (2) A saved-meal log deleted with a slow tap: 5 s and 11 s later still `live/synced`
+  (22:39:59.581Z), on screen, server empty.
+- **Likely mechanism, from a traced re-delete (120 ms local polling):** the tap marks the row
+  `DEL/pending` at +118 ms; the page fires **`GET /api/nutrition/food-logs` at +184 ms**, in parallel
+  with **`POST /api/sync/push` at +194 ms**; push confirms at +476 ms (row → `DEL/synced` at +555).
+  That GET can be answered **before** the server has deleted the row. If it resolves **after** the push
+  confirms, the loader's queued-delete guard (BF-47's fix — drop server rows that have a queued delete)
+  finds no pending delete any more, and hydrating that pre-delete copy writes the row back as live and
+  synced. In the traced run the GET won (435 < 476 ms) and nothing came back. **Still to prove:** a
+  capture of a resurrecting run showing the GET resolving after the confirm.
 
 - **Lane:** A — the pull/apply path (`applyDelta` food_logs branch, `lib/local-store/**`) against
   the push that confirms a delete.
@@ -813,6 +871,18 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
 
+- **📱 The write half, sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Walk Home→Nutrition→Health→Workout→More twice, plus a
+  final Home; writes: a food log (r1 Nutrition), a weigh-in at today's own 69.8 kg (r1 Health), the food
+  delete (r2 Nutrition). **Every reader of the food write refetched** (energy-balance 10×, food-logs 5,
+  weekly-summary 5, adherence 5, day-timeline 5 on Home). **The weigh-in's readers `weights-summary` and
+  `health-trends` were fetched only once** across the two Health visits that bracket it — candidates
+  for this entry's fetch-once class. Also once on a revisited tab: Health's activity-logs,
+  program-overview, calendar-data, hr-recovery-profile, muscle-sets, training-load, injuries,
+  sleep-performance-correlation; Nutrition's targets, meal-plans, saved-meals; Home's body-battery,
+  oura/workouts, user/profile (none of which the writes change). **Caveat:** per-visit attribution was
+  lost to a script bug (the recorder's `t` is relative); the tab map came from a separate read-only
+  pass. Re-run with attribution before naming a component.
+
 - **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
   The entry states it has **no build half** and names its own method: the measurement IS the
   deliverable, and the phone answers it objectively. That is the owner's line for this lane —
@@ -909,41 +979,6 @@ below threshold and left in place for next time.
   passes anyway. Until the owner switches to gesture nav, clearance is COULD NOT CHECK; the four
   claims above are unaffected and can run today.
 
-### [app-shell] RV-128 — DEVICE PROBE: does the tab switch drop a frame showing neither panel?
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P5**; `record.js --tap` is the instrument.
-- **The falsifiable claim:** across a tab switch, no captured compositor frame shows **neither** the
-  outgoing nor the incoming panel. Report the count and duration of any such frames, and separately
-  what `bg-page` resolves to mid-switch — **if it is transparent the blink shows the wallpaper**,
-  which is a different severity from showing the page colour.
-- **These are RV-113's two stated open questions**, and it says outright that they decide whether the
-  work is worth doing at all. Also covers RV-114 (the gap in ms for six untransitioned pushed
-  routes) and RV-115 (whether More's Profile ↔ Friends swap inherits the other view's scroll).
-- While there: toggle the OS reduce-motion setting and confirm `MotionConfig reducedMotion="user"`
-  actually takes effect.
-
-### [app-shell] RV-129 — DEVICE PROBE: is a warm visit ever painting a skeleton?
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P6**.
-- **The falsifiable claim:** on a tab already visited this session, no skeleton is painted between
-  navigation and first real content. FAILED anywhere one is — that means the synchronous
-  `readCacheSync` seed is missing, or is in a `useState` initializer rather than a `useEffect`.
-  Report ms-to-first-real-content per tab, warm and cold.
-- **The repo's own rule is that a skeleton flash on a repeat visit is a bug**, and it has never been
-  measured. RV-39 claims the `/more/devices` ring card does it — confirm or kill that claim.
-
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
 
 - **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
@@ -1022,6 +1057,10 @@ below threshold and left in place for next time.
   and mark the fresh half COULD NOT CHECK.
 
 ### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
+
+- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24):** unchanged — set_logs `86314832` is still `pending` (since
+  2026-09-19T22:41:16Z) against an **empty** outbox. Its `exercise_logs.workout_session_id`
+  (`a1847680…`) **does** resolve to a local `workout_sessions` row.
 
 - **⚠ CORRECTED by sweep 1 — two claims above were my misreading.** The set's session **is** in local
   `workout_sessions` (`a1847680…`, started 2026-09-19T22:06:01.141Z, completed, synced); the
@@ -1287,6 +1326,13 @@ below threshold and left in place for next time.
 - **Verify: device**
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
+
+- **📱 The lead, from a CPU profile of single tab taps (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24; `Profiler`, 200 µs sampling, 10
+  taps).** The top self-time item on **every** tap is the canvas `font` setter, **7–48 ms**, and its caller
+  chain is chart.js `update → _tickSize → _computeLabelSizes → set font`. Every tab switch re-runs a
+  chart.js update that re-measures axis labels. Smaller: `localStorage.setItem` 1–15 ms per tap.
+  Component names are minified, so **which** chart(s) and why is not established — the suspect is a
+  responsive resize when a panel leaves `content-visibility: hidden`.
 
 - **Lane: DV** — re-channelled from `B` by Lane B, 2026-09-23. **The fix will be Lane B's; the next
   ACTION is not.** This entry's own "Not established" line says what it needs: a CPU profile of one
@@ -1607,6 +1653,16 @@ below threshold and left in place for next time.
   reopen from the param-independent half.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
+
+- **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
+  `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
+  goes `visibility: hidden` in the **same frame** the incoming one becomes active, and the incoming
+  panel then reads **opacity 0** for 3–5 frames spanning **58–109 ms** — the same frames as DV-12's
+  long task — before `ta-tab-enter` fades it in. So yes: every switch shows ~60–110 ms with neither
+  panel painted. **What shows in the gap:** the panel's parent, `main` and `body` are all
+  transparent; the first painted layer is `html` (`oklch(0.145 0.02 215)`) plus any fixed wallpaper
+  layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
+  toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
 
 - **Gate: owner**
 - **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
@@ -6631,82 +6687,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   ② the device check — on the S25, confirm no exercise row shows a zone whose tooltip contradicts the
   reps prescribed on the same line.
 
-### [nutrition] BF-161 — the meal builder can only reach foods, so a meal made of meals has to be rebuilt ingredient by ingredient
-
-- **Lane:** B for the recommended shape (`components/nutrition/ingredient-search.tsx`,
-  `components/nutrition/meal-builder`'s add path). Lane A **only** if the owner chooses true nesting,
-  which needs a migration — see the decision below.
-- **Added:** 2026-09-14 (BugFix intake). Owner: *"For the meal builder it should let you add
-  meals/saved items as part of the meal builder."*
-- **The builder's search has three sources and none of them is a meal.** `ingredient-search.tsx`
-  documents them in its own header: the user's **own foods** (offline, instant), the **AI estimate**,
-  and the **food database** (Open Food Facts). `saved_meals` is absent. The field even says *"Search
-  your foods or the food database…"*, which is accurate and is the whole problem.
-- **`food-list.tsx` already has a `meals` tab** (`show === 'meals'` → *"Filter your meals"*), so Log
-  Food can log a saved meal in one tap. The builder — one screen deeper in the same sheet — cannot
-  see them. The capability exists; it just does not reach here.
-- **The schema forbids nesting today, and this is the decision the entry exists to frame:**
-
-  ```ts
-  export const savedMealItems = pgTable('saved_meal_items', {
-    savedMealId: uuid('saved_meal_id').notNull().references(() => savedMeals.id, …),
-    foodItemId:  uuid('food_item_id').notNull().references(() => foodItems.id, …),  // NOT NULL
-    quantityMultiplier: doublePrecision('quantity_multiplier').notNull().default(1.0),
-  })
-  ```
-
-  A meal item **is** a food item. There is no column a nested meal could occupy.
-- **Recommended: FLATTEN ON ADD — no migration, no recursion, Lane B alone.** Picking a saved meal
-  expands its items into the builder as ordinary food ingredients, quantity multipliers carried
-  through. The saved meal becomes a shortcut for adding N foods at once, which is the thing the owner
-  is actually short of. Measured on his account: **15 saved meals averaging 1.9 items each** against
-  **304 foods** — so the ingredient lists stay short, and the "it makes the list long" objection does
-  not bite at his scale.
-- **What flattening gives up, stated so it is a choice and not an oversight:** no link back. Editing
-  the source meal later does not change a meal built from it. That is arguably correct — a built meal
-  is a recipe you fixed, not a live reference — but it is a real difference and the owner should hear
-  it before it ships.
-- **The alternative, and why it is not recommended:** make `food_item_id` nullable and add
-  `nested_saved_meal_id`. Real composition, edits propagate. It costs a migration, **recursive macro
-  computation in every consumer of `saved_meal_items`**, and cycle prevention (meal A contains B
-  contains A) — a class of bug with no cheap guard. Not worth it for 15 meals of 1.9 items unless the
-  owner specifically wants edits to propagate.
-- **✅ OWNER DECIDED 2026-09-14: FLATTEN.** *"Okay lets go with flatten for now"* — the gate is
-  lifted and this is startable. **Build the flatten path only; do not add a nesting column.** The
-  *"for now"* is noted and changes nothing about the build: if propagation is wanted later it is a
-  new entry with its own migration, not a half-measure designed in here. Leaving room for nesting
-  would mean a nullable `food_item_id` today for a feature nobody has asked to build, which is the
-  cost this decision avoids.
-- **What the owner is accepting, restated because it is the part that bites later:** a meal built
-  from saved meals is a snapshot. Editing the source meal afterwards does not change it. Nothing on
-  screen should imply otherwise — no "from <meal name>" provenance chip that reads as a live link.
-- **✅ SHIPPED 2026-09-14** (`fix/bf161-meal-builder-add-saved-meals`, v1.456.8).
-  [Journal](overview/history-2026-09-16-folded-1.md#2026-09-14-bf161-builder-adds-saved-meals). `savedMealToEntries`
-  (`components/nutrition/saved-meal-flatten.ts`) is the one mapping; the source list is
-  `saved-meal-results.tsx`, a child rather than an addition to `saved-meals-sheet.tsx`, which was
-  788 lines against the hard 800 ceiling. **No schema change and no new fetch** — `SavedMeal`
-  already carries its items and the sheet already loads them.
-- **The quantity question answered itself.** `openBuild` already built the same `{ item, qty }` rows
-  inline to load a meal for editing, at the stored WHOLE-RECIPE multiplier. Both paths now share one
-  helper, which is what makes the check below true as this entry states it.
-- **Keep:** the device check, and only that. On the S25, build a meal from two saved meals and
-  confirm the ingredient rows, their quantities, and the resulting macro total match the sum of the
-  sources. The harness reaches the tab and proves it is wired; it cannot judge the arithmetic on a
-  real library.
-
-> **✅ LB-109 DONE and removed, 2026-09-15 (OR-116).** All three cleared. **BF-141** and **BF-135**
-> were verified and left the queue; **LB-47** was handled as this entry insisted — not swept with
-> them, but removed alongside BF-64 under a shared note recording that **nothing verified either
-> fix**, so a later report of the same symptom is read as a regression against an unverified fix
-> rather than as a fresh bug.
->
-> **Lane B's diagnosis was exactly right and worth keeping:** a finished entry that still advertises
-> is the same failure `Verify:` and `Keep:` exist to prevent, arriving from the other side. The sweep
-> that followed found the class was wider than three — and that the check written for it on
-> 2026-09-14 had its own blind spot, keying on `VERIFIED` and therefore missing an entry whose look
-> came back **FAILED**, which is the worse case: live, unbuilt work filed as finished. `keepIsSettled`
-> reads all three outcomes now, and that widening immediately turned up **BF-74** and **TN-13**.
-
 ### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
 - **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
 
@@ -7117,6 +7097,11 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Needs:** nothing.
 
 ### [platform][app-shell] BF-147 — the admin Exercises tab: the four UI defects shipped; the S3 credentials are still unchecked
+
+- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): the device look PASSES.** Rows read on two lines (*Abs [AI]* ⏎
+  *bodyweight · core*, thumbnail left, tick right, actions beneath). **Review GIFs** opens *"Reviewing 1
+  of 133"* with a 300×300 GIF and 48 px-tall *Finish later / Wrong / Looks right*; closed without judging.
+  The S3-credentials half is untouched. Seen alongside: DV-18.
 
 - **Lane:** B
 - **Keep:** ONE thing, and it is not UI. **Nobody has checked the production S3 credentials.** The
@@ -11294,24 +11279,6 @@ two screens, and a user who sets one has no way to know the other exists.
 - **Added:** 2026-09-01 · owner: *"I dont like how the temperature/uV pill sits. can we go back to
   the old way when it was side by side. you can make it smaller if needed."*
 
-### [app-shell] BF-95 — the swipe marker the tab navigator ignored (fixed; device check owed)
-
-- **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"Still requires a little pause."*
-- **The fix reduced the delay without removing it**, which is the same defect in a smaller size — the
-  entry's bar was that the confirmation appears on the **first** press. A pause the owner can still
-  feel means the press is still landing before the tray is ready, so this is a sequencing problem,
-  not a timing constant to tune down further.
-
-- **Lane:** B
-- **Verify:** device — a swipe-to-delete started at the far **left edge** of a meal row must open the
-  tray and **not** change tab. The web sandbox does not reproduce the WebView's touch behaviour, and
-  the navigator only arms within 24 px of the edge, so the strip has to be hit deliberately.
-- **Keep — nothing to build.** `swipe-actions.tsx` declared `data-swipe-actions` and the navigator's
-  exclusion list did not read it; it does now. A guard asserts the pairing from **both** ends, since
-  deleting the marker as unused would have been the wrong fix and a navigator-only test would have
-  called it a pass.
-- **Added:** 2026-09-01 · found while tracing BF-94.
-
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 
 > **⚑ THE DIVERGENCE IS FIXED 2026-08-31. What remains is one owner decision and one finding.**
@@ -12901,6 +12868,15 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
 
+- **📱 Sweep 3 — the immediate tap FAILS (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** New harness call `rawSwipeThenTap` (one
+  `adb shell "input swipe … && input tap …"`, so the tap lands the moment the swipe ends). From a
+  verified-closed tray: the tray opens (`translateX(-64px)`) but **no confirmation, 2 of 2**. The slow
+  tap (tray open, 1.5 s, tap) opens *"Delete food log?"* every time.
+- **And a side effect:** after that swallowed tap, the next **rightward swipe on the row** (meant to
+  close the tray) moved Nutrition to **Yesterday** instead — **2 of 2**. The same swipe on a tray opened
+  normally closes it and leaves the day alone. It looks like the swallowed tap leaves the row not
+  owning the next gesture, so the page's day-swipe takes it. Meal-list half not run.
+
 - **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** swipe-open then tapping the tray's own Delete worked **3 of 3**. The
   owed variant — an immediate tap from a verified-closed tray — was not run.
 
@@ -13165,6 +13141,11 @@ produces a label **only its author can scan** — which is the exact complaint B
   12-ingredient meal whose tail rolls into one remainder.
 
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
+
+- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): the workout row PASSES** — Home timeline *"7:21 AM – 8:12 AM Push 52
+  min"* → `/health/day?date=2026-09-24` → **one** back → `/`. With sweep 1's *Woke up* row, two of the
+  owner's three routes pass. The **food row** (his other report) was not testable — nothing was logged
+  that day — and Health's own timeline was not run.
 
 - **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Home → the timeline's "Woke up" row → `/health` **with the Sleep Detail sheet
   open** → back #1 closes the sheet (still `/health`) → back #2 → **`/`, where it started.** The one
@@ -16531,6 +16512,12 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 ### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
 
+- **📱 Narrowed in sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): plain tab switching does not leak.** 40 warm visits
+  (10 rounds of Health/Nutrition/More/Home, GC forced before each read): listeners **1,804 → 1,804**
+  (every per-visit delta −1…+1), DOM nodes 5,378 → 5,378, heap +0.5 MB. So sweep 1's 608 → ~2,200 came
+  from something else in that session — writes, sheets, pushed routes, offline toggling or sync. Next:
+  the same counter around each of those.
+
 - **📱 Evidence from sweep 1 (RV-142 + RV-133).** Tab time-to-content rose from 61–103 ms after a cold
   start to 126–434 ms after ~2 h of use, and stayed there (134–449 ms) after 30 idle minutes; listeners
   608 → ~2,200 over the same span, flat while idle. So the slowdown is real on the device, builds with
@@ -16593,6 +16580,11 @@ lived context.
 - **Surface: device only.** Every negative above is from source inspection, not from a running S25.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
+
+- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): no longer slow, and it stays.** Saved meal *Protein Granola* → **Log this
+  meal** → the row appears **271 ms** after the tap (push +136 ms, 298 ms), survives Home→Nutrition, and no
+  local-store-dead banner shows. It stored as a plain food log (`saved_meal_id` NULL) for this
+  one-ingredient meal. Deleted after (it then resurrected — DV-15).
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
 - **Added:** 2026-08-24 · owner: *"nutrition is loading very slow; about 20 seconds from clicking
@@ -19296,6 +19288,12 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 
+- **📱 Sweep 3 look (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** The owner's program sets targets, so the card reads *"vs your
+  program target"* and the landmark band is not in play. Every row shows a **red count with no word
+  beside it** (*Shoulders 7 / 13 sets*, *Chest 6 / 13* …) — colour-only state. And the body map above
+  draws every muscle **green** while every row below is red: two colour codes on one card that read as
+  contradicting. Not established what the map's green means.
+
 - **Lane:** B — the landmarks are already computed; what is missing is a surface that shows them. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - **Branch:** `feat/surface-volume-landmarks`
@@ -19394,51 +19392,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   is the second time an inline gate inside a Keep has done it (the first was BF-46).
 
 
-### [workouts] OR-118 — the push:pull balance card, split out of Q-305
-
-- **✅ SHIPPED 2026-09-20** (`feat/or118-movement-balance-card`, **v1.460.0**). The card is the
-  Training list's `movementBalance` section: `components/health/movement-balance-card.tsx` fetches
-  `/api/muscle-sets` over a trailing **60 days** and groups the rows with `movementPattern`, and
-  `components/health/movement-balance.ts` holds the fold as a pure function.
-- **Verify:** device
-- **Keep:** the S25 look, and only that — the pattern word sits beside a set count and a bar on a
-  narrow row, which is the thing a 412 px harness screenshot argues about and the phone settles.
-
-- **It was STARTABLE for four days and invisible, which is the finding worth keeping.** Nothing
-  blocked it after the engine half landed on 2026-09-18: `Needs:` was already empty and the entry
-  said so in words. It did not print in READY because a `⛔` used for **emphasis** in the body is
-  read by `next-item.js` as the legacy prose blocker. That is **LB-121**, and this is its first
-  measured cost. Two more Lane B entries are parked the same way right now — **TN-3b** and
-  **Q-305** — recorded on LB-121 rather than here.
-
-- **The engine half** (`lane-a/lb111-muscle-sets-window`, 2026-09-18) is `GET /api/muscle-sets?from=&to=`
-  → `{ from, to, muscles: [{ muscle, sets }] }`, canonical keys, secondary muscles at 0.5, both
-  params optional, `to` inclusive, 400-day cap, a date-shaped non-day answering 400 rather than a
-  driver 500. **It counts across programme changes** — deliberate, and the reason it is a separate
-  read rather than a `from`/`to` on `weekly-muscle-sets`: the card's claim is about the lifter's
-  balance, not one programme's adherence.
-- **Why not `muscle-tonnage-trend`, which was already windowed:** it reports tonnage. Legs move far
-  heavier loads, so a tonnage share overstates them and would hide the pull deficit the card exists
-  to show. Rendering it under a set-balance label would be a false claim.
-- **The classification is `movementPattern`'s and must not be re-derived** — `shoulders` is **push**
-  and `lower back` is **other**, both argued in `packages/shared/src/muscles.ts`. LB-103's first
-  caller is this card.
-- **No verdict, no target, and that is a decision.** There is no defensible universal push:pull
-  ratio; the owner asked to see the split, not be graded on it. The four rows always render,
-  including zeros — **an empty pull column IS the finding**, so dropping empty rows would hide
-  exactly the case worth seeing.
-- **Verification.** `components/health/__tests__/movement-balance.test.ts`, 11 cases, killed by four
-  mutations (ignore the classifier · drop zero rows · sort by size · drop the non-finite guard).
-  `e2e/or118-movement-balance-card.spec.ts` proves it is mounted and renders all four patterns, and
-  goes red with the section unregistered. It **refuses the empty state**: `seed.sql` logs nine chest
-  sets at 2/3/5 days ago, so a fresh CI database lands in-window with one pattern populated and
-  three at zero — which exercises the drawing path and the zero-row case together. Accepting "no
-  data" would have been the LB-98 trap.
-- **Q-305's shared-treatment question is still open and still Q-305's** — Q-305, Q-278 and Q-302 are
-  all "computed and never surfaced". This card was shipped plainly and stays cheap to fold in.
-- **Added:** 2026-09-16, Orchestrator — split from **Q-305**, whose `Keep:` had been describing this
-  as *"Lane B's and now unblocked"* since 2026-09-13 while parking it.
-
 ### [workouts][platform] LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
 
 - **Branch:** `lane-a/la118-muscle-attribution-extract` · **Added:** 2026-09-18 (Lane A, found while
@@ -19487,6 +19440,11 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
+
+- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): renders on the device** — Health → Training → *Rest discipline*: *"YOUR
+  REST VS THE PLAN · 443 sets · 90 days"*, PLANNED / YOU TAKE / DIFF / SETS rows. The page also
+  fetched `/api/health-trends?view=rest-adherence` (200), so **whether the rows came from
+  `getLocalStore` or the server fallback was not told apart** — the one thing this entry still owes.
 
 - **Branch:** `feat/rest-adherence-signal`
 - **Plan:** none yet

@@ -16431,6 +16431,16 @@ tables the entry exists to carry: the five-band decomposition of a 52-minute ses
 it) and weekly sets against all sixteen of his own configured volume targets. The second table is
 the answer to his question, so summarising it away would leave the entry unable to make its case.
 
+---
+
+## 2026-09-24 — backlog → 27598, projectOverview → 12624 (device/sweep-3)
+
+Both shrink. Sweep 3 closed two probes (RV-128, RV-129) and removed three verified entries (BF-95,
+BF-161, OR-118), filed DV-16/17/18, annotated about a dozen entries, and archived BF-161's
+Known-Issues row.
+
+---
+
 ## 2026-09-23 — `docs/implementation-backlog.md` → LB-138 + a note on BF-188
 
 Two findings from gating PR #1489. LB-138 records two e2e regression tests failing on `main`
