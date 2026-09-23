@@ -16458,6 +16458,16 @@ staying, so the reason has to outlive the exchange.
 
 ---
 
+## 2026-09-24 — backlog → 27648 (chore/or-141-salvage-1465)
+
+Growth, +7: the three re-lanings salvaged from #1465, each carrying its reason. `BF-92` to an owner
+gate because the check is a deliberate throw in production that may page someone; `BF-24` and
+`Q-395` to owner gates because artboard parity is a judgement about whether a screen looks right,
+which the phone cannot settle — `RV-143` had already read both as mis-gated rather than
+device-blocked.
+
+---
+
 ## 2026-09-23 — `docs/implementation-backlog.md` → LB-138 + a note on BF-188
 
 Two findings from gating PR #1489, then bisected in the same session. LB-138 was rewritten rather

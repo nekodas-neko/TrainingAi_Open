@@ -10943,7 +10943,9 @@ one. A swipe on the single Start button adds an affordance that does not current
 > the `Gate: device` below, unchanged, and it is still the only thing that proves this.
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
-- **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
+- **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
+- **Gate: owner** — a deliberate client-side throw in **production** may page someone. Ask before it
+  is fired; once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
@@ -11042,7 +11044,6 @@ experiment, not an inference.
 - **Do not treat this as a reason to distrust the integration.** `beforeSend: scrubEvent`,
   `sendDefaultPii: false`, `tracesSampleRate: 0` and no replay are all deliberate and all correct for
   a health app. The code is right; the environment and one header are not.
-- **Gate:** device
 - **Verification:** a deliberate client-side throw in production appears in Sentry within a minute,
   **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
   violation for the ingest host.
@@ -13655,8 +13656,12 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 ### [nutrition] BF-24 — artboard 1 parity: the header and the meal grouping shipped; the energy block and the tile row did not
 
 - **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
-- **Lane: B**
-- **Gate: device**
+- **Lane: O**
+- **Gate: owner** — re-laned 2026-09-24; was `B` with a device gate. Every buildable item below is
+  closed with a reason (② shipped, ③ ⑥ ⑦ each decided), so what remains is **artboard parity plus
+  the owner's ④ watching brief on grouped-section backgrounds**. Whether a screen matches a drawing
+  is a judgement about whether it looks right, which per CLAUDE.md waits on the owner even though
+  the phone is where he will look at it.
 - **Spec:** BF-28 — read it first for the parity rules, chiefly that an artboard is one screenful and
   a section absent from it is not thereby deleted.
 - **Read first:** artboard **1 · Nutrition — the day** in
@@ -13770,7 +13775,7 @@ That number is more valuable than either input on its own.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
-- **Lane:** B
+- **Lane:** O — was `B`; the remaining work is the owner's parity look, not a build.
 - **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
   269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
   work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
@@ -13778,7 +13783,9 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Gate:** device — see the ⚠ immediately below. Every phase has shipped and this is the completion
+- **Gate: owner** — re-laned 2026-09-24; was a device gate. *"Do the drawn screens match what
+  shipped"* is a judgement, not a measurement, and **`RV-143` already read this entry as mis-gated
+  rather than device-blocked** — both sweep plans exclude it for that reason. See the ⚠ below. Every phase has shipped and this is the completion
   checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
   never drawn, then leave the queue), but its own instruction is to **wait**, so it is gated rather
   than READY: it printed second in the Lane B queue while telling any taker not to start it.
