@@ -1507,20 +1507,33 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed
 
-- **Lane:** B — `components/more/friend-leaderboard.tsx:111`, `components/more/friend-feed.tsx:28`,
-  `app/nutrition/nutrition-content.tsx:140`, `app/coach/**`, `app/collection/**`,
+- **Lane:** B — `components/more/friend-leaderboard.tsx`, `components/more/friend-feed.tsx`,
+  `app/nutrition/nutrition-content.tsx`, `app/coach/**`, `app/collection/**`,
   `app/register/register-form.tsx`. **Added:** 2026-09-22 · Review sweep 53.
-- The transition router is used in 30 files and a plain `useRouter` in 16. The asymmetric pair:
-  both friends surfaces push `/profile/${userId}` with a plain router while that screen's own back
-  runs the `"back"` keyframes — **open hard, close animated**, the exact inversion
-  `lib/hooks/use-back-or-fallback.ts:30-34` was written to prevent. Transition-less both ways:
-  Nutrition → `/coach` (Nutrition is the #2 screen), the coach confirm route, `/collection` back,
-  and register.
-- **Fix:** swap `useRouter` for `useTransitionRouter` — same call signature, and it already no-ops
-  for tab hrefs and same-URL pushes, so it is import-only.
-- **⚠ Known hazard:** `lib/view-transition.ts:36`'s 300ms cap freezes the outgoing screen if the
-  destination never commits. `/coach` and `/coach/confirm/[toolCallId]` are dynamic routes and a
-  cold compile could hit it — a 300ms hold rather than a break, but check it on those two.
+- **Shipped 2026-09-23** (`fix/rv114-route-transitions`). Seven call sites swapped from `useRouter`
+  to `useTransitionRouter` — import-only, as the entry predicted. Re-verified against `main` first:
+  all seven still matched, and every usage is a `push` or a `back`, never a `refresh`, so nothing
+  animates that should not.
+- **The asymmetric pair was the point.** Both friends surfaces pushed `/profile/${userId}` with a
+  plain router while that screen's own back runs the `"back"` keyframes — open hard, close animated,
+  the exact inversion `lib/hooks/use-back-or-fallback.ts` exists to prevent. Transition-less both
+  ways: Nutrition → `/coach` (the #2 screen), the coach confirm route, `/collection` back, register.
+- **The `/coach` hazard is ANSWERED at source, not deferred.** `lib/view-transition.ts`'s 300 ms cap
+  cannot break a navigation to a dynamic route: `navigate()` is called unconditionally inside the
+  promise executor, *before* the commit poll starts, so the deadline only ends the frozen snapshot.
+  A destination that never commits costs a held frame, never a lost push — which is what the entry
+  expected and now has a reason attached.
+- **Pinned by `lib/__tests__/rv114-pushed-routes-animate.test.ts`** — each of the seven uses
+  `useTransitionRouter` and carries no bare `useRouter`; both friends surfaces still push a profile
+  AND animate it; and `useTransitionRouter` still spreads the real router, so a future change there
+  cannot silently drop `refresh`/`prefetch` from seven call sites without a type error. Control run:
+  reverting `friend-feed.tsx` fails 2 of 9.
+- **Deliberately NOT a repo-wide ratchet.** 16 files still use a plain `useRouter` and most are
+  right to — a tab href needs no transition (`useTransitionRouter` already no-ops for those) and a
+  `refresh()` is not a navigation. Widening it is its own entry, not a free extra here.
+- **Keep:** the device feel. This is motion on the owner's daily paths and the sandbox can only
+  prove the call sites changed; whether the shared-axis transition reads right on the S25 is a look
+  judgement, and `/coach` is the one worth watching because it is a dynamic route.
 
 ### [app-shell] RV-115 — More's Profile ↔ Friends swap is a hard `display:none` toggle that carries the other view's scroll
 

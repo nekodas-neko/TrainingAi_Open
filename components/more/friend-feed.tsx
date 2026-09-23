@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTransitionRouter } from "@/lib/view-transition";
 import Image from "next/image";
 import type { FeedEvent } from "@trainingai/shared/types/friends";
 import { TITLES } from "@trainingai/shared/types/friends";
@@ -12,7 +12,7 @@ import { TTL_SHORT } from '@trainingai/shared/cache-ttl';
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility";
 
 function FeedItem({ event }: { event: FeedEvent }) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const title = event.equippedTitle ? TITLES[event.equippedTitle] : null;
 
   const iconEl = event.type === 'pr'

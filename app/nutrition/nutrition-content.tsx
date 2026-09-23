@@ -2,7 +2,8 @@
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTransitionRouter } from "@/lib/view-transition";
 import { useDayRolloverRefresh } from "@/components/shell/local-day-provider";
 import { useRefreshOnTabShow, useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
@@ -105,7 +106,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   useScrollRestoration(scrollRef);
   const todayStr = todayInTz(tz);
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useTransitionRouter();
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const selectedDateRef = useRef(selectedDate);
   useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);

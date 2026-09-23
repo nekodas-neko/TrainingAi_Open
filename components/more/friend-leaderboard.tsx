@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTransitionRouter } from "@/lib/view-transition";
 import Image from "next/image";
 import type { LeaderboardEntry } from "@trainingai/shared/types/friends";
 import { TITLES } from "@trainingai/shared/types/friends";
@@ -30,7 +30,7 @@ function formatValue(value: number, metric: Metric): string {
 }
 
 export function FriendLeaderboard() {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   // Seed synchronously from cache before paint — in a useLayoutEffect, never a useState lazy
