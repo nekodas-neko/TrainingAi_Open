@@ -15759,6 +15759,17 @@ This is the third re-merge on this branch and the number has moved every time, i
 without a line of this branch's own material changing. That is RV-134's tax rather than a signal:
 the figure recorded here is the merged tree's, not this branch's contribution, and reading it as
 growth caused by DV-1 would be wrong.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27094 → 27063 (OR-130)
+
+OR-130 left the queue after being built, which is the whole of the 31 lines; the two entries that
+referenced it gained a sentence each and lost none, so the file shrank by slightly less than the
+entry's own length.
+
+A genuine shrink caused by this branch — the case the ratchet is right to make someone lower, as
+distinct from the tax RV-134 describes, where a branch is forced to lower a number because
+*someone else's* merge shrank the file. Five of five re-merges on #1423 were that other case in one
+night.
 ---
 
 ## 2026-09-23 — backlog → 27020 (+11 from this branch, measured after merging main), device-verification baton → 53 (−1) (device/probe-sitting-2)
