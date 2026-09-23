@@ -226,6 +226,25 @@ const fmt = (e) => {
 // the device. Both shapes are counted — BF-90 found eleven entries writing the same debt in both
 // places, so keying on either alone undercounts.
 if (sittingsOnly) {
+  // An entry PARKED on `Gate: device` is blocked until someone picks the phone up. An entry with
+  // `Verify: device` has shipped and works; the look is owed but nothing waits on it. Until
+  // 2026-09-23 this view listed only the second kind — so it showed 116 optional looks and hid the
+  // 24 that were BLOCKING, which is the priority exactly inverted. Measured that day: 44 entries
+  // parked on a device gate, 24 of them invisible here.
+  //
+  // They print in their own section, first, because that is the order the phone should be used in.
+  // They are NOT merged into the owed list: one is "go and confirm this still works", the other is
+  // "this cannot proceed until you look", and a sitting that cannot tell them apart will spend the
+  // owner's attention on the wrong half.
+  const blocked = entries.filter((e) => e.gates.includes('device') && !owesDeviceCheck(e));
+  if (blocked.length) {
+    console.log(`\nBLOCKED ON A DEVICE CHECK (${blocked.length}) — parked; nothing proceeds until the phone answers.`);
+    console.log('These come FIRST in a sitting. The list below is shipped work owed a look, which is');
+    console.log('worth doing and blocks nobody. Some of these need an APK or hardware built first —');
+    console.log("the gate says the phone is required, not that a check is all that's left.");
+    for (const e of blocked) console.log(`      ${fmt(e)}`);
+  }
+
   const owed = entries.filter(owesDeviceCheck);
   const groups = new Map();
   for (const e of owed) {

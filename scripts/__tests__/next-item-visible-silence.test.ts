@@ -47,6 +47,42 @@ describe('next-item does not stay silent about what it withheld (TN-61)', () => 
   })
 })
 
+describe('--sittings shows the BLOCKING device work, not only the optional looks', () => {
+  // The priority was inverted. `Gate: device` parks an entry — nothing proceeds until the phone
+  // answers. `Verify: device` means it shipped and works; the look is owed and blocks nobody. This
+  // view listed only the second kind, so it showed 116 optional looks and hid the 24 that were
+  // blocking. Measured 2026-09-23: 44 parked on a device gate, 24 invisible here.
+  const out = run('--sittings')
+
+  it('has a blocked section, and prints it before the owed list', () => {
+    const blocked = out.indexOf('BLOCKED ON A DEVICE CHECK')
+    const owed = out.indexOf('DEVICE CHECKS OWED')
+    expect(blocked).toBeGreaterThan(-1)
+    expect(owed).toBeGreaterThan(-1)
+    expect(blocked).toBeLessThan(owed)
+  })
+
+  it('counts entries parked on a device gate', () => {
+    const n = Number(/BLOCKED ON A DEVICE CHECK \((\d+)\)/.exec(out)?.[1])
+    expect(n).toBeGreaterThan(0)
+  })
+
+  // The two lists mean different things and a sitting that merges them spends the owner's attention
+  // on the wrong half, so an entry must never appear in both.
+  it('keeps the two lists disjoint', () => {
+    const ids = (block: string) => new Set(block.match(/\b[A-Z]{1,2}-\d+[a-z]?\b/g) ?? [])
+    const cut = out.indexOf('DEVICE CHECKS OWED')
+    const blocked = ids(out.slice(0, cut))
+    const owed = ids(out.slice(cut))
+    const both = [...blocked].filter((id) => owed.has(id))
+    expect(both, `an entry cannot be both blocked and merely owed: ${both.join(', ')}`).toEqual([])
+  })
+
+  it('says plainly that a gate can mean an APK or hardware, not just a look', () => {
+    expect(out).toMatch(/APK or hardware/)
+  })
+})
+
 describe('an assigned-only lane says where its real work is', () => {
   // `--lane DV` returning nothing is by design; saying nothing about the owed checks is not.
   it('points an empty DV lane at the owed device checks', () => {

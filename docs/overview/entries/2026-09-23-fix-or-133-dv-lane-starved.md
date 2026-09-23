@@ -57,6 +57,33 @@ This is the same starvation Lane B hit in August for a completely different reas
 against 48 parked. Worth naming as a pattern: **a lane reading zero is a claim about the whole
 queue, and a queue tool should never make that claim without checking it.**
 
+## The third place, and it was the one that mattered: `--sittings` hid the blocking work
+
+The owner asked whether device items had actually reached the DV agent. Measured:
+
+| | count |
+|---|---|
+| entries carrying `Gate: device` (parked — **blocked**) | **44** |
+| entries carrying `Verify: device` (shipped, a look owed) | 61 |
+| entries carrying **`Lane: DV`** | **0** |
+
+Not one item has ever been routed to the device agent through the lane channel. That is defensible
+on its own — `Lane:` says who *builds* a thing, and a check owed on the phone sits on the entry that
+built it. What is not defensible is the next number: **24 of the 44 parked entries were invisible to
+`--sittings`**, the one view the device agent has.
+
+`owesDeviceCheck` tested `Verify:` and a device-flavoured `Keep:`. It never tested `Gate:`. So the
+view showed **116 optional looks and hid the 24 that were blocking** — the priority exactly
+inverted. An entry with `Verify: device` has shipped and works; the look is worth doing and blocks
+nobody. An entry parked on `Gate: device` proceeds only when the phone answers.
+
+They now print in their own section, first, and deliberately **not merged** into the owed list: one
+means *go and confirm this still works*, the other means *this cannot proceed until you look*, and a
+sitting that cannot tell them apart spends the owner's attention on the wrong half. The header says
+outright that some of the 24 need an APK or hardware built first — `Gate: device` says the phone is
+required, not that a check is all that remains. Three of them (`PS-8`, `PS-9`, `PS-16`) are blocked
+on a Colmi R09 that is with a second wearer, which no tool can infer.
+
 ## The test, and that it was checked against the bug
 
 `scripts/__tests__/next-item-visible-silence.test.ts` runs the real script against the real backlog
