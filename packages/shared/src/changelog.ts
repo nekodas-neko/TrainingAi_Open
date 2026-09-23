@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.17",
+    date: "2026-09-23",
+    changes: [
+      "The Oura BLE admin console no longer ties up the server while it loads. It worked out the calendar day separately for every raw sample \u2014 nearly 59,000 of them in the default window \u2014 which stopped the app answering anything else for the best part of a second, and around three seconds over a fortnight's window. It now does that once a minute instead of once a sample, for the same result.",
+    ],
+  },
+  {
     version: "1.465.16",
     date: "2026-09-23",
     changes: [
