@@ -16438,3 +16438,20 @@ the answer to his question, so summarising it away would leave the entry unable 
 Both shrink. Sweep 3 closed two probes (RV-128, RV-129) and removed three verified entries (BF-95,
 BF-161, OR-118), filed DV-16/17/18, annotated about a dozen entries, and archived BF-161's
 Known-Issues row.
+
+---
+
+## 2026-09-24 — backlog → 27641 (chore/or-140-device-sweep-handover)
+
+Growth, +43, acting on the Device Verification agent's sweep 2/3 handover.
+
+One new entry, `RV-144` — three inputs on `/more/details` measured at ~33 px of vertical touch area
+against the 44 px floor. It is `RV-127`'s one actionable finding, handed to the lane that owns the
+surface; the rest of that probe's results were either by design, already filed, or looked at and
+harmless.
+
+The remainder is reasons rather than entries, on four corrections: `RV-111`'s gate discharged (the
+device answered it), `RV-127`'s shipped-look field removed (it failed, and a FAILED is work),
+`RV-127` re-laned to DV for the one half three-button navigation cannot answer, and `Q-168` held for
+sweep 4 with the argument written out — the device agent asked for it to be re-laned and it is
+staying, so the reason has to outlive the exchange.
