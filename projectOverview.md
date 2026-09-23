@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
@@ -2518,6 +2518,20 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
+
+The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,
+says so and offers a Retry instead of presenting the pre-write figure as current; it also stopped
+writing null on an empty payload, which made the budget and macro targets vanish rather than go
+stale. **But `cachedFetch` fires `onError` only when `cached === null` on both its failure paths,
+and `fetchWithRetry` counts a cached paint as a response — so no caller can be told a revalidation
+failed while a cached value is present.** Driving `/nutrition` with the balance route aborted, the
+same code both reported and stayed silent on consecutive runs; exhaustion fired **once in five**.
+The report path is wired and strictly additive, and is recorded as unproven rather than done.
+`LB-128` carries the fix (Lane A's, and **not** ungating `onError`, which every caller reads as "I
+have nothing to show"). Owed: the device check at the S25 width. Detail:
+[`docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md`](docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md).
 
 ### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
 

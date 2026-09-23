@@ -660,7 +660,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
-
 ### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
 
 - **Lane:** A — `lib/data/postgres/__tests__/personal-records-reconcile-migration.test.ts`.
@@ -681,55 +680,46 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   user in a parallel file during `run()` leaves it green.
 - **Not a device check.**
 
+### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
-### [nutrition][platform] RV-103 — the owner re-reported BF-177, and the fix BF-177 shipped cannot report its own failure
+- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
+  Review sweep 53. **Shipped:** 2026-09-22, `fix/rv103-rv104-nutrition-freshness`.
+- Both of the entry's defects are fixed. The dead `.catch(() => {})` is gone; the refetch runs
+  through `fetchWithRetry`, so a transient failure self-heals and a persistent one reports through
+  `onExhausted`; and `d => setBalance(d ?? null)` — which made the budget and macro targets
+  **disappear** rather than go stale, because `balanceForDate` is gated on the payload's date — is
+  now `if (d) setBalance(d)`. `EnergyCard` renders the failure line and a Retry.
+- **A third defect was found while reproducing it, and it would have made the whole mechanism
+  inert:** the unmount ref was set in a cleanup and never reset, so StrictMode's simulated unmount
+  latched it `true` for the life of the screen and `isCancelled()` killed every retry. One aborted
+  request was observed where four were due.
+- **Keep:** ① the device check — the failure line and its Retry at the S25 width, in the card that
+  carries "kcal left". ② the reporting path is **wired but only observed firing once in five
+  sandbox runs**, because of LB-128 below; it is strictly additive (absent the flag nothing renders,
+  which is today's behaviour) but it is not proven in the common case and must not be written up as
+  though it were.
 
-- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts:41-45`. **Added:** 2026-09-22 ·
-  Review sweep 53.
-- **Batch:** `nutrition-freshness`
-- **Owner report, 2026-09-22:** *"nutrition calorie macro not updating on screen when food added -
-  requires page swap"*. **BF-177 already quotes him saying the same thing** — *"The kcal left in the
-  top right; doesnt load on the same page: it requires page switching to show."* So this is a
-  RE-REPORT of a bug that was fixed once, not a new one.
-- **The mechanism BF-177 left open.** Its refetch is
-  `void cachedFetch(...).catch(() => {})` with **no `onError`**. Per RV-84 `cachedFetch` never
-  rejects, so that `.catch` is dead code. A 500, or bad signal, or offline, and the refetch silently
-  does nothing: `energyBalance` keeps the object fetched **before** the meal, "kcal left" and the
-  macro targets stay stale, **nothing on screen says so, and there is no retry**. A page swap
-  re-runs `fetchData`, which is exactly the recovery the owner describes — both times.
-- **⚠ Do not add another cache bust.** BF-177 establishes eviction was never the problem:
-  `invalidateNutritionWrite()` clears `energy-balance:` and always has. This is the Q-402 shape.
-- **Fix:** pass `onError` and render a retry affordance, or reuse `fetchWithRetry` — but see RV-85,
-  which is the same "retries then gives up silently" gap in that helper, so fix the helper first or
-  this inherits it.
-- **⚠ Second defect in the same callback, and it is worse than staleness:**
-  `d => setBalance(d ?? null)` sets **null** on an empty payload, and `balanceForDate` is gated on
-  `energyBalance?.date === selectedDate` (`nutrition-content.tsx:453`). So a null or wrong-date
-  payload makes the budget and macro targets **disappear** rather than go stale.
-- **Not established:** neither failure was reproduced — no device, and the sandbox cannot drive the
-  real write path. The mechanism is read from source; the owner's report is the evidence it fires.
+### [platform] LB-128 — `cachedFetch` cannot tell a caller that a revalidation failed
 
-### [nutrition][app-shell] RV-104 — deleting a food refetches the weekly chart; adding one does not
-
-- **Lane:** B — `app/nutrition/nutrition-content.tsx:303-312` (add) vs `:390-396` (delete).
-  **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `nutrition-freshness`
-- The delete path explicitly refetches `nutrition-weekly-summary`. `handleFoodLogged` does
-  `setLogs` + `refetchBalance` and **nothing else**. Both `nutrition-weekly-summary` and
-  `nutrition-adherence` are otherwise fetched **only** from `fetchMountData`, whose effect deps are
-  stable (`[fetchMountData, userId]`), on a screen the tab shell never unmounts.
-- **So: the 7-day calorie bar chart and the adherence percentages below it hold their launch-time
-  values until the app is restarted.** A tab switch does not fix them — `useRefreshOnTabShow`
-  re-runs `fetchData` (logs + balance), never `fetchMountData`.
-- **The asymmetry is the finding**: same screen, same quantity, delete updates it and add does not.
-  Both keys *are* in `invalidateNutritionWrite()` — this is Q-402 again, a missed re-render rather
-  than a missed eviction.
-- **⚑ The delete site's own comment names the cause:** *"BF-177's third site, which that entry did
-  not name"*. BF-177 was patched site-by-site, so a fourth site was always likely. **Fix the shape,
-  not the site** — subscribe both keys via `useCachedValue` or `useInvalidationRefetch` so no future
-  write path has to remember.
-- **Not established:** whether a single ~300 kcal add visibly moves a 7-day bar. The adherence
-  figures are unambiguous text and do not have that excuse.
+- **Lane:** A — `lib/sqlite/cache.ts:374`. **Added:** 2026-09-22 · found while shipping RV-103.
+- `cachedFetchCore`'s network-throw branch computes
+  `const online = cached === null && navigator.onLine` and fires `onError` only when `online`; the
+  `!res.ok` branch is gated the same way (`if (cached === null)`). So **both** failure paths are
+  silent whenever anything was painted from cache. `fetchWithRetry` has the mirror-image blind
+  spot: a cached paint sets `responded`, so the retry chain stops and `onExhausted` never fires.
+- **Together they mean no caller can report a failed refresh of a key that has a cached value** —
+  exactly the post-write case RV-103 was about, whenever the write's invalidation has not (yet)
+  cleared the entry. RV-103's suggested fix, *"pass `onError`"*, cannot reach it.
+- **Measured, not read:** driving `/nutrition` with `/api/nutrition/energy-balance` aborted, the
+  same code both reported and stayed silent on consecutive runs, decided by whether the entry was
+  in the cache when the refetch ran. The flake was the finding.
+- **Fix:** an ungated channel — an `onRevalidateError` that fires when a cached value was painted
+  and the revalidation then failed. The existing gate is right for what it guards (offline with
+  saved data is not an error); what is missing is the case where the caller *knows* the cached
+  value is out of date, because it just wrote.
+- **⚠ Do not simply ungate `onError`** — every existing caller reads it as "I have nothing to
+  show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
+  cached data with error cards across the app.
 
 ### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
 

@@ -15626,6 +15626,28 @@ code. Verified rather than assumed: 10 of 10 reach `--sittings`, 0 leak into eit
 **Two were parked by their own emphasis glyph** — `next-item.js` treats `⛔ …block` within 40
 characters as the legacy blocked marker, and *"⛔ The clearance half is BLOCKED"* matches it exactly.
 Same trap as sweep 52's eight parked entries. Swapped to `⚠`.
+## 2026-09-22 — `projectOverview.md` 12399 → 12413, backlog 26690 → 26682 (RV-103/RV-104)
+
+The fourteen lines on `projectOverview.md` are one Known-Issues entry, and it is there for the half
+that did **not** ship rather than the half that did. RV-103's report path is wired and only fired in
+one of five sandbox runs, because `cachedFetch` gates `onError` on `cached === null` on both its
+failure paths and `fetchWithRetry` counts a cached paint as a response — so a failed revalidation is
+unreportable by any caller while anything is cached. An entry that said only "the refetch now
+reports failures" would be the kind of claim the never-mark-fixed-from-intent rule exists to stop,
+and the next session would build on it. The mechanism, the measurement and the flake that was the
+finding are in the journal entry; what stays in the index is the caveat and the pointer, which is
+the split that keeps this file from regrowing.
+
+First draft of that entry ran 21 lines over the baseline and was cut to 14 rather than granted the
+space — the detail belongs in `docs/overview/entries/`, and the index carries the warning only.
+
+Both recorded figures move on arithmetic that is not this branch's doing alone: the final numbers
+are 26780 and 12376, after TN-61, DV-1, #1417's archiving sweep and #1418's RV-124…RV-133 all
+landed from `main` across three re-merges while this branch was open. What this branch contributed is −8 to the backlog
+— RV-104 shipped whole and left the queue, and RV-103 came back shorter as a `Keep:` entry, against
+the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
+above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
+read as genuinely given back rather than absorbed into someone else's sweep.
 ---
 
 ## 2026-09-23 — backlog → 26672, projectOverview → 12333 (−29) (device/bf166-mid-workout)

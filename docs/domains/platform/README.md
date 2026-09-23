@@ -239,6 +239,13 @@ grep -n '\[platform\]' docs/implementation-backlog.md   # 6 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **`cachedFetch` cannot tell a caller a revalidation failed** (LB-128, 2026-09-22). Both its
+  failure paths gate `onError` on `cached === null`, and `fetchWithRetry` counts a cached paint as a
+  response — so a refresh that fails while a stale entry is present is unreportable by any caller.
+  Found while shipping RV-103; the flake was the finding (the same code reported and stayed silent
+  on consecutive runs). **Do not fix by ungating `onError`** — every caller reads it as "I have
+  nothing to show" and `useCachedValue` renders an error state on it.
+
 - ⚠️ **Sixteen writes revalidated around their push, not after it** (LB-6, 2026-08-24, v1.344.0).
   Invalidating beside a fire-and-forget `pushMutations` makes subscribers refetch and **re-cache**
   the pre-write payload for the key's full TTL; one site had the mirror image and repainted nothing

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.6",
+    date: "2026-09-22",
+    changes: [
+      "The Nutrition screen's 7-day calorie chart and the adherence figures under it now update when you log a food. They only updated when you deleted one \u2014 same screen, same numbers, and adding a meal left them showing whatever they held when the app started, until it was restarted. Switching tabs did not help.",
+      "If the calorie budget beside the ring cannot be refreshed after you log something, the card now says so and offers a Retry instead of quietly showing you the figure from before your entry. It also no longer blanks the budget and macro targets outright when the server answers with nothing.",
+    ],
+  },
+  {
     version: "1.465.5",
     date: "2026-09-22",
     changes: [
