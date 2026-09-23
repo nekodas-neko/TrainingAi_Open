@@ -17,6 +17,7 @@ import {
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { TabPanels } from "@/components/ui/tab-panels";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility";
 import { toast } from "sonner";
@@ -157,16 +158,27 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
         // separates them, not the path: `usePathname()` reads the route tree, which a tab flip
         // leaves stale (LA-109), so the pathname half cannot be relied on to differ.
         scrollKey="more"
+        // RV-115: the two views share this scroller, so without a reset the incoming one opens at
+        // the offset the outgoing one left behind.
+        scrollResetKey={tab}
         scrollClassName="flex-1 overflow-y-auto pb-nav-safe"
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <div style={{ display: tab === "profile" ? undefined : "none" }}>
-          <SyncHealthCard userId={user?.id} />
-          <ProfileTab user={user} equippedTitle={equippedTitle} friendCode={friendCode} seasons={seasons} onUserSaved={(updated) => { _user = updated; setUser(updated); }} onTitleChange={handleTitleChange} />
-        </div>
-        <div style={{ display: tab === "friends" ? undefined : "none" }}>
-          <FriendsTab />
-        </div>
+        {/* RV-115 — a crossfade, not a `display` toggle, so this swap matches the one Friends' own
+            child views already use (`TabPanels` was written for exactly this and had one call site).
+            `mode="wait"` unmounts the outgoing panel: both re-seed synchronously from cache
+            (`profile-tab`'s useLayoutEffect, `friends-tab`'s readCacheSync), so the data repaints
+            instantly — but their local UI state does not survive, which is the accepted cost. */}
+        <TabPanels value={tab}>
+          {tab === "profile" ? (
+            <>
+              <SyncHealthCard userId={user?.id} />
+              <ProfileTab user={user} equippedTitle={equippedTitle} friendCode={friendCode} seasons={seasons} onUserSaved={(updated) => { _user = updated; setUser(updated); }} onTitleChange={handleTitleChange} />
+            </>
+          ) : (
+            <FriendsTab />
+          )}
+        </TabPanels>
       </PullToSync>
     </div>
   );

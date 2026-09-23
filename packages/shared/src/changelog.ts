@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.21",
+    date: "2026-09-23",
+    changes: [
+      "Switching between Profile and Friends on the More tab now fades across and starts at the top, instead of cutting straight over and keeping the other view\u2019s scroll position.",
+    ],
+  },
+  {
     version: "1.465.20",
     date: "2026-09-23",
     changes: [

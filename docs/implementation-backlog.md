@@ -1537,15 +1537,37 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-115 — More's Profile ↔ Friends swap is a hard `display:none` toggle that carries the other view's scroll
 
-- **Lane:** B — `app/more/more-content.tsx:157-163`. **Added:** 2026-09-22 · Review sweep 53.
-- Two `<div style={{display: …}}>` inside one shared scroller: no motion, and the scroll offset
-  carries across. Meanwhile Health's sub-tabs slide via `SwipeCarousel` and **the Friends tab's own
-  child view crossfades** via `TabPanels` — the single call site of that primitive.
-- **Fix:** wrap both panels in the existing `<TabPanels value={tab}>` and reset `scrollTop` in
-  `onValueChange`. Opacity-only, already inherits the global `MotionConfig`.
-- **⚠ `mode="wait"` unmounts the outgoing panel**, discarding Profile's and Friends' state on every
-  switch — confirm both re-seed from cache, or the swap trades a hard cut for a skeleton. That
-  caveat plus More's traffic (7) is why this ranks last of the navigation set.
+- **Lane:** B — `app/more/more-content.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- **Shipped 2026-09-23** (`fix/rv115-more-subtab-crossfade`). Both views now swap through the
+  existing `<TabPanels value={tab}>` — the primitive Friends' own child views already use — and the
+  shared scroller returns to the top on each swap.
+- **⚠ The entry's fix was not implementable as written, and the reason is worth keeping.** It said
+  "reset `scrollTop` in `onValueChange`", but `PullToSync` owns `scrollRef` privately and exposed no
+  prop, so the call site cannot reach the element it needs to move. Added `scrollResetKey` to
+  `PullToSync` instead — the reset belongs with the component that owns the scroller, and Health's
+  three-tab scroller can use it next.
+  **Structural call (Lane B's):** a new prop on a component three screens render, versus forwarding
+  a ref to every call site. Reversal is deleting one prop and one effect.
+- **The `mode="wait"` caveat RESOLVES, and was checked rather than assumed.** Both panels re-seed
+  synchronously from cache — `profile-tab.tsx` in a `useLayoutEffect` with `readCacheSync`,
+  `friends-tab.tsx` with `readCacheSync('friends-list')` — so unmounting the outgoing panel repaints
+  from cache rather than flashing a skeleton.
+- **But it costs UI state, which the entry did not name.** Unmounting discards Friends'
+  feed/leaderboard choice and Profile's expanded sections on every swap. Accepted: More's traffic is
+  7, the data is untouched, and the alternative (keeping both mounted for a crossfade) needs absolute
+  positioning inside `PullToSync`'s scroller and risks the layout bugs that machinery already carries.
+  Recorded in the code comment so it is not rediscovered as a bug.
+- **One narrow limitation, deliberately not fixed:** switching sub-tabs *within*
+  `useScrollRestoration`'s re-assert window after entering More can still let the restore win. That
+  is the behaviour today, so it is an incomplete fix rather than a regression — and the reset skips
+  its first run precisely so it cannot race the restore on mount.
+- **Pinned by `components/__tests__/rv115-more-subtab-crossfade.test.ts`** — the swap uses
+  `TabPanels` and no `display` toggle; `scrollResetKey={tab}` is passed; the reset bails when the key
+  is unchanged; **and both panels still seed from cache**, which is the load-bearing one: delete that
+  seeding and this swap silently becomes a skeleton flash nobody would trace back here. Control run:
+  removing `scrollResetKey` fails 1 of 5.
+- **Keep:** the device look — a 150 ms crossfade on the owner's own screen is a feel judgement, and
+  the sandbox can only prove the primitive is wired in.
 
 ### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
 
