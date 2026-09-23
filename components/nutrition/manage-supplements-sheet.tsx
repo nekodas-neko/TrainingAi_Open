@@ -158,18 +158,11 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
     let savedLocally = false
     if (store) {
       try {
-        const now = new Date().toISOString()
-        const existing = supplements.find(s => s.id === id)
-        await store.upsertSupplement({
-          id,
-          name: existing?.name ?? '',
-          dose: existing?.dose ?? null,
-          reminderEnabled: existing?.reminderEnabled ?? false,
-          reminderTime: existing?.reminderTime ?? null,
-          sortOrder: existing?.sortOrder ?? 0,
-          active: false,
-          updatedAt: now,
-        })
+        // DV-10: a targeted soft-delete, not an upsert of a rebuilt record. The old form passed
+        // only the fields this sheet happens to hold, and `upsertSupplement` writes the rest as
+        // null — so deleting blanked `defaultAmount`, `unit`, `startedOn`, `stoppedOn` and
+        // `dosePrompt`, and left `deleted_at` unset because the upsert cannot write it.
+        await store.deleteSupplement(id)
         await store.queueMutation({
           userId: userId!,
           domain: 'supplements',

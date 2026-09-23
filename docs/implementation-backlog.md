@@ -995,20 +995,6 @@ below threshold and left in place for next time.
   screen's consistency figure must NOT change. That is the one assertion the sandbox cannot make:
   it needs two clocks that disagree.
 
-### [nutrition][platform] DV-10 — a deleted supplement is never tombstoned on the device
-
-- **Lane:** A — `lib/local-store/**` (the supplements delete path) and the pull mapping.
-- **Added:** 2026-09-23 · Device Verification, sweep 1 (RV-45's run).
-- **Measured on the S25:** deleting a supplement — online (`DV test supplement B`) and offline (`C`) —
-  showed "Supplement deleted", removed it from the server and from both lists, but **the local
-  `supplements` row kept `deleted_at: null`** (B `synced`, C `pending` until drained). An injury
-  deleted the same way **is** tombstoned (`deleted: 1`). So the lists filter supplements some other
-  way, and the local store holds rows it believes are live.
-- **Why it matters:** CLAUDE.md's offline rule is that a delete must leave a tombstone the delta can
-  carry; a row that is live locally and gone on the server is the "deleted item comes back" shape
-  (BF-47) waiting for a read path that does not filter it.
-- **Pass test:** delete a supplement on the S25; `SELECT deleted_at FROM supplements WHERE id=…` is set.
-
 ### [nutrition][app-shell] DV-11 — Manage Supplements' on/off switches have no accessible name
 
 - **Lane:** B — swept app-wide; the guard is `scripts/check-icon-button-names.js`.

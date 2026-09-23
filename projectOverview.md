@@ -2617,6 +2617,25 @@ could this; filed as shape, not speed. **No per-user memo was added**, per the e
 prohibition: it trades against config-save freshness and needs its own decision. Detail:
 [`docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md`](docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md).
 
+### [nutrition][platform] ⚠️ Deleting a supplement left no tombstone and blanked five columns — NOT device-verified (DV-10, 2026-09-23)
+
+The local delete called `upsertSupplement({ …the fields the sheet held, active: false })`, so
+`deleted_at` stayed null — the one domain not tombstoning, against `deleteInjury`'s shape.
+**The measured consequence is latent, not live:** `getSupplements` filters `active=1 AND deleted_at
+IS NULL` (both), and the next pull hard-deletes the row, so nothing came back; the gap was waiting
+for a read path that checks only `deleted_at`. **The defect found underneath it is the sharper
+one:** that upsert writes every column with `?? null`, and the rebuilt record omitted
+`defaultAmount`, `unit`, `startedOn`, `stoppedOn` and `dosePrompt` — so a delete blanked all five
+locally. `startedOn`/`stoppedOn` are BF-69's presence window, where a date outside it is a TRUE ZERO
+and a date inside it with no contribution is UNKNOWN, so nulling them converts one into the other in
+any local aggregate read before the next pull. Replaced by a targeted `deleteSupplement(id)`
+UPDATE. ⚠️ **Owed: the device check, which is DV-10's own pass test** — on the S25, delete a
+supplement and confirm `SELECT deleted_at FROM supplements WHERE id=…` is set. The tests here are
+source-level scans, because `getLocalStore` returns null under node and there is no local SQLite to
+drive. Rows blanked by an earlier delete are not repaired in place; the next pull replaces them.
+Detail:
+[`docs/overview/entries/2026-09-23-lane-a-dv10-supplement-delete-tombstone.md`](docs/overview/entries/2026-09-23-lane-a-dv10-supplement-delete-tombstone.md).
+
 ### [readiness] ⚠️ Readiness no longer reaches 100, and that is the price of TN-60 — stored days unchanged until the batched recompute
 
 The hard clip at z = ±1.5 was where the information went: over 69 days `hrvBalance` (22.8% of all
