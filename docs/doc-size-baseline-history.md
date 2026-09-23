@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27334 (LA-129 rerouted, +21)
+
+Raised because the entry grew, which is the growth path doing its job — and worth noting that this
+is now the ONLY way an ordinary PR touches a `.size` file. `--fix` used to lower a baseline for any
+slack at all, including slack the check tolerates within its band, so every PR that struck a backlog
+entry rewrote this file and two concurrent PRs collided on a number neither needed to change. That
+was the whole of the conflict class LA-129 was filed against, and it was self-inflicted: a 40-line
+strike leaves the plain check at exit 0, reporting the slack, needing no edit.
+
+`--fix` now withholds within the band and prints what it withheld; `--tighten` lowers deliberately,
+for the compaction sweep. Growth still raises, and slack over the band still lowers, because there
+the check would otherwise fail.
+
 ## 2026-09-23 — backlog → 27313 (DV-13 measured, +30), projectOverview → 12597 (+27)
 
 DV-13 stays in the queue and grew, which is the right direction for an entry whose cause was not
