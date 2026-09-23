@@ -29,7 +29,6 @@
 **Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
-<<<<<<< HEAD
 **An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
 `Body` was `.extend()`-built and never `.strict()`, so a sheet posting a field whose server half had
 not landed got **201 and wrote nothing** — the failure LB-124 was filed over rather than attempted,
@@ -42,7 +41,6 @@ would reject a queued check-in outright rather than surface a mistake, turning a
 no save. That path is already gated by the local SQLite column list (LB-124 needed a migration),
 which the POST path is not. Reasoning is written beside both. Driven over HTTP on `pnpm dev`, and
 the pre-fix 201-writes-nothing was **observed**, not assumed. No user-visible change.
-=======
 **The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
 to it (RV-105).** ⛔ **The entry claims four; two survive checking** — RV-106 and RV-109 are this
 shape, while RV-104 and RV-107 are `nutrition-content.tsx:318`'s `useCallback` shape
@@ -62,7 +60,6 @@ branch was open, and the shrink-only rule failed the check on the first run afte
 demanded their rows go; both were `[today]`/`[userId]`, invisible to the old gate, which is why
 RV-106 and RV-109 had to be found by hand. Baseline is 23 across 18. All four motivating findings
 (RV-104/106/107/109) have since shipped. Mutation-checked in both directions, six cases.
->>>>>>> origin/main
 
 **A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
 `realisation` — the PEAK-output phase — as `text-red-500`, the app's failure colour, and `deload` as
