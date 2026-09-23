@@ -74,3 +74,23 @@ themes. Also not exercised: Samsung WebView compositing of a fixed, animated-opa
 Also filed: **LB-130** — `docs/doc-size-baseline-history.md` is now the guaranteed-conflict file
 that `.size` used to be, on the same append-to-one-shared-file shape LA-33 and RV-134 already
 fixed twice. Measured across five re-merges of #1449 in an hour.
+
+## The journal compaction sweep rode along, because the guard said it was mine
+
+Merging `main` took `docs/overview/entries/` past the 60-foldable runaway limit, and since BF-36
+that guard fails only a branch that **adds** an entry — which every feature PR does, so it lands on
+whoever is holding the door. `node scripts/fold-journal-entries.js` folded **40 entries** into
+`history-2026-09-23-folded-1.md`, rewriting citations in three durable docs
+(`projectOverview.md` and the heart-rate and readiness domain indexes). Six were held back because
+an agent baton cites them; rewriting another lane's live state file races whatever that lane is
+doing.
+
+Verified the way the README insists on rather than by reasoning about which links moved:
+`check-doc-links` OK across 823 files, `check-index-doc-paths` OK across 1,176 paths. The second
+one matters because it catches the trap the first cannot see — a citation whose link *text* is also
+the path, where repointing the target leaves the backticked text naming a file that no longer
+exists.
+
+Folded the full 40 rather than the minimum needed to clear the limit: a sweep across N files is
+already a batch, and stopping at the threshold hands the same failure to the next PR within the
+hour.

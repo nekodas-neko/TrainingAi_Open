@@ -2660,7 +2660,7 @@ same code both reported and stayed silent on consecutive runs; exhaustion fired 
 The report path is wired and strictly additive, and is recorded as unproven rather than done.
 `LB-128` carries the fix (Lane A's, and **not** ungating `onError`, which every caller reads as "I
 have nothing to show"). Owed: the device check at the S25 width. Detail:
-[`docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md`](docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md).
+[`2026-09-22-rv103-rv104-nutrition-freshness`](docs/overview/history-2026-09-23-folded-1.md#2026-09-22-rv103-rv104-nutrition-freshness).
 
 ### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
 

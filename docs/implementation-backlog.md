@@ -947,31 +947,22 @@ below threshold and left in place for next time.
   the clock, that the scrim is absent at rest, and **how the gradient composes with
   `DynamicBackground`'s sky**, which is the one thing the sandbox cannot judge. Check both themes.
 
-### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`
-  (`TOP_N = showAll ? Infinity : 10`).
-- **Background:** found twice in two days while verifying my own filings. Prose, not a `Reference:`
-  field — that field files an entry under *read, do not build*.
-
-**Lane A's READY list is 31 entries and the tool prints 10, with no line saying so.** Two entries I had
-just edited (`TN-55`, `LA-121`) appeared **nowhere** in the output, which reads exactly like *removed
-from the queue* — the failure mode the backlog's own two-deletions rule exists to catch. I only
-established they were fine by parsing their fields directly, which is the thing `next-item.js` exists to
-save everyone from doing.
-
-**The fix is one line of output, not a behaviour change.** Keep printing 10; add the count that was
-withheld and how to see them — *"showing 10 of 31 — `--all` for the rest"* — on every bucket it
-truncates, READY and PARKED alike. A tool whose silence is indistinguishable from absence is the same
-class of defect as the prose marker in TN-59: correct output, wrong conclusion drawn from it.
-
-**⚠ Do not raise `TOP_N` instead.** The cap is right — an implementer wants the next few items, not
-thirty-one. What is wrong is that the truncation is invisible.
-
-**Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
-IS in the queue but below the cut-off no longer comes back empty without explanation.
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
+
+- **❌ PASS TEST RUN ON THE DEVICE MACHINE, 2026-09-23 — FAILED; this is open work again.** Windows 11,
+  Node 22.23.2, `main` at v1.465.9. `pnpm ci:local`: lint **0 errors**; `check:rules` **Ran 76 of 76, 0
+  FAIL** — the four path fixes hold. Then `typecheck:tests` dies:
+  `Error: spawnSync npx.cmd EINVAL`. **Since Node's April 2024 patches (CVE-2024-27980),
+  `execFile`/`spawn` refuse a `.cmd`/`.bat` without `shell: true`**, so `npx.cmd` swapped ENOENT for
+  EINVAL. The robust fix avoids npx entirely: `execFileSync(process.execPath,
+  [require.resolve('typescript/bin/tsc'), '--noEmit', '-p', 'tsconfig.tests.json'])` — same on every OS.
+  `pnpm test` run by itself: **1005 files, 5 failed / 791 passed / 209 skipped** (the DB suites skip
+  cleanly without Postgres — so the pass test needs no local database). The five:
+  `personal-details-one-editor.test.ts` (4 tests) and `constants-delivery.test.ts` compare paths with
+  `/` and get `\\`; `mutation-schema.test.ts` reads `full-export.ts`'s `'_manifest'` as a domain literal,
+  likely a `/`-keyed exclusion; `check-comment-blindness.test.ts` still times out at 30 s (recorded
+  above); and `sleep-consistency.test.ts` — **not a path bug; filed as DV-7**.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 · Device Verification · **Lane: O** — the rule
   scripts under `scripts/`, `scripts/check-test-typecheck.js`, and `package.json` `engines`.
@@ -1009,7 +1000,7 @@ IS in the queue but below the cut-off no longer comes back empty without explana
     argument list to a shell for re-parsing.
   - **`engines.node` is `>=22.12`.** `check-node-version-agreement.js` reads the major and still
     passes; the local machine's own upgrade is the owner's.
-- **Keep:** **the pass test, which cannot be run from here.** Every fix above is reasoned from the
+- **Was the Keep, answered below:** the pass test, which could not be run from the cloud. Every fix above is reasoned from the
   reported failures and verified on Linux, where three of the four bugs are invisible by
   construction. `pnpm ci:local` on the Windows machine, unpiped, exiting 0, is the only thing that
   settles it — and that is the Device Verification agent's to run.
@@ -1034,6 +1025,37 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   times slower than it needs to be is the finding, and a bigger number would hide it.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
+
+### [sleep][platform] DV-7 — `minutesFromNoon` falls back to the device's clock, and its tests only pass on a UTC machine
+
+- **Lane:** A — `packages/shared/src/health/sleep-consistency.ts` and its test.
+- **Added:** 2026-09-23 · Device Verification, running DV-1's pass test on the device machine.
+- **Measured:** on a machine set to Brisbane, `sleep-consistency.test.ts` fails twice — *"expected 690 not
+  to be 690"* and *"expected 1312.5 to be close to 712.5"*, a difference of **600 minutes, the UTC ↔
+  Brisbane offset**. CI runs in UTC, so it has never failed there.
+- **Why:** with no `tz`, `minutesFromNoon` computes `d.getHours() * 60 + d.getMinutes()` in the
+  **device's** timezone (its own comment: *"omit it for the existing client usage (device-local time
+  is…"*). That is the pattern CLAUDE.md's Timezone section bans for anything user-facing. The test
+  encodes the other half: it compares against device-local and assumes device-local is UTC.
+- **Fix direction:** make `tz` required (or default to `DEFAULT_TZ`, never the device), and write the
+  tests with an explicit zone on both sides, so they pass on any machine. **DV-9** is the caller.
+- **Pass test:** `pnpm test packages/shared/src/health/__tests__/sleep-consistency.test.ts` green under
+  `TZ=UTC` and `TZ=Australia/Brisbane` alike.
+
+### [sleep] DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's
+
+- **Lane:** B — `app/health/sleep/sleep-content.tsx:72`.
+- **Needs:** DV-7
+- **Added:** 2026-09-23 · Device Verification, found with DV-7.
+- **The defect:** `computeSleepStartConsistency(recentStarts)` is called with **no timezone**, so each
+  bedtime is placed in the device's local clock. The server route (`app/api/user/bedtime-estimate`)
+  passes one; this screen does not. **Invisible on the owner's phone** because it is set to Brisbane —
+  wrong for anyone whose phone and profile disagree (travel, or another user), which is exactly how
+  CLAUDE.md says this class hid for months.
+- **Fix:** pass the user's timezone (the session's `timezone`, as the route does).
+- **Pass test:** with the device timezone emulated to another zone (CDP `Emulation.setTimezoneOverride`
+  in `scripts/device/pw.js`), the Sleep screen's consistency figure does not change.
+
 
 ### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
 
@@ -2067,6 +2089,24 @@ nothing structured saying why — and a human decides.
   shallow file, repeated three times in one session.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
+  REJECTED this one with a reason.** The two were filed hours apart by different sessions and
+  neither could see the other. Read this before starting:
+  - **The conflicts were not caused by the committed baseline.** They were caused by **slack
+    detection failing on any gap**, which forced every PR that shrank a tracked doc by one line to
+    edit `.size` — and striking a completed entry is what almost every PR does. RV-134 tolerates
+    slack within `max(25, 2%)`, and the tax it was measured against (23 re-merge commits across
+    five branches in one night) should now be mostly gone. **Measure it again before assuming the
+    class still exists.**
+  - **Generating baselines in CI removes the CEILING, which is the part worth keeping.** A derived
+    baseline makes every increment "inherited", so a file can grow ten lines per PR forever with
+    nothing objecting. Slack detection exists because CLAUDE.md once sat **429 lines** under its
+    number. Any design here has to say how growth is still caught and how slack is still surfaced —
+    if it cannot, it is trading a merge conflict for the thing the ratchet is for.
+  - **A merge driver was also considered and rejected**: `merge.<name>.driver` must be configured in
+    every clone (CI, this sandbox, the Windows device machine) and silently does nothing where it is
+    missing, which is the old behaviour wearing a disguise.
 
 - **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
   **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
