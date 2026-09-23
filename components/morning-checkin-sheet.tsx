@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateCheckinAffectsPrescription, invalidateHealthTrends } from '@/lib/cache-groups'
 import { MORNING_SCALES, type MorningScaleKey, type IllnessContext, type VsYesterday } from '@trainingai/shared/types/day-checkin'
 import { ScaleSelector } from '@/components/nutrition/end-of-day/scale-selector'
@@ -123,7 +123,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
             syncStatus: 'pending',
           })
           await store.queueMutation({ userId: userId!, domain: 'day_checkins', date, payload })
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, () => Promise.all([invalidateCheckinAffectsPrescription(), invalidateHealthTrends()]))
           return true
         } catch (sqliteErr) {
           // A local write that fails — most likely the DB not being open yet, right after an
