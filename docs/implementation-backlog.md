@@ -1987,32 +1987,6 @@ below threshold and left in place for next time.
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
-### [platform] LA-130 — a bare `git fetch origin main` re-shallows the sandbox clone every time, and a shallow clone silently kills CI
-
-- **Lane:** A — sandbox/workflow tooling and the CLAUDE.md Git Workflow rule.
-- **Added:** 2026-09-23 · Lane A, measured across PR #1445's three base races.
-- **What CLAUDE.md already says, and what is new.** The Git Workflow section documents the
-  shallow-fetch defect and says to re-check `test -f .git/shallow` **after** each fetch. What was
-  not established is the frequency: this session ran `git fetch origin main` in a clone it had
-  already unshallowed, **four separate times, and `.git/shallow` came back on every one**. So it is
-  not an occasional relapse to watch for — a bare fetch re-shallows deterministically, which makes
-  `--unshallow` part of every fetch rather than a recovery step.
-- **Why it is worth tooling rather than vigilance.** The failure is silent and its symptom points
-  somewhere else: the branch loses its ancestry, GitHub reads the PR as conflicted, and **a
-  conflicted PR is never given a workflow run** — so `get_check_runs` returns `total_count: 0`
-  forever and reads exactly like slow CI. Four PRs were abandoned to this before the mechanism was
-  found (OR-132), and the rule that now exists only helps a session that remembers to run the check
-  after every fetch, which is the kind of discipline that fails under exactly the time pressure
-  that makes people fetch quickly.
-- **The options, none of them chosen here.** A git alias or wrapper that always fetches with
-  `--unshallow`; a `fetch.depth`/`remote.origin.fetch` config written by the session-start hook; or
-  a `scripts/` helper that fetches and asserts. The config route is the only one that survives a
-  session forgetting, which is the point — but whether the session-start hook can set it, and
-  whether the proxy re-imposes the shallow on the next fetch regardless, is **not established** and
-  is the thing to test first.
-- **Pass test:** after the fix, `git fetch origin main` followed by `test -f .git/shallow` finds no
-  shallow file, repeated three times in one session.
-
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
 
 - **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
