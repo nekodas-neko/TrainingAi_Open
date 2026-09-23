@@ -29,6 +29,26 @@
 **Version:** v1.465.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
+to it (RV-105).** ⛔ **The entry claims four; two survive checking** — RV-106 and RV-109 are this
+shape, while RV-104 and RV-107 are `nutrition-content.tsx:318`'s `useCallback` shape
+(`}, [fetchMountData, userId]`, no `cachedFetch` in the effect body), which the script excludes on
+purpose: counting it is what inflated its baseline by 11 of 25 in the first version. `check-fetch-once-effects.js` gated on an empty dep array; inside the
+persistent tab shell `[userId]`, `[tz]` and `[today]` never change either, so those effects re-run
+never. **The entry's open question is answered by a scan rather than by hand: widening takes the
+tracked population from 11 to 25 across 20 files** — a re-baseline, not a tweak. **⛔ The entry
+contradicts itself on `trendsProp`** — its diagnosis names it, its narrow fix list omits it; the fix
+list is right, because `trendsProp` is a prop the parent resolves from `undefined`, so it genuinely
+changes and `oura-section.tsx` already carries a second effect to adopt it. Excluded, with the
+reason in the code. ⚠ **This widened the lens, it did not audit what it revealed** — all 14 new
+sites predate it and went into the baseline. `sync-provider.tsx` is 4 of them and is the sanctioned
+warm pass; `workout-screen` still needs judging by where it MOUNTS. **Two of the fourteen proved the
+gate immediately** — Lane B converted `hr-day-card` and `activity-history-card` in #1422 while this
+branch was open, and the shrink-only rule failed the check on the first run after the merge and
+demanded their rows go; both were `[today]`/`[userId]`, invisible to the old gate, which is why
+RV-106 and RV-109 had to be found by hand. Baseline is 23 across 18. All four motivating findings
+(RV-104/106/107/109) have since shipped. Mutation-checked in both directions, six cases.
+
 **A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
 `realisation` — the PEAK-output phase — as `text-red-500`, the app's failure colour, and `deload` as
 `text-green-500` while Home's banner paints a deload *recommendation* amber or red. **Both are live,

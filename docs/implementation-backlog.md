@@ -916,27 +916,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
   cached data with error cards across the app.
 
-### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
-
-- **Lane:** A — `scripts/check-fetch-once-effects.js:164`. **Added:** 2026-09-22 · Review sweep 53.
-- The gate is `if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(...)) continue;` — **only an empty dependency
-  array counts.** Its comment states the rationale: *"a non-empty one re-runs when its deps change,
-  which is a different (and usually correct) shape."*
-- **That reasoning is sound in general and wrong for this app.** Inside the persistent tab shell,
-  `[userId]`, `[today]` and `[trendsProp]` never change either, so those effects are fetch-once in
-  every way that matters. **Four of the five freshness findings in this sweep (RV-104, RV-106,
-  RV-107, RV-109) are that shape, and all four are invisible to the ratchet.**
-- **⚠ Widening the pattern is NOT a one-line change, and the file says why.** Its header records
-  that the first version used a non-greedy regex, swallowed unrelated code between effects, and
-  **inflated its own baseline by 11 of 25**. The brace-matching it uses now is the fix for that.
-  Extending to stable-deps needs a judgement about *which* deps are stable — `[userId]` on a
-  persistent screen is, `[date]` on a sheet that remounts per open is not (`week-day-sheet.tsx` is
-  the legitimate counter-example).
-- **Fix, narrowly:** treat a dep array containing **only** identifiers known to be shell-stable
-  (`userId`, `tz`, `today`) as fetch-once, re-baseline, and leave everything else alone.
-- **Not established:** how many *new* sites a widened pattern would surface — the four above were
-  found by hand, not by a candidate scan.
-
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
 - **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
@@ -12198,6 +12177,17 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   button's centre** and refused to dispatch, which fits the defect still being there but does not
   prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
   tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
+- **📱 Second attempt, 2026-09-23 (sitting 2) — still COULD NOT CHECK, and why, so the next try
+  does not repeat it.** Three "immediate tap" runs showed no confirmation, but **none of them is
+  evidence**: the row's tray was **already open** before the swipe (a tray left open by an earlier
+  step stays open — the row sat at `translateX(-64px)`), and the tap aimed 32 px inside the *row's*
+  right edge, which is x=271 with the tray open — the row, not Delete (x 303–367). A 1.5 s control
+  tap at that point opened *Edit Serving*, confirming it hit the row. Measured once correctly: from
+  an **open** tray, a further left swipe overshoots to −134 px and settles back at −64 px by 300 ms,
+  with Delete on top throughout. **What the next attempt needs:** a verified-closed tray first
+  (`translateX(0)`; a right swipe starting inside the navigator's 24 px edge strip does not close it,
+  and neither did a raw tap on the row), then swipe and `input tap` at **Delete's own rect** in one
+  `adb shell` call. Note the tray is `aria-hidden` while closed, so a visibility filter hides it.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
