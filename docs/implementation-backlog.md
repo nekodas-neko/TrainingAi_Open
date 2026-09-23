@@ -1163,32 +1163,12 @@ below threshold and left in place for next time.
   latched it `true` for the life of the screen and `isCancelled()` killed every retry. One aborted
   request was observed where four were due.
 - **Keep:** ① the device check — the failure line and its Retry at the S25 width, in the card that
-  carries "kcal left". ② the reporting path is **wired but only observed firing once in five
-  sandbox runs**, because of LB-128 below; it is strictly additive (absent the flag nothing renders,
-  which is today's behaviour) but it is not proven in the common case and must not be written up as
-  though it were.
-
-### [platform] LB-128 — `cachedFetch` cannot tell a caller that a revalidation failed
-
-- **Lane:** A — `lib/sqlite/cache.ts:374`. **Added:** 2026-09-22 · found while shipping RV-103.
-- `cachedFetchCore`'s network-throw branch computes
-  `const online = cached === null && navigator.onLine` and fires `onError` only when `online`; the
-  `!res.ok` branch is gated the same way (`if (cached === null)`). So **both** failure paths are
-  silent whenever anything was painted from cache. `fetchWithRetry` has the mirror-image blind
-  spot: a cached paint sets `responded`, so the retry chain stops and `onExhausted` never fires.
-- **Together they mean no caller can report a failed refresh of a key that has a cached value** —
-  exactly the post-write case RV-103 was about, whenever the write's invalidation has not (yet)
-  cleared the entry. RV-103's suggested fix, *"pass `onError`"*, cannot reach it.
-- **Measured, not read:** driving `/nutrition` with `/api/nutrition/energy-balance` aborted, the
-  same code both reported and stayed silent on consecutive runs, decided by whether the entry was
-  in the cache when the refetch ran. The flake was the finding.
-- **Fix:** an ungated channel — an `onRevalidateError` that fires when a cached value was painted
-  and the revalidation then failed. The existing gate is right for what it guards (offline with
-  saved data is not an error); what is missing is the case where the caller *knows* the cached
-  value is out of date, because it just wrote.
-- **⚠ Do not simply ungate `onError`** — every existing caller reads it as "I have nothing to
-  show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
-  cached data with error cards across the app.
+  carries "kcal left". ② the reporting path was **wired but only observed firing once in five
+  sandbox runs**, because the residue case had no channel; **LB-128 shipped that channel on
+  2026-09-23 and this hook now takes it** (`onRevalidateError` beside `onExhausted`), so the
+  flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
+  nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
+  it must not be written up as proven until ① is done.
 
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
