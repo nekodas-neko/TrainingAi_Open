@@ -16062,3 +16062,16 @@ test files. Two of three locked runs were slow and one was not, with a confound 
 direction. That is not enough to claim the lock costs CI time, and filing it as a finding would send
 the next session chasing a number that may be someone else's tests. Worth re-reading if `Tests`
 stays above six minutes over the next several PRs.
+
+## 2026-09-23 — `CLAUDE.md` → 932 and `docs/implementation-backlog.md` → 27456 (OR-135)
+
+**CLAUDE.md +17**: the lane rule in the owner's own words — DV takes what the phone can ANSWER, a
+looks-or-design judgement stays with the Orchestrator and waits for him — plus the three traps that
+mis-assigned real entries before it existed: "the agent can run it" is not "it belongs to DV", a
+probe that has already run is no longer DV's, and never convert a device gate into a shipped-work
+field to gain visibility.
+
+**Backlog +86**: sixteen device probes given a lane with the reason on each, five Colmi entries
+marked as waiting on hardware rather than on the device agent, and Q-253 struck on the owner's
+answer. The lane bullets are verbose on purpose — an assignment with no reason attached is what
+produced the circular gates, and this file is read by agents who cannot ask.

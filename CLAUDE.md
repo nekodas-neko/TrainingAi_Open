@@ -160,6 +160,23 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   and no two sessions awake at once — the queue outlives the session that wrote the entry.**
   **`O` and `DV` see only what is tagged for them**, because an unstated lane means "the path rule
   answers it" and that rule only resolves to an implementer.
+- **`Lane:` names who acts NEXT — and for the device that means what the phone can ANSWER, not
+  everything the phone is involved in** (owner, 2026-09-23: *"Only device testing that can be done
+  by DV goes to DV; if its device testing based on looks/design that should stay in orchestrator
+  waiting for user input."*). So `DV` takes an entry when the next action is a **measurement or
+  reproduction nobody has done yet** with an objective pass/fail. A judgement about **looks, layout
+  or whether something feels right** goes to `O` and waits for the owner, even though the phone is
+  where he will look at it — `DV-6`'s status-bar scrim was correctly his call, not a verification.
+  **Three traps, each of which mis-assigned real entries before this rule existed:**
+  **(a)** *"the agent can run the check"* is NOT *"the entry belongs to DV"* — `Q-418`'s remaining
+  work is Kotlin and an APK, `LA-36`'s is a local-store mapper, and `BF-49` was already reproduced
+  on a device pass, so all three next need a LANE, not the phone.
+  **(b)** *a probe that has already been run* is no longer DV's: re-running a question that has
+  answered is the device agent's time spent on nothing. Seven of the sixteen device probes were
+  already measured when this rule was written.
+  **(c)** **never** convert a device gate into a `Verify:` field to make an entry visible —
+  `Verify:` means SHIPPED, and applying it to unbuilt work files it under *"done, a look is owed"*,
+  which is worse than the silence it was meant to fix.
 - **The entry's LETTER and its LANE are different things.** The letter records who found it and
   never changes; the lane records who builds it. `DV-1` was found by the device agent and carries
   `Lane: O`.
