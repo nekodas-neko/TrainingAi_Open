@@ -2660,6 +2660,27 @@ the recommendation without updating the test's mock; two of the six still report
 trivially and one **vacuously**. #1472 fixed it concurrently. The red commit was inherited, not
 caused, by #1467 — but nothing signalled it.
 
+### [platform] ⚠️ Your fixes are merging but not reaching you — production is about ten hours behind (DV-14, 2026-09-24)
+
+**Measured 06:30 AEST: the live app reports v1.465.17. `main` is at v1.465.22.** 1.465.17 went in at
+20:36 last night, so production has been serving ten-hour-old code, and **five merges are sitting
+unshipped** — the post-push guard fix, the nutrition scroll nesting fix, route animations, the More
+tab's sub-tab crossfade, and Home's APK banner removal. All five are things you would notice, and
+none of them is on your phone.
+
+**It is not one stuck deploy.** It stalled, caught up on its own, and stalled again — so something is
+batching, throttling, or succeeding intermittently rather than failing outright. A deploy that simply
+failed would stay failed.
+
+**Two things follow, and both matter.** First, "it merged, so it is live" has been wrong all evening,
+which means nothing merged since 20:36 can be device-verified yet. Second, this is what makes the
+eight-minute outage above uncertain: that was blamed on a specific merge's deploy, and the deploys
+were not tracking merges at the time.
+
+**Blocked on you or the device machine.** The next step is Railway's deploy log for `main` from
+18:16 onward — the first failing or queued deploy names the cause. That log is not reachable from
+the sandbox; there is no Railway API or CLI here, so nobody in a container can take this further.
+
 ### [platform][devices] ⚠️ The app was unreachable for ~8 minutes, and the likeliest cause is how fast we were merging (DV-13, 2026-09-23)
 
 At **20:04:40 AEST** the public `/api/version` — which does not touch the database — took 30 s, then
@@ -2667,12 +2688,15 @@ timed out on every attempt until **20:12:41**, when it answered in half a second
 minutes the app was effectively down for anyone using it. The device agent was on the Oura BLE admin
 console at the time and four of its requests never answered, so the console was the first suspect.
 
-**It probably was not the console. It was a deploy.** `main` took four merges in sixteen minutes and
-every merge redeploys production — the third of them landed **70 seconds before the stall began**,
-and the recovery is an ordinary build-and-swap later. A container being replaced is exactly what
-makes a database-free route hang for minutes and then answer instantly. The only two server errors
-recorded in the window are at 20:12:36, the moment of recovery rather than the stall, and both say
-the app could not get a database connection — a new container warming up.
+**It probably was not the console. It looks like a deploy.** A container being replaced is exactly
+what makes a database-free route hang for minutes and then answer instantly, and the only two server
+errors recorded in the window are at 20:12:36 — the moment of recovery rather than the stall — both
+saying the app could not get a database connection, which is a new container warming up.
+
+**⚠ Corrected 2026-09-24: this first said a specific merge caused it, 70 seconds earlier. That is
+not established.** It assumed a merge deploys promptly, and the deploys were badly behind at the
+time — see the deployment row below. Which deploy it was, and whether it was a batched catch-up of
+several queued merges, is unknown.
 
 **So the thing to change is the merge cadence, not just the code**: several merges in a few minutes
 means several production restarts in a few minutes. Spacing them out is free.
