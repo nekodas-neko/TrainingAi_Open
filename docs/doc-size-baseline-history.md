@@ -16027,3 +16027,27 @@ treat an identical FK failure elsewhere as new.
 The measured numbers are in the row on purpose — 171 against 9, and 3-of-3 red versus 3-of-3 green
 — because DV-3 itself was filed from a single observation and a reading of the test, and the entry
 that replaces it should not be re-openable on the same standard of evidence.
+
+## 2026-09-23 — `implementation-backlog.md` 27325 → 27329, `projectOverview.md` 12491 → 12506 (DV-7)
+
+The backlog barely moves: DV-7 leaves and **LB-131 replaces it**, filed because the DV-7 fix
+*created* it rather than found it. `minutesFromNoon` now defaults to the user's zone, so the
+sleep-timing chart plots bedtime in Brisbane and wake in the device's zone — the two halves of one
+chart disagreeing off-Brisbane, where before they were consistently wrong together. The entry
+spends its length on why that is invisible on the S25, since an entry that only said "thread the tz"
+would read as tidying rather than as a regression someone introduced deliberately and recorded.
+
+`projectOverview.md` gains 15 lines for one Known-Issues row, most of it the two facts that make
+the defect explicable rather than surprising: CI runs in UTC and the owner's phone sits in the zone
+the data was recorded in, so a device-local read is invisible from both directions at once. The
+600-minute number is in the row because it identifies the cause on sight — it is the UTC↔Brisbane
+offset, not an arbitrary discrepancy.
+
+**A CI-timing observation recorded here rather than filed, because the evidence does not support an
+entry.** `Tests` ran 6:51 and 6:43 on the two heads after DV-3's `LOCK TABLE users IN SHARE MODE`
+landed, against 4:12–5:26 on four earlier runs — but the FIRST head carrying that same lock ran
+5:24, and the later heads also merged in more of `main` (RV-143, DV-4, #1451's probes), which adds
+test files. Two of three locked runs were slow and one was not, with a confound in the same
+direction. That is not enough to claim the lock costs CI time, and filing it as a finding would send
+the next session chasing a number that may be someone else's tests. Worth re-reading if `Tests`
+stays above six minutes over the next several PRs.
