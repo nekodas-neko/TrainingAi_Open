@@ -7,7 +7,7 @@
 // Runs only against a real Postgres. NOTE: CI's "Tests" job DOES set DATABASE_URL, so these run
 // there; reproduce CI locally by setting it too, or vitest silently skips them.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -83,7 +83,7 @@ describe.skipIf(!canRun)('migration 163 — personal_records reconcile (Q-5b)', 
     [userId],
   )).rows
 
-  const run = () => pool.query(migrationSql())
+  const run = () => runMigrationSql(pool, migrationSql())
 
   it('raises a PR the log path never promoted', async () => {
     // The production Barbell Bench Press case: the best log is OLDER than the PR's own row, so

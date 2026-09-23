@@ -33,6 +33,32 @@ table below was built by reading every one of those 116 entries; the plan above 
 4. **An owner-present block (~20 min)** for what only he can change: reduce-motion (Q-461, RV-128),
    three-button nav briefly (BF-62), TalkBack (Q-491), airplane mode (Q-499, RV-131, BF-47). Optional.
 
+### The owner's answers (2026-09-23)
+
+1. **Weigh-in: accepted**, with a similar number. Read today's weight first and log **that same value**,
+   so the only change is the day's source becoming manual. Covers RV-108 and RV-126's weigh-in half.
+2. **Mood: accepted, overwrite allowed.** Still, read today's check-in first and **restore it** after.
+3. **"Only what you need."** Of the nine, only **RV-45** (a throwaway supplement + injury, created and
+   deleted) is needed — it is the only way to exercise the device's delete path. The other eight are
+   **skipped and recorded COULD NOT CHECK — owner declined as unneeded**: completing a real workout
+   (BF-169, BF-168 — streak, PRs and phase counters), the Auto-detect timezone write (Q-477 — its own
+   entry says it breaks dates), a non-Brisbane Health Connect sync (LB-113), coach changes (Q-467),
+   admin rebuild runs (Q-318, TN-1 — expected to fail), account deactivation (PS-24).
+4. **Owner-present OS block:** not yet answered — skipped unless he opts in.
+
+### Added since the plan was written (queue as of 2026-09-23 afternoon)
+
+| ID | block | what |
+|---|---|---|
+| **DV-4** | 4 | the fix shipped (#1449): every Sleep card legend value ≥ 4.5:1 — computed colour vs the card, dark theme |
+| **RV-108** | 5 | weigh-in on the device: which cache keys are evicted, and does the Body card update — unblocked by answer 1 |
+| **DV-5** (shipped #1445, removed without a device look) | 5 | after the food delete, `localQuery`: the tombstone is `synced`, not `pending` |
+| **RV-110 / RV-112** (shipped #1431, same) | 2 | P15 wasted navigations: cross-tab pushes keep the tab shell; Home and More keep separate scroll offsets |
+| **Q-545**, **BF-24** | — | gated, but the work is unbuilt (Q-545) or a design look (BF-24): not this sweep |
+
+`--sittings` now lists gated entries too (#1443); the Colmi, scale and spec rows it adds are the ones
+already listed above as not movable.
+
 ## Order and time
 
 | # | block | what | tools | est. |
