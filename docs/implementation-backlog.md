@@ -473,6 +473,47 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
+
+- **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
+  neither implementer lane's paths (the OR-103 case). **Added:** 2026-09-23 · Review.
+- **The mechanism, which has not been stated before.** The ratchet runs the absolute check first
+  (`verdict({count, limit, atBase: null})`, `:136`). Growth over the baseline then gets an
+  `inherited` escape at `:157` — *"over the number, but no bigger than what the base already holds,
+  so the branch did not do this"*. **The slack direction gets no such escape, deliberately** (PS-34,
+  quoted in the file: *"Failing on slack rather than reporting it, and with no `inherited` escape
+  hatch"*). So the two directions are asymmetric, and the unprotected one is the one concurrency
+  triggers constantly: **every implementer PR that completes an entry SHRINKS the backlog**, the
+  merged file falls under the committed number, and the next branch must lower it — even when the
+  shrink was entirely someone else's merge.
+- **Measured twice, independently.** Tuning, 2026-09-20 → 2026-09-22: *"five of seven PRs hit a
+  `docs/doc-size/docs/implementation-backlog.md.size` conflict"*, two also needing the append-only
+  history file resolved by hand. Review, 2026-09-22 night: **three of three merges** (#1389 twice,
+  #1418), each a fetch, merge, recount, note edit and re-push. Every one mechanical.
+- **Fix: give the slack direction the same `inherited` escape the growth direction has.** If the doc
+  is under its baseline *and* the base branch is under it too, the shrink is not this branch's — report
+  it, do not fail. Then only a branch that itself shrank a doc has to lower the number, and two PRs
+  stop contending over one exact integer. Roughly five lines, in the file that already computes
+  `lineCountAtBase(baseRef, rel)` for the other direction.
+- **What that gives up, honestly, and why it is acceptable.** PS-34's concern was real — CLAUDE.md sat
+  **429 lines** under its number, free to regrow silently. Under this change a shrink that lands on
+  `main` without its baseline following stays unlowered until someone touches that doc. The residue is
+  covered by two things that already exist: any later branch that grows the doc back is still caught by
+  the absolute check, and `--fix` (LA-99) rewrites every stale baseline in one pass, which suits the
+  Orchestrator's weekly sweep.
+- **⚠ This does NOT need the owner** — Tuning's note (§2c) says it wants *"the owner's yes on changing
+  the ratchet"*, which was written before the 2026-09-22 narrowing in CLAUDE.md handing structural,
+  tooling and process calls to the agents. It is tooling, it is reversible in one commit, and no
+  number a human reads changes. Recorded here rather than asked.
+- **Rejected alternative — slack in the baseline** (round the number up so small deltas do not move
+  it). It is the obvious fix and it is the one PS-34 already removed for cause: slack is exactly the
+  room a document regrows into unwatched. Do not re-introduce it.
+- **Not the same as generating baselines in CI**, the other alternative in Tuning §2c. That removes
+  the committed file entirely and is a larger change to how the ratchet is read and audited; this one
+  keeps the file, the history note and the deliberate act of raising a number, and only stops blaming
+  the wrong branch. If both are wanted, this one first — it is cheap and it settles whether the tax
+  was ever about the committed file at all.
+
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
 - **Verify:** device — **and there is no build half.** This entry's entire work is the measurement;

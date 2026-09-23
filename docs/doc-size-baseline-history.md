@@ -15648,3 +15648,14 @@ landed from `main` across three re-merges while this branch was open. What this 
 the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
 above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
 read as genuinely given back rather than absorbed into someone else's sweep.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +41 (26780 → 26821) (Review: RV-134)
+
+One entry, naming the mechanism behind the `.size` conflict tax that Tuning measured on 2026-09-20
+(§2c) and said needed its own entry. It is longer than a one-line finding because the recommendation
+has to say what it gives up: PS-34 removed slack from this ratchet for cause, and the fix proposed is
+**not** re-introducing it — it is giving the slack direction the same `inherited` escape the growth
+direction already has, so a branch is not blamed for a shrink another PR's merge caused.
+
+Filed against Lane O rather than an implementer lane: `scripts/check-doc-index-size.js` is repo
+tooling in the Custom Rules job, which is the OR-103 case.
