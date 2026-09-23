@@ -16063,9 +16063,42 @@ direction. That is not enough to claim the lock costs CI time, and filing it as 
 the next session chasing a number that may be someone else's tests. Worth re-reading if `Tests`
 stays above six minutes over the next several PRs.
 
+## 2026-09-23 — `CLAUDE.md` → 932 and `docs/implementation-backlog.md` → 27456 (OR-135)
+
+**CLAUDE.md +17**: the lane rule in the owner's own words — DV takes what the phone can ANSWER, a
+looks-or-design judgement stays with the Orchestrator and waits for him — plus the three traps that
+mis-assigned real entries before it existed: "the agent can run it" is not "it belongs to DV", a
+probe that has already run is no longer DV's, and never convert a device gate into a shipped-work
+field to gain visibility.
+
+**Backlog +86**: sixteen device probes given a lane with the reason on each, five Colmi entries
+marked as waiting on hardware rather than on the device agent, and Q-253 struck on the owner's
+answer. The lane bullets are verbose on purpose — an assignment with no reason attached is what
+produced the circular gates, and this file is read by agents who cannot ask.
+
+## 2026-09-23 — backlog 27458 → 27492 (DV-6 + LB-130, +34)
+
+Two entries move this, and neither is the code.
+
+**DV-6 shipped and stayed in the queue** as `Verify: device` + `Keep:`, because the one thing the
+sandbox cannot judge is the thing most likely to need tuning: how the gradient composes with
+`DynamicBackground`'s sky. Its entry also now records why the decision logic sits in a `.ts`
+controller rather than the component — every vitest project here is `environment: 'node'` and
+cannot transform `.tsx` at all, so logic left in the component is logic nothing can drive, and on
+device a dead scrim and a mis-scoped one look identical. That is worth the lines because the
+obvious "simplification" later is to fold the controller back in.
+
+**LB-130 is new**, and it is the one to read: `docs/doc-size-baseline-history.md` — this file — is
+now the guaranteed-conflict line that `.size` used to be. LA-33 split the `.size` map per document
+and RV-134 gave it a slack band; across five re-merges of #1449 in one hour the `.size` file
+conflicted only when a change genuinely grew a document, and **this file conflicted every time**.
+Same append-to-one-shared-file shape, same fix the repo has already used twice: per-entry files
+under `docs/doc-size/history/`, folded in by the existing compaction sweep. It needs no code —
+`check-doc-index-size.js` prints the reminder to write a note and never reads what is written.
+
 ---
 
-## 2026-09-23 — backlog → 27400 (+28) (device/sweep-1)
+## 2026-09-23 — backlog → 27519 (sweep-1 results, measured after merging main) (device/sweep-1)
 
 Device sweep 1's results, quoted in the entries they settle as the probe checklist asks: the
 performance baseline (RV-137…RV-142, RV-133), the write checks (RV-108, BF-185, BF-177, LB-116), the

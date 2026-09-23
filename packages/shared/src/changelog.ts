@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.11",
+    date: "2026-09-23",
+    changes: [
+      "Text no longer runs through the clock. Scroll any screen and a soft fade now sits behind the status bar, so captions and numbers pass under it instead of through it. It is not there when you are at the top of a screen, and it appears on every tab without each one having to ask for it.",
+    ],
+  },
+  {
     version: "1.465.10",
     date: "2026-09-23",
     changes: [

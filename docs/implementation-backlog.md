@@ -526,7 +526,13 @@ below threshold and left in place for next time.
   start (sitting 2's two-link crash did not recur). **"Content"** = no visible loading block ≥ 16 px and
   real text; **"settled"** = content and no `/api` in flight for 400 ms — both defined in `perf.js`.
 
-- **Verify:** device — **no build half**; the measurement is the work. Method: **P11** in
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** **no build half**; the measurement is the work. Method: **P11** in
   [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md). **Added:** 2026-09-23 ·
   Review, at the owner's request for device checks on load efficiency and timing.
 - **The falsifiable claim:** every tab reaches first real content within **300 ms warm** and the
@@ -543,10 +549,6 @@ below threshold and left in place for next time.
 
 ### [app-shell][workouts] RV-138 — DEVICE PROBE: is Q-51's 1086 ms first mount a rule or a one-off?
 
-- **📱 RV-138 has run (sweep 1): 90 warm visits, no outlier — every first visit within 1.3× its
-  median, slowest 164 ms.** The 1086 ms reading did not recur. Per this entry's own rule, re-place it
-  rather than build the refactor; the numbers are on RV-138.
-
 - **📱 MEASURED — the 1086 ms outlier did NOT recur in 90 visits.** S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23. `perf.js cycles --n 10`,
   every duration, never a mean (content ms): **Home** 60 78 98 88 70 91 88 127 83 91 · **Health** 66 62 164
   92 87 79 98 60 94 91 · **Workout** 102 77 78 54 79 90 67 64 68 92 · **Nutrition** 73 79 77 112 91 78 62 63 59 77
@@ -558,7 +560,13 @@ below threshold and left in place for next time.
   start; the 1086 ms reading may belong to a colder state (a fresh deploy, an evicted cache) this run
   did not reproduce.
 
-- **Verify:** device — no build half. Method: **P12**. **Added:** 2026-09-23 · Review.
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P12**. **Added:** 2026-09-23 · Review.
 - **The one measured perf number in the whole queue is a single observation.** Q-51: `/workout`
   visited five times in one session — **four at ~100 ms, one at 1086 ms, all warm.** It is read as a
   first-mount cost, and that reading is what the remaining file-splitting work rests on.
@@ -584,7 +592,13 @@ below threshold and left in place for next time.
   **COULD NOT CHECK** with this method. "Chained" = started within 60 ms of another response:
   a heuristic, not proof of causation.
 
-- **Verify:** device — no build half. Method: **P13**; `scripts/device/pw.js` already instruments
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P13**; `scripts/device/pw.js` already instruments
   the Network domain. **Added:** 2026-09-23 · Review.
 - **The falsifiable claims, per screen:** no `/api/*` endpoint is requested **twice** for one screen;
   no request chain is deeper than **two** (a request that only starts once an earlier one finishes).
@@ -605,7 +619,13 @@ below threshold and left in place for next time.
   zero long tasks.** The old **`animationiteration` finding did not reappear** — it is absent from the
   top scripts entirely. So on this build the main-thread cost is the tap, not the animations.
 
-- **Verify:** device — no build half. Method: **P14**. **Added:** 2026-09-23 · Review.
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P14**. **Added:** 2026-09-23 · Review.
 - **The falsifiable claim:** no interaction — cold start, tab switch either direction, a scroll of
   Home or Health — produces a single main-thread task over **50 ms**, and no interaction's total
   blocked time exceeds **200 ms**.
@@ -623,7 +643,13 @@ below threshold and left in place for next time.
   shell survived, Health tab active). **RV-112's fix holds:** Home kept 600 px and More 300 px across a
   switch. BF-49's path is recorded on BF-49.
 
-- **Verify:** device — no build half. Method: **P15**. **Added:** 2026-09-23 · Review.
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P15**. **Added:** 2026-09-23 · Review.
 - **The falsifiable claims:** no screen is reachable by two tap paths of different length; no
   navigation lands somewhere and immediately moves again; pressing back from any deep screen reaches
   Home in as many presses as it took to get there, and never lands somewhere never visited.
@@ -636,13 +662,6 @@ below threshold and left in place for next time.
   correctness.**
 
 ### [platform][app-shell] RV-142 — DEVICE PROBE: does a long session get slower, and is that what BF-22 was feeling?
-
-- **📱 Evidence from sweep 1 (RV-142 + RV-133).** Tab time-to-content rose from 61–103 ms after a cold
-  start to 126–434 ms after ~2 h of use, and stayed there (134–449 ms) after 30 idle minutes; listeners
-  608 → ~2,200 over the same span, flat while idle. So the slowdown is real on the device, builds with
-  use rather than time, and survives idling — what the owner describes. Still unattributed: which
-  component's listeners grow. Next measurement: the listener count per tab visit, to find the one
-  that never lets go.
 
 - **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23.** Time-to-content per tab (`perf.js tti`) at three points:
   | tab | after cold start | after a ~2 h walk | after 30 min idle |
@@ -658,7 +677,13 @@ below threshold and left in place for next time.
   of scripted testing (90 measured visits, several writes, offline switching), heavier than a normal
   day; the direction is the finding, not the exact multiple.
 
-- **Verify:** device — no build half. Method: **P16**. **Added:** 2026-09-23 · Review.
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P16**. **Added:** 2026-09-23 · Review.
 - **BF-22 is an owner report with its mechanism already narrowed** — *"everything is loading very
   slowly"*, then *"actually its running a lot better after a force restart"*. So the slowdown is
   in-memory client state; the server-distance theory was measured and was **wrong** (`x-railway-edge`
@@ -685,6 +710,11 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
+
 - **📱 MEASURED ON THE S25 (food rows only), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. **Log a food:** the write goes
   local-first + `POST /api/sync/push`; within 3 s `energy-balance`, `weekly-summary` and
   `day-timeline` are each requested **twice** (once before the push, once after), the diary row
@@ -710,6 +740,12 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
 
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
 - **📱 BASELINE ON THE S25, 2026-09-23 — the write half is still owed.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js`, two
   and three rounds, **no writes**: 41 `/api` endpoints. Without a write between visits a well-built
   shell *should not* refetch, so "fetched on one visit of two" is not a defect here and the census's
@@ -717,7 +753,7 @@ below threshold and left in place for next time.
   `workout-data` (5×) refetch on every tab visit. The P2 answer needs one write per tab during the
   walk — next sitting, with the owner's approved write types.
 
-- **Verify:** device — no build half; the measurement is the work. Method: **P2**.
+- **The measurement, and it is the deliverable rather than a look owed —** no build half; the measurement is the work. Method: **P2**.
 - **The falsifiable claim:** over a fixed 5-minute walk (Home → Nutrition → Health → Workout → More,
   twice round, one write per tab), every `/api/*` endpoint belonging to a revisited tab shows a
   request count **greater than one**. FAILED for any endpoint fetched exactly once on a tab visited
@@ -737,6 +773,11 @@ below threshold and left in place for next time.
   `scripts/device/**`, which the role owns.
 
 ### [body][devices] RV-126 — DEVICE PROBE: the local-store write path, which no sandbox can execute
+
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
 
 - **📱 MEASURED ON THE S25, 2026-09-23 — the first read of the on-device store.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js`
   `localQuery` through the app's own `CapacitorSQLite` connection (SELECT only). **Every
@@ -762,6 +803,11 @@ below threshold and left in place for next time.
 - **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
+
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
 
 - **📱 MEASURED ON THE S25, 2026-09-23 — every claim, including clearance.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `sweep.js` over
   13 routes (tab roots + cardio, health/day, health/readiness, more/details, more/settings,
@@ -789,7 +835,13 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-128 — DEVICE PROBE: does the tab switch drop a frame showing neither panel?
 
-- **Verify:** device — no build half. Method: **P5**; `record.js --tap` is the instrument.
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P5**; `record.js --tap` is the instrument.
 - **The falsifiable claim:** across a tab switch, no captured compositor frame shows **neither** the
   outgoing nor the incoming panel. Report the count and duration of any such frames, and separately
   what `bg-page` resolves to mid-switch — **if it is transparent the blink shows the wallpaper**,
@@ -802,7 +854,13 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-129 — DEVICE PROBE: is a warm visit ever painting a skeleton?
 
-- **Verify:** device — no build half. Method: **P6**.
+- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
+  The entry states it has **no build half** and names its own method: the measurement IS the
+  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
+  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
+  judgement, which stays with the Orchestrator for him.
+
+- **The measurement, and it is the deliverable rather than a look owed —** no build half. Method: **P6**.
 - **The falsifiable claim:** on a tab already visited this session, no skeleton is painted between
   navigation and first real content. FAILED anywhere one is — that means the synchronous
   `readCacheSync` seed is missing, or is in a `useState` initializer rather than a `useEffect`.
@@ -811,6 +869,11 @@ below threshold and left in place for next time.
   measured. RV-39 claims the `/more/devices` ring card does it — confirm or kill that claim.
 
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
+
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
 
 - **📱 MEASURED ON THE S25 (walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Two `census.js` walks (10 and 15
   visits): **0 non-2xx and 0 failed requests** of 161. Console, the full list: **499×** *"Rendering
@@ -839,6 +902,11 @@ below threshold and left in place for next time.
   Under CDP emulation only — a real reconnect fires Capacitor's network event, which emulation does
   not — so this needs real airplane mode before it is a finding.
 
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
+
 - **📱 MEASURED ON THE S25, 2026-09-23 — mostly clean.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js` `offline(true)`
   (`navigator.onLine` false, page fetches fail). Food, one domain only: logged offline, **row on
   screen in 256 ms** with a "logged" toast, **one pending `food_logs` mutation** in
@@ -862,6 +930,11 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
 
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
+
 - **Verify:** device — no build half. Method: **P9**; `tour.js` already walks routes.
 - **The falsifiable claim:** every route in the build is reachable **by tapping only**, from a fresh
   install and from a warm one, and no picker or menu label names a different metric from what its
@@ -878,6 +951,11 @@ below threshold and left in place for next time.
   walk: heap **42.5 → 39.5 MB**, listeners **2,270 → 2,237**, DOM nodes flat at 5,564 across 30
   untouched minutes. **Nothing accumulates while idle.** The growth is in use (608 listeners after a
   cold start → ~2,200 after two hours), and RV-142 shows it costs paint time.
+
+- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
+  and its result is recorded above, so the device is no longer what it needs. What it needs now
+  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
+  answered is the device agent's time spent on a question nobody is asking.
 
 - **📱 MEASURED ON THE S25 (the walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js --rounds 3 --dwell 15`
   from a cold reload: heap / listeners / DOM nodes / live timers — start **21.9 MB · 608 · 1302 ·
@@ -927,40 +1005,74 @@ below threshold and left in place for next time.
   push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
   the local `workout_sessions` table.
 
+### [platform] LB-130 — the doc-size HISTORY file is now the guaranteed-conflict line that `.size` used to be
+
+- **Lane: O** — queue/docs infrastructure; the fix is a convention plus a sweep, not a surface change.
+- **Added:** 2026-09-23 · Lane B, measured across five re-merges of #1449 in one hour.
+- **It is a clean natural experiment, not an impression.** LA-33 split the shared doc-size map into
+  one `docs/doc-size/<path>.size` per tracked doc; RV-134 then tolerated slack within
+  `max(25, 2%)`. Both landed. **The `.size` files duly stopped conflicting** — across the last
+  three re-merges of #1449 the backlog `.size` conflicted only when the change genuinely grew the
+  file, which is the check working. **`docs/doc-size-baseline-history.md` conflicted on all five**,
+  including the merges where nothing else did.
+- **Why it must, structurally:** every PR that moves a tracked doc appends a note to the END of one
+  shared file, so two open PRs write at the same offset. That is a conflict by construction rather
+  than a disagreement about anything. It is the same defect LA-33 fixed, in the file that records
+  LA-33's fix.
+- **Measured cost:** #1449 took five re-merges, four against docs-only PRs that landed mid-CI
+  (#1442, #1445+#1446, #1448, #1444). `main` takes a commit every ~3-5 min against a ~5m30s CI run,
+  so a feature PR cannot win the race by being quick, and every lost race costs a full CI cycle
+  rather than just the resolve.
+- **The fix the repo has already used twice:** per-entry files, exactly like
+  `docs/overview/entries/` — `docs/doc-size/history/YYYY-MM-DD-<branch-slug>.md` — folded into the
+  batched file by the same periodic compaction sweep. **No code needed:**
+  `check-doc-index-size.js` only PRINTS the reminder to write a note, it never reads the file, so
+  this is a directory plus a line in CLAUDE.md plus the sweep.
+- **Do not instead drop the note.** The number carries no reason and the note is the half that
+  does — RV-134's own history entry is the argument for keeping it.
+- **Reversal cost: near zero.** A directory and a convention line; the batched file stays and keeps
+  every existing entry.
+
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
-- **Lane:** B
+- **Lane:** B — `components/shell/status-bar-scrim.tsx`, `lib/shell/status-bar-scrim-controller.ts`,
+  wired once in `tab-shell.tsx`.
+- **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
+- **Verify: device**
 - **✅ DECIDED BY THE OWNER, 2026-09-23 — gate released: a GRADIENT scrim, in the shell, once.**
   Not a solid strip; the owner was offered one and took the fade, so the app stays edge-to-edge and
-  nothing loses the ~28 px a flat backing costs. **It belongs in the app shell, not per screen** —
-  a per-screen scrim is a rule every future screen can forget, which is how this defect reaches a
-  sweep in the first place. It fades in on scroll rather than sitting there at rest.
-- **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
-- **What the screen shows:** on Home, scrolled, the energy bar's caption (*"Energy left right now —
-  opens at your readiness…"*) passes behind the status bar's clock and icons with nothing between
-  them. Edge-to-edge apps usually put a gradient or blur behind the status bar once content is
-  scrolled under it. The app's full-screen headers use `pt-safe`; the tab roots scroll to the top.
-- **The owner's question:** a scrim behind the status bar on scroll, or leave it. If yes, it belongs
-  in the shell once, not per screen.
-- **Three findings from the DV-4 session, which looked at building this and did not** (2026-09-23).
-  They are the reason it is not a ten-line component:
-  ① **There is no document scroll to listen to.** Every tab scrolls its own inner container — three
-  through `PullToSync`, and Nutrition owns a separate one — so a shell-level listener must be
-  `document.addEventListener('scroll', fn, true)`; `scroll` does not bubble, but it does reach a
-  capture listener on an ancestor. That keeps this in the shell once, with no per-screen opt-in,
-  which is what the owner asked for.
-  ② **`var(--page-bg)` is the wrong colour to fade from.** `DynamicBackground` sets
-  `--page-bg: transparent` on `<html>` when it is active, so a gradient built from it is invisible
-  in exactly the case the scrim exists for. `var(--background)` holds the theme base either way;
-  how that composes with the dynamic sky is the thing to look at on device.
-  ③ **Height is `--pt-safe-value`** (`max(1rem, calc(env(safe-area-inset-top,0px) + 0.5rem))`),
-  already defined in `globals.css`. It floors at 1rem, which matters because three-button
-  navigation reports insets as 0.
-  Also: `z-[60]` is taken by `local-store-dead-banner` (fixed, top) and the offline pill, so the
-  scrim sits below them or it covers a warning.
-  **The open question is the tab flip** — a panel left scrolled down shows no scrim until the next
-  scroll event, because nothing re-reads its offset on activation.
-
+  nothing loses the ~28 px a flat backing costs. It fades in on scroll rather than sitting at rest.
+- **Shipped 2026-09-23** (`fix/dv6-status-bar-scrim`, v1.465.11). One capture-phase listener in the
+  shell covers all five panels; no screen opts in, so no future screen can forget it.
+- **What the screen showed:** on Home, scrolled, the energy bar's caption (*"Energy left right now
+  — opens at your readiness…"*) passed behind the status bar's clock and icons with nothing between
+  them.
+- **The three findings that shaped it**, recorded before it was built:
+  ① **There is no document scroll to listen to** — every tab scrolls its own inner container (three
+  through `PullToSync`, Nutrition its own) and `scroll` does not bubble, so the shell listens in the
+  CAPTURE phase. ② **`var(--page-bg)` is the wrong colour to fade from**: `DynamicBackground` sets
+  it to `transparent`, so a gradient built from it vanishes in exactly the case the scrim exists
+  for — it fades from `var(--background)`. ③ **Height is the `pt-safe` utility**, not a hand-written
+  `--pt-safe-value`: an empty `pt-safe` div is exactly inset-height, and referencing the var
+  directly FAILS the Custom Rules check that every safe-area utility be a defined class (measured).
+  It floors at 1rem, which matters because three-button navigation reports the inset as 0.
+  `z-40` keeps it under `local-store-dead-banner` and the offline pill at `z-[60]` — a scrim over a
+  warning is worse than the defect.
+- **The open question is answered.** A panel keeps its offset while hidden, so a flip back to a tab
+  left scrolled down fires no scroll event. The controller remembers every element that has
+  scrolled (a handful) and re-reads the ones inside the newly active panel on each activation;
+  a tab never scrolled is absent and correctly shows nothing.
+- **Why the logic is not in the component.** Every vitest project here is `environment: 'node'` and
+  **cannot transform `.tsx` at all** — measured: importing the component fails at parse. Logic left
+  inside it is logic nothing can drive, and on the phone a dead scrim and a mis-scoped one look
+  identical. So the decision lives in a plain `.ts` controller with 12 tests
+  (`lib/shell/__tests__/dv6-status-bar-scrim-controller.test.ts`, jsdom via a per-file docblock),
+  and the component's four wiring constraints are pinned by reading its source. Control runs: with
+  `reevaluate` neutered the tab-flip test fails; with the component's `true` capture flag removed
+  the wiring test fails.
+- **Keep:** the device look — on the S25, scroll Home and confirm the caption no longer runs through
+  the clock, that the scrim is absent at rest, and **how the gradient composes with
+  `DynamicBackground`'s sky**, which is the one thing the sandbox cannot judge. Check both themes.
 
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
@@ -4753,42 +4865,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ---
 
-### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
-
-- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
-  a navigation issued while a surface closes is eaten by that surface's own history entry.
-- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
-  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
-- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
-- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
-  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
-  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
-  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
-  the session just abandoned. `history` instrumented in the page:
-  ```
-  3229ms pushState()                              ← the dialog opens and pushes its surface entry
-  5055ms back()                                   ← ONE back for the Leave tap
-  5073ms replaceState(/workout?session=…)
-  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
-  ```
-  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
-  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
-  spent on the dialog's own entry. Reproduced twice.
-- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
-  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
-- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
-  verified. This is the prompt's *Leave* button, which BF-166 never touched.
-- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
-  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
-  device). The surface has to be told the close was superseded by a navigation.
-- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
-  `/workout?session=…` for wherever back would have gone before the workout, and one more back
-  does not return to the abandoned session.
-- **Production data:** nothing was written. The only non-GET the page sent was the
-  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
-  for 2026-09-23 returned `sessions: []` afterwards.
-
-
 ## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 
 **BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
@@ -4957,6 +5033,41 @@ helper the call site calls.
 - **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
   (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
 
+
+### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
+
+- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
+  a navigation issued while a surface closes is eaten by that surface's own history entry.
+- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
+  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
+- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
+- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
+  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
+  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
+  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
+  the session just abandoned. `history` instrumented in the page:
+  ```
+  3229ms pushState()                              ← the dialog opens and pushes its surface entry
+  5055ms back()                                   ← ONE back for the Leave tap
+  5073ms replaceState(/workout?session=…)
+  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
+  ```
+  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
+  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
+  spent on the dialog's own entry. Reproduced twice.
+- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
+  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
+- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
+  verified. This is the prompt's *Leave* button, which BF-166 never touched.
+- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
+  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
+  device). The surface has to be told the close was superseded by a navigation.
+- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
+  `/workout?session=…` for wherever back would have gone before the workout, and one more back
+  does not return to the abandoned session.
+- **Production data:** nothing was written. The only non-GET the page sent was the
+  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
+  for 2026-09-23 returned `sessions: []` afterwards.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
@@ -11503,6 +11614,11 @@ were never looked at:
   duration gap.
 
 ### [devices] PS-15 — the comparison endpoint cannot pair the two rings' stress, and cannot see steps at all
+- **⚠ WAITING ON HARDWARE, NOT ON THE DEVICE AGENT (OR-135, 2026-09-23).** This gate names the
+  **Colmi R09**, not the S25, and the ring is with a second wearer. **The owner confirms it is coming
+  back**, so this stays queued rather than being parked deep — but the Device Verification agent
+  cannot discharge it by picking up the phone, and it must not be counted as owed device-check work.
+  Nothing here moves until the ring is in hand.
 
 - **Lane:** A (the engine)
 - **Added:** 2026-08-27, from a hand comparison the endpoint should have produced
@@ -11542,6 +11658,11 @@ statistics when two units differ and names them in `unitsDiffer`, and `spearman`
 `packages/shared/src/health/correlation.ts` beside `pearson`) is reported for every compared pair.
 
 ### [devices] PS-16 — settle whether the Colmi's activity buckets are cumulative, with a counted walk
+- **⚠ WAITING ON HARDWARE, NOT ON THE DEVICE AGENT (OR-135, 2026-09-23).** This gate names the
+  **Colmi R09**, not the S25, and the ring is with a second wearer. **The owner confirms it is coming
+  back**, so this stays queued rather than being parked deep — but the Device Verification agent
+  cannot discharge it by picking up the phone, and it must not be counted as owed device-check work.
+  Nothing here moves until the ring is in hand.
 
 - **Lane:** A (the engine)
 - **Added:** 2026-08-27
@@ -11617,6 +11738,11 @@ it. `connectHint` already mentions other apps; it should say plainly that anothe
 the connection and to try again shortly, rather than implying the ring is absent or flat.
 
 ### [devices] PS-12 — baseline the three-device comparison, and write down what "agreement" was
+- **⚠ WAITING ON HARDWARE, NOT ON THE DEVICE AGENT (OR-135, 2026-09-23).** This gate names the
+  **Colmi R09**, not the S25, and the ring is with a second wearer. **The owner confirms it is coming
+  back**, so this stays queued rather than being parked deep — but the Device Verification agent
+  cannot discharge it by picking up the phone, and it must not be counted as owed device-check work.
+  Nothing here moves until the ring is in hand.
 
 - **Lane:** A
 - **Gate:** device
@@ -11650,6 +11776,11 @@ the first real numbers.
 
 
 ### [devices][cardio] PS-9 — the R09 streams raw accelerometer on stock firmware, which makes it a tier-1 source
+- **⚠ WAITING ON HARDWARE, NOT ON THE DEVICE AGENT (OR-135, 2026-09-23).** This gate names the
+  **Colmi R09**, not the S25, and the ring is with a second wearer. **The owner confirms it is coming
+  back**, so this stays queued rather than being parked deep — but the Device Verification agent
+  cannot discharge it by picking up the phone, and it must not be counted as owed device-check work.
+  Nothing here moves until the ring is in hand.
 
 - **Lane:** A (a decoder + an ingest path; `lib/colmi-ble/**` is engine)
 - **Gate:** device
@@ -11678,6 +11809,11 @@ is public. That is a materially different proposition from "a cheap second opini
   whether the signal is worth anything.
 
 ### [devices][platform] PS-8 — the Colmi R09 in learning mode: ingest it, compare it, score nothing with it
+- **⚠ WAITING ON HARDWARE, NOT ON THE DEVICE AGENT (OR-135, 2026-09-23).** This gate names the
+  **Colmi R09**, not the S25, and the ring is with a second wearer. **The owner confirms it is coming
+  back**, so this stays queued rather than being parked deep — but the Device Verification agent
+  cannot discharge it by picking up the phone, and it must not be counted as owed device-check work.
+  Nothing here moves until the ring is in hand.
 
 - **Branch:** `claude/alternative-ring-testing-jzk8el` (plan + CI guard landed; the spike is a later branch)
 - **Lane:** A — `lib/colmi-ble/**` is engine and Phase 2 is a **migration**, which is Lane A's alone.
@@ -16210,6 +16346,13 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 
 ### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **📱 Evidence from sweep 1 (RV-142 + RV-133).** Tab time-to-content rose from 61–103 ms after a cold
+  start to 126–434 ms after ~2 h of use, and stayed there (134–449 ms) after 30 idle minutes; listeners
+  608 → ~2,200 over the same span, flat while idle. So the slowdown is real on the device, builds with
+  use rather than time, and survives idling — what the owner describes. Still unattributed: which
+  component's listeners grow. Next measurement: the listener count per tab visit, to find the one
+  that never lets go.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
@@ -22823,34 +22966,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   opinions about credentials. A DSN is not a secret in the way a bucket key is, but it should be a
   deliberate call, not a surprise in the first public commit.
 
-### [platform][app-shell] Q-253 — a real-hardware device-farm run, for the Samsung-specific rendering and safe-area rows
-
-- **✅ DECLINED FOR NOW BY THE OWNER, 2026-09-01 — which is the outcome this entry was filed
-  expecting** (*"filed to be decided, possibly declined"*). Not withdrawn: the case for it is
-  unchanged and it revives the moment its prerequisite lands.
-- **Why it lost:** of the ~25 hardware-gated rows, **15–18 are BLE** — ring, strap, scale — and no
-  device farm gives an agent the owner's Ring 5 speaking our own re-keyed protocol. It closes a named
-  minority, never "device verification". And **its prerequisite `Q-250` is not built**: paying per
-  run before the free CI emulator tier has caught the Android-runtime failures is the wrong order.
-- **Re-open it when `Q-250` ships and its emulator run is stable** — at that point what remains
-  uncovered is exactly the Samsung-WebView-compositor and real-safe-area minority this buys, and the
-  question becomes worth its per-run cost.
-- **Reference:** the options comparison below (Firebase Test Lab vs BrowserStack App Live) is what a
-  future session should read rather than re-derive. **Not startable work.**
-- **Branch:** `feat/device-farm-smoke`
-- **Added:** 2026-08-14 · same owner ask
-- **This is the lowest-value item in the cluster and is filed to be decided, possibly declined.**
-  Of the 25 hardware-gated rows, roughly 15–18 are BLE — ring, strap, scale — and **no device farm
-  gives an agent the owner's Ring 5 speaking our own re-keyed protocol**. A farm closes the
-  remainder: Samsung's WebView compositor (the SVG-wiping-sibling-gradients class), real safe-area
-  insets, and the launcher/notification icon rows.
-- **Options:** Firebase Test Lab (has real Galaxy hardware, API-driven, agents can trigger a run and
-  read the result) or BrowserStack App Live. Both cost per run, so treat this as a **pre-release
-  gate**, not a per-PR check.
-- **Prerequisite:** Q-250. There is no point paying per run until the free emulator tier has already
-  caught the Android-runtime failures.
-- **Do not file this as closing "device verification"** — it closes a named minority of it. The
-  BLE gate stays exactly where `CLAUDE.md` puts it: with the owner.
 
 ### [platform][app-shell] Q-254 — strike the device-verification rows an E2E spec can now cover (re-tagging landed 2026-08-15; the striking half remains)
 
@@ -24531,6 +24646,10 @@ per-field merge where an AI write has no honest source rank to claim.
   when this ships.
 
 ### [app-shell] 🔴 Q-51 — the perf work is not aimed at the screen the owner actually uses
+
+- **📱 RV-138 has run (sweep 1): 90 warm visits, no outlier — every first visit within 1.3× its
+  median, slowest 164 ms.** The 1086 ms reading did not recur. Per this entry's own rule, re-place it
+  rather than build the refactor; the numbers are on RV-138.
 
 > **⚑ THE PREMISE SOFTENED, 2026-09-14 — the owner no longer reports this as pain.** On the S25
 > app-shell pass: *"Its mostly fine; I'd still like it to be faster if possible."* This entry was

@@ -41,9 +41,15 @@ describe('next-item does not stay silent about what it withheld (TN-61)', () => 
     }
   })
 
+  // Asserted on the truncation LINE, not the bare word: this originally searched for "showing"
+  // anywhere in the output and went red the day the DV lane gained entries, because RV-128 is titled
+  // "does the tab switch drop a frame showing neither panel?". A substring assertion over a report
+  // that prints user-written titles is a false positive waiting for someone to write the word.
   it('does not claim truncation when everything fits', () => {
     const out = run('--lane', 'DV')
-    expect(out).not.toContain('showing')
+    const ready = Number(/READY \((\d+)\)/.exec(out)?.[1])
+    expect(ready).toBeLessThanOrEqual(10)
+    expect(out).not.toMatch(/showing \d+ of \d+/)
   })
 })
 
