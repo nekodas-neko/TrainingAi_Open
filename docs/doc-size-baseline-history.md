@@ -16366,3 +16366,12 @@ Both shrink. Sweep 2 removed nine device-verified backlog entries (Q-112e, BF-99
 Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
 `known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
 back to its 52-line baseline rather than raised.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27294 → 27385 (+91)
+
+BF-187, filed from an owner report asking whether sleep data can sync on app open. The length is
+mostly two measured tables that the entry exists to carry: 40 h of drain cadence (57–91 min between
+scheduled drains) and the per-night post-wake lag across the seven nights still resident in
+`oura_raw_samples` (4–34 min, median 25). The second table also records which nights had to be
+discarded as a packer-window artifact rather than read as multi-day lags — the kind of thing that
+gets re-derived wrongly if only the conclusion survives.
