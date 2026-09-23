@@ -16239,3 +16239,22 @@ not there. The second is to record the defect the entry did not find: the delete
 columns, including BF-69's presence window, where a nulled date silently converts an UNKNOWN into a
 TRUE ZERO. That is the part worth the lines, because it is invisible in the UI and the row it
 corrupts is replaced by the next pull — so it leaves no trace to find later.
+
+
+## 2026-09-23 — `implementation-backlog.md` → 27262, `projectOverview.md` → 12559 (RV-82)
+
+The backlog shrinks by 24 — RV-82 leaves and nothing replaces it.
+
+`projectOverview.md` gains 19 lines, and almost all of them record what the entry did NOT say rather
+than what it did. The measurement (five duplicated statements per request) was a line; the rest is
+the two findings that only appeared on contact with the code, and both would have shipped as
+regressions:
+
+`/api/next-session` serialises the recommendation wholesale, so adding a `program` field to it would
+have grown the home card's most-fetched response by the entire program. And
+`computeAiDynamicNextSession` destructures named fields and rebuilds its own result, so the obvious
+implementation — spread the program into the object already being passed in — drops it silently on
+the ai_dynamic path, which is the live one. `tsc` cannot see either, because the field is optional.
+
+Those are worth index space because the next person to touch `NextSessionRecommendation` will hit
+the same two edges, and neither is visible from the type.

@@ -87,6 +87,22 @@ export interface Schedule {
 export interface NextSessionRecommendation {
   isRestDay: boolean
   session?: ProgramSession
+  /**
+   * The active program this recommendation was derived from (RV-82).
+   *
+   * `getNextSession` already fetches it — `getActiveProgram` is a fixed 5-query composite, and it
+   * runs inside `getNextSession`'s own `Promise.all`. Two routes then asked for it a second time in
+   * the same request, so `programs`, `program_sessions`, `schedules`, `schedule_days` and
+   * `session_exercises` each ran twice per call. Handing back the copy already in hand is free;
+   * passing a pre-fetched program IN would instead serialise two calls that currently run together.
+   *
+   * **⚠ Server-internal. `/api/next-session` serialises this whole object with
+   * `NextResponse.json(recommendation)`, so it deletes this field first** — otherwise the home
+   * card's most-fetched response grows by the entire program, every session and exercise of it.
+   * A route that returns the recommendation wholesale must strip it; one that picks named fields
+   * (`session-explain/insight`, the AI chat tool) needs no change.
+   */
+  program?: Program
   // Per-exercise-name muscle assignments (main vs secondary) for `session`'s exercises —
   // populated so the sore-muscle check-in can predict computePerExerciseDeload's whole-session
   // escalation client-side (Q-115-followup) without re-deriving it from the flat
