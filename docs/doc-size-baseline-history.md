@@ -16062,3 +16062,19 @@ test files. Two of three locked runs were slow and one was not, with a confound 
 direction. That is not enough to claim the lock costs CI time, and filing it as a finding would send
 the next session chasing a number that may be someone else's tests. Worth re-reading if `Tests`
 stays above six minutes over the next several PRs.
+
+## 2026-09-23 — `implementation-backlog.md` 27372 → 27352, `projectOverview.md` 12508 → 12525 (LB-128)
+
+The backlog **shrinks by 20**: LB-128 leaves and nothing replaces it. RV-103's `Keep:` was edited
+rather than struck — its reporting path now has a working channel, but the device check it also
+names is still owed, and an entry with anything outstanding does not move to the archive.
+
+`projectOverview.md` gains 17 lines, and the expensive half is the sentence saying what was *not*
+done: `onError` was **not** ungated. That is the whole design constraint, and it is the one a future
+session would most plausibly undo — ungating looks like the smaller change and would swap good
+cached data for error cards across every screen. The row says so in the same breath as the fix, so
+the reason survives without reading the diff.
+
+The online gate is stated for the same reason. Reporting a failure when the user is merely offline
+is the opposite of what this codebase is built for, and nothing in the test suite would have caught
+it except the case written specifically for it.

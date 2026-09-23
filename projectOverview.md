@@ -2598,6 +2598,23 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][nutrition] ⚠️ A failed refresh of a cached key was unreportable — NOT device-verified (LB-128, 2026-09-23)
+
+`cachedFetchCore` gated `onError` on `cached === null` in **both** failure branches and skipped
+joined waiters on `hadCached`, while `fetchWithRetry` treated a cached paint as a response and
+stopped its retry ladder. Together no caller could say that a refresh of a key holding a cached
+value had failed — the post-write case, whenever the write's invalidation had not yet cleared the
+entry. RV-103 measured it as a flake: the same code reported or stayed silent on consecutive runs,
+decided only by cache state. **`onRevalidateError` is the complement of `onError`, not a
+relaxation** — it fires only when a cached value *was* painted, and ungating `onError` instead
+would have swapped good cached data for error cards app-wide, since every caller reads it as "I
+have nothing to show". It stays gated on being online, because offline with saved data is the
+sanctioned offline-first case. `use-energy-balance-refetch` now takes both channels.
+⚠️ **Owed: the device check** (RV-103's `Keep:` ①) — the failure line and its Retry at S25 width in
+the card carrying "kcal left". Tests are jsdom against localStorage; the native SQLite cache path
+and a real offline transition are not exercised. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-lb128-revalidate-error.md`](docs/overview/entries/2026-09-23-lane-a-lb128-revalidate-error.md).
+
 ### [sleep][platform] ⚠️ `minutesFromNoon` read the device's clock, and its test only passed in UTC (DV-7, 2026-09-23)
 
 `minutesFromNoon(iso, tz?)` fell back to `d.getHours()` — the **device's** timezone — which is the
