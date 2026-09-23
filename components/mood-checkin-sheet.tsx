@@ -10,7 +10,7 @@ import { MOOD_TTL, MUSCLE_RECOVERY_TTL, TTL_MEDIUM } from "@trainingai/shared/ca
 import { hapticLight } from "@/lib/haptics"
 import type { EnergyLevel, BodyState, MoodLog } from "@trainingai/shared/types/mood"
 import { getLocalStore } from "@/lib/local-store"
-import { pushMutations } from "@/lib/local-store/sync-engine"
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate"
 import { todayInTz } from "@trainingai/shared/date-utils"
 import { useUserTimezone } from "@/components/shell/user-timezone-provider"
 import { SoreMusclePicker, SORE_MUSCLE_GROUPS } from "@/components/checkin/sore-muscle-picker"
@@ -277,7 +277,7 @@ export function MoodCheckInSheet({
             syncStatus:   'pending',
           })
           await store.queueMutation({ userId: userId!, domain: 'mood_logs', date, payload: leanPayload })
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, invalidateCheckinAffectsPrescription)
           return true
         } catch (sqliteErr) {
           console.error('Mood SQLite write failed, falling back to API:', sqliteErr)

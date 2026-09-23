@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { formatTimeOfDay, formatDayShort, toAestDay, msToHHMMInTz } from '@trainingai/shared/date-utils';
 import { getLocalStore } from '@/lib/local-store'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import dynamic from 'next/dynamic'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -163,7 +163,7 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
               routePolyline,
             }),
           })
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, () => Promise.all([invalidateActivityWrites(), invalidateOuraWorkoutReview()]))
           savedLocally = true
         } catch (sqliteErr) {
           console.error('Activity log SQLite write failed, falling back to API:', sqliteErr)
