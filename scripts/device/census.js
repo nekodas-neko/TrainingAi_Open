@@ -45,16 +45,20 @@ async function main() {
   const con = dev.recordConsole();
   const metricsStart = await dev.metrics();
   const visits = [];
+  // Per round, not just start/end: round 1 mounts every tab for the first time, so growth there is
+  // expected. A leak is growth that continues through the later rounds (first phone run, 2026-09-23).
+  const perRound = [];
 
   for (let round = 1; round <= rounds; round++) {
     for (const tab of TABS) {
-      for (let i = 0; i < 4 && !(await dev.page.locator('nav a[href="/"]').isVisible()); i++) await dev.back();
+      await dev.home();
       const from = net.now();
       await dev.tab(tab, 0);
       await sleep(dwell);
       visits.push({ round, tab, from, to: net.now(), landed: (await dev.state()).path });
       process.stdout.write(`  round ${round} ${tab.padEnd(11)} ${net.entries.length} requests so far\n`);
     }
+    perRound.push({ round, ...(await dev.metrics()) });
   }
   const metricsEnd = await dev.metrics();
   let metricsIdle = null;
@@ -99,7 +103,7 @@ async function main() {
     rounds, dwellSec: dwell / 1000, idleMin, visits,
     p2: { endpoints, neverReRuns: endpoints.filter((e) => e.neverReRuns).map((e) => e.endpoint) },
     p7: { nonOk, console: consoleGrouped, totalRequests: net.entries.length },
-    p10: { start: metricsStart, end: metricsEnd, idle: metricsIdle },
+    p10: { start: metricsStart, perRound, end: metricsEnd, idle: metricsIdle },
   };
   const file = saveResult('census', result);
 
@@ -107,7 +111,9 @@ async function main() {
   result.p2.neverReRuns.forEach((e) => console.log(`        ${e}`));
   console.log(`  P7  ${nonOk.length} non-2xx/failed · ${con.msgs.length} console messages in ${consoleGrouped.length} groups`);
   const fmt = (m) => m ? `heap ${m.heapUsedMB} MB · listeners ${m.listeners} · nodes ${m.nodes} · timers ${JSON.stringify(m.timers)}` : '—';
-  console.log(`  P10 start ${fmt(metricsStart)}\n      end   ${fmt(metricsEnd)}${metricsIdle ? `\n      idle  ${fmt(metricsIdle)}` : ''}`);
+  console.log(`  P10 start   ${fmt(metricsStart)}`);
+  perRound.forEach((m) => console.log(`      round ${m.round} ${fmt(m)}`));
+  if (metricsIdle) console.log(`      idle    ${fmt(metricsIdle)}`);
   console.log(`\n  → ${file}  (gitignored — quote numbers, never the file)\n`);
   await dev.close();
 }

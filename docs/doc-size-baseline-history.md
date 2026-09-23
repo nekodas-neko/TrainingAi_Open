@@ -15715,7 +15715,18 @@ shrink caused by this branch, the case the ratchet is right to make someone lowe
 describes is the other case — a branch forced to lower a number because *someone else's* merge
 shrank the file. Four of four re-merges on #1422 were that case in one night.
 
-## 2026-09-22 — `CLAUDE.md` → 877 and `docs/implementation-backlog.md` → 26859 (OR-125: six owner answers)
+---
+
+## 2026-09-23 — backlog → 26944 (+150 from this sitting, measured after merging main), device-verification baton → 54 (−3) (device/probe-sitting)
+
+The first probe sitting on the S25 (RV-124…RV-133). `docs/device-agent-probe-checklist.md` asks for
+each verdict to carry the measurement that produced it, quoted in the entry — so the growth is the
+measurements themselves: result bullets on seven probe entries, BF-177 rewritten from verification
+debt to failed work with its request trace, a partial on BF-61, and three new entries (DV-4 contrast,
+DV-5 rows stuck `pending`, DV-6 status-bar backing, owner-gated). Raised rather than trimmed because
+a verdict without its number is what the checklist exists to stop.
+
+## 2026-09-22 — `CLAUDE.md` → 877 and `docs/implementation-backlog.md` → 27009 (OR-125: six owner answers)
 
 **CLAUDE.md +11**: one new standing rule — a filing sweep ships as ONE PR, not one per entry — plus
 the `--sittings` pointer beside the batching rule and a note that `enable_pr_auto_merge` does not

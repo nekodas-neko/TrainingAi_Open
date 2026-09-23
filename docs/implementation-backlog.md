@@ -518,6 +518,15 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
+- **📱 MEASURED ON THE S25 (food rows only), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. **Log a food:** the write goes
+  local-first + `POST /api/sync/push`; within 3 s `energy-balance`, `weekly-summary` and
+  `day-timeline` are each requested **twice** (once before the push, once after), the diary row
+  appears — and **Nutrition's "kcal left" never moves** (BF-177, FAILED, with the trace). **Home's
+  nutrition card** (read in its hidden panel) stays at the old intake until Home is shown, then
+  updates. **Delete a food:** same two batches; the card shows the right number only because it was
+  already stale. **COULD NOT CHECK this sitting:** weigh-in, macro targets, activity confirm,
+  workout completion, ring sync, and every row offline.
+
 - **Verify:** device — **and there is no build half.** This entry's entire work is the measurement;
   nothing is waiting to be implemented and nothing is blocked on it. Method: **P1** in
   [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
@@ -533,6 +542,13 @@ below threshold and left in place for next time.
   reversible rows (log then delete a food), and record a refused row as COULD NOT CHECK.
 
 ### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
+
+- **📱 BASELINE ON THE S25, 2026-09-23 — the write half is still owed.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js`, two
+  and three rounds, **no writes**: 41 `/api` endpoints. Without a write between visits a well-built
+  shell *should not* refetch, so "fetched on one visit of two" is not a defect here and the census's
+  `neverReRuns` flag is not a verdict. What it does show: `body-metadata` (6×) and
+  `workout-data` (5×) refetch on every tab visit. The P2 answer needs one write per tab during the
+  walk — next sitting, with the owner's approved write types.
 
 - **Verify:** device — no build half; the measurement is the work. Method: **P2**.
 - **The falsifiable claim:** over a fixed 5-minute walk (Home → Nutrition → Health → Workout → More,
@@ -555,6 +571,17 @@ below threshold and left in place for next time.
 
 ### [body][devices] RV-126 — DEVICE PROBE: the local-store write path, which no sandbox can execute
 
+- **📱 MEASURED ON THE S25, 2026-09-23 — the first read of the on-device store.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js`
+  `localQuery` through the app's own `CapacitorSQLite` connection (SELECT only). **Every
+  offline-first log table carries `deleted_at`** (food, supplements, activity, mood, body metrics,
+  injuries). **Food renders offline:** `food_logs` holds `food_item_id` and the local `food_items`
+  (339 rows) holds name, brand and macros. **Deletes are tombstoned** — three test deletes kept their
+  rows with `deleted_at` set. **But a pushed row does not always return to `synced`:** all **33**
+  tombstoned food logs (since 2026-08-19) sit at `sync_status='pending'` with the outbox **empty**,
+  and one set log has been `pending` since 2026-09-19 although the server has it — filed as
+  **DV-5**. **COULD NOT CHECK:** the weigh-in eviction question RV-108 turns on (no weigh-in was
+  written this sitting).
+
 - **Verify:** device — no build half. Method: **P3**.
 - **The falsifiable claim, three parts.** (a) A weigh-in evicts the body-metric cache keys **and**
   `invalidateBiometrics` fires from the `pushMutations` → `pullDelta` round trip on the device that
@@ -568,6 +595,20 @@ below threshold and left in place for next time.
 - **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
+
+- **📱 MEASURED ON THE S25, 2026-09-23 — every claim, including clearance.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `sweep.js` over
+  13 routes (tab roots + cardio, health/day, health/readiness, more/details, more/settings,
+  more/about, more/devices, program). **Clearance:** the only bottom-anchored control on any route is
+  the tab bar; its computed `padding-bottom` equals the inset (15px, gap 0) — it clears exactly.
+  **`truncate` on flex: 0. Nested interactives: 0.** **Under 44px, counting the invisible
+  `.tap-target-44`/`-dot` touch boxes:** the `tap-target-dot` session dots on Workout (24×44, by
+  design per `globals.css`) and three **318×21 inputs on `/more/details`** (display name, birth year,
+  height) — not judged; whether their row or label widens the target is the next question.
+  **Horizontal overflow:** content spilling with `overflow-x: visible` exists (`/program` card
+  text runs 70px past its column into the empty space under the action icons; Home's week strip 8px
+  into the gutter, aligned with the cards) — **looked at on screen: neither overlaps anything**.
+  Clipped overflow (`hidden`, working `truncate`) is by design. Found alongside it: **DV-4**
+  (a sleep-stage colour used as text) and **DV-6** (no status-bar backing).
 
 - **Verify:** device — no build half. Method: **P4**. `tour.js` already emits part of this digest.
 - **The falsifiable claims:** no element overflows horizontally at 384 px (`scrollWidth >
@@ -604,6 +645,14 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
 
+- **📱 MEASURED ON THE S25 (walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Two `census.js` walks (10 and 15
+  visits): **0 non-2xx and 0 failed requests** of 161. Console, the full list: **499×** *"Rendering
+  was performed in a subtree hidden by content-visibility"* (Chrome then suppresses it — so the real
+  count is higher), and **4 font files × 10** *"preloaded using link preload but not used within a
+  few seconds"*. The first says something forces layout **inside the hidden tab panels** about 50
+  times a visit — work done for screens nobody is looking at; the harness's own reads are ~1 per
+  visit, so it is the app's. Unattributed. **COULD NOT CHECK:** the resume-after-background half.
+
 - **Verify:** device — no build half. Method: **P7**.
 - **The falsifiable claim:** a full walk produces no repeated console error, and no `/api/*` request
   returns non-2xx. Send the **grouped counts**, not a summary — a warning firing 400 times is a
@@ -615,6 +664,17 @@ below threshold and left in place for next time.
   return. The counts say Home is where this bites and **nobody has ever watched it happen.**
 
 ### [platform][nutrition] RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
+
+- **📱 MEASURED ON THE S25, 2026-09-23 — mostly clean.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js` `offline(true)`
+  (`navigator.onLine` false, page fetches fail). Food, one domain only: logged offline, **row on
+  screen in 256 ms** with a "logged" toast, **one pending `food_logs` mutation** in
+  `mutations_outbox`. Walking all five tabs offline: **no blank tab, no skeleton, no alert** (text
+  present on each). Back online: **first push after 2.0 s, outbox drained**, row still there.
+  **No offline banner appeared on any tab** — likely because the app reads Capacitor's network
+  plugin rather than the page, which this emulation does not reach; unresolved. **COULD NOT
+  CHECK:** survives a force-stop while offline (a restart drops the emulation — needs real airplane
+  mode, which is the owner's toggle), the other five domains, and flicker on reconnect (only the
+  end state was read). "kcal left" stayed stale throughout — BF-177.
 
 - **Verify:** device — no build half. Method: **P8**. Use CDP's network override rather than
   airplane mode, so it can flip mid-action.
@@ -640,6 +700,13 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
 
+- **📱 MEASURED ON THE S25 (the walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js --rounds 3 --dwell 15`
+  from a cold reload: heap / listeners / DOM nodes / live timers — start **21.9 MB · 608 · 1302 ·
+  4 intervals**; after round 1 **30.1 · 1468 · 5452 · 5**; round 2 **32.8 · 1628 · 5453 · 5**; round 3
+  **30.6 · 1628 · 5453 · 5**. Round 1 is every tab mounting for the first time; round 2 adds 160
+  listeners once; **round 3 is flat on every count. No accumulation across the walk.** The 30-minute
+  idle half is **COULD NOT CHECK** — the phone disconnected before it ran.
+
 - **Verify:** device — no build half. Method: **P10**.
 - **The falsifiable claim:** across the 5-minute walk and then 30 minutes idle, JS heap, listener
   count by type, and live `setInterval`/`setTimeout` handles all **stabilise rather than only
@@ -647,6 +714,58 @@ below threshold and left in place for next time.
   and after the idle period.
 - The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
   the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
+
+### [sleep][app-shell] DV-4 — Home's Sleep card prints the Deep hours in the Deep stage colour, which is about 1:1 against the card
+
+- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend, ~line 143).
+- **Added:** 2026-09-23 · Device Verification, found during the P4 sweep (RV-127).
+- **❌ Measured on the S25.** Web v1.465.4 / APK 1.460.4, dark theme. The legend's value spans are
+  coloured with `STAGE_COLOR.<stage>` (`packages/shared/src/health/hypnogram.ts`): Deep's
+  **"0.5h" computes to `rgb(30, 58, 112)`**. The page root behind the card is `oklch(0.145 0.02 215)`
+  (≈ `rgb(9,22,26)`), giving **≈1.6:1**; against the card's purple paint in the screenshot it is
+  **≈1:1** — the number is effectively invisible. REM, Light and Awake pass only because their stage
+  colours happen to be light. CLAUDE.md's floor is 4.5:1 for body text.
+- **Why a palette fix will not hold:** the card's background is **owner-customisable**
+  (`ColorSwatchPicker`, `cardColors.sleepWidget`), so no stage colour is safe as text on every card
+  colour. Stage colours are fills — keep them on the dot and the stacked bar, and render the hours in
+  a foreground token. Sibling check: `hypnogram.tsx` and `sleep-phase-trend-card.tsx` also import
+  `STAGE_COLOR`; the latter uses it as a bar fill (fine), the former was not read.
+- **Pass test:** on the S25, every legend value on the Sleep card reads ≥ 4.5:1 against the card, in
+  dark and light, with the default card colour and one custom colour.
+
+### [platform] DV-5 — pushed rows are left at `sync_status='pending'`, so every later pull skips them
+
+- **Lane:** A — `lib/local-store/**` (whatever confirms a pushed mutation), `lib/data/postgres/adapter.ts` if the confirm depends on the push response.
+- **Added:** 2026-09-23 · Device Verification, from the first read of the on-device store (RV-126).
+- **Measured on the S25 (read-only `localQuery`).** `mutations_outbox` is **empty**, yet
+  **all 33 tombstoned `food_logs` rows (2026-08-19 → today) are `sync_status='pending'`** and none
+  is `synced`; three of them are this sitting's test deletes, whose pushes returned **200**. One
+  `set_logs` row (set 4, Chest-Supported Dumbbell Row, 10 kg × 12, 2026-09-20) has been `pending`
+  since 2026-09-19 22:41 UTC — and **the server has that set** (`/api/exercise-history` lists it), so
+  nothing was lost. Its local `exercise_logs.workout_session_id` (`a1847680…`) is not in the local
+  `workout_sessions` table, while the server's session that day is `0a2afbf9…` — worth reading in
+  the same pass.
+- **Why it matters even though no data was lost:** CLAUDE.md's pull rule is that `applyDelta` never
+  overwrites a row unless it is `synced`, which protects pending local edits. A row that is
+  *permanently* pending is therefore **immune to every later server correction** — harmless for a
+  tombstone, not harmless for a live row like that set.
+- **Not established:** whether live (non-deleted) food rows ever stay pending — none did today — or
+  what the confirm step keys on. Read the confirm path before assuming the cause.
+- **Pass test:** after a push drains the outbox, no row the push carried is still `pending`
+  (`SELECT count(*) … WHERE sync_status='pending'` against an empty outbox returns 0).
+
+### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
+
+- **Lane:** B
+- **Gate:** owner — a design call (whether to add a scrim), not a defect by a rule.
+- **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
+- **What the screen shows:** on Home, scrolled, the energy bar's caption (*"Energy left right now —
+  opens at your readiness…"*) passes behind the status bar's clock and icons with nothing between
+  them. Edge-to-edge apps usually put a gradient or blur behind the status bar once content is
+  scrolled under it. The app's full-screen headers use `pt-safe`; the tab roots scroll to the top.
+- **The owner's question:** a scrim behind the status bar on scroll, or leave it. If yes, it belongs
+  in the shell once, not per screen.
+
 
 ### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
 
@@ -2906,6 +3025,29 @@ why the count of affected entries always understated the harm.
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
+- **❌ FAILED ON THE S25, 2026-09-23 — this is open work again, not verification debt.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23.
+  Log *Cocoa powder, 5 g, 11 kcal* to Lunch from the Nutrition tab: the diary row appears, the ring
+  moves, and **"857 kcal left" does not change — sampled every second for 6 s, and still 857 a
+  minute later** while `/api/nutrition/energy-balance` on the server already said
+  `remainingKcal: 846, intakeKcal: 445`. Only leaving the tab and coming back shows 846 — the
+  owner's report, exactly. **Why, measured with response bodies:**
+  ```
+  +176ms GET energy-balance → remainingKcal=857   ← the hook's one-shot refetch, BEFORE the push
+  +238ms POST /api/sync/push → 200                ← the outbox lands the food
+  +677ms GET energy-balance → remainingKcal=846   ← correct, but not the card's request
+  ```
+  On the web path the write is an awaited POST, so the one-shot refetch sees it — which is why
+  `e2e/bf177-kcal-left-updates-after-log.spec.ts` is green. **On the APK the write is local-first +
+  outbox**, the refetch in `use-energy-balance-refetch.ts` fires at the local write and reaches the
+  server before the push, and the card never applies the post-push answer another subscriber fetches.
+  The file's own comment — *"'kcal left' lands a round trip later"* — never happens on the device.
+  **Fix direction:** have the card read `energy-balance:` through a subscription
+  (`useCachedValue`, Q-402's fix — Home's card already does and updated on visit), or refetch after
+  the outbox push for the nutrition domain resolves. A second timing race will not do: the gap was
+  60–70 ms on the S25. Delete is the same mechanism; it only looked right because the card was already
+  showing the post-delete number. **Pass test:** log a food on the S25, "kcal left" changes within
+  3 s without leaving the tab.
+
 - **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.
 - **Added:** 2026-09-19 (BugFix intake) · owner: *"requires page switching to show"*.
 - **✅ SHIPPED 2026-09-19** (`fix/bf177-kcal-left-stale-after-log`, v1.459.1). A balance-only refetch
@@ -2926,7 +3068,7 @@ why the count of affected entries always understated the harm.
   the card **without navigating** — anything that leaves the screen re-runs `fetchData` and passes
   against the unfixed component. Control run: with the refetch removed the spec reports
   **`kcal left went 1810 → 1810`**, which is the owner's report reproduced exactly.
-- **⚠ Keep:** ① **the device look**, and only that — the entry's own reason stands: the
+- **Was the Keep, now superseded by the FAILED bullet above:** ① the device look — the entry's own reason stood: the
   optimistic-append timing is what decides whether the round trip *feels* instant, and the browser
   can only show the arithmetic. ② **Two further `energy-balance:` readers were seen and NOT swept**
   — `app/health/day/day-detail-content.tsx:122` and
@@ -12036,6 +12178,14 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   on it — re-judge it if one is.
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
+
+- **📱 PARTIAL ON THE S25, 2026-09-23 — the immediate tap is still COULD NOT CHECK.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Food
+  rows only (Nutrition diary). Swiped with a real `adb shell input swipe` (300 ms): a tap **~1.5 s**
+  after the swipe opens *"Delete food log?"* on the first press, four times out of four — so the slow
+  tap works. At **~0.9 s** the harness's hit-test found an **svg of the row still over the Delete
+  button's centre** and refused to dispatch, which fits the defect still being there but does not
+  prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
+  tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
