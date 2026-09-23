@@ -15870,3 +15870,22 @@ for a rule that was pointing every session at a 7-day scratch buffer and calling
 **Backlog +5 net**: OR-126 left the queue after being built (a net shrink of about 25 lines) while Q-29
 gained the reconcile that the brief turned up, plus a third OR-121 occurrence recorded with its
 evidence explicitly marked lost — which is most of it back and then some.
+
+## 2026-09-23 — `CLAUDE.md` → 902 and `docs/implementation-backlog.md` → 27211 (OR-132a: four owner answers)
+
+**CLAUDE.md +7**: the device-sitting size, which the owner set at 45–60 minutes spanning two or
+three domains rather than ~20 minutes on one. It sits beside the batching rule because it is the
+same decision at a different granularity — what may be verified in one pick-up of the phone.
+
+**Backlog +60**: four decisions recorded on the entries that were waiting for them (DV-6, LA-126,
+LA-125, BF-137/BF-184), three `Gate: owner` fields released, and one measured table replacing an
+estimate. 104 gates → 102.
+
+Worth carrying, and it is about what a question is worth asking. **BF-137 asked the owner to supply
+a date that production already held** — it estimated the first Retatrutide dose at "around
+2026-09-04" from a window count, while `supplement_logs` recorded 2026-09-07 exactly. Reading the
+table before writing the prompt replaced a guess with a fact and turned a blocking owner action into
+a non-blocking one. The owner's answer then earned its place on a *different* question the data
+could not settle: whether the vial's stored open date or the dose log was the true one.
+
+**Ask for the fact nobody has, not the fact nobody looked up.**
