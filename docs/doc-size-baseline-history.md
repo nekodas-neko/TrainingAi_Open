@@ -16096,6 +16096,22 @@ Same append-to-one-shared-file shape, same fix the repo has already used twice: 
 under `docs/doc-size/history/`, folded in by the existing compaction sweep. It needs no code —
 `check-doc-index-size.js` prints the reminder to write a note and never reads what is written.
 
+## 2026-09-23 — `implementation-backlog.md` → 27472, `projectOverview.md` → 12525 (LB-128)
+
+The backlog **shrinks by 20**: LB-128 leaves and nothing replaces it. RV-103's `Keep:` was edited
+rather than struck — its reporting path now has a working channel, but the device check it also
+names is still owed, and an entry with anything outstanding does not move to the archive.
+
+`projectOverview.md` gains 17 lines, and the expensive half is the sentence saying what was *not*
+done: `onError` was **not** ungated. That is the whole design constraint, and it is the one a future
+session would most plausibly undo — ungating looks like the smaller change and would swap good
+cached data for error cards across every screen. The row says so in the same breath as the fix, so
+the reason survives without reading the diff.
+
+The online gate is stated for the same reason. Reporting a failure when the user is merely offline
+is the opposite of what this codebase is built for, and nothing in the test suite would have caught
+it except the case written specifically for it.
+
 ## 2026-09-23 — `docs/implementation-backlog.md` 27458 → 27461 (OR-136)
 
 Three lines net. The three bare device gates each gained their reason and two lost the boilerplate
