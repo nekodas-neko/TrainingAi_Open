@@ -130,15 +130,16 @@ const BASELINE = {
   'components/fitness-tests/test-select.tsx': 1,             // inside /baselines
   'components/nutrition/recent-foods-panel.tsx': 1,          // conditional, inside a sheet
 
-  // **⚠ These two need judging by where they MOUNT before anyone converts or dismisses them**, and
-  // neither was checked here — this change widened the lens, it did not audit what it revealed.
-  // `hr-day-card` and `activity-history-card` render inside Health, a persistent tab screen; if
-  // they mount unconditionally there they are CAN-BITE, not latent. `workout-screen` is not one of
-  // the five tab screens, so it plausibly unmounts — but "plausibly" is exactly the reasoning the
-  // group above has been got wrong three times. RV-104/106/107/109 cover this ground and are the
-  // right place for the verdicts.
-  'components/health/hr-day-card.tsx': 1,
-  'components/health/activity-history-card.tsx': 1,
+  // **`hr-day-card` and `activity-history-card` were here and are gone** — Lane B converted both in
+  // #1422 while this branch was open, and the shrink-only rule made the check demand their removal
+  // on the first run after the merge. That is the widened gate doing the job it was widened for:
+  // both were `[today]`/`[userId]` deps, invisible to the `[]`-only version, and RV-106 and RV-109
+  // were filed against them by hand because nothing could see them.
+  //
+  // **⚠ `workout-screen` still needs judging by where it MOUNTS**, and was not checked here — this
+  // change widened the lens, it did not audit what it revealed. It is not one of the five tab
+  // screens, so it plausibly unmounts — but "plausibly" is exactly the reasoning the group above
+  // has been got wrong three times.
   'components/workout-screen.tsx': 1,
 };
 

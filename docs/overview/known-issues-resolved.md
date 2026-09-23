@@ -2164,3 +2164,79 @@ from the archive rather than a ring.
   migration 263 alongside the server decode — an older WebView bundle could not produce it. Readings
   landed with those frames. The `decodedBy` field was the tell this row was written around; the
   ordering column turned out to be the stronger one, because it cannot be faked by a stale client.
+
+### [app-shell][platform] ✅ A tab flip left the previous tab's route tree on the history entry, so back rendered the wrong screen (LA-109, 2026-09-15)
+
+**Fixed — and the fix is proven, not merely green. The device gesture is what is still owed.** Owner:
+*"Going to more; then going to profile details and pressing back gets me to the home page again."*
+
+**Cause, measured by dumping `history.state` rather than reasoned.** After the More tab flip the URL
+reads `/more` while Next's recorded route tree for that entry is still `(home)` → `/`. `show()`
+(`tab-shell.tsx`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
+address bar; Next's patched `replaceState` re-injects its own current tree, still Home's, because no
+Next navigation happened. Popping back restores the Home tree — right URL, wrong screen.
+
+**The fix reads the address bar at mount.** `TabShell`'s `useState` is now a lazy initializer that
+prefers `tabKeyForHref(window.location.pathname)` over the `initialTab` the stale tree produced.
+`usePathname()` would not do — it reads from the very tree that is wrong. Nothing reaches into
+`__PRIVATE_NEXTJS_INTERNALS_TREE`, which the entry had flagged as the risky shape. All three
+invariants hold: the flip still adds no history entry, the URL stays honest for refresh and deep
+links, and LB-107's back-to-Home from a tab root is unchanged.
+
+**Why "proven" is the right word.** `e2e/la109-back-from-subroute.spec.ts` was run against `main`'s
+unfixed `tab-shell.tsx` and goes **red** there. This check was not ceremony: the spec's first draft
+used `goto('/more/details')`, a full document load that rebuilds history, and passed while the bug
+was untouched.
+
+**⚑ The BF-49 link is REFUTED.** LA-109's entry held that BF-49 (*"tapping a workout, then back,
+leads to health training not home"*) was very likely the same defect, and that neither should be
+fixed before one was tried against the other's repro. That trial ran: the same spec's second test
+drives BF-49's shape with the stale tree supplied deliberately, and it **passes against the unfixed
+file** in the same run where LA-109's test fails. BF-49 stays open on its own device repro, and the
+test is kept as a regression guard labelled as not being a BF-49 reproduction.
+
+**⚑ BF-100 is unblocked.** It could not be read while this stood — if back rendered Home there was
+no `/more` scroll position to restore. It needs a device pass now, not more reading.
+
+**NOT verified on device.** The Android system back gesture and the WebView's history handling are
+not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
+gesture. Kept as LA-109's `Keep:`.
+- **RESOLVED 2026-09-23 — VERIFIED ON THE S25** (Device Verification agent, `device/first-run`).
+  Web v1.465.4 / APK 1.460.4, portrait, three-button nav, system back via `adb shell input keyevent 4`:
+  Home → More → *Profile details* → back lands on `/more` with the More tab active, read from
+  `location.pathname` in the page. LA-109 left the queue the same day.
+
+### [app-shell] ✅ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
+
+**Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**
+
+Owner: *"If you have a nutrition meal creator menu open and you press the back button - it makes the
+page behind it go back to main."*
+
+**The entry proposed building an overlay registry, on the grounds that none existed. One does** —
+`lib/hooks/sheet-back-stack.ts`, reached via `BackDismiss`, which `SheetContent` and `DialogContent`
+both already render (BF-27 put it there). The grep that found nothing searched for
+`overlayStack`/`topOverlay`; the real names are `openSurface`/`closeSurface`. **Building the proposed
+one would have left two stacks disagreeing about what is open** — worse than the bug.
+
+**The real defect:** `openSurface` pushes with `pushState(state, '')` — no URL — so the pathname
+never moves, and `backActionForPath` reads nothing else. On a tab route it answers `"home"` and the
+listener navigates; on `/` it answers `"minimize"` and the app backgrounds. **Neither touches
+history, so the pushed entry is never consumed.** Only `"pop"` worked, and only because
+`history.back()` is coincidentally what consumes it. The `"minimize"` case is a second symptom the
+report did not name.
+
+**The fix** exports `hasOpenSurface()` and pops when it is true, which reaches `handlePop` and closes
+the topmost surface through Radix's own `onOpenChange` — the same path as the X button, so every
+guard on a sheet's close still runs. It sits **after** the three mode guards, because each raises a
+dialog that is itself on this stack.
+
+**NOT verified on device, and no harness run can help.** Android's hardware back is a Capacitor
+channel Playwright cannot fire, and in a browser Radix closes on Escape so the bug never appears. The
+unit tests (4 of 5 red against `main`) cover the stack and the listener's ordering, not the gesture.
+- **RESOLVED 2026-09-23 — VERIFIED ON THE S25** (Device Verification agent). Web v1.465.4 / APK
+  1.460.4, portrait, `adb shell input keyevent 4`. Back closed an open sheet and left the route alone
+  on `/nutrition`, on `/` (without minimising) and on `/program`; mid-workout (gesture navigation,
+  `warmup`) back raised *Leave workout?*, a second back kept it up, *Stay* kept the workout. The one
+  defect seen — *Leave* does not leave — is the dialog's own entry absorbing `onLeave`'s
+  `history.back()`, filed as **DV-2**, not a regression of this fix.

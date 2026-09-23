@@ -57,11 +57,19 @@ out in that block rather than left to look uniform:
   sanctioned exception. It was recorded as *one* site in the 2026-08-19 correction, which was
   looking only at `[]` deps and could not see these. Converting them would add refetches with no
   reader waiting.
-- **`hr-day-card`, `activity-history-card` and `workout-screen` need judging by where they MOUNT.**
-  The first two render inside Health, a persistent tab screen; if they mount unconditionally they
-  are CAN-BITE rather than latent. `workout-screen` is not one of the five tab screens, so it
-  plausibly unmounts — and "plausibly" is precisely the reasoning that group has been got wrong
-  three times. RV-104/106/107/109 own those verdicts; this entry does not pre-empt them.
+- **`workout-screen` still needs judging by where it MOUNTS.** It is not one of the five tab
+  screens, so it plausibly unmounts — and "plausibly" is precisely the reasoning that group has
+  been got wrong three times.
+
+**Two of the fourteen are already gone, and that is the check working.** `hr-day-card` and
+`activity-history-card` went into the baseline here; Lane B converted both in #1422 while this
+branch sat open, and on the first run after merging `main` the shrink-only rule **failed the check**
+and demanded their rows be deleted. Both were `[today]`/`[userId]` deps — invisible to the
+`[]`-only gate, which is why RV-106 and RV-109 had to be found by hand. The baseline is now 23
+across 18 files rather than 25 across 20.
+
+RV-104, RV-106, RV-107 and RV-109 have all since shipped (#1416, #1422), so the four findings that
+motivated this entry are fixed. The gate's value from here is the next one, not those.
 
 ## Verification
 

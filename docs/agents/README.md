@@ -11,6 +11,7 @@ session, and read it again if you are about to touch a path you do not own.
 | **Tuning** | 1 | Opus 5 · `high` | The owner — lived experience against what a score said | Calibration evidence + proposals | No |
 | **Review** | 1, weekly | Opus 5 · `xhigh` | The app itself | Review write-ups + backlog entries | No |
 | **Orchestrator** | 1, weekly | Sonnet 5 · `medium` | The queue and the docs | Sweeps: completions cleared, batches assigned, lanes resolved | No |
+| **Device Verification** | 1, **local** | Opus 5.5 · `high` | The device checks the queue owes, scoped by the Orchestrator | VERIFIED / FAILED / COULD NOT CHECK on the S25, written into the entries | Harness only (`scripts/device/**`) |
 
 The model column is not arbitrary and is not a cost ranking — §6 gives the reasoning per role.
 
@@ -105,6 +106,36 @@ block or one carrying `Gate: owner`, never moves down what the owner moved up, a
 it does make in the PR body. A silent reprioritisation is indistinguishable from a bad merge, and
 this repo has had both.
 
+### Device Verification
+
+**The only role that runs on the owner's machine rather than in a cloud container, and so the only
+one that can see the real app on the real phone.** Every other session reasons about the S25 from
+source; this one plugs into it over USB (`scripts/device/`, adb + the WebView's DevTools socket) and
+reports what it did.
+
+It exists to clear the queue's **device debt** — every `Verify: device`, every `Keep:` whose
+residue is an S25 look, every live report that needs reproducing on the APK. `next-item.js
+--sittings` lists them; there were 104 when the role started (2026-09-23). Before it, each of those
+waited for the owner to pick up the phone.
+
+**It works alongside the Orchestrator, not under it.** The Orchestrator *scopes* device work — it
+batches entries into sittings (`Batch: back-gesture-sitting`), orders them, and decides which checks
+are genuinely the owner's. The Device agent *runs* them and writes the outcome into each entry. What
+it cannot do — wear the ring overnight, stand on the scale, judge how something feels, anything
+that needs a system setting changed — goes back to the Orchestrator's owner checklist, never into a
+guess. Its baton is the hand-off point: it lists what was run, what is waiting on the owner, and the
+next sitting it will take, so the Orchestrator can plan around it without asking.
+
+Every check ends in exactly one of three outcomes — **VERIFIED ON THE S25**, **FAILED ON THE S25**
+(which makes it open work again, with a reproduction a lane can start from), or **COULD NOT CHECK**
+and why. Never a fourth, and never a pass converted from an opinion. It does not implement product
+fixes; the one code path it owns is the harness itself, `scripts/device/**`.
+
+**Two hard limits, because the phone is the owner's real one:** it is signed into **production**,
+so a check that would write real data (start a workout, log food) needs the owner's go-ahead; and
+**it never uninstalls the app** — an uninstall destroys the Oura ring's BLE key, which nothing in
+this repo can recover. Captures never leave the machine as images: the repo is public.
+
 ---
 
 ## 2. What every agent may do without asking
@@ -160,6 +191,61 @@ lib/hooks/**  lib/stores/**
 lib/haptics.ts  lib/shell-nav.ts  lib/navigate-with-transition.ts
 lib/view-transition.ts  lib/use-copy.ts  lib/use-online-status.ts  lib/session-icon.tsx
 ```
+
+### Re-reading your lane on a cadence — so assigned work is picked up without being announced
+
+A lane only works as a channel if somebody reads it. **Each standing session arms a recurring
+wake-up for itself** (`create_trigger` bound to its own session, or `send_later` re-armed each
+time), and on firing re-runs `node scripts/next-item.js --lane <its lane>` and acts on anything new.
+
+| role | cadence | why that one |
+|---|---|---|
+| Implementation A · B | **hourly** | the queue moves fastest here, and an idle lane is the expensive case |
+| Orchestrator | **hourly** | it holds the owner-facing items, and a question that waits is a lane that waits |
+| Device Verification | **on demand** | it needs the phone and the owner present; a timer would fire into an empty room |
+| BugFix · Tuning · Review | **their own sweep cadence** | they find rather than consume, so they read the queue to avoid duplicating, not to take work |
+
+**A quiet wake-up is silent.** Nothing changed → re-arm and say nothing. No message to the owner, no
+PR comment. The cadence catches assigned work; it does not produce activity, and an agent reporting
+"nothing to do" every hour trains everyone to stop reading it.
+
+**⚠ Never use a short timer to poll for something the harness already notifies you about.** CI and
+PR events wake a session on their own; the wake-up is the fallback for what they miss.
+
+### Assigning work to another agent — the lane field is the whole mechanism
+
+**Any agent can put work in any lane by writing the field.** That is the point of `Lane:` being a
+value rather than a convention: Review finds something only the phone can settle and writes
+`Lane: DV`; the device agent finds a real defect and writes `Lane: B`; anyone hits a question that
+needs the owner and writes `Lane: O`. No message, no handoff doc, no waiting for another session to
+be awake — **the queue is the channel, and an entry outlives the session that wrote it.**
+
+| value | whose | what belongs there |
+|---|---|---|
+| `A` / `B` | Implementation | code, decided by §3's path rule |
+| `O` | Orchestrator | the queue and docs themselves, CI config, repo settings — **and anything needing the owner or a round of thinking before it can be built** |
+| `DV` | Device Verification | work whose *deliverable* needs the phone |
+| `?` | nobody yet | "I could not tell" — surfaces to a human rather than being guessed |
+
+**`O` and `DV` see only what is tagged for them; `A` and `B` also see the untagged.** An unstated
+lane means *"§3's path rule answers it"*, and that rule only ever resolves to an implementer — so
+showing untagged work to both implementer lanes is the safe failure it was designed as, while
+showing the same 400 entries to the Orchestrator or the device agent would bury the few genuinely
+theirs.
+
+**The entry's LETTER and its LANE are different things**, and this is where they diverge most
+visibly: `DV-1` was found by the device agent and carries `Lane: O`, because the work is the
+Orchestrator's. The letter records who found it and never changes; the lane records who builds it.
+
+**A device CHECK is not a lane assignment.** A shipped entry owing a look keeps its own lane and
+carries `Verify: device` or a `Keep:`; `node scripts/next-item.js --sittings` gathers those across
+the queue, grouped by screen and **ordered by queue position**, so moving one entry up promotes its
+whole sitting. `Lane: DV` is for what the device agent *delivers* — a sitting, a harness fix. Mixing
+the two would put a hundred entries in one lane and tell it nothing about order.
+
+**When a check comes back FAILED, the entry goes back to the lane that owns the surface** with what
+reproduces it. That is the loop closing: the device agent never fixes product code, and the lane
+never has to guess what the phone did.
 
 ### Anything not listed — decide it by the rule, not by the list
 
@@ -217,6 +303,7 @@ makes "what has Review found, and did any of it get built" a question you can ac
 | Review | `RV-` |
 | Tuning | `TN-` |
 | Orchestrator | `OR-` |
+| Device Verification | `DV-` |
 | One-off sessions (planning, urgent) | `PS-` |
 
 Counters are **unbounded**. Find your next free number with one command:
@@ -375,6 +462,7 @@ glance, so a renamed successor is a lost thread even when its baton is perfect.
 | **🎶 Tuning Agent 🟢** | `state/tuning.md` | `prompts/tuning.md` |
 | **📖 Review Agent 🟢** | `state/review.md` | `prompts/review.md` |
 | **🪐 Orchestrator 🟢** | `state/orchestrator.md` | `prompts/orchestrator.md` |
+| **📱 Device Verification Agent 🟢** | `state/device-verification.md` | `prompts/device-verification.md` |
 
 The two Implementation lanes deliberately share an emoji and differ only by the `(A)` / `(B)`
 suffix — they are one role in two lanes, and the suffix is the part that carries meaning. Do not
@@ -515,6 +603,12 @@ baton first. No prompt needs editing between generations; the baton carries the 
 
 ### Creating your successor
 
+> **Device Verification is the exception.** It must run on the machine the phone is plugged into,
+> and `create_session` makes a *cloud* session, which cannot reach it. Its successor is opened by the
+> owner in the desktop app on that machine, from `prompts/device-verification.md`. The outgoing
+> session says so in its closing message, with the title and model to use, rather than calling
+> `create_session`.
+
 The outgoing session creates the incoming one, with `create_session` on the `claude-code-remote`
 MCP server. This exists because **a session's model is fixed at creation and cannot be changed
 afterwards** — so the only moment the assignment in §6 can be applied is the moment the session is
@@ -588,6 +682,7 @@ Paste the matching prompt from [`prompts/`](prompts/):
 | Tuning | [`prompts/tuning.md`](prompts/tuning.md) |
 | Review | [`prompts/review.md`](prompts/review.md) |
 | Orchestrator | [`prompts/orchestrator.md`](prompts/orchestrator.md) |
+| Device Verification (local only) | [`prompts/device-verification.md`](prompts/device-verification.md) |
 
 One prompt is not a standing agent: [`prompts/checkpoint.md`](prompts/checkpoint.md) runs a
 whole-app checkpoint — twenty-six specialist lanes from cold start to every leaf function, plus a seam pass between them, collated into one report —
@@ -621,6 +716,7 @@ mismatch surfaces in the first thing the owner reads rather than never.
 | **Tuning** 🎶 | Opus 5 | `high` | Proposal item 5 — how many other days a change moves, and by how much — is exactly the distribution work a weaker model waves through while sounding certain. Owner sign-off catches a bad proposal; it does not catch a wrong number inside a plausible one. |
 | **BugFix** 🪲 | Sonnet 5 | `high` | Tracing a symptom to a file is navigation plus matching against bug classes already written down. A weak trace fails visibly — the entry says it could not locate the path — rather than silently. Escalate to Opus for a report that resists two attempts. |
 | **Orchestrator** 🪐 | Sonnet 5 | `medium` | Four mechanical sweeps against scripts that already compute the answer (`next-item.js`, `check-backlog-pointers.js`). Bookkeeping under explicit guardrails. |
+| **Device Verification** 📱 | Opus 5.5 | `high` | Its verdict clears debt permanently: a VERIFIED removes the entry, and nothing re-checks it. The job is telling what was *observed* from what was *assumed* — a harness artifact, a stale inspector widget, a centred tap — and the first sitting hit two of those in an hour. A false pass here is the most expensive output in the set, because it is invisible. |
 
 **Effort is the bigger dial than the model.** Opus 5 defaults to `xhigh` in Claude Code. Dropping a
 role to `high` or `medium` keeps Opus's judgement while cutting spend, and that is usually the better

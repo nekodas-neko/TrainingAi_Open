@@ -15464,6 +15464,14 @@ later: converting these four also emptied four `REVIEWED_BENIGN` rows out of
 `check-timezone-rendering.js`, because a site that stops calling `toLocale*String` stops being a
 device-local renderer.
 
+## 2026-09-22 — RV-100 (`fix/rv100-deload-colour`)
+
+`docs/implementation-backlog.md` → **26690**: RV-100 left the queue, and Review sweep 53 (#1389) landed twenty new entries underneath it in the same window — the number is the merged one.
+
+`projectOverview.md` → **12399**: ten lines. The part worth carrying is not the fix but the
+correction: the entry named `SESSION_PALETTE` as the non-semantic source to borrow, and that
+palette contains green and red itself, so following the entry literally would have moved the
+collision rather than ended it.
 ## 2026-09-22 — `docs/implementation-backlog.md` +368 (26339 → 26707) (Review sweep 53)
 
 Twenty entries (**RV-103…RV-122**) from the sweep the owner scoped himself — animations and page
@@ -15517,6 +15525,177 @@ The distinction the rule draws is the part worth keeping exact: restyling a comp
 layout bug does not need a mockup; merging a card, collapsing a banner stack, or moving a card
 between tabs does. The test is whether the owner would notice the screen is *arranged* differently,
 not whether it looks different.
+
+## 2026-09-23 — `docs/implementation-backlog.md` → 26758
+
++68, and the largest block is a retraction rather than a finding.
+
+**Q-272 is the pre-existing Body Battery entry and TN-55 was filed without checking for it.** Q-272 had
+said since 2026-08-15 that the next action was Tuning's and no proposal existed; TN-55 is that proposal.
+Linking them cost lines on both entries and is worth every one, because two entries prescribing
+different fixes for one defect is how a lane gets sent two ways.
+
+Two of the additions exist to stop a later session inheriting a false premise. Q-272's acceptance test —
+`r = +0.67 (n = 11)` for end-of-day battery against next-day readiness, with an instruction to re-run it
+after the change — **does not replicate**: 0.252 over 70 days, against readiness's own 0.361
+autocorrelation. Someone would have validated the whole rework against a relationship that is not there.
+And overnight charging is now recorded as **out**, because Q-272 is right that the wake anchor already
+accounts for the night; the re-fit without it is strictly better, so the warning also carries the
+measurement that makes it stick.
+
+TN-61 (Lane O) and ledger items 2b/2c are the rest: a queue tool that truncates silently, a readiness
+contributor worth 2.8% of the movement on a 0.06 weight, and the `.size` conflict tax with a measured
+cost of five of seven PRs in one session.
+## 2026-09-22 — `docs/implementation-backlog.md` → 26770 (OR-127: the USB device harness + the recorder)
+
+One entry for `scripts/device/**`, which drives the real APK on the real phone over the DevTools
+protocol. The entry is long for a shipped tool because most of it is the **limits**, and those are
+the part that will otherwise be overread: what a pass here is evidence about (one screen, one
+orientation, one navigation mode, one phone), what it cannot touch (the ring, the scale, anything
+needing the owner present, every "does this feel instant" call), and that it does not retire the
+device-verification gate.
+
+Worth carrying: **automatable is not the same as owed.** The harness answers *behavioural*
+questions — did the row disappear, did back land on Home, is the computed padding above the gesture
+bar. A large share of the 104 device checks are look-and-feel, and an automated pass is the weakest
+evidence for exactly those. The honest expectation is a shorter, harder list, not an empty one.
+
+Third thing, added on the owner correcting the design: the first draft captured a **single** frame,
+and that was a gap. The whole `motion-polish` batch is timing questions — does the ring finish with
+the number, is the sheet 300 ms or the stock 500 — and no still frame answers one. `record.js` takes
+compositor frames over a window with the ms each landed at. **Read the timestamps, never the frame
+count**: the phone drops frames under load, so a sparse recording reads as a fast transition.
+
+Second thing worth carrying, because it is unusual for this repo: **the harness ships unrun.** No
+sandbox here has `adb` or a phone, so every line was reasoned from the protocol rather than
+observed — including the claim that it connects at all. It is filed with a `Keep:` naming that
+first run as the outstanding work, rather than presented as working software.
+
+## 2026-09-22 — `CLAUDE.md` → 844 (structural questions are the agent's) and the OR-127 corrections
+
+**CLAUDE.md**: a standing narrowing of the decisions section, on the owner's instruction — *"I'd
+like it if you could take a lot of these structural questions."* Architecture, tooling, process,
+layout, naming and how to test something are the agent's; what stays theirs is data destruction,
+money, auth and secrets, scoring calibration, and genuine product preference. It costs lines
+because the *carve-out list* is the load-bearing half — a delegation with no boundary is not a
+delegation, it is an invitation to decide something irreversible.
+
+Worth carrying: **delegated is not undocumented.** The rule says a structural call still gets
+written down with its reason and its reversal cost. The owner is trading *being asked* for *being
+able to read it later*, and without the second half the first is just a loss of oversight.
+
+**OR-127** gained a testing order and lost a wrong sentence. The first draft said the harness "does
+not reach the ring or the scale", in three places. It was wrong: this drives the app on the phone
+they are **paired to**, so every app-side BLE surface is reachable — roughly 17 checks written off
+by one line. The real limit is on making the hardware *produce* (wear the ring overnight, wake a
+power-gated radio, stand on the scale), not on reading what it already produced. Reading is not
+producing, and conflating them cost more than any other error in that entry.
+
+---
+
+## 2026-09-23 — backlog → 26664 (−224), projectOverview → 12362 (−37), new baton `device-verification.md` → 66 (device/first-run)
+
+**Backlog −255.** The first S25 sitting run by the local Device Verification agent verified three
+shipped fixes on the device — **LA-109**, **LB-107**, **BF-100** — and they left the queue whole
+(192 + 54 + 47 lines, less the result bullets written into BF-166, BF-165 and BF-111), and **DV-1** (+31) was filed in its
+place: `pnpm ci:local` cannot pass on Windows, where that agent runs. Net −224, ratcheted to the
+measured size so the space cannot be quietly regrown.
+
+**projectOverview −37.** LA-109's Known-Issues row moved whole to `known-issues-resolved.md`: the
+device gesture was the only thing it still owed, and it was verified on the S25 the same day.
+
+**New baseline: `docs/agents/state/device-verification.md` at 66**, its size on creation. A seventh
+role's baton joins the six already ratcheted; the same rule applies from its first line — it only
+comes down.
+
+## 2026-09-22 — `docs/implementation-backlog.md` +125 (26664 → 26789) (Review: DV probe entries)
+
+Ten entries (**RV-124…RV-133**) filing the probes in
+[`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md) as queue work now that the
+Device Verification role exists (#1417), at ~12 lines each.
+
+**They are the first entries whose ONLY work is the device check**, and the filing took three tries
+to get right, which is worth recording because the next one will hit it too. `Gate: device` parks an
+entry as unstartable *and* is not selected by `--sittings`, so it would have hidden them from the one
+agent that can run them. `Verify: device` reads as *shipped* — the protocol warns about exactly this
+misuse twice — but it is the only field `--sittings` selects on, and the warning is aimed at unbuilt
+work that still needs implementing. These have **no build half at all**, so nothing is hidden and
+nothing is blocked; each entry says so in its first bullet so no later reader mistakes it for shipped
+code. Verified rather than assumed: 10 of 10 reach `--sittings`, 0 leak into either lane's READY.
+
+**Two were parked by their own emphasis glyph** — `next-item.js` treats `⛔ …block` within 40
+characters as the legacy blocked marker, and *"⛔ The clearance half is BLOCKED"* matches it exactly.
+Same trap as sweep 52's eight parked entries. Swapped to `⚠`.
+## 2026-09-22 — `projectOverview.md` 12399 → 12413, backlog 26690 → 26682 (RV-103/RV-104)
+
+The fourteen lines on `projectOverview.md` are one Known-Issues entry, and it is there for the half
+that did **not** ship rather than the half that did. RV-103's report path is wired and only fired in
+one of five sandbox runs, because `cachedFetch` gates `onError` on `cached === null` on both its
+failure paths and `fetchWithRetry` counts a cached paint as a response — so a failed revalidation is
+unreportable by any caller while anything is cached. An entry that said only "the refetch now
+reports failures" would be the kind of claim the never-mark-fixed-from-intent rule exists to stop,
+and the next session would build on it. The mechanism, the measurement and the flake that was the
+finding are in the journal entry; what stays in the index is the caveat and the pointer, which is
+the split that keeps this file from regrowing.
+
+First draft of that entry ran 21 lines over the baseline and was cut to 14 rather than granted the
+space — the detail belongs in `docs/overview/entries/`, and the index carries the warning only.
+
+Both recorded figures move on arithmetic that is not this branch's doing alone: the final numbers
+are 26780 and 12376, after TN-61, DV-1, #1417's archiving sweep and #1418's RV-124…RV-133 all
+landed from `main` across three re-merges while this branch was open. What this branch contributed is −8 to the backlog
+— RV-104 shipped whole and left the queue, and RV-103 came back shorter as a `Keep:` entry, against
+the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
+above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
+read as genuinely given back rather than absorbed into someone else's sweep.
+---
+
+## 2026-09-23 — backlog → 26672, projectOverview → 12333 (−29) (device/bf166-mid-workout)
+
+BF-166's mid-workout half ran on the S25 and the entry left the queue whole; **DV-2** (*Leave* on the
+leave-workout prompt does not leave) was filed beside BF-165 in its place. BF-166's Known-Issues row
+moved to the resolved archive. DV-1 gained the two Windows test failures found once Node was
+upgraded, and DV-3 (a CI flake in the migration-163 test) was filed. The Device Verification
+baton goes 66 → 67 for the DV-3 row it has to carry. Both baselines set to the
+measured sizes.
+
+
+## 2026-09-23 — `docs/implementation-backlog.md` +41 (26780 → 26821) (Review: RV-134)
+
+One entry, naming the mechanism behind the `.size` conflict tax that Tuning measured on 2026-09-20
+(§2c) and said needed its own entry. It is longer than a one-line finding because the recommendation
+has to say what it gives up: PS-34 removed slack from this ratchet for cause, and the fix proposed is
+**not** re-introducing it — it is giving the slack direction the same `inherited` escape the growth
+direction already has, so a branch is not blamed for a shrink another PR's merge caused.
+
+Filed against Lane O rather than an implementer lane: `scripts/check-doc-index-size.js` is repo
+tooling in the Custom Rules job, which is the OR-103 case.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +42 (26829 → 26872), `CLAUDE.md` 844 → 866 (Review sweep 54)
+
+RV-135, plus an amendment to RV-125 correcting figures it had inherited from a stale `CLAUDE.md`
+line. The entry carries a before/after table because the point is that the signal **grew** between
+sweeps (`stuck` at `h=667`, 3 → 9) rather than fading — a number that has to be comparable next time.
+
+`CLAUDE.md` grows because the corrected sentence says what the old one got wrong and for how long.
+That is deliberate: the rule had asserted 19 can-bite fetch-once sites for five weeks after the
+script's baseline recorded **0**, and a silent swap of one number for another would leave the next
+reader with no reason to trust the new one over their memory of the old.
+## 2026-09-23 — backlog 26780 → 26731, `projectOverview.md` 12376 → 12388 (RV-106/RV-107/RV-109)
+
+The backlog ratchets **down** 49 lines on this branch's own account — RV-106, RV-107 and RV-109
+shipped whole and left the queue, and the batch `stale-surface-subscribe` is now empty. The figures
+finally recorded are 26823 and 12359, because #1419 (BF-166 closed on the S25, DV-2 filed) and
+#1421 (Review sweep 54) both landed from `main` mid-CI — four re-merges on one PR, every one of
+them a `.size` conflict, which is the tax sweep 54 went and measured. Nothing was filed against them — the one
+finding the work turned up (that `useStressDay` was already correct, which RV-106 had left
+untraced) is an answer rather than new work, so it lives in the code as an asserted comment.
+
+The twelve lines on `projectOverview.md` are one Known-Issues entry, and it is there for the device
+check that is owed rather than the fix that landed. Its pointer to RV-124 is the part worth the
+space: that probe settles this whole class by measurement, so the next session reading the index
+learns where the answer is coming from instead of re-reasoning it from source — which is precisely
+what these three entries show cannot distinguish a working subscription from a missing one.
 
 ## 2026-09-22 — `projectOverview.md` → 12403 (RV-105)
 

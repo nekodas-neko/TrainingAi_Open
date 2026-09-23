@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
@@ -42,9 +42,22 @@ list is right, because `trendsProp` is a prop the parent resolves from `undefine
 changes and `oura-section.tsx` already carries a second effect to adopt it. Excluded, with the
 reason in the code. ⚠ **This widened the lens, it did not audit what it revealed** — all 14 new
 sites predate it and went into the baseline. `sync-provider.tsx` is 4 of them and is the sanctioned
-warm pass; `hr-day-card`, `activity-history-card` and `workout-screen` still need judging by where
-they MOUNT, which RV-104/106/107/109 own. Mutation-checked in both directions, six cases.
+warm pass; `workout-screen` still needs judging by where it MOUNTS. **Two of the fourteen proved the
+gate immediately** — Lane B converted `hr-day-card` and `activity-history-card` in #1422 while this
+branch was open, and the shrink-only rule failed the check on the first run after the merge and
+demanded their rows go; both were `[today]`/`[userId]`, invisible to the old gate, which is why
+RV-106 and RV-109 had to be found by hand. Baseline is 23 across 18. All four motivating findings
+(RV-104/106/107/109) have since shipped. Mutation-checked in both directions, six cases.
 
+**A training phase was painted in the state colours (RV-100, v1.465.5).** `PHASE_COLORS` had
+`realisation` — the PEAK-output phase — as `text-red-500`, the app's failure colour, and `deload` as
+`text-green-500` while Home's banner paints a deload *recommendation* amber or red. **Both are live,
+which the entry asked to establish before sizing the work:** the active program is `ai_dynamic` and
+production carries 2 sessions in each of those phases. The five phases now use a cool ramp, leaving
+green/amber/red for state. **The entry's suggested source was wrong** — `SESSION_PALETTE` is indexed
+by session position and contains green and red itself, so borrowing it would have re-randomised the
+collision. Home's banner also had a third amber of its own; it takes `--accent-amber` now, and the
+hex baseline drops 3 → 2.
 
 **Four more date labels moved onto the shared formatter (LB-126, v1.465.4).** LB-125 (#1404, Lane A)
 gave `formatDateDisplay` the `weekday`, `weekday-date` and `weekday-date-long` styles; these are the
@@ -2526,6 +2539,32 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [heart-rate][nutrition][activity] ⚠️ Three shell-resident cards now subscribe to their own invalidation — NOT device-verified (RV-106, RV-107, RV-109, 2026-09-23, v1.465.7)
+
+Health's HR card kept pre-sync data after a ring sync while Home's strip had moved; Health's
+Activity History never showed an activity confirmed from Home; editing macro targets left the
+Nutrition rings banding against the old ones. All three were a `cachedFetch` in an effect with
+stable deps, inside the tab shell that never unmounts — the Q-402 shape, where the eviction lands
+and nothing asks for a new value. No invalidation was added: all five keys were already cleared,
+and are now checked against `lib/cache-groups.ts` in the test. Owed: the device check, which is the
+Device Verification agent's — and **RV-124's device probe settles this class by measurement**,
+these three included. Detail:
+[`docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md`](docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md).
+
+### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
+
+The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,
+says so and offers a Retry instead of presenting the pre-write figure as current; it also stopped
+writing null on an empty payload, which made the budget and macro targets vanish rather than go
+stale. **But `cachedFetch` fires `onError` only when `cached === null` on both its failure paths,
+and `fetchWithRetry` counts a cached paint as a response — so no caller can be told a revalidation
+failed while a cached value is present.** Driving `/nutrition` with the balance route aborted, the
+same code both reported and stayed silent on consecutive runs; exhaustion fired **once in five**.
+The report path is wired and strictly additive, and is recorded as unproven rather than done.
+`LB-128` carries the fix (Lane A's, and **not** ungating `onError`, which every caller reads as "I
+have nothing to show"). Owed: the device check at the S25 width. Detail:
+[`docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md`](docs/overview/entries/2026-09-22-rv103-rv104-nutrition-freshness.md).
+
 ### [app-shell] ⚠️ Buttons press, sheets open at 300 ms and progress bars composite — nothing has been felt (RV-71, RV-72, RV-75, 2026-09-21, v1.464.1) · needs: device
 
 The shared `Button` had **no `active:` state at all** across 129 importers on a touch-only product —
@@ -2961,43 +3000,6 @@ in and it saves with no prompt; the partner weighs in on his phone and **no** *"
 Two hardware questions BF-58 keeps are still unanswered — whether two phones can hold a GATT
 connection at once, and whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply (that one decides
 whether the race between the phones matters at all).
-
-### [app-shell][platform] ⚠️ A tab flip left the previous tab's route tree on the history entry, so back rendered the wrong screen (LA-109, 2026-09-15)
-
-**Fixed — and the fix is proven, not merely green. The device gesture is what is still owed.** Owner:
-*"Going to more; then going to profile details and pressing back gets me to the home page again."*
-
-**Cause, measured by dumping `history.state` rather than reasoned.** After the More tab flip the URL
-reads `/more` while Next's recorded route tree for that entry is still `(home)` → `/`. `show()`
-(`tab-shell.tsx`) flips tabs with `window.history.replaceState(null, "", href)`, which moves the
-address bar; Next's patched `replaceState` re-injects its own current tree, still Home's, because no
-Next navigation happened. Popping back restores the Home tree — right URL, wrong screen.
-
-**The fix reads the address bar at mount.** `TabShell`'s `useState` is now a lazy initializer that
-prefers `tabKeyForHref(window.location.pathname)` over the `initialTab` the stale tree produced.
-`usePathname()` would not do — it reads from the very tree that is wrong. Nothing reaches into
-`__PRIVATE_NEXTJS_INTERNALS_TREE`, which the entry had flagged as the risky shape. All three
-invariants hold: the flip still adds no history entry, the URL stays honest for refresh and deep
-links, and LB-107's back-to-Home from a tab root is unchanged.
-
-**Why "proven" is the right word.** `e2e/la109-back-from-subroute.spec.ts` was run against `main`'s
-unfixed `tab-shell.tsx` and goes **red** there. This check was not ceremony: the spec's first draft
-used `goto('/more/details')`, a full document load that rebuilds history, and passed while the bug
-was untouched.
-
-**⚑ The BF-49 link is REFUTED.** LA-109's entry held that BF-49 (*"tapping a workout, then back,
-leads to health training not home"*) was very likely the same defect, and that neither should be
-fixed before one was tried against the other's repro. That trial ran: the same spec's second test
-drives BF-49's shape with the stale tree supplied deliberately, and it **passes against the unfixed
-file** in the same run where LA-109's test fails. BF-49 stays open on its own device repro, and the
-test is kept as a regression guard labelled as not being a BF-49 reproduction.
-
-**⚑ BF-100 is unblocked.** It could not be read while this stood — if back rendered Home there was
-no `/more` scroll position to restore. It needs a device pass now, not more reading.
-
-**NOT verified on device.** The Android system back gesture and the WebView's history handling are
-not reachable from the sandbox; Playwright's `goBack()` is the same history step but not the same
-gesture. Kept as LA-109's `Keep:`.
 
 ### [workouts] ⚠️ The intensity chip now claims only the load it measures; judging load AND reps is still owed (BF-163, 2026-09-15)
 
@@ -4101,35 +4103,6 @@ time scales with the tree behind the route. **There is no second dead button; Gu
 elimination table (which came from reading, not the harness). **The sheet's `history.back()` theory is
 back to unproven** — that experiment also ran cold.
 ([retraction](docs/overview/history-2026-09-17-folded-1.md#2026-09-15-bf165-retraction-cold-route))
-
-### [app-shell] ⚠️ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
-
-**Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**
-
-Owner: *"If you have a nutrition meal creator menu open and you press the back button - it makes the
-page behind it go back to main."*
-
-**The entry proposed building an overlay registry, on the grounds that none existed. One does** —
-`lib/hooks/sheet-back-stack.ts`, reached via `BackDismiss`, which `SheetContent` and `DialogContent`
-both already render (BF-27 put it there). The grep that found nothing searched for
-`overlayStack`/`topOverlay`; the real names are `openSurface`/`closeSurface`. **Building the proposed
-one would have left two stacks disagreeing about what is open** — worse than the bug.
-
-**The real defect:** `openSurface` pushes with `pushState(state, '')` — no URL — so the pathname
-never moves, and `backActionForPath` reads nothing else. On a tab route it answers `"home"` and the
-listener navigates; on `/` it answers `"minimize"` and the app backgrounds. **Neither touches
-history, so the pushed entry is never consumed.** Only `"pop"` worked, and only because
-`history.back()` is coincidentally what consumes it. The `"minimize"` case is a second symptom the
-report did not name.
-
-**The fix** exports `hasOpenSurface()` and pops when it is true, which reaches `handlePop` and closes
-the topmost surface through Radix's own `onOpenChange` — the same path as the X button, so every
-guard on a sheet's close still runs. It sits **after** the three mode guards, because each raises a
-dialog that is itself on this stack.
-
-**NOT verified on device, and no harness run can help.** Android's hardware back is a Capacitor
-channel Playwright cannot fire, and in a browser Radix closes on Escape so the bug never appears. The
-unit tests (4 of 5 red against `main`) cover the stack and the listener's ordering, not the gesture.
 
 ### [heart-rate][app-shell] ⚠️ One metric name covered two heart rates; labelled, but the third surface's context is still undecided (OR-116, 2026-09-15)
 

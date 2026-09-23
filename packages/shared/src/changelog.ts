@@ -6,6 +6,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.7",
+    date: "2026-09-23",
+    changes: [
+      "Three screens that held stale numbers until the app was restarted now update when the thing behind them changes. Health's heart-rate card kept showing pre-sync data after a ring sync while the home screen's strip had already moved; Health's Activity History never showed an activity you confirmed from the home screen; and editing your macro targets left the Nutrition rings measuring against the old ones. A tab switch did not fix any of them.",
+    ],
+  },
+  {
+    version: "1.465.6",
+    date: "2026-09-22",
+    changes: [
+      "The Nutrition screen's 7-day calorie chart and the adherence figures under it now update when you log a food. They only updated when you deleted one \u2014 same screen, same numbers, and adding a meal left them showing whatever they held when the app started, until it was restarted. Switching tabs did not help.",
+      "If the calorie budget beside the ring cannot be refreshed after you log something, the card now says so and offers a Retry instead of quietly showing you the figure from before your entry. It also no longer blanks the budget and macro targets outright when the server answers with nothing.",
+    ],
+  },
+  {
+    version: "1.465.5",
+    date: "2026-09-22",
+    changes: [
+      "Training phases are no longer coloured like warnings. The AI periodization card painted Realise \u2014 your peak output phase \u2014 in the same red the app uses for something going wrong, and painted Deload green while the home screen calls a deload recommendation amber or red. A phase is a category, not a verdict, so the five now use a cool range and green, amber and red are kept for telling you how something is going. The home deload banner also had a third shade of amber of its own; it uses the shared one now.",
+    ],
+  },
+  {
     version: "1.465.4",
     date: "2026-09-22",
     changes: [

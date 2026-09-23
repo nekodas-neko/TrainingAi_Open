@@ -60,6 +60,8 @@ const MealPlanSetupSheet = dynamic(
 );
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { useEnergyBalanceRefetch } from "./use-energy-balance-refetch";
+import { useNutritionDerivedRefresh } from "./use-nutrition-derived-refresh";
+import { useNutritionTargetsRefresh } from "./use-nutrition-targets-refresh";
 import { WaterLogSheet } from "@/components/profile/water-log-sheet";
 import { mealTypeForHour } from "@trainingai/shared/nutrition/log-plan-meal";
 import { NutritionActionRow } from "@/components/nutrition/nutrition-action-row";
@@ -242,7 +244,14 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     finally { setLoading(false); }
   }, [loadFoodLogs]);
 
-  // Mount-scoped (PERF-5) — these seven fetches don't depend on selectedDate, so they
+  // RV-104: the weekly chart and the adherence figures, subscribed to their own invalidation so
+  // no write path has to remember them. Returns the loader this mount fetch still calls.
+  const refreshDerived = useNutritionDerivedRefresh(setWeeklyData, setAdherence);
+  // RV-107: the macro targets, subscribed to `invalidateGoalRecommendations`'s eviction so the
+  // rings stop banding against the previous target. Returns the loader this mount fetch calls.
+  const refreshTargets = useNutritionTargetsRefresh(setTargets);
+
+  // Mount-scoped (PERF-5) — these fetches don't depend on selectedDate, so they
   // previously all re-ran on every date-swipe (≈40 requests browsing back 5 days).
   const fetchMountData = useCallback(async () => {
     try {
@@ -258,14 +267,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             if (store && types.length) store.replaceMealTypes(types).catch(() => {});
           },
         ),
-        cachedFetch<NutritionTargets>(
-          'nutrition-targets', '/api/nutrition/targets', TTL_LONG,
-          d => setTargets(d ?? null),
-        ),
-        cachedFetch<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>(
-          'nutrition-weekly-summary', '/api/nutrition/weekly-summary', TTL_MEDIUM,
-          d => setWeeklyData(Array.isArray(d) ? d : []),
-        ),
+        refreshTargets(),
+        refreshDerived(),
         (async () => {
           // Local first — the plan has to render with no network, which is the whole point of
           // storing its names and macros on the device rather than just ids.
@@ -281,10 +284,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             d => setMealPlan(d?.plans.find(p => p.isActive) ?? null),
           );
         })(),
-        cachedFetch<NutritionAdherenceResponse>(
-          'nutrition-adherence', '/api/nutrition/adherence', TTL_MEDIUM,
-          d => setAdherence(d),
-        ),
         cachedFetch<{ today: BodyMetaRow | null }>(
           'body-metadata', '/api/body-metadata', TTL_MEDIUM,
           d => {
@@ -293,11 +292,12 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         ),
       ]);
     } catch { /* non-fatal */ }
-  }, [userId, tz]);
+  }, [userId, tz, refreshDerived, refreshTargets]);
 
   // BF-177. Balance-only refetch; the hook carries why it is not `fetchData` and not a
   // client-side subtraction.
-  const refetchBalance = useEnergyBalanceRefetch(setEnergyBalance)
+  const { refetch: refetchBalance, failed: balanceRefetchFailed, retry: retryBalance } =
+    useEnergyBalanceRefetch(setEnergyBalance)
 
   const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
     if (newLog) {
@@ -389,10 +389,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       // BF-177's third site, which that entry did not name: a delete changes intake, so the
       // balance's subtraction is stale exactly as it is after a log or an edit.
       refetchBalance(today);
-      cachedFetch<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>(
-        'nutrition-weekly-summary', '/api/nutrition/weekly-summary', TTL_MEDIUM,
-        d => setWeeklyData(Array.isArray(d) ? d : []),
-      ).catch(() => {});
+      // The weekly chart used to be refetched by hand here, and only here — the asymmetry RV-104
+      // found. `invalidateNutritionWrite()` above clears it, and `useNutritionDerivedRefresh`
+      // reloads it off that signal for every write path, not just this one.
     };
     const store = userId ? getLocalStore(userId) : null;
     if (store) {
@@ -576,6 +575,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               fatG={totals.fatG}
               goalCalories={effectiveCalorieGoal}
               earnedKcal={earnedForSelectedDate}
+              balanceStale={balanceRefetchFailed}
+              onRetryBalance={retryBalance}
               targets={effectiveTargets}
             />
 
@@ -632,9 +633,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
             <TdeeAdaptationCard
               energyBalance={energyBalance?.date === selectedDate ? energyBalance : null}
-              onApplied={() => {
-                cachedFetch<NutritionTargets>('nutrition-targets', '/api/nutrition/targets', TTL_LONG, d => setTargets(d ?? null));
-              }}
+              onApplied={refreshTargets}
             />
 
             {/* BF-24 ④: each meal is its own card with its name as a label above it — artboard 1

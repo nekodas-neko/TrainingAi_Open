@@ -17,7 +17,7 @@ const { PREFIXES, idPattern, idPartsPattern } = require('../lib/entry-id.js') as
 describe('backlog entry-id prefixes', () => {
   // The list in docs/agents/README.md §3, plus the legacy Q- numbers.
   it('knows every prefix the agents actually use', () => {
-    expect(new Set(PREFIXES)).toEqual(new Set(['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'PS', 'Q']))
+    expect(new Set(PREFIXES)).toEqual(new Set(['LA', 'LB', 'BF', 'RV', 'TN', 'OR', 'DV', 'PS', 'Q']))
   })
 
   it('matches an OR- id in a heading — the one that was missing', () => {
