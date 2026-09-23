@@ -17959,30 +17959,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
   invalidates every clearance reading in step 4.
 
-### [devices][platform] OR-126 — write the case for dropping the server raw archive, so Q-29 Task 5 can be answered on evidence
-
-- **Lane: O** — a written brief for the owner, not code. **Added:** 2026-09-22 (OR-125).
-- **Why this exists.** Q-29 Task 5 drops `oura_raw_samples.body_hex`, the server-side archival source
-  of truth. It was put to the owner as a yes-on-principle and they asked for the case first. That is
-  the correct answer to a one-line summary of an irreversible change, and it makes the missing brief
-  our debt rather than their indecision.
-- **What it must contain**, each measured rather than asserted:
-  1. **What is dropped**, exactly — table, column, row count, span, and what reads it today.
-  2. **What survives on the device** — and that it is a **14-day rolling window** by deliberate
-     decision (the owner's, 2026-08-02), so it is input to the on-device rollup, not an archive.
-  3. **What becomes permanently unrecoverable.** The ring's history buffer only moves forward and the
-     sync cursor cannot be rewound, so a decoder fix written later can back-fill **only** from stored
-     hex. After the drop, every future protocol correction is bounded by what the device still holds.
-  4. **What keeping it costs**, in money and in legibility. Railway bills on use at $0.15/GB/month
-     against a ~227 MB database, so the honest framing is almost certainly *"this is not a cost
-     problem"* — and if so the brief should say that outright rather than implying a saving.
-  5. **The reversal cost**, stated plainly: there isn't one. That is the whole reason this needs a
-     brief instead of a yes.
-- **⛔ Do not write this as an argument for the drop.** The decision is the owner's and the brief's
-  job is to make it answerable, not to win it. If the measurement says keeping the archive is
-  cheap and the loss is real, the brief should recommend keeping it.
-- **Verification:** the owner answers Q-29 Task 5 one way or the other. An answer either way clears
-  this entry; a second "show me more" means the brief missed something and it stays.
 
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
@@ -18256,6 +18232,14 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
     shallow-pack story is unconfirmed, the retry is a guess, and the diagnostic is the part that
     earns its place — the next occurrence prints git's own reason, which is the evidence this
     instance never produced.
+  - **A THIRD occurrence, 2026-09-23 (OR-126), and its evidence was thrown away exactly as this
+    entry describes.** A full `pnpm ci:local` on a **docs-only** branch exited 1; the next two runs
+    of the identical tree exited 0, **Ran 75 of 75**, 792 files passed. The failing output was lost
+    because the run was piped to `tail -5` — the run itself was unpiped, but only the last five
+    lines were kept, which is the same mistake wearing a different hat and is recorded here rather
+    than quietly dropped. **Keep the whole log** (`pnpm ci:local > /tmp/gate.log 2>&1; echo $?`),
+    not the tail of it; a five-line tail cannot show which file failed. Nothing is diagnosed from
+    this instance and it must not be counted as evidence for any cause.
   - **⛔ It does NOT close the first instance.** That one was `check-tz-aware-cache-guards.js`, which
     does not use `base-ref` at all — a grep for `resolveBaseRef` across both scripts matches only
     `check-strict-request-schemas.js`. Two flakes of similar *shape* are not evidence of one cause,
@@ -25146,8 +25130,29 @@ millisecond count talk a future session out of it.
     archive. The case must say plainly what is dropped, what survives on the device, what can never
     be recovered afterwards, and what the storage actually costs to keep — measured, not assumed,
     since Railway bills on use at $0.15/GB/month and the whole database is ~227 MB.
-  - **Do not re-ask until that is written.** Asking twice for the same yes with no new evidence is
-    how a decision gets made on fatigue rather than on the facts.
+  - **✅ THE BRIEF IS WRITTEN — [`docs/oura-raw-archive-retention-brief.md`](oura-raw-archive-retention-brief.md)
+    (2026-09-23, OR-126). It is now answerable, and it recommends KEEPING the archive.**
+  - **⛔ BUT DO NOT PUT TASK 5 TO THE OWNER AS WRITTEN — three of its load-bearing facts have moved,
+    and the brief found it rather than answering it.**
+    1. **The archive is in a different table.** The packer (Q-541 Task 4) moved it to
+       `oura_raw_packed.blob` — **1,467 rows, 1,811,765 frames, 25 MB**, lossless and verified by
+       read-back before any delete. `oura_raw_samples` is now a **7-day hot window**: 189,263 rows
+       across an 8-day span holding **4.5 MB** of hex. **Task 5 as written would drop a scratch
+       buffer, not the archive.**
+    2. **The device's 14-day window has not shipped** (`projectOverview.md:6211`): `pruneRaw` has no
+       caller, and its predicate needs `rolled_up = 1`, set only by D2 Task 5, not built. Measured
+       on-device 2026-08-18: **209,326 rows, 0 rolled up**. The "what survives on the device" half
+       of the trade does not currently exist — and the store is past Android's 25 MB Auto Backup
+       quota, so it is not backed up either.
+    3. **The 76 MB that makes `oura_raw_samples` look expensive is 45 MB of index plus bloat against
+       4.5 MB of payload.** That is `BF-106`'s `VACUUM FULL` — a **larger** lever than this one that
+       loses nothing, and one the owner has already deferred rather than declined.
+  - **So the next action is a reconcile, not a question.** Per the backlog protocol's re-verify rule,
+    rewrite Task 5 to say what it now means or strike it. Cost of keeping, measured: **$0.004/month
+    today, $4.66/year ten years out.** Reversal cost of dropping: none, ever.
+  - **Do not re-ask until that reconcile is done.** Asking twice for the same yes with no new
+    evidence is how a decision gets made on fatigue rather than on the facts — and asking against a
+    stale premise is worse, because the answer would not mean what either side thought.
 **Not a new planning item — this corrects a duplicate entry a different 2026-07-30 session
 nearly created.** [`docs/offline-first-target-architecture.md`](offline-first-target-architecture.md)
 names `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:4658–~5764`) as the load-bearing

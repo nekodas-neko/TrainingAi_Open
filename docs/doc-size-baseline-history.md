@@ -15777,3 +15777,15 @@ night.
 BF-61 gains the second attempt's bullet: why three "failed" immediate taps were not evidence (the tray
 was already open; the tap aimed at the row), so the next attempt does not repeat them. The baton
 shrank by a line on its rewrite.
+
+## 2026-09-23 — `CLAUDE.md` → 890 and `docs/implementation-backlog.md` → 27079 (OR-126)
+
+**CLAUDE.md +13**: the Oura raw-archive rule said `oura_raw_samples.body_hex` was the server's
+archival source of truth and had been wrong since the packer shipped. It names `oura_raw_packed`
+now, with the tier sizes measured, and carries the second correction beside it — the device's
+14-day window has not shipped, so the device cannot be cited as a surviving copy. Thirteen lines
+for a rule that was pointing every session at a 7-day scratch buffer and calling it the archive.
+
+**Backlog +5 net**: OR-126 left the queue after being built (a net shrink of about 25 lines) while Q-29
+gained the reconcile that the brief turned up, plus a third OR-121 occurrence recorded with its
+evidence explicitly marked lost — which is most of it back and then some.
