@@ -69,6 +69,44 @@ routes clears the gesture bar, which is a number. **Recorded on the entry as an 
 with the device agent named as the decider**, rather than resolved by whoever edited last. If it
 comes back it wants a `Gate: owner` and a note, not a silent re-park.
 
+## The ratchets' base read has been broken since the backlog passed 1 MiB
+
+CI failed this PR's Custom Rules with *"`docs/implementation-backlog.md` is 27338 lines, over its
+27300-line baseline by 38"* — a number the branch had not caused. Two lines above it, the warning
+added for exactly this purpose named the cause:
+
+```
+base-ref: could not read docs/implementation-backlog.md at origin/main after 3 attempts.
+          git said: spawnSync git ENOBUFS
+```
+
+**`showAtBase` spawned git with no `maxBuffer`, so it inherited `execFileSync`'s 1 MiB default.**
+The backlog is **2.03 MiB**. ENOBUFS is not a path-absent message, so the read was classified
+unreadable, retried three times, and then treated as **absent — which is strict**. The effect is
+that every ratchet reading the repo's largest tracked doc at base has been unable to answer
+*"the base already has this"* for as long as the file has been over 1 MiB.
+
+**It was never intermittent.** It reproduces on demand, in CI and the sandbox alike — it read as a
+flake only because the check it breaks reports a line count rather than the read behind it. One line
+fixes it, matching what `materialiseBaseTree` in the same file already does:
+
+```js
+stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28,
+```
+
+`lineCountAtBase` now returns **27300** — the exact baseline CI reported. The regression test uses
+the real backlog as its witness rather than a synthetic 2 MiB fixture, because the thing that
+regressed is *the repo's largest tracked doc is readable at base*, not a buffer size; it asserts the
+witness exceeds 1 MiB so it cannot silently stop pinning anything. Verified by reverting the fix and
+watching it fail with `base read failed: spawnSync git ENOBUFS`.
+
+**⚠ This is NOT the goals-route flake, and saying so would be the third wrong diagnosis of it.**
+That failure names `app/api/user/goals/route.ts` at **3,870 bytes**, nowhere near the buffer, and its
+run printed **no base-ref warning at all** — whereas this failure always warns. Two separate bugs
+that both end at `atBase === null`. The goals flake remains undiagnosed; what this does change is
+that one of the two paths into that state is now closed, so the next occurrence has one fewer
+explanation to rule out.
+
 ## Not done
 
 - **No product code**, no device run.
@@ -77,5 +115,6 @@ comes back it wants a `Gate: owner` and a note, not a silent re-park.
 
 ## Gate
 
-`pnpm ci:local` — exit 0, **Ran 77 of 77** Custom Rules steps, 803 test files passed. Full log kept,
-not tailed.
+`pnpm ci:local` — exit 0, **Ran 77 of 77** Custom Rules steps, 804 test files passed. Full log kept,
+not tailed. The one `base-ref: could not read` line remaining in it is
+`base-ref-read-failure.test.ts`'s own deliberate bad ref.
