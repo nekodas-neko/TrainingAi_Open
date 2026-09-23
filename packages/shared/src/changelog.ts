@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.20",
+    date: "2026-09-23",
+    changes: [
+      "Opening a friend\u2019s profile, the coach, the collection and the register screen now slide in the way every other screen does. Opening a profile from Friends was the odd one \u2014 it appeared instantly and then slid away when you went back.",
+    ],
+  },
+  {
     version: "1.465.19",
     date: "2026-09-23",
     changes: [

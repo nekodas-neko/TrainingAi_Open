@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useTransitionRouter } from '@/lib/view-transition'
 import { ChevronLeft } from 'lucide-react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
@@ -19,7 +19,7 @@ import type { CollectionResponse } from '@/components/home/collection-card'
  * be dropped, so it is written first and sits above the fold of the rules section.
  */
 export function CollectionContent() {
-  const router = useRouter()
+  const router = useTransitionRouter()
   const [failed, setFailed] = useState(false)
   const data = useCachedValue<CollectionResponse>(
     'collection', '/api/collection', COLLECTION_TTL, { onError: () => setFailed(true) },

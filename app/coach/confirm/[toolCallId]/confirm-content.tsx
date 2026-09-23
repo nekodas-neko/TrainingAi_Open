@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTransitionRouter } from "@/lib/view-transition";
 import { AlertTriangleIcon, CheckIcon, ChevronLeftIcon, ClockIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FIELD_LABEL } from "@/lib/coach/patch";
@@ -27,7 +27,7 @@ const COLOR = {
  * destructive-coloured control in the whole feature.
  */
 export function ConfirmContent({ toolCallId }: { toolCallId: string }) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const [pending, setPending] = useState<PendingChange | null | undefined>(undefined);
   const [consequences, setConsequences] = useState<Consequence[]>([]);
   const [drift, setDrift] = useState<Drift[]>([]);

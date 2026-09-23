@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useTransitionRouter } from '@/lib/view-transition'
 import Link from 'next/link'
 
 export default function RegisterForm() {
-  const router = useRouter()
+  const router = useTransitionRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
