@@ -813,11 +813,30 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   `rolldown@1.0.3` declares `engines.node ^20.19.0 || >=22.12.0`, so its
   `@rolldown/binding-win32-x64-msvc` is skipped at install on 22.9 and vitest throws
   `Cannot find module './rolldown-binding.win32-x64-msvc.node'`.
-- **The fix:** normalise every walked path with `.split(path.sep).join('/')` before comparing (one
-  helper, reused — three scripts carry the same bug); replace step 68's shell pipeline with a Node
-  walk; spawn `npx` portably. For the Node floor, set `engines.node` to `>=22.12` so the mismatch
-  fails at `pnpm install` with a message instead of at test time with a missing binding. The local
-  machine's own upgrade is the owner's.
+- **✅ SHIPPED 2026-09-23** (`fix/dv1-windows-ci-local`). All four, as specified:
+  - **`scripts/lib/repo-path.js`** — one helper, used by the three scripts that shared the bug
+    (`check-sign-out-clears-device`, `check-e2e-stub-dates`, `check-strict-request-schemas`).
+    **⚠ It replaces backslashes unconditionally, NOT `.split(path.sep)` as this entry proposed.**
+    Splitting on `path.sep` only normalises on the platform whose separator it sees, so on Linux it
+    returns a Windows path unchanged — which makes the helper untestable anywhere but Windows. The
+    first draft did that and **its own test caught it**; `scripts/__tests__/repo-path.test.ts` feeds
+    the Windows shape in literally rather than asking the platform for it, because a test built from
+    `path.sep` on this runner would pass against the broken code.
+  - **Step 68's shell pipeline is a Node walk.** Verified to find the **identical 28 files** as the
+    `grep -rl … | grep -v …` it replaces, diffed set against set — a rewrite that quietly narrowed
+    the scan would be worse than the bug.
+  - **`npx` → `npx.cmd` on win32**, named explicitly rather than `shell: true`, which would hand the
+    argument list to a shell for re-parsing.
+  - **`engines.node` is `>=22.12`.** `check-node-version-agreement.js` reads the major and still
+    passes; the local machine's own upgrade is the owner's.
+- **Keep:** **the pass test, which cannot be run from here.** Every fix above is reasoned from the
+  reported failures and verified on Linux, where three of the four bugs are invisible by
+  construction. `pnpm ci:local` on the Windows machine, unpiped, exiting 0, is the only thing that
+  settles it — and that is the Device Verification agent's to run.
+- **Found while fixing it, filed separately as `OR-130`:** `base-ref.js` cannot tell *"absent at
+  base"* from *"could not read the base"* and reports both as the branch's fault. It fires in this
+  shallow clone and failed one gate run on a file identical to `main`. That is also the second
+  instance under `OR-121`, and the only one of the two explained.
 - **Node half resolved on the device machine, 2026-09-23:** upgraded to 22.23.2 (winget
   `OpenJS.NodeJS.22`) and `pnpm exec vitest run` starts. The `engines.node` floor is still worth
   setting so the next machine fails at install, not at test time.
@@ -826,6 +845,12 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   script and inherits its path bug; `check-comment-blindness.test.ts`'s `check-hex-literals` case
   times out at 30 s — three full scans of `app/` + `components/`, which Windows' filesystem makes
   slower. Measure before raising the timeout.
+- **⚠ The first of those two is FIXED by the shipped work above** — `strict-schema-inert.test.ts`
+  shells out to `check-strict-request-schemas.js`, so normalising that script's keys fixes the test
+  with it. **The hex-literal timeout is NOT**, and it is the one thing from the device machine still
+  outstanding here: three full scans of `app/` + `components/` against a 30 s limit, which Windows'
+  filesystem makes slower. **Measure before raising the timeout** — a scan that is genuinely three
+  times slower than it needs to be is the finding, and a bigger number would hide it.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
@@ -18171,10 +18196,70 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   its batch count matches the `drain complete` log line. Incremental drains deliberately do not
   notify — hourly is too often to be worth a notification, and nobody is waiting on one.
 
+### [platform] OR-130 — a ratchet that cannot read its base blames the branch instead of saying so
+
+- **Lane: O** — `scripts/lib/base-ref.js`. **Added:** 2026-09-23, diagnosed while shipping DV-1.
+- **The conflation, confirmed by direct call rather than inferred.** `fileAtBase` returns `null` for
+  two different facts: *"the file does not exist at the base"* (which means the branch added it — a
+  real violation) and *"I could not read the base"* (which means nothing is known). `verdict` maps
+  `atBase === null` to **`fail`**, so the second becomes an accusation.
+  ```
+  fileAtBase('nosuchref', 'package.json')          -> null
+  verdict({ count: 1, limit: 0, atBase: null })    -> 'fail'
+  ```
+- **It fires here, intermittently, and it cost a gate run.** This clone is **shallow**, so
+  `git show origin/main:<path>` can fail when the blob is not in the pack. On 2026-09-23 a full
+  `pnpm ci:local` failed on `app/api/user/goals/route.ts` — a file **byte-identical to `main`** —
+  and the identical tree passed on a re-run. That is the second instance recorded under `OR-121`,
+  and the only one of the two that is explained.
+- **Why it matters more than one red run.** `base-ref.js` exists precisely so a branch is judged on
+  *what it changed*, not on what `main` already carries — its own header says a ratchet that asks
+  the wrong question *"read as 'your change was too big' when the change was eleven lines"*. This
+  defect reintroduces that failure through the back door, non-deterministically, which is worse: a
+  gate that accuses at random teaches the session reading it to stop believing it.
+- **The fix.** Distinguish the two cases — `fileAtBase` reports *unreadable* separately from
+  *absent* (a sentinel, or a second return) — and `verdict` refuses to return `fail` on unreadable,
+  returning `'unknown'` and letting the caller print *"could not read the base; not judged"*.
+  **Every caller of `countAtBase`/`lineCountAtBase`/`materialiseBaseTree` needs the same treatment**,
+  since they all funnel through the same `null`.
+- **⚠ Decide the CI case before writing it, because it inverts the argument.** CI checks out at
+  depth 1 (recorded in `CLAUDE.md`'s backlog-conflict rule), so if the base is unreadable *there*
+  too, "do not fail on unreadable" silently disables the ratchet everywhere rather than just
+  locally. **Measure what `resolveBaseRef`/`fileAtBase` actually return in a CI run first** — on a
+  `pull_request` `actions/checkout` gives the merge commit, which may make the base readable even at
+  depth 1. If CI can read it and only local cannot, the fix is safe and local stops lying. If
+  neither can, the honest fix is a louder failure with instructions, not a quieter one.
+- **Verification:** force the failure (`fileAtBase` against an unreachable ref) and confirm the
+  check prints "could not read the base" rather than naming an innocent file; then confirm on a
+  real CI run that the ratchet still fails a branch that genuinely adds one.
+
 ### [platform] OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away
 
 - **Lane:** O — the local gate and how it is invoked, not product code.
 - **Added:** 2026-09-20, Orchestrator, during OR-120.
+- **✅ A SECOND OCCURRENCE ARRIVED 2026-09-23, AND IT IS DIAGNOSED — but it is a DIFFERENT script,
+  so it does not explain the first one.** Read both halves of that sentence.
+  - **What happened.** A full `pnpm ci:local` failed once on `scripts/__tests__/strict-schema-inert.test.ts`,
+    which spawns `check-strict-request-schemas.js`. It passed alone, passed with the other 27
+    `scripts/__tests__` files, and passed on a clean full re-run. **The run was NOT piped this
+    time** — per this entry's own instruction — so the diagnostic survived, and it was decisive:
+    *"app/api/user/goals/route.ts has 1 non-strict request schema and is not in the baseline."*
+  - **That file is byte-identical to `main`.** `git diff origin/main -- app/api/user/goals/route.ts`
+    is empty, so the branch added nothing and the check should have read `inherited`.
+  - **The mechanism, confirmed rather than guessed.** `fileAtBase` in `scripts/lib/base-ref.js`
+    returns `null` for BOTH "the file does not exist at the base" and "I could not read the base",
+    and `verdict` turns `atBase === null` into **`fail`**. This clone is shallow
+    (`git rev-parse --is-shallow-repository` → `true`), so `git show origin/main:<path>` can fail
+    transiently when the blob is not in the pack — and a transient read failure is reported as
+    *"your branch added this"*. Verified directly: `fileAtBase('nosuchref', 'package.json')` → `null`,
+    and `verdict({count:1, limit:0, atBase:null})` → `'fail'`.
+  - **Filed as `OR-130` with the fix.** A ratchet that cannot read its base must say so, not blame
+    the branch.
+  - **⛔ It does NOT close the first instance.** That one was `check-tz-aware-cache-guards.js`, which
+    does not use `base-ref` at all — a grep for `resolveBaseRef` across both scripts matches only
+    `check-strict-request-schemas.js`. Two flakes of similar *shape* are not evidence of one cause,
+    and recording them as one would retire an open question on a resemblance. **The first instance
+    stays unexplained.**
 - **⚠ Filed as UNEXPLAINED, not as a flake.** `CLAUDE.md`'s own standing rule for faults that stop
   on their own — *"something that stopped is not something that was fixed"* — is why this exists
   rather than being waved through.

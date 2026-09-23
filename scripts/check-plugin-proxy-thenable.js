@@ -24,14 +24,41 @@
  * `lib/colmi-ble/ble.ts` and `lib/live-hr/chest-strap-source.ts` return it safely and are listed
  * below with that reason.
  */
-const { readFileSync } = require('fs')
-const { execSync } = require('child_process')
+const { readFileSync, readdirSync } = require('fs')
+const path = require('path')
 const { findProxyReturns } = require('./lib/plugin-proxy-scan.js')
+const { toPosix } = require('./lib/repo-path')
 
-const files = execSync(
-  "grep -rl \"import('@capacitor\" --include='*.ts' --include='*.tsx' app components lib packages 2>/dev/null | grep -v '__tests__' || true",
-  { encoding: 'utf8' },
-).split('\n').filter(Boolean)
+// DV-1: this was a `grep -rl … | grep -v …` shell pipeline, which **cannot run on Windows at all**
+// — under `cmd.exe` it dies with "The system cannot find the path specified." The Device
+// Verification agent runs on Windows next to the phone, so the one rule here that needed a real
+// shell was the one rule it could never execute. A Node walk has no such dependency and is no
+// slower at this size: four roots, `.ts`/`.tsx` only.
+const ROOTS = ['app', 'components', 'lib', 'packages']
+const NEEDLE = "import('@capacitor"
+
+function collect(dir, out) {
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return out // a root that does not exist is not a failure — `grep` treated it the same way
+  }
+  for (const e of entries) {
+    const full = path.join(dir, e.name)
+    if (e.isDirectory()) {
+      if (e.name === 'node_modules' || e.name === '__tests__') continue
+      collect(full, out)
+    } else if (e.name.endsWith('.ts') || e.name.endsWith('.tsx')) {
+      // The path is a KEY here: it is printed for a human to open, so it must read the way the
+      // repo writes one rather than the way this platform joins one.
+      if (readFileSync(full, 'utf8').includes(NEEDLE)) out.push(toPosix(full))
+    }
+  }
+  return out
+}
+
+const files = ROOTS.reduce((out, r) => collect(r, out), [])
 
 const offenders = findProxyReturns(files.map((file) => ({ file, src: readFileSync(file, 'utf8') })))
 
