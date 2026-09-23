@@ -62,7 +62,36 @@ the manifest's own debuggable flag, so a release APK can never expose the socket
 node scripts/device/probe.js                         # read-only: platform, real insets, a screenshot
 node scripts/device/record.js 1500 --tap '#open'     # frames over time, with the ms each one landed
 node scripts/device/tour.js [routes.json]            # walk a set of screens, capture each
+node scripts/device/sweep.js [routes.json]           # P4: clearance, overflow, <44px, truncate+flex, nesting
+node scripts/device/census.js [--rounds 2 --dwell 25 --idle-min 30]   # P2 + P7 + P10 in one walk
+node scripts/device/selftest.js                      # the harness against a local fixture — no phone
 ```
+
+**Two drivers.** `cdp.js` is the dependency-free original. `pw.js` is Playwright's
+`connectOverCDP` on the same socket (it attaches — see *What the first run corrected*) and is what
+the probes are built on: `attach()` returns a device with `state()`, `tap()`, `tab()`, `back()`,
+`go()`, `recordNetwork()`, `recordConsole()`, `watchAfter()`, `offline()`, `metrics()`,
+`instrumentTimersAndReload()`, `localQuery()` and `shot()`. Its `tap` keeps both of `cdp.js`'s
+paid-for rules — hit-test before touching — and drops the centring, so a scroll check is not
+measuring an offset the harness chose.
+
+**Probe → tool** (`docs/device-agent-probe-checklist.md`):
+
+| probe | tool |
+|---|---|
+| P1 invalidation | `watchAfter(write, surfaces, { thenTab })` — the write is driven by hand in the sitting |
+| P2 fetch-once, P7 console, P10 long session | `census.js` |
+| P3 local store | `localQuery()` — SELECT/PRAGMA only; this is the owner's real store |
+| P4 computed styles | `sweep.js` |
+| P5 transition frames | `record.js --tap` |
+| P6 repeat-visit paint | `record.js` from a tab tap, first frame with content |
+| P8 offline | `offline(true)` — page network only; the native BLE ingest is not affected |
+| P9 route census | `tour.js` plus tapping, never typed URLs |
+
+`selftest.js` proves the driver's own logic in a desktop Chrome through the same `connectOverCDP`
+path (18 checks, 2026-09-23). It proves nothing about the WebView — the Android back, the local
+SQLite and the real inset are only settled on the phone. `sweep.js` and `census.js` have **not
+run on the phone yet**.
 
 Run `probe.js` first; if it cannot connect, nothing else here will either. It changes nothing.
 `ADB_PATH` and `DEVICE_CDP_PORT` override the `adb` binary and the forwarded port;
