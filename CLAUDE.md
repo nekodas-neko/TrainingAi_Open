@@ -418,16 +418,29 @@ handles it. Consequences and rules:
   docs** (they don't cover the BLE protocol). The `oura-native-ble` skill was the second source
   and is gone from this repo; where a code comment still cites it, the Rust source is the one to
   reach for. Every ported builder/decoder is pinned to a captured test vector.
-- **`oura_raw_samples.body_hex` is the archival source of truth — on the *server*.** The ring's
-  history buffer is finite and the sync cursor only moves forward — a decoder added later can only
-  back-fill by re-decoding stored hex, never by re-draining. Never prune or mutate the **server**
-  copy of `body_hex`; protocol fixes ship as decoder changes + a redecode pass. (Until D4's
+- **The raw bytes on the SERVER are the archival source of truth — but they are in
+  `oura_raw_packed.blob` now, not `oura_raw_samples.body_hex`.** ⚠ This line named `body_hex` until
+  2026-09-23 and had been wrong since the packer shipped (Q-541 Task 4); the correction is OR-126's,
+  measured against production. **`oura_raw_samples` is a 7-day HOT WINDOW** (`HOT_WINDOW_DS`) —
+  189,263 rows across an 8-day span holding **4.5 MB** of hex — and the packer moves each sealed
+  bucket into one compressed blob, **verifying by read-back and unpack before it deletes anything**.
+  The archive is **1,467 rows, 1,811,765 frames, 25 MB**. Readers
+  (`lib/data/postgres/slices/oura-raw-frames.ts`) span both tiers, so nothing outside the packer
+  needs to know which side a frame is on. **The consequence for anyone reasoning about retention:
+  "drop `body_hex`" now means "drop a week of scratch", and "drop the archive" means
+  `oura_raw_packed`.** The full measurement, and the case for keeping it, is
+  [`docs/oura-raw-archive-retention-brief.md`](docs/oura-raw-archive-retention-brief.md).
+  The ring's history buffer is finite and the sync cursor only moves forward — a decoder added later
+  can only back-fill by re-decoding stored bytes, never by re-draining. Never prune or mutate the
+  **server** archive; protocol fixes ship as decoder changes + a redecode pass. (Until D4's
   owner-confirmed cutover moves that archive to the device, at which point this PR rewrites the
-  rule.) **The device-local copy is deliberately transient** — a 14-day rolling window, per the
-  owner's 2026-08-02 retention decision (`2026-08-02-native-convergence-goal-layout.md` §4 Stage
-  1a): raw frames are input to the on-device rollup, not an archive, and an uncapped local store
-  would reach ~1.2 GB/year at the measured ~3.2 MB/day. Local pruning is local-only and must never
-  reach a server delete or a sync decision.
+  rule.) **The device-local copy is MEANT to be transient — a 14-day rolling window, per the owner's
+  2026-08-02 retention decision — and ⚠ that window HAS NOT SHIPPED** (`projectOverview.md`):
+  `pruneRaw` has no caller, and its predicate needs `rolled_up = 1`, which only D2 Task 5 sets.
+  Measured on-device 2026-08-18: **209,326 rows, 0 rolled up, 31.2 MB**, growing at ~3.4 MB/day, and
+  past Android Auto Backup's 25 MB quota so none of it is backed up. **Do not cite the device as a
+  surviving copy of anything until that lands.** Local pruning is local-only and must never reach a
+  server delete or a sync decision.
 - **The history cursor may only advance past events that are durably ingested (server 2xx).**
   Advancing on the ring's batch completion alone silently loses the drained span forever
   (found in review `docs/reviews/2026-07-07-oura-ble-system-review.md` BLE-1). Re-sends are
