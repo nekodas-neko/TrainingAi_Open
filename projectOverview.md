@@ -2598,6 +2598,23 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep][platform] ⚠️ `minutesFromNoon` read the device's clock, and its test only passed in UTC (DV-7, 2026-09-23)
+
+`minutesFromNoon(iso, tz?)` fell back to `d.getHours()` — the **device's** timezone — which is the
+pattern the Timezone section bans. It hid twice over: CI runs in UTC, and the owner's phone sits in
+the zone the data was recorded in. On a machine set to Brisbane the file's own tests failed by
+exactly **600 minutes**, the UTC↔Brisbane offset. The test encoded the same assumption it should
+have caught, asserting that the explicit-tz result differs from the no-tz one — true only off
+Brisbane. `tz` now defaults to `DEFAULT_TZ` and the device path is gone; every case pins its zone on
+both sides and passes under UTC, Brisbane, New York and `Etc/GMT-13` alike. Both server callers
+already passed `tz`. The sleep-timing chart was pulled along with it: it plotted bedtime through this
+helper and wake through its own device-local read, which a red consumer test exposed
+(`expected '9:30 AM' to be '11:30 PM'` — its fixtures were bare local-time strings). `timingPoints`
+now takes a `tz` and resolves both modes through one clock. **LB-131 carries what is left** — the
+card still takes the default, so every user gets Brisbane rather than their own zone, which ships
+with DV-9. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-dv7-sleep-consistency-timezone.md`](docs/overview/entries/2026-09-23-lane-a-dv7-sleep-consistency-timezone.md).
+
 ### [platform] ⚠️ 162 test files can delete a user under a running migration; two are now guarded (DV-3, 2026-09-23)
 
 The `migrationTestLock` advisory lock serialises the sixteen **migration** tests against each
