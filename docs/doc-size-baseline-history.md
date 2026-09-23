@@ -15749,3 +15749,26 @@ independent filing of the ⛔ parser bug, after `LA-49` (2026-09-01) and alongsi
 it quotes the glyph as evidence and was parked by the bug it describes. **A finding that reaches a
 human gets answered; a finding that hides itself gets re-derived, and each re-derivation pays the
 investigation again.**
+
+## 2026-09-22 — `projectOverview.md` → 12403 (RV-105)
+
+The backlog shrinks by RV-105's entry and the overview gains a block. Most of that block is spent on
+two things the diff cannot say for itself.
+
+The first is a correction that cost nothing to make and would have cost a lot to inherit: the entry
+says four of sweep 53's five freshness findings are this shape, and **two are**. RV-104 and RV-107
+are `nutrition-content.tsx`'s `useCallback` shape, which this script excludes deliberately — and
+counting it is exactly what inflated its baseline by 11 of 25 the first time. A later session
+reading "four of five" would treat the remaining two as a gap in the check rather than as a
+different bug class.
+
+The second is the number: widening the fetch-once gate takes the tracked population from 11 sites to
+25. The entry could not state that — it said outright that its four motivating findings were found
+by hand and that no candidate scan had been run — and without it the change reads as a one-line
+regex tweak rather than a re-baseline of twenty files.
+
+The third is the limit. This widened the lens; it did not audit what the lens revealed. All 14 new
+sites went into the baseline, four of them the sync provider's sanctioned warm pass, and three more
+still need judging by where they mount. Recording that here matters because the next reader will see
+25 tracked sites and a green check and conclude the ground is covered. It is not; RV-104, RV-106,
+RV-107 and RV-109 are the entries that own those verdicts.

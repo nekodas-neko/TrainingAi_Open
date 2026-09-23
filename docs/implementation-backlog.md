@@ -890,27 +890,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   show", and `useCachedValue`'s `onError` renders an error state. Ungating it would replace good
   cached data with error cards across the app.
 
-### [platform] RV-105 — `check-fetch-once-effects.js` cannot see the shape that produced four of this sweep's findings
-
-- **Lane:** A — `scripts/check-fetch-once-effects.js:164`. **Added:** 2026-09-22 · Review sweep 53.
-- The gate is `if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(...)) continue;` — **only an empty dependency
-  array counts.** Its comment states the rationale: *"a non-empty one re-runs when its deps change,
-  which is a different (and usually correct) shape."*
-- **That reasoning is sound in general and wrong for this app.** Inside the persistent tab shell,
-  `[userId]`, `[today]` and `[trendsProp]` never change either, so those effects are fetch-once in
-  every way that matters. **Four of the five freshness findings in this sweep (RV-104, RV-106,
-  RV-107, RV-109) are that shape, and all four are invisible to the ratchet.**
-- **⚠ Widening the pattern is NOT a one-line change, and the file says why.** Its header records
-  that the first version used a non-greedy regex, swallowed unrelated code between effects, and
-  **inflated its own baseline by 11 of 25**. The brace-matching it uses now is the fix for that.
-  Extending to stable-deps needs a judgement about *which* deps are stable — `[userId]` on a
-  persistent screen is, `[date]` on a sheet that remounts per open is not (`week-day-sheet.tsx` is
-  the legitimate counter-example).
-- **Fix, narrowly:** treat a dep array containing **only** identifiers known to be shell-stable
-  (`userId`, `tz`, `today`) as fetch-once, re-baseline, and leave everything else alone.
-- **Not established:** how many *new* sites a widened pattern would surface — the four above were
-  found by hand, not by a candidate scan.
-
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
 - **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
