@@ -2660,6 +2660,30 @@ the recommendation without updating the test's mock; two of the six still report
 trivially and one **vacuously**. #1472 fixed it concurrently. The red commit was inherited, not
 caused, by #1467 — but nothing signalled it.
 
+### [nutrition][platform] ⚠️ A food you deleted could come back — fixed, not yet checked on the phone (DV-15, 2026-09-24)
+
+Delete a food within a few seconds of logging it and it could **reappear in the day's list and stay
+there**, adding calories the server does not count. It happened on the S25 during sweep 2: a cocoa
+powder entry sat in Lunch for over a minute, through tab swaps, while the server had already deleted
+it.
+
+**Why.** Deleting writes a "deleted" marker on the phone and queues it. When the server confirms,
+the phone marks the row as in-sync but keeps it. If a refresh that started *before* the delete then
+lands, it carries the food as it was — not deleted — and the phone accepts it, wiping the marker.
+Worse, the row is now flagged as already-synced, so nothing ever pushes it again.
+
+**Fixed:** a refresh can no longer undo a delete the phone has already recorded. Nine places did the
+same thing and all nine now carry the guard — food, supplements and their logs, injuries, mood,
+body metrics, fitness tests, prescribed runs and daily check-ins.
+
+**Still owed:** the on-device check (log and delete a food five times in quick succession, confirming
+the deletion sticks each time). The race was reproduced exactly in a test, but the test reproduces
+the database behaviour, not the real timing between your phone and the server.
+
+**One narrower gap is deliberately left open** and recorded: if the phone has already discarded the
+row entirely before the stale refresh arrives, there is nothing left to protect it. Closing that
+needs a storage change rather than a one-line guard.
+
 ### [platform] ⚠️ Your fixes are merging but not reaching you — production is about ten hours behind (DV-14, 2026-09-24)
 
 **Measured 06:30 AEST: the live app reports v1.465.17. `main` is at v1.465.22.** 1.465.17 went in at
