@@ -518,6 +518,15 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
+- **📱 MEASURED ON THE S25 (food rows only), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. **Log a food:** the write goes
+  local-first + `POST /api/sync/push`; within 3 s `energy-balance`, `weekly-summary` and
+  `day-timeline` are each requested **twice** (once before the push, once after), the diary row
+  appears — and **Nutrition's "kcal left" never moves** (BF-177, FAILED, with the trace). **Home's
+  nutrition card** (read in its hidden panel) stays at the old intake until Home is shown, then
+  updates. **Delete a food:** same two batches; the card shows the right number only because it was
+  already stale. **COULD NOT CHECK this sitting:** weigh-in, macro targets, activity confirm,
+  workout completion, ring sync, and every row offline.
+
 - **Verify:** device — **and there is no build half.** This entry's entire work is the measurement;
   nothing is waiting to be implemented and nothing is blocked on it. Method: **P1** in
   [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
@@ -533,6 +542,13 @@ below threshold and left in place for next time.
   reversible rows (log then delete a food), and record a refused row as COULD NOT CHECK.
 
 ### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
+
+- **📱 BASELINE ON THE S25, 2026-09-23 — the write half is still owed.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js`, two
+  and three rounds, **no writes**: 41 `/api` endpoints. Without a write between visits a well-built
+  shell *should not* refetch, so "fetched on one visit of two" is not a defect here and the census's
+  `neverReRuns` flag is not a verdict. What it does show: `body-metadata` (6×) and
+  `workout-data` (5×) refetch on every tab visit. The P2 answer needs one write per tab during the
+  walk — next sitting, with the owner's approved write types.
 
 - **Verify:** device — no build half; the measurement is the work. Method: **P2**.
 - **The falsifiable claim:** over a fixed 5-minute walk (Home → Nutrition → Health → Workout → More,
@@ -555,6 +571,17 @@ below threshold and left in place for next time.
 
 ### [body][devices] RV-126 — DEVICE PROBE: the local-store write path, which no sandbox can execute
 
+- **📱 MEASURED ON THE S25, 2026-09-23 — the first read of the on-device store.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js`
+  `localQuery` through the app's own `CapacitorSQLite` connection (SELECT only). **Every
+  offline-first log table carries `deleted_at`** (food, supplements, activity, mood, body metrics,
+  injuries). **Food renders offline:** `food_logs` holds `food_item_id` and the local `food_items`
+  (339 rows) holds name, brand and macros. **Deletes are tombstoned** — three test deletes kept their
+  rows with `deleted_at` set. **But a pushed row does not always return to `synced`:** all **33**
+  tombstoned food logs (since 2026-08-19) sit at `sync_status='pending'` with the outbox **empty**,
+  and one set log has been `pending` since 2026-09-19 although the server has it — filed as
+  **DV-5**. **COULD NOT CHECK:** the weigh-in eviction question RV-108 turns on (no weigh-in was
+  written this sitting).
+
 - **Verify:** device — no build half. Method: **P3**.
 - **The falsifiable claim, three parts.** (a) A weigh-in evicts the body-metric cache keys **and**
   `invalidateBiometrics` fires from the `pushMutations` → `pullDelta` round trip on the device that
@@ -568,6 +595,20 @@ below threshold and left in place for next time.
 - **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
+
+- **📱 MEASURED ON THE S25, 2026-09-23 — every claim, including clearance.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `sweep.js` over
+  13 routes (tab roots + cardio, health/day, health/readiness, more/details, more/settings,
+  more/about, more/devices, program). **Clearance:** the only bottom-anchored control on any route is
+  the tab bar; its computed `padding-bottom` equals the inset (15px, gap 0) — it clears exactly.
+  **`truncate` on flex: 0. Nested interactives: 0.** **Under 44px, counting the invisible
+  `.tap-target-44`/`-dot` touch boxes:** the `tap-target-dot` session dots on Workout (24×44, by
+  design per `globals.css`) and three **318×21 inputs on `/more/details`** (display name, birth year,
+  height) — not judged; whether their row or label widens the target is the next question.
+  **Horizontal overflow:** content spilling with `overflow-x: visible` exists (`/program` card
+  text runs 70px past its column into the empty space under the action icons; Home's week strip 8px
+  into the gutter, aligned with the cards) — **looked at on screen: neither overlaps anything**.
+  Clipped overflow (`hidden`, working `truncate`) is by design. Found alongside it: **DV-4**
+  (a sleep-stage colour used as text) and **DV-6** (no status-bar backing).
 
 - **Verify:** device — no build half. Method: **P4**. `tour.js` already emits part of this digest.
 - **The falsifiable claims:** no element overflows horizontally at 384 px (`scrollWidth >
@@ -604,6 +645,14 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
 
+- **📱 MEASURED ON THE S25 (walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Two `census.js` walks (10 and 15
+  visits): **0 non-2xx and 0 failed requests** of 161. Console, the full list: **499×** *"Rendering
+  was performed in a subtree hidden by content-visibility"* (Chrome then suppresses it — so the real
+  count is higher), and **4 font files × 10** *"preloaded using link preload but not used within a
+  few seconds"*. The first says something forces layout **inside the hidden tab panels** about 50
+  times a visit — work done for screens nobody is looking at; the harness's own reads are ~1 per
+  visit, so it is the app's. Unattributed. **COULD NOT CHECK:** the resume-after-background half.
+
 - **Verify:** device — no build half. Method: **P7**.
 - **The falsifiable claim:** a full walk produces no repeated console error, and no `/api/*` request
   returns non-2xx. Send the **grouped counts**, not a summary — a warning firing 400 times is a
@@ -615,6 +664,17 @@ below threshold and left in place for next time.
   return. The counts say Home is where this bites and **nobody has ever watched it happen.**
 
 ### [platform][nutrition] RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
+
+- **📱 MEASURED ON THE S25, 2026-09-23 — mostly clean.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js` `offline(true)`
+  (`navigator.onLine` false, page fetches fail). Food, one domain only: logged offline, **row on
+  screen in 256 ms** with a "logged" toast, **one pending `food_logs` mutation** in
+  `mutations_outbox`. Walking all five tabs offline: **no blank tab, no skeleton, no alert** (text
+  present on each). Back online: **first push after 2.0 s, outbox drained**, row still there.
+  **No offline banner appeared on any tab** — likely because the app reads Capacitor's network
+  plugin rather than the page, which this emulation does not reach; unresolved. **COULD NOT
+  CHECK:** survives a force-stop while offline (a restart drops the emulation — needs real airplane
+  mode, which is the owner's toggle), the other five domains, and flicker on reconnect (only the
+  end state was read). "kcal left" stayed stale throughout — BF-177.
 
 - **Verify:** device — no build half. Method: **P8**. Use CDP's network override rather than
   airplane mode, so it can flip mid-action.
@@ -640,6 +700,13 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-133 — DEVICE PROBE: what the shell accumulates over a long session
 
+- **📱 MEASURED ON THE S25 (the walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js --rounds 3 --dwell 15`
+  from a cold reload: heap / listeners / DOM nodes / live timers — start **21.9 MB · 608 · 1302 ·
+  4 intervals**; after round 1 **30.1 · 1468 · 5452 · 5**; round 2 **32.8 · 1628 · 5453 · 5**; round 3
+  **30.6 · 1628 · 5453 · 5**. Round 1 is every tab mounting for the first time; round 2 adds 160
+  listeners once; **round 3 is flat on every count. No accumulation across the walk.** The 30-minute
+  idle half is **COULD NOT CHECK** — the phone disconnected before it ran.
+
 - **Verify:** device — no build half. Method: **P10**.
 - **The falsifiable claim:** across the 5-minute walk and then 30 minutes idle, JS heap, listener
   count by type, and live `setInterval`/`setTimeout` handles all **stabilise rather than only
@@ -647,6 +714,58 @@ below threshold and left in place for next time.
   and after the idle period.
 - The tab shell never unmounts, so anything registering without cleanup accumulates for the life of
   the app — and the app is resumed far more often than it is cold-started (see RV-130's numbers).
+
+### [sleep][app-shell] DV-4 — Home's Sleep card prints the Deep hours in the Deep stage colour, which is about 1:1 against the card
+
+- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend, ~line 143).
+- **Added:** 2026-09-23 · Device Verification, found during the P4 sweep (RV-127).
+- **❌ Measured on the S25.** Web v1.465.4 / APK 1.460.4, dark theme. The legend's value spans are
+  coloured with `STAGE_COLOR.<stage>` (`packages/shared/src/health/hypnogram.ts`): Deep's
+  **"0.5h" computes to `rgb(30, 58, 112)`**. The page root behind the card is `oklch(0.145 0.02 215)`
+  (≈ `rgb(9,22,26)`), giving **≈1.6:1**; against the card's purple paint in the screenshot it is
+  **≈1:1** — the number is effectively invisible. REM, Light and Awake pass only because their stage
+  colours happen to be light. CLAUDE.md's floor is 4.5:1 for body text.
+- **Why a palette fix will not hold:** the card's background is **owner-customisable**
+  (`ColorSwatchPicker`, `cardColors.sleepWidget`), so no stage colour is safe as text on every card
+  colour. Stage colours are fills — keep them on the dot and the stacked bar, and render the hours in
+  a foreground token. Sibling check: `hypnogram.tsx` and `sleep-phase-trend-card.tsx` also import
+  `STAGE_COLOR`; the latter uses it as a bar fill (fine), the former was not read.
+- **Pass test:** on the S25, every legend value on the Sleep card reads ≥ 4.5:1 against the card, in
+  dark and light, with the default card colour and one custom colour.
+
+### [platform] DV-5 — pushed rows are left at `sync_status='pending'`, so every later pull skips them
+
+- **Lane:** A — `lib/local-store/**` (whatever confirms a pushed mutation), `lib/data/postgres/adapter.ts` if the confirm depends on the push response.
+- **Added:** 2026-09-23 · Device Verification, from the first read of the on-device store (RV-126).
+- **Measured on the S25 (read-only `localQuery`).** `mutations_outbox` is **empty**, yet
+  **all 33 tombstoned `food_logs` rows (2026-08-19 → today) are `sync_status='pending'`** and none
+  is `synced`; three of them are this sitting's test deletes, whose pushes returned **200**. One
+  `set_logs` row (set 4, Chest-Supported Dumbbell Row, 10 kg × 12, 2026-09-20) has been `pending`
+  since 2026-09-19 22:41 UTC — and **the server has that set** (`/api/exercise-history` lists it), so
+  nothing was lost. Its local `exercise_logs.workout_session_id` (`a1847680…`) is not in the local
+  `workout_sessions` table, while the server's session that day is `0a2afbf9…` — worth reading in
+  the same pass.
+- **Why it matters even though no data was lost:** CLAUDE.md's pull rule is that `applyDelta` never
+  overwrites a row unless it is `synced`, which protects pending local edits. A row that is
+  *permanently* pending is therefore **immune to every later server correction** — harmless for a
+  tombstone, not harmless for a live row like that set.
+- **Not established:** whether live (non-deleted) food rows ever stay pending — none did today — or
+  what the confirm step keys on. Read the confirm path before assuming the cause.
+- **Pass test:** after a push drains the outbox, no row the push carried is still `pending`
+  (`SELECT count(*) … WHERE sync_status='pending'` against an empty outbox returns 0).
+
+### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
+
+- **Lane:** B
+- **Gate:** owner — a design call (whether to add a scrim), not a defect by a rule.
+- **Added:** 2026-09-23 · Device Verification, seen on the S25 during the P4 sweep.
+- **What the screen shows:** on Home, scrolled, the energy bar's caption (*"Energy left right now —
+  opens at your readiness…"*) passes behind the status bar's clock and icons with nothing between
+  them. Edge-to-edge apps usually put a gradient or blur behind the status bar once content is
+  scrolled under it. The app's full-screen headers use `pt-safe`; the tab roots scroll to the top.
+- **The owner's question:** a scrim behind the status bar on scroll, or leave it. If yes, it belongs
+  in the shell once, not per screen.
+
 
 ### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
 
@@ -694,11 +813,30 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   `rolldown@1.0.3` declares `engines.node ^20.19.0 || >=22.12.0`, so its
   `@rolldown/binding-win32-x64-msvc` is skipped at install on 22.9 and vitest throws
   `Cannot find module './rolldown-binding.win32-x64-msvc.node'`.
-- **The fix:** normalise every walked path with `.split(path.sep).join('/')` before comparing (one
-  helper, reused — three scripts carry the same bug); replace step 68's shell pipeline with a Node
-  walk; spawn `npx` portably. For the Node floor, set `engines.node` to `>=22.12` so the mismatch
-  fails at `pnpm install` with a message instead of at test time with a missing binding. The local
-  machine's own upgrade is the owner's.
+- **✅ SHIPPED 2026-09-23** (`fix/dv1-windows-ci-local`). All four, as specified:
+  - **`scripts/lib/repo-path.js`** — one helper, used by the three scripts that shared the bug
+    (`check-sign-out-clears-device`, `check-e2e-stub-dates`, `check-strict-request-schemas`).
+    **⚠ It replaces backslashes unconditionally, NOT `.split(path.sep)` as this entry proposed.**
+    Splitting on `path.sep` only normalises on the platform whose separator it sees, so on Linux it
+    returns a Windows path unchanged — which makes the helper untestable anywhere but Windows. The
+    first draft did that and **its own test caught it**; `scripts/__tests__/repo-path.test.ts` feeds
+    the Windows shape in literally rather than asking the platform for it, because a test built from
+    `path.sep` on this runner would pass against the broken code.
+  - **Step 68's shell pipeline is a Node walk.** Verified to find the **identical 28 files** as the
+    `grep -rl … | grep -v …` it replaces, diffed set against set — a rewrite that quietly narrowed
+    the scan would be worse than the bug.
+  - **`npx` → `npx.cmd` on win32**, named explicitly rather than `shell: true`, which would hand the
+    argument list to a shell for re-parsing.
+  - **`engines.node` is `>=22.12`.** `check-node-version-agreement.js` reads the major and still
+    passes; the local machine's own upgrade is the owner's.
+- **Keep:** **the pass test, which cannot be run from here.** Every fix above is reasoned from the
+  reported failures and verified on Linux, where three of the four bugs are invisible by
+  construction. `pnpm ci:local` on the Windows machine, unpiped, exiting 0, is the only thing that
+  settles it — and that is the Device Verification agent's to run.
+- **Found while fixing it, filed separately as `OR-130`:** `base-ref.js` cannot tell *"absent at
+  base"* from *"could not read the base"* and reports both as the branch's fault. It fires in this
+  shallow clone and failed one gate run on a file identical to `main`. That is also the second
+  instance under `OR-121`, and the only one of the two explained.
 - **Node half resolved on the device machine, 2026-09-23:** upgraded to 22.23.2 (winget
   `OpenJS.NodeJS.22`) and `pnpm exec vitest run` starts. The `engines.node` floor is still worth
   setting so the next machine fails at install, not at test time.
@@ -707,6 +845,12 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   script and inherits its path bug; `check-comment-blindness.test.ts`'s `check-hex-literals` case
   times out at 30 s — three full scans of `app/` + `components/`, which Windows' filesystem makes
   slower. Measure before raising the timeout.
+- **⚠ The first of those two is FIXED by the shipped work above** — `strict-schema-inert.test.ts`
+  shells out to `check-strict-request-schemas.js`, so normalising that script's keys fixes the test
+  with it. **The hex-literal timeout is NOT**, and it is the one thing from the device machine still
+  outstanding here: three full scans of `app/` + `components/` against a 30 s limit, which Windows'
+  filesystem makes slower. **Measure before raising the timeout** — a scan that is genuinely three
+  times slower than it needs to be is the finding, and a bigger number would hide it.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
@@ -1370,7 +1514,10 @@ nothing structured saying why — and a human decides.
   PRs landing between mine. **The fix that does is item 5's alternative — generate the baselines in CI
   rather than committing them — which needs its own entry and the owner's yes on changing the ratchet.**
 
-**3. Q-28, BF-9 and BF-7 carry NO `Gate:` field.** (unblocks all three)
+**3. ~~Q-28, BF-9 and BF-7 carry NO `Gate:` field.~~ ✅ ANSWERED 2026-09-22: all three RELEASED.**
+  The owner chose release over gating, on this item's own argument — a rule living in a scheduled
+  prompt rather than in the file every agent reads goes stale unnoticed. **The Lane A prompt's
+  exclusion list should stop naming them.** Original text follows.
   `check-backlog-pointers.js` sees them as ordinary startable work. They are held back only by an
   exclusion list inside the Lane A routine prompt — a convention living in a scheduled prompt rather
   than in the file every agent reads, which is exactly the kind of thing that goes stale unnoticed.
@@ -1378,10 +1525,16 @@ nothing structured saying why — and a human decides.
   request and the cheapest of the three.
 
 **4. Q-29 Task 5 is a destructive drop of the server raw archive.** (unblocks Q-29)
+  **↳ Put to the owner 2026-09-22; they asked for the case before answering, which is the right
+  response to a one-line summary of an irreversible change. The ball is OURS now — tracked as
+  `OR-126`, and Q-29 carries a `Gate: owner` saying so. Do not re-ask until the brief is written.**
   Confirm-first per CLAUDE.md, and the entry's own gate language says so. Needs a yes on principle
   before anyone writes it, not a review after.
 
-**5. The `.size` conflict tax — a workflow question, not a defect.**
+**5. ~~The `.size` conflict tax — a workflow question, not a defect.~~ ✅ ANSWERED 2026-09-22:
+  a sweep ships as ONE PR.** The convention is in CLAUDE.md now, beside the batching rule. The
+  owner took the cheap option knowingly; generating the baselines in CI removes the conflict class
+  entirely and remains the better long-term answer, unfiled. Original text follows.
   Every merging PR touches `docs/doc-size/docs/implementation-backlog.md.size`, and so does every
   Lane A PR. On 2026-09-20 `main` took a commit roughly every 8 minutes against a ~6-minute CI run,
   and **Q-1a needed five rebases and four refused merges to land**. Cheapest fix: **BugFix batches a
@@ -1392,8 +1545,13 @@ nothing structured saying why — and a human decides.
   *"Protected branch rules not configured for this branch"*, so the CI/CD section's auto-merge
   option does not apply to this repo.
 
-**6. Six PRs are open and at least one is verifiably dead — closing a PR is confirm-first, so none
-  of them can be cleared by an agent.** (added 2026-09-21)
+**6. ~~Six PRs are open and at least one is verifiably dead.~~ ✅ CLEARED 2026-09-22: the owner
+  authorised closing, and #1250, #608, #265, #10 and #6 are closed.** #1341 had merged on its own.
+  **The item's own point stands and is why it was written down:** CLAUDE.md exempts pushing,
+  opening and merging-when-green from confirm-first and deliberately does not exempt **closing**, so
+  an agent that proves a PR dead still cannot clear it. That is correct, and it is also how six
+  accumulated. The answer is to put the list somewhere an owner will see it, which this ledger did.
+  Original text follows.
   **[#1250](https://github.com/nekodas-neko/TrainingAi_Open/pull/1250) is Lane A's and is
   superseded.** It was opened 2026-09-16 to unblock a red `main` by dropping `Q-305:device` from
   `keep-gate-set-off.test.ts`. Verified against `main` 2026-09-21: **that string is already gone from
@@ -1411,8 +1569,14 @@ nothing structured saying why — and a human decides.
   confirm-first, and deliberately does not exempt **closing**. So an agent that finds a dead PR can
   prove it dead and cannot clear it — which is correct, and is also how six of them accumulated.
 
-- **Keep:** this entry until all **six** are answered. Strike each item as it resolves; remove the
-  entry when the last one goes.
+- **Keep:** items **1** (a diagnostic look at *Why Upper?*) and **4** (Q-29 Task 5, now waiting on
+  `OR-126` rather than on the owner). Items 2, 3, 5 and 6 were answered on 2026-09-22 and are struck
+  above. Remove the entry when the last one goes.
+- **What four answers in one sitting says about the ledger.** Five of the six had sat between one
+  and nine days; the sixth had been noticed in an earlier session, recorded nowhere, and re-derived
+  from scratch. They were not hard questions — they were questions nobody had been asked, because
+  each lived in a session transcript that ended. **Writing them in one place was the whole of the
+  work.** That is the argument for this ledger continuing to exist after these six clear.
 ### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
 
 - **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.
@@ -2247,55 +2411,42 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 - **Do NOT delete `temp-penalty-suspension.test.ts` as part of any cleanup.** It is the only record
   of what the ladder did, and answering (1) needs it.
 
-### [platform] LB-121 — the queue parser's "blocked" marker is the same glyph the repo uses for emphasis
+### [platform] LB-121 — Reference: the queue parser's "blocked" marker, filed three times before it was fixed
 
-- **Lane: O** — `scripts/next-item.js:97` (and `lib/queue-buckets.js` for the ordering).
-  Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.
-- **Added:** 2026-09-18 · found by re-reading PARKED, which is where the damage hides.
-- **`if (!current.legacyBlocked && line.includes('⛔'))` treats a `⛔` ANYWHERE in an entry as the
-  legacy prose blocker.** That is right for the marker it was written for and wrong for the same
-  character used as emphasis — which this repo does constantly, CLAUDE.md included.
-- **The damage is not the bucket, it is the LOST RESIDUE.** A parked entry prints
-  `unmigrated marker — <first 90 chars of whatever line held the glyph>`, so an entry with a real
-  `Keep:` shows a prose fragment instead of what is owed. TN-25 printed
-  *"length the app already uses (30 min) deliberately…"* where its residue is a device walk and a
-  month of compliance data. A reader scanning PARKED cannot see the obligation at all.
-- **It has fired at least four times: LB-116, TN-3b, and — the same day the baton warned about it —
-  TN-25 and OR-116, both from my own edits.** One of the two was a `⛔` *inside backticks, quoting
-  the name of another warning*. Knowing the rule is demonstrably not enough to follow it, which is
-  the argument for a code fix over a prose one.
-- **A `Gate:` or `Needs:` already overrides the marker; a `Keep:` does not**, and that asymmetry is
-  the whole bug. The script's own comment says *"a structured field is authoritative"* — `Keep:` is
-  a structured field.
+- **✅ FIXED 2026-09-22 (#1390, OR-122). `Reference:` — kept for the pattern, not for the fix.**
+  `next-item.js` now matches the glyph followed within 40 characters by the word *block*, which is
+  the convention this file's own protocol documents. Entries parked by a prose marker alone: **0**,
+  against the 28 measured that morning. LB-121's recommendation — *let `Keep:` override the legacy
+  marker* — was not what shipped; narrowing the detector fixes the same defect at the source and
+  needs no per-field override. The `Keep:`-residue damage this entry identified goes with it: an
+  entry that is no longer parked prints its residue.
+- **Lane: O** — was `scripts/next-item.js:97`. Filed 2026-09-18 by Lane B.
 
-- **⚑ IT HAS NOW COST A SHIPPABLE ITEM, measured 2026-09-20.** **OR-118 sat startable and invisible
-  for four days.** Its engine half landed 2026-09-18, its `Needs:` was empty and the entry said in
-  words that it was *"now startable"* — and it printed under PARKED the whole time, because a `⛔`
-  three bullets up was emphasising a corrected premise. Lane B's READY read **0** across five
-  consecutive queue checks while a buildable card waited. It shipped the day someone read PARKED
-  instead of trusting READY.
-- **Two more are parked this way RIGHT NOW** — found in the same sweep, neither touched:
-  - **TN-3b** — its marker line is itself an argument that the entry should be UNparked
-    (*"the parking rationale was right for a score and is wrong for a chart"*).
-  - **Q-305** — marker reads *"the push:pull half is not done, deliberately"*, a note about scope
-    rather than a blocker. That half is what became OR-118 and is now shipped.
-  Whoever fixes the parser should re-run `next-item.js --lane B` immediately afterwards: the real
-  READY list on 2026-09-20 was not 0, and nobody could see it.
-- **⚑ PRIORITY ARGUMENT, 2026-09-20.** OR-118 shipped the day someone read PARKED instead of
-  trusting READY, and the audit that found it also established that **TN-3b and Q-305 are parked by
-  the same glyph right now** — one of them (TN-3b) blocking a buildable entry. So the defect is not
-  "an entry reads oddly in PARKED": it is **Lane B reporting an empty lane while holding work**.
-  Every session that trusts READY pays this again.
-- **Recommendation: let `Keep:` override the legacy marker, exactly as `Gate:` and `Needs:` do.**
-  One clause at `next-item.js:135`. It cannot hide a genuine block, because an entry whose residue
-  really is gated states `Gate:` in the `Keep:` line and that path already parks it.
-  - **Alternative considered — require the marker at line start.** Cheaper to reason about, but it
-    silently un-parks any legacy entry whose marker is mid-line, which is the population the field
-    exists to keep visible. Worse.
-  - **Alternative — ban `⛔` from the backlog and lint for it.** Honest, and it fights the house
-    style everywhere else in the repo for no gain once `Keep:` is authoritative.
-- **Reversal cost: low.** One conditional; the buckets are unit-tested in `lib/queue-buckets.js`.
-- **Branch:** _unassigned_
+**Why this is kept rather than deleted: it is the THIRD independent filing of one bug, and the
+count is the finding.**
+
+| filed | by | from |
+|---|---|---|
+| 2026-09-01 | `LA-49` | found while shipping BF-90, which fixed the same disease in the `Gate:` field |
+| 2026-09-18 | **LB-121** (this entry) | re-reading PARKED, "which is where the damage hides" |
+| 2026-09-22 | `TN-59` | having swept 17 markers by hand, then watching a new one arrive |
+| 2026-09-22 | `OR-122` | Lane B reporting zero startable entries |
+
+Four sessions, three weeks, no two aware of each other. **LA-49 had the complete diagnosis and the
+two-step fix on day one and never surfaced, because it quotes the glyph as evidence and so was
+parked by the bug it describes.** Everything after it is re-derivation paid for again.
+
+**The transferable rule: a self-parking finding does not stay found.** When an entry describes a
+mechanism that hides entries, check whether it hides itself — and if it does, that is the first
+thing to fix, ahead of the mechanism. The same shape produced BF-165's circular gate (*"ungate it
+the moment the fix lands"*, on work the gate prevented starting). Both cost more than the bug.
+
+**What this entry got right and is worth keeping:** the damage is not the bucket, it is the **lost
+residue**. A parked entry printed `unmigrated marker — <90 chars of whatever line held the glyph>`,
+so an entry with a real `Keep:` showed a prose fragment instead of what was owed — TN-25 printed
+*"length the app already uses (30 min) deliberately…"* where its residue is a device walk and a
+month of compliance data. **A reader scanning PARKED could not see the obligation at all**, which is
+why the count of affected entries always understated the harm.
 
 ### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
 
@@ -2899,6 +3050,29 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 ### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
 
+- **❌ FAILED ON THE S25, 2026-09-23 — this is open work again, not verification debt.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23.
+  Log *Cocoa powder, 5 g, 11 kcal* to Lunch from the Nutrition tab: the diary row appears, the ring
+  moves, and **"857 kcal left" does not change — sampled every second for 6 s, and still 857 a
+  minute later** while `/api/nutrition/energy-balance` on the server already said
+  `remainingKcal: 846, intakeKcal: 445`. Only leaving the tab and coming back shows 846 — the
+  owner's report, exactly. **Why, measured with response bodies:**
+  ```
+  +176ms GET energy-balance → remainingKcal=857   ← the hook's one-shot refetch, BEFORE the push
+  +238ms POST /api/sync/push → 200                ← the outbox lands the food
+  +677ms GET energy-balance → remainingKcal=846   ← correct, but not the card's request
+  ```
+  On the web path the write is an awaited POST, so the one-shot refetch sees it — which is why
+  `e2e/bf177-kcal-left-updates-after-log.spec.ts` is green. **On the APK the write is local-first +
+  outbox**, the refetch in `use-energy-balance-refetch.ts` fires at the local write and reaches the
+  server before the push, and the card never applies the post-push answer another subscriber fetches.
+  The file's own comment — *"'kcal left' lands a round trip later"* — never happens on the device.
+  **Fix direction:** have the card read `energy-balance:` through a subscription
+  (`useCachedValue`, Q-402's fix — Home's card already does and updated on visit), or refetch after
+  the outbox push for the nutrition domain resolves. A second timing race will not do: the gap was
+  60–70 ms on the S25. Delete is the same mechanism; it only looked right because the card was already
+  showing the post-delete number. **Pass test:** log a food on the S25, "kcal left" changes within
+  3 s without leaving the tab.
+
 - **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.
 - **Added:** 2026-09-19 (BugFix intake) · owner: *"requires page switching to show"*.
 - **✅ SHIPPED 2026-09-19** (`fix/bf177-kcal-left-stale-after-log`, v1.459.1). A balance-only refetch
@@ -2919,7 +3093,7 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   the card **without navigating** — anything that leaves the screen re-runs `fetchData` and passes
   against the unfixed component. Control run: with the refetch removed the spec reports
   **`kcal left went 1810 → 1810`**, which is the owner's report reproduced exactly.
-- **⚠ Keep:** ① **the device look**, and only that — the entry's own reason stands: the
+- **Was the Keep, now superseded by the FAILED bullet above:** ① the device look — the entry's own reason stood: the
   optimistic-append timing is what decides whether the round trip *feels* instant, and the browser
   can only show the arithmetic. ② **Two further `energy-balance:` readers were seen and NOT swept**
   — `app/health/day/day-detail-content.tsx:122` and
@@ -12030,6 +12204,14 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
 
+- **📱 PARTIAL ON THE S25, 2026-09-23 — the immediate tap is still COULD NOT CHECK.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Food
+  rows only (Nutrition diary). Swiped with a real `adb shell input swipe` (300 ms): a tap **~1.5 s**
+  after the swipe opens *"Delete food log?"* on the first press, four times out of four — so the slow
+  tap works. At **~0.9 s** the harness's hit-test found an **svg of the row still over the Delete
+  button's centre** and refused to dispatch, which fits the defect still being there but does not
+  prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
+  tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
+
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-30 · owner, confirmed on device the same day: *"if I wait a second it works."*
@@ -17765,6 +17947,31 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
   invalidates every clearance reading in step 4.
 
+### [devices][platform] OR-126 — write the case for dropping the server raw archive, so Q-29 Task 5 can be answered on evidence
+
+- **Lane: O** — a written brief for the owner, not code. **Added:** 2026-09-22 (OR-125).
+- **Why this exists.** Q-29 Task 5 drops `oura_raw_samples.body_hex`, the server-side archival source
+  of truth. It was put to the owner as a yes-on-principle and they asked for the case first. That is
+  the correct answer to a one-line summary of an irreversible change, and it makes the missing brief
+  our debt rather than their indecision.
+- **What it must contain**, each measured rather than asserted:
+  1. **What is dropped**, exactly — table, column, row count, span, and what reads it today.
+  2. **What survives on the device** — and that it is a **14-day rolling window** by deliberate
+     decision (the owner's, 2026-08-02), so it is input to the on-device rollup, not an archive.
+  3. **What becomes permanently unrecoverable.** The ring's history buffer only moves forward and the
+     sync cursor cannot be rewound, so a decoder fix written later can back-fill **only** from stored
+     hex. After the drop, every future protocol correction is bounded by what the device still holds.
+  4. **What keeping it costs**, in money and in legibility. Railway bills on use at $0.15/GB/month
+     against a ~227 MB database, so the honest framing is almost certainly *"this is not a cost
+     problem"* — and if so the brief should say that outright rather than implying a saving.
+  5. **The reversal cost**, stated plainly: there isn't one. That is the whole reason this needs a
+     brief instead of a yes.
+- **⛔ Do not write this as an argument for the drop.** The decision is the owner's and the brief's
+  job is to make it answerable, not to win it. If the measurement says keeping the archive is
+  cheap and the loss is real, the brief should recommend keeping it.
+- **Verification:** the owner answers Q-29 Task 5 one way or the other. An answer either way clears
+  this entry; a second "show me more" means the brief missed something and it stays.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A
@@ -18010,10 +18217,70 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   its batch count matches the `drain complete` log line. Incremental drains deliberately do not
   notify — hourly is too often to be worth a notification, and nobody is waiting on one.
 
+### [platform] OR-130 — a ratchet that cannot read its base blames the branch instead of saying so
+
+- **Lane: O** — `scripts/lib/base-ref.js`. **Added:** 2026-09-23, diagnosed while shipping DV-1.
+- **The conflation, confirmed by direct call rather than inferred.** `fileAtBase` returns `null` for
+  two different facts: *"the file does not exist at the base"* (which means the branch added it — a
+  real violation) and *"I could not read the base"* (which means nothing is known). `verdict` maps
+  `atBase === null` to **`fail`**, so the second becomes an accusation.
+  ```
+  fileAtBase('nosuchref', 'package.json')          -> null
+  verdict({ count: 1, limit: 0, atBase: null })    -> 'fail'
+  ```
+- **It fires here, intermittently, and it cost a gate run.** This clone is **shallow**, so
+  `git show origin/main:<path>` can fail when the blob is not in the pack. On 2026-09-23 a full
+  `pnpm ci:local` failed on `app/api/user/goals/route.ts` — a file **byte-identical to `main`** —
+  and the identical tree passed on a re-run. That is the second instance recorded under `OR-121`,
+  and the only one of the two that is explained.
+- **Why it matters more than one red run.** `base-ref.js` exists precisely so a branch is judged on
+  *what it changed*, not on what `main` already carries — its own header says a ratchet that asks
+  the wrong question *"read as 'your change was too big' when the change was eleven lines"*. This
+  defect reintroduces that failure through the back door, non-deterministically, which is worse: a
+  gate that accuses at random teaches the session reading it to stop believing it.
+- **The fix.** Distinguish the two cases — `fileAtBase` reports *unreadable* separately from
+  *absent* (a sentinel, or a second return) — and `verdict` refuses to return `fail` on unreadable,
+  returning `'unknown'` and letting the caller print *"could not read the base; not judged"*.
+  **Every caller of `countAtBase`/`lineCountAtBase`/`materialiseBaseTree` needs the same treatment**,
+  since they all funnel through the same `null`.
+- **⚠ Decide the CI case before writing it, because it inverts the argument.** CI checks out at
+  depth 1 (recorded in `CLAUDE.md`'s backlog-conflict rule), so if the base is unreadable *there*
+  too, "do not fail on unreadable" silently disables the ratchet everywhere rather than just
+  locally. **Measure what `resolveBaseRef`/`fileAtBase` actually return in a CI run first** — on a
+  `pull_request` `actions/checkout` gives the merge commit, which may make the base readable even at
+  depth 1. If CI can read it and only local cannot, the fix is safe and local stops lying. If
+  neither can, the honest fix is a louder failure with instructions, not a quieter one.
+- **Verification:** force the failure (`fileAtBase` against an unreachable ref) and confirm the
+  check prints "could not read the base" rather than naming an innocent file; then confirm on a
+  real CI run that the ratchet still fails a branch that genuinely adds one.
+
 ### [platform] OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away
 
 - **Lane:** O — the local gate and how it is invoked, not product code.
 - **Added:** 2026-09-20, Orchestrator, during OR-120.
+- **✅ A SECOND OCCURRENCE ARRIVED 2026-09-23, AND IT IS DIAGNOSED — but it is a DIFFERENT script,
+  so it does not explain the first one.** Read both halves of that sentence.
+  - **What happened.** A full `pnpm ci:local` failed once on `scripts/__tests__/strict-schema-inert.test.ts`,
+    which spawns `check-strict-request-schemas.js`. It passed alone, passed with the other 27
+    `scripts/__tests__` files, and passed on a clean full re-run. **The run was NOT piped this
+    time** — per this entry's own instruction — so the diagnostic survived, and it was decisive:
+    *"app/api/user/goals/route.ts has 1 non-strict request schema and is not in the baseline."*
+  - **That file is byte-identical to `main`.** `git diff origin/main -- app/api/user/goals/route.ts`
+    is empty, so the branch added nothing and the check should have read `inherited`.
+  - **The mechanism, confirmed rather than guessed.** `fileAtBase` in `scripts/lib/base-ref.js`
+    returns `null` for BOTH "the file does not exist at the base" and "I could not read the base",
+    and `verdict` turns `atBase === null` into **`fail`**. This clone is shallow
+    (`git rev-parse --is-shallow-repository` → `true`), so `git show origin/main:<path>` can fail
+    transiently when the blob is not in the pack — and a transient read failure is reported as
+    *"your branch added this"*. Verified directly: `fileAtBase('nosuchref', 'package.json')` → `null`,
+    and `verdict({count:1, limit:0, atBase:null})` → `'fail'`.
+  - **Filed as `OR-130` with the fix.** A ratchet that cannot read its base must say so, not blame
+    the branch.
+  - **⛔ It does NOT close the first instance.** That one was `check-tz-aware-cache-guards.js`, which
+    does not use `base-ref` at all — a grep for `resolveBaseRef` across both scripts matches only
+    `check-strict-request-schemas.js`. Two flakes of similar *shape* are not evidence of one cause,
+    and recording them as one would retire an open question on a resemblance. **The first instance
+    stays unexplained.**
 - **⚠ Filed as UNEXPLAINED, not as a flake.** `CLAUDE.md`'s own standing rule for faults that stop
   on their own — *"something that stopped is not something that was fixed"* — is why this exists
   rather than being waved through.
@@ -24887,6 +25154,20 @@ millisecond count talk a future session out of it.
 ### [devices][readiness][app-shell] 🟠 Q-29 — Oura on-device rollup migration — Task 4 built, Task 5 next
 
 - **Lane:** A
+- **Gate: owner** — and the ball is **OURS**, not theirs. Put to the owner 2026-09-22 (OR-125) as a
+  yes-on-principle to Task 5's drop of the server raw archive. **They declined to answer against a
+  one-line summary and asked for the case first**, which is the right call and is now a debt on this
+  entry rather than on them. It is tracked as **OR-126**.
+  - **What the case has to state, because a yes here is not recoverable.** `oura_raw_samples.body_hex`
+    is the archival source of truth and the ring's history buffer only moves forward — the cursor
+    cannot be rewound, so a decoder written later can back-fill **only** by re-decoding stored hex.
+    Drop the server copy and every future protocol fix is bounded by whatever the device still holds,
+    which is a deliberate 14-day rolling window (the owner's 2026-08-02 retention decision), not an
+    archive. The case must say plainly what is dropped, what survives on the device, what can never
+    be recovered afterwards, and what the storage actually costs to keep — measured, not assumed,
+    since Railway bills on use at $0.15/GB/month and the whole database is ~227 MB.
+  - **Do not re-ask until that is written.** Asking twice for the same yes with no new evidence is
+    how a decision gets made on fatigue rather than on the facts.
 **Not a new planning item — this corrects a duplicate entry a different 2026-07-30 session
 nearly created.** [`docs/offline-first-target-architecture.md`](offline-first-target-architecture.md)
 names `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:4658–~5764`) as the load-bearing
@@ -25851,6 +26132,12 @@ degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
+- **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
+  instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
+  agent reads it (LA-122 item 3). The owner released all three of Q-28, BF-9 and BF-7 rather than
+  gating them, on the reasoning that a rule kept in a prompt rather than in this file goes stale
+  unnoticed. **It is ordinary queue work now; the exclusion list should stop naming it.**
+
 - **Lane:** A
 Plan: [`docs/superpowers/plans/2026-07-29-prefetch-remainder-and-applydelta-batching.md`](superpowers/plans/2026-07-29-prefetch-remainder-and-applydelta-batching.md),
 Gap 2. Found 2026-07-29 while auditing what Q-1 does not already cover; the sibling finding (prefetch
@@ -26208,6 +26495,12 @@ patch.
 
 ### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
 
+- **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
+  instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
+  agent reads it (LA-122 item 3). The owner released all three of Q-28, BF-9 and BF-7 rather than
+  gating them, on the reasoning that a rule kept in a prompt rather than in this file goes stale
+  unnoticed. **It is ordinary queue work now; the exclusion list should stop naming it.**
+
 - **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New tables, authorization and routes are the engine; the trainer UI follows as **B**. The planning session still splits the work — it does not re-decide the lane.
 
 
@@ -26337,6 +26630,13 @@ routes gain a trainer path, what a trainer may read about a trainee (a program i
 is a much larger consent question), and how revocation behaves for programs already assigned.
 
 ### [workouts] 🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
+
+- **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
+  instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
+  agent reads it (LA-122 item 3). The owner released all three of Q-28, BF-9 and BF-7 rather than
+  gating them, on the reasoning that a rule kept in a prompt rather than in this file goes stale
+  unnoticed. **It is ordinary queue work now; the exclusion list should stop naming it.**
+  **BF-7 is the owner's own request and the cheapest of the three.**
 
 - **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). The model in `packages/shared/**` is the engine; the picker in `components/**` follows as **B**.
 

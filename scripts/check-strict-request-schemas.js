@@ -108,6 +108,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { toPosix } = require('./lib/repo-path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
 const { countInertStrict } = require('./lib/inert-strict');
@@ -199,10 +200,14 @@ function walk(dir, hit) {
     if (e.isDirectory()) walk(p, hit);
     else if (p.endsWith('.ts') && !p.includes('__tests__')) {
       const src = stripComments(fs.readFileSync(p, 'utf8'));
+      // The KEY, not the read — `BASELINE` is hand-written with forward slashes, and on Windows
+      // `path.join` yields `app\api\…`, so an un-normalised key finds no allowance and every
+      // baselined file reports as a new violation.
+      const key = toPosix(p);
       const n = countNonStrict(src);
-      if (n > 0) hit[p] = n;
+      if (n > 0) hit[key] = n;
       const inert = countInertStrict(src);
-      if (inert > 0) INERT[p] = inert;
+      if (inert > 0) INERT[key] = inert;
     }
   }
 }

@@ -84,6 +84,17 @@ class Device {
     return hit;
   }
 
+  /**
+   * Back to Home with the tab bar showing. Through the router, not repeated back presses: a probe
+   * that navigated with `go()` has stacked entries, and four backs from `/program` once landed on
+   * `/cardio` (first phone run, 2026-09-23).
+   */
+  async home() {
+    if (await this.page.locator('nav a[href="/"]').isVisible()) return;
+    await this.go('/', 1500);
+    await this.page.locator('nav a[href="/"]').waitFor({ state: 'visible', timeout: 10_000 });
+  }
+
   /** Tab-bar navigation, the way a thumb does it. */
   async tab(href, settleMs = 1200) {
     await this.tap(`nav a[href="${href}"]`);
@@ -123,7 +134,7 @@ class Device {
    * the component that fired it. Production chunks are minified: the stack names a chunk and an
    * offset, not a component, unless source maps are served.
    */
-  async recordNetwork() {
+  async recordNetwork({ bodies = null } = {}) {
     const t0 = Date.now();
     const byId = new Map();
     const entries = [];
@@ -142,6 +153,15 @@ class Device {
       if (row) { row.status = e.response.status; row.fromServiceWorker = !!e.response.fromServiceWorker; }
     };
     const onFail = (e) => { const row = byId.get(e.requestId); if (row) row.failed = e.errorText; };
+    // `bodies`: a RegExp on the URL. Matching responses keep their body — how the first sitting told
+    // a stale server answer from a right answer the card ignored (BF-177, 2026-09-23).
+    const onDone = (e) => {
+      const row = byId.get(e.requestId);
+      if (!row || !bodies || !bodies.test(row.url)) return;
+      this.cdp.send('Network.getResponseBody', { requestId: e.requestId })
+        .then((b) => { row.body = b.base64Encoded ? '(binary)' : b.body; }).catch(() => {});
+    };
+    this.cdp.on('Network.loadingFinished', onDone);
     this.cdp.on('Network.requestWillBeSent', onReq);
     this.cdp.on('Network.responseReceived', onRes);
     this.cdp.on('Network.loadingFailed', onFail);
@@ -156,6 +176,7 @@ class Device {
         this.cdp.off('Network.requestWillBeSent', onReq);
         this.cdp.off('Network.responseReceived', onRes);
         this.cdp.off('Network.loadingFailed', onFail);
+        this.cdp.off('Network.loadingFinished', onDone);
       },
     };
   }
