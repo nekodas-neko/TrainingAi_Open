@@ -318,7 +318,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
                 <p className="text-sm font-semibold">Ask for the amount each time</p>
                 <p className="text-xs text-muted-foreground mt-0.5">For a dose that changes — logging asks for the number instead of using the one above</p>
               </div>
-              <Switch checked={dosePrompt} onCheckedChange={setDosePrompt} />
+              <Switch checked={dosePrompt} onCheckedChange={setDosePrompt} aria-label="Ask for the amount each time" />
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1.5">Started <span className="font-normal">(optional)</span></p>
@@ -350,7 +350,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
                 <p className="text-sm font-semibold">Daily reminder</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Notify me if not logged by this time</p>
               </div>
-              <Switch checked={reminderEnabled} onCheckedChange={setReminderEnabled} />
+              <Switch checked={reminderEnabled} onCheckedChange={setReminderEnabled} aria-label="Daily reminder" />
             </div>
             {reminderEnabled && (
               <div>
@@ -408,7 +408,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
                   </p>
                 )}
               </button>
-              <Switch checked={s.active} onCheckedChange={() => toggleActive(s)} />
+              <Switch checked={s.active} onCheckedChange={() => toggleActive(s)} aria-label={s.name} />
             </div>
           ))}
         </div>
