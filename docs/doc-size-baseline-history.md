@@ -18,7 +18,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-23 — backlog → 27367 (RV-77 re-verified and moved, LA-131 filed, +33)
+## 2026-09-23 — backlog → 27119 (RV-77 re-verified and moved, LA-131 filed, +33 on a shrunken base)
+
+Raising this number is also what surfaced **LA-132**, fixed in the same PR: the base comparison for
+this file had been failing with `spawnSync git ENOBUFS` because the document passed **2.11 MB**
+against node's 1 MB default `maxBuffer`. The read was then treated as absent, which is the STRICT
+path — so the `inherited` escape hatch had silently stopped working for the one file most likely to
+be grown by somebody else's merge. `base-ref.js`'s own comment said that mechanism had never been
+reproduced. It is this, and it arrives the day a tracked file crosses a megabyte.
+
 
 Growth, and the growth is the deliverable: RV-77 was NOT built. Its structural claim holds, but the
 two top-up calls it calls duplicates target different macros (the rest variant drops 15% of carbs),
@@ -16325,3 +16333,19 @@ the same two edges, and neither is visible from the type.
 
 DV-13 filed at the top of the queue: a production outage (~8 min) coincided with the BLE admin
 console's hung requests during device sweep 2. Placed first because it is availability.
+
+---
+
+## 2026-09-23 — backlog → 27335 (device/sweep-2b)
+
+DV-14 (production has not deployed since 15:13) filed above DV-13, and DV-13 gains the deploy as a
+second explanation for its outage.
+
+---
+
+## 2026-09-23 — backlog → 27035, projectOverview → 12507 (device/sweep-2b, sweep 2 write-up)
+
+Both shrink. Sweep 2 removed nine device-verified backlog entries (Q-112e, BF-99, BF-162, RV-39,
+Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
+`known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
+back to its 52-line baseline rather than raised.

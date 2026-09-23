@@ -58,6 +58,28 @@ measurement and wrong about the conclusion drawn from it, or already fixed by an
 pointed at the wrong component. Two were mine, and one of those was my own correction of an earlier
 mistake. The re-verify step is not ceremony; it is where most of the value has been.
 
+## LA-132, found by the merge this PR needed, and fixed here
+
+Raising the backlog's baseline printed a warning nobody had seen resolved before:
+
+```
+base-ref: could not read docs/implementation-backlog.md at origin/main after 3 attempts.
+          git said: spawnSync git ENOBUFS
+```
+
+`docs/implementation-backlog.md` is **2,112,034 bytes** and node's default `maxBuffer` is 1 MB, so
+`git show <base>:<file>` failed and the base read was treated as **absent** — which `base-ref.js`
+documents as the STRICT path. The consequence is precise: the Q-424 `inherited` escape hatch, which
+exists so a branch is not blamed for growth that `main` already carries, **had silently stopped
+working for the single file most likely to be grown by someone else's merge.**
+
+`base-ref.js`'s own comment says of this failure that *"the mechanism behind this failure has never
+been reproduced, so the next occurrence has to identify itself"*. It has: it is a file crossing a
+megabyte, and it arrives without warning on the day that happens. `maxBuffer` is now 256 MB, and the
+same run then reported `33 of which this branch added` — the attribution working again.
+
+Fixed in this PR rather than filed, so there is no orphaned finding.
+
 ## Not done
 
 - **No code change, deliberately.** Building the entry as written would have produced a fix that
