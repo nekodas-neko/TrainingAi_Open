@@ -81,10 +81,9 @@ describe('the real queue classifies exactly as it did before', () => {
   // The entry is named here rather than the count being edited, so the next reader can tell an
   // intended change from a parser regression.
   //
-  // **Q-317 dropped 2026-09-23, same mechanism again.** Device sweep 2 (#1471) closed its device
-  // check, so the entry left the queue and took its gate with it — the intended case, not a parser
-  // regression. It turned `main` red because the sweep did not update this list; named here for the
-  // same reason Q-305 is.
+  // **Q-317 dropped 2026-09-23 — verified and removed, not un-parked.** Device sweep 2 checked its
+  // card on the S25 and the entry left the queue, so its gate went with it. It turned `main` red
+  // in passing, because the sweep did not update this list (LB-134).
   it('yields the same sixteen gates, by id', () => {
     expect(gated).toEqual([
       'BF-80:device', 'LB-53:owner', 'BF-10:device', 'Q-486:device', 'Q-499:device', 'Q-477:device',
