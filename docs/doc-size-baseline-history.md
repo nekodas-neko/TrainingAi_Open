@@ -15877,3 +15877,13 @@ One entry, most of it a triage of the 24 affected entries. That list is the poin
 padding: the fix is three lines in `next-item.js`, and the risk is that turning the selector on
 dumps two dozen entries on the device agent with no indication that five of them want a ring it does
 not have and four are not really device work at all.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +7 (RV-143's own mis-parse)
+
+RV-143's first draft wrote the field names as literal tokens, and `keepFromLines` read the sentence
+*"a regex over the `Keep:` text"* as a real Keep block — whose prose then contained a bolded
+device-gate token it read as a real gate. `keep-gate-set-off.test.ts`, which pins the queue's
+seventeen gates by id, failed with an eighteenth: `RV-143:device`.
+
+The entry now writes the names as prose and carries the incident, because an entry about the gate
+parser being mis-parsed by it is LA-103's bug one level deeper and the best evidence the entry has.

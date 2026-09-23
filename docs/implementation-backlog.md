@@ -479,8 +479,14 @@ below threshold and left in place for next time.
   in neither implementer lane's paths, the OR-103 case. **Added:** 2026-09-23 · Review, answering the
   owner's *"has everything that needs to be sent to DV agent been backlogged?"* — the answer was no.
 - **The filter, verbatim:** `if (e.verify?.value === 'device') return true;` then a regex over the
-  `Keep:` text. **`Gate:` is never consulted.** Measured on `main` 2026-09-23: **29 entries carry a
-  `Gate: device` field; 24 of them do not appear in `--sittings`.**
+  Keep field's text. **The Gate field is never consulted.** Measured on `main` 2026-09-23:
+  **29 entries carry a device gate; 24 of them do not appear in `--sittings`.**
+- **⚠ Write the field NAMES in this entry as prose, never as the literal tokens.** The first draft
+  said *"a regex over the `Keep:` text"*, and `keepFromLines` read that mention as a real Keep
+  block — whose prose then contained a bolded device-gate token, which it read as a real gate. CI
+  went red on `keep-gate-set-off.test.ts`, the snapshot that pins the queue's seventeen gates by id,
+  with an eighteenth: `RV-143:device`. **An entry about the gate parser was mis-parsed by it**, which
+  is LA-103's bug one level deeper, and is the sharpest argument this entry has for its own fix.
 - **They are in a dead zone, not merely missing.** A `Gate:` **parks** an entry, so the implementer
   lanes skip it *because* it needs the device — and the one agent holding the device cannot see it.
   Nothing surfaces these to anybody.
