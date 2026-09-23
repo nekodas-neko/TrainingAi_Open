@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.22",
+    date: "2026-09-23",
+    changes: [
+      "The \u201cDownload Android App\u201d banner is gone from Home. The app you are using is the Android app, and the download link is still on More \u2192 About if you need it.",
+      "The widget picker now says Energy Balance is an alternative to the Nutrition card rather than an extra one \u2014 they answer the same question, and having both on has shown two different \u201cleft\u201d figures before.",
+    ],
+  },
+  {
     version: "1.465.21",
     date: "2026-09-23",
     changes: [
