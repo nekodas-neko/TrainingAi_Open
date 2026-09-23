@@ -15648,11 +15648,23 @@ landed from `main` across three re-merges while this branch was open. What this 
 the new LB-128 filed for Lane A — and +14 to `projectOverview.md` for the one Known-Issues entry
 above. The ratchet only ever records where a file ended up; this paragraph is so the eight lines
 read as genuinely given back rather than absorbed into someone else's sweep.
+---
+
+## 2026-09-23 — backlog → 26672, projectOverview → 12333 (−29) (device/bf166-mid-workout)
+
+BF-166's mid-workout half ran on the S25 and the entry left the queue whole; **DV-2** (*Leave* on the
+leave-workout prompt does not leave) was filed beside BF-165 in its place. BF-166's Known-Issues row
+moved to the resolved archive. DV-1 gained the two Windows test failures found once Node was
+upgraded, and DV-3 (a CI flake in the migration-163 test) was filed. The Device Verification
+baton goes 66 → 67 for the DV-3 row it has to carry. Both baselines set to the
+measured sizes.
 
 ## 2026-09-23 — backlog 26780 → 26731, `projectOverview.md` 12376 → 12388 (RV-106/RV-107/RV-109)
 
-The backlog ratchets **down** 49 lines: RV-106, RV-107 and RV-109 shipped whole and left the queue,
-and the batch `stale-surface-subscribe` is now empty. Nothing was filed against them — the one
+The backlog ratchets **down** 49 lines on this branch's own account — RV-106, RV-107 and RV-109
+shipped whole and left the queue, and the batch `stale-surface-subscribe` is now empty. The figures
+finally recorded are 26738 and 12359, because #1419 (BF-166 closed on the S25, DV-2 filed) landed
+from `main` mid-CI and moved both. Nothing was filed against them — the one
 finding the work turned up (that `useStressDay` was already correct, which RV-106 had left
 untraced) is an answer rather than new work, so it lives in the code as an asserted comment.
 
