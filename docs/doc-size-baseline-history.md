@@ -15816,3 +15816,17 @@ BF-22's slowdown was narrowed to in-memory client state, which RV-142 pairs with
 listener counts. RV-110 counts 37 shell-tearing call sites with no cost per teardown, which RV-141
 supplies. Each entry names what already exists so the device run settles an open question rather
 than producing a fresh pile of numbers.
+
+## 2026-09-23 — `projectOverview.md` and the backlog both rise (E2E path filter + the shallow-fetch rule)
+
+The backlog grows by two entries rather than shrinking, which is the right direction here: LA-129
+files what owner decision item 5 named as the better answer and explicitly left unfiled, and OR-132
+hands the Orchestrator five PRs that need the owner's authorisation to close. Neither is new work
+invented — one is an orphaned finding given a queue entry, the other is cleanup Lane A created and
+cannot authorise itself.
+
+`projectOverview.md` spends its block on the git-proxy defect rather than on the CI tweak, because
+the tweak is one `grep -vE` and the defect cost four abandoned PRs. The part worth the lines is the
+discrimination: a shallow-grafted branch and a stale base produce the **same** observable —
+`get_check_runs` reading `total_count: 0` — and CLAUDE.md already documented the stale-base reading,
+so a session that hits this will reach for the wrong remedy first. It did.

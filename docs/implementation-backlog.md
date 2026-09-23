@@ -561,6 +561,39 @@ below threshold and left in place for next time.
   the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
   or is exactly what BF-22 is feeling — and **neither answers it alone.**
 
+### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
+  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
+  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
+  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
+- **The conflict class, measured on this session rather than argued.** Every merging PR touches
+  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
+  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
+  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
+  being mergeable at the moment it was green. Another session's commit messages that day read
+  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
+- **What the owner already decided, and why this does not reopen it.** He took the cheap option
+  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
+  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
+  touched, it cannot stop two PRs touching them at once.
+- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
+  without losing the shrink-only property, which is the whole point of the check. That is the design
+  question to answer first, and it decides whether this is small or not.
+
+### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
+
+- **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
+  did for item 6 on 2026-09-22. **Added:** 2026-09-23 · Lane A, who created and then abandoned them.
+- **#1405 (RV-99), #1426 + #1435 (LA-128), #1428 + #1430 (RV-105).** Every one carries a sound,
+  gated diff; none is mergeable, and none can be repaired in place.
+- **Why, and it is not their diffs:** each was built in a repo the sandbox git proxy had shallowed,
+  so GitHub reads their history as unrelated to `main`, marks them conflicted, and **never gives
+  them a CI run**. The full mechanism and the `--unshallow` remedy are now in CLAUDE.md's Git
+  Workflow section. The work itself shipped from clean rebuilds: RV-105 as #1432, LA-128 as #1436.
+- **RV-99 is the one that still owes work** — its rebuild is not done, and #1405 is where its diff
+  lives until it is. Close that one last, or keep it until the replacement is open.
+
 ### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
 
 - **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
