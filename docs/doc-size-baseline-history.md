@@ -15801,6 +15801,49 @@ still need judging by where they mount. Recording that here matters because the 
 25 tracked sites and a green check and conclude the ground is covered. It is not; RV-104, RV-106,
 RV-107 and RV-109 are the entries that own those verdicts.
 
+
+## 2026-09-23 — `docs/implementation-backlog.md` and the probe checklist (Review: DV performance probes)
+
+Six entries (**RV-137…RV-142**) plus Part B of `docs/device-agent-probe-checklist.md`, filed after
+the owner asked whether the device agent had been given the checks it can really test — load
+efficiency, timing, path structure. It had not: of the original ten probes only P6 and P10 touched
+timing and the rest were correctness.
+
+The length is mostly cross-references, and that is the point of filing them at all. **Q-51 already
+asks for this measurement and says a refactor without it is a poor trade**; its one number is a
+single `/workout` mount at 1086 ms against ~100 ms warm, which RV-138 turns into a distribution.
+BF-22's slowdown was narrowed to in-memory client state, which RV-142 pairs with RV-133's heap and
+listener counts. RV-110 counts 37 shell-tearing call sites with no cost per teardown, which RV-141
+supplies. Each entry names what already exists so the device run settles an open question rather
+than producing a fresh pile of numbers.
+
+## 2026-09-23 — `projectOverview.md` and the backlog both rise (E2E path filter + the shallow-fetch rule)
+
+The backlog grows by two entries rather than shrinking, which is the right direction here: LA-129
+files what owner decision item 5 named as the better answer and explicitly left unfiled, and OR-132
+hands the Orchestrator five PRs that need the owner's authorisation to close. Neither is new work
+invented — one is an orphaned finding given a queue entry, the other is cleanup Lane A created and
+cannot authorise itself.
+
+`projectOverview.md` spends its block on the git-proxy defect rather than on the CI tweak, because
+the tweak is one `grep -vE` and the defect cost four abandoned PRs. The part worth the lines is the
+discrimination: a shallow-grafted branch and a stale base produce the **same** observable —
+`get_check_runs` reading `total_count: 0` — and CLAUDE.md already documented the stale-base reading,
+so a session that hits this will reach for the wrong remedy first. It did.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26303, `projectOverview.md` → 12389 (LA-128)
+
+The backlog shrinks by LA-128's whole entry; nothing is owed, so no `Keep:`. The
+`projectOverview.md` block spends most of its lines on the half that is NOT in the diff: the outbox
+staying lenient on purpose.
+
+That is the part worth the space. The route and the outbox now disagree about unknown keys, and the
+disagreement looks exactly like an oversight — a future sweep will find the non-strict parse in
+`adapter.ts`, read it as the same defect, and "finish the job". Doing that would reject a queued
+check-in outright rather than surface a mistake, deleting something the user already wrote. The
+reasoning is in `adapter.ts` beside the parse, and here, because those are the two places someone
+would look before changing it.
+
 ## 2026-09-22 — `docs/implementation-backlog.md` → 26340, `projectOverview.md` → 12391 (RV-99, half)
 
 The backlog GROWS on an entry that shipped half its work, which is the right direction here. RV-99

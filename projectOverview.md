@@ -43,6 +43,34 @@ hex triad is **183 occurrences across 68 files**, not the entry's "173 across ~2
 those modules (`rarity-colors`, `hr-zones`, `macro-colors`, `home-prefs`) are identity colours that
 must keep their hex. ⚠ **Not seen rendered** — every assertion is on a returned string; no card was
 viewed in a browser or on device.
+**An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
+`Body` was `.extend()`-built and never `.strict()`, so a sheet posting a field whose server half had
+not landed got **201 and wrote nothing** — the failure LB-124 was filed over rather than attempted,
+and the one that would have burned TN-58's pass test. **Checked before flipping it: no current
+client sends an unknown key** (morning sheet 13, evening review 9, all known; the retired
+`motivation`/`restingSoreness`/`wakeMood` are still in the schema and sent as null on purpose).
+**⛔ The outbox stays LENIENT deliberately — do not "fix" the mismatch.** It never touches the
+route's `Body`; it is `adapter.ts` parsing the two shared schemas non-strictly, and stricting them
+would reject a queued check-in outright rather than surface a mistake, turning a partial save into
+no save. That path is already gated by the local SQLite column list (LB-124 needed a migration),
+which the POST path is not. Reasoning is written beside both. Driven over HTTP on `pnpm dev`, and
+the pre-fix 201-writes-nothing was **observed**, not assumed. No user-visible change.
+**A test file under `app/` was buying the 34-minute browser suite, and a plain `git fetch` was
+producing PRs CI never ran (2026-09-23).** Two independent CI/tooling findings from one session.
+**E2E's path gate now drops `__tests__/` the way it already drops `app/api/**`** — a vitest file is
+not loaded by any browser, and PR #1405 touched exactly one of them and bought **four** full runs,
+reaching all-six-green on the fourth and still failing to merge because `main` moved each time.
+⛔ **The expensive one: this sandbox's git proxy returns a SHALLOW pack on every `git fetch origin
+main`**, grafting the tip as a root, so `git merge origin/main` fails with *"refusing to merge
+unrelated histories"* and the resulting tree reads as conflicted to GitHub — **and a conflicted PR
+is never given a workflow run**, which presents as `total_count: 0` forever while every other branch
+builds fine. Four PRs with sound diffs died that way (#1426, #1428, #1430, #1435). The rule, the two
+cheap discriminators and the `--unshallow` remedy are in CLAUDE.md's Git Workflow section; the
+decisive test is `update_pull_request_branch`, which merges server-side and so distinguishes a real
+conflict from a reporting lag. Also filed: **LA-129** (generate the `.size` baselines in CI — the
+answer owner decision item 5 named and left unfiled) and **OR-132** (the five dead PRs, which need
+the owner's authorisation to close).
+
 
 **The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
 to it (RV-105).** ⛔ **The entry claims four; two survive checking** — RV-106 and RV-109 are this
