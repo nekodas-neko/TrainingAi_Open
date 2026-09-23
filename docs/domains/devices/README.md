@@ -78,17 +78,24 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
    failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
    runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure
    signature in the same PR that handles it.
-2. [`docs/oura-ble-feature-playbook.md`](../../oura-ble-feature-playbook.md) — how to enable a new
+2. [`docs/oura-raw-archive-retention-brief.md`](../../oura-raw-archive-retention-brief.md) —
+   **what the raw tiers actually are, measured 2026-09-23 (OR-126).** `oura_raw_packed` is the
+   archive (1,467 rows, 1,811,765 frames, 25 MB, lossless and read-back-verified);
+   `oura_raw_samples` is a **7-day hot window** holding 4.5 MB of hex, not the archive it is still
+   described as in older docs. Written as the decision brief for Q-29 Task 5 and it recommends
+   keeping the archive — $0.004/month against a loss the ring's forward-only cursor makes permanent.
+   Read it before believing any doc that calls `body_hex` the source of truth.
+3. [`docs/oura-ble-feature-playbook.md`](../../oura-ble-feature-playbook.md) — how to enable a new
    ring feature over the wire.
-3. [`docs/oura-ble-remaining-work.md`](../../oura-ble-remaining-work.md) — what's left in the BLE
+4. [`docs/oura-ble-remaining-work.md`](../../oura-ble-remaining-work.md) — what's left in the BLE
    programme.
-4. [`docs/oura-ring-data-reference.md`](../../oura-ring-data-reference.md) — the Cloud v2 field
+5. [`docs/oura-ring-data-reference.md`](../../oura-ring-data-reference.md) — the Cloud v2 field
    reference (still the authority for field *names*).
-5. [`docs/oura-ble-sleep-staging-findings.md`](../../oura-ble-sleep-staging-findings.md) ·
+6. [`docs/oura-ble-sleep-staging-findings.md`](../../oura-ble-sleep-staging-findings.md) ·
    [`docs/oura-ble-open-oura-audit-2026-07-08.md`](../../oura-ble-open-oura-audit-2026-07-08.md) ·
    the extracted-model inventory and bundle-provisioning docs (private archive — see
    `scripts/private-paths.json`)
-6. [`docs/data-source-connector-guide.md`](../../data-source-connector-guide.md) — **the concrete
+7. [`docs/data-source-connector-guide.md`](../../data-source-connector-guide.md) — **the concrete
    contract a new data source is checked against (2026-09-14, PS-40):** transport categories, the
    canonical shape of every data type (HR as a time-series list, sleep as a session + stage-interval
    array, body metrics as sparse daily scalars, etc.), the ranked-provenance merge, the
