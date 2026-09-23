@@ -18,6 +18,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27367 (RV-77 re-verified and moved, LA-131 filed, +33)
+
+Growth, and the growth is the deliverable: RV-77 was NOT built. Its structural claim holds, but the
+two top-up calls it calls duplicates target different macros (the rest variant drops 15% of carbs),
+so the fix as written would collapse almost nothing — and `ai_call_log` still holds zero
+`meal-plan-top-up` rows against a feature that has run twice in total, last on 2026-09-01. The entry
+now carries all three findings and sits at position 8 instead of 1. LA-131 is the duplicate
+`REST_DAY_CARB_REDUCTION` found while reading it.
+
 ## 2026-09-23 — backlog → 27334 (LA-129 rerouted, +21)
 
 Raised because the entry grew, which is the growth path doing its job — and worth noting that this
