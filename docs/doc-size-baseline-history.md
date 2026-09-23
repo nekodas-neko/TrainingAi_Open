@@ -16027,3 +16027,14 @@ treat an identical FK failure elsewhere as new.
 The measured numbers are in the row on purpose — 171 against 9, and 3-of-3 red versus 3-of-3 green
 — because DV-3 itself was filed from a single observation and a reading of the test, and the entry
 that replaces it should not be re-openable on the same standard of evidence.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27230 → 27274 (OR-134)
+
+Forty-four lines recording why three different things were wearing one `Gate: device`: two circular
+gates released with what is genuinely owed after the build, three Colmi-blocked entries marked as
+not-an-S25-sitting, and three reasonless gates flagged rather than released.
+
+This is the growth side of the ratchet doing its job, and worth noting the day the slack side was
+softened (RV-134): **growth still fails at the first line over.** The asymmetry is the point — a
+document that grew needs someone to look at what was added, and forty-four lines of reasoning on an
+entry that previously said `- **Gate:** device` is a trade the index should be asked about.
