@@ -57,6 +57,40 @@ export function lockPidsStillHeld(): number[] {
  *  read off the documentation. */
 export const LOCK_PG_LOCKS_OBJID = MIGRATION_TEST_LOCK_KEY
 
+/**
+ * Runs a whole migration file the way `ensureSchema` does — one multi-statement simple query, so
+ * Postgres wraps it in a single implicit transaction — with one statement prepended.
+ *
+ * **DV-3.** The advisory lock above stops two *migrations* running at once. It does nothing about
+ * the other 162 test files that create a user and `DELETE FROM users` in `afterAll`, and migrations
+ * 163 and 164 both carry
+ * `INSERT INTO exercise_estimates … SELECT … FROM personal_records` with no user filter, because a
+ * data migration has no business having one. At READ COMMITTED the `INSERT … SELECT` fixes its
+ * snapshot at statement start, so it can read a foreign user's `personal_records` rows, block on
+ * the referential-integrity check while that user's DELETE is still uncommitted, and then fail with
+ * `exercise_estimates_user_id_fkey` the moment the delete commits. That is the CI failure DV-3
+ * saw on PR #1419 — one red run out of 997 files, green on re-run.
+ *
+ * Reproduced deterministically rather than inferred: hold an uncommitted `DELETE FROM users` on a
+ * second connection, start the migration, wait for it to block, commit the delete. Without this
+ * lock that is `23503 exercise_estimates_user_id_fkey`, three times out of three; with it, green,
+ * three times out of three. `migration-test-lock.test.ts` runs exactly that sequence.
+ *
+ * `SHARE` is the weakest mode that conflicts with the `ROW EXCLUSIVE` a `DELETE` takes, and it is
+ * self-compatible, so the migration tests do not block each other on it. Taking it FIRST, before
+ * the migration touches anything else, is what keeps it deadlock-free against the ordinary tests:
+ * they hold only their own short `DELETE FROM users` lock and never wait on a table this
+ * transaction already holds. A test that deleted a user *and* wrote a migration-touched table
+ * inside one explicit transaction could still deadlock; none does today, and Postgres would
+ * detect it rather than hang.
+ *
+ * Not a retry, deliberately — Q-171 says so, and a flaky red is how a real regression gets waved
+ * through.
+ */
+export function runMigrationSql(pool: Pool, sql: string) {
+  return pool.query(`LOCK TABLE users IN SHARE MODE;\n${sql}`)
+}
+
 export interface MigrationLock {
   acquire(): Promise<void>
   release(): Promise<void>

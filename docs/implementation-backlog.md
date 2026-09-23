@@ -923,26 +923,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
-### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
-
-- **Lane:** A — `lib/data/postgres/__tests__/personal-records-reconcile-migration.test.ts`.
-- **Added:** 2026-09-23 · Device Verification — seen on PR #1419's CI, a docs-only change.
-- **Observed once:** `Tests` failed with `insert or update on table "exercise_estimates" violates
-  foreign key constraint "exercise_estimates_user_id_fkey"` at the test's `await run()` (line 130),
-  1 of 997 files. **Re-run of the same commit: green.** `main`'s last four CI runs were green.
-- **Why it can happen (read from the test, not reproduced):** `run()` applies migration 163, which
-  reconciles `personal_records` into `exercise_estimates` for **every** user, not only this file's
-  `USER_A`/`USER_B`. All of `lib/data/postgres/__tests__` shares one database, and many files create
-  a user in `beforeAll` and `DELETE FROM users` in `afterAll`. If one of those users is deleted
-  mid-migration, the migration inserts an estimate for a user that no longer exists.
-- **Fix direction:** scope what the test asserts *and* what it runs to its own users — run the
-  migration's statements under a `WHERE user_id = ANY(…)` test harness, or take the same advisory
-  lock the migration runner uses, or move it to the `rollup`-style serial project. Do not add a
-  retry: that hides the next genuine failure in this file.
-- **Pass test:** the file cannot see another test's users — e.g. inserting and deleting a foreign
-  user in a parallel file during `run()` leaves it green.
-- **Not a device check.**
-
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
 - **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
