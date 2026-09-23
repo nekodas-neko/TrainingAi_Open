@@ -94,6 +94,18 @@ Reverted the fix and re-ran: **4 of the 5 cases fail.** The fifth ("does not cla
 everything fits") passes either way, correctly. A regression test that has not been run against the
 bug is a guess.
 
+## A note on this branch's own last merge
+
+RV-134 landed while this was open, and this re-merge is its second confirmation. The `.size` file
+still conflicted — both sides had edited it *before* the band existed — but resolving it by taking
+**main's value verbatim** now passes: 55 lines of slack against a 544-line band, exit 0, no new
+number written.
+
+That is a materially simpler drill than the one this session has been running all night. The
+resolution for a `.size` conflict is now *take main's side* rather than *recompute from the merged
+tree*, because a few dozen lines of staleness is no longer a failure. Recomputing is still correct;
+it is just no longer necessary, and "take theirs" is a thing a tired session gets right.
+
 ## Not done
 
 - **TN-59 is untouched** — an entry parked only by a prose marker. Different mechanism, still open.

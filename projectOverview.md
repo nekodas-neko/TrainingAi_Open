@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.465.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
 **Score bands now use the theme tokens, and the thing guarding them failed silently (RV-99, half).**
@@ -2581,6 +2581,26 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][app-shell] 🟠 Home's "review your day" does nothing on the first tap of a session (LB-129, 2026-09-23) · found, not fixed
+
+Reproduced twice against the running app: flipping to `/nutrition?review=day` when Nutrition has not
+yet been mounted leaves the End of Day sheet closed; the same href on a later flip opens it. **Not a
+param-delivery problem** — instrumenting the reader showed `searchParams` arriving as `review=day` at
+both the initializer and the effect, and `setReviewOpen(true)` running, on the failing run. The
+defect is downstream, in what the sheet renders or is gated on during a cold first render. Filed
+with a probe recipe rather than chased inside RV-110's PR.
+
+### [app-shell] ⚠️ Cross-tab navigation goes through the shell now — the teardown premise is UNVERIFIED (RV-110, RV-112, 2026-09-23, v1.465.8) · needs: device
+
+Fifteen `router.push` sites that target a tab href now call `navigateToTab`, and Home and More no
+longer share one scroll-restoration slot. **22 of the entry's 37 sites were deliberately left
+alone** — sub-routes and the full-screen workout route, for which `tabKeyForHref` returns null;
+`scripts/check-tab-navigation.js` encodes that boundary and holds it (Custom Rules is now 76 steps).
+**What is not established is RV-110's own mechanism:** that a push to a tab href unmounts
+`TabShell`. It follows from the code, but the e2e written to prove it did not discriminate and was
+deleted rather than shipped — a valid control has to drive a real push through the UI. Owed: that
+spec, and the device check.
 
 ### [heart-rate][nutrition][activity] ⚠️ Three shell-resident cards now subscribe to their own invalidation — NOT device-verified (RV-106, RV-107, RV-109, 2026-09-23, v1.465.7)
 

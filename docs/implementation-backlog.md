@@ -594,48 +594,6 @@ below threshold and left in place for next time.
 - **RV-99 is the one that still owes work** — its rebuild is not done, and #1405 is where its diff
   lives until it is. Close that one last, or keep it until the replacement is open.
 
-### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
-
-- **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
-  neither implementer lane's paths (the OR-103 case). **Added:** 2026-09-23 · Review.
-- **The mechanism, which has not been stated before.** The ratchet runs the absolute check first
-  (`verdict({count, limit, atBase: null})`, `:136`). Growth over the baseline then gets an
-  `inherited` escape at `:157` — *"over the number, but no bigger than what the base already holds,
-  so the branch did not do this"*. **The slack direction gets no such escape, deliberately** (PS-34,
-  quoted in the file: *"Failing on slack rather than reporting it, and with no `inherited` escape
-  hatch"*). So the two directions are asymmetric, and the unprotected one is the one concurrency
-  triggers constantly: **every implementer PR that completes an entry SHRINKS the backlog**, the
-  merged file falls under the committed number, and the next branch must lower it — even when the
-  shrink was entirely someone else's merge.
-- **Measured twice, independently.** Tuning, 2026-09-20 → 2026-09-22: *"five of seven PRs hit a
-  `docs/doc-size/docs/implementation-backlog.md.size` conflict"*, two also needing the append-only
-  history file resolved by hand. Review, 2026-09-22/23 night: **four of four** (#1389 twice, #1418,
-  and then THIS ENTRY'S OWN PR, which conflicted on the two files it was filed to describe), each a
-  fetch, merge, recount, note edit and re-push. Every one mechanical. Nine of eleven across two
-  agents in three days.
-- **Fix: give the slack direction the same `inherited` escape the growth direction has.** If the doc
-  is under its baseline *and* the base branch is under it too, the shrink is not this branch's — report
-  it, do not fail. Then only a branch that itself shrank a doc has to lower the number, and two PRs
-  stop contending over one exact integer. Roughly five lines, in the file that already computes
-  `lineCountAtBase(baseRef, rel)` for the other direction.
-- **What that gives up, honestly, and why it is acceptable.** PS-34's concern was real — CLAUDE.md sat
-  **429 lines** under its number, free to regrow silently. Under this change a shrink that lands on
-  `main` without its baseline following stays unlowered until someone touches that doc. The residue is
-  covered by two things that already exist: any later branch that grows the doc back is still caught by
-  the absolute check, and `--fix` (LA-99) rewrites every stale baseline in one pass, which suits the
-  Orchestrator's weekly sweep.
-- **⚠ This does NOT need the owner** — Tuning's note (§2c) says it wants *"the owner's yes on changing
-  the ratchet"*, which was written before the 2026-09-22 narrowing in CLAUDE.md handing structural,
-  tooling and process calls to the agents. It is tooling, it is reversible in one commit, and no
-  number a human reads changes. Recorded here rather than asked.
-- **Rejected alternative — slack in the baseline** (round the number up so small deltas do not move
-  it). It is the obvious fix and it is the one PS-34 already removed for cause: slack is exactly the
-  room a document regrows into unwatched. Do not re-introduce it.
-- **Not the same as generating baselines in CI**, the other alternative in Tuning §2c. That removes
-  the committed file entirely and is a larger change to how the ratchet is read and audited; this one
-  keeps the file, the history note and the deliberate act of raising a number, and only stops blaming
-  the wrong branch. If both are wanted, this one first — it is cheap and it settles whether the tax
-  was ever about the committed file at all.
 
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
@@ -1039,29 +997,6 @@ below threshold and left in place for next time.
   for a body-metrics delta on the device that wrote it. If it does, the window is shorter than TTL
   but still non-deterministic.
 
-### [app-shell][platform] RV-110 — 37 cross-tab `router.push` sites tear down the whole tab shell; 5 use the helper that does not
-
-- **Lane:** B — `lib/shell-nav.ts` call sites across `app/` and `components/`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `tab-nav-shell`
-- Counted 2026-09-22: **37** `router.push('/health'|'/nutrition'|'/more'|'/workout')` sites against
-  **5** `navigateToTab(...)`. `app/(home)` and `app/health` are different route segments, so a push
-  unmounts the entire `TabShell` — every panel's component state, `state.mounted`, and every inner
-  `scrollTop` — and the four code-split tabs re-mount.
-- **The illustration is two adjacent lines on Home** (`session-select-content.tsx:436-437`):
-  `handleNavigateStats` uses `router.push("/health?tab=training")`, `handleNavigateHealthBody` uses
-  `navigateToTab(router, "/health?tab=body")`. Two taps on one screen, one slow and one instant, for
-  no reason the owner could infer.
-- `lib/view-transition.ts:118-126` deliberately declines to animate a tab href but still forwards it
-  to `router.push`, so `useTransitionRouter` does not save these sites.
-- **Fix:** route them through `navigateToTab`, which already falls back to `router.push` when no
-  shell is mounted (covering `done-activity-screen`, `walk-summary`, `test-result`). Then a grep
-  rule holds it.
-- **⚠ Check the query-param destinations before converting.** The shell's `show()` `replaceState`s
-  the full href, but whether Health/Nutrition read `?tab=`/`?review=` **on a flip** rather than only
-  on mount has to be confirmed per screen — a flip landing on the wrong sub-tab is a regression the
-  current full navigation does not have.
-
 ### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
 
 - **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
@@ -1082,20 +1017,29 @@ below threshold and left in place for next time.
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
 
-### [app-shell] RV-112 — Home and More share one scroll-restoration key and overwrite each other
+### [nutrition][app-shell] LB-129 — the day-review sheet does not open on a first flip into Nutrition
 
-- **Lane:** B — `app/session-select/session-select-content.tsx:1052-1055`,
-  `app/more/more-content.tsx:152-155`. **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `tab-nav-shell`
-- `use-scroll-restoration.ts:105` keys on `keySuffix ? pathname#suffix : pathname`. Health passes
-  three suffixes (`scrollKey="body"|"training"|"progress"`); **Home and More pass none**, and both
-  panels stay mounted, so while the URL reads `/more` both containers save and restore the same
-  `ta_scroll:/more` slot. The restore path has no owner check.
-- **Fix:** `scrollKey="home"` and `scrollKey="more"` — one prop each, copying what Health already
-  does. Keys are session-scoped, so nothing needs migrating.
-- **Not established:** the real magnitude. Restores need ≥40px and the takeover listeners cancel
-  aggressively, so the collision may often resolve to a no-op. The e2e spec
-  (`e2e/scroll-restoration.spec.ts`) was not run.
+- **Lane:** B — `app/nutrition/nutrition-content.tsx:191`. **Added:** 2026-09-23 · found while
+  shipping RV-110.
+- **Reproduced twice, driving the real app:** from Home, `navigateToTab` to `/nutrition?review=day`
+  when Nutrition has **not yet been mounted in this shell session** leaves the End of Day sheet
+  CLOSED. The same href on a later flip, into an already-mounted Nutrition, opens it. Home's
+  "review your day" (`session-select-content.tsx:1183`) takes exactly that path, so the first tap of
+  a session is the one that does nothing.
+- **⚠ It is NOT a param-delivery problem, and that is the part worth not re-deriving.** The obvious
+  theory — that a tab flip's `replaceState` does not reach `useSearchParams` — was tested and is
+  false: instrumenting the reader showed `searchParams` arriving as `review=day` at **both** the
+  `useState` initializer and the `[searchParams]` effect on the failing run. `setReviewOpen(true)`
+  runs. The sheet still does not appear, so the defect is downstream of the param, in what the
+  sheet renders or is gated on during a cold first render of that screen.
+- **Also ruled out:** the generic "effect-only reader misses the first mount" story. Health's
+  `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
+- **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
+  it as, and what it is gated on) rather than the param.
+- **Probe recipe:** `page.goto('/')`, `settleRouteBoundary`, then
+  `page.evaluate(() => window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/nutrition?review=day', cancelable: true })))`,
+  wait ~10 s, read `[role="dialog"]`. Allow generously for the dynamic import — a run that renders
+  nothing after 8 s is a probe artefact, not the defect.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
 
@@ -2555,6 +2499,16 @@ month of compliance data. **A reader scanning PARKED could not see the obligatio
 why the count of affected entries always understated the harm.
 
 ### [platform] LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
+
+- **✅ THE MEASURED CAUSE IS FIXED (RV-134, 2026-09-23) — re-verify before building this.** The
+  collisions were not caused by the ceiling; they were caused by **slack detection firing on every
+  PR**, which put a shared one-line file in almost every diff. `check-doc-index-size.js` now
+  tolerates slack within `max(25, 2%)` of the baseline and only fails beyond it, so a PR that shrinks
+  a tracked doc by a few lines no longer has to touch `.size` at all. Measured the night it was
+  written: 23 re-merge commits across five branches, one branch paying it twelve times; both of that
+  night's real cases (23 lines under 27,128 and 7 under 877) now fall inside the band. What remains
+  is two PRs that both GROW past the ceiling on the same day — a genuine disagreement about one
+  number, and the case a ratchet should conflict on.
 
 - **Lane: O** — `scripts/check-doc-index-size.js` and `docs/doc-size/docs/implementation-backlog.md.size`.
   Filed by Lane B, not built by it: `scripts/**` is the Orchestrator's.

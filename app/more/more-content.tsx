@@ -150,6 +150,13 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
 
       <PullToSync
         onSync={handlePullSync}
+        // RV-112: Home and More both stay mounted in the shell, and the key is
+        // `keySuffix ? pathname#suffix : pathname` — neither passed a suffix, so while the URL read
+        // `/more` both containers wrote and restored `ta_scroll:/more`, with no owner check on the
+        // restore. Health passed three suffixes and was never affected. The SUFFIX is what
+        // separates them, not the path: `usePathname()` reads the route tree, which a tab flip
+        // leaves stale (LA-109), so the pathname half cannot be relied on to differ.
+        scrollKey="more"
         scrollClassName="flex-1 overflow-y-auto pb-nav-safe"
         className="flex-1 flex flex-col overflow-hidden"
       >
