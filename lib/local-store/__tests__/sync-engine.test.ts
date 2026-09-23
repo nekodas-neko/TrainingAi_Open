@@ -7,6 +7,15 @@ const { fakeStore } = vi.hoisted(() => ({
     deleteMutations:        vi.fn().mockResolvedValue(undefined),
     recordMutationFailures: vi.fn().mockResolvedValue(undefined),
     getFoodLogs:            vi.fn().mockResolvedValue([]),
+    markFoodLogSynced:      vi.fn().mockResolvedValue(undefined),
+    getInjuries:            vi.fn().mockResolvedValue([]),
+    upsertInjury:           vi.fn().mockResolvedValue(undefined),
+    markInjurySynced:       vi.fn().mockResolvedValue(undefined),
+    getSupplementLogs:      vi.fn().mockResolvedValue([]),
+    upsertSupplementLog:    vi.fn().mockResolvedValue(undefined),
+    markSupplementLogSynced: vi.fn().mockResolvedValue(undefined),
+    markPlanMealAnswerSynced: vi.fn().mockResolvedValue(undefined),
+    upsertFoodLog:          vi.fn().mockResolvedValue(undefined),
     getStrandedPendingWorkouts: vi.fn().mockResolvedValue([]), // added in Task 9; harmless before
     requeueStrandedFoodItems: vi.fn().mockResolvedValue(0),
     queueMutation:          vi.fn().mockResolvedValue(undefined),
@@ -304,5 +313,121 @@ describe('restoreFromCloud', () => {
     // success toast. The cursor is still resumable (persisted up to the last successful page).
     expect(res).toEqual({ synced: 0, failed: true })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DV-5 — a confirmed food-log DELETE must not stay pending', () => {
+  beforeEach(() => { vi.clearAllMocks(); _resetSyncBackoff() })
+
+  // The row is already tombstoned when the push is confirmed, and `getFoodLogs` filters
+  // `deleted_at IS NULL` — so the read-then-upsert path finds nothing, the `if (rec)` guard
+  // silently does nothing, and the outbox entry is dropped anyway. The tombstone is then
+  // `pending` forever, and `applyDelta` only ever overwrites `synced` rows, so no later server
+  // correction can reach it. Measured on the S25: 33 such rows back to 2026-08-19.
+  it('marks the tombstone synced by id rather than re-reading a row that is filtered out', async () => {
+    fakeStore.getPendingMutations.mockResolvedValue([
+      { id: 'ob-del', userId: 'u1', domain: 'food_logs', date: '2026-07-01',
+        payload: { id: 'food-row-1', deleted: true },
+        createdAt: '2026-07-01T00:00:00.000Z', attempts: 0, lastError: null,
+        status: 'pending', nextRetryAt: null },
+    ])
+    // What the device sees: the getter cannot return a deleted row.
+    fakeStore.getFoodLogs.mockResolvedValue([])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ processed: 1, errors: [] })))
+
+    await pushMutations('u1')
+
+    expect(fakeStore.markFoodLogSynced).toHaveBeenCalledWith('food-row-1')
+    expect(fakeStore.deleteMutations).toHaveBeenCalledWith(['ob-del'])
+  })
+
+  it('still uses the read-then-upsert path for a normal (non-delete) log', async () => {
+    fakeStore.getPendingMutations.mockResolvedValue([
+      { id: 'ob-add', userId: 'u1', domain: 'food_logs', date: '2026-07-01',
+        payload: { id: 'food-row-2' },
+        createdAt: '2026-07-01T00:00:00.000Z', attempts: 0, lastError: null,
+        status: 'pending', nextRetryAt: null },
+    ])
+    fakeStore.getFoodLogs.mockResolvedValue([{ id: 'food-row-2', date: '2026-07-01', syncStatus: 'pending' }])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ processed: 1, errors: [] })))
+
+    await pushMutations('u1')
+
+    expect(fakeStore.markFoodLogSynced).not.toHaveBeenCalled()
+    expect(fakeStore.upsertFoodLog).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'food-row-2', syncStatus: 'synced' }),
+    )
+  })
+})
+
+describe('DV-5 siblings — the same defect on every other delete-capable domain', () => {
+  beforeEach(() => { vi.clearAllMocks(); _resetSyncBackoff() })
+
+  function outbox(domain: string, payload: Record<string, unknown>) {
+    fakeStore.getPendingMutations.mockResolvedValue([
+      { id: 'ob-1', userId: 'u1', domain, date: '2026-07-01', payload,
+        createdAt: '2026-07-01T00:00:00.000Z', attempts: 0, lastError: null,
+        status: 'pending', nextRetryAt: null },
+    ])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ processed: 1, errors: [] })))
+  }
+
+  // `getInjuries` filters `deleted_at IS NULL`, so the tombstone is unreachable from the
+  // read-then-upsert arm and would stay pending past every later pull.
+  it('marks a deleted injury synced by id', async () => {
+    outbox('injuries', { id: 'inj-1', deleted: true })
+    fakeStore.getInjuries.mockResolvedValue([])
+    await pushMutations('u1')
+    expect(fakeStore.markInjurySynced).toHaveBeenCalledWith('inj-1')
+  })
+
+  it('still reads-then-upserts a non-deleted injury', async () => {
+    outbox('injuries', { id: 'inj-2' })
+    fakeStore.getInjuries.mockResolvedValue([{ id: 'inj-2', syncStatus: 'pending' }])
+    await pushMutations('u1')
+    expect(fakeStore.markInjurySynced).not.toHaveBeenCalled()
+    expect(fakeStore.upsertInjury).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'inj-2', syncStatus: 'synced' }),
+    )
+  })
+
+  // Keyed on (supplementId, logDate) because that is the pair `deleteSupplementLog` writes.
+  it('marks a deleted supplement log synced by its (supplementId, logDate) pair', async () => {
+    outbox('supplement_logs', { supplementId: 'sup-1', logDate: '2026-07-01', deleted: true })
+    fakeStore.getSupplementLogs.mockResolvedValue([])
+    await pushMutations('u1')
+    expect(fakeStore.markSupplementLogSynced).toHaveBeenCalledWith('sup-1', '2026-07-01')
+  })
+
+  it('still reads-then-upserts a non-deleted supplement log', async () => {
+    outbox('supplement_logs', { supplementId: 'sup-2' })
+    fakeStore.getSupplementLogs.mockResolvedValue([
+      { id: 'sl-2', supplementId: 'sup-2', source: 'manual', syncStatus: 'pending' },
+    ])
+    await pushMutations('u1')
+    expect(fakeStore.markSupplementLogSynced).not.toHaveBeenCalled()
+    expect(fakeStore.upsertSupplementLog).toHaveBeenCalledWith(
+      expect.objectContaining({ supplementId: 'sup-2', syncStatus: 'synced' }),
+    )
+  })
+
+  // This domain had NO confirm arm, so both halves were stuck, not just the delete.
+  it('confirms a plan-meal answer on the delete arm', async () => {
+    outbox('plan_meal_answers', { planMealId: 'pm-1', logDate: '2026-07-01', deleted: true })
+    await pushMutations('u1')
+    expect(fakeStore.markPlanMealAnswerSynced).toHaveBeenCalledWith('pm-1', '2026-07-01')
+  })
+
+  it('confirms a plan-meal answer on the non-delete arm too', async () => {
+    outbox('plan_meal_answers', { planMealId: 'pm-2', logDate: '2026-07-01' })
+    await pushMutations('u1')
+    expect(fakeStore.markPlanMealAnswerSynced).toHaveBeenCalledWith('pm-2', '2026-07-01')
+  })
+
+  // The outbox entry carries the date; a payload that omits logDate must still confirm.
+  it('falls back to the mutation date when the payload omits logDate', async () => {
+    outbox('plan_meal_answers', { planMealId: 'pm-3' })
+    await pushMutations('u1')
+    expect(fakeStore.markPlanMealAnswerSynced).toHaveBeenCalledWith('pm-3', '2026-07-01')
   })
 })
