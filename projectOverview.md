@@ -27,7 +27,23 @@
 ## 🔖 Current Status
 
 **Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-22.
+**Last updated:** 2026-09-23.
+
+**Four sync confirm arms could never mark a pushed row synced (DV-5).** `pushMutations` confirms a
+drained mutation by re-reading the row through the **UI-facing getter**, and every one of those
+getters filters `deleted_at IS NULL` — so a DELETE's row is never found, the `if (rec)` guard does
+nothing, and the outbox entry is dropped anyway. The tombstone stays `pending` forever, which makes
+it immune to `applyDelta` (which only overwrites `synced` rows) and unreclaimable by the local prune
+(which only deletes `synced` rows). Device Verification measured **33 such `food_logs` rows on the
+S25 against an empty outbox**. The sibling sweep found three more: `injuries` and `supplement_logs`
+on their delete paths, and **`plan_meal_answers`, which had no confirm arm at all** — so every
+answer, not only a delete, was stuck from its first write, and that table's `applyDelta` upsert
+gates *each column* on `sync_status='synced'`. Fixed with three keyed marks that read nothing back.
+⚠️ **The pass test is on-device only** (empty outbox, zero pending rows) and has not been run — the
+sandbox has no local SQLite. **DV-5's other half — one `set_logs` row pending since 2026-09-19 whose
+`exercise_logs.workout_session_id` is not in the local `workout_sessions` table — is NOT explained
+by this fix** (`workout_log` confirms with a keyed `UPDATE`, not a read-back) and is carved out as
+**DV-8**, `Gate: device`.
 
 **Score bands now use the theme tokens, and the thing guarding them failed silently (RV-99, half).**
 `scoreBand()` returned raw `#22c55e`/`#f59e0b`/`#ef4444` while `recovery-band.ts` and
@@ -2581,6 +2597,24 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [platform][nutrition] ⚠️ Four sync confirm arms could not mark a pushed row synced — NOT device-verified (DV-5, 2026-09-23)
+
+`pushMutations` confirmed a drained mutation by re-reading the row through the UI-facing getter,
+and every such getter filters `deleted_at IS NULL` — so a DELETE never confirmed, its tombstone
+stayed `sync_status='pending'` forever, and that made it immune to `applyDelta` (which overwrites
+only `synced` rows) and unreclaimable by the local prune (which deletes only `synced` rows).
+Measured by Device Verification: **33 `food_logs` tombstones on the S25 against an empty outbox**,
+three from pushes that returned 200. The sibling sweep found `injuries` and `supplement_logs` in
+the same state, plus **`plan_meal_answers`, which had no confirm arm at all** — every answer, not
+only a delete, was stuck from its first write. Fixed with three keyed marks that read nothing back.
+**Owed: the device check.** DV-5's pass test (empty outbox → zero pending rows) cannot run in the
+sandbox — `getLocalStore` returns null under node, so no test in this repo touches a real local
+SQLite file. **DV-5's other half is deliberately not claimed:** one `set_logs` row pending since
+2026-09-19 whose `exercise_logs.workout_session_id` is absent from the local `workout_sessions`
+table is *not* explained by this fix (`workout_log` confirms with a keyed `UPDATE`, not a
+read-back), and is carved out as **DV-8**, `Gate: device`. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-dv5-pending-after-push.md`](docs/overview/entries/2026-09-23-lane-a-dv5-pending-after-push.md).
 
 ### [heart-rate][nutrition][activity] ⚠️ Three shell-resident cards now subscribe to their own invalidation — NOT device-verified (RV-106, RV-107, RV-109, 2026-09-23, v1.465.7)
 

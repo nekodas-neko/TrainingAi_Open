@@ -97,7 +97,11 @@ export interface LocalStore {
   /** Offline-capable delete — pair with a queued `activity_logs` `{ id, deleted: true }` (Q-328). */
   softDeleteActivityLogPending(id: string): Promise<void>;
   /** Confirm a queued activity-log mutation, so a tombstone becomes prunable (Q-328). */
+  markFoodLogSynced(id: string): Promise<void>;
   markActivityLogSynced(id: string): Promise<void>;
+  markInjurySynced(id: string): Promise<void>;
+  markSupplementLogSynced(supplementId: string, logDate: string): Promise<void>;
+  markPlanMealAnswerSynced(planMealId: string, logDate: string): Promise<void>;
   upsertFitnessTest(record: LocalFitnessTest): Promise<void>;
   upsertPrescribedRun(record: LocalPrescribedRun): Promise<void>;
   logWorkoutLocally(payload: LogExercisePayload, syncStatus: 'pending' | 'synced'): Promise<void>;
