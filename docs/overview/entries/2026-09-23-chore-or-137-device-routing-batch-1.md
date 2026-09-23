@@ -107,6 +107,47 @@ that both end at `atBase === null`. The goals flake remains undiagnosed; what th
 that one of the two paths into that state is now closed, so the next occurrence has one fewer
 explanation to rule out.
 
+## `main` was RED, and this PR fixes it — crossing the lane line on purpose
+
+Re-merging `main` turned this branch's gate red in
+`app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6. **It is not this diff**:
+confirmed red on `origin/main` in a clean worktree, 4 failed / 2 passed, identical.
+
+**Cause.** `#1466` (RV-82, *"Hand back the program `getNextSession` already fetched"*) replaced the
+route's `repo.getActiveProgram()` call with `recommendation.program ?? null`. The change is right —
+`getActiveProgram` is a fixed 5-query composite that was running twice per request. But the spec
+still seeded the program through `getActiveProgram.mockResolvedValue(...)`, and its `getNextSession`
+mock returned `{ isRestDay: false, session, reason: '' }` with **no `program` key**. So `program`
+was `null`, the route took its `!program` branch, and every case got `REST_DAY_RESPONSE` — hence
+*"expected true to be false"* on `isRestDay`.
+
+**Nothing failed at compile time, because a `vi.fn()` that is never called is not an error.** A mock
+for a call the code no longer makes is dead in exactly the way an unused export is — the `LA-26`
+shape, one layer up.
+
+**The fix** carries the program on the `getNextSession` mock in all five cases, keeping
+`getActiveProgram` seeded from the same object so the two cannot drift. `#1466` is NOT reverted; the
+double-fetch it removed is real.
+
+### Why an Orchestrator touched `app/api/**`
+
+It is Lane A's path and this crosses the rule deliberately, so the reasoning is on the record:
+
+- **`Tests` is a required check, so red `main` blocks every PR from every agent** — including Lane
+  A's own live `#1467`, and including the backlog entry that would have documented the breakage.
+  Filing it and waiting would have parked the whole repo behind a queue entry that could not merge.
+- **It is test-only and mechanical** — no product behaviour changes, and the shape of the fix is
+  forced by `#1466`'s new contract.
+- **No open PR was fixing it.** Checked before writing anything.
+- **The collision risk is the real cost** and it is not zero: Lane A may fix the same file in
+  `#1467`. If both land, it is one test file to reconcile and the two fixes would be near-identical.
+
+Filed as `OR-138` at the top of Lane A's queue first, then removed from the queue when this PR fixed
+it — a finished entry must not sit in the queue.
+
+**Worth checking next:** whether the other specs touching `getNextSession` seed a program the same
+way. Not done here.
+
 ## Not done
 
 - **No product code**, no device run.
