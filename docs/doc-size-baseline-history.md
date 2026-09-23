@@ -16076,7 +16076,27 @@ marked as waiting on hardware rather than on the device agent, and Q-253 struck 
 answer. The lane bullets are verbose on purpose — an assignment with no reason attached is what
 produced the circular gates, and this file is read by agents who cannot ask.
 
-## 2026-09-23 — `implementation-backlog.md` 27458 → 27438, `projectOverview.md` 12508 → 12525 (LB-128)
+## 2026-09-23 — backlog 27458 → 27492 (DV-6 + LB-130, +34)
+
+Two entries move this, and neither is the code.
+
+**DV-6 shipped and stayed in the queue** as `Verify: device` + `Keep:`, because the one thing the
+sandbox cannot judge is the thing most likely to need tuning: how the gradient composes with
+`DynamicBackground`'s sky. Its entry also now records why the decision logic sits in a `.ts`
+controller rather than the component — every vitest project here is `environment: 'node'` and
+cannot transform `.tsx` at all, so logic left in the component is logic nothing can drive, and on
+device a dead scrim and a mis-scoped one look identical. That is worth the lines because the
+obvious "simplification" later is to fold the controller back in.
+
+**LB-130 is new**, and it is the one to read: `docs/doc-size-baseline-history.md` — this file — is
+now the guaranteed-conflict line that `.size` used to be. LA-33 split the `.size` map per document
+and RV-134 gave it a slack band; across five re-merges of #1449 in one hour the `.size` file
+conflicted only when a change genuinely grew a document, and **this file conflicted every time**.
+Same append-to-one-shared-file shape, same fix the repo has already used twice: per-entry files
+under `docs/doc-size/history/`, folded in by the existing compaction sweep. It needs no code —
+`check-doc-index-size.js` prints the reminder to write a note and never reads what is written.
+
+## 2026-09-23 — `implementation-backlog.md` → 27472, `projectOverview.md` → 12525 (LB-128)
 
 The backlog **shrinks by 20**: LB-128 leaves and nothing replaces it. RV-103's `Keep:` was edited
 rather than struck — its reporting path now has a working channel, but the device check it also
