@@ -15749,3 +15749,16 @@ independent filing of the ⛔ parser bug, after `LA-49` (2026-09-01) and alongsi
 it quotes the glyph as evidence and was parked by the bug it describes. **A finding that reaches a
 human gets answered; a finding that hides itself gets re-derived, and each re-derivation pays the
 investigation again.**
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26303, `projectOverview.md` → 12389 (LA-128)
+
+The backlog shrinks by LA-128's whole entry; nothing is owed, so no `Keep:`. The
+`projectOverview.md` block spends most of its lines on the half that is NOT in the diff: the outbox
+staying lenient on purpose.
+
+That is the part worth the space. The route and the outbox now disagree about unknown keys, and the
+disagreement looks exactly like an oversight — a future sweep will find the non-strict parse in
+`adapter.ts`, read it as the same defect, and "finish the job". Doing that would reject a queued
+check-in outright rather than surface a mistake, deleting something the user already wrote. The
+reasoning is in `adapter.ts` beside the parse, and here, because those are the two places someone
+would look before changing it.
