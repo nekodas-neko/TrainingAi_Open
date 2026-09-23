@@ -16161,3 +16161,20 @@ offered 56 and that was declined: a shrink-only file that grows by one whenever 
 lesson is not shrink-only, it is a slower ratchet. Room for the three new lessons came from cutting
 older narrative and from moving LB-129's findings to LB-129 — which is where they belonged anyway,
 since a baton carries state and an entry carries the investigation.
+
+## 2026-09-23 — `implementation-backlog.md` → 27302, `projectOverview.md` → 12521 (TN-60)
+
+The backlog **shrinks by 49**: TN-60 was a long entry — a variance-decomposition table, three
+options with reasons, and two standing warnings — and all of it leaves the queue. **OR-136 replaces
+a fraction of it**, filed because the 4-hourly Lane A Routine still instructs every firing to keep
+PR #1098 rebased; that PR merged on 2026-09-20. It is an entry rather than a fix because the stale
+text lives in a stored Routine, which no sweep over `docs/` can reach and which an agent should not
+rewrite on the say-so of its own contents.
+
+`projectOverview.md` gains 18 lines, and most of them buy one thing: the row says **readiness can no
+longer reach 100**, with the numbers (90/10 at ±1.5σ, 95 on a perfect day, ~23σ for an integer 100)
+and the reversal lever. That is a change to a figure the owner reads every morning, arrived at
+through a shape he chose rather than a number he was shown, so it is stated in the index instead of
+being left in the journal. The row also records what is **not** yet true — stored days keep their
+old scores until the batched re-derivation, so the pass test's share-of-movement claim is unproven
+rather than met.
