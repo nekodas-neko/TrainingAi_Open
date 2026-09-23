@@ -29,6 +29,23 @@
 **Version:** v1.465.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**A test file under `app/` was buying the 34-minute browser suite, and a plain `git fetch` was
+producing PRs CI never ran (2026-09-23).** Two independent CI/tooling findings from one session.
+**E2E's path gate now drops `__tests__/` the way it already drops `app/api/**`** — a vitest file is
+not loaded by any browser, and PR #1405 touched exactly one of them and bought **four** full runs,
+reaching all-six-green on the fourth and still failing to merge because `main` moved each time.
+⛔ **The expensive one: this sandbox's git proxy returns a SHALLOW pack on every `git fetch origin
+main`**, grafting the tip as a root, so `git merge origin/main` fails with *"refusing to merge
+unrelated histories"* and the resulting tree reads as conflicted to GitHub — **and a conflicted PR
+is never given a workflow run**, which presents as `total_count: 0` forever while every other branch
+builds fine. Four PRs with sound diffs died that way (#1426, #1428, #1430, #1435). The rule, the two
+cheap discriminators and the `--unshallow` remedy are in CLAUDE.md's Git Workflow section; the
+decisive test is `update_pull_request_branch`, which merges server-side and so distinguishes a real
+conflict from a reporting lag. Also filed: **LA-129** (generate the `.size` baselines in CI — the
+answer owner decision item 5 named and left unfiled) and **OR-132** (the five dead PRs, which need
+the owner's authorisation to close).
+
+
 **The fetch-once ratchet could only see `[]`, so two of sweep 53's freshness findings were invisible
 to it (RV-105).** ⛔ **The entry claims four; two survive checking** — RV-106 and RV-109 are this
 shape, while RV-104 and RV-107 are `nutrition-content.tsx:318`'s `useCallback` shape

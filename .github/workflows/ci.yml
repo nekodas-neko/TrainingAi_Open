@@ -657,7 +657,13 @@ jobs:
           # `app/api/**` is dropped BEFORE the match (LA-63): it is reached by no browser, so a
           # migration and four API routes used to buy the full ~25-minute suite. An `app/` path that
           # is not under `app/api/` still counts, which is what keeps a page change gated.
-          if echo "$FILES" | grep -vE '^app/api/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'; then
+          # `__tests__/` is dropped alongside `app/api/`, and for the same reason: a vitest file
+          # under app/ or components/ is not loaded by any browser, so it cannot change what
+          # Playwright sees. Measured 2026-09-23 — PR #1405 touched exactly ONE such file
+          # (app/session-explain/__tests__/bf172-fit-not-readiness.test.ts) and bought four full
+          # ~34-minute runs, drifting out of date during three of them. `e2e/` specs are NOT under
+          # a `__tests__/` directory (checked: zero), so the browser suite still gates on itself.
+          if echo "$FILES" | grep -vE '^app/api/' | grep -vE '(^|/)__tests__/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "No app/, components/, e2e/ or playwright.config.ts changes — skipping the browser run."
