@@ -13,13 +13,19 @@ import {
 } from "chart.js";
 import { resolveColor } from "@trainingai/shared/chart-colors";
 import { timingPoints, timingValueToClock, type TimingNight } from "./sleep-timing-trend-utils";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 export type { TimingNight };
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 
 export function SleepTimingTrendCard({ nights, mode }: { nights: TimingNight[]; mode: "bedtime" | "wake" }) {
-  const points = useMemo(() => timingPoints(nights, mode), [nights, mode]);
+  // LB-131. `timingPoints` defaults to Brisbane, which is right for the owner and wrong for anyone
+  // else — the "a default every caller overrides" shape CLAUDE.md names. Read from the context
+  // rather than taking a prop: the card is rendered through `sleep-trend-toggle-card.tsx`, which
+  // has no other use for a timezone, and a threaded prop is one a future render site can forget.
+  const tz = useUserTimezone();
+  const points = useMemo(() => timingPoints(nights, mode, tz), [nights, mode, tz]);
   const toClock = (v: number) => timingValueToClock(v, mode);
 
   if (points.every(p => p.value == null)) {

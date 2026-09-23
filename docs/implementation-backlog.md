@@ -1117,37 +1117,45 @@ below threshold and left in place for next time.
 
 ### [sleep] LB-131 — the sleep-timing chart takes the owner's zone by default; nothing passes the user's
 
-- **Lane:** B — `components/health/sleep-timing-trend-card.tsx:22`.
+- **Lane:** B — `components/health/sleep-timing-trend-card.tsx`.
 - **Added:** 2026-09-23 · Lane A, as the residue of the DV-7 fix.
-- **Already done in DV-7's PR, so do not redo it.** `timingPoints(nights, mode, tz = DEFAULT_TZ)`
-  now resolves BOTH modes through `minutesFromNoon`. Wake used to read `d.getHours()` — the device
-  — while bedtime went through the shared helper, so when DV-7 stopped that helper reading the
-  device, the two modes of one chart would have sat in two different zones off Brisbane. The tests
-  carry explicit `+10:00` fixtures and pass under UTC, Brisbane, New York and `Etc/GMT-13`.
-- **What is left:** the card calls `timingPoints(nights, mode)` and takes the default, so every
-  user gets **Brisbane** rather than their own zone. Thread the session timezone from the screen
-  into the card and on into `timingPoints`. **Ships with DV-9**, which threads the same value into
-  `computeSleepStartConsistency` one component above — one tz resolved once per screen, not twice.
-- **Why it is not urgent and still not nothing:** the owner is in Brisbane, so the default is
-  correct for the only user today. It is wrong the moment there is a second one, and it is the
-  shape CLAUDE.md calls invisible — *"while the device sits in the zone the data was recorded in"*.
-- **Pass test:** with a profile timezone far from Brisbane, the chart's bedtime and wake axes both
-  move with the profile rather than with the phone.
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/lb131-dv9-sleep-timezone`, v1.465.12), with DV-9 as one PR.
+- **Built differently from the plan, deliberately.** The entry said to thread the session timezone
+  from the screen through into the card. The card is rendered by `sleep-trend-toggle-card.tsx`,
+  which has no other use for a zone — so a threaded prop is a parameter a future render site can
+  omit, which is the SAME hazard as the `tz = DEFAULT_TZ` default this entry is about, moved one
+  level up. The card reads `useUserTimezone()` instead, which is a context fed from the root
+  layout's `auth()` call, so it is correct wherever it is mounted. Reversal is a prop and two
+  edits.
+- **The maths was already right.** DV-7 resolved both modes through `minutesFromNoon` with explicit
+  `+10:00` fixtures passing under UTC, Brisbane, New York and `Etc/GMT-13`. Only the call site was
+  missing.
+- **Keep:** the device look, shared with DV-9 — set the profile timezone far from Brisbane and
+  confirm the bedtime and wake axes move with the profile rather than the phone.
 
 ### [sleep] DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's
 
-- **Lane:** B — `app/health/sleep/sleep-content.tsx:72`.
-- **Needs:** DV-7
+- **Lane:** B — `app/health/sleep/sleep-content.tsx`.
 - **Added:** 2026-09-23 · Device Verification, found with DV-7.
-- **The defect:** `computeSleepStartConsistency(recentStarts)` is called with **no timezone**, so each
-  bedtime is placed in the device's local clock. The server route (`app/api/user/bedtime-estimate`)
-  passes one; this screen does not. **Invisible on the owner's phone** because it is set to Brisbane —
-  wrong for anyone whose phone and profile disagree (travel, or another user), which is exactly how
-  CLAUDE.md says this class hid for months.
-- **Fix:** pass the user's timezone (the session's `timezone`, as the route does).
-- **Pass test:** with the device timezone emulated to another zone (CDP `Emulation.setTimezoneOverride`
-  in `scripts/device/pw.js`), the Sleep screen's consistency figure does not change.
-
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/lb131-dv9-sleep-timezone`, v1.465.12), with LB-131 as one PR — one
+  zone read per surface, as that entry asked.
+- **The defect:** `computeSleepStartConsistency(recentStarts)` took no zone, so each bedtime landed
+  in the DEVICE's clock. The server route (`app/api/user/bedtime-estimate`) already passed one;
+  this screen did not. Invisible on the owner's phone because it is set to Brisbane.
+- **The sibling sweep found no third site.** Both helpers have exactly two call sites between
+  `app/` and `components/`, and the API route's was already correct.
+- **Pinned by `components/health/__tests__/lb131-dv9-sleep-tz-call-sites.test.ts`**, which sweeps
+  every client call site of `computeSleepStartConsistency` and `timingPoints` for a missing zone,
+  and asserts the value comes from `useUserTimezone()` rather than a literal or an `Intl` read. It
+  reads each call to its balanced closing paren — a first draft matched one line at a time and
+  reported the API route's three-line call as bare, which is a false positive, not a find. Control
+  runs: reverting either call site, or hardcoding the zone, each fails its own assertion.
+- **Keep:** the device check — with the device timezone overridden (CDP
+  `Emulation.setTimezoneOverride` in `scripts/device/pw.js`) and the profile left alone, the Sleep
+  screen's consistency figure must NOT change. That is the one assertion the sandbox cannot make:
+  it needs two clocks that disagree.
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 

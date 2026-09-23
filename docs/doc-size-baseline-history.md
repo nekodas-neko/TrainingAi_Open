@@ -16096,3 +16096,20 @@ Same append-to-one-shared-file shape, same fix the repo has already used twice: 
 under `docs/doc-size/history/`, folded in by the existing compaction sweep. It needs no code —
 `check-doc-index-size.js` prints the reminder to write a note and never reads what is written.
 
+
+## 2026-09-23 — backlog 27492 → 27500 (LB-131 + DV-9, +8)
+
+Both entries shipped and both stayed, each as `Verify: device` + `Keep:` — so two completed items
+cost eight lines rather than clearing thirty.
+
+That is the right direction here, and the reason is worth the space: **DV-9's pass test is one the
+sandbox cannot make at all.** It needs the device clock and the profile to disagree — override the
+handset's zone, leave the profile alone, and the consistency figure must not move. No amount of
+local testing produces two clocks, so deleting the entry would have recorded a check that nobody
+ran.
+
+The lines also carry why LB-131 was built against its own plan. It asked for the timezone to be
+threaded as a prop; the card is rendered through a toggle component that has no use for a zone, so
+the prop would be one a future render site can omit — the same hazard as the `tz = DEFAULT_TZ`
+default the entry exists to remove, moved up a level. It reads the context instead. A later session
+reading only the original entry would see a prop missing and "fix" it back.

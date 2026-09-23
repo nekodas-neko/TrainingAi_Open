@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.12",
+    date: "2026-09-23",
+    changes: [
+      "Sleep times now follow your profile's timezone rather than the phone's. The Sleep screen's bedtime consistency was worked out in whatever zone the handset was set to, and the bedtime and wake charts always assumed Brisbane \u2014 so both could drift if you travelled. They read your profile setting now.",
+    ],
+  },
+  {
     version: "1.465.11",
     date: "2026-09-23",
     changes: [
