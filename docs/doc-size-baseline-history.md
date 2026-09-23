@@ -15889,3 +15889,14 @@ a non-blocking one. The owner's answer then earned its place on a *different* qu
 could not settle: whether the vial's stored open date or the dose log was the true one.
 
 **Ask for the fact nobody has, not the fact nobody looked up.**
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27230 → 27274 (OR-134)
+
+Forty-four lines recording why three different things were wearing one `Gate: device`: two circular
+gates released with what is genuinely owed after the build, three Colmi-blocked entries marked as
+not-an-S25-sitting, and three reasonless gates flagged rather than released.
+
+This is the growth side of the ratchet doing its job, and worth noting the day the slack side was
+softened (RV-134): **growth still fails at the first line over.** The asymmetry is the point — a
+document that grew needs someone to look at what was added, and forty-four lines of reasoning on an
+entry that previously said `- **Gate:** device` is a trade the index should be asked about.

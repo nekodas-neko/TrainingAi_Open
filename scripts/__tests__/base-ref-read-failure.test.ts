@@ -8,7 +8,9 @@
 // which ref is being read.
 import { describe, expect, it } from 'vitest'
 
-const { showAtBase, fileAtBase, verdict } = require('../lib/base-ref.js') as {
+const { showAtBase, fileAtBase, verdict, resolveBaseRef, DEFAULT_BASE_REFS } = require('../lib/base-ref.js') as {
+  resolveBaseRef: (refs?: string[]) => string | null
+  DEFAULT_BASE_REFS: string[]
   showAtBase: (ref: string, p: string) => { content: string | null; unreadable: boolean; reason?: string }
   fileAtBase: (ref: string | null, p: string) => string | null
   verdict: (a: { count: number; limit: number; atBase: number | null }) => string
@@ -62,5 +64,29 @@ describe('the strict fallback is unchanged', () => {
 
   it('still reports an unreadable base as absent, so the outcome stays strict', () => {
     expect(fileAtBase('or130-definitely-not-a-ref', 'package.json')).toBeNull()
+  })
+})
+
+
+// The half of OR-130 that was missed, found on its FOURTH occurrence (2026-09-23).
+//
+// OR-130 instrumented `fileAtBase`, which is the path where a per-file read fails. It is not the
+// path that fires. When NO base ref resolves at all, `fileAtBase(null, …)` returns null without
+// consulting git — so no per-file warning can exist — and `verdict` turns that null into 'fail'.
+// The ratchet then runs in ABSOLUTE mode while its output still reads as a judgement about the
+// branch: a file byte-identical to main, named as this branch's new violation.
+describe('a run with no base at all says so (OR-130, the missed half)', () => {
+  it('returns null when none of the refs resolve', () => {
+    expect(resolveBaseRef(['or134-nope-a', 'or134-nope-b'])).toBeNull()
+  })
+
+  it('still resolves normally with the real defaults', () => {
+    expect(DEFAULT_BASE_REFS).toContain('origin/main')
+  })
+
+  // Saying so changes no verdict — absolute mode is stricter and stays exactly as it is. What
+  // changes is that a reader can tell which mode produced the answer in front of them.
+  it('does not alter the verdict for an unknown base', () => {
+    expect(verdict({ count: 1, limit: 0, atBase: null })).toBe('fail')
   })
 })
