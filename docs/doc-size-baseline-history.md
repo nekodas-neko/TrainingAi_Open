@@ -18,6 +18,19 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-24 — journal compaction sweep: 61 foldable entries → 21
+
+Not a baseline raise. `docs/overview/entries/` crossed the hard runaway limit of 60, and the gate
+assigns the sweep to whoever adds the entry that crosses it — which was RV-76's. Run as its OWN
+docs-only PR rather than bundled into that feature branch: the README says the sweep is one
+docs-only PR precisely because only one session runs it, so it never conflicts, and bundling forty
+file deletions into a code PR would have handed it a conflict surface for no reason.
+
+`node scripts/fold-journal-entries.js` folded 40 entries into `history-2026-09-23-folded-1.md` and
+held back 7 that an agent baton cites — rewriting those would mean one lane writing into another
+lane's live state file. `check-doc-links` (829 files) and `check-index-doc-paths` (1,176 paths)
+both clean afterwards.
+
 ## 2026-09-24 — backlog → 27294 (DV-15 reproduced and fixed), projectOverview → 12638
 
 DV-15 stays queued for its device pass test, and grew because the entry now carries the
