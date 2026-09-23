@@ -16038,3 +16038,16 @@ This is the growth side of the ratchet doing its job, and worth noting the day t
 softened (RV-134): **growth still fails at the first line over.** The asymmetry is the point — a
 document that grew needs someone to look at what was added, and forty-four lines of reasoning on an
 entry that previously said `- **Gate:** device` is a trade the index should be asked about.
+
+## 2026-09-23 — `CLAUDE.md` → 932 and `docs/implementation-backlog.md` → 27456 (OR-135)
+
+**CLAUDE.md +17**: the lane rule in the owner's own words — DV takes what the phone can ANSWER, a
+looks-or-design judgement stays with the Orchestrator and waits for him — plus the three traps that
+mis-assigned real entries before it existed: "the agent can run it" is not "it belongs to DV", a
+probe that has already run is no longer DV's, and never convert a device gate into a shipped-work
+field to gain visibility.
+
+**Backlog +86**: sixteen device probes given a lane with the reason on each, five Colmi entries
+marked as waiting on hardware rather than on the device agent, and Q-253 struck on the owner's
+answer. The lane bullets are verbose on purpose — an assignment with no reason attached is what
+produced the circular gates, and this file is read by agents who cannot ask.
