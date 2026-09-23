@@ -2205,3 +2205,38 @@ gesture. Kept as LA-109's `Keep:`.
   Web v1.465.4 / APK 1.460.4, portrait, three-button nav, system back via `adb shell input keyevent 4`:
   Home → More → *Profile details* → back lands on `/more` with the More tab active, read from
   `location.pathname` in the page. LA-109 left the queue the same day.
+
+### [app-shell] ✅ The Android back button ignored the overlay stack the app already had (BF-166, 2026-09-15)
+
+**Fixed in v1.456.19 — one line, after the entry's premise turned out to be wrong. Device check owed.**
+
+Owner: *"If you have a nutrition meal creator menu open and you press the back button - it makes the
+page behind it go back to main."*
+
+**The entry proposed building an overlay registry, on the grounds that none existed. One does** —
+`lib/hooks/sheet-back-stack.ts`, reached via `BackDismiss`, which `SheetContent` and `DialogContent`
+both already render (BF-27 put it there). The grep that found nothing searched for
+`overlayStack`/`topOverlay`; the real names are `openSurface`/`closeSurface`. **Building the proposed
+one would have left two stacks disagreeing about what is open** — worse than the bug.
+
+**The real defect:** `openSurface` pushes with `pushState(state, '')` — no URL — so the pathname
+never moves, and `backActionForPath` reads nothing else. On a tab route it answers `"home"` and the
+listener navigates; on `/` it answers `"minimize"` and the app backgrounds. **Neither touches
+history, so the pushed entry is never consumed.** Only `"pop"` worked, and only because
+`history.back()` is coincidentally what consumes it. The `"minimize"` case is a second symptom the
+report did not name.
+
+**The fix** exports `hasOpenSurface()` and pops when it is true, which reaches `handlePop` and closes
+the topmost surface through Radix's own `onOpenChange` — the same path as the X button, so every
+guard on a sheet's close still runs. It sits **after** the three mode guards, because each raises a
+dialog that is itself on this stack.
+
+**NOT verified on device, and no harness run can help.** Android's hardware back is a Capacitor
+channel Playwright cannot fire, and in a browser Radix closes on Escape so the bug never appears. The
+unit tests (4 of 5 red against `main`) cover the stack and the listener's ordering, not the gesture.
+- **RESOLVED 2026-09-23 — VERIFIED ON THE S25** (Device Verification agent). Web v1.465.4 / APK
+  1.460.4, portrait, `adb shell input keyevent 4`. Back closed an open sheet and left the route alone
+  on `/nutrition`, on `/` (without minimising) and on `/program`; mid-workout (gesture navigation,
+  `warmup`) back raised *Leave workout?*, a second back kept it up, *Stay* kept the workout. The one
+  defect seen — *Leave* does not leave — is the dialog's own entry absorbing `onLeave`'s
+  `history.back()`, filed as **DV-2**, not a regression of this fix.
