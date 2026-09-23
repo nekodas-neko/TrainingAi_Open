@@ -15957,6 +15957,24 @@ seen from the other side: there it blames a branch for a shrink it did not cause
 funds a branch's growth from one. Recorded here rather than "corrected" — dropping the baseline to
 27192 in this PR would be exactly the unattributed ratchet move RV-134 is about.
 
+
+## 2026-09-23 — `docs/implementation-backlog.md` +44 (27227 → 27271) (Review: RV-143)
+
+One entry, most of it a triage of the 24 affected entries. That list is the point rather than
+padding: the fix is three lines in `next-item.js`, and the risk is that turning the selector on
+dumps two dozen entries on the device agent with no indication that five of them want a ring it does
+not have and four are not really device work at all.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +7 (RV-143's own mis-parse)
+
+RV-143's first draft wrote the field names as literal tokens, and `keepFromLines` read the sentence
+*"a regex over the `Keep:` text"* as a real Keep block — whose prose then contained a bolded
+device-gate token it read as a real gate. `keep-gate-set-off.test.ts`, which pins the queue's
+seventeen gates by id, failed with an eighteenth: `RV-143:device`.
+
+The entry now writes the names as prose and carries the incident, because an entry about the gate
+parser being mis-parsed by it is LA-103's bug one level deeper and the best evidence the entry has.
+
 ## 2026-09-23 — `docs/implementation-backlog.md` 27151 → 27128 (TN-61 / the starved DV lane)
 
 TN-61 left the queue after being built, which is the whole of the 23 lines.
