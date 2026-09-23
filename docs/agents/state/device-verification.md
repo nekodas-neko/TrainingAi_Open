@@ -4,63 +4,53 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-23 · **By:** the first-run session (`device/bf166-mid-workout`) · **Next ID:** `DV-4`
+**Updated:** 2026-09-23 · **By:** the first-run session (`device/probe-tooling`) · **Next ID:** `DV-4`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
 
 - **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`. Tell the
-  owner only what needs a human (wearing, weighing, feel, a production write he has not OK'd).
-- **The phone is on GESTURE navigation now** (owner, 2026-09-23; `probe.js` reads mode 2, bottom
-  inset **15px**). Safe-area checks are valid from here on.
-- **`back-gesture-sitting` is done on the device side.** All five checks answered; what remains in
-  that batch is build work for Lane B — **BF-165** and **DV-2**, one mechanism.
-- **Leave PR #1411 alone** — the owner wants the Orchestrator to close its own PR. Its content is
-  already in `main` via #1417.
+  owner only what needs a human (wearing, weighing, feel).
+- **Next sitting is Review's probe set, RV-124…RV-133** (`docs/device-agent-probe-checklist.md`),
+  then the ~80 owed checks that need no human. Tooling for it landed on this branch.
+- **The phone is unplugged between sittings.** I message the owner to connect it; nothing runs
+  on a timer.
 
 ## Now
 
-Nothing in flight once `device/bf166-mid-workout` merges. Results so far (web v1.465.4, APK 1.460.4):
+No sitting in flight. Tooling built and self-tested off-phone: `scripts/device/pw.js` (Playwright
+over the WebView socket), `sweep.js` (P4), `census.js` (P2/P7/P10), `selftest.js` (18/18 against a
+desktop Chrome). **None of the new tools has touched the phone yet** — expect a fix on first run.
 
-| entry | outcome |
-|---|---|
-| LA-109, LB-107, BF-100 | ✅ VERIFIED, removed (#1417) |
-| BF-166 | ✅ VERIFIED in full, removed — the mid-workout half ran on 2026-09-23 with the owner's OK |
-| BF-165 | ❌ reproduced — sheet's `back()` 7 ms after the push. READY, Lane B |
-| BF-111 | ❌ "built 23 Aug" is the release's `published_at`. Lane A |
-| DV-2 | ❌ new — *Leave* on "Leave workout?" stays on the session screen. Lane B, batched with BF-165 |
-| DV-1 | Lane O — Windows rule-script paths. **Node half fixed here** (22.23.2) |
-| DV-3 | Lane A — migration-163 test flaked on #1419 CI (another file's user deleted mid-migration); re-run green |
+Open results: BF-165 + DV-2 (Lane B, one mechanism), BF-111 (Lane A), DV-1 (Lane O, Windows
+rule-script paths — Node half fixed here), DV-3 (Lane A, migration-163 test flake).
 
-## Next — in this order
+## Next — the sitting, in this order
 
-1. **Safe-area sweep, as one pass** — now valid. `tour.js` computes per-screen clearance; it has
-   **not run on the device yet**, so expect to fix it first. Floored utilities vs a 15px inset.
-2. **Offline-first reads** — needs airplane mode; ask the owner to toggle it (a system setting).
-3. **`admin-console-sitting`** (7) and **devices** (10) — read-only buttons first; anything that
-   re-keys, re-pairs or syncs → ask.
-4. **`motion-polish`** via `record.js` (RV-74/75) — also not yet run on the device.
+1. `probe.js` (confirm gesture nav), `selftest.js`, then `sweep.js` — P4, RV-127.
+2. `census.js --rounds 2 --dwell 25` — P2/P7/P10, RV-125/130/133. Then `--idle-min 30`.
+3. P1 matrix (RV-124) with `watchAfter`, then P3 (RV-126) with `localQuery`, then P8 (RV-131)
+   with `offline(true)` — all with the writes below, each deleted straight after.
+4. P5/P6 with `record.js` (RV-128/129), P9 (RV-132).
+5. The owed checks by queue order (`--sittings`), look-and-feel left to the owner.
 
-## Blocked — on the owner
+## Standing permissions from the owner (2026-09-23)
 
-- **`e2e/**` on the phone** — `connectOverCDP` attaches, but the specs write into production. A
-  read-only allowlist, or a test account on the phone? Not yet answered.
+- **All five write types, each deleted/undone straight after:** log a food, tick a supplement,
+  log a mood check-in, save a weigh-in, confirm a detected activity.
+- **A workout may be started** for a check, deleted afterwards if anything was logged (starting
+  alone writes nothing; verify with `/api/workout-sessions/day?date=<today>`).
+- **Upgrade tooling on this machine yourself.** Leave other agents' PRs for them to close.
 
-## Standing permissions from the owner
+## Decided — do not re-litigate
 
-- **A workout may be started for a check, provided it is deleted afterwards.** Starting alone
-  writes nothing server-side; only a logged set (`workout_log`) or completion does. Verify with
-  `/api/workout-sessions/day?date=<today>` afterwards; if a set was logged, delete that session.
-- **Upgrade tooling on this machine yourself** (Node was done this way via winget).
+- **The existing `e2e/**` suite does not run on the phone**: 62 of 121 specs use the local DB,
+  ~80 assume the seeded account, and the suite signs in — which would sign the owner out, and
+  sign-out wipes the device. Playwright is used as *this role's driver* instead. A small
+  phone-only read-only regression pack is optional, after the probes.
+- **Start Workout runs a 3-second countdown** before the store leaves `pre`.
+- **Captures never leave this machine as images** — the repo is public.
 
 ## Claimed paths
 
 `scripts/device/**` — mine for good (the role owns the harness).
-
-## Do not re-litigate
-
-- **Start Workout runs a 3-second countdown** before the store leaves `pre`; a back during it
-  just leaves the screen. Wait for `mode` to change before testing anything mid-workout.
-- **Two back presses to close `/program`'s New Program sheet is correct** — the first closes the
-  keyboard the autofocused field raised.
-- **Captures never leave this machine as images** — the repo is public.

@@ -61,6 +61,7 @@ const MealPlanSetupSheet = dynamic(
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { useEnergyBalanceRefetch } from "./use-energy-balance-refetch";
 import { useNutritionDerivedRefresh } from "./use-nutrition-derived-refresh";
+import { useNutritionTargetsRefresh } from "./use-nutrition-targets-refresh";
 import { WaterLogSheet } from "@/components/profile/water-log-sheet";
 import { mealTypeForHour } from "@trainingai/shared/nutrition/log-plan-meal";
 import { NutritionActionRow } from "@/components/nutrition/nutrition-action-row";
@@ -246,6 +247,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // RV-104: the weekly chart and the adherence figures, subscribed to their own invalidation so
   // no write path has to remember them. Returns the loader this mount fetch still calls.
   const refreshDerived = useNutritionDerivedRefresh(setWeeklyData, setAdherence);
+  // RV-107: the macro targets, subscribed to `invalidateGoalRecommendations`'s eviction so the
+  // rings stop banding against the previous target. Returns the loader this mount fetch calls.
+  const refreshTargets = useNutritionTargetsRefresh(setTargets);
 
   // Mount-scoped (PERF-5) — these fetches don't depend on selectedDate, so they
   // previously all re-ran on every date-swipe (≈40 requests browsing back 5 days).
@@ -263,10 +267,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             if (store && types.length) store.replaceMealTypes(types).catch(() => {});
           },
         ),
-        cachedFetch<NutritionTargets>(
-          'nutrition-targets', '/api/nutrition/targets', TTL_LONG,
-          d => setTargets(d ?? null),
-        ),
+        refreshTargets(),
         refreshDerived(),
         (async () => {
           // Local first — the plan has to render with no network, which is the whole point of
@@ -291,7 +292,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         ),
       ]);
     } catch { /* non-fatal */ }
-  }, [userId, tz, refreshDerived]);
+  }, [userId, tz, refreshDerived, refreshTargets]);
 
   // BF-177. Balance-only refetch; the hook carries why it is not `fetchData` and not a
   // client-side subtraction.
@@ -632,9 +633,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
             <TdeeAdaptationCard
               energyBalance={energyBalance?.date === selectedDate ? energyBalance : null}
-              onApplied={() => {
-                cachedFetch<NutritionTargets>('nutrition-targets', '/api/nutrition/targets', TTL_LONG, d => setTargets(d ?? null));
-              }}
+              onApplied={refreshTargets}
             />
 
             {/* BF-24 ④: each meal is its own card with its name as a label above it — artboard 1
