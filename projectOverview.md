@@ -2467,6 +2467,14 @@ all shipped 2026-09-23. **The open question is answered:** `sync-engine.ts` fire
 invalidation at all, so the pull path never closes the window and the far-side call is the only
 thing that does. Six further sites that looked identical were verified correct and are named in the
 entries, so a later sweep does not patch them. **Owed: the device pass on both.**
+**And the CI guard for this class could not see it (LB-133, fixed 2026-09-23).**
+`check-invalidate-after-push.js` reported clean, with no baseline, through the whole period those
+five sites carried the defect — it matched a ±12-line window and they sat 14 to 53 lines out.
+Checked against the five real pre-fix sources recovered from git: **the old detector missed all
+five; the new one catches all five and is clean after the fix.** It now brace-matches the enclosing
+handler, scans `lib/` (which it never did), and found a sixth offender on its first run —
+`lib/home/rest-day.ts`, where choosing a rest day invalidated the server-computed next-session
+recommendation before the push carrying the choice had landed.
 
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
 Three GET routes answered a parameter or configuration question before establishing the caller was anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-route-hardening-batch)).

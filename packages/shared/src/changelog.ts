@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.17",
+    date: "2026-09-23",
+    changes: [
+      "Choosing a rest day now refreshes your next-session recommendation once the choice reaches the server, instead of leaving the old suggestion in place until it expired on its own.",
+    ],
+  },
+  {
     version: "1.465.16",
     date: "2026-09-23",
     changes: [
