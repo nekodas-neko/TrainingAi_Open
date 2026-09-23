@@ -473,6 +473,40 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [devices][platform] DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+
+- **Lane:** A — `app/api/oura-ble/device-metrics/route.ts` first; also `samples/summary`, `rollup-state`,
+  `samples/pack`.
+- **Added:** 2026-09-23 · Device Verification, sweep 2 (station G, the read-only admin checks).
+- **⚠ Placed at the top because it is production availability, and the cause is NOT proven.**
+- **What was measured.** Opening `/admin/oura-ble` in the APK (web v1.465.10) issued `db-stats` → 200,
+  `rekey` → 200, `pending-count` → 200, and **four requests that never answered**:
+  `device-metrics`, `samples/summary`, `rollup-state`, `samples/pack` — still pending after 15 s, and
+  a direct timed `fetch` of `device-metrics` and `rollup-state` **aborted at 90 s with no response**.
+  Minutes later the public, database-free `/api/version`, curled from a separate PC, took **30 s** at
+  20:04:40 AEST and then **timed out at 20–30 s on every attempt until 20:12:41**, when it answered in
+  0.5 s. So production was effectively down for **~8 minutes**, for every user.
+- **Why the admin routes are the suspect, and why it is only a suspicion.** The pool's
+  `statement_timeout` is 15 s (`lib/data/postgres/client.ts:40`), so a stuck **query** cannot hold a
+  connection for minutes — and `/api/version` does not touch the database at all. What stalls a
+  database-free route is a **blocked Node event loop**. `device-metrics` loops over every decoded raw
+  row in JavaScript (`route.ts:58` onward, parsing `decoded` arrays per row), and `rollup-state` —
+  documented as *"a single-row read"* — also hung, which is what a blocked process looks like rather
+  than a slow query. The raw store is large: the server's DB-footprint card read 142 MB / 176,125
+  `oura_raw_samples` rows at the time. **Not established:** that these routes were the cause (the
+  outage could be coincidental — Railway, a deploy, another client), whether the server restarted at
+  20:12, and what `error_events` holds for the window. **Read `error_events` and Railway's logs for
+  20:00–20:15 AEST on 2026-09-23 first.**
+- **Contributing:** the device agent issued two extra requests to the hung endpoints while measuring
+  them, and an earlier `page.reload()` of the same screen had already left the page unresponsive to
+  DevTools for ~3 minutes. Both are now forbidden in the harness (see `scripts/device/README.md`).
+- **Fix direction, if it confirms:** move the per-row work into SQL or a bounded window, cap the rows
+  a single admin request may decode, and put an explicit request timeout on these routes so one screen
+  cannot occupy the process.
+- **Pass test:** open `/admin/oura-ble` in the APK; every request answers within 5 s, and `/api/version`
+  stays under 1 s from another client throughout.
+
+
 ### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
 
 - **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
@@ -2000,32 +2034,6 @@ below threshold and left in place for next time.
 - **Watch, unchanged:** a faster sheet gives its content less time to paint, so a sheet that fetches
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
-
-### [platform] LA-130 — a bare `git fetch origin main` re-shallows the sandbox clone every time, and a shallow clone silently kills CI
-
-- **Lane:** A — sandbox/workflow tooling and the CLAUDE.md Git Workflow rule.
-- **Added:** 2026-09-23 · Lane A, measured across PR #1445's three base races.
-- **What CLAUDE.md already says, and what is new.** The Git Workflow section documents the
-  shallow-fetch defect and says to re-check `test -f .git/shallow` **after** each fetch. What was
-  not established is the frequency: this session ran `git fetch origin main` in a clone it had
-  already unshallowed, **four separate times, and `.git/shallow` came back on every one**. So it is
-  not an occasional relapse to watch for — a bare fetch re-shallows deterministically, which makes
-  `--unshallow` part of every fetch rather than a recovery step.
-- **Why it is worth tooling rather than vigilance.** The failure is silent and its symptom points
-  somewhere else: the branch loses its ancestry, GitHub reads the PR as conflicted, and **a
-  conflicted PR is never given a workflow run** — so `get_check_runs` returns `total_count: 0`
-  forever and reads exactly like slow CI. Four PRs were abandoned to this before the mechanism was
-  found (OR-132), and the rule that now exists only helps a session that remembers to run the check
-  after every fetch, which is the kind of discipline that fails under exactly the time pressure
-  that makes people fetch quickly.
-- **The options, none of them chosen here.** A git alias or wrapper that always fetches with
-  `--unshallow`; a `fetch.depth`/`remote.origin.fetch` config written by the session-start hook; or
-  a `scripts/` helper that fetches and asserts. The config route is the only one that survives a
-  session forgetting, which is the point — but whether the session-start hook can set it, and
-  whether the proxy re-imposes the shallow on the next fetch regardless, is **not established** and
-  is the thing to test first.
-- **Pass test:** after the fix, `git fetch origin main` followed by `test -f .git/shallow` finds no
-  shallow file, repeated three times in one session.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
 

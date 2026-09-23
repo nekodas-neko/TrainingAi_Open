@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27283 (LA-130, −26)
+
+The Git Workflow shallow-fetch rule told every session to fetch with `--unshallow` every time,
+because "a plain fetch re-grafts at the new tip". The real cause is `pnpm check:rules`: it replays
+every step of the Custom Rules job against the local clone, and one step was `git fetch --depth=1
+origin main`, which truncated the clone to 2 commits on every run — immediately before every push,
+which is when ancestry matters. The lines are the correction, the measurement, and the reason a
+fatal from `--unshallow` read as a success through `| tail -1` and sent the diagnosis the wrong way
+twice.
+
+The backlog falls by LA-130's entry, whose own filing carried the wrong cause.
+
 ## 2026-09-23 — backlog → 27224 (LA-125 shipped, −38), projectOverview → 12564 (+5)
 
 LA-125's entry left the queue, which is the whole of the backlog's fall; the same edit amended
@@ -16270,3 +16282,10 @@ the ai_dynamic path, which is the live one. `tsc` cannot see either, because the
 
 Those are worth index space because the next person to touch `NextSessionRecommendation` will hit
 the same two edges, and neither is visible from the type.
+
+---
+
+## 2026-09-23 — backlog → 27258 (device/sweep-2)
+
+DV-13 filed at the top of the queue: a production outage (~8 min) coincided with the BLE admin
+console's hung requests during device sweep 2. Placed first because it is availability.

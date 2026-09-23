@@ -479,7 +479,16 @@ jobs:
         # step turns a transient network blip into a red Custom Rules run on an unrelated change,
         # which is the same "failure that is not the branch author's" this whole class is about. It
         # bit locally the first time it was flaky.
-        run: git fetch --depth=1 origin main || true
+        #
+        # LA-130: guarded on the ref being ABSENT, which is what makes it safe to replay locally.
+        # `pnpm check:rules` runs every step of this job against the developer's own clone, so an
+        # unguarded `--depth=1` fetch re-shallowed that clone on every run — measured, 1,445 commits
+        # to 2. A shallow local clone then loses its ancestry, `git merge origin/main` fails with
+        # "refusing to merge unrelated histories", and GitHub reads the resulting PR as conflicted
+        # and never gives it a workflow run. Four PRs were abandoned to that, blamed on a plain
+        # `git fetch origin main` that was innocent. In CI `origin/main` genuinely is not there after
+        # a depth-1 checkout, so the fetch still runs and nothing about the gate changes.
+        run: git rev-parse --verify --quiet origin/main >/dev/null || git fetch --depth=1 origin main || true
       - name: No stray module at the repo root
         run: node scripts/check-repo-root.js
 
