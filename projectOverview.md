@@ -29,6 +29,32 @@
 **Version:** v1.465.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**Score bands now use the theme tokens, and the thing guarding them failed silently (RV-99, half).**
+`scoreBand()` returned raw `#22c55e`/`#f59e0b`/`#ef4444` while `recovery-band.ts` and
+`body-battery-band.ts` returned tokens for the identical concept — in dark those are different
+colours, not shades (green `rgb(34,197,94)` vs `rgb(86,238,102)`). It now returns
+`SCORE_BAND_COLOR`. **The entry warned about Chart.js canvas and `resolveColor()`; all eleven
+consumers are DOM or SVG, so none was needed.** The real blocker was **`accentCardStyle`**, which
+sliced the hex to parse it and returned a bare muted background — no gradient, no border, no error —
+for anything not starting with `#`, so the HRV-baseline card would have lost its tint silently. It
+has a `color-mix` path now; the hex branch is untouched on purpose (≈30 cards render through it and
+`rgba()` ≠ `color-mix(in oklch)`), and `transparent` keeps its bail. ⚠ **Half of RV-99 only** — the
+hex triad is **183 occurrences across 68 files**, not the entry's "173 across ~25", and four of
+those modules (`rarity-colors`, `hr-zones`, `macro-colors`, `home-prefs`) are identity colours that
+must keep their hex. ⚠ **Not seen rendered** — every assertion is on a returned string; no card was
+viewed in a browser or on device.
+**An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
+`Body` was `.extend()`-built and never `.strict()`, so a sheet posting a field whose server half had
+not landed got **201 and wrote nothing** — the failure LB-124 was filed over rather than attempted,
+and the one that would have burned TN-58's pass test. **Checked before flipping it: no current
+client sends an unknown key** (morning sheet 13, evening review 9, all known; the retired
+`motivation`/`restingSoreness`/`wakeMood` are still in the schema and sent as null on purpose).
+**⛔ The outbox stays LENIENT deliberately — do not "fix" the mismatch.** It never touches the
+route's `Body`; it is `adapter.ts` parsing the two shared schemas non-strictly, and stricting them
+would reject a queued check-in outright rather than surface a mistake, turning a partial save into
+no save. That path is already gated by the local SQLite column list (LB-124 needed a migration),
+which the POST path is not. Reasoning is written beside both. Driven over HTTP on `pnpm dev`, and
+the pre-fix 201-writes-nothing was **observed**, not assumed. No user-visible change.
 **A test file under `app/` was buying the 34-minute browser suite, and a plain `git fetch` was
 producing PRs CI never ran (2026-09-23).** Two independent CI/tooling findings from one session.
 **E2E's path gate now drops `__tests__/` the way it already drops `app/api/**`** — a vitest file is

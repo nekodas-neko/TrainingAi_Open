@@ -15830,11 +15830,42 @@ the tweak is one `grep -vE` and the defect cost four abandoned PRs. The part wor
 discrimination: a shallow-grafted branch and a stale base produce the **same** observable —
 `get_check_runs` reading `total_count: 0` — and CLAUDE.md already documented the stale-base reading,
 so a session that hits this will reach for the wrong remedy first. It did.
-## 2026-09-23 — backlog 26794 → 26780, `projectOverview.md` 12359 → 12379 (RV-110/RV-112)
+## 2026-09-22 — `docs/implementation-backlog.md` → 26303, `projectOverview.md` → 12389 (LA-128)
 
-The backlog nets down 14 on this branch's account (after #1408, #1429, #1423, #1434, #1432 and #1433 landed from `main` mid-CI across SIX
-re-merges — `projectOverview.md` also moves 12379 → 12399 purely on their growth, not this
-branch's): RV-110 and RV-112 shipped and left the queue, against the new LB-129
+The backlog shrinks by LA-128's whole entry; nothing is owed, so no `Keep:`. The
+`projectOverview.md` block spends most of its lines on the half that is NOT in the diff: the outbox
+staying lenient on purpose.
+
+That is the part worth the space. The route and the outbox now disagree about unknown keys, and the
+disagreement looks exactly like an oversight — a future sweep will find the non-strict parse in
+`adapter.ts`, read it as the same defect, and "finish the job". Doing that would reject a queued
+check-in outright rather than surface a mistake, deleting something the user already wrote. The
+reasoning is in `adapter.ts` beside the parse, and here, because those are the two places someone
+would look before changing it.
+
+## 2026-09-22 — `docs/implementation-backlog.md` → 26340, `projectOverview.md` → 12391 (RV-99, half)
+
+The backlog GROWS on an entry that shipped half its work, which is the right direction here. RV-99
+was one heading covering two jobs of very different size — retargeting `scoreBand()` (11 consumer
+files, done) and migrating 183 hardcoded hexes across 68 files (not done). The rewritten entry costs
+lines because it now carries three things the original did not: the corrected file count, the four
+modules whose hex is an identity colour and must NOT be migrated, and the hazard that actually
+blocked the work.
+
+That last one is why this is worth the space. The entry warned about Chart.js canvas and
+`resolveColor()`; no consumer touches a canvas. What would have broken is `accentCardStyle`, which
+returned a bare background with no gradient, no border and no error for any non-hex input. A future
+session reading only the original entry would check for canvases, find none, and ship the silent
+regression.
+
+## 2026-09-23 — backlog 27165 → 27151, `projectOverview.md` 12422 → 12442 (RV-110/RV-112)
+
+The backlog nets down 14 on this branch's account. The absolute figures moved a long way while this
+PR sat open — SEVEN re-merges, and the last of them was not a re-merge at all but the first honest
+one: `git fetch origin main` had been returning a shallow pack, so every earlier merge was computed
+against a grafted history and produced a tree GitHub read as conflicted. `projectOverview.md` moves
++20 here and the rest of its growth is other branches', not this one's: RV-110 and RV-112 shipped
+and left the queue, against the new LB-129
 filed for the day-review sheet that does not open on a first flip — a finding from RV-110's probing
 that is not RV-110's subject, so it goes in the queue rather than into that PR's diff.
 
@@ -15850,3 +15881,4 @@ rule requires, and came back shorter. It is shrink-only, so the number follows i
 first write, then +4 for the lesson that cost this PR a red CI — run the FULL vitest suite, never a
 subset scoped to the directories you changed, because a source-shape test asserting on your file
 can live anywhere. Still well under the 65 it inherited.)
+
