@@ -32,12 +32,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const { laneFromLines } = require('./lib/lane');
-const { keepFromLines } = require('./lib/keep');
-const { referenceFromLines } = require('./lib/reference');
-const { verifyFromLines } = require('./lib/verify');
 const { bucketFor } = require('./lib/queue-buckets');
-const { idPattern } = require('./lib/entry-id');
+const { parseEntries, NoQueueError } = require('./lib/backlog-entries');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -53,85 +49,16 @@ const showAll = argv.includes('--all');
 const sittingsOnly = argv.includes('--sittings');
 const TOP_N = showAll ? Infinity : 10;
 
-const lines = fs.readFileSync(BACKLOG, 'utf8').split('\n');
-const queueStart = lines.findIndex((l) => l.trim() === '## Queue');
-if (queueStart < 0) {
-  console.error('next-item: no "## Queue" heading found — has the backlog been restructured?');
-  process.exit(1);
-}
-
-/** Parse the queue into entries, in file order, which IS priority order. */
-const entries = [];
-let current = null;
-for (const line of lines.slice(queueStart)) {
-  if (line.startsWith('### ')) {
-    const id = line.match(idPattern());
-    const title = line.replace(/^###\s*/, '');
-    current = id
-      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false, keep: null }
-      : null;
-    if (current) entries.push(current);
-    continue;
+let entries;
+try {
+  entries = parseEntries(fs.readFileSync(BACKLOG, 'utf8').split('\n'));
+} catch (err) {
+  if (err instanceof NoQueueError) {
+    console.error(`next-item: ${err.message}`);
+    process.exit(1);
   }
-  // A `## ` section heading ends the previous entry — see check-backlog-pointers.js for why.
-  if (line.startsWith('## ')) {
-    current = null;
-    continue;
-  }
-  if (!current) continue;
-
-  const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
-  if (needs) for (const m of needs[1].matchAll(idPattern('g'))) current.needs.push(m[1]);
-
-  const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
-  if (gate) current.gates.push(gate[1].toLowerCase());
-
-  const batch = line.match(/^\s*[-*]\s*\*{0,2}Batch:\*{0,2}\s*`?([^`\s]+)`?/i);
-  if (batch && !current.batch) current.batch = batch[1];
-
-  // Advisory only, and deliberately fuzzy: a batched entry that looks like it carries a schema
-  // change gets flagged, because the one thing that must never be batched is a migration — its
-  // blast radius is data and its revert is a corrective migration, not a git revert.
-  if (/\bmigration\b|schema change|ADD COLUMN|local SQLite version/i.test(line)) current.schemaRisk = true;
-
-  // `Lane: ?` is a deliberate "I could not tell" — it must reach a human, not be filtered away.
-  //
-  // The lane rule lives in `lib/lane.js` and is applied over the whole entry once it is collected —
-  // NOT re-implemented here. It was, briefly, and the two copies drifted within a day: the lib
-  // learned to refuse an ambiguous entry and this file went on guessing, so the unit test was
-  // testing a function the tool did not call.
-  current.laneLines.push(line);
-
-  // Entries not yet migrated off the prose marker. Treated as parked, and named as unmigrated so
-  // the remaining ones stay visible instead of quietly reading as ready.
-  //
-  // **The glyph alone is not the marker — `⛔ block…` is** (LA-49, narrowed 2026-09-22 by OR-122).
-  // The file's own protocol documents the marker as `⛔ blocked: <reason>`, so this is the file's
-  // convention rather than a new heuristic. Matching the bare glyph parked **28 entries of which
-  // ~7 meant blocked**; the other 21 use ⛔ as an emphasis glyph for a warning to whoever BUILDS the
-  // entry — *"⛔ Do not extend this to the conic-gradient rings"*, *"⛔ Do not re-litigate the
-  // missing e2e"* — which is the opposite of a reason not to build it. Measured 2026-09-01 at 34/7
-  // and unchanged three weeks later, because **LA-49, the entry that describes this, quotes the
-  // glyph and was parked by its own bug.** A detector whose false-positive rate is 75% teaches
-  // implementers to ignore the section it fills.
-  //
-  // ⚠ **This change is second on purpose.** LA-49's own caution is that narrowing the rule without
-  // triaging first trades a section nobody reads for a section an implementer starts from — two of
-  // the entries it exposes open with *"REFUTED"*. The triage shipped in the same PR: the genuinely
-  // blocked ones (TN-2, Q-49, Q-72, Q-85, Q-538, Q-252) carry a `Gate:`/`Needs:` now, and the
-  // refuted ones (BF-14, LA-57) carry a `Reference:`. Do not re-widen this without redoing that.
-  if (!current.legacyBlocked && /⛔[^\n]{0,40}block/i.test(line)) {
-    current.legacyBlocked = line.replace(/^\s*[-*]?\s*/, '').slice(0, 90);
-  }
+  throw err;
 }
-
-for (const e of entries) {
-  e.lane = laneFromLines(e.laneLines);
-  e.keep = keepFromLines(e.laneLines);
-  e.reference = referenceFromLines(e.laneLines);
-  e.verify = verifyFromLines(e.laneLines);
-}
-
 const inQueue = new Set(entries.map((e) => e.id));
 // An absent target means shipped — the protocol removes a completed entry from the queue.
 const unmetNeeds = (e) => e.needs.filter((n) => inQueue.has(n));

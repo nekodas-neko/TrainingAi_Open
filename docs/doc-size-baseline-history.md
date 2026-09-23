@@ -16179,7 +16179,22 @@ being left in the journal. The row also records what is **not** yet true — sto
 old scores until the batched re-derivation, so the pass test's share-of-movement claim is unproven
 rather than met.
 
-## 2026-09-23 — backlog 27302 → 27360 (RV-108 + LB-132 + two re-channellings, +58)
+## 2026-09-23 — `docs/implementation-backlog.md` 27458 → 27482 (OR-136)
+
+Three lines net. The three bare device gates each gained their reason and two lost the boilerplate
+flag OR-134 had left on them, so the additions and removals nearly cancel — which is the shape a
+triage pass should have, as against the filing passes that grew this file earlier today.
+
+The other twenty are one pointer: Q-7b's body carried a paragraph that reads like an unfiled
+finding and is `Q-270`, which is 🔴 and far past it. Twenty lines saying so is cheap against a
+duplicate of a well-developed entry, which is what nearly happened.
+
+## 2026-09-23 — backlog → 27300 (RV-108 + LB-132 + two re-channellings, +58 against a clearance)
+
+**The number falls while this branch adds 58 lines** — Orchestrator sweeps cleared completed entries
+from `main` twice while this sat in CI. Stated because the figure alone reads as a shrink this PR
+did not do, and because the baseline is set to the real count rather than left where this branch
+computed it: a baseline above reality is slack for the next growth to hide in.
 
 Three things, and the largest is the one that shipped no code.
 

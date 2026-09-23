@@ -779,7 +779,11 @@ below threshold and left in place for next time.
 
 - **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
   SQLite file.
-- **Gate:** device
+- **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
+  is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
+  PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
+  gate name the same actor there is nothing to wait for, and the entry is simply that actor's
+  work. Filed by the device agent itself, which is how easily the shape hides.
 - **Added:** 2026-09-23 · Lane A, carved out of DV-5 when the rest of it shipped. The confirm-arm
   half of DV-5 is fixed and merged; **this half was never explained**, and DV-5 itself said so
   (*"Not established: ... Read the confirm path before assuming the cause"*).
@@ -1408,76 +1412,6 @@ below threshold and left in place for next time.
   never-two-suites-at-once rule. Only the #1098 paragraph is spent.
 - **Pass test:** a firing of the Routine contains no instruction to maintain a merged PR.
 
-### [platform] TN-59 — an entry parked only by a prose marker is invisible, and the queue is still producing new ones
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning · **Lane: O** — `scripts/`, the queue
-  tooling, which §3's path rule does not reach.
-- **Background:** the 2026-09-20 sweep that converted 17 of these by hand, and its journal entry.
-  (Written as prose, not a `Reference:` field — that field files an entry under *read, do not build*,
-  and this one is to be built. Third field-semantics slip in this filer's day; see TN-59's own point.)
-
-## ⚑ SUPERSEDED IN ITS PREMISE, 2026-09-22 (OR-122, #1390) — the parking is GONE; what is left is a much smaller prevention
-
-**`next-item.js` no longer parks on the bare glyph.** It matches `U+26D4` followed within 40
-characters by the word *block* — the convention this file's own protocol documents
-(`<no-entry sign> blocked: <reason>`). **Measured on this commit: entries parked by a prose marker
-alone = 0**, against the 28 this entry counted the same morning. LB-124, named below as the case
-that took Lane B's READY list to zero, is READY. So every number in the text that follows is a
-record of the 2026-09-22 morning, not of now.
-
-**Two sessions found this independently on the same day, which is worth more than either finding.**
-Tuning filed this entry from the *sweep* side — it had converted 17 markers by hand two days earlier
-and watched a new one arrive. OR-122 found it from the *queue* side: Lane B had zero startable
-entries. Neither saw the other. The common cause was `LA-49`, which measured the whole thing on
-2026-09-01, specified the fix in two ordered steps, and then **sat for three weeks because it quotes
-the glyph as evidence and was parked by the bug it describes.** Both of these entries are what a
-self-parking finding costs — it does not stay found, it gets re-found.
-
-**What survives, and it is worth building.** The detector is narrower, so the old failure shape
-cannot recur; the new one can. Someone writes `<no-entry sign> blocked: <reason>` in prose where a
-`Gate:`/`Needs:` belongs, and the entry parks for a reason no field states and no tool can act on.
-**Baseline that at 0** — it is 0 today, which is the strongest baseline a shrink-only check can
-have, the same shape as `check-aest-midnight-timezone.js`. The check is materially smaller than the
-specification below: no 28-entry baseline to freeze, no triage to precede it.
-
-**⛔ The caution below still stands and is the load-bearing part: do not make the check guess which
-kind of marker it is reading.** It reports the shape — parked with nothing structured saying why —
-and a human decides. (Checked rather than assumed: this line does **not** park the entry — the
-narrowed rule wants *block* within 40 characters of the glyph, and this one carries a caution
-instead. TN-59 is READY. An earlier draft of this note asserted the opposite without running the
-tool, which is the same mistake in miniature as the one the entry is about.)
-
----
-
-**Everything below is the 2026-09-22 morning record, kept for the reasoning.**
-
-**`next-item.js` parks any entry containing the no-entry sign (U+26D4) when no structured field
-explains it — spelled by codepoint here on purpose, because writing the character even inside
-backticks parks the entry that describes it, as the first draft of this one discovered.** The marker is
-doing two jobs across the file — *"this cannot start"* and *"do not implement it this way"* — and the
-second is far commoner. A sweep on 2026-09-20 read all 25 marker lines across 19 parked tuning
-entries and found **17 were cautions**; converting them took the queue's READY list from 6 to 21.
-
-**This is not a cleared backlog, which is the reason to build the check rather than sweep again.**
-Measured 2026-09-22: **28 entries are still parked by a prose marker alone** — and **LB-124 was filed
-that same morning and parked immediately**, taking Lane B's entire READY list to zero, because its
-marker reads *"the failure mode is SILENT, which is why this is filed rather than attempted"* — an
-explanation of why it was written up, not a statement that it cannot begin. The rule was in the file
-and the sweep was two days old.
-
-**What to build.** A Custom Rules check that fails when an entry's **only** block is a prose marker —
-mechanically detectable, and always a human judgement to resolve: either it is genuinely blocked and
-wants a `Gate:`/`Needs:`, or the marker is a caution and should carry a warning sign instead.
-**The check must exempt its own entry and any doc that discusses the convention**, which is the same
-self-reference trap. Baseline the existing
-**28 shrink-only**, exactly as `check-fetch-once-effects.js` freezes its 36 sites, so the debt is
-visible and a new one fails.
-
-**⚠ Do not make the check guess which kind of marker it is reading.** Prose detection is the thing
-the structured fields exist to replace; a heuristic that sorts "do not fix this by…" from "this
-cannot start" would be a third convention to maintain. The check reports the *shape* — parked, with
-nothing structured saying why — and a human decides.
-
 ### [readiness][app-shell] TN-58 — the comparative check-in: KEEP, the two-week pass test is owed
 
 - **Lane:** B — control shipped 2026-09-22 (`components/checkin/vs-yesterday-picker.tsx`,
@@ -1507,7 +1441,7 @@ nothing structured saying why — and a human decides.
   2026-09-22: the hex triad is **183 occurrences across 68 files**, not "173 across ~25". The
   `scoreBand` consumer set is a different and much smaller population (11 files), which is why the
   first half shipped in an afternoon and this half did not.
-- **⛔ The blocking hazard was NOT the one the entry named.** It warned about Chart.js canvas and
+- **⛔ The real hazard was NOT the one the entry named.** It warned about Chart.js canvas and
   `resolveColor()`; no `scoreBand` consumer touches a canvas. The live hazard was
   `accentCardStyle(hex)` (`packages/shared/src/utils.ts`), which sliced the string to parse it and
   **returned a bare muted background — no gradient, no border, no error — for anything not starting
@@ -11587,13 +11521,7 @@ the connection and to try again shortly, rather than implying the ring is absent
 
 - **Lane:** A
 - **Gate:** device
-- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
-  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
-  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
-  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
-  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
-  released here**: un-gating on the assumption it is circular would be the same unchecked move that
-  created the problem. Whoever next touches PS-12 writes the reason or removes the gate.
+
 - **Needs:** PS-11
 - **Plan:** [`multi-device-comparison.md`](multi-device-comparison.md) — read it before running this;
   most of the ways to get a wrong number here are listed in it.
@@ -23795,15 +23723,18 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
-- **Lane:** B
-- **Gate:** device
-- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
-  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
-  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
-  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
-  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
-  released here**: un-gating on the assumption it is circular would be the same unchecked move that
-  created the problem. Whoever next touches Q-168 writes the reason or removes the gate.
+- **The check that was gating this, now stated as the work (OR-136, 2026-09-23).** The gate is
+  removed because it named the same actor as the lane — a `Lane: DV` entry gated on `device` parks
+  the one agent who can discharge it. **The reason was always written, just not beside the field.**
+  The entry's own *What is actually left* section names it: `/coach` and `/coach/confirm/[toolCallId]`
+  are navless full-screen routes with bottom-anchored controls, the shape that has regressed 11+
+  times. Run the **AI Coach** section of `docs/device-smoke-checklist.md`.
+- **Lane: DV** — reassigned 2026-09-23 (OR-136) from B. The blocking work is that check, and it is
+  one the phone ANSWERS: bottom-anchored controls either clear the gesture bar or they do not, and
+  a safe-area inset is a number rather than a matter of taste. The **cardio-goals** half was
+  dropped rather than built, so nothing here is waiting on Lane B. A FAILED result goes back to B
+  with what reproduces it.
+
 
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
   entry is removed per this file's own rule that a finished item must never linger.
@@ -23816,7 +23747,11 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 #### What is actually left
 
-- **⛔ Device verification** — the blocking one. `/coach` and `/coach/confirm/[toolCallId]` are both
+- **Device verification — this is the work, and it is `Lane: DV`'s (OR-136, 2026-09-23).** The
+  decorative ⛔ that used to open this line is removed: the queue parser reads that glyph followed
+  by *block* within forty characters as a real block marker, so *"the blocking one"* parked the
+  entry under UNMIGRATED MARKER the moment its gate came off. That is `TN-59`'s class, caught
+  live. Say what blocks in words; keep the glyph for a field. `/coach` and `/coach/confirm/[toolCallId]` are both
   navless full-screen routes with bottom-anchored controls, the shape that has regressed 11+ times.
   Run the **AI Coach** section of [`docs/device-smoke-checklist.md`](device-smoke-checklist.md) and
   strike the Known-Issues row in `projectOverview.md`.
@@ -25817,14 +25752,12 @@ against yet. Blocked on real-data capture, not code.
   `vascular_age`, `pwv`, and `chronic_stress_granular_nights` (the eleventh, not in the entry's ten).
 
 - **Lane:** A
-- **Gate:** device
-- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
-  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
-  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
-  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
-  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
-  released here**: un-gating on the assumption it is circular would be the same unchecked move that
-  created the problem. Whoever next touches Q-7b writes the reason or removes the gate.
+- **⚠ THE DEVICE GATE WAS WRONG AND IS REMOVED (OR-136, 2026-09-23).** Nothing in this entry is a
+  question the phone answers. Ten columns have no producer — that is engine work, and the producer
+  these columns are waiting for is the on-device rollup, which is `Q-545`'s build rather than a
+  check anybody can run. Recorded as a dependency below instead of a gate nobody could discharge.
+- **Needs:** Q-545
+
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
 > every column in the table against 82 rows rather than spot-checking: **`active_calories_est`,
@@ -25842,7 +25775,14 @@ against yet. Blocked on real-data capture, not code.
 > `worn_hours_ble` **0**. Partially populated: `body_comp` 57, `illness_score` 29, `bdi_derived` 29,
 > `resilience_level` 13, `daytime_stress_scaled` 11.
 >
-> **New detail worth chasing separately:** `/api/training-stress` *does* compute and persist an OTS,
+> **⚠ ALREADY FILED, AND FAR PAST THIS NOTE — see `Q-270` (OR-136, 2026-09-23).** The paragraph
+> below reads as an unfiled finding and is not one. `Q-270` is 🔴, re-measured **0 of 104 days** on
+> 2026-08-30, and has ruled out all four gates individually plus the MET gate, which clears by
+> ~12:07 local rather than late evening. **Do not open a new entry for it** — that was one step
+> from happening here, and the only thing that stopped it was grepping the column name first.
+> Anything learned about it belongs on Q-270.
+>
+> **The original note, kept for its wording:** `/api/training-stress` *does* compute and persist an OTS,
 > yet `training_load_ots` is empty across the entire history — so that route's gating conditions
 > (readiness still learning / incomplete profile / insufficient MET signal) are never being met in
 > practice. That is a live route returning `status:'gated'` forever, which is a different failure
