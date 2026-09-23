@@ -15713,3 +15713,14 @@ Worth noting against RV-134, which is the open entry about this exact number: th
 shrink caused by this branch, the case the ratchet is right to make someone lower. The tax RV-134
 describes is the other case — a branch forced to lower a number because *someone else's* merge
 shrank the file. Four of four re-merges on #1422 were that case in one night.
+
+---
+
+## 2026-09-23 — backlog → 26944 (+150 from this sitting, measured after merging main), device-verification baton → 54 (−3) (device/probe-sitting)
+
+The first probe sitting on the S25 (RV-124…RV-133). `docs/device-agent-probe-checklist.md` asks for
+each verdict to carry the measurement that produced it, quoted in the entry — so the growth is the
+measurements themselves: result bullets on seven probe entries, BF-177 rewritten from verification
+debt to failed work with its request trace, a partial on BF-61, and three new entries (DV-4 contrast,
+DV-5 rows stuck `pending`, DV-6 status-bar backing, owner-gated). Raised rather than trimmed because
+a verdict without its number is what the checklist exists to stop.
