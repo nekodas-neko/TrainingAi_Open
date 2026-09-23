@@ -15859,7 +15859,19 @@ returned a bare background with no gradient, no border and no error for any non-
 session reading only the original entry would check for canvases, find none, and ship the silent
 regression.
 
-## 2026-09-23 — `docs/implementation-backlog.md` +38 (27165 → 27203) (Review: RV-143)
+## 2026-09-23 — `CLAUDE.md` → 890 and `docs/implementation-backlog.md` → 27179 (OR-126)
+
+**CLAUDE.md +13**: the Oura raw-archive rule said `oura_raw_samples.body_hex` was the server's
+archival source of truth and had been wrong since the packer shipped. It names `oura_raw_packed`
+now, with the tier sizes measured, and carries the second correction beside it — the device's
+14-day window has not shipped, so the device cannot be cited as a surviving copy. Thirteen lines
+for a rule that was pointing every session at a 7-day scratch buffer and calling it the archive.
+
+**Backlog +5 net**: OR-126 left the queue after being built (a net shrink of about 25 lines) while Q-29
+gained the reconcile that the brief turned up, plus a third OR-121 occurrence recorded with its
+evidence explicitly marked lost — which is most of it back and then some.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +38 (27170 → 27208) (Review: RV-143)
 
 One entry, most of it a triage of the 24 affected entries. That list is the point rather than
 padding: the fix is three lines in `next-item.js`, and the risk is that turning the selector on
