@@ -12179,6 +12179,17 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   button's centre** and refused to dispatch, which fits the defect still being there but does not
   prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
   tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
+- **📱 Second attempt, 2026-09-23 (sitting 2) — still COULD NOT CHECK, and why, so the next try
+  does not repeat it.** Three "immediate tap" runs showed no confirmation, but **none of them is
+  evidence**: the row's tray was **already open** before the swipe (a tray left open by an earlier
+  step stays open — the row sat at `translateX(-64px)`), and the tap aimed 32 px inside the *row's*
+  right edge, which is x=271 with the tray open — the row, not Delete (x 303–367). A 1.5 s control
+  tap at that point opened *Edit Serving*, confirming it hit the row. Measured once correctly: from
+  an **open** tray, a further left swipe overshoots to −134 px and settles back at −64 px by 300 ms,
+  with Delete on top throughout. **What the next attempt needs:** a verified-closed tray first
+  (`translateX(0)`; a right swipe starting inside the navigator's 24 px edge strip does not close it,
+  and neither did a raw tap on the row), then swipe and `input tap` at **Delete's own rect** in one
+  `adb shell` call. Note the tray is `aria-hidden` while closed, so a visibility filter hides it.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`

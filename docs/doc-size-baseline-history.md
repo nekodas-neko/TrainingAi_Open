@@ -15724,3 +15724,11 @@ measurements themselves: result bullets on seven probe entries, BF-177 rewritten
 debt to failed work with its request trace, a partial on BF-61, and three new entries (DV-4 contrast,
 DV-5 rows stuck `pending`, DV-6 status-bar backing, owner-gated). Raised rather than trimmed because
 a verdict without its number is what the checklist exists to stop.
+
+---
+
+## 2026-09-23 — backlog → 26955 (+11), device-verification baton → 53 (−1) (device/probe-sitting-2)
+
+BF-61 gains the second attempt's bullet: why three "failed" immediate taps were not evidence (the tray
+was already open; the tap aimed at the row), so the next attempt does not repeat them. The baton
+shrank by a line on its rewrite.

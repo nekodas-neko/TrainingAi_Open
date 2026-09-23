@@ -257,3 +257,25 @@ was the reading, not the connection:
 - **`offline(true)` is page-level.** Fetches fail and `navigator.onLine` is false, but no offline
   banner appeared — the app may read Capacitor's network plugin, which this does not reach — and a
   force-stop drops it, so "survives a restart offline" needs real airplane mode.
+
+### Sitting 2 — S25, 2026-09-23
+
+- **The first screenshot after attaching timed out again** — twice now, both first attempts. Retry.
+- **The phone sleeps after 5 minutes unless a key arrives**, and "Stay awake" is the owner's system
+  setting. For an idle measurement, send `adb shell input keyevent 224` (KEYCODE_WAKEUP) every few
+  minutes: it keeps the screen on without touching the app. The first sitting's disconnect was
+  probably this.
+- **A swipe tray is `aria-hidden` while closed** — any "visible" filter drops its Delete button.
+- **A tray left open stays open across steps.** Check the row's `translateX` is 0 before a
+  swipe-to-delete test, or you are testing an open tray.
+- **⛔ Raw `adb input` is blind, and it has already cost the owner.** During the BF-61 tray
+  experiments the app left the tab under test (`/health/activity`, then `/`), the hidden panel kept
+  answering DOM reads so the scripts carried on, and later taps landed **outside the app — they
+  opened another app (Tasks) and closed this one** on the owner's phone. **Raw input now goes only
+  through `dev.rawTap()` / `dev.rawSwipe()`**, which refuse unless the app holds the foreground and
+  is on `expectPath`, checked immediately before sending. Never call `adb shell input tap|swipe`
+  directly. (`systemBack()` — keyevent 4 — stays, because back is the thing under test; check the
+  path after it.)
+- **After a cold reload `nav a[href="/"]` matched two elements** and Playwright's strict mode threw.
+  Tab-bar locators are now scoped `.filter({ visible: true }).first()`. Whether the shell really mounts
+  two tab bars after a reload was not checked.
