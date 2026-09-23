@@ -15994,3 +15994,23 @@ needed, and the floored height already exists as `--pt-safe-value`. Writing them
 the alternative to a second session rediscovering them, and it is why DV-6 was left out of the PR
 rather than half-built inside it.
 
+
+## 2026-09-23 — backlog 27305 → 27339 (DV-6 + LB-130, +34)
+
+Two entries move this, and neither is the code.
+
+**DV-6 shipped and stayed in the queue** as `Verify: device` + `Keep:`, because the one thing the
+sandbox cannot judge is the thing most likely to need tuning: how the gradient composes with
+`DynamicBackground`'s sky. Its entry also now records why the decision logic sits in a `.ts`
+controller rather than the component — every vitest project here is `environment: 'node'` and
+cannot transform `.tsx` at all, so logic left in the component is logic nothing can drive, and on
+device a dead scrim and a mis-scoped one look identical. That is worth the lines because the
+obvious "simplification" later is to fold the controller back in.
+
+**LB-130 is new**, and it is the one to read: `docs/doc-size-baseline-history.md` — this file — is
+now the guaranteed-conflict line that `.size` used to be. LA-33 split the `.size` map per document
+and RV-134 gave it a slack band; across five re-merges of #1449 in one hour the `.size` file
+conflicted only when a change genuinely grew a document, and **this file conflicted every time**.
+Same append-to-one-shared-file shape, same fix the repo has already used twice: per-entry files
+under `docs/doc-size/history/`, folded in by the existing compaction sweep. It needs no code —
+`check-doc-index-size.js` prints the reminder to write a note and never reads what is written.
