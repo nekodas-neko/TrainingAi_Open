@@ -473,6 +473,44 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
+
+- **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
+  in neither implementer lane's paths, the OR-103 case. **Added:** 2026-09-23 · Review, answering the
+  owner's *"has everything that needs to be sent to DV agent been backlogged?"* — the answer was no.
+- **The filter, verbatim:** `if (e.verify?.value === 'device') return true;` then a regex over the
+  `Keep:` text. **`Gate:` is never consulted.** Measured on `main` 2026-09-23: **29 entries carry a
+  `Gate: device` field; 24 of them do not appear in `--sittings`.**
+- **They are in a dead zone, not merely missing.** A `Gate:` **parks** an entry, so the implementer
+  lanes skip it *because* it needs the device — and the one agent holding the device cannot see it.
+  Nothing surfaces these to anybody.
+- **The cause is a role that changed the meaning of a field.** `--sittings` was built around *shipped
+  work owing a look* (BF-90's eleven entries writing the same debt in `Verify:` and `Keep:`). Before
+  2026-09-23 a `Gate: device` meant *wait for the owner to pick the phone up*, so leaving it out was
+  right. The Device Verification role makes `Gate: device` mean *the DV agent can unblock this* —
+  and a gated entry is **more** urgent for it than a `Verify:` one, because one blocks work and the
+  other is a look owed on work already shipped.
+- **Fix:** select `Gate: device` in `sittingsOnly` as well, and print which field each row came from,
+  so a reader can tell *blocked-on-this* from *look-owed-on-this*. Roughly three lines.
+- **Triage of the 24, so the fix does not just dump them on the device agent.** Read each against its
+  own entry rather than trusting this split:
+  - **Runnable by the agent now (~13):** BF-22 (slow loads clear on force restart — this is RV-142's
+    P16), BF-49 (back from a timeline row lands on Health), BF-92 (Sentry receiving nothing from the
+    client), Q-418 (the free walk's Android pill cannot show the time), Q-51 (the perf thread —
+    RV-137/RV-138 now cover it), RV-111 (back while the barcode scanner is open), LA-36
+    (`image_data_uri` written to the device and read back), LA-115 (Health Connect record types the
+    plugin cannot parse, failing silently), Q-7b, PS-7, TN-44.
+  - **Needs hardware the agent does not have (~5):** PS-8, PS-9, PS-12, PS-16 all want the **Colmi
+    R09 in hand**; Q-388 wants multi-day wear plus an owner decision on SpO₂ drain.
+  - **Needs a production write or the owner physically present (~2):** RV-108 (a weigh-in — the scale,
+    and real data), Q-114 (the scale's progress bar against the native flow).
+  - **Arguably mis-gated and worth re-reading (~4):** BF-11, BF-24, Q-395 are large design specs that
+    read as `Reference:` rather than device-blocked; Q-168 and Q-34 name follow-up phases.
+- **⚠ Do NOT bulk-convert `Gate: device` → `Verify: device` to make them visible.** `Verify:` means
+  **shipped**, the protocol warns against that misuse twice, and doing it to 24 unbuilt entries files
+  them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
+  because a reader in either place stops looking. The selector is the defect, not the entries.
+
 ### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
 
 - **Verify:** device — **no build half**; the measurement is the work. Method: **P11** in

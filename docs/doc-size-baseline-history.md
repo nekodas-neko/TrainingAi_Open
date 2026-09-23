@@ -15858,3 +15858,10 @@ That last one is why this is worth the space. The entry warned about Chart.js ca
 returned a bare background with no gradient, no border and no error for any non-hex input. A future
 session reading only the original entry would check for canvases, find none, and ship the silent
 regression.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +38 (27165 → 27203) (Review: RV-143)
+
+One entry, most of it a triage of the 24 affected entries. That list is the point rather than
+padding: the fix is three lines in `next-item.js`, and the risk is that turning the selector on
+dumps two dozen entries on the device agent with no indication that five of them want a ring it does
+not have and four are not really device work at all.
