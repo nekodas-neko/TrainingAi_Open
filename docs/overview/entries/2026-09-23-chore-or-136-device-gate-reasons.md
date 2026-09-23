@@ -63,6 +63,34 @@ It now asserts the invariant across every lane — the truncation line appears i
 hid something, and its total matches that lane's READY count. **A test that names a lane is a test
 that expires.**
 
+## The finding I was about to file already existed
+
+Q-7b's body carries a paragraph reading *"New detail worth chasing separately: `/api/training-stress`
+does compute and persist an OTS, yet `training_load_ots` is empty across the entire history"*. It
+reads as an unfiled finding, and the No-orphaned-findings rule says an unfiled finding is a dropped
+one — so the plan was to open an entry for it.
+
+**It is `Q-270`, and Q-270 is far past that note.** 🔴, re-measured **0 of 104 days** on 2026-08-30,
+with all four gates ruled out individually *and* the MET gate shown to clear by ~12:07 local rather
+than late evening. A new entry would have been a worse duplicate of a well-developed one.
+
+**The only thing that stopped it was grepping the column name before writing.** Q-7b now points at
+Q-270 outright, so the next reader does not make the same move. **A paragraph that reads like an
+orphan is not evidence of one** — the rule says file what is unfiled, not file what looks unfiled.
+
+## The prose-marker scan (TN-59), run but not acted on
+
+Scanning for the shape OR-136 caught live — the block glyph followed by *block* within forty
+characters — returns **5 entries**: `RV-99`, `Q-538`, `Q-1b`, `Q-34`, `PS-7`.
+
+They are **not one class**, which is why this stops at the scan. `RV-99`'s two are decorative
+emphasis on corrections. `Q-538`'s is a real block *by something outside the queue*, so it cannot
+become a dependency field. `Q-34`'s two are real blocks on device checks, which the new lane rule
+now has somewhere to send. `PS-7`'s mark deferred and sub-phase work. And `Q-1b` carries a **meta**
+mention — an entry describing the glyph being mis-parsed, which the parser then mis-parses.
+
+Each needs its own read and a different remedy. Recorded here so the scan is not re-run.
+
 ## Not done
 
 - **The remaining ~105 device checks stay on their building lanes.** Most correctly so.

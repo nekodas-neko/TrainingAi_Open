@@ -25957,7 +25957,14 @@ against yet. Blocked on real-data capture, not code.
 > `worn_hours_ble` **0**. Partially populated: `body_comp` 57, `illness_score` 29, `bdi_derived` 29,
 > `resilience_level` 13, `daytime_stress_scaled` 11.
 >
-> **New detail worth chasing separately:** `/api/training-stress` *does* compute and persist an OTS,
+> **⚠ ALREADY FILED, AND FAR PAST THIS NOTE — see `Q-270` (OR-136, 2026-09-23).** The paragraph
+> below reads as an unfiled finding and is not one. `Q-270` is 🔴, re-measured **0 of 104 days** on
+> 2026-08-30, and has ruled out all four gates individually plus the MET gate, which clears by
+> ~12:07 local rather than late evening. **Do not open a new entry for it** — that was one step
+> from happening here, and the only thing that stopped it was grepping the column name first.
+> Anything learned about it belongs on Q-270.
+>
+> **The original note, kept for its wording:** `/api/training-stress` *does* compute and persist an OTS,
 > yet `training_load_ots` is empty across the entire history — so that route's gating conditions
 > (readiness still learning / incomplete profile / insufficient MET signal) are never being met in
 > practice. That is a live route returning `status:'gated'` forever, which is a different failure

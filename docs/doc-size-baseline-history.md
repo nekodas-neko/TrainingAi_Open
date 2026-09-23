@@ -16112,8 +16112,12 @@ The online gate is stated for the same reason. Reporting a failure when the user
 is the opposite of what this codebase is built for, and nothing in the test suite would have caught
 it except the case written specifically for it.
 
-## 2026-09-23 — `docs/implementation-backlog.md` 27458 → 27461 (OR-136)
+## 2026-09-23 — `docs/implementation-backlog.md` 27458 → 27482 (OR-136)
 
 Three lines net. The three bare device gates each gained their reason and two lost the boilerplate
 flag OR-134 had left on them, so the additions and removals nearly cancel — which is the shape a
 triage pass should have, as against the filing passes that grew this file earlier today.
+
+The other twenty are one pointer: Q-7b's body carried a paragraph that reads like an unfiled
+finding and is `Q-270`, which is 🔴 and far past it. Twenty lines saying so is cheap against a
+duplicate of a well-developed entry, which is what nearly happened.
