@@ -1,6 +1,17 @@
-# 2026-09-23 — OR-132: four owner answers, and a date that was already in the database
+# 2026-09-23 — OR-132a: four owner answers, and a date that was already in the database
 
 **Branch:** `chore/or-132-owner-decisions` · **Lane:** O · docs and queue state only
+
+**⚠ This is `OR-132a`, not `OR-132`.** Lane A filed a real queue entry as `OR-132` the same day
+(*"five PRs are dead from the shallow-fetch defect"*) while this work was in flight under the same
+number. Theirs is the canonical one — it is in the queue, this never was — so this takes the letter
+suffix per CLAUDE.md's duplicate rule. The branch name keeps the old spelling because renaming it
+would cost a second PR for nothing.
+
+**`check-backlog-pointers.js` could not catch this**, and that is the point worth carrying: it fails
+on a duplicate ID *inside the backlog*, and this collision was between a queue entry and a PR that
+never filed one. Two sessions of the same role, neither able to see the other's unmerged work —
+the exact shape CLAUDE.md warns about, in the one place the check does not reach.
 
 The owner turned gesture navigation on, which revalidated the largest group of owed device checks,
 and asked what else needed unblocking. Four questions went out; all four came back the same sitting.

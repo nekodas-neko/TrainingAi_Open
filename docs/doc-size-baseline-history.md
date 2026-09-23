@@ -15844,7 +15844,7 @@ check-in outright rather than surface a mistake, deleting something the user alr
 reasoning is in `adapter.ts` beside the parse, and here, because those are the two places someone
 would look before changing it.
 
-## 2026-09-23 — `CLAUDE.md` → 902 and `docs/implementation-backlog.md` → 27211 (OR-132: four owner answers)
+## 2026-09-23 — `CLAUDE.md` → 902 and `docs/implementation-backlog.md` → 27211 (OR-132a: four owner answers)
 
 **CLAUDE.md +7**: the device-sitting size, which the owner set at 45–60 minutes spanning two or
 three domains rather than ~20 minutes on one. It sits beside the batching rule because it is the
