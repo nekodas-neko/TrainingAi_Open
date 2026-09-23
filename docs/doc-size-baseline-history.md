@@ -15749,10 +15749,20 @@ independent filing of the ⛔ parser bug, after `LA-49` (2026-09-01) and alongsi
 it quotes the glyph as evidence and was parked by the bug it describes. **A finding that reaches a
 human gets answered; a finding that hides itself gets re-derived, and each re-derivation pays the
 investigation again.**
+
+## 2026-09-23 — `docs/implementation-backlog.md` → 27094 (DV-1 / OR-130)
+
+DV-1 gained a `Keep:` naming the one run that settles it — `pnpm ci:local` on the Windows machine,
+unpiped, exiting 0 — and `OR-130` was filed for the `base-ref.js` defect the gate run surfaced.
+
+This is the third re-merge on this branch and the number has moved every time, in both directions,
+without a line of this branch's own material changing. That is RV-134's tax rather than a signal:
+the figure recorded here is the merged tree's, not this branch's contribution, and reading it as
+growth caused by DV-1 would be wrong.
 ## 2026-09-23 — backlog 26794 → 26780, `projectOverview.md` 12359 → 12379 (RV-110/RV-112)
 
-The backlog nets down 14 on this branch's account (recorded at 26995, after #1408 and #1429 landed
-from `main` mid-CI): RV-110 and RV-112 shipped and left the queue, against the new LB-129
+The backlog nets down 14 on this branch's account (recorded at 27080, after #1408, #1429 and #1423 landed
+from `main` mid-CI across three re-merges): RV-110 and RV-112 shipped and left the queue, against the new LB-129
 filed for the day-review sheet that does not open on a first flip — a finding from RV-110's probing
 that is not RV-110's subject, so it goes in the queue rather than into that PR's diff.
 
