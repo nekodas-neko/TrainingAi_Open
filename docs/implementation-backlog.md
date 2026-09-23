@@ -1081,21 +1081,24 @@ below threshold and left in place for next time.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
 
-### [sleep][platform] DV-7 — `minutesFromNoon` falls back to the device's clock, and its tests only pass on a UTC machine
+### [sleep] LB-131 — the sleep-timing chart takes the owner's zone by default; nothing passes the user's
 
-- **Lane:** A — `packages/shared/src/health/sleep-consistency.ts` and its test.
-- **Added:** 2026-09-23 · Device Verification, running DV-1's pass test on the device machine.
-- **Measured:** on a machine set to Brisbane, `sleep-consistency.test.ts` fails twice — *"expected 690 not
-  to be 690"* and *"expected 1312.5 to be close to 712.5"*, a difference of **600 minutes, the UTC ↔
-  Brisbane offset**. CI runs in UTC, so it has never failed there.
-- **Why:** with no `tz`, `minutesFromNoon` computes `d.getHours() * 60 + d.getMinutes()` in the
-  **device's** timezone (its own comment: *"omit it for the existing client usage (device-local time
-  is…"*). That is the pattern CLAUDE.md's Timezone section bans for anything user-facing. The test
-  encodes the other half: it compares against device-local and assumes device-local is UTC.
-- **Fix direction:** make `tz` required (or default to `DEFAULT_TZ`, never the device), and write the
-  tests with an explicit zone on both sides, so they pass on any machine. **DV-9** is the caller.
-- **Pass test:** `pnpm test packages/shared/src/health/__tests__/sleep-consistency.test.ts` green under
-  `TZ=UTC` and `TZ=Australia/Brisbane` alike.
+- **Lane:** B — `components/health/sleep-timing-trend-card.tsx:22`.
+- **Added:** 2026-09-23 · Lane A, as the residue of the DV-7 fix.
+- **Already done in DV-7's PR, so do not redo it.** `timingPoints(nights, mode, tz = DEFAULT_TZ)`
+  now resolves BOTH modes through `minutesFromNoon`. Wake used to read `d.getHours()` — the device
+  — while bedtime went through the shared helper, so when DV-7 stopped that helper reading the
+  device, the two modes of one chart would have sat in two different zones off Brisbane. The tests
+  carry explicit `+10:00` fixtures and pass under UTC, Brisbane, New York and `Etc/GMT-13`.
+- **What is left:** the card calls `timingPoints(nights, mode)` and takes the default, so every
+  user gets **Brisbane** rather than their own zone. Thread the session timezone from the screen
+  into the card and on into `timingPoints`. **Ships with DV-9**, which threads the same value into
+  `computeSleepStartConsistency` one component above — one tz resolved once per screen, not twice.
+- **Why it is not urgent and still not nothing:** the owner is in Brisbane, so the default is
+  correct for the only user today. It is wrong the moment there is a second one, and it is the
+  shape CLAUDE.md calls invisible — *"while the device sits in the zone the data was recorded in"*.
+- **Pass test:** with a profile timezone far from Brisbane, the chart's bedtime and wake axes both
+  move with the profile rather than with the phone.
 
 ### [sleep] DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's
 
