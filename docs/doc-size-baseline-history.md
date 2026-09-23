@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27198 (LA-130, −26)
+## 2026-09-23 — CLAUDE.md → 949 (a rule that blamed the wrong command), backlog → 27249 (LA-130, −26)
 
 The Git Workflow shallow-fetch rule told every session to fetch with `--unshallow` every time,
 because "a plain fetch re-grafts at the new tip". The real cause is `pnpm check:rules`: it replays

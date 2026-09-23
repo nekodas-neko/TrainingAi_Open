@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { BodyMetaRow } from "@/app/api/body-metadata/route"
 import type { WidgetDef } from "@/lib/home/home-prefs"
 import { getLocalStore } from "@/lib/local-store"
-import { pushMutations } from "@/lib/local-store/sync-engine"
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate"
 import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils"
 import { cn } from "@trainingai/shared/utils"
 import { invalidateBodyMetricWrite, invalidateReadinessInputs } from "@/lib/cache-groups"
@@ -114,7 +114,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
             syncStatus:       'pending',
           });
           await store.queueMutation({ userId: userId!, domain: 'body_metrics', date, payload: leanPayload });
-          pushMutations(userId!).catch(() => {});
+          pushThenRevalidate(userId!, () => Promise.all([invalidateBodyMetricWrite(), invalidateReadinessInputs()]));
           toast.success(`${widget.label} saved`);
           onClose();
           const cutoff = new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000);
