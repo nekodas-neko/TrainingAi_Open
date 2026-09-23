@@ -15,7 +15,7 @@ import { Meteors } from "@/components/ui/meteors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { toast } from "sonner";
-import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Download, X, Eye } from "lucide-react";
+import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import dynamic from "next/dynamic";
@@ -170,7 +170,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [perSessionPhaseStatus, setPerSessionPhaseStatus] = useState<import('@/app/api/workout-data/route').PerSessionPhaseStatus[]>([])
   const [earlyDeloadDismissed, setEarlyDeloadDismissed] = useState(false)
   const [adminBadge, setAdminBadge] = useState(0)
-  const [apkBannerDismissed, setApkBannerDismissed] = useState(true);
   const [goalsProfile, setGoalsProfile] = useState<{ activityLevel: string | null; fitnessGoal: string | null; lastGoalReviewAt: string | null } | null>(null);
   const [trainingLoad, setTrainingLoad] = useState<TrainingLoadResponse | null>(null);
   const [muscleRecovery, setMuscleRecovery] = useState<MuscleRecoveryEntry[] | null>(null);
@@ -332,7 +331,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     const weekKey = `ta_early_deload_dismissed_${formatInTimeZone(new Date(), tz, 'yyyy-MM')}`
     setEarlyDeloadDismissed(!!localStorage.getItem(weekKey));
 
-    setApkBannerDismissed(!!localStorage.getItem('apk-banner-dismissed'));
 
     // "Day in review" is an END-of-day summary (mirrors the "Bedtime approaching" reminder,
     // lib/day-review-reminders.ts) — most of the day hasn't happened yet before evening, so the
@@ -1144,29 +1142,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               onDismiss={handleEarlyDeloadDismiss}
               reason={readiness.earlyDeload}
             />
-          </div>
-        )}
-
-        {/* ── APK Download Banner ── the body link takes the 48px tap floor locally (LB-26; globals.css says why not there) ── */}
-        {!apkBannerDismissed && (
-          <div className="mx-4 mb-3 rounded-2xl border border-border p-3 flex items-center gap-3" style={{ background: "color-mix(in oklab, var(--color-brand) 8%, var(--color-background))", borderColor: "color-mix(in oklch, var(--color-brand) 25%, transparent)" }}>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-none" style={{ background: "color-mix(in oklab, var(--color-brand) 15%, var(--color-muted))" }}>
-              <Download className="h-4 w-4" style={{ color: "var(--color-brand)" }} />
-            </div>
-            <a href="/api/download-apk" className="flex min-h-[48px] flex-1 min-w-0 flex-col justify-center">
-              <p className="text-sm font-semibold leading-tight">Download Android App</p>
-              <p className="text-[10px] text-muted-foreground">Get the latest APK</p>
-            </a>
-            <button
-              onClick={() => {
-                localStorage.setItem('apk-banner-dismissed', '1');
-                setApkBannerDismissed(true);
-              }}
-              className="flex-none rounded-lg p-2.5 -m-1 text-muted-foreground hover:bg-muted/60 transition"
-              aria-label="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
         )}
 

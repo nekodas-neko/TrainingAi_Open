@@ -1571,60 +1571,44 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
 
-- **Lane:** B — `components/home/home-nutrition-card.tsx:48`,
-  `components/home/home-energy-balance-card.tsx:14`. **Added:** 2026-09-22 · Review sweep 53.
-  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise; see below.
+- **Lane:** B — `components/more/home-widgets-section.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise.
 - **Batch:** `home-ia-merge`
-- **The original entry proposed folding the energy-balance card's provenance line into the nutrition
-  card. That was wrong: the nutrition card already has it.** `HomeNutritionZoneBar` renders
-  `CalorieZoneBar`, which prints the `N resting rate — no movement recorded yet today` line (Q-401),
-  so the running card already carries ring + totals + zone bar + provenance + macros.
-- **What remains** is structural: both call `useEnergyBalanceToday()` — same hook, same
-  `energy-balance:${today}` key — and both sit in the picker. `DEFAULT_CARD_WIDGETS` is `[]`, so
-  `energyBalanceWidget` is opt-in and off; the duplication is latent, not on screen.
-- **This shape already produced two live bugs:** Q-401/Q-415, two budgets 271–274 kcal apart, both
-  labelled "left" — they agree today only because `budgetProvenance` was centralised.
-- **Remaining delta, if the second card were enabled:** the large `remainingKcal` figure, the
-  `zoneLabel` word, and the `eaten · burned · maintenance` breakdown (no equivalent on the other).
-- **Fix, reduced:** merge and delete nothing. Relabel the picker entry so it reads as an alternative
-  to the nutrition card rather than an addition, and grey it out while that card is on if cheap.
-- **No owner gate** — the reduced fix changes picker copy, it does not rearrange a screen.
+- **Shipped 2026-09-23** (`fix/home-ia-merge-part1`). The picker now says, under the Card Widgets
+  heading, that Energy Balance is an **alternative** to Nutrition rather than an addition, and the
+  Energy Balance chip dims while Nutrition is on and it is off.
+- **Deviation from the entry's letter, and the reason:** it said "relabel the picker entry". The
+  chips sit in a wrapping row built for 384 px, and a label long enough to carry "alternative to
+  Nutrition" wraps that row. The sentence went under the heading instead, where it has space to say
+  the whole thing. Same intent, better fit; reversal is moving one `<p>`.
+- **Dimmed, never disabled** — it is a real choice, just not one to make *on top of* Nutrition.
+  Disabling would hide the alternative rather than rank it.
+- **Keep:** nothing. The structural duplication the entry describes (both cards reading
+  `energy-balance:${today}` through one hook) is deliberate and stays; this was only ever about the
+  picker reading as though you should turn both on.
 
-### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
+### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
 
-- **Lane:** B — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
-  Review sweep 53.
-- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
-  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
-- **Batch:** `health-ia-merge`
-- The "Balance" tile renders `netKcal` `vs TDEE est.` in group **Body**; `CalorieBalanceBar` renders
-  `remainingKcal` + zone band in group **Activity & intake**. Same payload, two different numbers,
-  both presented as today's energy answer, with the Sleep group and eight Heart-&-recovery cards in
-  between.
-- `use-health-calcs.ts:44-47` records that these two surfaces **already disagreed once**, each
-  deriving its own TDEE. The data was unified; the presentation was not.
-- **Fix:** fold `netKcal` and `maintenance` in as a secondary line of `CalorieBalanceBar`, **behind a
-  prop** — that component is shared with Nutrition and `/health/day`, which did not ask for the extra
-  number.
-- **Fold, do not delete:** surplus/deficit and remaining-to-eat are genuinely different framings.
-
-### [body] RV-118 — "Weight Trend" exists twice in Health, and the card with that title has no trend number
-
-- **Lane:** B — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
-  **Added:** 2026-09-22 · Review sweep 53.
-- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
-  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
-- **Batch:** `health-ia-merge`
-- Body has a "Trend" tile with the kg/wk regression slope and **no chart**; Progress has a card
-  **titled "Weight Trend"** with a sparkline and two goal bars and **no slope number**. One question
-  — am I losing weight, how fast, how far to target — split across two sub-tabs the owner must swipe
-  between.
-- **Fix:** one card with sparkline + slope + goal bars. Body is the better home (it holds the
-  weight, body-fat and lean-mass cards it derives from). Both are plain JSX in one file sharing one
-  context, so the mechanical risk is low.
-- **What is lost:** the goal bars are Progress's subject, so **Progress becomes a 4-card tab.** Say
-  that out loud before doing it.
-- Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
+- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
+- **RV-119, RV-117 and RV-118 all carry "Owner gate SATISFIED 2026-09-22 — mockup shown at 384 px
+  dark … Build to it; a departure from it needs a fresh yes."** The mockup is not in the repo.
+  Searched: nothing in `docs/design/` from that date, and the sweep write-up describes the problems
+  rather than the approved layouts.
+- **So the instruction cannot be followed.** "Build to it" and "a departure needs a fresh yes" both
+  require knowing what *it* was. An implementer either invents a layout — the precise departure the
+  gate exists to prevent — or re-asks the owner something he already answered. **This blocked
+  RV-119's collapse today**, and will block RV-117 and RV-118 identically.
+- **The gate rule already says how to avoid it and does not say to keep it.** CLAUDE.md requires a
+  mockup "presented and a yes returned before any code", shown "at the real 384 px dark viewport,
+  not a description of it" — and `docs/design/` is where seven earlier rounds were kept
+  (`2026-08-07-score-row-mockups*.html`, `2026-08-18-nutrition-rework-mockups.html`, …). The habit
+  exists; this sweep skipped it.
+- **Proposed rule, Orchestrator's to accept:** a `Gate: owner` entry may only be marked satisfied
+  alongside a path to the artefact under `docs/design/`. An approval whose artefact is gone should
+  read as NOT satisfied, because that is the state an implementer is actually in.
+- **Cheap to fix going forward, and the reversal is nil** — it is one saved file per mockup round.
+  What it prevents is a lane building a Home layout the owner never saw and only finding out when he
+  opens the app.
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
 
@@ -1632,6 +1616,21 @@ below threshold and left in place for next time.
   Review sweep 53.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **⚠ THE MOCKUP IT SAYS TO BUILD TO WAS NOT PRESERVED, so "build to it" is not actionable.**
+  Searched 2026-09-23: nothing in `docs/design/` from that date, and the sweep write-up
+  (`docs/reviews/2026-09-22-sweep-53-…`) describes the problem, not the approved layout. The
+  approval is recorded; the artefact it approved is not. **Any session that picks this up hits the
+  same wall** — filed as **LB-135**.
+- **PARTIALLY SHIPPED 2026-09-23** (`fix/home-ia-merge-part1`): **the APK banner is gone**, with its
+  `apkBannerDismissed` state, its `apk-banner-dismissed` key and the now-unused `Download` and `X`
+  imports. That half needed no design judgement — the entry states the reason outright and the
+  canonical runtime *is* the APK, with the same download row at More → About.
+- **STILL OWED — the collapse, and it needs the owner before code.** Two stay full-width (illness
+  advisory, early deload); four collapse (exercise-detected, goals check-in, day-review, weekly
+  recap — five in the entry, minus the APK banner now removed). What a "collapsed strip" LOOKS like
+  is the part the missing mockup specified, and inventing it is exactly the departure this entry
+  says needs a fresh yes. Re-make the mockup at 384 px dark, **save it under `docs/design/`**, and
+  get the yes before building.
 - **Batch:** `home-ia-merge`
 - Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
   weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
