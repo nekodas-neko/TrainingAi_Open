@@ -1592,7 +1592,13 @@ below threshold and left in place for next time.
 
 ### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
 
-- **Lane:** B — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
+- **Lane: O — the mockup exists, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
+  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (or one file per entry), link it from this
+  bullet, and set the lane back to `B`.** Nothing else is blocking — the build is understood and
+  ready the moment the artefact lands.
+- **Was Lane B** — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
   Review sweep 53.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
@@ -1610,7 +1616,13 @@ below threshold and left in place for next time.
 
 ### [body] RV-118 — "Weight Trend" exists twice in Health, and the card with that title has no trend number
 
-- **Lane:** B — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
+- **Lane: O — the mockup exists, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
+  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (or one file per entry), link it from this
+  bullet, and set the lane back to `B`.** Nothing else is blocking — the build is understood and
+  ready the moment the artefact lands.
+- **Was Lane B** — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
   **Added:** 2026-09-22 · Review sweep 53.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
@@ -1628,7 +1640,13 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
 
-- **Lane:** B — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
+- **Lane: O — the mockup exists, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
+  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (or one file per entry), link it from this
+  bullet, and set the lane back to `B`.** Nothing else is blocking — the build is understood and
+  ready the moment the artefact lands.
+- **Was Lane B** — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
   Review sweep 53.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
