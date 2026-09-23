@@ -103,6 +103,9 @@ class Device {
 
   /** The Android system back (KEYCODE_BACK). Off the phone this is `page.goBack()` — not the same path. */
   async back(settleMs = 1500) {
+    // KEYCODE_BACK goes to whatever app holds the screen. Refuse unless it is this one — the same
+    // rule as rawTap, for the same reason (2026-09-23: blind input closed the app on the owner's phone).
+    if (this.onPhone && !(await this.inForeground())) throw new Error('back refused: the app is not in the foreground');
     if (this.onPhone) await systemBack();
     else await this.page.goBack().catch(() => {});
     await sleep(settleMs);
@@ -169,20 +172,21 @@ class Device {
       const row = {
         t: Date.now() - t0, method: e.request.method, url: e.request.url, type: e.type,
         initiator: frame ? `${frame.url.split('/').pop()}:${frame.lineNumber}:${frame.columnNumber}` : e.initiator?.type,
-        status: null, fromServiceWorker: false, failed: null,
+        status: null, fromServiceWorker: false, failed: null, tResp: null, tEnd: null, bytes: null,
       };
       byId.set(e.requestId, row);
       entries.push(row);
     };
     const onRes = (e) => {
       const row = byId.get(e.requestId);
-      if (row) { row.status = e.response.status; row.fromServiceWorker = !!e.response.fromServiceWorker; }
+      if (row) { row.status = e.response.status; row.fromServiceWorker = !!e.response.fromServiceWorker; row.tResp = Date.now() - t0; }
     };
-    const onFail = (e) => { const row = byId.get(e.requestId); if (row) row.failed = e.errorText; };
+    const onFail = (e) => { const row = byId.get(e.requestId); if (row) { row.failed = e.errorText; row.tEnd = Date.now() - t0; } };
     // `bodies`: a RegExp on the URL. Matching responses keep their body — how the first sitting told
     // a stale server answer from a right answer the card ignored (BF-177, 2026-09-23).
     const onDone = (e) => {
       const row = byId.get(e.requestId);
+      if (row) { row.tEnd = Date.now() - t0; row.bytes = e.encodedDataLength; }
       if (!row || !bodies || !bodies.test(row.url)) return;
       this.cdp.send('Network.getResponseBody', { requestId: e.requestId })
         .then((b) => { row.body = b.base64Encoded ? '(binary)' : b.body; }).catch(() => {});
@@ -196,6 +200,8 @@ class Device {
     return {
       entries,
       now: () => Date.now() - t0,
+      /** Requests still in flight (started, not finished or failed). */
+      inFlight: (re = /\/api\//) => entries.filter((r) => r.tEnd === null && re.test(r.url)).length,
       /** Requests to paths matching `re` since `sinceMs` (from `now()`). */
       count: (re, sinceMs = 0) => entries.filter((r) => r.t >= sinceMs && re.test(api(r.url))).length,
       stop: () => {

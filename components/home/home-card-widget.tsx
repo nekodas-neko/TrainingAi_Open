@@ -140,6 +140,10 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
       const latest = sleepData.find(s => s.date === _today || s.date === _yesterday) ?? null
       const hrs = latest?.durationHours ?? null
       const goalPct = hrs != null ? Math.min((hrs / sleepGoal) * 100, 100) : null
+      // DV-4: stage colours are FILLS here (the dot and the stacked bar), never text. The card's
+      // background is owner-customisable, so no stage colour is readable on every card — Deep's
+      // #1e3a70 measured ~1:1 on the S25. The hours inherit the foreground, as the sleep detail
+      // sheet's identical legend already does.
       const stages = latest ? [{ label: "Deep", hours: latest.deepSleepHours, color: STAGE_COLOR.deep }, { label: "REM", hours: latest.remSleepHours, color: STAGE_COLOR.rem }, { label: "Light", hours: latest.lightSleepHours, color: STAGE_COLOR.light }, { label: "Awake", hours: latest.awakHours, color: STAGE_COLOR.awake }] : []
       const totalStageHrs = stages.reduce((s, st) => s + (st.hours ?? 0), 0)
       const _sColor = cardColors['sleepWidget'] ?? CARD_DEFAULT_COLORS.sleepWidget
@@ -159,7 +163,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
               <Moon className="h-6 w-6 flex-none" style={{ color: "var(--accent-purple)" }} />
             </div>
             {goalPct !== null && <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: "rgba(139,92,246,0.15)" }}><div className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none" style={{ transform: `scaleX(${goalPct / 100})`, background: "linear-gradient(90deg, #6366f1, #a78bfa)" }} /></div>}
-            {totalStageHrs > 0 && (<><div className="flex h-2 rounded-full overflow-hidden gap-px mb-1.5">{stages.filter(s => (s.hours ?? 0) > 0).map(s => <div key={s.label} style={{ flex: s.hours ?? 0, background: s.color }} />)}</div><div className="flex gap-3">{stages.map(s => <div key={s.label} className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} /><span className="text-xs text-muted-foreground">{s.label}</span><span className="text-xs font-bold" style={{ color: s.color }}>{s.hours != null ? `${s.hours.toFixed(1)}h` : "—"}</span></div>)}</div></>)}
+            {totalStageHrs > 0 && (<><div className="flex h-2 rounded-full overflow-hidden gap-px mb-1.5">{stages.filter(s => (s.hours ?? 0) > 0).map(s => <div key={s.label} style={{ flex: s.hours ?? 0, background: s.color }} />)}</div><div className="flex gap-3">{stages.map(s => <div key={s.label} className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} /><span className="text-xs text-muted-foreground">{s.label}</span><span className="text-xs font-bold">{s.hours != null ? `${s.hours.toFixed(1)}h` : "—"}</span></div>)}</div></>)}
           </div>
         </div>
       )

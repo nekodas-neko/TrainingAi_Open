@@ -15957,6 +15957,64 @@ seen from the other side: there it blames a branch for a shrink it did not cause
 funds a branch's growth from one. Recorded here rather than "corrected" — dropping the baseline to
 27192 in this PR would be exactly the unattributed ratchet move RV-134 is about.
 
+## 2026-09-23 — `docs/implementation-backlog.md` +44 (27227 → 27271) (Review: RV-143)
+
+One entry, most of it a triage of the 24 affected entries. That list is the point rather than
+padding: the fix is three lines in `next-item.js`, and the risk is that turning the selector on
+dumps two dozen entries on the device agent with no indication that five of them want a ring it does
+not have and four are not really device work at all.
+
+## 2026-09-23 — `docs/implementation-backlog.md` +7 (RV-143's own mis-parse)
+
+RV-143's first draft wrote the field names as literal tokens, and `keepFromLines` read the sentence
+*"a regex over the `Keep:` text"* as a real Keep block — whose prose then contained a bolded
+device-gate token it read as a real gate. `keep-gate-set-off.test.ts`, which pins the queue's
+seventeen gates by id, failed with an eighteenth: `RV-143:device`.
+
+The entry now writes the names as prose and carries the incident, because an entry about the gate
+parser being mis-parsed by it is LA-103's bug one level deeper and the best evidence the entry has.
+
+## 2026-09-23 — backlog 27271 → 27305 (DV-4, +34)
+
+The backlog GROWS on an entry that shipped, and both halves of the growth are for things NOT in the
+diff.
+
+DV-4 stays in the queue as a `Verify: device` + `Keep:` rather than being deleted: the fix is a
+contrast change and the sandbox can compute the ratio but cannot see the card, let alone a custom
+card colour. Its entry also gains the sibling sweep it asked for — all four `STAGE_COLOR` consumers
+read, three already correct, and the sleep detail sheet rendering the identical legend the right
+way. That is worth the lines because it inverts how the fix reads: not a judgement call about
+colour, but one surface out of step with three.
+
+The larger share is **DV-6, which this session did not build**. It looked at building it and found
+three things that would each have cost the next session an hour: there is no document scroll to
+listen to (five inner containers, so the shell needs a capture-phase listener), `--page-bg` goes
+`transparent` under `DynamicBackground` so a gradient built from it is invisible exactly when it is
+needed, and the floored height already exists as `--pt-safe-value`. Writing them into the entry is
+the alternative to a second session rediscovering them, and it is why DV-6 was left out of the PR
+rather than half-built inside it.
+
+---
+
+## 2026-09-23 — backlog → 27350 (+45 from this branch, measured after merging main) (device/sweep-prep)
+
+DV-1's pass test was run on the device machine for the first time and failed (`npx.cmd` → EINVAL since
+Node's CVE-2024-27980 patch), so the entry gains the measured result; and DV-7 / DV-9 are new — bedtime
+consistency computed in the phone's timezone, which only shows on a machine not set to UTC.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27151 → 27128 (TN-61 / the starved DV lane)
+
+TN-61 left the queue after being built, which is the whole of the 23 lines.
+
+A genuine shrink caused by this branch — the case the ratchet is right to make someone lower, as
+distinct from the tax RV-134 describes where a branch is forced to lower a number because someone
+else's merge shrank the file.
+
+Worth recording beside it: this failure is the first one today that arrived **legible**. Two earlier
+gate runs exited 1 with their evidence piped away to `tail -5`; this one was kept whole and named
+its own cause in the first line of the failure block. `pnpm ci:local > /tmp/gate.log 2>&1; echo $?`
+costs nothing and is the difference between a fix and a third OR-121 entry.
+
 ## 2026-09-23 — `docs/implementation-backlog.md` 27230 → 27274 (OR-134)
 
 Forty-four lines recording why three different things were wearing one `Gate: device`: two circular

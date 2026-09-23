@@ -473,6 +473,50 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
+
+- **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
+  in neither implementer lane's paths, the OR-103 case. **Added:** 2026-09-23 · Review, answering the
+  owner's *"has everything that needs to be sent to DV agent been backlogged?"* — the answer was no.
+- **The filter, verbatim:** `if (e.verify?.value === 'device') return true;` then a regex over the
+  Keep field's text. **The Gate field is never consulted.** Measured on `main` 2026-09-23:
+  **29 entries carry a device gate; 24 of them do not appear in `--sittings`.**
+- **⚠ Write the field NAMES in this entry as prose, never as the literal tokens.** The first draft
+  said *"a regex over the `Keep:` text"*, and `keepFromLines` read that mention as a real Keep
+  block — whose prose then contained a bolded device-gate token, which it read as a real gate. CI
+  went red on `keep-gate-set-off.test.ts`, the snapshot that pins the queue's seventeen gates by id,
+  with an eighteenth: `RV-143:device`. **An entry about the gate parser was mis-parsed by it**, which
+  is LA-103's bug one level deeper, and is the sharpest argument this entry has for its own fix.
+- **They are in a dead zone, not merely missing.** A `Gate:` **parks** an entry, so the implementer
+  lanes skip it *because* it needs the device — and the one agent holding the device cannot see it.
+  Nothing surfaces these to anybody.
+- **The cause is a role that changed the meaning of a field.** `--sittings` was built around *shipped
+  work owing a look* (BF-90's eleven entries writing the same debt in `Verify:` and `Keep:`). Before
+  2026-09-23 a `Gate: device` meant *wait for the owner to pick the phone up*, so leaving it out was
+  right. The Device Verification role makes `Gate: device` mean *the DV agent can unblock this* —
+  and a gated entry is **more** urgent for it than a `Verify:` one, because one blocks work and the
+  other is a look owed on work already shipped.
+- **Fix:** select `Gate: device` in `sittingsOnly` as well, and print which field each row came from,
+  so a reader can tell *blocked-on-this* from *look-owed-on-this*. Roughly three lines.
+- **Triage of the 24, so the fix does not just dump them on the device agent.** Read each against its
+  own entry rather than trusting this split:
+  - **Runnable by the agent now (~13):** BF-22 (slow loads clear on force restart — this is RV-142's
+    P16), BF-49 (back from a timeline row lands on Health), BF-92 (Sentry receiving nothing from the
+    client), Q-418 (the free walk's Android pill cannot show the time), Q-51 (the perf thread —
+    RV-137/RV-138 now cover it), RV-111 (back while the barcode scanner is open), LA-36
+    (`image_data_uri` written to the device and read back), LA-115 (Health Connect record types the
+    plugin cannot parse, failing silently), Q-7b, PS-7, TN-44.
+  - **Needs hardware the agent does not have (~5):** PS-8, PS-9, PS-12, PS-16 all want the **Colmi
+    R09 in hand**; Q-388 wants multi-day wear plus an owner decision on SpO₂ drain.
+  - **Needs a production write or the owner physically present (~2):** RV-108 (a weigh-in — the scale,
+    and real data), Q-114 (the scale's progress bar against the native flow).
+  - **Arguably mis-gated and worth re-reading (~4):** BF-11, BF-24, Q-395 are large design specs that
+    read as `Reference:` rather than device-blocked; Q-168 and Q-34 name follow-up phases.
+- **⚠ Do NOT bulk-convert `Gate: device` → `Verify: device` to make them visible.** `Verify:` means
+  **shipped**, the protocol warns against that misuse twice, and doing it to 24 unbuilt entries files
+  them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
+  because a reader in either place stops looking. The selector is the defect, not the entries.
+
 ### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
 
 - **Verify:** device — **no build half**; the measurement is the work. Method: **P11** in
@@ -776,21 +820,37 @@ below threshold and left in place for next time.
 
 ### [sleep][app-shell] DV-4 — Home's Sleep card prints the Deep hours in the Deep stage colour, which is about 1:1 against the card
 
-- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend, ~line 143).
+- **Lane:** B — `components/home/home-card-widget.tsx` (the `stages` legend).
 - **Added:** 2026-09-23 · Device Verification, found during the P4 sweep (RV-127).
-- **❌ Measured on the S25.** Web v1.465.4 / APK 1.460.4, dark theme. The legend's value spans are
-  coloured with `STAGE_COLOR.<stage>` (`packages/shared/src/health/hypnogram.ts`): Deep's
-  **"0.5h" computes to `rgb(30, 58, 112)`**. The page root behind the card is `oklch(0.145 0.02 215)`
-  (≈ `rgb(9,22,26)`), giving **≈1.6:1**; against the card's purple paint in the screenshot it is
-  **≈1:1** — the number is effectively invisible. REM, Light and Awake pass only because their stage
-  colours happen to be light. CLAUDE.md's floor is 4.5:1 for body text.
-- **Why a palette fix will not hold:** the card's background is **owner-customisable**
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/dv4-sleep-legend-contrast`, v1.465.10). The legend's hours now
+  inherit the foreground; the stage colour stays on the dot and the stacked bar.
+- **❌ The measurement that produced it, on the S25.** Web v1.465.4 / APK 1.460.4, dark theme.
+  The legend's value spans were coloured with `STAGE_COLOR.<stage>`
+  (`packages/shared/src/health/hypnogram.ts`): Deep's **"0.5h" computes to `rgb(30, 58, 112)`**.
+  The page root behind the card is `oklch(0.145 0.02 215)` (≈ `rgb(9,22,26)`), giving
+  **≈1.6:1**; against the card's purple paint in the screenshot it is **≈1:1** — the number was
+  effectively invisible. REM, Light and Awake passed only because their stage colours happen to be
+  light. CLAUDE.md's floor is 4.5:1 for body text.
+- **Why a palette fix would not have held:** the card's background is **owner-customisable**
   (`ColorSwatchPicker`, `cardColors.sleepWidget`), so no stage colour is safe as text on every card
-  colour. Stage colours are fills — keep them on the dot and the stacked bar, and render the hours in
-  a foreground token. Sibling check: `hypnogram.tsx` and `sleep-phase-trend-card.tsx` also import
-  `STAGE_COLOR`; the latter uses it as a bar fill (fine), the former was not read.
-- **Pass test:** on the S25, every legend value on the Sleep card reads ≥ 4.5:1 against the card, in
-  dark and light, with the default card colour and one custom colour.
+  colour. Stage colours are fills.
+- **The sibling sweep answered the entry's own open question, and it inverted the fix.** DV-4 noted
+  `hypnogram.tsx` "was not read". All four `STAGE_COLOR` consumers were read: `hypnogram.tsx`
+  (SVG `fill` + a legend dot), `sleep-phase-trend-card.tsx` (Chart.js `backgroundColor`) and
+  `health-metric-sheet.tsx` are clean — and the last one renders the **identical** legend with a
+  coloured dot and the hours in the inherited foreground. So the target shape already existed in
+  the repo and Home was the only offender; nothing else needed changing.
+- **Pinned by `components/home/__tests__/dv4-stage-colour-is-never-text.test.ts`**, which sweeps
+  every `STAGE_COLOR` consumer for the palette reaching a CSS `color` inside a `style` object — the
+  durable rule rather than the one span. It also asserts the dot and bar are still coloured, so the
+  check cannot be satisfied by deleting the palette, and it pins the contrast ratio. Control run:
+  with the colour put back it fails naming `home-card-widget.tsx:166`. A first draft flagged the
+  two legitimate `{ label, color: STAGE_COLOR.deep }` **data** fields; the check is scoped to
+  `style=` lines for that reason.
+- **Keep:** the device look — on the S25, every legend value on the Sleep card reads ≥ 4.5:1
+  against the card, in dark and light, with the default card colour and one custom colour. The
+  sandbox can compute the ratio (and does, in the test) but cannot see the card.
 
 ### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
 
@@ -833,33 +893,42 @@ below threshold and left in place for next time.
   scrolled under it. The app's full-screen headers use `pt-safe`; the tab roots scroll to the top.
 - **The owner's question:** a scrim behind the status bar on scroll, or leave it. If yes, it belongs
   in the shell once, not per screen.
+- **Three findings from the DV-4 session, which looked at building this and did not** (2026-09-23).
+  They are the reason it is not a ten-line component:
+  ① **There is no document scroll to listen to.** Every tab scrolls its own inner container — three
+  through `PullToSync`, and Nutrition owns a separate one — so a shell-level listener must be
+  `document.addEventListener('scroll', fn, true)`; `scroll` does not bubble, but it does reach a
+  capture listener on an ancestor. That keeps this in the shell once, with no per-screen opt-in,
+  which is what the owner asked for.
+  ② **`var(--page-bg)` is the wrong colour to fade from.** `DynamicBackground` sets
+  `--page-bg: transparent` on `<html>` when it is active, so a gradient built from it is invisible
+  in exactly the case the scrim exists for. `var(--background)` holds the theme base either way;
+  how that composes with the dynamic sky is the thing to look at on device.
+  ③ **Height is `--pt-safe-value`** (`max(1rem, calc(env(safe-area-inset-top,0px) + 0.5rem))`),
+  already defined in `globals.css`. It floors at 1rem, which matters because three-button
+  navigation reports insets as 0.
+  Also: `z-[60]` is taken by `local-store-dead-banner` (fixed, top) and the offline pill, so the
+  scrim sits below them or it covers a warning.
+  **The open question is the tab flip** — a panel left scrolled down shows no scrim until the next
+  scroll event, because nothing re-reads its offset on activation.
 
 
-### [platform] TN-61 — `next-item.js` prints ten rows of a thirty-one-row bucket and says nothing about the rest
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-23 · Tuning · **Lane: O** — `scripts/next-item.js:54`
-  (`TOP_N = showAll ? Infinity : 10`).
-- **Background:** found twice in two days while verifying my own filings. Prose, not a `Reference:`
-  field — that field files an entry under *read, do not build*.
-
-**Lane A's READY list is 31 entries and the tool prints 10, with no line saying so.** Two entries I had
-just edited (`TN-55`, `LA-121`) appeared **nowhere** in the output, which reads exactly like *removed
-from the queue* — the failure mode the backlog's own two-deletions rule exists to catch. I only
-established they were fine by parsing their fields directly, which is the thing `next-item.js` exists to
-save everyone from doing.
-
-**The fix is one line of output, not a behaviour change.** Keep printing 10; add the count that was
-withheld and how to see them — *"showing 10 of 31 — `--all` for the rest"* — on every bucket it
-truncates, READY and PARKED alike. A tool whose silence is indistinguishable from absence is the same
-class of defect as the prose marker in TN-59: correct output, wrong conclusion drawn from it.
-
-**⚠ Do not raise `TOP_N` instead.** The cap is right — an implementer wants the next few items, not
-thirty-one. What is wrong is that the truncation is invisible.
-
-**Pass test:** with Lane A's READY at 31, the output names 31 somewhere, and a grep for an entry ID that
-IS in the queue but below the cut-off no longer comes back empty without explanation.
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
+
+- **❌ PASS TEST RUN ON THE DEVICE MACHINE, 2026-09-23 — FAILED; this is open work again.** Windows 11,
+  Node 22.23.2, `main` at v1.465.9. `pnpm ci:local`: lint **0 errors**; `check:rules` **Ran 76 of 76, 0
+  FAIL** — the four path fixes hold. Then `typecheck:tests` dies:
+  `Error: spawnSync npx.cmd EINVAL`. **Since Node's April 2024 patches (CVE-2024-27980),
+  `execFile`/`spawn` refuse a `.cmd`/`.bat` without `shell: true`**, so `npx.cmd` swapped ENOENT for
+  EINVAL. The robust fix avoids npx entirely: `execFileSync(process.execPath,
+  [require.resolve('typescript/bin/tsc'), '--noEmit', '-p', 'tsconfig.tests.json'])` — same on every OS.
+  `pnpm test` run by itself: **1005 files, 5 failed / 791 passed / 209 skipped** (the DB suites skip
+  cleanly without Postgres — so the pass test needs no local database). The five:
+  `personal-details-one-editor.test.ts` (4 tests) and `constants-delivery.test.ts` compare paths with
+  `/` and get `\\`; `mutation-schema.test.ts` reads `full-export.ts`'s `'_manifest'` as a domain literal,
+  likely a `/`-keyed exclusion; `check-comment-blindness.test.ts` still times out at 30 s (recorded
+  above); and `sleep-consistency.test.ts` — **not a path bug; filed as DV-7**.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 · Device Verification · **Lane: O** — the rule
   scripts under `scripts/`, `scripts/check-test-typecheck.js`, and `package.json` `engines`.
@@ -897,7 +966,7 @@ IS in the queue but below the cut-off no longer comes back empty without explana
     argument list to a shell for re-parsing.
   - **`engines.node` is `>=22.12`.** `check-node-version-agreement.js` reads the major and still
     passes; the local machine's own upgrade is the owner's.
-- **Keep:** **the pass test, which cannot be run from here.** Every fix above is reasoned from the
+- **Was the Keep, answered below:** the pass test, which could not be run from the cloud. Every fix above is reasoned from the
   reported failures and verified on Linux, where three of the four bugs are invisible by
   construction. `pnpm ci:local` on the Windows machine, unpiped, exiting 0, is the only thing that
   settles it — and that is the Device Verification agent's to run.
@@ -922,6 +991,37 @@ IS in the queue but below the cut-off no longer comes back empty without explana
   times slower than it needs to be is the finding, and a bigger number would hide it.
 - **Pass test:** `pnpm ci:local` on the Windows machine the S25 is plugged into, unpiped, exits 0.
 - **Not a device check** — nothing here needs the phone.
+
+### [sleep][platform] DV-7 — `minutesFromNoon` falls back to the device's clock, and its tests only pass on a UTC machine
+
+- **Lane:** A — `packages/shared/src/health/sleep-consistency.ts` and its test.
+- **Added:** 2026-09-23 · Device Verification, running DV-1's pass test on the device machine.
+- **Measured:** on a machine set to Brisbane, `sleep-consistency.test.ts` fails twice — *"expected 690 not
+  to be 690"* and *"expected 1312.5 to be close to 712.5"*, a difference of **600 minutes, the UTC ↔
+  Brisbane offset**. CI runs in UTC, so it has never failed there.
+- **Why:** with no `tz`, `minutesFromNoon` computes `d.getHours() * 60 + d.getMinutes()` in the
+  **device's** timezone (its own comment: *"omit it for the existing client usage (device-local time
+  is…"*). That is the pattern CLAUDE.md's Timezone section bans for anything user-facing. The test
+  encodes the other half: it compares against device-local and assumes device-local is UTC.
+- **Fix direction:** make `tz` required (or default to `DEFAULT_TZ`, never the device), and write the
+  tests with an explicit zone on both sides, so they pass on any machine. **DV-9** is the caller.
+- **Pass test:** `pnpm test packages/shared/src/health/__tests__/sleep-consistency.test.ts` green under
+  `TZ=UTC` and `TZ=Australia/Brisbane` alike.
+
+### [sleep] DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's
+
+- **Lane:** B — `app/health/sleep/sleep-content.tsx:72`.
+- **Needs:** DV-7
+- **Added:** 2026-09-23 · Device Verification, found with DV-7.
+- **The defect:** `computeSleepStartConsistency(recentStarts)` is called with **no timezone**, so each
+  bedtime is placed in the device's local clock. The server route (`app/api/user/bedtime-estimate`)
+  passes one; this screen does not. **Invisible on the owner's phone** because it is set to Brisbane —
+  wrong for anyone whose phone and profile disagree (travel, or another user), which is exactly how
+  CLAUDE.md says this class hid for months.
+- **Fix:** pass the user's timezone (the session's `timezone`, as the route does).
+- **Pass test:** with the device timezone emulated to another zone (CDP `Emulation.setTimezoneOverride`
+  in `scripts/device/pw.js`), the Sleep screen's consistency figure does not change.
+
 
 ### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
 
@@ -1955,6 +2055,24 @@ nothing structured saying why — and a human decides.
   shallow file, repeated three times in one session.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
+  REJECTED this one with a reason.** The two were filed hours apart by different sessions and
+  neither could see the other. Read this before starting:
+  - **The conflicts were not caused by the committed baseline.** They were caused by **slack
+    detection failing on any gap**, which forced every PR that shrank a tracked doc by one line to
+    edit `.size` — and striking a completed entry is what almost every PR does. RV-134 tolerates
+    slack within `max(25, 2%)`, and the tax it was measured against (23 re-merge commits across
+    five branches in one night) should now be mostly gone. **Measure it again before assuming the
+    class still exists.**
+  - **Generating baselines in CI removes the CEILING, which is the part worth keeping.** A derived
+    baseline makes every increment "inherited", so a file can grow ten lines per PR forever with
+    nothing objecting. Slack detection exists because CLAUDE.md once sat **429 lines** under its
+    number. Any design here has to say how growth is still caught and how slack is still surfaced —
+    if it cannot, it is trading a merge conflict for the thing the ratchet is for.
+  - **A merge driver was also considered and rejected**: `merge.<name>.driver` must be configured in
+    every clone (CI, this sandbox, the Windows device machine) and silently does nothing where it is
+    missing, which is the old behaviour wearing a disguise.
 
 - **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
   **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
