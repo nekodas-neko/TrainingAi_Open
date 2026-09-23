@@ -64,6 +64,7 @@ node scripts/device/record.js 1500 --tap '#open'     # frames over time, with th
 node scripts/device/tour.js [routes.json]            # walk a set of screens, capture each
 node scripts/device/sweep.js [routes.json]           # P4: clearance, overflow, <44px, truncate+flex, nesting
 node scripts/device/census.js [--rounds 2 --dwell 25 --idle-min 30]   # P2 + P7 + P10 in one walk
+node scripts/device/perf.js coldstart|tti|cycles|longtasks|backstack   # Part B, P11–P16
 node scripts/device/selftest.js                      # the harness against a local fixture — no phone
 ```
 
@@ -87,11 +88,17 @@ measuring an offset the harness chose.
 | P6 repeat-visit paint | `record.js` from a tab tap, first frame with content |
 | P8 offline | `offline(true)` — page network only; the native BLE ingest is not affected |
 | P9 route census | `tour.js` plus tapping, never typed URLs |
+| P11 cold start + TTI | `perf.js coldstart`, `perf.js tti` |
+| P12 first-mount distribution | `perf.js cycles --n 10` — the full list, never a mean |
+| P13 waterfall | every `measureVisit` carries `waterfall()`: counts, KB, duplicates, chain depth |
+| P14 long tasks | `perf.js longtasks` — long tasks plus long-animation-frame script attribution |
+| P15 path structure | `perf.js backstack` (guarded back; stops at Home) |
+| P16 long session | `perf.js tti --label open|walk|idle` around `census.js --idle-min 30` |
 
 `selftest.js` proves the driver's own logic in a desktop Chrome through the same `connectOverCDP`
-path (18 checks, 2026-09-23). It proves nothing about the WebView — the Android back, the local
-SQLite and the real inset are only settled on the phone. `sweep.js` and `census.js` have **not
-run on the phone yet**.
+path (22 checks as of 2026-09-23, including `perf.js`'s timing, chain depth and long tasks). It proves
+nothing about the WebView — the Android back, the local SQLite and the real inset are only settled on
+the phone. `sweep.js` and `census.js` have run on the S25; `perf.js` has **not** yet.
 
 Run `probe.js` first; if it cannot connect, nothing else here will either. It changes nothing.
 `ADB_PATH` and `DEVICE_CDP_PORT` override the `adb` binary and the forwarded port;

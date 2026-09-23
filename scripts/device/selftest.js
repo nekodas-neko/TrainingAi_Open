@@ -33,19 +33,20 @@ nav a{flex:1;padding:14px;text-align:center} .text-brand{color:blue}
 <button id=small style="width:20px;height:20px">x</button>
 <div id=wide><div>overflowing</div></div><span class=truncate>flex truncate</span>
 <a href="#" id=nested>link <button>inside</button></a>
-<button id=log>Log</button></main>
+<button id=log>Log</button><button id=busy>Busy</button><p>filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text filler text </p></main>
 <nav><a href="/" class=text-brand>Home</a><a href="/more">More</a></nav>
 <script>
 const render = () => {
   document.getElementById('title').textContent = location.pathname === '/' ? 'home' : 'more';
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('text-brand', a.getAttribute('href') === location.pathname));
-  fetch('/api/ping?p=' + location.pathname);
+  fetch('/api/ping?p=' + location.pathname).then(() => fetch('/api/chain'));
 };
 document.querySelectorAll('nav a').forEach(a => a.addEventListener('click', e => {
   e.preventDefault(); history.pushState({}, '', a.getAttribute('href')); render();
 }));
 document.getElementById('log').addEventListener('click', () => { fetch('/api/write', { method: 'POST' }); fetch('/api/ping?after=write'); });
 addEventListener('popstate', render);
+document.getElementById('busy').addEventListener('click', () => { const e = performance.now() + 120; while (performance.now() < e) {} });
 console.warn('fixture warning 42');
 fetch('/api/broken');
 setInterval(() => {}, 60000);
@@ -140,6 +141,20 @@ async function main() {
     check('sweep: a sub-44px target is found', sw.smallTargets.some((t) => /small/.test(t.el)), `${sw.counts.smallTargets}`);
     check('sweep: truncate on flex is found', sw.truncateOnFlex.length >= 1, `${sw.counts.truncateOnFlex}`);
     check('sweep: a button inside a link is found', sw.nested.some((n) => /nested/.test(n)), `${sw.counts.nested}`);
+
+    const perf = require('./perf');
+    await perf.installObservers(dev);
+    const net2 = await dev.recordNetwork();
+    const v = await perf.measureVisit(dev, net2, () => dev.tab('/', 0));
+    check('measureVisit reports time to content and to settled', v.contentMs !== null && v.settledMs !== null, `content ${v.contentMs} ms, settled ${v.settledMs} ms`);
+    const wf = perf.waterfall(v.requests);
+    check('waterfall finds the two-step request chain', wf.chainDepth >= 2, JSON.stringify({ depth: wf.chainDepth, chain: wf.chain }));
+    const from = await dev.page.evaluate(() => performance.now());
+    await dev.tap('#busy'); await sleep(600);
+    const p = await perf.takePerf(dev, from);
+    check('a 120 ms busy handler shows up as a long task', p.longTasks.some((e) => e.dur >= 100) || p.unsupported.longtask, JSON.stringify(p.longTasks.map((e) => Math.round(e.dur))));
+    check('long-animation-frame entries name the script (or LoAF is unsupported)', p.unsupported.loaf || p.frames.some((f) => f.scripts.length), `${p.frames.length} frames`);
+    net2.stop();
 
     let ro = null;
     try { await dev.localQuery('DELETE FROM food_logs'); } catch (e) { ro = e.message; }

@@ -4,45 +4,44 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-23 · **By:** the first-run session (`device/probe-sitting-2`) · **Next ID:** `DV-7`
+**Updated:** 2026-09-23 · **By:** the first-run session (`device/sweep-prep`) · **Next ID:** `DV-7`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
 
 - **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`.
-- Open from sitting 1: **BF-177 FAILED** (B, READY), **DV-4** (B), **DV-5** (A), **DV-6** (B, owner).
-- **Sitting 2 was stopped by an incident I caused:** blind `adb input` taps landed outside the app,
-  opened another app and closed this one on the owner's phone. Raw input now goes only through the
-  guarded `rawTap`/`rawSwipe` (foreground + path checked immediately before sending).
+- **Sweep 1 is planned, not run:** `docs/device-sweep-1-plan.md` — all 116 owed checks read and
+  bucketed (53 automatable, 9 approved writes, 9 writes needing the owner, 18 hardware, 6 judgement,
+  21 not really device checks), plus P11–P16 (RV-137…142). **Stale for your sweep:** BF-107 and
+  LA-57 print as owed but are closed/refuted; BF-95's failure note reads like BF-61's.
+- Open from sitting 1: **BF-177** (B), **DV-4** (B), **DV-5** (A), **DV-6** (B, owner-gated).
 
 ## Now
 
-Nothing running. The phone is the owner's to use; I message him before the next sitting.
+Waiting on the owner's go-ahead **and** his four decisions (plan §"Decisions"): weigh-in overwrite,
+mood one-per-day, the nine unapproved writes (default skip), the optional owner-present OS block.
 
-## Next — sitting 3, in this order
+## Next — sweep 1, in the plan's order
 
-1. `probe.js`, then **check whether the shell mounts two tab bars after a cold reload** — sitting 2's
-   census crashed on `nav a[href="/"]` matching two elements. Not yet a finding.
-2. **RV-133's 30-minute idle** (`census.js --rounds 1 --idle-min 30`) with `keyevent 224` every 4 min.
-3. **P1/P2 remaining writes** — weigh-in (+ RV-126's RV-108 question), supplement tick, mood,
-   activity confirm; each undone straight after.
-4. **BF-61's immediate tap** — only with `rawSwipe`/`rawTap`, from a tray verified at
-   `translateX(0)`, tapping Delete's own rect. Read the entry's sitting-2 bullet first.
-5. P5/P6 (`record.js`), P9, RV-130's resume half; then `--sittings` (110) by queue order.
+Setup → cold start (`perf.js coldstart`, `longtasks`) → distribution (`perf.js cycles --n 10`,
+`backstack`) → frames/paint/census → screens (AUTO rows) → writes → admin → resume → owner block →
+long session (`perf.js tti` at open/walk/idle around `census.js --idle-min 30`). About 3 hours.
+First check at setup: **two tab bars after a cold reload?** (sitting 2's census crashed on it).
 
-## Blocked — on the owner
+## Rules for every message and every input
 
-- **Airplane mode** for RV-131's restart-offline half. **DV-6** — scrim or not.
+- **Lead every message with 🟢 (phone may be unplugged) or 🔴 (plug in / leave plugged).**
+- **No raw `adb shell input` outside `rawTap`/`rawSwipe`; `back()` refuses off-foreground.**
+- **Wake key `keyevent 224` every 4 min during idle stretches** — the screen sleeps at 5 min.
 
 ## Standing permissions from the owner (2026-09-23)
 
-- **All five write types, each undone straight after:** food, supplement tick, mood check-in,
-  weigh-in, activity confirm. **Workouts** may be started; delete anything logged.
-- **Upgrade tooling on this machine yourself.** Leave other agents' PRs for them to close.
+- **Five write types, each undone straight after:** food, supplement tick, mood check-in,
+  weigh-in, activity confirm — but see the weigh-in and mood caveats in the plan.
+  **Workouts** may be started; delete anything logged. **Tooling upgrades** on this machine: yes.
 
 ## Decided — do not re-litigate
 
-- **No raw `adb input tap|swipe` outside `rawTap`/`rawSwipe`.** The phone is the owner's.
 - **`e2e/**` does not run on the phone**; Playwright is this role's driver (`pw.js`).
 - **A request count lies for local-first screens** — read the visible number too (BF-177).
 - **Captures never leave this machine as images** — the repo is public.
