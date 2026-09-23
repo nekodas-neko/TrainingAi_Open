@@ -473,41 +473,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [app-shell][platform] RV-135 — BF-110's reading arrived five days ago, and its own `Keep:` still parks it as waiting for one
-
-- **Lane: B** — no file yet; the fix BF-110 points at is native (`android/**`), which makes it
-  **Lane A**, and that reassignment is part of the work. **Added:** 2026-09-23 · Review sweep 54.
-- **The contradiction is inside one entry.** BF-110's body opens *"✅ THE READING IS IN, and it says
-  NATIVE — measured 2026-09-18. This entry is no longer waiting on data."* Its `Keep:` line, below
-  that, still reads *"the READING, and only that … Still do not write a fix before that row
-  exists."* `next-item.js` reads the `Keep:`, so the entry sits in the **KEEP** bucket, whose
-  heading is *"shipped; only the stated residue is owed. **Not new work.**"*
-- **So the native fix is owned by nobody.** An implementer scanning either lane sees an entry
-  explicitly labelled not-new-work, waiting on a measurement that has been in the table for five
-  days. The `✅` block is only visible to someone who opens the entry and reads past its status line.
-- **Re-measured 2026-09-23, and it has grown rather than gone quiet** — `error_events` over the full
-  retained window:
-
-  | | sweep 50 (2026-09-18) | now | change |
-  |---|---:|---:|---:|
-  | `recheck stuck` at `h=667` | 3 | **9** | ×3 |
-  | `recheck stuck` at `h=826` (healthy) | 12 | 16 | — |
-  | first readings at `h=667`, `children≤2` | 22 | **28** | +6 |
-  | `recheck resized` | 0 | **0** | — |
-  | `dom-lost` | 0 | **0** | — |
-
-- **Twenty-five rechecks, twenty-five `stuck`, zero `resized`.** By the module's own stated criterion
-  (`lib/resume-repaint.ts`: *"If it still reads 667, the viewport is genuinely stuck and the fix is
-  in the native layer"*) that answer is not marginal, and **`dom-lost` has never once fired in 62
-  reported resumes** — so BF-80's renderer-death is disproven for every sample, and the compositor
-  reading is the one standing.
-- **Fix:** rewrite BF-110's `Keep:` to name what is actually owed (the native viewport fix) or drop
-  the `Keep:` so the entry returns to READY, and move it to Lane A. **Nothing else about the entry
-  needs changing** — its analysis is right, which is what makes the filing error costly.
-- **⚠ The telemetry's own caveats still apply and are already written into BF-110:** `stuck` fires on
-  healthy resumes too (16 of 25 rows are 826→826, a viewport that was never wrong), and `w=384`
-  appears on every row, so only the **height** discriminates.
-
 ### [platform] RV-134 — the doc-size ratchet blames a branch for a shrink it did not cause, and that is the `.size` conflict tax
 
 - **Lane: O** — `scripts/check-doc-index-size.js`. Repo tooling in the Custom Rules job, which is
@@ -9437,13 +9402,16 @@ stronger reason the measured one wins.
   (2) `w=384` appears on **every** row including the healthy ones, so this entry's "384×667"
   signature is half right: **only the height discriminates.** Read `h1`, not the pair.
 
-- **Keep:** the READING, and only that. The second viewport log **shipped 2026-09-14**
-  (`feat/bf110-second-viewport-log`), so nothing here is owed a build. What is owed is one blank
-  resume in the owner's normal use, then `error_events`:
-  `... WHERE message LIKE 'bf110 resume recheck%'`. **`stuck` → the viewport is genuinely held at
-  384×667 and the fix is native; `resized` → the measurement was early and the fix is when the app
-  decides to render.** Still do not write a fix before that row exists — the two answers point at
-  different files.
+- **The reading it was waiting for arrived, so this is READY work rather than residue.** The `Keep:`
+  that stood here said *"the READING, and only that … Still do not write a fix before that row
+  exists"*, and it survived five days after the rows landed. `next-item.js` reads the `Keep:`, so the
+  entry sat in the KEEP bucket — *"shipped; only the stated residue is owed. Not new work."* — and
+  the `✅` at the top of this entry was visible only to someone who opened it and read past its
+  status line. **The native fix was owned by nobody for five days** (RV-135).
+  The second viewport log shipped 2026-09-14 (`feat/bf110-second-viewport-log`); the verdict split it
+  was built to produce is below, and re-measured 2026-09-23 it has grown rather than gone quiet —
+  **25 rechecks, 25 `stuck`, 0 `resized`, and `dom-lost` has never fired in 62 reported resumes.**
+  By this entry's own criterion that is the native answer, and it is not marginal.
 
 - **⚠ RE-MEASURED 2026-09-14 (Orchestrator): the separation HOLDS with more samples, and it is now
   route-independent — which rules out a hypothesis.** Seven days of `bf110 resume dom-intact` rows,
@@ -9512,8 +9480,11 @@ stronger reason the measured one wins.
   `dom-intact` row is the measurement this entry wanted, and a `dom-lost` row would put BF-80 back
   in play.
 
-- **Lane:** B — the DOM is alive, so the fix is a paint invalidation in the shell, not native. **No APK
-  needed**, which is the practical difference between this entry and BF-80.
+- **Lane: A** — `android/**`. **Reassigned 2026-09-23 (RV-135), and the old reasoning is retracted
+  here rather than deleted, because it was right until the reading landed:** it said *"the DOM is
+  alive, so the fix is a paint invalidation in the shell, not native. No APK needed."* The
+  measurement below says the viewport is genuinely held at h=667, which is the native side of this
+  entry's own criterion — so it **does** need an APK, and it is not Lane B's.
 - **Added:** 2026-09-02 · owner: *"this screen still happens when tabbing back. I noticed it fixes
   itself if you just scroll on it. but would like to fix."* Screenshots: About at v1.436.2, then the
   same screen with the status bar, the nav bar and nothing between them.
