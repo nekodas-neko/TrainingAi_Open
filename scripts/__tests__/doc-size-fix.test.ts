@@ -80,4 +80,50 @@ describe('check-doc-index-size --fix (LA-99)', () => {
     const cfg = JSON.parse(readFileSync(path.join(dir, 'docs', 'doc-size-baseline.json'), 'utf8'))
     expect(cfg.entries.totalCeiling).toBe(360)
   })
+
+  // LA-129 — the conflict class, and it was self-inflicted.
+  //
+  // RV-134 gave every tracked file a `max(25, 2%)` slack band so an ordinary PR need NOT touch its
+  // `.size` file. `--fix` lowered the baseline anyway, so every PR that struck a backlog entry —
+  // which is nearly every PR — wrote to the same one-line file, and two concurrent PRs conflicted
+  // there. Measured 2026-09-23: three consecutive base races on one branch inside forty minutes,
+  // every one on that file.
+  //
+  // The band is what decides. Within it `--fix` leaves the number alone and SAYS SO; over it the
+  // check fails, so `--fix` must still lower or the gate is left red (the case above).
+  it('leaves a baseline alone when the slack is within its band, and says it did', () => {
+    const dir = sandbox()
+    writeFileSync(path.join(dir, 'tracked.md'), docOf(90))
+    writeFileSync(path.join(dir, 'docs', 'doc-size', 'tracked.md.size'), '100\n')
+
+    const out = run(dir, ['--fix'])
+
+    expect(readFileSync(path.join(dir, 'docs', 'doc-size', 'tracked.md.size'), 'utf8').trim()).toBe('100')
+    expect(out).toContain('left 1 baseline(s) alone')
+    // Withholding must never read as "the flag did nothing".
+    expect(out).not.toContain('already matches')
+    // And the gate is still green in that state — the band tolerates it.
+    expect(() => run(dir)).not.toThrow()
+  })
+
+  it('--tighten lowers exactly that baseline, because a sweep is deliberate', () => {
+    const dir = sandbox()
+    writeFileSync(path.join(dir, 'tracked.md'), docOf(90))
+    writeFileSync(path.join(dir, 'docs', 'doc-size', 'tracked.md.size'), '100\n')
+
+    run(dir, ['--fix', '--tighten'])
+
+    expect(readFileSync(path.join(dir, 'docs', 'doc-size', 'tracked.md.size'), 'utf8').trim()).toBe('90')
+  })
+
+  it('still raises a baseline the document has outgrown', () => {
+    // The ceiling is the reason this check exists; withholding must not reach the growth side.
+    const dir = sandbox()
+    writeFileSync(path.join(dir, 'tracked.md'), docOf(140))
+    writeFileSync(path.join(dir, 'docs', 'doc-size', 'tracked.md.size'), '100\n')
+
+    run(dir, ['--fix'])
+
+    expect(readFileSync(path.join(dir, 'docs', 'doc-size', 'tracked.md.size'), 'utf8').trim()).toBe('140')
+  })
 })

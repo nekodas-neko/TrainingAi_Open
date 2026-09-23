@@ -2037,7 +2037,28 @@ below threshold and left in place for next time.
     every clone (CI, this sandbox, the Windows device machine) and silently does nothing where it is
     missing, which is the old behaviour wearing a disguise.
 
-- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
+- **⛔ ITS JUSTIFICATION IS GONE — MEASURED 2026-09-23, and the conflict was self-inflicted.**
+  RV-134 gave every tracked file a `max(25, 2%)` slack band so an ordinary PR need **not** touch its
+  `.size` file at all. But `check-doc-index-size.js --fix` **lowered the baseline anyway**, for any
+  slack including slack the check tolerates — so every PR that struck a backlog entry, which is
+  nearly every PR, wrote to `docs/doc-size/docs/implementation-backlog.md.size`, and two concurrent
+  PRs collided there. Verified directly: a 40-line strike leaves the plain check at **exit 0**,
+  reporting `40 lines of slack (band 546)`, and needing no edit whatsoever. Every `.size` conflict
+  this lane paid on 2026-09-23 — three on one branch inside forty minutes — was created by running
+  `--fix` out of habit, not by the committed baseline.
+  **Fixed at that source in the same PR as this note:** `--fix` now leaves a baseline alone when the
+  gap is within its band and prints what it withheld; `--tighten` lowers deliberately, which is the
+  compaction sweep's job; growth still raises, and slack **over** the band still lowers, because
+  there the check would otherwise fail. So a feature PR now touches no `.size` file at all, and the
+  only remaining conflicts are two PRs that genuinely disagree about one number.
+- **⚠ SO THE QUESTION THIS ENTRY ASKS IS NOW THE OWNER'S, AND IT IS A DIFFERENT QUESTION.**
+  Every cost argument below was a conflict cost, and that cost is gone. What CI-generation would
+  still buy is not having to carry `docs/doc-size/**` in the repo at all — weighed against the
+  ceiling it removes, which this entry itself identified as the part worth keeping, and against the
+  design question nobody has answered (how growth is still caught from a derived baseline). **Do not
+  build it on the old justification.** Re-read as a fresh proposal or strike it.
+- **Lane:** O — the owner's call now, not an implementer's; the code half that mattered has shipped.
+  Previously `A` — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
   **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
   **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
   better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
