@@ -6,6 +6,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.21",
+    date: "2026-09-23",
+    changes: [
+      "Switching between Profile and Friends on the More tab now fades across and starts at the top, instead of cutting straight over and keeping the other view\u2019s scroll position.",
+    ],
+  },
+  {
+    version: "1.465.20",
+    date: "2026-09-23",
+    changes: [
+      "Opening a friend\u2019s profile, the coach, the collection and the register screen now slide in the way every other screen does. Opening a profile from Friends was the odd one \u2014 it appeared instantly and then slid away when you went back.",
+    ],
+  },
+  {
+    version: "1.465.19",
+    date: "2026-09-23",
+    changes: [
+      "The end-of-day review should now open the first time you tap \u201creview your day\u201d in a session. It previously needed the Nutrition tab to have been opened once already, so the first tap of the day often did nothing.",
+    ],
+  },
+  {
+    version: "1.465.18",
+    date: "2026-09-23",
+    changes: [
+      "Choosing a rest day now refreshes your next-session recommendation once the choice reaches the server, instead of leaving the old suggestion in place until it expired on its own.",
+    ],
+  },
+  {
     version: "1.465.17",
     date: "2026-09-23",
     changes: [

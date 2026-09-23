@@ -2,7 +2,8 @@
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTransitionRouter } from "@/lib/view-transition";
 import { useDayRolloverRefresh } from "@/components/shell/local-day-provider";
 import { useRefreshOnTabShow, useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
@@ -20,10 +21,17 @@ const MealTypeManager = dynamic(
   () => import("@/components/nutrition/meal-type-manager").then(m => m.MealTypeManager),
   { ssr: false },
 );
-const EndOfDayReview = dynamic(
-  () => import("@/components/nutrition/end-of-day/end-of-day-review").then(m => m.EndOfDayReview),
-  { ssr: false },
-);
+
+// LB-129 — STATIC on purpose, and reverting it to `dynamic` reopens the bug.
+//
+// This screen is itself a lazily-loaded chunk (the shell code-splits every tab and warms them on
+// idle), so a second `dynamic({ ssr: false })` nested inside it kept almost nothing out of the
+// initial bundle and bought a chunk boundary that demonstrably does not resolve. Measured: flip
+// from Home to `/nutrition?review=day` the instant the route boundary settles and the sheet's
+// chunk NEVER loads — `reviewOpen` goes true, the element is in the tree, and the component body
+// never runs. Wait 1.5s before the same flip and it opens. That is the whole of "the first tap of
+// a session does nothing".
+import { EndOfDayReview } from "@/components/nutrition/end-of-day/end-of-day-review";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -98,7 +106,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   useScrollRestoration(scrollRef);
   const todayStr = todayInTz(tz);
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useTransitionRouter();
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const selectedDateRef = useRef(selectedDate);
   useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);

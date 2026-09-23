@@ -1318,81 +1318,162 @@ below threshold and left in place for next time.
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
 
+### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
+
+- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133.
+- **⚠ The test half of this entry was NOT fixed here — `#1472` fixed it concurrently on `main`,
+  and this entry originally claimed the fix as its own. Corrected before merge.** What this branch
+  carries is one added assertion on top of #1472's fix (below); the substantive finding is the
+  merge-gate one, which is untouched by #1472 and is why the entry stays open.
+- **What was red:** `app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6,
+  deterministically on `main` — reproduced in a clean worktree, confirmed byte-identical to
+  GitHub's copy so it was not a stale checkout, and unchanged with `DATABASE_URL` unset.
+- **Cause:** #1466 (RV-82) changed the route to read `recommendation.program` — `getNextSession`
+  hands back the program it already fetched — while the test still stubbed `getActiveProgram` and
+  its `getNextSession` mock had no `program`. So `program` was null and **every case fell into the
+  rest-day branch**, including the two still reporting green: the rest-day test passed trivially,
+  and *"never calls a prescription-mutating repo method"* passed **vacuously**, asserting nothing,
+  because that branch returns before any of them is reachable.
+- **This branch adds one line to #1472's fix:** `expect(getActiveProgram).not.toHaveBeenCalled()`,
+  which pins RV-82's actual point — the route must not fetch the program a second time — so the
+  stub cannot go stale in silence again. #1472 restored the mock but not the guard against a repeat.
+- **⚠ THE FINDING THAT MATTERS, and it is not about this test.** The failing `Tests` job did **not**
+  stop the merge. PR #1467 was squash-merged at 10:18 while `Tests` was failing on its head
+  (`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned
+  *"Pull Request successfully merged"*. **`main` took a red commit.**
+  **This falsifies a rule CLAUDE.md leans on heavily**, in the CI/CD section: *"attempting the merge
+  is the reliable green test … it cannot merge a genuinely pending check."* It can, and it did.
+  The likely reason is already recorded in the standing-agents section — `enable_pr_auto_merge`
+  fails here with *"Protected branch rules not configured for this branch"* — i.e. the required
+  checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
+  inference in this repo unsound. The same section's opening claim that branch protection *"requires
+  a PR with all CI checks passing"* is then also wrong.
+- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
+  change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
+  way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
+  unsound gate.
+- **Until it is settled, the workaround is cheap and every lane should use it:** before merging,
+  read the `Tests` job conclusion explicitly rather than trusting the merge call —
+  `get_job_logs` with `failed_only: true` returns only failed jobs, so an empty list is the green
+  signal, and it does not flood context the way `list_workflow_jobs` does (Custom Rules alone is 79
+  steps). Note the RUN stays `in_progress` for ~31 minutes because E2E is advisory; that is not a
+  failure.
+- **⚠ `main` went red a SECOND time the same day, from the same shape — found and fixed here too.**
+  `scripts/__tests__/keep-gate-set-off.test.ts` pins the queue's gate classification by id. Device
+  sweep 2 (#1471) closed Q-317's device check and removed its entry — legitimate — but did not
+  update the pinned list, so the snapshot read 16 where it expected 17 and `main` was red on every
+  branch. Fixed by dropping `Q-317:device` and naming the reason in place, which is exactly what
+  that test's own comment instructs (the Q-305 precedent, 2026-09-16).
+  **Two independent red-`main` events in one day, both snapshot-vs-change mismatches, neither
+  signalled anywhere** — that is the argument for enforcing the checks rather than for fixing two
+  tests.
+- **Blast radius was small only by luck:** `main` was already red from #1466 before #1467 went near
+  it, so nothing in #1467 caused it — but #1467 merged on top, and the next PR would have inherited
+  a red base with no signal. #1472 has since cleared it.
+
 ### [platform] LB-133 — the guard for the post-push class cannot see the class
 
 - **Lane: B** · **Added:** 2026-09-23 · Lane B, found while shipping LB-132.
-- **`scripts/check-invalidate-after-push.js` reported `no write invalidates around its push` while
-  five live sites carried exactly that defect.** It is CI step 37 in Custom Rules, it has no
-  baseline and no allowlist, and it exits 0. The green tick is read as evidence, which is what makes
-  this worse than having no check.
-- **Measured, by reverting one fixed site and re-running:** the ratchet still reported clean. So it
-  is blind to the shape, not merely to a formatting variant of it.
-- **The blind spot is `WINDOW = 12`** — a ±12-line text window around the `pushMutations` call.
-  Every one of LB-132's five sites puts its invalidation further away than that:
-
-  | Site | push → invalidate |
-  |------|-------------------|
-  | `end-of-day-review.tsx` | 14 lines |
-  | `mood-checkin-sheet.tsx` | 26 |
-  | `morning-checkin-sheet.tsx` | 35 |
-  | `log-value-sheet.tsx` | 39 |
-  | `exercise-review-sheet.tsx` | 53 |
-
-- **Widening the window is the fix that already failed once, and must not be tried again.** The
-  script's own docblock records it: LB-6 looked at the six lines ABOVE each call and missed five
-  written below, so the window was widened to ±12 both ways. That is how it reached today's state.
-  A window of 60 would catch these five and miss the sixth, and would start matching an unrelated
-  `invalidate*` in a neighbouring function.
-- **Fix: match the ENCLOSING BLOCK, not a line window** — walk to the balanced close of the function
-  or `try` containing the push, and ask whether any `invalidate*(` occurs inside it.
-  `check-admin-guard-catch.js` learned the same lesson under Q-548, where one regex requiring the
-  try's brace on the next line let twelve live sites through; `scripts/__tests__/admin-guard-catch.test.ts`
-  pins its blind spots as cases so a later narrowing fails. Copy that shape, test included.
-- **⚠ The evidence disappears when LB-132 merges.** All five instances are fixed there, so the
-  detector cannot be tested against live offenders afterwards. The distances are recorded above for
-  exactly that reason, and the regression test must construct the shapes as fixtures rather than
-  pointing at files.
-- **Expect new hits when it is fixed, and triage rather than sweep them.** The same rule LB-132
-  established applies: a bare `pushMutations` is only a defect where some CACHED key holds what the
-  write changed. Six sites that look like the class are already verified correct and named in LB-132
-  and its predecessors — `use-plan-meal-logging.ts`, `manual-bedtime-card.tsx`, `more-content.tsx`,
-  `sync-health-card.tsx` and the two group-① candidates. A tightened detector will flag some of
-  them; they are not regressions.
+- **Shipped 2026-09-23** (`fix/lb133-post-push-guard-blind-spot`). `check-invalidate-after-push.js`
+  now brace-matches the enclosing **handler** instead of scanning a ±12-line text window, exports
+  `offendersIn(src)` with the CLI behind `require.main === module`, and scans `lib/` as well — which
+  the old version never did.
+- **The defect it had:** it reported `no write invalidates around its push` while five live sites
+  carried the defect, with no baseline, so the clean line read as proof. Reverting a fixed site and
+  re-running still reported clean.
+- **Measured, and this is the part worth keeping:** the five real pre-fix sources were recovered
+  from git (`git show 66c04c3fdf0:<path>`) and run through both detectors. **The old one missed all
+  five. The new one catches all five at their exact pre-fix lines and is clean on the fixed
+  versions.** The five sat 14, 26, 35, 39 and 53 lines from their invalidation.
+- **Why the scope is the HANDLER, not the immediately-enclosing block.** Three of the five put the
+  push and the invalidation in *different* blocks of one handler — two sibling async IIFEs, or a
+  nested `try` and its parent — so brace-matching the nearest block (what `check-admin-guard-catch.js`
+  does for its own class) still misses them. The scope is the function block just inside the
+  component/hook body: wide enough to span those siblings, narrow enough that an unrelated handler
+  in the same file is out of scope. `app/more/more-content.tsx` is the case that proves it matters —
+  it contains an `invalidate*` call AND a bare push, in different handlers, and is correctly clean.
+- **Widening the window was never an option:** LB-6 looked six lines ABOVE each call, missed five
+  written below, and the window became ±12 both ways. That is how it reached the state above. A
+  bigger number catches today's five, misses the sixth, and starts matching a neighbouring function.
+- **It found a sixth offender immediately — `lib/home/rest-day.ts:65`, fixed in the same PR.**
+  `chooseRestDay` queued the mutation, fired a bare `pushMutations`, then `await`ed
+  `invalidateRestDayChoice()` — which clears `next-session`, `next-session-prescription` and
+  `collection`, all server-computed, and the file's own docblock says `getNextSession` prefers the
+  stored `rest_days` row. So the recomputed recommendation only arrives after the push lands. The
+  old scanner never looked at `lib/` at all.
+  **Lane call (structural, mine):** `lib/home/rest-day.ts` is in neither lane's path list; it is
+  reached only from `app/**` and `components/**`, so the §3 rule puts it in **B**. Reversal cost is
+  nil — it is a three-line change in one file.
+- **Pinned by `scripts/__tests__/invalidate-after-push.test.ts`** — ten cases, written as SHAPES
+  rather than distances, taken from the real pre-fix sources: the far-below invalidation, the
+  sibling IIFEs, the nested try, the module-scope helper, and five that must NOT be flagged (two
+  handlers, a bare flush, an awaited push, a `.then` chain, the import line).
+- **Keep:** the device look at the rest-day surface, folded into LB-132's device pass — choose a
+  rest day on the S25 and confirm Home's recommendation settles on the pushed row rather than at
+  TTL. The sandbox proves the call is present and cannot watch the eviction.
 
 ### [nutrition][app-shell] LB-129 — the day-review sheet does not open on a first flip into Nutrition
 
-- **Lane:** B — `app/nutrition/nutrition-content.tsx:191`. **Added:** 2026-09-23 · found while
-  shipping RV-110.
+- **Lane: B** · `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-23 · found while shipping
+  RV-110.
+- **Gate: device**
 - **Reproduced twice, driving the real app:** from Home, `navigateToTab` to `/nutrition?review=day`
   when Nutrition has **not yet been mounted in this shell session** leaves the End of Day sheet
-  CLOSED. The same href on a later flip, into an already-mounted Nutrition, opens it. Home's
-  "review your day" (`session-select-content.tsx:1183`) takes exactly that path, so the first tap of
-  a session is the one that does nothing.
-- **⚠ It is NOT a param-delivery problem, and that is the part worth not re-deriving.** The obvious
-  theory — that a tab flip's `replaceState` does not reach `useSearchParams` — was tested and is
-  false: instrumenting the reader showed `searchParams` arriving as `review=day` at **both** the
-  `useState` initializer and the `[searchParams]` effect on the failing run. `setReviewOpen(true)`
-  runs. The sheet still does not appear, so the defect is downstream of the param, in what the
-  sheet renders or is gated on during a cold first render of that screen.
-- **Also ruled out:** the generic "effect-only reader misses the first mount" story. Health's
-  `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
-- **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
-  it as, and what it is gated on) rather than the param.
-- **Three more candidates ruled out from source, 2026-09-23** (while DV-11 was in CI — reading only,
-  nothing built). None is the cause, and each would otherwise be the obvious first guess:
-  ① **`steps` empty → `step` undefined.** `visibleReviewSteps` starts with `['day']` unconditionally
-  and always returns ≥2, so `safeIndex` is never -1 even with `mealTypes`/`logs` still loading.
-  ② **An early return before the sheet mounts.** `nutrition-content.tsx` has a single `return (` and
-  renders `<EndOfDayReview>` unconditionally — there is no loading gate above it.
-  ③ **A mount gate in the `Sheet` primitive.** Its only `return null` is `SheetSurfaceLayer`, a
-  decorative gradient that no-ops when the wallpaper is off.
-  **What remains unexamined is the one thing worth instrumenting:** `EndOfDayReview` is a SECOND
-  `dynamic(..., { ssr: false })` chunk nested inside the tab's own code-split chunk, so on a cold
-  flip it renders `null` while its chunk loads and then mounts already `open={true}`. Start there.
-- **Probe recipe:** `page.goto('/')`, `settleRouteBoundary`, then
-  `page.evaluate(() => window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/nutrition?review=day', cancelable: true })))`,
-  wait ~10 s, read `[role="dialog"]`. Allow generously for the dynamic import — a run that renders
-  nothing after 8 s is a probe artefact, not the defect.
+  CLOSED. Home's "review your day" (`session-select-content.tsx:1183`) takes that path, so the first
+  tap of a session is the one that does nothing.
+- **A speculative fix is ON `main` and is NOT demonstrated — do not read it as closed.**
+  `EndOfDayReview` is now a STATIC import rather than a second `dynamic({ ssr: false })` nested
+  inside the tab's own lazy chunk. The reasoning is sound and the reversal is one line, but **no
+  test in this repo shows it fixing anything**; the device check is what would.
+
+#### What was MEASURED in the Playwright harness (2026-09-23) — and what it does not prove
+
+- **The param is NOT the problem, confirmed by instrumenting the reader.** At the failing timing the
+  effect logs `sp=review=day loc=?review=day` and `reviewOpen` goes `false → true`. There is no
+  error and no `pageerror`. The state is correct.
+- **`EndOfDayReview`'s component body never runs** while `reviewOpen` is true — its chunk had not
+  resolved. So the defect is downstream of the param, in chunk loading, exactly where the old entry
+  pointed.
+- **It is a RACE, cleanly bracketed.** Flip the instant `settleRouteBoundary` returns and the sheet
+  does not appear within 12 s. Flip 1500 ms later and it opens; 6000 ms later, sooner still.
+
+  | wait before the flip | End of Day |
+  |---|---|
+  | 0 ms | not within 12 s |
+  | 1500 ms | opens |
+  | 6000 ms | opens |
+
+- **⚠ BUT THE HARNESS CANNOT TELL THIS FROM A DEV-COMPILER ARTEFACT, AND THAT IS THE BLOCKER.**
+  The harness drives `pnpm dev`, where a cold chunk is **compiled on demand** — seconds, visibly, in
+  the server log. With the fix reverted and the window widened to 20 s the sheet DID appear, so the
+  chunk resolves late rather than never. In a production build the chunk is prebuilt. **So the
+  measurement above may be the dev compiler, not the owner's bug.**
+  A production-mode run would settle it and **is not available in this sandbox**: `next start` sets
+  `NODE_ENV=production`, which turns the pg pool's SSL on, and the local Postgres speaks no SSL —
+  every request dies (`playwright.config.ts` records this). Only the device, or a Railway preview,
+  can separate the two.
+- **Two traps that each cost a pass, both worth not repeating:**
+  **(a)** The old probe recipe — flip, then read `[role="dialog"]` — gives a **FALSE PASS**. Home
+  auto-opens the Morning Check-in for a user who has not done one, so the role is already satisfied
+  before the flip. Assert the sheet's own heading.
+  **(b)** A spec written from this was **deleted rather than committed**: it passed with the fix AND
+  with the fix reverted, so it is a green tick that proves nothing — the LB-133 failure mode. Do not
+  re-add it without a control run showing it red.
+- **Previously ruled out, from source — do not re-derive:** param delivery; `steps` empty →
+  `step` undefined (`visibleReviewSteps` always returns ≥2); an early return above the sheet
+  (`nutrition-content.tsx` has one `return` and renders it unconditionally); a mount gate in the
+  `Sheet` primitive (its only `return null` is the decorative `SheetSurfaceLayer`); the
+  effect-only-reader story (Health's `?openSleepDate=` is effect-only and works).
+- **Also ruled out, this session:** the **back-dismiss machinery**, which is the most tempting
+  candidate because `sheet-back-stack.ts` carries a documented bug where *"the dialog closed on the
+  frame it opened"* (BF-34). `handlePop` only runs on a `popstate`, and a tab flip emits none —
+  `tab-shell.tsx:103` navigates with `window.history.replaceState`. The timeline also shows the
+  sheet **never opening** rather than opening and closing.
+- **Keep:** the device check, which is the only thing that can close this. On the S25, from a cold
+  app start, tap Home's "review your day" as the first action of the session and confirm the End of
+  Day sheet opens. If it now opens, the static import was the fix; if it still does not, the chunk
+  boundary was never the cause and the dev-compiler reading above was a red herring — say so and
+  reopen from the param-independent half.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
 
@@ -1426,32 +1507,67 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed
 
-- **Lane:** B — `components/more/friend-leaderboard.tsx:111`, `components/more/friend-feed.tsx:28`,
-  `app/nutrition/nutrition-content.tsx:140`, `app/coach/**`, `app/collection/**`,
+- **Lane:** B — `components/more/friend-leaderboard.tsx`, `components/more/friend-feed.tsx`,
+  `app/nutrition/nutrition-content.tsx`, `app/coach/**`, `app/collection/**`,
   `app/register/register-form.tsx`. **Added:** 2026-09-22 · Review sweep 53.
-- The transition router is used in 30 files and a plain `useRouter` in 16. The asymmetric pair:
-  both friends surfaces push `/profile/${userId}` with a plain router while that screen's own back
-  runs the `"back"` keyframes — **open hard, close animated**, the exact inversion
-  `lib/hooks/use-back-or-fallback.ts:30-34` was written to prevent. Transition-less both ways:
-  Nutrition → `/coach` (Nutrition is the #2 screen), the coach confirm route, `/collection` back,
-  and register.
-- **Fix:** swap `useRouter` for `useTransitionRouter` — same call signature, and it already no-ops
-  for tab hrefs and same-URL pushes, so it is import-only.
-- **⚠ Known hazard:** `lib/view-transition.ts:36`'s 300ms cap freezes the outgoing screen if the
-  destination never commits. `/coach` and `/coach/confirm/[toolCallId]` are dynamic routes and a
-  cold compile could hit it — a 300ms hold rather than a break, but check it on those two.
+- **Shipped 2026-09-23** (`fix/rv114-route-transitions`). Seven call sites swapped from `useRouter`
+  to `useTransitionRouter` — import-only, as the entry predicted. Re-verified against `main` first:
+  all seven still matched, and every usage is a `push` or a `back`, never a `refresh`, so nothing
+  animates that should not.
+- **The asymmetric pair was the point.** Both friends surfaces pushed `/profile/${userId}` with a
+  plain router while that screen's own back runs the `"back"` keyframes — open hard, close animated,
+  the exact inversion `lib/hooks/use-back-or-fallback.ts` exists to prevent. Transition-less both
+  ways: Nutrition → `/coach` (the #2 screen), the coach confirm route, `/collection` back, register.
+- **The `/coach` hazard is ANSWERED at source, not deferred.** `lib/view-transition.ts`'s 300 ms cap
+  cannot break a navigation to a dynamic route: `navigate()` is called unconditionally inside the
+  promise executor, *before* the commit poll starts, so the deadline only ends the frozen snapshot.
+  A destination that never commits costs a held frame, never a lost push — which is what the entry
+  expected and now has a reason attached.
+- **Pinned by `lib/__tests__/rv114-pushed-routes-animate.test.ts`** — each of the seven uses
+  `useTransitionRouter` and carries no bare `useRouter`; both friends surfaces still push a profile
+  AND animate it; and `useTransitionRouter` still spreads the real router, so a future change there
+  cannot silently drop `refresh`/`prefetch` from seven call sites without a type error. Control run:
+  reverting `friend-feed.tsx` fails 2 of 9.
+- **Deliberately NOT a repo-wide ratchet.** 16 files still use a plain `useRouter` and most are
+  right to — a tab href needs no transition (`useTransitionRouter` already no-ops for those) and a
+  `refresh()` is not a navigation. Widening it is its own entry, not a free extra here.
+- **Keep:** the device feel. This is motion on the owner's daily paths and the sandbox can only
+  prove the call sites changed; whether the shared-axis transition reads right on the S25 is a look
+  judgement, and `/coach` is the one worth watching because it is a dynamic route.
 
 ### [app-shell] RV-115 — More's Profile ↔ Friends swap is a hard `display:none` toggle that carries the other view's scroll
 
-- **Lane:** B — `app/more/more-content.tsx:157-163`. **Added:** 2026-09-22 · Review sweep 53.
-- Two `<div style={{display: …}}>` inside one shared scroller: no motion, and the scroll offset
-  carries across. Meanwhile Health's sub-tabs slide via `SwipeCarousel` and **the Friends tab's own
-  child view crossfades** via `TabPanels` — the single call site of that primitive.
-- **Fix:** wrap both panels in the existing `<TabPanels value={tab}>` and reset `scrollTop` in
-  `onValueChange`. Opacity-only, already inherits the global `MotionConfig`.
-- **⚠ `mode="wait"` unmounts the outgoing panel**, discarding Profile's and Friends' state on every
-  switch — confirm both re-seed from cache, or the swap trades a hard cut for a skeleton. That
-  caveat plus More's traffic (7) is why this ranks last of the navigation set.
+- **Lane:** B — `app/more/more-content.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- **Shipped 2026-09-23** (`fix/rv115-more-subtab-crossfade`). Both views now swap through the
+  existing `<TabPanels value={tab}>` — the primitive Friends' own child views already use — and the
+  shared scroller returns to the top on each swap.
+- **⚠ The entry's fix was not implementable as written, and the reason is worth keeping.** It said
+  "reset `scrollTop` in `onValueChange`", but `PullToSync` owns `scrollRef` privately and exposed no
+  prop, so the call site cannot reach the element it needs to move. Added `scrollResetKey` to
+  `PullToSync` instead — the reset belongs with the component that owns the scroller, and Health's
+  three-tab scroller can use it next.
+  **Structural call (Lane B's):** a new prop on a component three screens render, versus forwarding
+  a ref to every call site. Reversal is deleting one prop and one effect.
+- **The `mode="wait"` caveat RESOLVES, and was checked rather than assumed.** Both panels re-seed
+  synchronously from cache — `profile-tab.tsx` in a `useLayoutEffect` with `readCacheSync`,
+  `friends-tab.tsx` with `readCacheSync('friends-list')` — so unmounting the outgoing panel repaints
+  from cache rather than flashing a skeleton.
+- **But it costs UI state, which the entry did not name.** Unmounting discards Friends'
+  feed/leaderboard choice and Profile's expanded sections on every swap. Accepted: More's traffic is
+  7, the data is untouched, and the alternative (keeping both mounted for a crossfade) needs absolute
+  positioning inside `PullToSync`'s scroller and risks the layout bugs that machinery already carries.
+  Recorded in the code comment so it is not rediscovered as a bug.
+- **One narrow limitation, deliberately not fixed:** switching sub-tabs *within*
+  `useScrollRestoration`'s re-assert window after entering More can still let the restore win. That
+  is the behaviour today, so it is an incomplete fix rather than a regression — and the reset skips
+  its first run precisely so it cannot race the restore on mount.
+- **Pinned by `components/__tests__/rv115-more-subtab-crossfade.test.ts`** — the swap uses
+  `TabPanels` and no `display` toggle; `scrollResetKey={tab}` is passed; the reset bails when the key
+  is unchanged; **and both panels still seed from cache**, which is the load-bearing one: delete that
+  seeding and this swap silently becomes a skeleton flash nobody would trace back here. Control run:
+  removing `scrollResetKey` fails 1 of 5.
+- **Keep:** the device look — a 150 ms crossfade on the owner's own screen is a feel judgement, and
+  the sandbox can only prove the primitive is wired in.
 
 ### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
 

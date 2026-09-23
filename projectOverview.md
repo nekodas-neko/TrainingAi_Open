@@ -2467,6 +2467,14 @@ all shipped 2026-09-23. **The open question is answered:** `sync-engine.ts` fire
 invalidation at all, so the pull path never closes the window and the far-side call is the only
 thing that does. Six further sites that looked identical were verified correct and are named in the
 entries, so a later sweep does not patch them. **Owed: the device pass on both.**
+**And the CI guard for this class could not see it (LB-133, fixed 2026-09-23).**
+`check-invalidate-after-push.js` reported clean, with no baseline, through the whole period those
+five sites carried the defect — it matched a ±12-line window and they sat 14 to 53 lines out.
+Checked against the five real pre-fix sources recovered from git: **the old detector missed all
+five; the new one catches all five and is clean after the fix.** It now brace-matches the enclosing
+handler, scans `lib/` (which it never did), and found a sixth offender on its first run —
+`lib/home/rest-day.ts`, where choosing a rest day invalidated the server-computed next-session
+recommendation before the push carrying the choice had landed.
 
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
 Three GET routes answered a parameter or configuration question before establishing the caller was anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-route-hardening-batch)).
@@ -2603,6 +2611,54 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][app-shell] ⚠️ The day review may still not open on the first tap of a session — fix NOT verified (LB-129, 2026-09-23)
+
+Home's "review your day" flips to `/nutrition?review=day`. On a Nutrition the shell has not mounted
+yet, the sheet stays closed; the same tap later opens it, so the first tap of a session is the one
+that does nothing.
+
+**Measured:** the param is fine (`reviewOpen` goes true, no error) — `EndOfDayReview`'s component
+body never runs, because its chunk has not resolved. Flip immediately and the sheet does not appear
+within 12 s; wait 1500 ms and it opens.
+
+**Shipped speculatively:** `EndOfDayReview` is now a static import instead of a `dynamic` nested
+inside the tab's own lazy chunk. **Nothing demonstrates this fixes it.** The harness drives
+`pnpm dev`, where a cold chunk is compiled on demand, so the measurement cannot be separated from a
+dev-compiler artefact — and a production-mode run is impossible in the sandbox (`next start` turns
+the pg pool's SSL on and the local Postgres speaks none).
+
+**Owed — the only thing that can close it:** on the S25, from a cold app start, tap "review your
+day" as the first action of the session. If it opens, the chunk boundary was the cause; if not, that
+reading was a red herring and the entry says where to resume. Reversal is one line.
+
+### [platform] ⚠️ A merge went through on a FAILING required check — the merge call is not a gate (LB-134, 2026-09-23)
+
+**Read this before merging anything.** PR #1467 was squash-merged at 10:18 while its `Tests` job
+was **failing** on its head (`efb8ee295e6`, run 35845811258→35847259425, job 107136618616), and
+`merge_pull_request` returned *"Pull Request successfully merged"*. **`main` took a red commit.**
+
+**This falsifies two claims in CLAUDE.md**, and both currently instruct every agent to use an
+unsound gate:
+1. CI/CD section — *"attempting the merge is the reliable green test … it cannot merge a genuinely
+   pending check."* It can, and it did.
+2. Standing Instructions — *"Branch protection on `main` requires a PR with all CI checks
+   passing."* Evidently not: `enable_pr_auto_merge` already fails here with *"Protected branch
+   rules not configured for this branch"*, which is the same fact seen from another angle.
+
+**Workaround every lane should use until it is settled:** read the `Tests` job **conclusion**
+explicitly before merging, rather than trusting that the merge succeeded. `get_job_logs` with
+`failed_only: true` returns only failed jobs, so an empty list is the green signal — and unlike
+`list_workflow_jobs` it does not flood context (Custom Rules alone is 79 steps). The **run** stays
+`in_progress` for ~31 minutes because E2E is advisory; that is not a failure.
+
+**Owner's call, not a lane's** (`Lane: O`): whether to enforce the required checks, and — either
+way — correcting the two passages above. Filed as **LB-134**.
+
+**What was red, and by whom:** `prescription.test.ts`, 4 of 6, after #1466 moved the program onto
+the recommendation without updating the test's mock; two of the six still reported green, one
+trivially and one **vacuously**. #1472 fixed it concurrently. The red commit was inherited, not
+caused, by #1467 — but nothing signalled it.
 
 ### [platform][devices] ⚠️ The app was unreachable for ~8 minutes, and the likeliest cause is how fast we were merging (DV-13, 2026-09-23)
 

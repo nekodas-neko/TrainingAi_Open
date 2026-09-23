@@ -30,6 +30,17 @@ interface PullToSyncProps {
   /** Distinguishes two scrollers on one route (BF-100). Health renders three — one per tab — so
    *  without this they would share a saved offset and restore each other's. */
   scrollKey?: string;
+  /**
+   * Send the scroller back to the top whenever this value changes (RV-115).
+   *
+   * For a screen whose sub-views share ONE scroller: swapping them leaves the offset where the
+   * outgoing view left it, so the incoming one opens part-scrolled into content it has never shown.
+   * The reset lives here because `scrollRef` is internal — a call site cannot reach the element it
+   * needs to move.
+   *
+   * Deliberately skipped on first render, so it cannot race `useScrollRestoration` above on mount.
+   */
+  scrollResetKey?: string | number;
 }
 
 export function PullToSync({
@@ -39,6 +50,7 @@ export function PullToSync({
   scrollStyle,
   className = 'flex-1 flex flex-col overflow-hidden',
   scrollKey,
+  scrollResetKey,
 }: PullToSyncProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // BF-100. The app scrolls this container, not the document, so Next's own restoration cannot see
@@ -55,6 +67,14 @@ export function PullToSync({
   // A scroll fixes it by hand, so the DOM was never lost — this measures that once and forces the
   // compositor to re-raster without one.
   useResumeRepaint(scrollRef);
+  // RV-115. Skipping the first run is what keeps this off the restoration's toes: a mount-time
+  // reset would race the restore that `useScrollRestoration` re-asserts for its whole window.
+  const lastResetKey = useRef(scrollResetKey);
+  useEffect(() => {
+    if (lastResetKey.current === scrollResetKey) return;
+    lastResetKey.current = scrollResetKey;
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [scrollResetKey]);
   const isPulling = useRef(false);
   const isSyncing = useRef(false);
   const phaseRef = useRef<Phase>('idle');

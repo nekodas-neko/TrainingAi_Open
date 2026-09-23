@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
-import { useRouter } from "next/navigation";
+import { useTransitionRouter } from "@/lib/view-transition";
 import {
   ChevronLeftIcon,
   ClockIcon,
@@ -37,7 +37,7 @@ interface CoachContentProps {
 }
 
 export function CoachContent({ tz, userId, scope }: CoachContentProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const [input, setInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [online, setOnline] = useState(true);

@@ -90,6 +90,10 @@ describe('GET /api/next-session/prescription', () => {
     expect(body.sessionName).toBe('Push')
     expect(body.exercises[0].sets[0]).toEqual({ weightKg: 80, reps: 8, restSec: 90 })
     expect(getSessionPeriodization).not.toHaveBeenCalled()
+    // RV-82 (#1466): the program comes off the recommendation now. This stub going stale is
+    // what turned every case here into the rest-day branch while two of them still reported
+    // green — one trivially, one vacuously (#1472 restored the mock; this pins the cause).
+    expect(getActiveProgram).not.toHaveBeenCalled()
   })
 
   it('returns source "pending" for an ai_dynamic program with no stored prescription', async () => {

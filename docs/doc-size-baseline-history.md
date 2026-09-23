@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-23 — backlog → 27119 (RV-77 re-verified and moved, LA-131 filed, +33 on a shrunken base)
+## 2026-09-23 — backlog → 27235 (RV-77 re-verified and moved, LA-131 filed, +33 on a shrunken base)
 
 Raising this number is also what surfaced **LA-132**, fixed in the same PR: the base comparison for
 this file had been failing with `spawnSync git ENOBUFS` because the document passed **2.11 MB**
