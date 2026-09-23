@@ -15994,3 +15994,10 @@ needed, and the floored height already exists as `--pt-safe-value`. Writing them
 the alternative to a second session rediscovering them, and it is why DV-6 was left out of the PR
 rather than half-built inside it.
 
+---
+
+## 2026-09-23 — backlog → 27350 (+45 from this branch, measured after merging main) (device/sweep-prep)
+
+DV-1's pass test was run on the device machine for the first time and failed (`npx.cmd` → EINVAL since
+Node's CVE-2024-27980 patch), so the entry gains the measured result; and DV-7 / DV-9 are new — bedtime
+consistency computed in the phone's timezone, which only shows on a machine not set to UTC.
