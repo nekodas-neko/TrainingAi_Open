@@ -62,7 +62,7 @@ function sweepInPage() {
     if (r.bottom < vh - 24) continue;
     if (!e.matches(INTERACTIVE) && !e.querySelector(INTERACTIVE)) continue;
     const pad = parseFloat(cs.paddingBottom) || 0;
-    bottom.push({ el: label(e), paddingBottomPx: pad, gapBelowPx: Math.round(vh - r.bottom), clearsInset: pad + (vh - r.bottom) >= inset });
+    bottom.push({ el: label(e), paddingBottomPx: pad, gapBelowPx: Math.round(vh - r.bottom), clearsInset: pad + (vh - r.bottom) >= inset - 0.5 });
   }
 
   const overflow = all
@@ -72,9 +72,16 @@ function sweepInPage() {
 
   const smallTargets = all
     .filter((e) => e.matches(INTERACTIVE) && !e.parentElement?.closest(INTERACTIVE))
-    .map((e) => ({ e, r: e.getBoundingClientRect() }))
-    .filter(({ r }) => r.width < 44 || r.height < 44)
-    .map(({ e, r }) => ({ el: label(e), w: Math.round(r.width), h: Math.round(r.height) }))
+    .map((e) => {
+      // The touch box, not the ink: `.tap-target-44` / `.tap-target-dot` add an invisible
+      // ::before of 44×44 / 24×44 (app/globals.css), so the drawn size understates what a thumb gets.
+      const r = e.getBoundingClientRect();
+      const hit = e.classList.contains('tap-target-44') ? { w: 44, h: 44 }
+        : e.classList.contains('tap-target-dot') ? { w: 24, h: 44 } : { w: 0, h: 0 };
+      return { e, w: Math.max(r.width, hit.w), h: Math.max(r.height, hit.h), inkW: r.width, inkH: r.height };
+    })
+    .filter(({ w, h }) => w < 44 || h < 44)
+    .map(({ e, w, h, inkW, inkH }) => ({ el: label(e), w: Math.round(w), h: Math.round(h), ink: `${Math.round(inkW)}x${Math.round(inkH)}` }))
     .slice(0, 80);
 
   const truncateOnFlex = all
@@ -107,7 +114,7 @@ async function main() {
     try {
       if (TABS.includes(route)) {
         // A tab root is reachable only from a screen that shows the tab bar.
-        for (let i = 0; i < 4 && !(await dev.page.locator('nav a[href="/"]').isVisible()); i++) await dev.back();
+        await dev.home();
         await dev.tab(route, 1800);
       } else {
         await dev.go(route, 2200);
