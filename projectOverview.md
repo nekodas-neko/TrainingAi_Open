@@ -29,6 +29,20 @@
 **Version:** v1.465.7 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-22.
 
+**Score bands now use the theme tokens, and the thing guarding them failed silently (RV-99, half).**
+`scoreBand()` returned raw `#22c55e`/`#f59e0b`/`#ef4444` while `recovery-band.ts` and
+`body-battery-band.ts` returned tokens for the identical concept — in dark those are different
+colours, not shades (green `rgb(34,197,94)` vs `rgb(86,238,102)`). It now returns
+`SCORE_BAND_COLOR`. **The entry warned about Chart.js canvas and `resolveColor()`; all eleven
+consumers are DOM or SVG, so none was needed.** The real blocker was **`accentCardStyle`**, which
+sliced the hex to parse it and returned a bare muted background — no gradient, no border, no error —
+for anything not starting with `#`, so the HRV-baseline card would have lost its tint silently. It
+has a `color-mix` path now; the hex branch is untouched on purpose (≈30 cards render through it and
+`rgba()` ≠ `color-mix(in oklch)`), and `transparent` keeps its bail. ⚠ **Half of RV-99 only** — the
+hex triad is **183 occurrences across 68 files**, not the entry's "173 across ~25", and four of
+those modules (`rarity-colors`, `hr-zones`, `macro-colors`, `home-prefs`) are identity colours that
+must keep their hex. ⚠ **Not seen rendered** — every assertion is on a returned string; no card was
+viewed in a browser or on device.
 **An unknown key on the check-in route is a 400 that names it, not a silent strip (LA-128).**
 `Body` was `.extend()`-built and never `.strict()`, so a sheet posting a field whose server half had
 not landed got **201 and wrote nothing** — the failure LB-124 was filed over rather than attempted,

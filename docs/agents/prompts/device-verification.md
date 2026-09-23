@@ -32,6 +32,15 @@ can see the real app on the real phone; every other session runs in a cloud cont
    Then `node scripts/next-item.js --sittings` — the device checks owed, grouped by screen and
    ordered by queue position. A defect you find goes out the same way: write `Lane: A` or `Lane: B`.
 
+**Start every message to the owner with the phone's status — his request, 2026-09-23.** 🟢 = the
+phone can be unplugged (nothing running, nothing about to run). 🔴 = plug it in / leave it plugged
+in (a sitting is starting or running). Flip it the moment the state changes, and never show 🟢 while
+any script or background loop could still send input to the phone. He lends his own phone, and
+before this he had to keep asking whether testing was still going on.
+
+**Raw input goes only through `rawTap` / `rawSwipe` in `scripts/device/pw.js`.** Blind `adb shell
+input` taps once landed outside the app, opened another app and closed this one on his phone.
+
 **Your job: verify, report, and keep the harness working.** You do not implement product fixes —
 Lane A owns the engine, Lane B the surface. The one code path you own is `scripts/device/**`.
 
