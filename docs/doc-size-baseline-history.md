@@ -15697,6 +15697,23 @@ space: that probe settles this whole class by measurement, so the next session r
 learns where the answer is coming from instead of re-reasoning it from source — which is precisely
 what these three entries show cannot distinguish a working subscription from a missing one.
 
+---
+
+## 2026-09-23 — Device Verification baton → 57 (−10) (device/probe-tooling)
+
+Rewritten in full for the probe sitting; the per-entry results table moved out, since every row it
+held is now in the backlog entry it describes. Ratcheted to the new size.
+## 2026-09-23 — `docs/implementation-backlog.md` 26823 → 26794 (RV-135)
+
+RV-135 left the queue after being built, which is most of the 29 lines; BF-110's `Keep:` was
+replaced by a slightly longer paragraph and its lane line by a slightly longer one, so the entry
+itself grew a little while the file shrank.
+
+Worth noting against RV-134, which is the open entry about this exact number: this is a **genuine**
+shrink caused by this branch, the case the ratchet is right to make someone lower. The tax RV-134
+describes is the other case — a branch forced to lower a number because *someone else's* merge
+shrank the file. Four of four re-merges on #1422 were that case in one night.
+
 ## 2026-09-22 — `projectOverview.md` → 12403 (RV-105)
 
 The backlog shrinks by RV-105's entry and the overview gains a block. Most of that block is spent on
