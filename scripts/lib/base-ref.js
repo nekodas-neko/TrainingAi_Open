@@ -28,6 +28,65 @@ function git(args) {
 }
 
 /**
+ * git's own stderr for "that path is not in that tree" — the ordinary answer for a file the branch
+ * adds. Measured against git 2.x on 2026-09-23; both wordings are live, the second when the path
+ * exists in the working tree but not at the ref.
+ */
+const PATH_ABSENT_RE = /does not exist in|exists on disk, but not in/;
+
+/**
+ * `git show ref:path`, told apart from the failure that looks identical to it (OR-130).
+ *
+ * @returns {{ content: string|null, unreadable: boolean }}
+ *   `content` is the file, or `null` when the path is genuinely not at that ref.
+ *   `unreadable` is `true` when git failed for any OTHER reason — a bad ref, a missing object, a
+ *   repack mid-run — which is *nothing known about the base*, not *absent from it*.
+ *
+ * **Why the distinction is load-bearing.** `verdict` maps a `null` base count to `'fail'`, so a read
+ * failure became an accusation: a file byte-identical to `main` reported as this branch's new
+ * violation, non-deterministically. It cost a session. This helper exists so a ratchet can no
+ * longer confuse "the branch added it" with "we could not look".
+ *
+ * **It must not become a pass, and that is the whole of the CI question.** In CI the base comes from
+ * `git fetch --depth=1 origin main || true`; when that fetch fails, `resolveBaseRef` finds no ref at
+ * all and every `atBase` is `null`, which `verdict` turns into the plain absolute comparison — the
+ * pre-Q-424 behaviour, and STRICTER than the base-aware one. Making an unknown base pass would
+ * therefore not fix this bug; it would disable every base-aware ratchet in the repo on any fetch
+ * blip. So an unreadable base keeps today's strict outcome and only stops lying about the reason.
+ */
+function showAtBase(baseRef, relPath) {
+  try {
+    // Its own spawn rather than `git()`, which pipes stderr to `ignore` — and the whole of this
+    // function is reading that stderr. Capturing it there instead would change every other caller.
+    const content = execFileSync('git', ['show', `${baseRef}:${relPath}`], {
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { content, unreadable: false };
+  } catch (err) {
+    const stderr = String((err && err.stderr) || '');
+    if (PATH_ABSENT_RE.test(stderr)) return { content: null, unreadable: false };
+    // `reason` is git's own words, or node's when the spawn itself failed. It is the whole point of
+    // the warning below: the mechanism behind this failure has never been reproduced (see the note
+    // on `fileAtBase`), so the next occurrence has to identify itself.
+    const reason = (stderr.trim() || String((err && err.message) || 'unknown')).split('\n')[0];
+    return { content: null, unreadable: true, reason };
+  }
+}
+
+const warned = new Set();
+function warnUnreadable(baseRef, relPath, reason) {
+  const key = `${baseRef}:${relPath}`;
+  if (warned.has(key)) return;
+  warned.add(key);
+  process.stderr.write(
+    `  base-ref: could not read ${relPath} at ${baseRef} after ${ATTEMPTS} attempts.\n` +
+    `            git said: ${reason}\n` +
+    `            Treating it as absent, which is STRICT. If this file is unchanged from the base,\n` +
+    `            that is this read failing and not your diff — quote this line rather than the\n` +
+    `            ratchet's, which will name the file as if the branch had added it.\n`);
+}
+
+/**
  * A ref naming the base this branch would merge into, or `null` when there is none to be had —
  * a shallow clone with no remote, a detached tree, an export. Callers degrade to baseline-only
  * behaviour rather than failing: a missing base is not a violation.
@@ -36,6 +95,11 @@ function resolveBaseRef() {
   for (const ref of ['origin/main', 'FETCH_HEAD', 'main']) {
     try {
       git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+      // OR-130: a resolvable commit is not a readable tree. A shallow or partial clone can hold the
+      // commit object and not the tree behind it, and every per-file read would then fail one at a
+      // time and read as a violation each time. Probe once here instead, so a base we cannot see
+      // degrades to no base at all — which is the honest, and stricter, fallback.
+      git(['cat-file', '-e', `${ref}^{tree}`]);
       return ref;
     } catch { /* try the next one */ }
   }
@@ -46,13 +110,34 @@ function resolveBaseRef() {
  * The file's content at `baseRef`, or `null` when it does not exist there — which is the ordinary
  * case for a file the branch adds, and must not read as "zero lines".
  */
+/**
+ * Retries, with a short blocking backoff between them. These scripts are synchronous by design —
+ * they are `node scripts/check-x.js` in a CI step — so the sleep is `Atomics.wait`, which is the
+ * only way to block a main thread without a busy loop.
+ *
+ * **The mechanism behind the failure this retries has NOT been reproduced.** It was seen once, in a
+ * full `pnpm ci:local`, on a file byte-identical to `main`; 24 concurrent runs of the same script
+ * reproduced nothing, with and without this change. So the retry is a reasonable guess and the
+ * warning is the part to rely on — the next occurrence prints git's own reason, which is the
+ * evidence nobody had the first time.
+ */
+const ATTEMPTS = 3;
+const BACKOFF_MS = [40, 160];
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function fileAtBase(baseRef, relPath) {
   if (!baseRef) return null;
-  try {
-    return git(['show', `${baseRef}:${relPath}`]);
-  } catch {
-    return null;
+  let last = null;
+  for (let i = 0; i < ATTEMPTS; i++) {
+    if (i > 0) sleep(BACKOFF_MS[i - 1]);
+    last = showAtBase(baseRef, relPath);
+    if (!last.unreadable) return last.content;
   }
+  warnUnreadable(baseRef, relPath, last.reason);
+  return null;
 }
 
 /**
@@ -168,6 +253,6 @@ function verdict({ count, limit, atBase }) {
 }
 
 module.exports = {
-  resolveBaseRef, fileAtBase, lineCountAtBase, countAtBase, dirNamesAtBase,
+  resolveBaseRef, fileAtBase, showAtBase, lineCountAtBase, countAtBase, dirNamesAtBase,
   materialiseBaseTree, cleanupBaseTree, verdict,
 };
