@@ -4704,6 +4704,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           processed++
         } else if (mut.domain === 'day_checkins') {
           const p = clean as Record<string, unknown>
+          // LA-128. **This path stays LENIENT about unknown keys while the web route is `.strict()`,
+          // and the asymmetry is deliberate — do not "fix" it by stricting these two schemas.**
+          //
+          // Two reasons. First, stricting either one alone rejects everything: each is parsed
+          // against the WHOLE payload, so the scales schema sees `journal`/`soreMuscles`/`phase`
+          // and the extras schema sees the ten scales. Second, and the real argument: an outbox
+          // item is rejected per-item and never retried, so a strict failure here does not surface
+          // a mistake, it DELETES a check-in the user already wrote. Turning today's partial save
+          // into no save is the wrong trade on a queue that may hold an older payload shape from
+          // before an app update.
+          //
+          // The route needs `.strict()` because nothing else gates what a sheet can post. This path
+          // is already gated: a new field must pass `store.upsertDayCheckin` and the local SQLite
+          // column list first (LB-124 needed a local migration for exactly this), so it cannot
+          // reach here unnoticed the way a POST body can.
           const scaleCheck = DayCheckinScalesSchema.safeParse(p)
           if (!scaleCheck.success) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid day_checkins scale value' })
