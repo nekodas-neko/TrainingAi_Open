@@ -4,841 +4,6 @@ Entries folded out of `docs/overview/entries/` by `scripts/fold-journal-entries.
 oldest-first. **Unlike earlier sweeps, entries cited by a durable doc were folded too** — every
 citation was repointed here, at the `<a id="…">` anchor named after the entry's old filename.
 
-<a id="2026-09-22-lane-a-rv99-score-band-tokens"></a>
-
-# 2026-09-22 — one good/warning/bad palette, and the silent bail that was guarding it
-
-**Branch:** `lane-a/rv99-score-band-theme-tokens` · **Agent:** Implementation (Lane A) ·
-**Code + docs.** Half of RV-99; the rest stays queued with corrected numbers.
-
-RV-99 found the same good/warning/bad triad implemented twice: `score-band.ts` returned raw hex,
-while `recovery-band.ts` and `body-battery-band.ts` returned theme tokens for the identical concept.
-Only the token half can follow the theme, so the tokens win.
-
-## The premise is right, and I checked it rather than repeating it
-
-Resolved in dark, these are different colours rather than shades:
-
-| | hex | token | Δ contrast vs dark bg |
-|---|---|---|---|
-| green | `rgb(34,197,94)` | `rgb(86,238,102)` | 8.68 → 13.02 |
-| amber | `rgb(245,158,11)` | `rgb(239,175,0)` | 9.21 → 10.18 |
-| red | `rgb(239,68,68)` | `rgb(255,100,103)` | 5.26 → 6.85 |
-
-Computed by converting the `oklch()` tokens in `globals.css` to sRGB. The entry quoted 4.93 and 6.42
-for the reds against my 5.26 and 6.85 — a different background assumption, same ~1.6:1 gap, so its
-conclusion stands.
-
-## The hazard it named is not the hazard that was there
-
-The entry warned that Chart.js paints on a canvas, which resolves no `var()` and silently fills
-black, and said callers must go through `resolveColor()`. I checked all eleven `scoreBand` consumers:
-**every one is DOM or SVG.** No `resolveColor()` call was needed anywhere.
-
-**The real blocker was `accentCardStyle`**, which the entry does not mention. It takes a hex, slices
-it into components, and for anything not starting with `#` returned a bare muted background — no
-gradient, no border, no error. `health-sections.tsx` feeds `scoreBand`'s colour straight into it for
-the HRV-baseline card, so moving to tokens would have removed that card's tint silently. It now has
-a `color-mix` path.
-
-**The hex branch is deliberately untouched.** `rgba()` built from parsed components and
-`color-mix(in oklch, …)` are not the same colour, and about thirty cards render through that branch;
-converting them all would have been an unrequested repaint. `transparent` keeps its bail too — it is
-the card picker's "no accent" choice, not a colour, and mixing it paints a grey wash exactly where
-the user asked for nothing.
-
-## What is left, and why it did not all ship
-
-**The entry welds two jobs together and mis-sizes the second.** The `scoreBand` consumer set is 11
-files. The hardcoded-hex population is **183 occurrences across 68 files** — not the entry's "173
-across ~25". That 2.7× difference in file count is the whole reason one half shipped this afternoon
-and the other is still queued.
-
-The remaining hex sites are not interchangeable, which is the entry's own "do not migrate blind"
-warning re-confirmed by measurement rather than inherited. Four shared modules have genuine band
-semantics and are Lane A's (`acwr.ts`, `calorie-balance.ts`, `strength-progress.ts`,
-`day-checkin.ts`), each needing its own consumer check. Four more are legitimate one-offs that must
-keep their hex: `rarity-colors.ts`, `hr-zones.ts`'s deliberate blue→red ramp, `macro-colors.ts`
-(protein's identity colour) and `home-prefs.ts` (per-metric identity colours). The check script
-banning the three literals comes last, after both halves — adding it now would fail CI on 183 sites
-that are legitimate until migrated.
-
-## Verification
-
-- 3 new `accentCardStyle` cases, `score-band.test.ts` rewritten to assert against the exported
-  constants rather than literals, so it cannot pin a stale value again.
-- **4 mutations caught, 1 equivalent control** (renaming the local parameter — correctly not
-  caught). Two of the four target the branch that silently bailed.
-- Two existing tests pinned the old hex and were updated to the constants, not weakened.
-- `pnpm check:rules` **75 of 75** · `tsc --noEmit` clean · lint 0 errors · test-typecheck none above
-  baseline · full suite **9,325 passed, 87 skipped**.
-
-**Colours are the one thing a test cannot confirm, and none of this was seen rendered.** Every
-assertion here is on the string a function returns; that the resulting cards look right — and in
-particular that the `color-mix` gradient reads like the `rgba()` one beside it — was not observed in
-a browser or on the device. Samsung WebView was not exercised, though `color-mix(in oklch)` was
-already used by both branches of this function before the change.
-
-<a id="2026-09-22-lane-a-tn57-untouched-scales-are-not-answers"></a>
-
-# 2026-09-22 — Lane A · TN-57: an untouched scale is not an answer
-
-Tuning filed this answering the owner's *"what is your suggestion to get better tuning and have it be
-more accurate"*. It is the answer: every calibration to date was fitted partly to a number nobody
-gave.
-
-## The defect
-
-The morning check-in sheet seeds `perceivedRecovery` and `sleepQualityFeel` from a neutral constant,
-tracks whether the lifter actually moved each one, and posts both the value and the flag. The route
-stores both. **The row has always been honest. Every reader was not.**
-
-The schema said what to do about it when the columns were added (Q-113): *"a calibration query must
-filter on these before trusting perceivedRecovery/sleepQualityFeel as real self-report."* Nothing
-ever did.
-
-Re-measured on production 2026-09-22, the owner's rows (`claude_ro` is row-scoped), 97 morning
-check-ins since 2026-07-02:
-
-| | |
-|---|---|
-| rows carrying a `perceived_recovery` | **78** |
-| of those, ever touched | **0** |
-| distinct values | **2** · standard deviation **0.286** |
-| `sleep_quality_feel` touched | **3 of 97** |
-
-The entry measured 96/77 the day before; it is 97/78 now, so the untouched population is still
-growing — which is the pass test it set.
-
-## Five corrections to the entry, one of which would have broken production
-
-**1. The write-path instruction, as written, drops the check-in.** The entry says *"a body carrying
-only untouched defaults now counts as carrying no answers."* Traced: the morning sheet posts these
-two scales, `illnessContext`, an empty `soreMuscles` and a null journal — nothing else that
-`dayCheckinHasAnswers` counts. So nulling before the guard makes an untouched save carry no answers
-at all. On the web route that is a 400. In `pushMutations` the same guard rejects the mutation
-**per-item with no retry** — the poison-pill path — so the row never reaches the server. And
-`session-select-content.tsx` re-opens the sheet until a row exists for the day. The owner has never
-touched the control, so **every one of his daily check-ins would have stopped syncing.** The guard
-now reads the submitted body and the nulling applies to what is stored. Submitting the sheet is an
-act worth recording; what it is not is a self-report.
-
-**2. "Three readers" is two readers and a comment.** `body-battery/stress-day/route.ts:17` does not
-read `perceivedRecovery` — the only occurrence in the file is a docblock sentence observing that it
-reads 3 on all 17 days. Nothing to change there.
-
-**3. A sibling sweep found three more consumers the entry did not name.** `admin/sleep-feel-
-calibration` (the exact twin for the other scale), `score-audit/build-day-audit.ts` (displays the
-value and a derived label), and `ai-periodization/signals.ts` → `prompt.ts`, which tells the model
-*"Morning check-in (1=best, 5=worst): recovery 3"* as the lifter's own report. All five now resolve
-through one helper.
-
-**4. `recap`-style line numbers had drifted**, so each reader was located by grep rather than by the
-cited line.
-
-**5. My own claim that the sleep-feel route had no test was wrong.** It has one —
-`lib/__tests__/admin-report-calibration-routes.test.ts`. I had run a file selection that excluded it
-and read the pass as coverage; the full suite found both its fixture and the battery route's,
-neither of which set a touched flag. Both moved, each with a new case pinning the untouched
-semantics beside the date-keying they were written for. A targeted run still cannot tell you what
-you broke.
-
-## What shipped
-
-`packages/shared/src/health/self-report.ts` — `answeredMorningScales(row)`, one place that decides
-whether a scale was answered. Five readers and both write paths go through it.
-
-**No migration, no data write, and the 78 rows are deliberately not backfilled** — the flag already
-tells them apart, so a write buys nothing and destroys the record of how long this ran.
-
-**On the periodization prompt:** no weight, threshold or formula moved. The only change is that a
-value the lifter never supplied is no longer stated to the model, which is the same rule
-`PROSE_GUARDS` applies to output.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**. It caught two real defects in my own test code: a
-  `toISOString().slice(0, 10)` in a fixture, and a zero-arg mock declaration on `saveDayCheckin`
-  whose `.mock.calls[0][1]` reads as `undefined` — a test that looks like it inspects the write and
-  cannot.
-- Full suite green; `check-test-typecheck` none above baseline.
-- **Mutation pass: 6 mutations caught, 2 equivalent controls passed.** The load-bearing one is
-  correction 1: nulling before the guard fails four cases, including the pre-existing Q-465 test
-  *"accepts what the morning sheet sends"*. The repo's own suite already guarded the trap the entry
-  walked into.
-- **`pnpm dev` against the local database.** An untouched morning POST returned **201** with
-  `perceivedRecovery: null` — the row still writes. A touched one stored **5**. The battery
-  calibration then showed `rating: 5` on the touched day and `rating: null` on the untouched one;
-  sleep-feel showed `feel: null` throughout (nothing has ever been touched); health-trends answered
-  *"Not enough paired data yet"* with no buckets; and `/api/admin/day-review` returned
-  `perceivedRecovery: 5` for the touched day and `null` for the untouched one, with the sleep-feel
-  label nulled alongside its value.
-
-**Expect the correlations to EMPTY rather than shift.** That is the correct outcome and must not be
-rescued by relaxing the filter: three answers that are real beat 78 that are not.
-
-## Not exercised
-
-Sandbox only; nothing native, offline-first at the UI layer, safe-area or gesture. The outbox half
-is covered by the web/push parity integration test against the local Postgres, not on the device.
-
-`ai-periodization/signals.ts` is the one reader **not executed** — `aggregateSignals` needs a full
-program fixture, and stubbing it was judged out of proportion. It is covered by the shared helper's
-unit tests, by typecheck, and by a new prompt test pinning the consequence (an unanswered scale
-renders as an em dash, never as a number or the word "null"). Reviewing the diff is how the wiring
-itself was checked.
-
-<a id="2026-09-22-layout-384-truncation-batch"></a>
-
-# 2026-09-22 — `layout-384`: five places a 384px screen cut the wrong thing
-
-**Branch:** `feat/layout-384-truncation-batch` · **Lane:** Implementation B · **Version:** 1.464.6
-
-Five entries, one PR, one verification — the batch's whole point. All five are a class combination
-whose effect is geometric.
-
-## What shipped
-
-- **RV-92** `pre-workout-screen.tsx` — `truncate` sat on a **flex container**. `text-overflow`
-  applies to inline content of a *block* container; on a flex container the name became an anonymous
-  flex item at `min-width:auto`, so it never shrank, no ellipsis painted, and the green "done today"
-  tick after it was **clipped out of existence — a completed exercise read as unlogged.** The name
-  is its own `truncate` span now, inside a `min-w-0` flex parent.
-- **RV-93** `injury-notice.tsx` — the chip was `shrink-0` at `max-w-[11rem]`, taking 176 of 352px
-  whatever the title needed. Mid-set, "Single Leg Romanian Deadlift" read `Single Leg Roma…`.
-- **RV-94** `food-row.tsx` — 162px of name column is ~22 characters against **130 of 337 real items
-  longer than that**. `line-clamp-2`, which the row's existing `min-h-12` already accommodates.
-- **RV-95** `weekly-stats-hub.tsx` — the unit rode with the value in a 74px cell, so `kg` wrapped to
-  a second line for **every non-zero week**, dropping the VOLUME caption ~22px below its three
-  neighbours. It moves to the `unit` line the other three tiles already use.
-- **RV-96** `done-screen.tsx` — name and `· 3/4 sets` shared one truncating span, so the caveat on
-  the HRR number was always cut first, and cut **precisely on the longest names**.
-
-## All three "not established" questions settled, two of them against the entry
-
-- **RV-93 asked whether the chip fires on a specific exercise.** It does, and on the entry's own
-  example: the single unresolved injury is `lower back`, and **"Single Leg Romanian Deadlift" carries
-  `lower back` as a secondary muscle** (ten library exercises do). Not hypothetical.
-- **RV-94 said "check first, it may make the fix unnecessary" —** whether the grey secondary line
-  disambiguates the colliding pair. It *does* differ: both are Sanitarium, at **350 g and 258 g**.
-  But it differs **at the tail**, which is exactly what truncation removes, and the secondary line
-  truncates too. So it never disambiguated them, and the fix stands. One refinement to the entry:
-  the rows are not quite "indistinguishable" — the calorie column already shows 259 against 208 —
-  but nothing tells you *which* is the Choc Hit.
-- **RV-95 asked whether `/api/weekly-stats` rounds `totalVolumeKg`.** It does, at `:115`. The
-  fractional-widening worry is unfounded.
-
-## The test caught a branch my own fix missed
-
-`injury-notice.tsx` has two variants — a `button` when `onSwap` is given and a `role="status"` div
-when it is not. The first pass fixed the button and left `shrink-0` on the div beside it. The
-assertion is on `${shell} shrink-0`, so it failed, and the sibling was fixed before it shipped.
-
-## Also in this PR: LB-125 split
-
-LB-125 was filed an hour earlier, out of RV-91, **spanning two lanes in one entry** — the helper is
-Lane A's, the five call sites Lane B's. `next-item.js` has no way to know that, so it printed at the
-top of Lane B's READY while its first half was unstartable here. Split per the repo's own rule: the
-helper keeps **LB-125** (Lane A), the call sites become **LB-126** with `Needs: LB-125`. Three of
-those five are a bare `{ weekday: 'short' }` and cannot be converted until the helper has a style
-for it, so starting LB-126 first would convert two of five and make the other three look deliberate.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**. `tsc --noEmit` clean; lint clean (one pre-existing warning).
-- **Controlled: all five cases go red against the unfixed files**, each naming its own defect.
-- Source-shape by necessity — jsdom has no layout engine, so a rendering test would assert nothing
-  about geometry.
-
-**Not exercised:** ⚠ **no device sitting, and this batch is the kind that wants one.** Every fix is
-a pixel claim at 412px. The arithmetic behind each is in the entries and re-checked here, but the
-ellipsis, the two-line food row and the Volume tile's single line are unconfirmed on the S25.
-
-<a id="2026-09-22-lb126-shared-date-styles"></a>
-
-# 2026-09-22 — LB-126: four weekday labels onto the shared formatter
-
-**Branch:** `feat/lb126-shared-date-styles` · **Lane:** Implementation B · **Version:** 1.465.4
-
-## What shipped
-
-LB-125 (#1404, Lane A) gave `formatDateDisplay` the `weekday`, `weekday-date` and
-`weekday-date-long` styles. These are the call sites that were spelling those option bags
-themselves — the four RV-91 closed with as *"noted, not filed"* and that LB-126 was filed to carry:
-
-| site | was | now |
-|---|---|---|
-| `weekly-nutrition-chart.tsx:50` | `{ weekday: 'short' }` | `formatDateDisplay(date, 'weekday')` |
-| `recommendation-card.tsx:36` | `{ weekday: 'short' }` | `formatDateDisplay(maxDate, 'weekday')` |
-| `week-day-sheet.tsx:13` | `{ weekday: 'long', day, month: 'short' }` | `'weekday-date-long'` |
-| `nutrition-content.tsx:88` | `{ weekday: 'short', day, month: 'short' }` | `'weekday-date'` |
-
-**Equivalence was checked before the swap, not after:** `Tue`, `Tue, 15 Sept` and
-`Tuesday 15 Sept` come out byte-identical, and the helper accepts either separator — so
-`recommendation-card`'s own `.replace(/\//g, "-")` went with its option bag.
-
-## The fifth site the entry named is not one
-
-`calendar-widget.tsx:109` renders a **month and year** from `(viewYear, viewMonth - 1, 1)`.
-`formatDateDisplay` takes a `YYYY-MM-DD` **string** and has no month-year style, so it cannot take
-this at all; converting it would need a new style, which is Lane A's. **I wrote that entry, and it
-was wrong to list the site** — the test now asserts the calendar keeps its option bag, so the next
-sweep does not re-file it.
-
-## An unpredicted consequence, caught by CI rather than by me
-
-All four converted files were `REVIEWED_BENIGN` rows in `scripts/check-timezone-rendering.js` —
-triaged in 2026-08-08 as benign because each built its Date from calendar components or a
-local-noon string. Routing them through the helper means they **no longer call `toLocale*String` at
-all**, so the check failed with *"These files no longer call toLocale*String without a timeZone —
-remove them from GRANDFATHERED"*. That is the script's own shrink-only rule working exactly as
-designed, and it means this change also removes four sites from the timezone bug class that CLAUDE.md
-devotes a section to. `calendar-widget` keeps its row, now annotated with why it was left.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75** (it was step 18, *No device-local date/time rendering*, that
-  failed until the four rows came out). `tsc --noEmit` clean; lint clean apart from a pre-existing
-  warning.
-- **Controlled: 2 of the test's 4 cases go red** against the unfixed tree — the two source-shape
-  ones. The other two assert the shared styles' literal output and that the calendar is *not*
-  converted; both hold either way by design, and the first is what justified the swap at all.
-- The repo-wide sweep filters the extension in JS and skips `__tests__`, for the two reasons RV-98
-  wrote down the hard way: `git ls-files a b -- '*.tsx'` unions its pathspecs rather than filtering,
-  and a test stating a rule has to quote the thing it bans.
-
-**Not exercised:** no device sitting. Four label strings whose output is asserted identical to what
-they replaced, so there is nothing new to see at 412px.
-
-<a id="2026-09-22-perf-rv64-hr-profile-remount"></a>
-
-# RV-64 — the HR profile is read by the screens, not by the chart that remounts
-
-**Branch:** `perf/rv64-hr-profile-remount` · **Lane B** · no version bump (see below)
-
-## What shipped
-
-`LiveHrChart` read `hr-profile` in a mount-once effect, and `active-workout-screen.tsx` renders it
-on `workoutPhase === "rest"`. So it remounted **once per rest period**: a 5×4 workout paid a
-~230 ms route around twenty times *during the workout*, against the same ten-connection pool as
-`log-exercise` and `complete-workout` — and `/api/hr-profile`'s 20-per-60s limit meant a dense rest
-cadence could make the chart 429 itself.
-
-The chart now takes `profile` as a prop. The two screens that render it and outlive it —
-`active-workout-screen` and `exercise-summary-screen` — own the read through a new
-`lib/hooks/use-hr-profile.ts`, which wraps `useCachedValue` and owns the key, URL and TTL for the
-workout flow. The active screen stays mounted for the whole active phase, so its ~20 reads become
-one.
-
-## The entry offered two fixes and one of them is wrong
-
-RV-64 also proposed `freshWithinTtl: true`, and said the written invalidation proof that flag
-requires was *"available rather than owed"* because `HR_PROFILE_TTL` is 6 h and two groups in
-`lib/cache-groups.ts` already clear `hr-profile`.
-
-**The proof does not hold.** The flag needs *every writer of the payload* to sit in a group that
-clears the key, not two of them. `resolveHrProfile` computes from `repo.getUserById`,
-`repo.listBodyMetrics` and `repo.getHrForWindow` over **90 days** — and live BLE samples land inside
-that window *during the workout*, ingested natively and server-side, with nothing in
-`lib/live-hr/**` invalidating anything. The two groups are `invalidateOuraSync` and
-`invalidateBodyMetricWrite`; neither fires for live ingest. So the flag would have pinned a profile
-for up to six hours **across workouts**, where hoisting bounds the staleness to one screen's
-lifetime. Checking which groups contain the key is not the same check as which writers change the
-payload.
-
-## What the test can and cannot see
-
-`lib/hooks/__tests__/rv64-hr-profile-read-is-hoisted.test.ts` is **structural**, and deliberately so
-rather than as a shortcut: the repo has no React render harness, and
-`use-invalidation-refetch.test.ts` is the established shape for "which module is allowed to do
-this". No spec drives the active workout through a rest period, so counting real requests would
-have meant building that fixture first.
-
-**Mutation-checked three ways**, one per claim: putting the fetch back in the chart fails it;
-calling the hook but dropping the prop at the call site fails it; adding a third mount site — which
-compiles and renders and would silently draw no zones, since the prop has no default — fails it.
-
-One assertion was wrong on the first draft and the test caught it rather than the code: matching
-`/hr-profile/` failed on the chart's legitimate `import type { HrProfileResponse } from
-'@/app/api/hr-profile/route'`. A second matched this file's own comment naming `useHrProfile`.
-Assertions now match the URL, and read source with comments stripped — a test that cannot tell prose
-from a call punishes documenting the change.
-
-**What it cannot see: the request count on a running app.** "One call per workout instead of ~20"
-follows from the chart not fetching plus the owner outliving it, and the second half is read off the
-source rather than observed.
-
-## A stale annotation, corrected
-
-`live-hr-chart` was in `check-fetch-once-effects.js`'s frozen list annotated *"inside
-exercise-summary-screen"* — only half its mounts, and the wrong half. `active-workout-screen`
-renders it on the rest phase, which is the whole of RV-64's cost. The list's judgement ("nothing
-writes those keys during that window") was about **staleness** and was right; the cost was never the
-question that list asks. Its row is removed, because the check itself fails and says to remove it
-when a site goes, and the note now says to judge a site by *every* place it mounts.
-
-## Not exercised
-
-**No device pass**, and the entry keeps one. The measured claim is a request count, and this was
-verified structurally plus by four e2e runs of the workout screens.
-
-`bf163-intensity-chip-load-only` failed once on the branch and then passed four times — alone and in
-the same two-spec pairing, on the branch and on clean `main`. It is in the same flaky set CI
-reported on #1377. **Recorded as unexplained rather than closed:** it was not reproduced, and one
-red that will not come back is not the same as one understood.
-
-## What blocked this PR was not this PR
-
-Its `Tests` check went red on `lib/__tests__/cardio-hub-routes.test.ts` — nothing in this diff.
-Reading it rather than re-running found `main` red for every lane: the test asserted
-`Math.round(spanDays) === 90` against a window that runs from **local midnight** ninety days back to
-`now`, so the span is 90.0–91.0 and `Math.round` tips at local **12:00**. It had been failing for
-roughly half of every day, on every branch. Fixed test-only in **#1387**, which merged first.
-
-**The sweep that PR listed as not established is now done, and it was the only one.** Three other
-tests assert an exact day span — `oura-ble-device-routes.test.ts` ×3 — and all of them inject the
-clock with `vi.setSystemTime`, so both sides are fixed, which is the shape the date rule prescribes.
-`ai-periodization-program-routes.test.ts` compares two fixed ISO dates. No other assertion in the
-suite divides a live `Date` delta into days and pins the result.
-
-## No version bump
-
-Nothing user-visible changed. The chart draws the same zones from the same profile; what changed is
-how many times the app asks for it.
-
-<a id="2026-09-22-review-agent-sweep-53"></a>
-
-# Review sweep 53 — stale surfaces, movement, and what should be one thing
-
-**Branch:** `review/sweep-53-user-visible` · docs-only · Review Agent.
-**Write-up:** [`docs/reviews/2026-09-22-sweep-53-stale-surfaces-and-movement.md`](../reviews/2026-09-22-sweep-53-stale-surfaces-and-movement.md).
-**Filed:** RV-103 … RV-122 (20 entries, five new batches).
-
-The owner asked for more user-visible sweeps and named the angles: animations and page swaps,
-caching — with a live example, *"nutrition calorie macro not updating on screen when food added -
-requires page swap"* — and which widgets or pages could merge. Three read-only lanes plus a
-coordinator investigation of his report. Ranked by traffic (Home 22 · Nutrition 14 · Health 11 ·
-More 7 · Workout 2).
-
-## His report is a re-report
-
-`app/nutrition/use-energy-balance-refetch.ts` exists because of BF-177, and its docblock opens by
-quoting him saying the same thing: *"The kcal left in the top right; doesnt load on the same page:
-it requires page switching to show."* So BF-177 did not close it.
-
-The mechanism is `cachedFetch(...).catch(() => {})` with no `onError` — and per RV-84 `cachedFetch`
-never rejects, so that catch is dead. Any failure and the refetch silently does nothing, leaving the
-pre-meal object in place with no retry and nothing on screen saying so. A page swap re-runs
-`fetchData`, which is exactly what he describes, twice. Eviction was never the problem and BF-177
-already said so; Home's copy of the card is fine because Q-402 gave it `useCachedValue` (RV-103).
-
-## The asymmetry that proves the class is wide
-
-**Deleting a food refetches the weekly calorie chart. Adding one does not** — same screen, same
-quantity, and the delete site's comment calls itself *"BF-177's third site, which that entry did not
-name"*. Patched site-by-site, so a fourth was always likely (RV-104). Four more of the shape: a ring
-sync leaves Health's HR card behind Home's (RV-106); macro-target edits leave Nutrition banding
-against the old number (RV-107); on-device a weigh-in invalidates almost nothing while its sibling
-does it right two files away (RV-108); Activity History never shows an activity confirmed from Home
-(RV-109).
-
-**Why the guard missed four of them.** `check-fetch-once-effects.js` matches only `useEffect(…, [])`
-— its comment calls a non-empty dep array *"a different (and usually correct) shape"*, which is true
-in general and false inside a shell where `[userId]` and `[today]` never change. Widening it is not
-trivial: the file records that its first version inflated its own baseline by 11 of 25 (RV-105).
-
-## Movement
-
-**37 cross-tab `router.push` sites against 5 `navigateToTab`** — a push tears down the whole tab
-shell, every panel's state and scroll. Home does both on adjacent lines (RV-110). Home and More
-share one scroll-restoration key while Health correctly passes three (RV-112). The tab switch hides
-the outgoing panel in the same commit the incoming one starts transparent (RV-113). And back while
-the barcode scanner is open discards the entire Log Food flow, because the scanner replaces the
-sheet's body rather than taking its own back-stack entry (RV-111).
-
-## Consolidation
-
-Home offers **two widgets answering one question from one cache key** — the shape that already
-produced Q-401/Q-415, two budgets 271–274 kcal apart both labelled "left" (RV-116). Health → Body
-shows two different energy answers nine cards apart, from one payload that was unified after they
-disagreed once (RV-117). "Weight Trend" exists twice, and the card with that title has no trend
-number (RV-118). Seven banners stack above Home's first content (RV-119) — filed with an explicit
-⛔ against collapsing the illness and deload ones into a dismissible strip.
-
-Two housekeeping items: `aiVolume` is built, has a live render arm, is in no order array, and has
-**zero** backlog entries despite a comment promising the merge — orphaned by the repo's own rule
-(RV-120). `/collection` has one in-app link behind an off-by-default widget, so a fresh install
-cannot reach it (RV-121).
-
-The design lane also found and reported the cases the repo has **already decided** to keep separate
-— OR-116's HR naming, Q-239's six single-entry screens, Q-112a's end-of-day merge — and did not
-re-propose them.
-
-## Not established
-
-Nothing was rendered or reproduced: no device, no WebView, no `pnpm dev`. RV-108 is **device-only**
-— the misbehaving branch is the local-store one, which does not run off the APK. RV-113 turns
-entirely on two device questions that decide whether it is worth doing at all. Whether the owner has
-both energy widgets enabled is unknowable from the repo.
-
-<a id="2026-09-22-rv100-phase-colour-language"></a>
-
-# 2026-09-22 — RV-100: a training phase painted in the state colours
-
-**Branch:** `fix/rv100-deload-colour` · **Lane:** Implementation B · **Version:** 1.465.5
-
-## What shipped
-
-`PHASE_COLORS` in `ai-periodization-status-card.tsx` mixed two colour languages:
-
-- **`realisation: "text-red-500"`** — the *peak-output* phase, in the app's failure colour.
-- **`deload: "text-green-500"`** — while Home's `DeloadBanner` paints a deload *recommendation*
-  `#ef4444` / `#f97316` / `#fbbf24` by strength.
-
-The five phases now use a cool ramp — `baseline` neutral, then blue, indigo, purple, cyan — so
-green, amber and red are left to mean state. Home's banner also carried a **third** amber beside
-`#f59e0b` and `--accent-amber`; the soft tier takes the token now, and `check-hex-literals.js`
-drops that file 3 → 2.
-
-## The open question, answered before sizing the work
-
-The entry says to establish whether both surfaces are actually reachable — *"if the phase card only
-shows `deload` while the banner is suppressed, the collision is theoretical."* Measured against
-production: the active program **is** `ai_dynamic`, so the card renders, and
-`session_periodization` carries **2 sessions in `deload` and 2 in `realisation`** right now. Both
-are live.
-
-## The entry's suggested fix would have moved the collision, not ended it
-
-RV-100 says to *"give `PHASE_COLORS` a non-semantic set (`packages/shared/src/session-palette.ts` is
-already the repo's categorical palette)"*. **That palette contains `green` and `red`.** It is
-indexed by session *position*, so borrowing it would have assigned a phase whichever hue its index
-landed on — including the two reserved ones. A cool ramp chosen explicitly against the state hues is
-what the entry wanted; its named source is not it, and the test asserts that palette still carries
-green and red so the suggestion cannot be quietly retried.
-
-## A distinction the entry overstates, kept in mind rather than acted on
-
-The entry frames the two surfaces as the same concept — *"neither is wrong alone; the pair cannot
-both be right."* They are not quite the same thing: the chip is a **program phase** (this session is
-in its deload block) and the banner is a **recommendation** (you have trained eight days running,
-rest). Green for "you are in the easy week" and amber for "you should take one" can both be correct
-readings. What is *not* defensible is a category borrowing the state language at all, which is why
-the fix still stands — and `realisation` in red needs no such argument.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**. `tsc --noEmit` clean.
-- **Controlled: 3 of the test's 4 cases go red** against the unfixed files. The fourth characterises
-  `SESSION_PALETTE` and correctly does not move; it exists to stop the entry's suggestion being
-  retried.
-- The assertions parse the `PHASE_COLORS` object body rather than grepping the file, and fail loudly
-  if that parse returns nothing — a passing vacuous assertion is the failure mode here.
-
-**Not exercised:** no device sitting. This is a hue change on two surfaces and wants an eye on the
-S25 — particularly whether indigo and purple read as distinct at chip size.
-
-<a id="2026-09-22-rv103-rv104-nutrition-freshness"></a>
-
-# 2026-09-22 — RV-103 / RV-104: nutrition freshness (`fix/rv103-rv104-nutrition-freshness`)
-
-Batch `nutrition-freshness`, both entries from Review sweep 53. Both are the Q-402 shape — the
-eviction lands and nothing asks for a new value — so neither fix adds an invalidation. Every key
-involved was already in `invalidateNutritionWrite()` and always had been.
-
-## RV-104 — the weekly chart and adherence, subscribed rather than remembered
-
-`nutrition-weekly-summary` and `nutrition-adherence` were fetched **only** from `fetchMountData`,
-whose effect deps are stable, on a screen the tab shell never unmounts. So the 7-day calorie chart
-and the adherence percentages held their launch-time values until the app was restarted; a tab
-switch did not help, because `useRefreshOnTabShow` re-runs `fetchData` (logs + balance), never
-`fetchMountData`. The asymmetry that made it visible: the delete path had learned to refetch the
-weekly summary by hand and the add path had not.
-
-Fixed as a shape, not a site — `app/nutrition/use-nutrition-derived-refresh.ts` owns both fetches
-and subscribes both keys through `useInvalidationRefetch`, so every write path present and future
-refreshes them. The delete path's hand-rolled refetch is gone. BF-177 was patched site-by-site
-three times; a fourth site was always going to appear.
-
-**Verified on the running app**, not inferred: `e2e/rv104-weekly-refetch-after-log.spec.ts` logs a
-food and asserts both endpoints are requested without navigating. It was confirmed to **fail with
-the subscription disabled and pass with it** — and the dev server's own log shows
-`POST /api/nutrition/food-logs 201` followed by `GET …/weekly-summary` and `GET …/adherence`,
-which the add path never produced before.
-
-## RV-103 — the refetch that could not report its own failure
-
-Three defects, all in `app/nutrition/use-energy-balance-refetch.ts`:
-
-1. `void cachedFetch(...).catch(() => {})` — per RV-84 `cachedFetch` never rejects, so that was
-   dead code standing in for error handling. Now `fetchWithRetry`, whose `onExhausted` (RV-85) is
-   the one moment a caller can tell a slow load from a failed one; `EnergyCard` renders a failure
-   line and a Retry.
-2. `d => setBalance(d ?? null)` wrote **null** on an empty payload, and `balanceForDate` is gated on
-   the payload's date — so the budget and the macro targets *disappeared* rather than going stale.
-   Now `if (d) setBalance(d)`.
-3. **Found while reproducing it, and it would have made the whole mechanism inert:** the unmount ref
-   was set in a cleanup and never reset, so StrictMode's simulated unmount latched it `true` for the
-   life of the screen and `isCancelled()` killed every retry. Driving the real screen with the
-   balance route aborted counted **one** request where four were due.
-
-### What is NOT established, and why the spec for it was deleted rather than shipped
-
-`cachedFetchCore`'s network-throw branch computes `const online = cached === null && navigator.onLine`
-and fires `onError` only when `online`; its `!res.ok` branch is gated the same way. **So no caller
-can be told that a revalidation failed whenever a cached value was painted** — and `fetchWithRetry`
-has the mirror-image blind spot, counting a cached paint as a response. Together they mean RV-103's
-suggested fix, *"pass `onError`"*, cannot reach the case it was written for.
-
-Driving `/nutrition` with `/api/nutrition/energy-balance` aborted, the same code both reported and
-stayed silent on consecutive runs, decided by whether the entry happened to be in the cache when the
-refetch ran. **The flake was the finding.** Exhaustion was observed firing once in five runs. A spec
-that green-lights a mechanism half the time is a tax on every future session, so it was dropped
-rather than retried into submission; the report path is wired and strictly additive (absent the
-flag nothing renders, which is today's behaviour) and is recorded as unproven rather than done.
-
-Filed as **LB-128** for Lane A, which owns `lib/sqlite/cache.ts`: an ungated `onRevalidateError`
-for the case where the caller knows the cached value is out of date because it just wrote. The
-entry carries the warning not to simply ungate `onError` — every existing caller reads it as "I
-have nothing to show", and `useCachedValue` renders an error state on it.
-
-## Not exercised
-
-Native SQLite / Capacitor (the web path takes the API fallback throughout), safe-area insets,
-Samsung WebView rendering, drifted production data, real Oura/Health Connect tokens. **No device
-sitting** — the failure line and its Retry at the S25 width are owed, and RV-103 keeps that.
-
-<a id="2026-09-22-rv86-rv87-absence-not-zero"></a>
-
-# 2026-09-22 — RV-86 + RV-87: a failed read is not a measured zero
-
-**Branch:** `fix/rv86-rv87-absence-not-zero` · **Lane:** Implementation B · **Version:** 1.464.2
-
-## What shipped
-
-Two screens rendered a failed fetch as a confident number.
-
-- **RV-86 — Home's Streak card.** `/api/streak-data` failing left `calendarDays` at its `{}` initial
-  value, and the card painted that as fact. It now takes a `loaded` prop, raised only by the cache
-  seed and by `onData`, and the streak figure, the week count, the week progress bar and the ten-day
-  dot strip all render an unknown state until it is true.
-- **RV-87 — the Profile tab.** Every lifetime figure was a `?? 0` default handed straight to
-  `StatsGrid` and `AchievementsSection`. A failed `/api/achievements` read as a genuine
-  *Level 1 · Novice · 0 XP* with an all-zero lifetime, **best streak included**. `StatsGrid` and
-  `AchievementsSection` now take a gate prop, the hero reads `Level —`, and one
-  "Couldn't load your stats — pull to refresh." line appears.
-
-## Two of the entries' claims did not survive contact
-
-- **RV-86 said the streak number itself had "no unknown representation".** It already did —
-  `streak-card.tsx:82` rendered `streak > 0 ? streak : "—"` before this change. The confident zeros
-  were the *week* count ("0 / 5 · sessions done", with an empty progress bar) and the ten-day dot
-  strip, which the entry does not mention. The fix went where the defect was.
-- **RV-86 also implicated the rest-day banner** ("Resting today breaks your streak"). It is driven
-  by `recommendation?.consecutiveRestDays`, from `/api/next-session` — a different fetch, guarded by
-  `consecutiveRestDays != null && >= 1`, so a failed streak read cannot produce it. Not touched.
-- **RV-87's "the grid below spins forever (RV-84)"** was already fixed, in #1391 the day before:
-  `achievements-section.tsx` renders "Could not load achievements" on a null payload. Only the
-  header's `0 / 0` and the figures above it were left.
-- **RV-86's open question — can `pendingDays` independently populate a nonzero streak offline?** Yes,
-  the outbox overlay merges into `trainedDays` regardless of the fetch. It is deliberately *not*
-  treated as raising the gate: one unsynced workout does not make a 365-day history known, so the
-  card still reads "—" and the pending day still lights its dot.
-
-## The size ratchet forced an extraction, which is what it is for
-
-`session-select-content.tsx` sits on a 1448-line baseline that may not grow, and the change added 11
-lines. Rather than shave comments, the streak walk moved to `app/session-select/compute-streak.ts`
-(1459 → 1431). The move is mechanical and `computeStreak` now has its own test pinning the rest-gap
-rule — two rest days are bridged and credited, the third breaks the walk — which nothing asserted
-while it was inline.
-
-The move turned `lib/__tests__/rv57-streak-lookback-contract.test.ts` red, which is the right
-behaviour and was left as-is rather than loosened: RV-57 asserts the consumer of
-`STREAK_LOOKBACK_DAYS` imports it instead of walking to a literal, and naming a path is how that
-test notices the consumer has gone somewhere it is no longer watching. It was repointed, not
-relaxed.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**, all passed (it was the component-size step that failed
-  before the extraction).
-- `tsc --noEmit` clean; lint clean on the changed files (the warnings it prints are pre-existing).
-- **e2e, `rv86-rv87-absence-is-not-zero.spec.ts`** — intercepts each endpoint with a 500 and asserts
-  the rendered text, at the 412 px S25 viewport. **Both specs were run against the unfixed components
-  as a control**, not just against the fix.
-- Two unit files, both mutation-checked rather than merely green: raising the gate inside a `.catch`
-  handler, and making a gate prop optional, each turn the source-shape test red.
-
-**Not exercised:** no device sitting. These are render-only changes in no device-gated class
-(no offline-first write path, native plugin, safe area, gesture or notification), and the e2e run is
-the web build, where `getLocalStore` returns null — so the `pendingDays` overlay interaction with the
-new gate is reasoned about above, not observed on the device path.
-
-<a id="2026-09-22-rv89-one-rm-display-helper"></a>
-
-# 2026-09-22 — RV-89: one stored 1RM, one number
-
-**Branch:** `fix/rv89-one-rm-display-helper` · **Lane:** Implementation B · **Version:** 1.464.3
-
-## What shipped
-
-A stored `estimated_1rm` sits on a 0.25 grid, and five surfaces each rounded it their own way. For
-a stored **92.25**, in one session: ready screen **92.5 kg**, pre-workout list **~92kg**, stats
-sheet **92.3 kg**, Strength Trend **92.3 kg**, exercise summary **92.25 kg**. All of them now call
-`displayOneRm(oneRm, exerciseType)`.
-
-Four of the five already imported that helper and called it for the **bodyweight** branch of the
-same ternary while hand-rolling the weighted branch beside it, so most of the diff is deleting the
-hand-roll and letting the ternary collapse.
-
-**The ready screen's rounder was `mround125`** — the 1.25 kg plate grid, clamped 5–250. It is a
-*prescription* rounder, and applying it to a bodyweight 1RM index is what told the owner to load
-**82.5 kg onto a pull-up** in BF-127. Its import is gone from that file. The two remaining calls in
-the stats sheet are prescription weights and are correct.
-
-## Three sites the entry does not name
-
-**The Strength Trend card carries three, not one** — the headline, the 90-day low and the peak all
-used `.toFixed(1)`. The low is now taken from the **raw** history rather than from the
-already-converted `values` series: `bodyweightRepMax` is monotonic in the stored 1RM, so the minimum
-is the same either way, and that version cannot double-convert a bodyweight figure.
-
-## Two things left alone on purpose
-
-- **The exercise summary's bodyweight branch** passes `storedReps` to `bodyweightRepMax`, which
-  `displayOneRm` does not accept (BF-164 / BF-149). Only its weighted branch moved.
-- **The trend card's footer says "reps" where the helper's `.text` says "RM".** Those sites take
-  `.value` and keep the card's own wording — the defect is the number, not the noun.
-
-## Both of the entry's open questions are answered
-
-- **Was the pre-workout `~` a deliberate approximation signal?** No. It is `Math.round` with a tilde
-  in front, the fourth of four hand-rolled roundings, and nothing in the repo records it as a
-  decision. Dropped.
-- **Does any site read a differently-rounded server field?** No. `strength-trend` passes
-  `getExercise1rmHistory` straight through, and that SQL is
-  `MAX(el.estimated_1rm)::double precision` — no rounding anywhere on the path.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**, all passed. `tsc --noEmit` clean; lint clean on the five
-  changed files (its warnings are pre-existing, `labels` in the trend card among them).
-- `components/workout/__tests__/rv89-one-rm-renders-one-number.test.ts` — run against the unfixed
-  files as a control, **5 of its 7 cases go red**, each naming its own defect.
-- **Its blind spot is written into its header rather than left implied:** `exercise-summary-screen`
-  stays green on that control, because its hand-roll was a bare template literal with no rounding
-  call in it. Numerically it was the one site already right; routing it through the helper is
-  robustness against an off-grid value, not a fix, and only the import assertion holds it.
-
-**Not exercised:** no device sitting. Render-only changes in no device-gated class. The e2e runs the
-web build.
-
-<a id="2026-09-22-rv91-shared-date-and-energy-label"></a>
-
-# 2026-09-22 — RV-91: a raw ISO date on two screens, and one `Cal` among 155 `kcal`
-
-**Branch:** `fix/rv91-raw-iso-date-and-cal-label` · **Lane:** Implementation B · **Version:** 1.464.5
-
-## What shipped
-
-- **`components/health/activity-history-card.tsx:142`** and
-  **`components/activity/activity-detail-sheet.tsx:148`** rendered `{log.date}` — the raw
-  `2026-09-15` — on the line directly above a correctly formatted `formatTime12h()`. Both now call
-  `formatDateDisplay`, the history row at `'short'` and the sheet header at `'long'`.
-- **`components/home-day-timeline.tsx:117`** said `Cal` where the rest of the app says `kcal`.
-  Re-counted on the day: **155 `kcal`, exactly 1 `Cal`**. A food Calorie *is* a kilocalorie, so
-  neither label was wrong and the defect was the disagreement — 155 to 1 decides it.
-- **A sibling the entry does not name:** `app/health/day/day-detail-content.tsx:186` hand-rolled the
-  same long-form date. Its noon-UTC anchor rendered in UTC was correct — that pairing is what kept
-  the day from shifting — and `formatDateDisplay` reaches the same string by constructing
-  component-wise, which is the Q-130 fix. Routed through the helper here, per the sibling-surface
-  rule.
-
-## The entry quoted a comment instead of running the function
-
-RV-91 says the same day reads *"Monday, 15 September"* in the day detail. **That string does not
-exist anywhere.** It is the wording of `formatDateDisplay`'s own header comment, which is wrong
-twice: `en-AU` is **day-first** and puts **no comma** before the day. Measured — `'short'` returns
-**`15 Sept`** (not `Sep 15`) and `'long'` returns **`Tuesday 15 September`**. The day detail was
-rendering the comma-less form all along.
-
-Both facts are now pinned by assertions rather than left in prose, and the comment itself is in
-`packages/shared`, which is Lane A's — so it is **filed, not edited**.
-
-## Filed rather than dropped: LB-125
-
-RV-91 closes with *"Also noted, not filed: four hand-rolled `toLocaleDateString` option bags sit
-beside the shared helper."* Removing the entry would have dropped that, so it is now **LB-125**:
-five remaining call sites (the count after this PR absorbs two), of which **three are a bare
-`{ weekday: 'short' }`** that one new `style` variant would take, plus the wrong comment above. The
-`style` half is Lane A's; the call sites are Lane B's.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**. `tsc --noEmit` clean; lint clean on the changed files.
-- `components/health/__tests__/rv91-shared-date-and-energy-label.test.ts` — run against the unfixed
-  files as a control, **4 of its 5 cases go red**. The fifth is a characterisation test of the pure
-  formatter and correctly does not move; it is what caught the wrong comment.
-- The `Cal`/`kcal` half is asserted as a **repo-wide count over `git ls-files`**, not against one
-  file, because the defect *was* the count: one site disagreeing with 155 is invisible from inside
-  that file. It also asserts `kcal` is still the majority, so the rule cannot be inverted quietly.
-
-**Not exercised:** no device sitting. Render-only string changes in no device-gated class. No e2e —
-the two assertions are a source shape and a pure function, and neither needs a browser.
-
-<a id="2026-09-22-rv97-acwr-band-colour"></a>
-
-# 2026-09-22 — RV-97: the ACWR number was the "High" colour in every band
-
-**Branch:** `fix/rv97-acwr-band-colour` · **Lane:** Implementation B · **Version:** 1.464.7
-
-## What shipped
-
-`components/health/training-load-card.tsx` painted its headline `style={{ color: '#f59e0b' }}` — a
-hard-coded literal that is **exactly** what `acwrBand()` reserves for the `high` band. The band
-*word* beside it came from the real `interpretation`, so an ACWR of **1.05** rendered
-*"✓ Optimal zone"* with the number in warning amber, directly above body copy at `:91` calling
-0.8–1.3 the green zone. The card contradicted itself twice on one line.
-
-`acwrBandByKey()` had existed at `acwr.ts:90` for this exact caller and was not imported. It is now.
-The card's `accentCardStyle('#f59e0b')` identity is unchanged — only the *value* takes the band.
-
-## The entry's open question, and why its fix does not compile
-
-RV-97 asks whether `interpretation` can carry a key outside `AcwrBand['key']`. **It can.** The
-route's union has **six** members (`optimal | high | very_high | low | insufficient_data |
-baselining`) and `acwrBandByKey` takes four. The entry reasons that the coloured branch is
-unreachable for the other two because earlier branches handle them — which is true at runtime, and
-irrelevant to the compiler: `insufficient` and `baselining` are **booleans, not type predicates**,
-so they cannot narrow the property for the branch below. `acwrBandByKey(trainingLoad!.interpretation)`
-as written is a type error.
-
-So the key is narrowed explicitly into its own `bandKey`, and the unreachable arm inherits the text
-colour rather than inventing one — a lookup miss that returns `undefined` and then reads `.color`
-is a crash, which is a worse failure than the wrong colour this entry is about.
-
-## Verification
-
-- `pnpm check:rules` — **Ran 75 of 75**. `tsc --noEmit` clean; lint clean.
-- **Controlled, and the count is stated rather than implied: 1 of the test's 4 cases goes red**
-  against the unfixed card. The second guards a *wrong* fix — re-banding the raw number at the call
-  site, which is what `acwrBand` was extracted to end — and passes on the unfixed card because it
-  does not band at all. The last two characterise the shared helper and would pass either way; they
-  are there because the card's body copy makes a promise about 0.8–1.3 that nothing else checks.
-
-**Not exercised:** no device sitting. A colour change on one number, in no device-gated class.
-
-## Also in this PR: the baton, rewritten in full
-
-`docs/agents/state/implementation-lane-b.md` had fallen **four merged PRs behind** — #1392, #1395,
-#1396 and #1398 shipped with only its Next ID bumped. It is rewritten rather than appended, per its
-own rule. Two lessons were merged to stay inside the 65-line ratchet: the vacuous-guard rule folded
-into the control rule it is a case of, and the Morning Check-in modal into the Playwright bullet
-beside it. The new material worth carrying is the control-run lesson from RV-89 — **a control that
-stops at the first failed assertion never exercises the ones below it** — and the RV-91 one, that a
-repo-wide source scan must exclude the file making the claim.
-
 <a id="2026-09-22-rv98-opacity-contrast"></a>
 
 # 2026-09-22 — RV-98: opacity-modified text was below AA, and the check could not see it
@@ -1771,6 +936,118 @@ another agent moving `origin/main` mid-run, or a genuine transient path-absent f
 `pnpm ci:local` — exit 0, **Ran 77 of 77** Custom Rules steps (76 before this branch added
 `check-prose-parked-entries`). Full log kept, not tailed.
 
+<a id="2026-09-23-chore-or-139-report-triage-loop"></a>
+
+# 2026-09-23 — the Orchestrator reads in-app reports, and can stop re-reading them
+
+Orchestrator. Docs-only. Branch `chore/or-139-report-triage-loop`.
+
+## What the owner asked for
+
+> *"i want this agent to be able to read reports sent within the app — through the report feature.
+> Can you make this happen? So you review; then assign it to a lane and clear it."*
+
+## The capability already existed, and that is the finding
+
+*Report an Issue* on `/more` (`components/more/feedback-section.tsx` → `POST /api/feedback`) writes
+to `feedback_submissions`, and **`claude_ro.feedback_submissions` has been exposed since migration
+142**. It was read live this session with the ordinary admin db-query endpoint before anything was
+written. So no new access was needed — what was missing was **a line telling sessions to read it**
+and **a way to stop re-reading the same report forever**.
+
+Worth stating plainly because it nearly became a build: the answer to *"can you make this happen"*
+was mostly *"it already does"*.
+
+## The feature has essentially never been used
+
+Measured 2026-09-23:
+
+| | |
+|---|---|
+| rows visible in `claude_ro.feedback_submissions` | **0** |
+| `feedback_submissions.n_tup_ins` (lifetime inserts, a counter not an estimate) | **1** |
+
+The view is **row-scoped to the owner** like every `claude_ro` view, so that single report belongs
+to someone else and is invisible here by design. **A zero from this read means *none of the
+owner's*, never *nobody has reported anything*** — the same trap the `error_events` rule already
+records, in a new table.
+
+That number drove the design rather than decorating it: see below.
+
+## Two owner decisions
+
+**Clearing is a watermark in the Orchestrator's baton, not a status column.** Offered against a
+migration adding `status`/`triaged_at`/`backlog_id` plus a Lane B surface so a reporter would see
+*"triaged → LB-xyz"* in the app. The owner took the watermark. **The argument that decided it is the
+usage number**: a migration and two lanes' work is a lot of machinery for a feature with one
+lifetime submission, a migration's revert is a corrective migration, and a line in a markdown file
+costs nothing to abandon if reports start arriving and the answer changes.
+
+**The screenshot gap is real and is now filed.** The view withholds `screenshot_data` and exposes
+`octet_length(...) AS screenshot_bytes`, so a UI bug arrives as *"screenshot, 240 KB"* — and for a
+layout or rendering fault reported from a phone, the picture is most of the report. The owner chose
+to fix it. **Not by adding the column to the view**: it is a base-64 data URI up to 500 KB, which
+would drag into every `SELECT *` on that table and make the endpoint unusable for ordinary triage.
+Filed as `OR-137` for Lane A — a route returning **one** screenshot by id, carrying the same owner
+scoping the view uses, and explicitly marked not urgent.
+
+## What shipped here
+
+- **`CLAUDE.md`** — the report read joins the session-start list beside `error_events` and the
+  database size, with the query, the loop, and both things the read cannot tell you.
+- **`docs/agents/state/orchestrator.md`** — the watermark, starting at the epoch, with the rule for
+  moving it: only once every report above it has become a backlog entry or been recorded as
+  not-a-defect with its reason.
+- **`docs/implementation-backlog.md`** — `OR-137` for the screenshot route.
+
+**The loop is read → review → file with a lane → move the watermark.** A report is never answered by
+replying to it; it becomes a queue entry, per **No orphaned findings**.
+
+## Reading the reporter's data — the owner widened the scope
+
+Second owner request the same session:
+
+> *"The orchestrator or a set agent should be able to use the claude read only feature and read the
+> data of the user who made the report. The app is in development mode so each user has consented to
+> having their data used for training."*
+
+**No migration is needed, and that is the finding that makes this small.** Every `claude_ro` view
+already filters on `current_setting('app.claude_ro_owner', true)::uuid` — Q-456 moved them off the
+hard-coded id. The views do not change. What is fixed is **where that setting comes from**:
+`bootstrapClaudeRoOwner` issues `ALTER ROLE claude_readonly SET app.claude_ro_owner = '<uuid>'` once
+at boot, binding the scope to the **role**, globally, for every request.
+
+So the change is one endpoint: an optional `userId`, applied as
+`BEGIN; SET LOCAL app.claude_ro_owner = '<uuid>'; <the caller's SELECT>; COMMIT`. Absent `userId`,
+behaviour is byte-identical to today. Filed as **`OR-138`**, Lane A, third in the queue.
+
+**`SET LOCAL` rather than `SET` is load-bearing.** The endpoint reads through a **pool**, so a plain
+`SET` would persist on that pooled connection and silently re-scope whichever later request reused
+it. That is a cross-request data leak, not a tidiness point.
+
+**This is an auth/security change and the carve-out still applies** — it widens the endpoint from
+*one user, structurally* to *whichever user the caller names*. The owner asked for it and the
+consent basis is recorded. The entry recommends one restriction: **allow the pivot only to a user
+who has actually filed feedback**, so the widening stays tied to the justification given. One
+predicate to delete if he wants it broader later; the broad version cannot be un-shipped.
+
+**A probe I did not run, deliberately.** The obvious next question is whether a caller can *already*
+pivot today by sending a bare `SET` as its own statement — the endpoint rejects SQL containing a
+`;`, so it cannot be smuggled alongside a `SELECT`, but a lone `SET` on a pooled connection is a
+different question. The attempt was blocked as credential exploration, which was the right call: the
+answer came from reading the route instead, and the entry records it as **unverified** rather than
+asserting it either way. If it does stick, the current single-user guarantee is already softer than
+it reads.
+
+## Not done
+
+- **No report was triaged**, because none of the owner's exist. The loop is armed, not exercised.
+- **No product code**, no migration, no device run.
+
+## Gate
+
+`pnpm ci:local` — exit 0. Full log kept, not tailed.
+
 <a id="2026-09-23-device-bf166-mid-workout"></a>
 
 # 2026-09-23 — BF-166 verified in full on the S25, and the leave-workout prompt's *Leave* does not leave
@@ -2181,63 +1458,6 @@ blind taps.
 ## Not exercised
 
 All of it on the phone. `perf.js` has only run against the desktop fixture.
-
-<a id="2026-09-23-docs-lb135-mockup-back-to-orchestrator"></a>
-
-# 2026-09-23 — LB-135: hand the IA mockup back to the Orchestrator, and undo a deletion I caused
-
-**Branch:** `docs/lb135-mockup-back-to-orchestrator` · **Lane B** · docs-only
-
-## The correction that unblocked this
-
-LB-135 was filed saying the 2026-09-22 mockup was lost. **The owner corrected that: it is in the
-Orchestrator's chat.** So it is an EXPORT gap, not a design to redo — that session still holds what
-he approved, and the recovery is cheap.
-
-RV-117, RV-118 and RV-119 are re-channelled **`Lane: O`**, asking the Orchestrator to save the
-mockup under `docs/design/` and set the lane back to `B`. The queue is the channel between agents;
-there is no messaging and no two sessions awake at once, so the `Lane:` field *is* the handover.
-
-The proposed rule stands and is worth more, not less: a mockup living only in one session's
-transcript is invisible to every other agent and to the owner later. The repo is the only shared
-memory.
-
-## ⚠ A deletion I caused, found and undone here
-
-**PR #1481's auto-merge of `docs/implementation-backlog.md` silently deleted RV-117 and RV-118** —
-two Review-filed entries carrying owner-approved gates. Present at `ef199122700`, gone at
-`5ed93e4b1a9`.
-
-Both are restored from `ef199122700`, with the handback bullet applied. Verified by heading parity:
-the only difference from the pre-damage file is the intended addition of LB-135.
-
-**Why my verification missed it.** After that merge I counted the headings I had *touched* —
-RV-116, RV-119, LB-135 — and all three were present, so it read as clean. Counting what you edited
-cannot see a neighbour that vanished. The check that does:
-
-```
-diff <(git show origin/main:docs/implementation-backlog.md | grep "^### " | sort) \
-     <(grep "^### " docs/implementation-backlog.md | sort)
-```
-
-Every line of that diff must be an add or a remove you intended. Recorded in the Lane B baton.
-
-This is the class CLAUDE.md already warns about from the other direction — a backlog conflict is
-usually two deletions, and "keep both" resurrects shipped entries. The mirror case is just as real:
-an auto-merge that keeps one side drops the other side's entries with no marker to notice.
-
-## Also here
-
-- **RV-116 removed from the queue.** It shipped in #1481 and its own `Keep:` says nothing is owed,
-  so leaving it was wrong — a finished entry must not still print as READY.
-- **Doc-size baseline raised back**, with the reason in `docs/doc-size-baseline-history.md`: the
-  baseline had ratcheted DOWN to match my deletion, so restoring the entries is an undo rather than
-  growth.
-
-## Verification
-
-`pnpm check:rules` **Ran 77 of 77** · backlog-pointers clean · doc-size clean · full heading diff
-shows exactly the three intended changes (+RV-117, +RV-118, −RV-116). Docs-only: no code touched.
 
 <a id="2026-09-23-docs-or-126-raw-archive-brief"></a>
 
@@ -2857,3 +2077,1012 @@ alone, and the consistency figure must NOT move. That needs two clocks that disa
 the owner setting a profile zone far from Brisbane and watching both chart axes follow the profile.
 
 Also not exercised: Samsung WebView rendering, native SQLite / Capacitor, drifted production data.
+
+<a id="2026-09-23-fix-lb132-post-push-invalidation"></a>
+
+# 2026-09-23 — LB-132: invalidate again once a local write reaches the server
+
+**Branch:** `fix/lb132-post-push-invalidation` · **Lane B** · v1.465.15
+
+## What shipped
+
+Five local-first write paths queued their mutation, fired a bare `pushMutations` and evicted their
+caches on the same beat. Each now pairs that immediate call with `pushThenRevalidate`, carrying its
+own group's invalidator(s):
+
+| Site | Invalidators |
+|------|--------------|
+| `app/session-select/components/log-value-sheet.tsx` | `invalidateBodyMetricWrite` + `invalidateReadinessInputs` |
+| `components/mood-checkin-sheet.tsx` | `invalidateCheckinAffectsPrescription` |
+| `components/morning-checkin-sheet.tsx` | `invalidateCheckinAffectsPrescription` + `invalidateHealthTrends` |
+| `components/nutrition/end-of-day/end-of-day-review.tsx` | `invalidateHealthTrends` |
+| `components/activity/exercise-review-sheet.tsx` | `invalidateActivityWrites` + `invalidateOuraWorkoutReview` |
+
+## Why the second half is load-bearing
+
+The entry left one question open — whether the pull path already re-invalidates — and it bounded
+whether any of group ② was worth doing. It is answered: **`lib/local-store/sync-engine.ts` fires no
+cache invalidation at all.** No `invalidateBiometrics`, no `invalidateCache(`. Nothing downstream
+closes the window.
+
+`pushThenRevalidate`'s own docblock names the cost exactly: invalidating only *before* the push
+makes every `useCachedValue` subscriber refetch while the server still holds the pre-write state and
+**re-cache the stale payload**, which then stands for the key's full TTL because nothing invalidates
+again. That is LB-4 — the 42 kcal Energy Balance reading. Every one of the five groups clears a
+server-computed aggregate (readiness, the prescription, health trends, the day log), so each had a
+real window rather than a theoretical one.
+
+The immediate call stays in all five. Offline the push never resolves usefully, so a push-only
+invalidation repaints nothing at all.
+
+## What this was NOT
+
+Group ① of LB-132 is **empty** — both its candidates were verified correct before this session, and
+the entry now says so in place, so a later sweep does not patch a working file. The same test emptied
+four more apparent offenders: `use-plan-meal-logging.ts`, `manual-bedtime-card.tsx`,
+`more-content.tsx`, `sync-health-card.tsx`. `log-value-sheet.tsx` looked like the defect from its
+call line too — its invalidation sits 39 lines below the push, inside the same `try`, so only the
+far-side half was missing there.
+
+**RV-108 remains the only genuine missed invalidation found in the app.**
+
+## Verification
+
+- `components/__tests__/lb132-post-push-invalidation.test.ts` — 17 assertions. Per site: the exact
+  far-side call, the immediate call still present, no bare `pushMutations` on the write path. Plus
+  each group really clearing a server-computed key, and `sync-engine.ts` still invalidating nothing
+  (so the far-side calls are not later removed as redundant).
+- Control run: reverting `mood-checkin-sheet.tsx` to the bare push failed 2 of its 3.
+- `tsc --noEmit` clean · `check-test-typecheck` at baseline (320/90) · lint clean on all five ·
+  `pnpm check:rules` **Ran 77 of 77** · `pnpm build` green · 12 related test files, 85 tests green.
+
+## Not exercised
+
+**The changed branch is unreachable in the web sandbox.** `getLocalStore` returns null there, so
+`pnpm dev` runs the API fallback arm — the one this PR does not touch. The build proves it compiles
+and the test proves the calls are present; neither watches an eviction on a phone. Also not
+exercised: native SQLite, safe-area, Samsung WebView, drifted prod data.
+
+**Owed:** the device pass, recorded as `Keep:` on the entry — log a morning check-in and an
+end-of-day review on the S25 and confirm the prescription and health-trends surfaces move when the
+push lands rather than at TTL.
+
+## Found while shipping this — filed as LB-133
+
+`scripts/check-invalidate-after-push.js` is CI step 37, has no baseline, and reported
+`no write invalidates around its push` for the whole time these five sites carried the defect.
+Reverting one fixed site and re-running still reported clean, so it is blind to the shape rather
+than to a formatting variant.
+
+The cause is `WINDOW = 12` — a ±12-line text window around the push. All five sites sit further out
+(14, 26, 35, 39 and 53 lines). Its docblock already records that widening the window failed once:
+LB-6 looked six lines up, missed five written below, and the window became ±12. The fix is to match
+the **enclosing block** to its balanced close, as `check-admin-guard-catch.js` learned under Q-548,
+with the blind spots pinned as fixture cases.
+
+Recorded with the measurements because **this PR removes the evidence** — all five instances are
+fixed here, so the detector can no longer be tested against live offenders.
+
+<a id="2026-09-23-fix-lb133-post-push-guard-blind-spot"></a>
+
+# 2026-09-23 — LB-133: the guard for the post-push class could not see the class
+
+**Branch:** `fix/lb133-post-push-guard-blind-spot` · **Lane B** · v1.465.17
+
+## What was wrong
+
+`scripts/check-invalidate-after-push.js` runs as Custom Rules step 37 and printed
+`no write invalidates around its push` for the whole time five live sites carried exactly that
+defect. It had no baseline and no allowlist, so the clean line read as proof rather than as an
+unmeasured claim. Reverting a fixed site and re-running still reported clean — it was blind to the
+shape, not to a formatting variant.
+
+The cause was `WINDOW = 12`: a ±12-line text window around the `pushMutations` call. The five sites
+LB-132 fixed sit 14, 26, 35, 39 and 53 lines from their invalidation.
+
+## The measurement
+
+The five real pre-fix sources were recovered from git (`git show 66c04c3fdf0:<path>`) and run
+through both detectors, because #1467 had already removed every live offender:
+
+| | old detector | new detector |
+|---|---|---|
+| five real pre-fix sources | **missed all five** | caught all five, at their exact lines |
+| the same files after the fix | clean | clean |
+
+## Why the scope is the handler
+
+Widening the window was never an option — that fix already failed once. LB-6 looked only at the six
+lines *above* each call, missed five written below, and the window became ±12 both ways, which is how
+it reached the state above. A larger number catches today's five, misses the sixth, and starts
+matching an unrelated `invalidate*` in a neighbouring function.
+
+Brace-matching the immediately-enclosing block is not enough either: three of the five put the push
+and the invalidation in *different* blocks of one handler — two sibling async IIFEs, or a nested
+`try` and its parent. So the scope is the function block just inside the component/hook body. Wide
+enough to span those siblings, narrow enough that an unrelated handler in the same file is out of
+scope. `app/more/more-content.tsx` is the case that proves the second half matters: it holds an
+`invalidate*` call **and** a bare push, in different handlers, and is correctly clean.
+
+## It found a sixth offender immediately
+
+`lib/home/rest-day.ts:65`, fixed in the same PR. `chooseRestDay` queued the mutation, fired a bare
+`pushMutations`, then `await`ed `invalidateRestDayChoice()` — which clears `next-session`,
+`next-session-prescription` and `collection`, all server-computed, and the file's own docblock says
+`getNextSession` prefers the stored `rest_days` row. The recomputed recommendation only arrives once
+the push lands. **The old scanner never looked at `lib/` at all**; the new one scans it, taking the
+file count from 945 to 1,224.
+
+**Lane call (structural, mine):** `lib/home/rest-day.ts` appears in neither lane's path list. It is
+reached only from `app/**` and `components/**`, so §3's rule puts it in B. Reversal cost is nil — a
+three-line change in one file.
+
+## Verification
+
+- `scripts/__tests__/invalidate-after-push.test.ts` — ten cases, written as **shapes rather than
+  distances** and taken from the real pre-fix sources: the far-below invalidation, the sibling
+  IIFEs, the nested try, the module-scope helper, and five that must NOT be flagged (two handlers, a
+  bare flush, an awaited push, a `.then` chain, the import line).
+- Control: the old detector run against all five real pre-fix sources missed every one.
+- `tsc --noEmit` clean · `check-test-typecheck` at baseline (320/90) · lint clean ·
+  `pnpm check:rules` **Ran 77 of 77** · full vitest suite green.
+
+## Not exercised
+
+The rest-day fix changes when an invalidation fires on the device; the sandbox can prove the call is
+present and cannot watch an eviction on a phone. Also not exercised: native SQLite, safe-area,
+Samsung WebView, drifted prod data. **Owed:** the rest-day device look, folded into LB-132's pass.
+
+## Also in this PR
+
+LB-129 gained a ruling-out rather than a fix: the back-dismiss machinery **cannot** be the cause of
+the day-review sheet failing to open on a cold flip, even though `sheet-back-stack.ts` carries a
+documented bug where *"the dialog closed on the frame it opened"*. `handlePop` only runs on a
+`popstate`, and `tab-shell.tsx:103` navigates with `replaceState`, which does not emit one. The
+entry's claim that `<EndOfDayReview>` renders unconditionally was also re-checked and holds. That
+leaves the nested `dynamic({ ssr: false })` chunk as the only live hypothesis.
+
+## Also found here — `main` was red, and the merge call did not stop it (LB-134)
+
+Running the full suite for this change surfaced
+`app/api/next-session/prescription/__tests__/prescription.test.ts` failing 4 of 6 **on `main`** —
+reproduced in a clean worktree at `main`'s HEAD, byte-identical to GitHub's copy (so not a stale
+checkout), and unchanged with `DATABASE_URL` unset (so not environmental).
+
+**Cause:** #1466 (RV-82) changed the route to read `recommendation.program`, since `getNextSession`
+already fetches it. The test still stubbed `getActiveProgram` and its `getNextSession` mock had no
+`program` field, so `program` was null and **every case fell into the rest-day branch** — including
+the two that still reported green. *"Never calls a prescription-mutating repo method"* was passing
+**vacuously**, because that branch returns before any of them is reachable.
+
+**⚠ Correction, made before this PR merged: the test fix is NOT this branch's.** #1472 fixed it
+concurrently on `main`, and an earlier draft of this entry and of LB-134 claimed it here. This
+branch keeps #1472's version and adds one line it lacks —
+`expect(getActiveProgram).not.toHaveBeenCalled()` — which pins RV-82's actual point, that the route
+must not fetch the program twice, so the stub cannot go stale in silence again.
+
+**The part that is this session's, and matters more than the test.** The failing `Tests` job did not
+block the merge: #1467 was squash-merged at 10:18 while `Tests` was failing on its head
+(`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned success.
+**`main` took a red commit.**
+
+That falsifies a rule this repo leans on: *"attempting the merge is the reliable green test … it
+cannot merge a genuinely pending check."* It can. The likely reason is already recorded elsewhere in
+CLAUDE.md — `enable_pr_auto_merge` fails here with *"Protected branch rules not configured for this
+branch"* — meaning required checks are not actually enforced, which also makes the same file's claim
+that protection *"requires a PR with all CI checks passing"* wrong.
+
+Branch-protection configuration is the owner's call, not a lane's, so LB-134 is filed `Lane: O` with
+both decisions named: whether to enforce the checks, and correcting the two CLAUDE.md passages that
+currently instruct every agent to use an unsound gate. Until then, read the `Tests` conclusion
+explicitly before merging — `get_job_logs` with `failed_only: true` is the cheap form.
+
+<a id="2026-09-23-fix-or-130-base-read-failure"></a>
+
+# 2026-09-23 — OR-130: a ratchet that could not read its base blamed the branch
+
+**Branch:** `fix/or-130-base-read-failure` · **Lane:** O (Orchestrator) · docs + `scripts/lib` only
+
+## What was wrong
+
+`fileAtBase` in `scripts/lib/base-ref.js` returned `null` for two different facts — *"this file is
+not at the base"*, which is what a branch adding a file looks like, and *"I could not read the
+base"*, which is nothing known at all. `verdict` maps a `null` base to `'fail'`, so the second
+became an accusation: a file byte-identical to `main`, named as this branch's new violation, on a
+branch that had not touched it.
+
+Eleven scripts read the base through this helper.
+
+## The CI question, decided first, because it inverts the fix
+
+The entry carried a warning: CI checks out at depth 1, so *"do not fail on unreadable"* might
+disable the ratchet everywhere rather than just locally. Measured rather than reasoned about.
+
+`.github/workflows/ci.yml` fetches the base with `git fetch --depth=1 origin main || true`. **When
+that fetch fails, no ref resolves at all** — `resolveBaseRef` returns `null`, every `atBase` is
+`null`, and `verdict` falls back to the plain absolute comparison, which is *stricter* than the
+base-aware one. The CI step's own comment says as much.
+
+So turning an unknown base into a pass would not have fixed this bug. It would have disabled every
+base-aware ratchet in the repo on any fetch blip. **The outcome of an unreadable base is therefore
+unchanged on purpose; only the lying stopped.**
+
+## What shipped
+
+- `showAtBase` classifies git's own stderr. `does not exist in` / `exists on disk, but not in` is
+  the only wording counted as absent. Measured against git on the day, not recalled.
+- Anything else is a read failure: three attempts with a 40 ms / 160 ms backoff, then a warning
+  carrying git's own words.
+- `resolveBaseRef` also probes the tree behind the commit it picks. A resolvable commit is not a
+  readable tree, and a base we cannot see should degrade to no base rather than failing one file at
+  a time.
+- Seven regression cases, plus three that pin the strict fallback so a later session does not
+  "finish the job" by turning it into a pass.
+
+## The part worth carrying: the mechanism was never reproduced
+
+The entry stated the cause confidently — a shallow clone, `git show` failing when the blob is not
+in the pack. **That did not survive testing.** 24 concurrent runs of the affected script triggered
+nothing, with and without the fix, and `git show origin/main:<path>` succeeds for every path asked
+directly.
+
+So the retry is a reasonable guess and the diagnostic is the part that earns its place: the next
+occurrence prints git's own reason, which is the evidence this instance never produced. A fix whose
+mechanism is unconfirmed should say so in its own comment, or the next session inherits a certainty
+nobody measured.
+
+It fired again during this session's own gate run — third sighting, same shape, clean on a direct
+re-run a minute later. That is the argument for instrumenting it rather than retrying harder.
+
+## Not done
+
+- **`OR-121`'s first instance stays open.** It was `check-tz-aware-cache-guards.js`, which does not
+  use `base-ref` at all. Two flakes of similar shape are not one cause.
+- **No device surface touched** — this is a build-gate script. Nothing to exercise on the S25, and
+  no offline-first, native, safe-area or notification path involved.
+
+## Gate
+
+`pnpm ci:local` — exit 0, **Ran 75 of 75** Custom Rules steps, **8,058 tests passed**, run unpiped.
+
+<a id="2026-09-23-fix-or-133-dv-lane-starved"></a>
+
+# 2026-09-23 — TN-61 and the starved DV lane: one defect, two places
+
+**Branch:** `fix/or-133-dv-lane-starved` · **Lane:** O · `scripts/next-item.js` + one test
+
+Two findings that look unrelated and are the same thing: **the tool's output is correct and the
+conclusion a reader draws from it is wrong, because what is missing is never accounted for.**
+
+## TN-61 — the truncation line could not fire
+
+READY caps at 10. There *was* a `… and N more (--all)` line, which is why this read as a missing
+feature rather than a bug. It was computed from:
+
+```js
+const shown = ready.filter((e) => !e.batch || shownBatches.has(e.batch)).length
+```
+
+That counts every **unbatched** entry, whether or not the cap reached it. So the line fired only
+when a *batch* collapsed rows, and **never when the cap hid them**. With Lane A's READY at 31 and
+no batches involved, `shown` was 31, `ready.length` was 31, and ten rows printed in silence.
+
+TN-61 found it the way you would: two entries it had just edited (`TN-55`, `LA-121`) appeared
+nowhere in the output, which reads exactly like removed-from-the-queue — the failure the backlog's
+own two-deletions rule exists to catch.
+
+It now counts what was actually printed, and says so:
+
+```
+      … showing 10 of 16 — `--all` for the rest.
+      An entry you cannot see here is BELOW THE CUT, not gone from the queue.
+```
+
+**The cap stays at 10**, per the entry's own warning. An implementer wants the next few items, not
+thirty-one; what was wrong was that the truncation was invisible.
+
+**One correction to TN-61:** it says *"READY and PARKED alike"*. Only READY truncates — KEEP,
+VERIFY, REFERENCE, UNCLASSIFIED and PARKED all print in full. Nothing was changed there.
+
+## The starved DV lane — found while reading, fixed in the same change
+
+`node scripts/next-item.js --lane DV` printed **`nothing startable`** while **116 device checks were
+owed**. The device agent's documented start ritual answered "there is nothing for you".
+
+**The lane filter is not the bug, and it must not be "fixed".** `Lane:` says who *builds* a thing. A
+check owed on the phone sits on the entry that built it — a Lane B screen fix with a device check
+owed is still Lane B's entry, not DV's. `--lane DV` is *correctly* near-empty.
+
+Correctly empty is indistinguishable from *there is nothing for me* unless the tool says otherwise.
+So it does now, on both assigned-only lanes (`O` gets it too — Review and BugFix hand the
+Orchestrator device work as well):
+
+```
+  116 device check(s) are owed across the whole queue and are NOT listed above —
+  they sit on the entries that built them, whatever lane those are. `--sittings` groups them.
+```
+
+This is the same starvation Lane B hit in August for a completely different reason — 0 startable
+against 48 parked. Worth naming as a pattern: **a lane reading zero is a claim about the whole
+queue, and a queue tool should never make that claim without checking it.**
+
+## The third place, and it was the one that mattered: `--sittings` hid the blocking work
+
+The owner asked whether device items had actually reached the DV agent. Measured:
+
+| | count |
+|---|---|
+| entries carrying `Gate: device` (parked — **blocked**) | **44** |
+| entries carrying `Verify: device` (shipped, a look owed) | 61 |
+| entries carrying **`Lane: DV`** | **0** |
+
+Not one item has ever been routed to the device agent through the lane channel. That is defensible
+on its own — `Lane:` says who *builds* a thing, and a check owed on the phone sits on the entry that
+built it. What is not defensible is the next number: **24 of the 44 parked entries were invisible to
+`--sittings`**, the one view the device agent has.
+
+`owesDeviceCheck` tested `Verify:` and a device-flavoured `Keep:`. It never tested `Gate:`. So the
+view showed **116 optional looks and hid the 24 that were blocking** — the priority exactly
+inverted. An entry with `Verify: device` has shipped and works; the look is worth doing and blocks
+nobody. An entry parked on `Gate: device` proceeds only when the phone answers.
+
+They now print in their own section, first, and deliberately **not merged** into the owed list: one
+means *go and confirm this still works*, the other means *this cannot proceed until you look*, and a
+sitting that cannot tell them apart spends the owner's attention on the wrong half. The header says
+outright that some of the 24 need an APK or hardware built first — `Gate: device` says the phone is
+required, not that a check is all that remains. Three of them (`PS-8`, `PS-9`, `PS-16`) are blocked
+on a Colmi R09 that is with a second wearer, which no tool can infer.
+
+## The test, and that it was checked against the bug
+
+`scripts/__tests__/next-item-visible-silence.test.ts` runs the real script against the real backlog
+rather than a fixture — a fixture would have pinned the *formatting*, and what broke was the
+**count being derived from the wrong set**.
+
+Reverted the fix and re-ran: **4 of the 5 cases fail.** The fifth ("does not claim truncation when
+everything fits") passes either way, correctly. A regression test that has not been run against the
+bug is a guess.
+
+## A note on this branch's own last merge
+
+RV-134 landed while this was open, and this re-merge is its second confirmation. The `.size` file
+still conflicted — both sides had edited it *before* the band existed — but resolving it by taking
+**main's value verbatim** now passes: 55 lines of slack against a 544-line band, exit 0, no new
+number written.
+
+That is a materially simpler drill than the one this session has been running all night. The
+resolution for a `.size` conflict is now *take main's side* rather than *recompute from the merged
+tree*, because a few dozen lines of staleness is no longer a failure. Recomputing is still correct;
+it is just no longer necessary, and "take theirs" is a thing a tired session gets right.
+
+## Not done
+
+- **TN-59 is untouched** — an entry parked only by a prose marker. Different mechanism, still open.
+- **No product code.** This is a queue tool; nothing reaches the device or the app.
+
+## Gate
+
+`pnpm ci:local` — exit 0, **Ran 75 of 75** Custom Rules steps, **8,075 tests passed**.
+
+The first run exited 1, and because the log was kept whole rather than tailed it named its own cause
+in the first line: the backlog had shrunk 23 lines under its baseline when TN-61 left the queue.
+Fixed in one edit. Two earlier gate failures today were piped to `tail -5` and became OR-121 entries
+instead of fixes — the difference is the redirect, not the diagnosis.
+
+<a id="2026-09-23-fix-rv-134-size-conflict-tax"></a>
+
+# 2026-09-23 — RV-134: the conflicts were not the ceiling, they were slack detection
+
+**Branch:** `fix/rv-134-size-conflict-tax` · **Lane:** O · `scripts/` + one test
+
+## The measurement the entry was missing
+
+Counted across one night's work on this repo:
+
+| branch | re-merge commits |
+|---|---|
+| `chore/or-125-owner-decisions` | **12** |
+| `fix/dv1-windows-ci-local` | 5 |
+| `docs/or-126-raw-archive-brief` | 3 |
+| `chore/or-132-owner-decisions` | 2 |
+| `fix/or-133-dv-lane-starved` | 1 |
+
+**23 re-merge commits across five branches in one night**, nearly every one of them resolving a
+one-line `docs/doc-size/<path>.size` file where **neither side was wrong** — the merged tree's own
+count was the answer, and no human judgement was involved in any of them.
+
+## The cause was not where the entry looked
+
+RV-134 described a ratchet that "blames a branch for a shrink it did not cause", which reads as a
+problem with the *ceiling*. It is not. The ceiling only fails a branch that grows past it, and that
+is rare and genuine.
+
+**Slack detection was the cause.** The rule failed on *any* gap between the file and its number, so
+every PR that shrank a tracked doc by even one line had to edit the baseline file — and a one-line
+file is the one thing two concurrent PRs cannot both write. Striking a completed backlog entry
+shrinks the backlog, and striking a completed entry is what almost every PR does.
+
+So the conflict was not a side effect of the ratchet. It was **slack detection putting a shared
+one-line file into nearly every diff in the repo.**
+
+## The fix, and what it deliberately does not do
+
+`check-doc-index-size.js` now tolerates slack within **`max(25, 2%)`** of the baseline and fails only
+beyond it.
+
+**Slack detection is kept, not removed**, and that is the whole design constraint. It exists because
+CLAUDE.md once sat **429 lines** under its number — the most-read file in the repo able to grow by
+half its own length with nothing complaining. 429 against a ~900-line baseline is far outside any
+band, and a test pins exactly that case.
+
+**Why a scaling band.** The tracked docs run from a 53-line baton to a 27,000-line backlog. A flat 25
+would fail the backlog on 0.1% drift; a flat 500 would let a baton double. The floor carries the
+small files and the percentage the large ones, and a test pins that no document's band ever reaches
+half its own length.
+
+**Growth is untouched and still fails at the first line over.** The asymmetry is deliberate: growing
+past the ceiling is the thing the ratchet exists to catch and the fix there is moving prose. Slack is
+a stale number, and a number that is 0.08% stale is not worth a merge conflict.
+
+**Tolerated slack is printed, never silent.** A check that quietly accepts drift is how the 429-line
+gap accumulated. The band changes who has to act and when — not whether anyone can see it.
+
+## It demonstrated itself while being written
+
+Striking RV-134 from the queue shrank the backlog by 32 lines. Under the old rule that would have
+forced a `.size` edit on this branch, conflicting with the two PRs already in flight. Under the band
+(543 for a 27,170-line file) it reported and passed, and this PR touches no `.size` file at all.
+
+Both of the night's real cases fall inside their bands: 23 lines under 27,128, and 7 under 877.
+
+**Then it was verified rather than predicted.** This branch had to be re-merged onto a `main` that
+had moved twice while it was open — exactly the situation that produced the 23 commits. The merge
+came back clean, the check exited 0 reporting **32 lines of slack inside a 545-line band**, and
+**no baseline edit was required**. Under the old rule that same re-merge would have demanded the
+backlog number be lowered 27,230 → 27,198, in a one-line file that another PR was holding open at
+that moment.
+
+## What remains, correctly
+
+Two PRs that both **grow** past the same ceiling on the same day still conflict. That is a genuine
+disagreement about one number and the case a ratchet should conflict on. `LB-120` is annotated with
+this rather than struck, since it describes the same subject and should be re-verified against the
+new behaviour before anyone builds from it.
+
+## Not done
+
+- **No merge driver.** It was the other candidate and it loses: `merge.<name>.driver` has to be
+  configured in every clone — CI, this sandbox, the Windows device machine — and silently does
+  nothing where it is missing, which is the current behaviour wearing a disguise.
+- **Baselines are still stored, not derived.** Deriving them from the base branch removes the
+  ceiling altogether: a file could grow ten lines per PR forever, each increment "inherited". That
+  trades a merge conflict for the thing the ratchet is for.
+
+## Gate
+
+`pnpm ci:local` — exit 0, **Ran 75 of 75** Custom Rules steps. Full log kept, not tailed.
+
+<a id="2026-09-23-fix-rv108-weigh-in-invalidation"></a>
+
+# 2026-09-23 — RV-108: a weigh-in cleared 3 of 202 cached keys
+
+**Branch:** `fix/rv108-weigh-in-invalidation` · **Lane:** B · one write path, one sweep, two queue calls
+
+Measured on the S25: logging a weight cleared **3 of 202** cached keys. The sheet's local-store
+branch ended at a bare `pushMutations`, and the only invalidation was the *consumer's* — which takes
+its `invalidateReadinessInputs()` arm when `onSaved` receives a fresh row, so the body-metric keys
+were never evicted at all. Recovery was TTL expiry.
+
+The fix is the one the entry named: copy `water-log-sheet.tsx` exactly — `pushThenRevalidate(userId!,
+invalidateBodyMetricWrite)` **and** an immediate `invalidateBodyMetricWrite().catch(() => {})`.
+
+Both halves are load-bearing for different reasons. The immediate call repaints the device that
+wrote the row; the post-push one covers what the server derives. An offline write's push never
+resolves usefully, so a push-only invalidation repaints nothing.
+
+## The sweep narrowed the fix rather than widening it
+
+Every `pushMutations` call site in `app/`, `components/` and `lib/` was read. **Only this one had no
+invalidation at all.** The rest are filed as LB-132, split by how wrong they are: two with no
+invalidation in a different domain, five with the immediate half and no post-push half. Two more —
+`more-content.tsx`'s pull-sync and `sync-health-card.tsx`'s failed-mutation retry — push without
+writing and are correct as they stand.
+
+**`log-value-sheet.tsx` was nearly "fixed" and must not be.** Home's quick-log writes the same
+`body_metrics` domain through the same shape, and a ±10-line window around its push shows no
+invalidation, so it reads as this defect byte-for-byte. It calls `invalidateBodyMetricWrite()` and
+`invalidateReadinessInputs()` **39 lines later, inside the same `try`**. The patch was written and
+its own assertion refused to match — patching it would have double-invalidated a correct file.
+
+That is the third time in one day a fixed-line window produced a false finding: a three-line call
+whose timezone argument sat on line 3, an over-count of unnamed switches labelled on the next line,
+and now this. The baton lesson is widened accordingly — read the enclosing block, not a window.
+
+## Two queue heads re-channelled, because both were blocked at their next action
+
+Working top-down put DV-12 and RV-113 ahead of this, and neither is buildable by Lane B as it
+stands. Both were left in `Lane: B` at the head of the queue, where every Lane B session pays to
+rediscover that. CLAUDE.md's lane rule separates them cleanly:
+
+- **DV-12 → `Lane: DV`.** Its own "Not established" line says the next step is a CPU profile of one
+  tap to name the component that dominates. That is a measurement nobody has taken, with an
+  objective output, on hardware only the device agent has. The fix will still be Lane B's.
+- **RV-113 → `Lane: O` + `Gate: owner`.** Its two open questions "decide whether this is worth doing
+  at all", and both are **looks** judgements on the app's most frequent interaction — is a 180 ms
+  blink perceptible, does `bg-page` resolve transparent under the owner's wallpaper. The rule sends
+  a feels-right judgement to the owner, not to the device agent. Building the one-line fix first
+  risks changing a daily interaction he never asked to have changed.
+
+**`check-backlog-pointers.js` caught a real defect in that edit**: `Gate: owner` written inline on
+the `Lane:` bullet is ignored, so RV-113 would have stayed READY with a gate that did nothing. It
+has its own bullet now, and the runner parks it.
+
+## Not done, and not claimed
+
+**`Verify: device` + `Keep:`** — log a weight on the S25 and confirm the surfaces reading
+`body-metadata`, `day-log:` and `energy-balance:` move without waiting for TTL. The sandbox proves
+the calls are present; it cannot watch 202 keys on a phone.
+
+**Still not established, and it bounds LB-132's worth:** whether `pushMutations` → `pullDelta`
+reliably fires `invalidateBiometrics` on the device that wrote the row. RV-108 left that open and
+this PR does not close it.
+
+Also not exercised: Samsung WebView rendering, native SQLite / Capacitor, drifted production data.
+
+<a id="2026-09-23-fix-rv114-route-transitions"></a>
+
+# 2026-09-23 — RV-114: pushed routes animate
+
+**Branch:** `fix/rv114-route-transitions` · **Lane B**
+
+## What shipped
+
+Seven call sites swapped from `useRouter` to `useTransitionRouter`. Import-only, as the entry
+predicted. The plan was re-verified against `main` first: all seven still matched, and every usage
+is a `push` or a `back` — never a `refresh` — so nothing animates that should not.
+
+| File | navigates |
+|---|---|
+| `components/more/friend-leaderboard.tsx` | `push('/profile/…')` |
+| `components/more/friend-feed.tsx` | `push('/profile/…')` |
+| `app/nutrition/nutrition-content.tsx` | `push('/coach?scope=nutrition')` |
+| `app/register/register-form.tsx` | `push('/sign-in?registered=1')` |
+| `app/coach/coach-content.tsx` | `back()` |
+| `app/coach/confirm/[toolCallId]/confirm-content.tsx` | `back()` ×4 |
+| `app/collection/collection-content.tsx` | `back()` |
+
+## The asymmetric pair was the point
+
+Both friends surfaces pushed `/profile/${userId}` with a plain router while that screen's own back
+runs the `"back"` keyframes — **open hard, close animated**, the exact inversion
+`lib/hooks/use-back-or-fallback.ts` exists to prevent. Nothing at the call site looks wrong, which
+is why it is pinned by a test rather than left to review.
+
+## The `/coach` hazard is answered, not deferred
+
+The entry flagged that `lib/view-transition.ts`'s 300 ms cap freezes the outgoing screen if the
+destination never commits, and that `/coach` and `/coach/confirm/[toolCallId]` are dynamic routes.
+
+Reading it: `navigate()` is called unconditionally inside the promise executor, **before** the
+commit poll starts. The deadline only resolves the promise that ends the frozen snapshot. So a
+destination that never commits costs a held frame, never a lost push — a 300 ms hold, exactly as the
+entry expected, now with a reason attached rather than a "check this".
+
+## Verification
+
+- `lib/__tests__/rv114-pushed-routes-animate.test.ts` — 9 assertions: each of the seven uses
+  `useTransitionRouter` and carries no bare `useRouter`; both friends surfaces still push a profile
+  *and* animate it; and `useTransitionRouter` still spreads the real router, so a change there
+  cannot silently drop `refresh`/`prefetch` from seven call sites without a type error.
+- Control: reverting `friend-feed.tsx` fails 2 of 9.
+- `tsc --noEmit` clean · `pnpm check:rules` **Ran 77 of 77** · full suite green · build clean.
+
+## Deliberately not done
+
+**No repo-wide ratchet.** 16 files still use a plain `useRouter` and most are right to: a tab href
+needs no transition (`useTransitionRouter` already no-ops for those) and a `refresh()` is not a
+navigation. Widening this is its own entry, not a free extra.
+
+## Not exercised
+
+Device. This is motion on daily paths and the sandbox can only prove the call sites changed —
+whether the shared-axis transition reads right on the S25 is a look judgement. `/coach` is the one
+worth watching, being a dynamic route. Also not exercised: native SQLite, safe-area, Samsung WebView.
+
+<a id="2026-09-23-fix-rv115-more-subtab-crossfade"></a>
+
+# 2026-09-23 — RV-115: More's sub-tab swap crossfades and starts at the top
+
+**Branch:** `fix/rv115-more-subtab-crossfade` · **Lane B** · v1.465.21
+
+## What shipped
+
+Profile ↔ Friends on the More tab swapped via two `<div style={{display}}>` inside one shared
+scroller: no motion, and the scroll offset carried across. Both views now swap through the existing
+`<TabPanels value={tab}>` — the primitive Friends' own child views already use — and the scroller
+returns to the top on each swap.
+
+## The entry's fix was not implementable as written
+
+It said "reset `scrollTop` in `onValueChange`". `PullToSync` owns `scrollRef` privately and exposed
+no prop, so the call site cannot reach the element it needs to move.
+
+Added `scrollResetKey` to `PullToSync` instead. **Structural call, Lane B's:** the reset belongs with
+the component that owns the scroller rather than being threaded out to every caller, and Health's
+three-tab scroller can use it next. Reversal is deleting one prop and one effect.
+
+It deliberately skips its first run. `useScrollRestoration` re-asserts a saved offset across a whole
+window after mount, so a mount-time reset would fight the restore — the same scroll-key machinery
+RV-112 dealt with earlier today.
+
+## The `mode="wait"` caveat resolves — checked, not assumed
+
+`TabPanels` is `AnimatePresence mode="wait"`, so the outgoing panel unmounts. The entry flagged that
+this could trade a hard cut for a skeleton. It does not: both panels re-seed synchronously from
+cache — `profile-tab.tsx` in a `useLayoutEffect` with `readCacheSync`, `friends-tab.tsx` with
+`readCacheSync('friends-list')`.
+
+**But it costs UI state, which the entry did not name.** Unmounting discards Friends'
+feed/leaderboard choice and Profile's expanded sections on every swap. Accepted: More's traffic is 7,
+the data is untouched, and the alternative — keeping both mounted for a real crossfade — needs
+absolute positioning inside `PullToSync`'s scroller and risks the layout bugs that machinery already
+carries. It is written into the code comment so it is not later rediscovered as a bug.
+
+## One limitation, deliberately not fixed
+
+Switching sub-tabs *within* the restoration's re-assert window after entering More can still let the
+restore win. That is the behaviour today, so it is an incomplete fix rather than a regression.
+
+## Verification
+
+- `components/__tests__/rv115-more-subtab-crossfade.test.ts` — 5 assertions. The load-bearing one is
+  that **both panels still seed from cache**: delete that seeding and this swap silently becomes a
+  skeleton flash on every switch, and nothing in More would fail.
+- Control: removing `scrollResetKey` fails 1 of 5.
+- `tsc --noEmit` clean · `pnpm check:rules` **Ran 77 of 77** · full suite green · build clean.
+
+## Not exercised
+
+Device. A 150 ms crossfade is a feel judgement and the sandbox can only prove the primitive is wired
+in. Also not exercised: native SQLite, safe-area, Samsung WebView, drifted prod data.
+
+<a id="2026-09-23-lane-a-dv10-supplement-delete-tombstone"></a>
+
+# 2026-09-23 — DV-10: the missing tombstone, and the column wipe underneath it
+
+**Branch:** `lane-a/dv10-supplement-delete-tombstone` · **Lane A** · `lib/local-store/**` plus the
+one call site. No migration, no schema change.
+
+## The entry's measurement was right; its consequence is latent, not live
+
+Device Verification measured it on the S25: deleting a supplement online and offline removed it
+from the server and from both lists, but the local row kept `deleted_at: null`. An injury deleted
+the same way tombstones correctly.
+
+The entry then said this is *"the 'deleted item comes back' shape (BF-47) waiting for a read path
+that does not filter it"*. Checked rather than assumed, and it is **waiting**, not happening:
+`getSupplements()` filters `active=1 AND deleted_at IS NULL` — **both** — so the list is right
+today, and `applyDelta`'s supplements arm hard-deletes the row on the next pull
+(`DELETE … WHERE id = ? AND sync_status='synced'`). The gap is real and worth closing; it is not a
+live "my supplement came back".
+
+**It is also not a consequence of DV-5**, which shipped earlier today and touched the *confirm*
+arms. Checked, because the two are adjacent.
+
+## The defect the entry did not find, on the same line
+
+The delete called `upsertSupplement({ …the fields this sheet happens to hold, active: false })`.
+That upsert writes **every** column, with `?? null` for anything absent — and the rebuilt record
+omitted `defaultAmount`, `unit`, `startedOn`, `stoppedOn` and `dosePrompt`.
+
+So **deleting a supplement blanked five columns on the local row.** The one that matters is the
+presence window: BF-69's own comment says a date *outside* `startedOn`/`stoppedOn` is a **TRUE
+ZERO** while a date inside it with no contribution is **UNKNOWN** and must be excluded from an
+aggregate. Nulling them converts one into the other for any local aggregate read between the delete
+and the next pull.
+
+It also had a smaller edge: `name: existing?.name ?? ''`, so a delete issued when the list was out
+of step would write an empty-named row.
+
+## The fix
+
+`deleteSupplement(id)` on the store, mirroring `deleteInjury`:
+
+```sql
+UPDATE supplements SET deleted_at=?, active=0, sync_status='pending', updated_at=? WHERE id=?
+```
+
+`active=0` as well as the tombstone, because `getSupplements` filters on both and dropping either
+half leaves the row in the list the delete was issued from. `pending` rather than `synced`, because
+`applyDelta` prunes only `synced` rows and the push's confirm arm (Q-124) is what flips it — a
+delete landing as `synced` would be prunable before its own push had been acknowledged.
+
+An `UPDATE` rather than an upsert is the whole point: an upsert cannot express *"leave the other
+columns alone"*, since it always supplies every one.
+
+**Sibling sweep:** `active: false` appears at one other site, `chest-strap-pairing.tsx`, where it is
+local React state for a BLE link and has nothing to do with this. One call site to change.
+
+## Mutation pass
+
+| # | mutation | result |
+|---|---|---|
+| 1 | drop `deleted_at=?` (the tombstone) | killed |
+| 2 | delete also blanks `name` | killed |
+| 3 | `sync_status='pending'` → `'synced'` | killed |
+| 4 | call site reverts to the rebuilt upsert | killed |
+| C | `SET` clause reordered, same placeholders | **survived** (correct) |
+
+## Not done, and what is still owed
+
+- **The device check is DV-10's own pass test and has NOT been run here:** on the S25, delete a
+  supplement and confirm `SELECT deleted_at FROM supplements WHERE id=…` is set. These tests are
+  source-level scans, for the reason their siblings are — both vitest projects run in `node`, where
+  `getLocalStore` returns null, so there is no local SQLite to drive.
+- **The column wipe is fixed going forward, not repaired in place.** A row already blanked by a
+  previous delete stays blanked until the next pull replaces it — which it will, because the server
+  row is the source of those fields and `applyDelta` overwrites a `synced` row wholesale.
+- **Failure surfaces not exercised:** the device, the APK, and any real offline transition.
+
+<a id="2026-09-23-lane-a-dv13-device-metrics-blocking"></a>
+
+# 2026-09-23 — DV-13: the outage was probably us deploying, and the route was still wrong
+
+**Branch:** `lane-a/dv13-device-metrics-blocking` · **Lane A** · one admin route and its new test.
+No migration, no schema change, no client change. **DV-13 stays queued** — see Keep.
+
+## The entry said to measure before fixing, and measuring changed the answer
+
+DV-13 was filed with the Oura BLE admin console as the suspect for an eight-minute production
+outage, explicitly flagging that the cause was **not proven** and naming the first two reads:
+`error_events`, and Railway's logs for 20:00–20:15 AEST.
+
+**`error_events` for the window holds exactly two server rows, and they are at 20:12:36–37** — the
+moment of *recovery*, not the stall:
+
+```
+GET /api/day-timeline   [cause: timeout exceeded when trying to connect] Failed query: select …
+/api/body-battery       [cause: timeout exceeded when trying to connect] Failed query: select …
+```
+
+That is a **pool-acquisition** failure — the app could not obtain a database connection — which is
+what a container looks like while it warms, and is neither a slow query nor a blocked event loop.
+
+## The merge timeline, which nobody had put beside it
+
+```
+19:47:07  #1463      19:51:20  #1466      20:03:30  #1468      20:18:18  #1467   (AEST)
+                                    outage: 20:04:40 → 20:12:41
+```
+
+**Four merges in sixteen minutes, each auto-deploying to Railway production — and #1468 landed 70
+seconds before `/api/version` first went slow.** A replaced container explains a database-free route
+timing out for minutes and then answering in 0.5 s, without needing a blocked loop at all. Those
+merges were mine, earlier in this same session, which is the part worth saying plainly: the
+measurement that looked like a device-agent finding is substantially an artefact of how fast this
+lane was merging.
+
+## The route was still doing something indefensible
+
+`device-metrics` called `toAestDay` — `formatInTimeZone` — **once per raw row**:
+
+| measurement | value |
+|---|---|
+| rows in the owner's default `?days=3` window | **58,856** |
+| cost of one `formatInTimeZone` call | **11.2 µs** |
+| synchronous time before any decoding | **656 ms** |
+| extrapolated at `?days=14` | **~3.1 s** |
+
+On sandbox CPU, so worse on Railway. Nothing else runs on the process while that happens — and the
+siblings named in the entry (`samples/summary`, `rollup-state`, `samples/pack`) have **no such
+loop**, which is checked, not assumed. So a documented "single-row read" appearing to hang is the
+signature of *the process being occupied*, not of that route being slow. That part of the entry's
+reasoning was right.
+
+The fix memoises the day lookup **by minute**. No UTC offset is finer than a minute, so every
+timestamp in a minute is in the same local day in every zone — the result is identical and the
+formatter is called at most 1,440 times per day of window instead of once per row.
+
+## Mutation pass
+
+| # | mutation | result |
+|---|---|---|
+| 1 | route memo keyed by hour | killed |
+| 2 | bucketing loop bypasses the memo | killed |
+| 3 | the TEST's own helper keyed by hour | killed — by Kathmandu and Chatham |
+| C | key written `60000` rather than `60_000` | **survived**, after a fix |
+
+**Mutation 3 is why the zone list is what it is.** An hour-keyed memo passes every whole-hour zone;
+only the 45- and 45/60-minute offsets catch it. **The control failed first time** — the source scan
+pinned the literal `60_000`, so the identical `60000` broke it. That is the third time today an
+assertion pinned syntax instead of contract (TN-60, RV-82, here); it now matches the value in either
+form.
+
+## Keep — DV-13 is NOT closed
+
+1. **That `device-metrics` caused the outage is still not established.** 656 ms, or even 3 s, does
+   not account for a 90-second abort, and the deploy correlation is the better explanation for that
+   window. Do not close this entry by pointing at the fix that shipped.
+2. **The loop is cheaper but still unbounded** — the row cap and the explicit per-request timeout
+   from the entry's fix direction are not done.
+3. **Railway's logs for 20:00–20:15 AEST are unread** — no access from the sandbox.
+4. **The device pass test needs the phone.**
+
+## Failure surfaces not exercised
+
+The device, and production. The route was not executed end-to-end — it needs an admin session — so
+what is pinned is the bucketing's equivalence and the route's use of it, measured against the real
+row count read from production rather than a guess.
+
+<a id="2026-09-23-lane-a-dv3-migration-user-race"></a>
+
+# 2026-09-23 — DV-3: the advisory lock was the wrong lock, and the race is reproducible
+
+**Branch:** `lane-a/dv3-migration-user-race` · **Lane A** · test infrastructure only. No product code,
+no migration, no schema change.
+
+## What DV-3 reported
+
+One CI failure on PR #1419 (a docs-only change): `Tests` red with
+`insert or update on table "exercise_estimates" violates foreign key constraint
+"exercise_estimates_user_id_fkey"`, 1 file of 997, **green on re-run**. The entry was explicit that
+it had read the test rather than reproduced it, and named three possible fixes.
+
+## Two of the three suggested fixes were unavailable, and the third was already in place
+
+- *"take the same advisory lock the migration runner uses"* — **the test already takes it.**
+  `personal-records-reconcile-migration.test.ts` has used `migrationTestLock` since Q-171.
+- *"move it to the `rollup`-style serial project"* — **there is no serial project.** `vitest.config.ts`
+  has `rollup` and `unit`; `rollup` differs only in its 60 s timeout, and both run files in parallel
+  workers.
+- *"scope what it runs to its own users"* — possible, but `migration-test-lock.ts`'s own header
+  argues against scoping a data migration, since table-wide is what it is for.
+
+## What the advisory lock actually covers, and the gap
+
+It serialises **migration tests against each other** — sixteen files take the key. It says nothing
+about ordinary tests. Measured: **171 test files run `DELETE FROM users`; nine of them take the
+lock.** The other 162 can delete a user at any moment.
+
+Migrations **163 and 164** both carry
+`INSERT INTO exercise_estimates … SELECT … FROM personal_records` with no user filter. At READ
+COMMITTED the `INSERT … SELECT` fixes its snapshot at statement start, so it reads a foreign user's
+`personal_records` rows, blocks on the referential-integrity check while that user's `DELETE` is
+still uncommitted, and fails the moment the delete commits.
+
+## Reproduced, not inferred
+
+Hold an uncommitted `DELETE FROM users` on a second connection, start the migration, wait until it
+is **observably blocked** (polled from `pg_stat_activity`, not slept on), then commit the delete.
+
+| | result |
+|---|---|
+| `pool.query(sql)` | `23503 exercise_estimates_user_id_fkey`, **3 of 3** |
+| `LOCK TABLE users IN SHARE MODE` first | green, **3 of 3** |
+
+## The fix
+
+`runMigrationSql(pool, sql)` in `migration-test-lock.ts` prepends `LOCK TABLE users IN SHARE MODE`
+to the migration, inside the same implicit transaction that `pool.query` of a multi-statement
+string already creates. Adopted by **both** exposed files — `personal-records-reconcile` (the one
+DV-3 named) and `cable-exercise-merge`, which carries the identical INSERT and is the file Q-171
+already recorded failing one run in three.
+
+`SHARE` is the weakest mode that conflicts with the `ROW EXCLUSIVE` a `DELETE` takes, and it is
+self-compatible, so migration tests do not block each other on it. Taking it **first** is what keeps
+it deadlock-free: ordinary tests hold only their own short `DELETE FROM users` lock and never wait
+on a table this transaction already holds.
+
+Not a retry — Q-171 forbids it, and DV-3 repeated the prohibition.
+
+## Mutation pass
+
+| # | mutation | result |
+|---|---|---|
+| 1 | lock removed entirely | killed — FK violation returns |
+| 2 | weakened to `ACCESS SHARE` (does not conflict with `DELETE`) | killed |
+| C | strengthened to `EXCLUSIVE` (still conflicts) | **survived** (correct) |
+
+Mutant 2 is the one worth keeping: it proves the test pins the lock's **conflict semantics** rather
+than the word `SHARE`, so a future "tidy-up" to a weaker mode cannot pass.
+
+## Not done, and a residual risk stated plainly
+
+- **The other 162 `DELETE FROM users` files are untouched.** This closes the two migrations that
+  insert into a user-referencing table; it does not make the shared test database safe in general.
+- **Deadlock is reduced, not proven impossible.** A test that deleted a user *and* wrote a
+  migration-touched table inside one explicit transaction could still deadlock with this lock
+  ordering. None does today. Postgres would detect it rather than hang.
+- **Failure surfaces not exercised:** none that apply — this is test infrastructure, runs only
+  against a real Postgres, and touches no product code, no device path and no UI.
+
+<a id="2026-09-23-lane-a-dv5-pending-after-push"></a>
+
+# 2026-09-23 — DV-5: four confirm arms that could never mark a pushed row synced
+
+**Branch:** `lane-a/dv5-pending-after-push` · **Lane A** · engine only, no UI, no migration.
+
+## What DV-5 reported, and what survived checking
+
+Device Verification measured 33 tombstoned `food_logs` rows on the S25, all
+`sync_status='pending'`, against an **empty** outbox — three of them from pushes that had
+returned 200. That part reproduced exactly at source.
+
+`pushMutations` confirms a drained mutation by re-reading the row through the **UI-facing
+getter** and upserting it back with `syncStatus: 'synced'`. `getFoodLogs` is
+`… WHERE date = ? AND deleted_at IS NULL`, so a delete's row is never found, the `if (rec)`
+guard silently does nothing, and the outbox entry is dropped regardless. The tombstone is then
+`pending` forever — and `applyDelta` only ever overwrites `synced` rows, so no later pull can
+correct it and the local prune (`DELETE … AND sync_status='synced'`) can never reclaim it.
+
+## The sibling sweep found three more, one of them worse than the reported one
+
+Every delete-capable domain was checked against its getter:
+
+| domain | getter filters `deleted_at IS NULL` | was broken |
+|---|---|---|
+| `food_logs` | yes | delete only — **the reported one** |
+| `injuries` | yes | delete only |
+| `supplement_logs` | yes | delete only |
+| `plan_meal_answers` | yes | **every write** — the domain had no confirm arm at all |
+| `supplements`, `saved_meals`, `activity_logs` | yes | already fixed (Q-124, Q-328) |
+
+`plan_meal_answers` is the one worth naming: it was absent from the confirm chain entirely, so
+every answer stayed `pending` after a successful push, not only the deletes — and `applyDelta`
+gates **each of that table's columns** on `sync_status='synced'`, so those rows were unreachable
+by the server from the first write.
+
+## What shipped
+
+Three new keyed marks beside the existing `markFoodLogSynced`/`markActivityLogSynced`:
+`markInjurySynced(id)`, `markSupplementLogSynced(supplementId, logDate)` and
+`markPlanMealAnswerSynced(planMealId, logDate)` — narrow `UPDATE`s that read nothing back, which
+is the whole point. `markSupplementLogSynced` carries `source='manual'` in its `WHERE`, because
+the branch that uses it cannot apply the read path's `(r.source ?? 'manual') === 'manual'`
+narrowing, and without it confirming one delete would also mark that supplement's **meal**
+contribution synced.
+
+## One existing test had to be rescoped, and it came out stronger
+
+`supplement-contribution-chain.test.ts` asserted the manual narrowing by slicing **400
+characters** after the arm's opening line. The new delete branch pushed the narrowing past that
+window and the test went red on a change it should not have cared about. It now slices to the
+arm's **real extent** (up to the next `} else if (m.domain === …)`) and additionally asserts that
+`markSupplementLogSynced`'s body contains `source='manual'` — so the delete branch is covered
+where it never was. Both halves were mutation-checked; each kills its own mutant.
+
+## Mutation pass
+
+Six mutants, all killed; two deliberately equivalent controls, both survived.
+
+| # | mutation | result |
+|---|---|---|
+| 1 | food delete branch removed | killed |
+| 2 | food delete reads `payload.foodLogId` | killed |
+| 3 | non-delete path short-circuits to the mark | killed |
+| 4 | injury delete branch removed | killed |
+| 5 | supplement log keyed on a wrong date | killed |
+| 6 | `plan_meal_answers` arm deleted entirely | killed (3 tests) |
+| C1 | `const id = …; if (id)` → `if (typeof … === 'string')` | **survived** (correct) |
+| C2 | plan-meal arm rewritten with an equivalent nullish guard | **survived** (correct) |
+
+## Not done, and not claimed
+
+DV-5 also reported **one `set_logs` row pending since 2026-09-19 whose
+`exercise_logs.workout_session_id` is not in the local `workout_sessions` table**. That is **not**
+this defect: the `workout_log` arm calls `markWorkoutSynced(wsId, exerciseLogId)`, a keyed
+`UPDATE` that reads nothing back, so a filtered getter cannot explain it. Read at source and left
+unexplained rather than assumed — carved out as **DV-8**, `Gate: device`, because nothing in the
+sandbox can open a local SQLite file.
+
+**Failure surfaces not exercised:** native SQLite (`getLocalStore` returns null under node, so
+every local-store test in this repo is either a fake-store or a source scan), the real on-device
+store, and any Samsung WebView behaviour. The proof here is source-level and unit-level; the
+**pass test in DV-5 — an empty outbox with zero pending rows — can only be run on the device.**
+
+## Queue
+
+- **DV-5** removed; **DV-8** filed for the unexplained half.
+- **LA-129 repositioned.** It had landed at the top of READY because it was filed beside the entry
+  it argued with, and queue position *is* priority here — which silently promoted a change the
+  owner had deliberately deferred. Moved below the defects, with the reason recorded in the entry.
