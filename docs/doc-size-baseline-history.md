@@ -16359,3 +16359,24 @@ Both shrink. Sweep 2 removed nine device-verified backlog entries (Q-112e, BF-99
 Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
 `known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
 back to its 52-line baseline rather than raised.
+
+---
+
+## 2026-09-23 — CLAUDE.md → 966, orchestrator baton → 78, backlog → 27110 (chore/or-139-report-triage-loop)
+
+Three rises, all growth, for the in-app report triage loop the owner asked for.
+
+**CLAUDE.md +17.** A new standing session-start read (`claude_ro.feedback_submissions`), of which
+6 lines are the `curl` block the other session-start reads also carry verbatim. The first draft was
++22 and was cut rather than baselined: it repeated the measurement detail the baton holds, and the
+orientation doc should carry the instruction while the baton carries the state.
+
+**Orchestrator baton +17.** The watermark itself, its rule for moving, and the measurement that
+justified choosing a watermark over a status column — the baton is where per-role state belongs, so
+this is the growth landing in the right file.
+
+**Backlog +71.** Two entries. `OR-137` for the screenshot-fetch route: the `claude_ro` view
+withholds `screenshot_data` and exposes only its byte length, so a reported UI bug arrives without
+the picture that is most of it. `OR-138` for reading the reporting user's own data — an auth/security
+widening the owner asked for, so it carries its reasoning, its recommended restriction and one
+explicitly unverified claim rather than a one-line instruction.
