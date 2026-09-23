@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.10",
+    date: "2026-09-23",
+    changes: [
+      "The Sleep card on Home prints its stage hours in a readable colour. Each figure was painted in its own stage's colour, and Deep's is a dark navy \u2014 on the card it was very nearly invisible. The coloured dot and the bar beside it are unchanged, so you can still tell the stages apart at a glance.",
+    ],
+  },
+  {
     version: "1.465.9",
     date: "2026-09-23",
     changes: [
