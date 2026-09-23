@@ -143,6 +143,14 @@ class Device {
     await adb(['shell', 'input', 'swipe', ...[x1, y1, x2, y2].map((v) => String(Math.round(v * dpr))), String(ms)]);
   }
 
+  // One guarded shell call, so the tap lands as soon as the swipe ends rather than after a second
+  // adb process spawns (~1.5 s in sweep 1) — BF-61's "tap immediately" cannot be tested otherwise.
+  async rawSwipeThenTap(x1, y1, x2, y2, tx, ty, { ms = 300, expectPath } = {}) {
+    const dpr = await this._guard(expectPath);
+    const px = (v) => String(Math.round(v * dpr));
+    await adb(['shell', `input swipe ${px(x1)} ${px(y1)} ${px(x2)} ${px(y2)} ${ms} && input tap ${px(tx)} ${px(ty)}`]);
+  }
+
   async bringToFront() {
     if (this.onPhone) await adb(['shell', 'am', 'start', '-n', 'com.trainingai.app/.MainActivity']);
     await sleep(2000);

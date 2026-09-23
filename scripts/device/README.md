@@ -336,3 +336,18 @@ was the reading, not the connection:
   what is deployed, not what the WebView is running.
 - **`recordNetwork({ bodies: true })`** now keeps every body; before, it needed a RegExp and threw
   on the first response.
+
+### Sweep 3's lessons (2026-09-24)
+
+- **`rawSwipeThenTap`** puts a swipe and a tap in one guarded `adb shell` call, so the tap lands as
+  the swipe ends. Two separate raw calls leave ~1.5 s between them, which is not "immediately".
+- **A `requestAnimationFrame` loop outlives the script that installed it** (no reload is allowed),
+  and it keeps writing into any shared global. Give every sampler a token
+  (`window.__tok`), check it each frame, and bump it at the end. Sweep 3's first RV-128 numbers were
+  three stacked loops.
+- **`recordNetwork`'s `t` is milliseconds since recording started**, not `Date.now()`. Mark phases
+  with `Date.now() - T0`.
+- **The Workout tab can trap the harness** (DV-16): with a finished workout, tapping another tab
+  raises "Leave workout?". Press **Stay**, never *Leave*, and leave with `go()` instead.
+- **Read the active panel, not the document** — `document.querySelector('header')` returns
+  whichever tab's header comes first. Scope to `[data-tab-active="true"]`.
