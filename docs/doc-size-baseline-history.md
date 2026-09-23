@@ -16015,7 +16015,31 @@ gate runs exited 1 with their evidence piped away to `tail -5`; this one was kep
 its own cause in the first line of the failure block. `pnpm ci:local > /tmp/gate.log 2>&1; echo $?`
 costs nothing and is the difference between a fix and a third OR-121 entry.
 
-## 2026-09-23 — backlog 27350 → 27379 (DV-6 + LB-130, +29 net)
+## 2026-09-23 — `projectOverview.md` 12476 → 12491 for DV-3, and a backlog that shrank by 20
+
+DV-3 left the queue, so the backlog moved down. `projectOverview.md` gains one Known-Issues row
+whose length is mostly the part that is **not** fixed: the advisory lock covers sixteen migration
+tests, 171 files delete users and nine of them hold it, and this change guards the **two** that
+insert into a user-referencing table rather than making the shared test database safe. Writing it
+short would have read as "the flaky migration test is fixed", which invites the next session to
+treat an identical FK failure elsewhere as new.
+
+The measured numbers are in the row on purpose — 171 against 9, and 3-of-3 red versus 3-of-3 green
+— because DV-3 itself was filed from a single observation and a reading of the test, and the entry
+that replaces it should not be re-openable on the same standard of evidence.
+
+## 2026-09-23 — `docs/implementation-backlog.md` 27230 → 27274 (OR-134)
+
+Forty-four lines recording why three different things were wearing one `Gate: device`: two circular
+gates released with what is genuinely owed after the build, three Colmi-blocked entries marked as
+not-an-S25-sitting, and three reasonless gates flagged rather than released.
+
+This is the growth side of the ratchet doing its job, and worth noting the day the slack side was
+softened (RV-134): **growth still fails at the first line over.** The asymmetry is the point — a
+document that grew needs someone to look at what was added, and forty-four lines of reasoning on an
+entry that previously said `- **Gate:** device` is a trade the index should be asked about.
+
+## 2026-09-23 — backlog 27369 → 27403 (DV-6 + LB-130, +34)
 
 Two entries move this, and neither is the code.
 

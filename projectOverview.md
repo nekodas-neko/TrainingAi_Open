@@ -2598,6 +2598,21 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ⚠️ 162 test files can delete a user under a running migration; two are now guarded (DV-3, 2026-09-23)
+
+The `migrationTestLock` advisory lock serialises the sixteen **migration** tests against each
+other. It says nothing about ordinary tests, and **171 files run `DELETE FROM users` while only
+nine take that lock**. Migrations 163 and 164 both carry an unfiltered
+`INSERT INTO exercise_estimates … SELECT … FROM personal_records`, so at READ COMMITTED the
+statement can read a foreign user's rows, block on the FK check while that user's delete is
+uncommitted, and fail with `exercise_estimates_user_id_fkey` when it commits — the one red run in
+997 files that DV-3 saw on PR #1419. Reproduced deterministically (3 of 3 red without the fix, 3 of
+3 green with it) and closed by `runMigrationSql`, which takes `LOCK TABLE users IN SHARE MODE`
+first. **Both exposed files are fixed; the underlying shared-database hazard is not.** The other
+162 files are untouched, and a test that deleted a user *and* wrote a migration-touched table in
+one explicit transaction could still deadlock — none does today. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-dv3-migration-user-race.md`](docs/overview/entries/2026-09-23-lane-a-dv3-migration-user-race.md).
+
 ### [platform][nutrition] ⚠️ Four sync confirm arms could not mark a pushed row synced — NOT device-verified (DV-5, 2026-09-23)
 
 `pushMutations` confirmed a drained mutation by re-reading the row through the UI-facing getter,

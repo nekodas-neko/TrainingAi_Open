@@ -73,12 +73,26 @@ function showAtBase(baseRef, relPath) {
   }
 }
 
+/**
+ * Both warnings go to **stdout**, and that is measured rather than stylistic (OR-134, 2026-09-23).
+ *
+ * `execFileSync`'s return value is **stdout only** — verified: a child writing to stderr does not
+ * appear in it. The ratchet scripts are spawned that way by their own tests
+ * (`strict-schema-inert.test.ts` asserts on exactly that return value), so a warning written to
+ * stderr **cannot appear in anything the test sees or reports**.
+ *
+ * That is not a cosmetic detail. Across five occurrences of the goals-route flake, "no warning
+ * fired" was taken as evidence three times — including the conclusion that the no-base path must be
+ * the one firing. It was never evidence: the diagnostic was being written where the observer
+ * structurally could not look. **A diagnostic in the wrong stream is worse than none, because its
+ * silence reads as information.**
+ */
 const warned = new Set();
 function warnUnreadable(baseRef, relPath, reason) {
   const key = `${baseRef}:${relPath}`;
   if (warned.has(key)) return;
   warned.add(key);
-  process.stderr.write(
+  process.stdout.write(
     `  base-ref: could not read ${relPath} at ${baseRef} after ${ATTEMPTS} attempts.\n` +
     `            git said: ${reason}\n` +
     `            Treating it as absent, which is STRICT. If this file is unchanged from the base,\n` +
@@ -91,8 +105,11 @@ function warnUnreadable(baseRef, relPath, reason) {
  * a shallow clone with no remote, a detached tree, an export. Callers degrade to baseline-only
  * behaviour rather than failing: a missing base is not a violation.
  */
-function resolveBaseRef() {
-  for (const ref of ['origin/main', 'FETCH_HEAD', 'main']) {
+const DEFAULT_BASE_REFS = ['origin/main', 'FETCH_HEAD', 'main'];
+
+/** `refs` is injectable so the no-base path can be tested; callers pass nothing. */
+function resolveBaseRef(refs = DEFAULT_BASE_REFS) {
+  for (const ref of refs) {
     try {
       git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
       // OR-130: a resolvable commit is not a readable tree. A shallow or partial clone can hold the
@@ -103,7 +120,30 @@ function resolveBaseRef() {
       return ref;
     } catch { /* try the next one */ }
   }
+  // OR-130 left this path silent, and it is the one that actually fires (found 2026-09-23, the
+  // fourth occurrence). `fileAtBase(null, …)` returns `null` without consulting git, so no
+  // per-file warning can reach it — and `verdict` turns a `null` base into `'fail'`. The result is
+  // a ratchet running in ABSOLUTE mode while its output still reads as a judgement about the
+  // branch: `app/api/user/goals/route.ts`, byte-identical to `main`, named as this branch's new
+  // violation.
+  //
+  // Saying so does not change any verdict. Absolute mode is stricter than the base-aware one and
+  // stays exactly as it is; what changes is that a reader can tell which mode produced the answer
+  // they are looking at, which is the whole of this defect.
+  warnNoBase(refs);
   return null;
+}
+
+let noBaseWarned = false;
+function warnNoBase(refs) {
+  if (noBaseWarned) return;
+  noBaseWarned = true;
+  process.stdout.write(
+    `  base-ref: no base branch resolved (tried ${refs.join(', ')}) — the ratchets are\n` +
+    '            comparing against their BASELINE only, with no "is this the branch\'s growth?"\n' +
+    '            check. That is STRICTER, not weaker: a file already over its number on main will\n' +
+    '            be reported against whatever branch runs next. Re-run after `git fetch origin main`\n' +
+    '            before treating any failure below as your own.\n');
 }
 
 /**
@@ -253,6 +293,6 @@ function verdict({ count, limit, atBase }) {
 }
 
 module.exports = {
-  resolveBaseRef, fileAtBase, showAtBase, lineCountAtBase, countAtBase, dirNamesAtBase,
+  DEFAULT_BASE_REFS, resolveBaseRef, fileAtBase, showAtBase, lineCountAtBase, countAtBase, dirNamesAtBase,
   materialiseBaseTree, cleanupBaseTree, verdict,
 };

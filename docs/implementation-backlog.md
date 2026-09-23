@@ -1057,26 +1057,6 @@ below threshold and left in place for next time.
   in `scripts/device/pw.js`), the Sleep screen's consistency figure does not change.
 
 
-### [platform] DV-3 — the migration-163 test runs a whole-table migration against a database other test files are changing, and fails on their users
-
-- **Lane:** A — `lib/data/postgres/__tests__/personal-records-reconcile-migration.test.ts`.
-- **Added:** 2026-09-23 · Device Verification — seen on PR #1419's CI, a docs-only change.
-- **Observed once:** `Tests` failed with `insert or update on table "exercise_estimates" violates
-  foreign key constraint "exercise_estimates_user_id_fkey"` at the test's `await run()` (line 130),
-  1 of 997 files. **Re-run of the same commit: green.** `main`'s last four CI runs were green.
-- **Why it can happen (read from the test, not reproduced):** `run()` applies migration 163, which
-  reconciles `personal_records` into `exercise_estimates` for **every** user, not only this file's
-  `USER_A`/`USER_B`. All of `lib/data/postgres/__tests__` shares one database, and many files create
-  a user in `beforeAll` and `DELETE FROM users` in `afterAll`. If one of those users is deleted
-  mid-migration, the migration inserts an estimate for a user that no longer exists.
-- **Fix direction:** scope what the test asserts *and* what it runs to its own users — run the
-  migration's statements under a `WHERE user_id = ANY(…)` test harness, or take the same advisory
-  lock the migration runner uses, or move it to the `rollup`-style serial project. Do not add a
-  retry: that hides the next genuine failure in this file.
-- **Pass test:** the file cannot see another test's users — e.g. inserting and deleting a foreign
-  user in a parallel file during `run()` leaves it green.
-- **Not a device check.**
-
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
 - **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
@@ -5107,7 +5087,15 @@ composite reports which of its inputs were inferred.
 ### [devices] LA-115 — Health Connect reads three record types the plugin cannot parse, and fails silently on all three
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-44's investigation.
-- **Gate: device** — needs a new APK and an on-device Health Connect permission grant.
+- **✅ GATE RELEASED 2026-09-23 (OR-134) — it was CIRCULAR, the same shape as BF-165 and LA-49.**
+  It read *"needs a new APK and an on-device Health Connect permission grant"*. Both are true and
+  neither blocks the work: the fix is a patch to the pinned plugin's `RecordConverter`, which is
+  Kotlin and compile-gated in the sandbox like every other `android/**` change. The APK and the
+  permission grant are how the fix is **verified**, and they can only happen *after* it is built —
+  so the gate parked the build behind its own verification and nothing could ever discharge it.
+- **Verification once built:** `Verify: device` — install the APK, grant Health Connect, and prove a
+  non-null value for each of the three types lands in its column. Per the external-field rule, a
+  wrong key reads as `undefined` and fails silently, so a green build proves nothing here.
 - **Review:** [`the source read`](reviews/2026-09-16-health-connect-record-converter-gap.md).
 - **⚠ This supersedes TN-44's framing.** That entry files the work as "add ten types to
   `HC_SYNC_READ_TYPES`". The list is not the wall — see TN-44 as re-scoped below.
@@ -5315,7 +5303,14 @@ composite reports which of its inputs were inferred.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner supplied the Health Connect type list.
 - **Lane: A**
-- **Gate: device** — every new type needs a plugin patch and a new APK.
+- **✅ GATE RELEASED 2026-09-23 (OR-134) — circular, and it contradicted this entry's own owner
+  decision.** It read *"every new type needs a plugin patch and a new APK"* — which is the
+  description of the WORK, not a reason it cannot start. The plugin patch is the deliverable; the
+  APK is how it is checked afterwards. And the owner decided on 2026-09-17, recorded below, **not to
+  block** and to build against synthetic data. A gate contradicting a decision written eight lines
+  under it is the clearest case of a field nobody re-read.
+- **Verification once built:** `Verify: device` — on the APK, with the synthetic-data caveat this
+  entry already states.
 - **Review:** [`review`](reviews/2026-09-15-base-data-reachability-and-composites.md), and
   [`the plugin source read`](reviews/2026-09-16-health-connect-record-converter-gap.md) which
   **re-scoped this entry on 2026-09-16**.
@@ -11569,6 +11564,10 @@ statistics when two units differ and names them in `unitsDiffer`, and `spearman`
 - **Gate:** device — ⚠ **re-scoped 2026-09-22: the ring is with a second wearer, so the OWNER cannot
   run this walk.** It is blocked on whoever holds the ring, or on its return. Do not read the gate as
   "the owner has not got round to it" — PS-15's steps half waits behind it via `Needs:`.
+- **⚠ NOT A DEVICE-VERIFICATION SITTING (OR-134, 2026-09-23).** The gate names the **Colmi R09**,
+  not the S25. The Device Verification agent cannot discharge it with the phone in hand, so it must
+  not be counted as owed device-check work — it is blocked on hardware returning. Same for `PS-8`
+  and `PS-9`.
 
 The four buckets 07:00–10:00 on 2026-08-27 read 485 → 876 → 1128 → 1524, then 11:00 reads 55. Read
 per-bucket the day totals **4562** steps; read as a running total that resets, **2073**. Oura says
@@ -11637,6 +11636,13 @@ the connection and to try again shortly, rather than implying the ring is absent
 
 - **Lane:** A
 - **Gate:** device
+- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
+  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
+  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
+  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
+  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
+  released here**: un-gating on the assumption it is circular would be the same unchecked move that
+  created the problem. Whoever next touches PS-12 writes the reason or removes the gate.
 - **Needs:** PS-11
 - **Plan:** [`multi-device-comparison.md`](multi-device-comparison.md) — read it before running this;
   most of the ways to get a wrong number here are listed in it.
@@ -11694,6 +11700,10 @@ is public. That is a materially different proposition from "a cheap second opini
   The pairing card is the only Lane-B surface and rides with it, as the scale and strap did.
 - **Gate:** device — **Phase 0 cannot start without the physical R09 in hand**, and every later
   phase is conditional on it passing
+- **⚠ NOT A DEVICE-VERIFICATION SITTING (OR-134, 2026-09-23).** This gate names the **Colmi R09**,
+  not the S25, and the R09 is with a second wearer (see PS-16). The Device Verification agent cannot
+  discharge it by picking up the phone, and it must not be read as owed device-check work. It is
+  blocked on hardware returning, which no sitting and no lane can hurry.
 - **Plan:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
 - **Added:** 2026-08-26 · one-off session, from an owner request for a deployment plan plus a
   guarantee that the ring *"wont affect scoring of anything I have going"*
@@ -23839,6 +23849,13 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 - **Lane:** B
 - **Gate:** device
+- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
+  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
+  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
+  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
+  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
+  released here**: un-gating on the assumption it is circular would be the same unchecked move that
+  created the problem. Whoever next touches Q-168 writes the reason or removes the gate.
 
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
   entry is removed per this file's own rule that a finished item must never linger.
@@ -25844,6 +25861,13 @@ against yet. Blocked on real-data capture, not code.
 
 - **Lane:** A
 - **Gate:** device
+- **⚠ THIS GATE STATES NO REASON, so nobody can discharge it (OR-134, 2026-09-23).** `Gate: device`
+  with no clause after it cannot be evaluated: it does not say whether the phone is needed to BUILD
+  this, to CHECK it, or because it waits on hardware — and those three lead to opposite next
+  actions. Two of its neighbours turned out to be circular gates parking buildable work (`LA-115`,
+  `TN-44`), and one guards hardware that is not in the building (`PS-8`). **Deliberately not
+  released here**: un-gating on the assumption it is circular would be the same unchecked move that
+  created the problem. Whoever next touches Q-7b writes the reason or removes the gate.
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
 > every column in the table against 82 rows rather than spot-checking: **`active_calories_est`,

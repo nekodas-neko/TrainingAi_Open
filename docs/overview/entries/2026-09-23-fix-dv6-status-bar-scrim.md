@@ -75,22 +75,20 @@ Also filed: **LB-130** — `docs/doc-size-baseline-history.md` is now the guaran
 that `.size` used to be, on the same append-to-one-shared-file shape LA-33 and RV-134 already
 fixed twice. Measured across five re-merges of #1449 in an hour.
 
-## The journal compaction sweep rode along, because the guard said it was mine
+## The compaction sweep was run, and then handed back
 
-Merging `main` took `docs/overview/entries/` past the 60-foldable runaway limit, and since BF-36
-that guard fails only a branch that **adds** an entry — which every feature PR does, so it lands on
-whoever is holding the door. `node scripts/fold-journal-entries.js` folded **40 entries** into
-`history-2026-09-23-folded-1.md`, rewriting citations in three durable docs
-(`projectOverview.md` and the heart-rate and readiness domain indexes). Six were held back because
-an agent baton cites them; rewriting another lane's live state file races whatever that lane is
-doing.
+Merging `main` took `docs/overview/entries/` past the 60-foldable limit, and since BF-36 that guard
+fails only a branch that **adds** an entry — which every feature PR does, so it lands on whoever is
+holding the door. This branch ran `scripts/fold-journal-entries.js`, folded 40 entries, and both
+link checks came back clean.
 
-Verified the way the README insists on rather than by reasoning about which links moved:
-`check-doc-links` OK across 823 files, `check-index-doc-paths` OK across 1,176 paths. The second
-one matters because it catches the trap the first cannot see — a citation whose link *text* is also
-the path, where repointing the target leaves the backticked text naming a file that no longer
-exists.
+**None of that is in this diff, because #1447 ran its own sweep at the same time and landed first.**
+The two folds collided as an add/add conflict on `history-2026-09-23-folded-1.md`, each holding a
+different set of entries. Hand-merging two folds is precisely how a journal entry gets silently
+duplicated or dropped, so this branch discarded its own fold, took `main`'s state wholesale, and
+re-checked: `main`'s sweep had already cleared the guard, so nothing was owed. The only file this PR
+adds under `docs/overview/` is its own journal entry.
 
-Folded the full 40 rather than the minimum needed to clear the limit: a sweep across N files is
-already a batch, and stopping at the threshold hands the same failure to the next PR within the
-hour.
+**The reusable part is the resolution, not the sweep.** Two sessions folding on the same day write
+the same `history-<date>-folded-N.md`, and `git` surfaces it as add/add rather than as anything
+resembling "you both did the chore". Take one side whole and re-run the script; never splice.
