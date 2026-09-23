@@ -15844,6 +15844,21 @@ check-in outright rather than surface a mistake, deleting something the user alr
 reasoning is in `adapter.ts` beside the parse, and here, because those are the two places someone
 would look before changing it.
 
+## 2026-09-22 — `docs/implementation-backlog.md` → 26340, `projectOverview.md` → 12391 (RV-99, half)
+
+The backlog GROWS on an entry that shipped half its work, which is the right direction here. RV-99
+was one heading covering two jobs of very different size — retargeting `scoreBand()` (11 consumer
+files, done) and migrating 183 hardcoded hexes across 68 files (not done). The rewritten entry costs
+lines because it now carries three things the original did not: the corrected file count, the four
+modules whose hex is an identity colour and must NOT be migrated, and the hazard that actually
+blocked the work.
+
+That last one is why this is worth the space. The entry warned about Chart.js canvas and
+`resolveColor()`; no consumer touches a canvas. What would have broken is `accentCardStyle`, which
+returned a bare background with no gradient, no border and no error for any non-hex input. A future
+session reading only the original entry would check for canvases, find none, and ship the silent
+regression.
+
 ## 2026-09-23 — `CLAUDE.md` → 890 and `docs/implementation-backlog.md` → 27179 (OR-126)
 
 **CLAUDE.md +13**: the Oura raw-archive rule said `oura_raw_samples.body_hex` was the server's
