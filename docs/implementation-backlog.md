@@ -827,39 +827,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
 - **Not established:** how many *new* sites a widened pattern would surface — the four above were
   found by hand, not by a candidate scan.
 
-### [heart-rate][app-shell] RV-106 — a ring sync updates Home's HR strip and leaves Health's HR card on pre-sync data
-
-- **Lane:** B — `components/health/hr-day-card.tsx:39-51`. **Added:** 2026-09-22 · Review sweep 53.
-- **Batch:** `stale-surface-subscribe`
-- `invalidateOuraSync()` clears `oura-hr-day:` and Home's reader is gated on `refreshTick`, which the
-  `ta:oura-ble-synced` listener bumps. Health's reader is `cachedFetch` in a `useEffect(…, [today])`
-  on a card the shell mounts once and never unmounts, and `health-content`'s invalidation
-  subscription covers `body-metadata`/`sleep-sessions`/`readiness-score` — **not this key**. Neither
-  `fetchSharedHealthData` nor `fetchActiveTabHealthData` fetches it, so the `tabEpoch` pass does not
-  reach it either.
-- **Two surfaces, same quantity, one updates.** A tab switch does **not** fix it; recovery needs a
-  shell remount (a non-tab route and back), midnight rollover, or a restart.
-- **Fix:** `useInvalidationRefetch(['oura-hr-day:', 'workout-sessions-day:'], load)` — the in-repo
-  escape hatch for a read that also seeds and sets several pieces of state.
-- **Not established:** whether `useStressDay(today)` in the same card shares the gap — not traced.
-
-### [nutrition][app-shell] RV-107 — editing macro targets leaves the Nutrition screen banding against the old numbers
-
-- **Lane:** B — `app/nutrition/nutrition-content.tsx:262-265`. **Added:** 2026-09-22 ·
-  Review sweep 53.
-- **Batch:** `stale-surface-subscribe`
-- `macro-targets-pane.tsx:101-107` POSTs and then awaits `invalidateGoalRecommendations()`, which
-  clears `nutrition-targets`. Nutrition reads that key inside the same mount-scoped `fetchMountData`
-  as RV-104, at `TTL_LONG`, and nothing subscribes — so the macro rings keep banding against the
-  previous target for the life of the app. Applying a goal recommendation from Home routes through
-  the same group and has the same result.
-- **⚑ The proof the refetch is needed is already in the file:** the TDEE card's `onApplied`
-  (`:637`) refetches — a different write path that *did* get the treatment. One path was fixed, its
-  siblings were not.
-- **Fix:** `useInvalidationRefetch('nutrition-targets', …)` rather than `useCachedValue` here —
-  `targets` is currently set from two places, and the repo's one-fetch-expression-per-key rule
-  (`packages/shared/src/cache-ttl.ts`) makes the hook the smaller change.
-
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
 - **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
@@ -880,22 +847,6 @@ IS in the queue but below the cut-off no longer comes back empty without explana
 - **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
   for a body-metrics delta on the device that wrote it. If it does, the window is shorter than TTL
   but still non-deterministic.
-
-### [activity][app-shell] RV-109 — Health's Activity History never shows an activity confirmed from Home
-
-- **Lane:** B — `components/health/activity-history-card.tsx:72-107`. **Added:** 2026-09-22 ·
-  Review sweep 53.
-- **Batch:** `stale-surface-subscribe`
-- Seed plus two `cachedFetch` calls in a `useEffect(…, [userId])`. All three Health sub-tabs render
-  simultaneously inside the `SwipeCarousel`, so the card is mounted for the life of the shell once
-  Health is visited, and nothing in the `tabEpoch` pass fetches `activity-logs`.
-- So an activity reviewed from Home (`exercise-review-sheet.tsx:219` fires
-  `invalidateActivityWrites()`) or arriving via background sync never appears until a shell remount.
-  A walk logged through `/activity` self-heals **only because that route change unmounts the shell**
-  — which is why this looks intermittent rather than broken.
-- **Fix:** `useInvalidationRefetch(['activity-logs','activity-types'], load)` — the card seeds from
-  the local store and merges pending rows, the case that hook's docblock says `useCachedValue`
-  cannot own.
 
 ### [app-shell][platform] RV-110 — 37 cross-tab `router.push` sites tear down the whole tab shell; 5 use the helper that does not
 
