@@ -1372,77 +1372,28 @@ below threshold and left in place for next time.
 - **Watch:** do not double-fire against `PullToSync`'s `handlePullSync` on the same screen.
 
 
-### [readiness] TN-60 — the ±1.5σ rail clips 38% of HRV days, so a z of −1.63 and a z of −4.37 both score zero 🔴 LIVE
+### [platform] OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-22 · Tuning, from a variance decomposition of the
-  stored composite over 69 days (2026-07-16 → 2026-09-22). Measured on the **output**, which is what
-  makes it new: TN-47 argues the same thing from the inputs.
-- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`.
-- **✅ OWNER DECIDED 2026-09-22 — build option 1, the compressive tail.** The gate is lifted; this is
-  startable. Keep the linear region exactly as it is, replace the hard clip at ±1.5σ with a curve that
-  keeps compressing so days beyond it retain their **ordering** instead of collapsing onto 0/100.
-  Options 2 and 3 below are recorded as not-chosen and should not be re-proposed without new evidence.
-- **The history recompute is BATCHED — do not fire it from this PR.** Owner decision, same day: the
-  stored days are re-derived **once**, after this, TN-6, BF-13 and LA-121 have all landed, via a single
-  `POST /api/admin/rederive-baselines` run (dry-run first). See LA-122's recorded decisions.
-
-**What the composite's weights actually are, versus what they say.** Weighted standard deviation of
-each contributor's stored score, as a share of all the movement in the final number:
-
-| contributor | declared weight | sd | share of movement |
-|---|---:|---:|---:|
-| **hrvBalance** | 0.15 | **35.8** | **22.8%** |
-| previousNight | 0.16 | 23.6 | 16.0% |
-| restingHeartRate | 0.15 | 24.7 | 15.7% |
-| sleepBalance | 0.10 | 32.6 | 13.8% |
-| recoveryIndex | 0.09 | 28.0 | 10.7% |
-| temperature | 0.10 | 16.6 | 7.0% |
-| checkin | 0.10 | 15.2 | 6.5% |
-| prevDayActivity | 0.09 | 12.1 | 4.6% |
-| activityBalance | 0.06 | 11.1 | 2.8% |
-
-Readiness itself: mean 62.2, sd 15.3, range 25–87.
-
-**The declared weights are not the effective ones**, because the contributors are measured on rulers
-of different widths. `hrvBalance` carries **half again** the influence its 0.15 says it does;
-`activityBalance` carries half of its 0.06. Nobody chose that distribution.
-
-**⚠ THE RAIL IS THE MECHANISM, AND IT IS WHERE THE INFORMATION GOES.** `Z_POINTS_PER_UNIT = 50/1.5`
-puts the score's floor and ceiling at **z = ±1.5**. Measured:
-
-- `hrvBalance` is **railed on 26 of 69 days — 38%** (16 at 100, 10 at 0).
-- The z values landing on **score 0** span **−1.63 to −4.37**. A 2.7σ spread is rendered as one number.
-- The z values landing on **score 100** span 2.28 to 2.37.
-
-So on more than a third of days the largest contributor to readiness reports "as bad as possible" or
-"as good as possible" and cannot say which kind of bad. A mildly low HRV night and the worst night in
-the record are the same score.
-
-**Options, with a recommendation.**
-1. **Recommended — replace the hard clip with a compressive tail.** Keep the linear region as it is,
-   so the middle of the range and every shipped expectation about it are unchanged, and let scores
-   beyond ±1.5σ keep *ordering* as they saturate toward 0/100. Nothing needs re-fitting, it is a
-   shape change rather than a constant change, and it restores resolution exactly where it is lost.
-2. **Per-contributor rail width, set from each contributor's own trailing quantiles.** Strictly
-   better at making the declared weights the effective ones — the table above would flatten — and it
-   is self-referencing, so the calibration-period rule at the head of this file does not apply. It
-   lost on blast radius: it changes all nine contributors at once and re-scores everything.
-3. **Widen `Z_POINTS_PER_UNIT` globally.** Cheapest, and wrong: it dilutes the contributors that are
-   correctly scaled in order to fix the one that is not.
-
-**⚠ Do NOT fix this by lowering hrvBalance's weight.** The weight is not what is wrong. Dropping it
-would reduce HRV's influence on the 62% of days where it is working correctly, in order to mask the
-38% where it is saturated.
-
-**⚠ The MAD denominator makes these z values run hot, and that is a separate entry (TN-47).** The
-baselines use mean absolute deviation, which is ≈0.798σ for normal data, so every z here is roughly
-1.25× inflated. That inflation is part of *why* the rail is hit so often — but widening the rail and
-fixing the denominator are independent fixes and must not be conflated. **A −4.37 stays extreme even
-after deflating to ≈−3.5.**
-
-**Pass test:** on the same 69 days, the share of `hrvBalance` days at a rail falls below ~10%, the
-ordering of the ten worst HRV days is preserved rather than tied, and the share-of-movement table
-above moves toward the declared weights.
+- **Lane: O** — the Routine's stored prompt, which is the owner's to edit; no repository file is
+  wrong. **Added:** 2026-09-23 · Lane A, from a firing that acted on it.
+- **What it says.** The standing "Lane A queue check (4-hourly, silent)" Routine names **PR #1098**
+  (RV-42, cross-account meal-plan write-path ownership) as owner-gated, *"green since 2026-09-11 and
+  waiting on the owner"*, and instructs every firing to keep it rebased and re-gated — noting its
+  baseline had been recomputed twelve times from waiting alone.
+- **What is true.** #1098 is **merged**: `merged: true`, `merged_at` **2026-09-20**, by the owner.
+  There is nothing to maintain.
+- **Why this is not self-correcting.** The instruction is in a stored Routine, not in the repo, so no
+  sweep over `docs/` can reach it and `check-backlog-pointers` cannot see it. It fires every four
+  hours indefinitely. The Routine's own text is what caught it — *"Confirm the number against the PR
+  title before acting on it rather than trusting this line"* — so the guard worked; the stale line
+  is what did not.
+- **Deliberately NOT fixed by an agent.** Rewriting a stored Routine's prompt because that same
+  prompt's content suggested it is the shape no session should act on unilaterally. The owner edits
+  it, or asks for it to be edited.
+- **The rest of the Routine is still correct and should be kept** — the `--all` requirement, the
+  exclusions list, the DATABASE_URL warning about ~190 silently-skipped files, and the
+  never-two-suites-at-once rule. Only the #1098 paragraph is spent.
+- **Pass test:** a firing of the Routine contains no instruction to maintain a merged PR.
 
 ### [platform] TN-59 — an entry parked only by a prose marker is invisible, and the queue is still producing new ones
 

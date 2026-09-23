@@ -66,14 +66,20 @@ describe('computeReadinessComposite', () => {
     expect(result.contributors.recoveryIndex).toEqual({ score: 50, provisional: true, input: null, gap: 'no_input' })
   })
 
-  it('clamps sub-scores to [0, 100]', () => {
+  it('keeps sub-scores inside [0, 100], and z-driven ones approach the rail without landing on it', () => {
     const result = computeReadinessComposite({
       rhrZ: -10, hrvZ: 10, tempZ: 0, sleepBalanceZ: null,
       previousNightScore: 500, prevDayActivityScore: -500, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
-    expect(result.contributors.restingHeartRate.score).toBe(100)
-    expect(result.contributors.hrvBalance.score).toBe(100)
+    // TN-60: a z-driven contributor no longer CLAMPS, it compresses. Even ±10σ stays a hair short
+    // of the rail, which is the whole mechanism — a score sitting exactly on 100 is a score that
+    // has stopped carrying information about how far past the edge the day was.
+    for (const c of [result.contributors.restingHeartRate, result.contributors.hrvBalance]) {
+      expect(c.score).toBeGreaterThan(95)
+      expect(c.score).toBeLessThan(100)
+    }
+    // Plain (already-0-100) inputs are NOT z-driven and still hard-clamp — untouched by TN-60.
     expect(result.contributors.previousNight.score).toBe(100)
     expect(result.contributors.prevDayActivity.score).toBe(0)
   })
@@ -87,27 +93,86 @@ describe('computeReadinessComposite', () => {
     expect(result.score).toBe(50)
   })
 
-  // Recalibration (2026-07-22, W-D): baseline terms now reach a full 100 at +1.5σ (was +2.5σ), and
-  // the weights sum to exactly 1.00, so a genuinely great day + a good check-in can reach a true 100.
-  it('reaches a full 100 sub-score at +1.5σ (softened z-scaling)', () => {
-    const r = computeReadinessComposite({
-      rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
+  // 2026-07-22 (W-D) moved the rail from ±2.5σ to ±1.5σ so a great day could reach a true 100.
+  // TN-60 (2026-09-23) replaced the rail itself: ±1.5σ now scores 90, and the remaining 10 points
+  // are spent giving the days BEYOND it their ordering back. That is the trade the owner chose —
+  // 38% of hrvBalance days were sitting on a rail, with z from −1.63 to −4.37 all reading 0.
+  // **The floor is the half TN-60 was actually filed about, so it gets its own case.** The entry's
+  // measurement is of days scoring ZERO — hrvBalance z from −1.63 to −4.37, all rendered as 0. A
+  // mutation run proved this was worth writing separately: deleting the lower tail outright, so the
+  // floor hard-clips exactly as before, passed all 1004 tests in this package. Every case here
+  // exercised the ceiling.
+  it('scores 10 at −1.5σ and keeps FALLING beyond it, instead of railing at 0', () => {
+    const at = (z: number) => computeReadinessComposite({
+      rhrZ: null, hrvZ: z, tempZ: null, sleepBalanceZ: null,
+      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      nHistory: FULL_HISTORY,
+    }).contributors.hrvBalance.score
+
+    expect(at(-1.5)).toBe(10)
+
+    // The seven worst days the entry measured. Under the old clip all seven read 0.
+    const worst = [-1.63, -1.9, -2.2, -2.6, -3.1, -3.6, -4.37].map(at)
+
+    // Non-increasing, not strictly decreasing. The 20-point band separates SIX of these seven —
+    // that is the number the width was chosen on — so one adjacent pair ties after rounding, and
+    // asserting a strict drop on every pair pins float noise rather than the design. A
+    // mathematically identical rewrite of the tail moved which pair ties; the contract did not.
+    for (let i = 1; i < worst.length; i++) {
+      expect(worst[i], `a worse day scored HIGHER: ${worst.join(',')}`)
+        .toBeLessThanOrEqual(worst[i - 1])
+    }
+    expect(new Set(worst).size, `expected 6 of 7 separated, got ${worst.join(',')}`)
+      .toBeGreaterThanOrEqual(6)
+    // The part that is absolute: nothing lands on the rail any more.
+    expect(Math.min(...worst), `something still railed at 0: ${worst.join(',')}`).toBeGreaterThan(0)
+  })
+
+  it('scores 90 at +1.5σ and keeps rising beyond it, instead of railing', () => {
+    const at = (z: number) => computeReadinessComposite({
+      rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
       previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
-    expect(r.contributors.restingHeartRate.score).toBe(100)
-    expect(r.contributors.hrvBalance.score).toBe(100)
-    expect(r.contributors.sleepBalance.score).toBe(100)
+    const edge = at(1.5)
+    expect(edge.contributors.restingHeartRate.score).toBe(90)
+    expect(edge.contributors.hrvBalance.score).toBe(90)
+    expect(edge.contributors.sleepBalance.score).toBe(90)
+
+    // The point of the change: past the old rail, worse/better days remain distinguishable.
+    const scores = [1.6, 2.0, 2.6, 3.4, 4.4].map(z => at(z).contributors.hrvBalance.score)
+    for (let i = 1; i < scores.length; i++) {
+      expect(scores[i], `z grew but the score did not: ${scores.join(',')}`)
+        .toBeGreaterThan(scores[i - 1])
+    }
+    // Under the old hard clip every one of these was exactly 100.
+    expect(new Set(scores).size).toBe(scores.length)
   })
 
-  it('lets a genuinely perfect day with a good check-in reach 100', () => {
+  // **TN-60 makes 100 unreachable, and that is the cost of the change rather than a bug.** A
+  // saturating curve and a reachable ceiling are mutually exclusive: the ceiling IS the rail. A
+  // 1.5σ-on-everything day now reads ~95 rather than 100, because the z-driven contributors carry
+  // 0.59 of the weight and each tops out at 90 there. Milder than the ~86 the 2026-07-22 note
+  // called a defect, and reversible with one constant (TAIL_BAND_POINTS).
+  it('puts a genuinely perfect day just under the ceiling rather than on it', () => {
     const r = computeReadinessComposite({
       rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
       previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
       recoveryIndexHours: 6, checkinScore: 100,
       nHistory: FULL_HISTORY,
     })
-    expect(r.score).toBe(100)
+    expect(r.score).toBe(95)
+  })
+
+  it('still rewards a day better than 1.5σ on every axis — the ceiling is approached, not hit', () => {
+    const at = (z: number) => computeReadinessComposite({
+      rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
+      previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
+      recoveryIndexHours: 6, checkinScore: 100,
+      nHistory: FULL_HISTORY,
+    }).score
+    expect(at(3)).toBeGreaterThan(at(1.5))
+    expect(at(3)).toBeLessThan(100)
   })
 
   it('maps the check-in as a contributor; a good one lifts the composite over a drained one', () => {
@@ -123,14 +188,15 @@ describe('computeReadinessComposite', () => {
   })
 
   it('caps below 100 without a check-in but never tanks readiness for skipping it', () => {
-    // No check-in → neutral 50 → a perfect-biometrics day tops out ~95 (check-in unlocks the last 5).
+    // No check-in → neutral 50 → a perfect-biometrics day tops out at 90 (check-in unlocks the last
+    // 5, same relationship as before TN-60 — both ends simply moved down with the tail).
     const r = computeReadinessComposite({
       rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
       previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
       recoveryIndexHours: 6,
       nHistory: FULL_HISTORY,
     })
-    expect(r.score).toBeGreaterThanOrEqual(94)
+    expect(r.score).toBeGreaterThanOrEqual(89)
     expect(r.score).toBeLessThan(100)
   })
 

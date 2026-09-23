@@ -2598,6 +2598,24 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness] ⚠️ Readiness no longer reaches 100, and that is the price of TN-60 — stored days unchanged until the batched recompute
+
+The hard clip at z = ±1.5 was where the information went: over 69 days `hrvBalance` (22.8% of all
+movement in readiness) sat on a rail on **26 of them (38%)**, with the z values scoring 0 spanning
+**−1.63 to −4.37** — 2.7σ as one number. It is now a compressive tail (owner decision 2026-09-22,
+option 1; band chosen 2026-09-23). **The entry's claim that this needed no constant was wrong**:
+integer rounding means the tail must be paid for out of the linear region, and a 5-point band
+separates only 3 of the 7 worst days against 6 for a 20-point band. 20 was chosen from that table.
+⚠️ **The consequence to know about: a saturating curve and a reachable ceiling are the same thing.**
+A contributor at ±1.5σ now scores 90/10 rather than 100/0; a perfect day with a good check-in reads
+**95**, without one **90**; an integer 100 would need ~23σ. That is milder than the ~86 the
+2026-07-22 note called a defect, and it reverses with one constant (`TAIL_BAND_POINTS`).
+**Not yet true of stored history:** `READINESS_MODEL_VERSION` is `v4:tail20:2026-09-23`, but the
+re-derivation is deliberately batched behind TN-6, BF-13 and LA-121, so existing rows keep their old
+scores and the pass test's "share-of-movement moves toward the declared weights" is **not claimed**
+until that single run. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-tn60-compressive-tail.md`](docs/overview/entries/2026-09-23-lane-a-tn60-compressive-tail.md).
+
 ### [platform][nutrition] ⚠️ A failed refresh of a cached key was unreportable — NOT device-verified (LB-128, 2026-09-23)
 
 `cachedFetchCore` gated `onError` on `cached === null` in **both** failure branches and skipped
