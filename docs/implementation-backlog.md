@@ -473,6 +473,94 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell][platform] RV-137 — DEVICE PROBE: cold start and per-tab time-to-interactive, measured rather than felt
+
+- **Verify:** device — **no build half**; the measurement is the work. Method: **P11** in
+  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md). **Added:** 2026-09-23 ·
+  Review, at the owner's request for device checks on load efficiency and timing.
+- **The falsifiable claim:** every tab reaches first real content within **300 ms warm** and the
+  cold start's `first-contentful-paint` is within **1.5 s**. Report the actual numbers either way —
+  a pass is as useful as a fail here, because nothing has a baseline yet.
+- **This is now measurable without a recording**, which is why it was not done before:
+  `performance.getEntriesByType('navigation')` and `('paint')` survive for the life of the page, so
+  attaching *after* a normal cold start loses nothing. `device-perf-profiling-checklist.md` records
+  that mechanic; it had no agent to run it.
+- **Why it matters now:** Q-51's premise softened to *"Its mostly fine; I'd still like it to be
+  faster if possible"* and Q-147 closed on *"Seems good now"*. Both are impressions. If they are
+  right, this closes the perf thread with evidence; if a number disagrees with them, that is worth
+  more than either.
+
+### [app-shell][workouts] RV-138 — DEVICE PROBE: is Q-51's 1086 ms first mount a rule or a one-off?
+
+- **Verify:** device — no build half. Method: **P12**. **Added:** 2026-09-23 · Review.
+- **The one measured perf number in the whole queue is a single observation.** Q-51: `/workout`
+  visited five times in one session — **four at ~100 ms, one at 1086 ms, all warm.** It is read as a
+  first-mount cost, and that reading is what the remaining file-splitting work rests on.
+- **The falsifiable claim:** across ten warm visit/leave/return cycles per route, the **first** mount
+  is no more than 2× the median of the rest. FAILED means the outlier is structural and the
+  file-splitting work has its justification; passing means 1086 ms was noise and **Q-51 should be
+  re-placed, not built.**
+- Report the full list of durations per route, never a mean — one outlier in ten is invisible in an
+  average, which is exactly how this started.
+- **Pair each outlier with P14's long tasks and P13's in-flight requests.** An outlier with neither
+  is a different defect from one with both, and the entry cannot be actioned without knowing which.
+- **⚠ Q-51 says *"measure before refactoring" is now MORE binding, not less*** — a large refactor is
+  a poor trade against "mostly fine". This probe is what makes that decision, so do not start the
+  refactor on the strength of the single 1086 ms reading.
+
+### [platform][app-shell] RV-139 — DEVICE PROBE: the per-screen network waterfall, and how much of it is serial
+
+- **Verify:** device — no build half. Method: **P13**; `scripts/device/pw.js` already instruments
+  the Network domain. **Added:** 2026-09-23 · Review.
+- **The falsifiable claims, per screen:** no `/api/*` endpoint is requested **twice** for one screen;
+  no request chain is deeper than **two** (a request that only starts once an earlier one finishes).
+- **Chain depth is the number to hunt.** Three requests in parallel cost one round trip; three in
+  series cost three, and on a phone that is the whole difference between instant and not. Depth is
+  invisible to every source-reading sweep because it depends on what awaits what at runtime.
+- Report request count, `/api/*` count, total bytes and the largest single response per screen.
+- **Cross-checks that already exist:** RV-78 says `/api/next-session` serialises two independent
+  queries, and RV-82 says two routes fetch the active program twice inside one request. Both are
+  server-side and were found by reading; this probe says whether the device sees them as latency.
+
+### [app-shell][platform] RV-140 — DEVICE PROBE: main-thread long tasks, and whether animations still dominate
+
+- **Verify:** device — no build half. Method: **P14**. **Added:** 2026-09-23 · Review.
+- **The falsifiable claim:** no interaction — cold start, tab switch either direction, a scroll of
+  Home or Health — produces a single main-thread task over **50 ms**, and no interaction's total
+  blocked time exceeds **200 ms**.
+- **Check the prior finding rather than rediscovering it:** a device profile once attributed
+  **21.3% of main-thread time to `animationiteration`**, which is why the repo pauses animations at
+  all. Confirm that is still true and report what dominates now if it is not.
+- This is the probe RV-113 needs as evidence and does not have: its cross-dissolve *"keeps a second
+  full-screen tree alive"*, which is a main-thread cost the entry can only assert.
+
+### [app-shell] RV-141 — DEVICE PROBE: path structure — depth, redirects, and navigations that cost a shell teardown
+
+- **Verify:** device — no build half. Method: **P15**. **Added:** 2026-09-23 · Review.
+- **The falsifiable claims:** no screen is reachable by two tap paths of different length; no
+  navigation lands somewhere and immediately moves again; pressing back from any deep screen reaches
+  Home in as many presses as it took to get there, and never lands somewhere never visited.
+- **The measurement RV-110 is missing.** That entry counts 37 cross-tab `router.push` sites against 5
+  using the helper, and argues each tears down the whole tab shell — **but it has no number for what
+  a teardown costs.** Time one, and RV-110 stops being a count and becomes a budget.
+- Related and already device-verified: BF-100 (scroll offset restored exactly), LB-107 (back from
+  every tab root reaches `/`) and BF-165 (a sheet's `back()` eats the push **7 ms** after it) — so
+  the back stack itself is largely proven. **This is about the shape of the paths, not their
+  correctness.**
+
+### [platform][app-shell] RV-142 — DEVICE PROBE: does a long session get slower, and is that what BF-22 was feeling?
+
+- **Verify:** device — no build half. Method: **P16**. **Added:** 2026-09-23 · Review.
+- **BF-22 is an owner report with its mechanism already narrowed** — *"everything is loading very
+  slowly"*, then *"actually its running a lot better after a force restart"*. So the slowdown is
+  in-memory client state; the server-distance theory was measured and was **wrong** (`x-railway-edge`
+  names the caller's PoP, not the server's region).
+- **The falsifiable claim:** per-tab time-to-interactive at app open, after the P2 five-minute walk,
+  and after 30 minutes idle are **within 20% of each other**. A monotonic rise is the finding.
+- **This is the timing half of RV-133**, which measures heap, listener counts and live timers over
+  the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
+  or is exactly what BF-22 is feeling — and **neither answers it alone.**
+
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
 
 - **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.

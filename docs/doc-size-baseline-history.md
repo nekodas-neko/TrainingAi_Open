@@ -15801,6 +15801,22 @@ still need judging by where they mount. Recording that here matters because the 
 25 tracked sites and a green check and conclude the ground is covered. It is not; RV-104, RV-106,
 RV-107 and RV-109 are the entries that own those verdicts.
 
+
+## 2026-09-23 — `docs/implementation-backlog.md` and the probe checklist (Review: DV performance probes)
+
+Six entries (**RV-137…RV-142**) plus Part B of `docs/device-agent-probe-checklist.md`, filed after
+the owner asked whether the device agent had been given the checks it can really test — load
+efficiency, timing, path structure. It had not: of the original ten probes only P6 and P10 touched
+timing and the rest were correctness.
+
+The length is mostly cross-references, and that is the point of filing them at all. **Q-51 already
+asks for this measurement and says a refactor without it is a poor trade**; its one number is a
+single `/workout` mount at 1086 ms against ~100 ms warm, which RV-138 turns into a distribution.
+BF-22's slowdown was narrowed to in-memory client state, which RV-142 pairs with RV-133's heap and
+listener counts. RV-110 counts 37 shell-tearing call sites with no cost per teardown, which RV-141
+supplies. Each entry names what already exists so the device run settles an open question rather
+than producing a fresh pile of numbers.
+
 ## 2026-09-23 — `projectOverview.md` and the backlog both rise (E2E path filter + the shallow-fetch rule)
 
 The backlog grows by two entries rather than shrinking, which is the right direction here: LA-129

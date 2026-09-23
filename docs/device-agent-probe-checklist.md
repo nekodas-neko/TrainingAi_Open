@@ -236,3 +236,94 @@ the sweep write-up saying the thing was checked and is fine — which is worth h
 alternative is that the next sweep re-derives the same suspicion from the same source code. **Send
 the numbers even when they are boring.** The boring ones are what let a later finding be attributed
 to a change rather than to "it was probably always like that".
+
+---
+
+# Part B — performance, timing and structure (P11–P16)
+
+**Added 2026-09-23, because Part A was almost all correctness.** P6 (warm paint) and P10
+(accumulation) touch timing; nothing else did. These six are the measurement half, and they exist
+because **Q-51 explicitly asks for them**: the owner's position is *"Its mostly fine; I'd still like
+it to be faster if possible"*, and that entry's own conclusion is that *"measure before refactoring"
+is now **more** binding, not less* — a large refactor is a poor trade against "mostly fine" unless a
+number says where the cost is.
+
+**The one measured number that exists** is Q-51's: `/workout` visited five times in one session,
+**four at ~100 ms and one at 1086 ms, all warm.** A first-mount cost, not a general one. Everything
+below is aimed at turning that single observation into a shape.
+
+**`docs/device-perf-profiling-checklist.md` is the human version of some of this** — it asks for
+DevTools screenshots and a saved profile. Do not re-run it by hand. It does record the mechanic that
+makes P11 possible, and it is worth reading once:
+
+> *"A Console read of `performance.getEntriesByType(...)` after a normal cold start. The browser
+> keeps navigation and paint entries for the life of the page, so the numbers are still there when
+> you attach afterwards — **no race at all.**"*
+
+That is the answer to "you cannot record across an app kill", and it is why cold start is now
+measurable from a harness that attaches *after* the fact.
+
+## P11 — cold start and per-tab time-to-interactive
+
+Cold-start the app normally, attach, then read `performance.getEntriesByType('navigation')` and
+`('paint')`. Report **`domContentLoaded`, `loadEventEnd`, `first-paint`, `first-contentful-paint`**,
+and `performance.now()` at the moment of the read. Then for each tab, warm and cold: **ms from the
+tap to the first frame with real content** (P6's number, taken here per-route rather than per-visit).
+
+No kill is needed for the reads themselves and no recording has to span anything.
+
+## P12 — the first-mount outlier, characterised
+
+**Q-51's number is one observation. Make it a distribution.** For each of the five tab routes and
+the main pushed routes: visit it, leave, return — **ten times**, all warm — and report the full list
+of mount durations, not a mean. The question is whether the first mount of a route is reliably
+expensive and by how much, or whether 1086 ms was a one-off.
+
+Report alongside each outlier: what was on the main thread during it (P14's long tasks) and what was
+in flight (P13's requests). **An outlier with neither is a different finding from one with both.**
+
+## P13 — the per-screen network waterfall
+
+`scripts/device/pw.js` already instruments the Network domain. For each screen, from tap to settled:
+
+- **request count**, and the count of those that are `/api/*`
+- **total bytes**, and the largest single response
+- **duplicate URLs** — the same endpoint requested more than once for one screen
+- **serial chains** — requests that only start after an earlier one finishes, with the chain depth
+
+**The chain depth is the finding to look for.** Three requests in parallel cost one round trip;
+three in series cost three, and on a phone that is the difference between instant and not.
+
+## P14 — main-thread long tasks
+
+Record `PerformanceObserver` long-task entries (>50 ms) across: a cold start, one pass through every
+tab, a tab switch in each direction, and a scroll of Home and Health. Report **count, total blocked
+ms, and the longest single task per interaction.**
+
+Prior finding to check against rather than rediscover: a device profile once attributed **21.3% of
+main-thread time to `animationiteration`**, which is why the repo pauses animations — confirm that
+is still true, and whether anything else now dominates.
+
+## P15 — path structure
+
+Not speed; shape. For every route reachable by tapping:
+
+- **depth** — how many taps from app open, and whether the same screen is reachable by two paths of
+  different length
+- **redirects** — any navigation that lands somewhere and immediately moves again
+- **wasted navigations** — a push that unmounts the tab shell and then restores the same tab
+  (RV-110's 37 sites are the source; this measures what they cost rather than counting them)
+- **back-stack depth after a normal session** — press back repeatedly from a deep screen and report
+  how many presses reach Home, and whether any press lands somewhere the owner never visited
+
+## P16 — does a long session get slower?
+
+**BF-22 is an owner report with a mechanism already narrowed:** *"everything is loading very
+slowly"*, then *"actually its running a lot better after a force restart"* — so the slowdown is
+in-memory client state, not the server or the database (the server-distance theory was measured and
+was wrong).
+
+Take P11's per-tab time-to-interactive numbers **at app open, after the P2 walk, and after 30
+minutes idle**. Report the three sets side by side. RV-133 measures heap and listener counts over the
+same window; **this is the timing half of the same question**, and the two together decide whether
+the accumulation RV-133 finds is inert or is what BF-22 is feeling.
