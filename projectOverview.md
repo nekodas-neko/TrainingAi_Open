@@ -2598,6 +2598,25 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ⚠️ Two routes fetched the active program twice per request (RV-82, 2026-09-23)
+
+`getNextSession` already calls `getActiveProgram` — a fixed 5-query composite — inside its own
+`Promise.all`, and two routes asked for it again in the same `Promise.all`, so `programs`,
+`program_sessions`, `schedules`, `schedule_days` and `session_exercises` each ran twice (5 wasted
+statements of 22 on `/api/next-session/prescription`, of 19 on `/api/progress-summary`). The
+recommendation now carries the program it was derived from. **The entry's two suggested fixes are
+not equivalent:** passing a pre-fetched program IN would serialise two calls that currently run in
+parallel, so reading it off the result is what shipped. **Two things the entry did not mention, both
+found by checking:** `/api/next-session` serialises the recommendation WHOLESALE, so it now strips
+the field — otherwise the home card's most-fetched response would grow by the entire program; and
+`computeAiDynamicNextSession` destructures named fields and rebuilds its own result, so a `program`
+spread into its input is silently dropped on the **ai_dynamic path**, which is the live one. That
+would have made both routes behave as though there were no active program, and `tsc` cannot see it
+because the field is optional. **No latency figure** — the entry could not measure one and neither
+could this; filed as shape, not speed. **No per-user memo was added**, per the entry's own
+prohibition: it trades against config-save freshness and needs its own decision. Detail:
+[`docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md`](docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md).
+
 ### [nutrition][platform] ⚠️ Deleting a supplement left no tombstone and blanked five columns — NOT device-verified (DV-10, 2026-09-23)
 
 The local delete called `upsertSupplement({ …the fields the sheet held, active: false })`, so
@@ -2800,11 +2819,16 @@ the scale's 25.7%, which lowers lean mass and so lowers the calculated targets t
 111 g protein**. Against the 1,660 / 150 you are eating to, that is **+19% calories and +35%
 protein**, not the +18%/+30% first written here.
 
-**Two smaller things came out of measuring it**, both queued: `calculateBaseline` and the clamp
-disagree about fat (25% of calories vs 0.6 g/kg — 39 g against 42 g for you), so the recommendation
-is the baseline *made safe* rather than the baseline exactly (LA-125); and `user_goals` and
-`body_fat_calibration` have no `claude_ro` view, so your steps goal could not be read at all while
-measuring this (LA-127).
+**Two smaller things came out of measuring it.** `calculateBaseline` and the clamp disagreed about
+fat — 25% of calories against 0.6 g/kg, 39 g against 42 g for you — so the recommendation was the
+baseline *made safe* rather than the baseline exactly. **Fixed 2026-09-23 (LA-125): the 0.6 g/kg
+floor now lives inside the baseline**, so one formula answers the question and every screen reading
+it agrees with the route serving it. It settled on **42 g, not 39** — the floor outranks the 25%
+share, and the alternative (dropping the floor) was rejected because the calorie floor beside it is
+what stops a cutting target falling under your resting rate. For you that is **fat 39 → 42 g and
+carbs 150 → 143 g**, and you see both on the recommendation sheet before you tap apply. The other:
+`user_goals` and `body_fat_calibration` have no `claude_ro` view, so your steps goal could not be
+read at all while measuring this (LA-127).
 
 ### [readiness] ⚠️ A past day now says what you were doing when stress spiked — the marker half is unbuilt (TN-35, 2026-09-21, v1.462.0) · needs: device
 

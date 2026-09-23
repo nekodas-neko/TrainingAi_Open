@@ -1518,30 +1518,6 @@ below threshold and left in place for next time.
   `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
   `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
 
-### [platform] RV-82 — two routes fetch the active program twice inside a single request
-
-- **Lane:** A — `app/api/next-session/prescription/route.ts:57`,
-  `app/api/progress-summary/route.ts:35,37`. **Added:** 2026-09-20 · Review sweep 51.
-- Both call `repo.getActiveProgram(userId)` in the same `Promise.all` as `getNextSession`, and
-  `getNextSession` calls `getActiveProgram` itself (`lib/data/postgres/adapter.ts:1730`).
-  `getActiveProgram` is a fixed **5-query composite** (programs → program_sessions + schedules →
-  session_exercises + schedule_days).
-- **Measured on the wire** (local dev Postgres, `log_statement='all'`, idle baseline 0 statements in
-  25 s): `/api/next-session/prescription` = **22 statements**, of which `programs`,
-  `program_sessions`, `schedules`, `schedule_days` and `session_exercises` each appear exactly
-  **twice** — 5 wasted. `/api/progress-summary` = **19 statements**, same doubling.
-- **Fix, and keep it to this:** have `getNextSession` accept an already-fetched program, or have
-  those two routes call `getNextSession` alone and read the program off its result. Risk-free —
-  same data, same request.
-- **⚠ Do NOT add a per-user memo of `getActiveProgram` as part of this.** The same launch reads the
-  program 8 times across 22 warm routes (~30 of 132 statements), and collapsing that is tempting —
-  but it trades directly against config-save freshness, which is a decision, not a cleanup. If it is
-  wanted, it is its own entry with that trade stated.
-- **Not established:** no latency figure. Dev wall times were a flat ~350 ms/route regardless of
-  query count (dev-mode compile overhead), so the cost against Railway's private network is
-  unmeasured. On a single-user app this is server work the owner will not feel directly — filed as
-  shape, not as a latency emergency.
-
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).
@@ -1749,11 +1725,20 @@ below threshold and left in place for next time.
   not the mechanism. The path is unchanged: he applies a post-RV-66 recommendation from the sheet,
   one tap, and the write is his. **Do not run this for him** — a decision recorded in a backlog
   entry is not a hand on the database.
-- **⚠ `LA-125` MUST SHIP FIRST, and this is new as of the decision.** The recommendation route
-  serves **42 g fat / 143 g carbs** where `calculateBaseline` computes **39 / 150**, because the
-  clamp's 0.6 g/kg floor is applied after the baseline rather than inside it. Applying today would
-  hand him the clamp's numbers, not the baseline's — which is precisely the "corrected/calculated"
-  figure he asked for and would not be getting. Sequence: **LA-125 → RV-66 re-run → he applies.**
+- **✅ `LA-125` SHIPPED 2026-09-23 — this blocker is cleared, and it moved the fat number.** The
+  0.6 g/kg floor now lives inside `calculateBaseline`, so the route and the baseline are one number
+  rather than two and there is no longer a "clamp's figure vs baseline's figure" to choose between.
+  **It resolved in favour of 42 g, not 39.** This entry was written expecting the baseline's 39 / 150
+  to win; the decision recorded under LA-125 was the opposite, because deleting the floor was
+  rejected outright — the calorie floor beside it is load-bearing for every cutting user. Remaining
+  sequence: **RV-66 re-run → he applies.**
+- **⚠ THE FAT AND CARB FIGURES BELOW WERE COMPUTED UNDER THE OLD SPLIT and are stale — re-derive
+  them from the re-run before quoting any of them to the owner.** His floor is **42 g** (`round(0.6 ×
+  weight)`, unchanged by which body-fat reading is used), and at the DEXA reading the 25% target is
+  38 g, which is under it. So the expected post-LA-125 figures are **1,359 kcal / 111 g protein /
+  134 g carbs / 42 g fat** — fat +4 g and carbs −9 g against what this entry says. That is
+  arithmetic from this entry's own numbers, **not a fresh measurement**: the re-run is what settles
+  it.
 - **The numbers he is moving to**, so nobody has to re-derive them: **1,359 kcal / 111 g protein /
   143 g carbs / 38 g fat** at the DEXA-corrected body fat — down **259 kcal** and **39 g protein**
   from the 1,660 / 150 he has been eating for three weeks. That is a real cut, not a correction.
@@ -1782,53 +1767,6 @@ below threshold and left in place for next time.
   change to his intake, not a bug fix. **Do not run this for him.**
 - **Verification:** after the owner applies a post-RV-66 recommendation, `nutrition_targets` matches
   `calculateBaseline` for his profile, clamp floors included.
-
-### [nutrition][platform] LA-125 — two formulas disagree about fat, so the recommendation is not the baseline it claims to be
-
-- **Lane:** A — `packages/shared/src/nutrition/goal-recommendation.ts:205,262-268`.
-  **Added:** 2026-09-21 (Lane A, found while shipping RV-66).
-- **✅ GATE RELEASED 2026-09-23.** It existed so the owner saw the fat number before it shipped.
-  He has now chosen the computed targets outright (`LA-126`), and the number reaches him at the
-  point that matters anyway — the recommendation sheet shows 39 g before he taps apply, and the tap
-  is his. A gate whose protection is already built into the flow it guards is ceremony.
-- **Gate (historical):** owner — **added 2026-09-21 as a correction.** The entry always said the fix *"changes
-  the computed fat target for real users, so it wants the owner's eye on the number before it
-  ships"*, and that sentence was prose. `Gate:` is a FIELD; written inline it is ignored, so this sat
-  at **READY position 1** describing its own owner gate in a form nothing reads. Its sibling LA-126
-  was filed the same hour with the same mistake and `check-backlog-pointers.js` caught that one,
-  because there the field name appeared mid-bullet where the checker looks for it. Here it was never
-  written at all, so there was nothing to catch: **the check finds a gate in the wrong place, not a
-  gate that is missing.**
-- `calculateBaseline` sets `fatG = round(calories * 0.25 / 9)`. `clampRecommendation` floors fat at
-  `round(0.6 * weightKg)`. For the owner those are **39 g and 42 g**, so the clamp raises fat and
-  carbs fall out of the remainder at **143 instead of 150**.
-- **Why it matters now.** RV-66 made the recommendation deterministic, and its stated win was One
-  Formula, One Place — the displayed number being the same number every other surface computes. That
-  is true for calories, protein, water and steps and **false for fat and carbs**: a surface reading
-  `calculateBaseline` directly gets 39/150, this route serves 42/143.
-- **⚠ Do not close this by deleting the clamp.** `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for
-  `lose_weight`, and `bmr × 1.2 − 500 < bmr` for any BMR under **2,500** — most people — so its
-  calorie floor is load-bearing for every cutting user. `rv66-baseline-is-the-recommendation.test.ts`
-  pins both the floor and this fat disagreement, the latter explicitly as current-behaviour-not-
-  endorsed.
-- **✅ ON THE CRITICAL PATH AS OF 2026-09-23, and the structural half is decided.** The owner chose
-  the computed nutrition targets under `LA-126`, and **this entry is what makes "computed" mean one
-  thing.** Ship it before the RV-66 re-run, or he applies the clamp's 42/143 while being told it is
-  the baseline's 39/150.
-  **The call, and it is the Orchestrator's to make rather than the owner's** (structural — which
-  formula is authoritative, not what the app should do): **move the 0.6 g/kg floor INTO
-  `calculateBaseline`.** The baseline then computes a number that is already safe, every surface
-  reading it agrees, and `clampRecommendation` keeps the floor only as a redundant guard rather
-  than as a second opinion. The alternative — deleting the floor and letting the baseline's 25%
-  stand — is rejected outright by the warning below: the calorie floor beside it is load-bearing
-  for every cutting user. **Reversal cost: one function, one test file.** For the owner this moves
-  fat 39 → 42 g and carbs 150 → 143 g; he is told that number before he applies, not after.
-- **Fix:** decide which fat rule is the real one and make the other defer to it — most likely by
-  moving the 0.6 g/kg floor *into* `calculateBaseline` so the baseline is already safe and the clamp
-  becomes the no-op it reads as. **That changes the computed fat target for real users**, so it
-  wants the owner's eye on the number before it ships.
-- **Verification:** the route's response equals `calculateBaseline` field-for-field, and the
-  `lose_weight` floor test still passes.
 
 ### [nutrition][app-shell] RV-68 — the supplement tick paints only after three awaited local writes and a native call
 

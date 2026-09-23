@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-23 — backlog → 27224 (LA-125 shipped, −38), projectOverview → 12564 (+5)
+
+LA-125's entry left the queue, which is the whole of the backlog's fall; the same edit amended
+LA-126 to record that its blocker cleared and that it cleared in the *other* direction — the fat
+rule settled on the 0.6 g/kg floor's 42 g, not the baseline's 39 g, which LA-126 had been written
+expecting. That amendment is longer than the entry removed, so the net is smaller than a deletion
+would suggest, and deliberately: LA-126 quotes the numbers the owner is moving to, and two of them
+moved.
+
+`projectOverview.md` grew by five lines turning a "both queued" note into a fixed one that states
+which way it resolved and what the owner will see on the sheet.
+
 ## 2026-09-20 — backlog → 24984 (TN-54, the strap is dark and nothing says so)
 
 **+12.** The owner wore the strap overnight and asked whether it recorded. It did not, and the
@@ -16239,3 +16251,22 @@ not there. The second is to record the defect the entry did not find: the delete
 columns, including BF-69's presence window, where a nulled date silently converts an UNKNOWN into a
 TRUE ZERO. That is the part worth the lines, because it is invisible in the UI and the row it
 corrupts is replaced by the next pull — so it leaves no trace to find later.
+
+
+## 2026-09-23 — `implementation-backlog.md` → 27262, `projectOverview.md` → 12559 (RV-82)
+
+The backlog shrinks by 24 — RV-82 leaves and nothing replaces it.
+
+`projectOverview.md` gains 19 lines, and almost all of them record what the entry did NOT say rather
+than what it did. The measurement (five duplicated statements per request) was a line; the rest is
+the two findings that only appeared on contact with the code, and both would have shipped as
+regressions:
+
+`/api/next-session` serialises the recommendation wholesale, so adding a `program` field to it would
+have grown the home card's most-fetched response by the entire program. And
+`computeAiDynamicNextSession` destructures named fields and rebuilds its own result, so the obvious
+implementation — spread the program into the object already being passed in — drops it silently on
+the ai_dynamic path, which is the live one. `tsc` cannot see either, because the field is optional.
+
+Those are worth index space because the next person to touch `NextSessionRecommendation` will hit
+the same two edges, and neither is visible from the type.

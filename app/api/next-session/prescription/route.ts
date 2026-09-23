@@ -52,12 +52,15 @@ export async function GET() {
   const tz = session.user?.timezone ?? DEFAULT_TZ;
   const repo = await getRepository();
 
-  const [recommendation, program, styles, library] = await Promise.all([
+  // RV-82: the program comes off the recommendation. `getNextSession` already fetches it, and
+  // `getActiveProgram` is a fixed 5-query composite — asking for it again here ran `programs`,
+  // `program_sessions`, `schedules`, `schedule_days` and `session_exercises` twice per request.
+  const [recommendation, styles, library] = await Promise.all([
     repo.getNextSession(userId, tz),
-    repo.getActiveProgram(userId),
     repo.listProgressionStyles(userId),
     repo.listExerciseLibrary(),
   ]);
+  const program = recommendation.program ?? null;
 
   if (recommendation.isRestDay || !recommendation.session || !program) {
     return NextResponse.json(REST_DAY_RESPONSE, { headers: CACHE_HEADERS });
