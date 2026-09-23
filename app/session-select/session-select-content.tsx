@@ -441,7 +441,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     router.prefetch(`/workout?session=${encodeURIComponent(recommendedSessionId)}`);
   }, [router, recommendedSessionId]);
 
-  const handleNavigateStats = useCallback(() => router.push("/health?tab=training"), [router]);
+  const handleNavigateStats = useCallback(() => navigateToTab(router, "/health?tab=training"), [router]);
   const handleNavigateHealthBody = useCallback(() => navigateToTab(router, "/health?tab=body"), [router]);
   const handleOpenWaterLog = useCallback(() => setWaterLogOpen(true), []);
   const hrData = useMemo(
@@ -1041,6 +1041,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     <div className="flex h-screen flex-col bg-page">
       <PullToSync
         onSync={handlePullSync}
+        scrollKey="home"  // RV-112 — Home and More shared one scroll slot; see more-content.tsx.
         scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-nav-safe"
         className="flex-1 flex flex-col overflow-hidden"
       >

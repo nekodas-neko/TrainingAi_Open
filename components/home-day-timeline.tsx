@@ -10,6 +10,7 @@ import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { TTL_SHORT } from "@trainingai/shared/cache-ttl";
 import type { TimelineEvent } from "@/app/api/day-timeline/route";
 import { useTransitionRouter } from "@/lib/view-transition";
+import { navigateToTab } from "@/lib/shell-nav";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Sunrise, Moon, Dumbbell, Footprints, Utensils, BedDouble, Tag,
@@ -186,9 +187,9 @@ function EventRow({ ev, isLast }: { ev: TimelineEvent; isLast: boolean; isFirst?
   // to reach, so both stay inert.
   let onTap: (() => void) | undefined;
   if (ev.date && ev.type === "meal") {
-    onTap = () => router.push(`/nutrition?date=${ev.date}`);
+    onTap = () => navigateToTab(router, `/nutrition?date=${ev.date}`);
   } else if (ev.date && (ev.type === "wakeup" || ev.type === "sleep")) {
-    onTap = () => router.push(`/health?tab=body&openSleepDate=${ev.date}`);
+    onTap = () => navigateToTab(router, `/health?tab=body&openSleepDate=${ev.date}`);
   } else if (ev.date && (ev.type === "workout" || ev.type === "walk")) {
     onTap = () => router.push(`/health/day?date=${ev.date}`);
   }
