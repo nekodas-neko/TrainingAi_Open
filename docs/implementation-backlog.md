@@ -534,6 +534,35 @@ below threshold and left in place for next time.
 - **Suspected shape, not established:** a pull that fetched the pre-delete row, applied after the
   push confirmed the delete and flipped the row to `synced` — so the `sync_status === 'synced'` gate
   let it overwrite. Needs one reproduction with the pull/push ordering captured.
+- **✅ REPRODUCED AND FIXED 2026-09-24 (Lane A). The suspected shape was exactly right** — the
+  first entry in a while whose diagnosis survived contact with the code. Reproduced deterministically
+  against real SQLite by running `applyDelta`'s own upsert: log, tombstone, `markFoodLogSynced`
+  flips it to `'synced'` **without removing the row**, then a pull fetched pre-delete lands, its
+  `WHERE food_logs.sync_status='synced'` guard is satisfied, and `deleted_at=excluded.deleted_at`
+  writes NULL over the tombstone. Result `deleted_at NULL, sync_status 'synced'` — the device
+  reading, exactly.
+- **The fix is one clause: `AND <table>.deleted_at IS NULL`, on NINE arms.** A timestamp comparison
+  would also work and was rejected: the local tombstone's `updated_at` is device-set and the
+  incoming row's is server-set, so clock skew would decide it. *We hold a tombstone, so a row
+  without one is stale* needs no clock.
+  **Sibling sweep, classified rather than guessed:** nine arms can write
+  `deleted_at=excluded.deleted_at` and so can clear a tombstone — `body_metrics`, `mood_logs`,
+  `fitness_tests`, `prescribed_runs`, `food_logs`, `supplements`, `supplement_logs`, `injuries`,
+  `day_checkins`; all nine now carry the clause. The other four delete-bearing arms
+  (`workout_sessions`, `exercise_logs`, `set_logs`, `activity_logs`) never SET `deleted_at` in their
+  update arm, so a tombstone they hold already survives a stale pull. They were left alone.
+- **`dv15-stale-pull-cannot-resurrect.test.ts` drives the REAL statement** — the upsert is extracted
+  from `sqlite-backend.ts` at test time and run against `node:sqlite`, so it cannot drift from the
+  implementation or pass against a stale copy. It also pins the two cases the guard must not buy:
+  an ordinary pull still updates a live row, and a `pending` local edit is still protected.
+- **Keep:** the device pass test below. The race needs a real pull/push overlap on the S25, which no
+  container can stage — the reproduction is of the SQL, not of the timing.
+- **⚠ One window remains open and is NOT fixed here.** The guard protects a tombstone the device
+  still holds. If a server tombstone delta has already hard-DELETEd the local row (the
+  `if (r.deletedAt)` branch) and a stale pull arrives *after* that, the INSERT re-creates it with
+  nothing to guard against. Narrower than the measured case — it needs the tombstone delta and the
+  stale pull to arrive in that order — but real. Closing it wants a local tombstone that outlives
+  the row, which is a schema change and its own entry.
 - **Pass test (device):** log and delete a food within 10 s, five times; the local row keeps
   `deleted_at` every time.
 
