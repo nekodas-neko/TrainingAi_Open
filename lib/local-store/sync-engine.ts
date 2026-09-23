@@ -958,26 +958,57 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
       const rec = recs.find(r => r.logDate === m.date);
       if (rec) await store.upsertMoodLog({ ...rec, syncStatus: 'synced' });
     } else if (m.domain === 'food_logs') {
-      const recs = await store.getFoodLogs(m.date);
-      const rec = recs.find(r => r.id === m.payload.id);
-      if (rec) await store.upsertFoodLog({ ...rec, syncStatus: 'synced' });
+      // DV-5, identical to the activity_logs arm below and for the identical reason: a delete
+      // cannot confirm through the upsert round-trip, because `getFoodLogs` filters
+      // `deleted_at IS NULL` and never finds the row. The `if (rec)` guard then silently does
+      // nothing while the outbox entry is dropped, so the tombstone stays `pending` forever and
+      // `applyDelta` — which only overwrites `synced` rows — can never correct it again.
+      if (m.payload.deleted) {
+        const id = m.payload.id as string | undefined;
+        if (id) await store.markFoodLogSynced(id);
+      } else {
+        const recs = await store.getFoodLogs(m.date);
+        const rec = recs.find(r => r.id === m.payload.id);
+        if (rec) await store.upsertFoodLog({ ...rec, syncStatus: 'synced' });
+      }
     } else if (m.domain === 'supplement_logs') {
-      const recs = await store.getSupplementLogs(m.date);
-      const rec = recs.find(r => r.supplementId === (m.payload.supplementId as string) && (r.source ?? 'manual') === 'manual');
-      if (rec) await store.upsertSupplementLog({ ...rec, syncStatus: 'synced' });
+      if (m.payload.deleted) {
+        // DV-5 sibling: `getSupplementLogs` filters `deleted_at IS NULL`, so the tombstone is
+        // never found by the read-then-upsert path below and stays `pending` forever.
+        const supplementId = m.payload.supplementId as string | undefined;
+        const logDate = (m.payload.logDate as string | undefined) ?? m.date;
+        if (supplementId) await store.markSupplementLogSynced(supplementId, logDate);
+      } else {
+        const recs = await store.getSupplementLogs(m.date);
+        const rec = recs.find(r => r.supplementId === (m.payload.supplementId as string) && (r.source ?? 'manual') === 'manual');
+        if (rec) await store.upsertSupplementLog({ ...rec, syncStatus: 'synced' });
+      }
     } else if (m.domain === 'supplements') {
       // Flip the local row back to synced so the next pull is allowed to update it again —
       // without this arm the row stays 'pending' forever and the new clobber guard would make
       // it permanently unreachable by sync (Q-124).
       if (typeof m.payload.id === 'string') await store.markSupplementSynced(m.payload.id);
     } else if (m.domain === 'injuries') {
-      const recs = await store.getInjuries();
-      const rec = recs.find(r => r.id === m.payload.id);
-      if (rec) await store.upsertInjury({ ...rec, syncStatus: 'synced' });
+      if (m.payload.deleted) {
+        // DV-5 sibling: `getInjuries` filters `deleted_at IS NULL`.
+        const id = m.payload.id as string | undefined;
+        if (id) await store.markInjurySynced(id);
+      } else {
+        const recs = await store.getInjuries();
+        const rec = recs.find(r => r.id === m.payload.id);
+        if (rec) await store.upsertInjury({ ...rec, syncStatus: 'synced' });
+      }
     } else if (m.domain === 'saved_meals') {
       // Flip the local row to synced; a synced tombstone (offline delete) then gets
       // pruned by the next hydrateSavedMeals pass against the server list.
       if (typeof m.payload.id === 'string') await store.markSavedMealSynced(m.payload.id);
+    } else if (m.domain === 'plan_meal_answers') {
+      // DV-5 sibling, and the worst of them: this domain had no confirm arm at all, so every
+      // answer stayed `pending` after a successful push — not only the deletes — and applyDelta
+      // gates each plan_meal_answers column on `sync_status='synced'`. One mark covers both arms.
+      const planMealId = m.payload.planMealId as string | undefined;
+      const logDate = (m.payload.logDate as string | undefined) ?? m.date;
+      if (planMealId) await store.markPlanMealAnswerSynced(planMealId, logDate);
     } else if (m.domain === 'day_checkins') {
       const rec = await store.getDayCheckin(m.date, String(m.payload.phase ?? 'evening'));
       if (rec) await store.upsertDayCheckin({ ...rec, syncStatus: 'synced' });

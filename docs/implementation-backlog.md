@@ -561,26 +561,6 @@ below threshold and left in place for next time.
   the same window. Run them together: the two decide whether the accumulation RV-133 finds is inert
   or is exactly what BF-22 is feeling — and **neither answers it alone.**
 
-### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
-
-- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
-  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
-  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
-  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
-- **The conflict class, measured on this session rather than argued.** Every merging PR touches
-  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
-  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
-  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
-  being mergeable at the moment it was green. Another session's commit messages that day read
-  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
-- **What the owner already decided, and why this does not reopen it.** He took the cheap option
-  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
-  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
-  touched, it cannot stop two PRs touching them at once.
-- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
-  without losing the shrink-only property, which is the whole point of the check. That is the design
-  question to answer first, and it decides whether this is small or not.
-
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
 - **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
@@ -812,26 +792,31 @@ below threshold and left in place for next time.
 - **Pass test:** on the S25, every legend value on the Sleep card reads ≥ 4.5:1 against the card, in
   dark and light, with the default card colour and one custom colour.
 
-### [platform] DV-5 — pushed rows are left at `sync_status='pending'`, so every later pull skips them
+### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
 
-- **Lane:** A — `lib/local-store/**` (whatever confirms a pushed mutation), `lib/data/postgres/adapter.ts` if the confirm depends on the push response.
-- **Added:** 2026-09-23 · Device Verification, from the first read of the on-device store (RV-126).
-- **Measured on the S25 (read-only `localQuery`).** `mutations_outbox` is **empty**, yet
-  **all 33 tombstoned `food_logs` rows (2026-08-19 → today) are `sync_status='pending'`** and none
-  is `synced`; three of them are this sitting's test deletes, whose pushes returned **200**. One
-  `set_logs` row (set 4, Chest-Supported Dumbbell Row, 10 kg × 12, 2026-09-20) has been `pending`
-  since 2026-09-19 22:41 UTC — and **the server has that set** (`/api/exercise-history` lists it), so
-  nothing was lost. Its local `exercise_logs.workout_session_id` (`a1847680…`) is not in the local
-  `workout_sessions` table, while the server's session that day is `0a2afbf9…` — worth reading in
-  the same pass.
-- **Why it matters even though no data was lost:** CLAUDE.md's pull rule is that `applyDelta` never
-  overwrites a row unless it is `synced`, which protects pending local edits. A row that is
-  *permanently* pending is therefore **immune to every later server correction** — harmless for a
-  tombstone, not harmless for a live row like that set.
-- **Not established:** whether live (non-deleted) food rows ever stay pending — none did today — or
-  what the confirm step keys on. Read the confirm path before assuming the cause.
-- **Pass test:** after a push drains the outbox, no row the push carried is still `pending`
-  (`SELECT count(*) … WHERE sync_status='pending'` against an empty outbox returns 0).
+- **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
+  SQLite file.
+- **Gate:** device
+- **Added:** 2026-09-23 · Lane A, carved out of DV-5 when the rest of it shipped. The confirm-arm
+  half of DV-5 is fixed and merged; **this half was never explained**, and DV-5 itself said so
+  (*"Not established: ... Read the confirm path before assuming the cause"*).
+- **What Device Verification measured on the S25.** One `set_logs` row (set 4, Chest-Supported
+  Dumbbell Row, 10 kg × 12, 2026-09-20) has been `sync_status='pending'` since 2026-09-19 22:41
+  UTC, against an **empty** outbox. Its local `exercise_logs.workout_session_id` is `a1847680…`,
+  which **is not a row in the local `workout_sessions` table**, while the server's session for that
+  day is `0a2afbf9…`. The server has the set (`/api/exercise-history` lists it) — nothing was lost.
+- **Why the DV-5 fix does not cover it.** That fix was four confirm arms whose read-back getter
+  filters `deleted_at IS NULL`. `workout_log` is not one of them: its arm calls
+  `markWorkoutSynced(wsId, exerciseLogId)`, which is a keyed `UPDATE` and reads nothing back, so a
+  filtered getter cannot be the cause here. Read at source 2026-09-23 — the arm is correct as
+  written, which is what makes the orphaned session id the thing to chase.
+- **The hypothesis to test first, not to assume:** the session was written locally under one id and
+  the server assigned another, so `markWorkoutSynced` updated `set_logs WHERE exercise_log_id=?`
+  for an exercise log that hangs off a session id the local store no longer has. That is an
+  id-reconciliation question, not a confirm question.
+- **Pass test:** on the device, after a workout push drains the outbox, every `set_logs` row the
+  push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
+  the local `workout_sessions` table.
 
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
@@ -850,6 +835,47 @@ below threshold and left in place for next time.
   in the shell once, not per screen.
 
 
+### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+
+- **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
+  REJECTED this one with a reason.** The two were filed hours apart by different sessions and
+  neither could see the other. Read this before starting:
+  - **The conflicts were not caused by the committed baseline.** They were caused by **slack
+    detection failing on any gap**, which forced every PR that shrank a tracked doc by one line to
+    edit `.size` — and striking a completed entry is what almost every PR does. RV-134 tolerates
+    slack within `max(25, 2%)`, and the tax it was measured against (23 re-merge commits across
+    five branches in one night) should now be mostly gone. **Measure it again before assuming the
+    class still exists.**
+  - **Generating baselines in CI removes the CEILING, which is the part worth keeping.** A derived
+    baseline makes every increment "inherited", so a file can grow ten lines per PR forever with
+    nothing objecting. Slack detection exists because CLAUDE.md once sat **429 lines** under its
+    number. Any design here has to say how growth is still caught and how slack is still surfaced —
+    if it cannot, it is trading a merge conflict for the thing the ratchet is for.
+  - **A merge driver was also considered and rejected**: `merge.<name>.driver` must be configured in
+    every clone (CI, this sandbox, the Windows device machine) and silently does nothing where it is
+    missing, which is the old behaviour wearing a disguise.
+
+- **Lane:** A — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
+  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
+  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
+  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
+- **The conflict class, measured on this session rather than argued.** Every merging PR touches
+  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
+  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
+  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
+  being mergeable at the moment it was green. Another session's commit messages that day read
+  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
+- **What the owner already decided, and why this does not reopen it.** He took the cheap option
+  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
+  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
+  touched, it cannot stop two PRs touching them at once.
+- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
+  without losing the shrink-only property, which is the whole point of the check. That is the design
+  question to answer first, and it decides whether this is small or not.
+- **Queue position (2026-09-23, Lane A).** This sat at the top of READY because it was filed
+  beside the entry it argued with, not at the priority it deserves — queue position *is* priority
+  here, so that silently promoted a change the owner had already chosen to defer. Moved below the
+  defects. Reversing it is one cut-and-paste.
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
 

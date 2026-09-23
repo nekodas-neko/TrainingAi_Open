@@ -15913,6 +15913,25 @@ first write, then +4 for the lesson that cost this PR a red CI — run the FULL 
 subset scoped to the directories you changed, because a source-shape test asserting on your file
 can live anywhere. Still well under the 65 it inherited.)
 
+## 2026-09-23 — `implementation-backlog.md` 27216 → 27225, `projectOverview.md` 12442 → 12476 (DV-5)
+
+The backlog is up **nine net lines** across a removal and an addition, which is the shape worth
+recording rather than the number. DV-5 left the queue and **DV-8 replaced it**, carrying the half
+that was never explained — one `set_logs` row pending since 2026-09-19 whose
+`exercise_logs.workout_session_id` is absent from the local `workout_sessions` table. The cost is
+the paragraph saying **why the DV-5 fix does not cover it** (`workout_log` confirms with a keyed
+`UPDATE` and reads nothing back, so a filtered getter cannot be the cause), plus the hypothesis
+named as a hypothesis. Without that, the next session reads a `pending` row next to a shipped
+"pending rows" fix and either re-chases the confirm arms or assumes it was covered. LA-129 also
+gained four lines recording why it moved down the queue; it was filed beside the entry it argued
+with rather than at its priority, and queue position *is* priority here.
+
+`projectOverview.md` is up **34 lines** for one Known-Issues row and one status paragraph. Both
+spend most of their length on what is **not** claimed: the pass test is on-device only and was not
+run, and DV-5's `set_logs` half is explicitly excluded. That is the expensive half of an honest
+entry, and it is the half that stops the next reader treating "DV-5 shipped" as "the device is
+clean".
+
 ## 2026-09-23 — `docs/implementation-backlog.md` 27151 → 27128 (TN-61 / the starved DV lane)
 
 TN-61 left the queue after being built, which is the whole of the 23 lines.
