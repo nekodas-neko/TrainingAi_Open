@@ -1040,7 +1040,13 @@ below threshold and left in place for next time.
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
 
-- **Lane:** B — the tab shell's switch path (`components/shell/**`).
+- **Lane: DV** — re-channelled from `B` by Lane B, 2026-09-23. **The fix will be Lane B's; the next
+  ACTION is not.** This entry's own "Not established" line says what it needs: a CPU profile of one
+  tap, to name the component that dominates the task. That is a measurement nobody has taken, with
+  an objective output, on hardware only the device agent has — which is exactly what
+  CLAUDE.md's lane rule assigns to `DV`. Left in `B` it sits at the head of the lane blocking on
+  something the lane cannot do, and each Lane B session pays to rediscover that. Hand it back to
+  `B` with the profile attached. The eventual fix path is still `components/shell/**`.
 - **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
 - **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
   long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
@@ -1076,34 +1082,77 @@ below threshold and left in place for next time.
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
 
+### [platform] LB-132 — six write paths invalidate for this device but not after the push
+
+- **Lane: B** · **Added:** 2026-09-23 · Lane B, from RV-108's sibling sweep.
+- **Found by reading every `pushMutations` call site** in `app/`, `components/` and `lib/` — the
+  sweep RV-108 prompted. RV-108 itself was the only site with NO invalidation; these are the weaker
+  version of the same defect, and they split into two groups that need different judgements.
+- **① IS EMPTY — both candidates were checked and are CORRECT.** They were filed as "no
+  invalidation at all, same class as RV-108" and that was wrong; corrected the same session, before
+  the entry could send anyone to patch a working file.
+  **`app/nutrition/use-plan-meal-logging.ts:231`** — nothing in `cache-groups.ts` or
+  `cache-ttl.ts` mentions `plan-meal`/`plan_meal`, the only reader is the hook itself going straight
+  to `store.getPlanMealAnswers(date)`, and the screen repaints optimistically from React state.
+  There is nothing to evict. (The file's line-61 comment about a sibling firing `pushThenRevalidate`
+  is about `logPlanMeal`, which writes `food_logs` — a domain that IS cached. Different domain,
+  different answer.)
+  **`components/health/sleep/manual-bedtime-card.tsx:69`** — no cached key holds a manual bedtime,
+  and the derivative it feeds is not cached either: `/api/sleep-sessions` does **not** return
+  `manualSleepStart` (Q-519), and `/api/user/bedtime-estimate`, its only consumer, is fetched by no
+  client code. Nothing a cache holds changes.
+- **So RV-108 really was the only genuine missed invalidation in the app**, which is worth more than
+  the two entries this one nearly created.
+- **② Immediate half only, missing `pushThenRevalidate`:**
+  `app/session-select/components/log-value-sheet.tsx`, `components/mood-checkin-sheet.tsx`,
+  `components/morning-checkin-sheet.tsx`, `components/nutrition/end-of-day/end-of-day-review.tsx`,
+  `components/activity/exercise-review-sheet.tsx`. Each repaints the writing device correctly and
+  never re-invalidates once the server has the row.
+- **Group ② is a smaller bug than it looks, and might be none.** The second half only matters where
+  something SERVER-derived changes as a result — a recomputed score, an aggregate, a streak. Where
+  the payload is the whole of what any reader wants, the immediate call is sufficient and adding
+  the second is noise. **Decide it per site against what the group's keys actually feed**, and do
+  not sweep ② mechanically; that is how a correct file gets a redundant call.
+- **The test that emptied ① is the one to apply to ②:** a bare `pushMutations` is only a defect if
+  some CACHED key holds what the write changed. Check `cache-groups.ts`/`cache-ttl.ts` for a key,
+  then check whether the readers go through `cachedFetch` or straight to the local store. Four sites
+  looked like the defect from their call line today and were correct once read that way.
+- **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
+  on the device that wrote the row. RV-108 left the same question open, and it bounds how much
+  group ② is worth.
+
 ### [body][devices] RV-108 — on the device, a weigh-in invalidates almost nothing
 
-- **📱 MEASURED, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23** (weigh-in approved by the owner; logged today's own 69.4 kg so the value did not
-  change). **A weigh-in clears 3 of the 202 cached keys: `body-battery`, `muscle-recovery`,
-  `progress-summary`.** It then refetches `body-metadata`, `sleep-sessions`, `readiness-score` and
-  `body-battery/stress-day`. The Body Weight card showed 69.4 kg after. The local row kept body fat,
-  resting HR and HRV — `upsertBodyMetric` read-merges (`sqlite-backend.ts:1084`), so CLAUDE.md's "copy
-  water-log-sheet's pattern, not metric-log-sheet's" warning is out of date for this path. Now
-  buildable: compare those 3 keys against every surface that shows a weight.
-
-- **Lane:** B — `components/health/metric-log-sheet.tsx:101-138`. **Added:** 2026-09-22 ·
-  Review sweep 53.
-- **Gate lifted — measured on the S25 in sweep 1 (see the first bullet).**
-- The sheet contains **no `invalidate*` call at all**. Its local-store branch ends at `onSaved(...)`
-  with a bare `pushMutations(userId!)`. The consumer branches — `if (freshMeta) { setMetaToday(...);
-  invalidateReadinessInputs() } else { invalidateBodyMetricWrite() }` — so on device only the
-  **readiness** subset is cleared. **Not cleared:** `body-metadata`, `energy-balance:`, `day-log:`,
-  `health-trends-summary`, `hr-profile`, `training-stress`, `achievements:`, `collection`, and both
-  review-window keys.
-- **⚑ Its sibling two files away does it correctly:** `components/profile/water-log-sheet.tsx:78-82`
-  calls `pushThenRevalidate(userId!, invalidateBodyMetricWrite)` **and** an immediate
-  `invalidateBodyMetricWrite()` on the same local branch. Copy that exactly.
-- **This is a missed invalidation, not a missed re-render** — the other findings in this sweep are
-  the opposite, and the fixes are different. Recovery today is TTL expiry or an incidental
-  `pullDelta`, i.e. a delay rather than a repaint.
-- **Not established:** whether `pushMutations` → `pullDelta` reliably fires `invalidateBiometrics`
-  for a body-metrics delta on the device that wrote it. If it does, the window is shorter than TTL
-  but still non-deterministic.
+- **Lane:** B — `components/health/metric-log-sheet.tsx`. **Added:** 2026-09-22 · Review sweep 53.
+- **Verify: device**
+- **Shipped 2026-09-23** (`fix/rv108-weigh-in-invalidation`, v1.465.14). Both halves, copied from
+  `water-log-sheet.tsx` exactly as this entry said: `pushThenRevalidate(userId!,
+  invalidateBodyMetricWrite)` **and** an immediate `invalidateBodyMetricWrite().catch(() => {})`.
+- **The measurement that produced it, S25 sweep 1:** a weigh-in cleared **3 of 202** cached keys.
+  The sheet's local branch ended at a bare `pushMutations`, and the only invalidation was the
+  CONSUMER's — which takes its `invalidateReadinessInputs()` arm when `onSaved` receives a fresh
+  row, so the body-metric keys were never evicted at all. Recovery was TTL expiry.
+- **Why both halves:** immediately so the writing device repaints, and again once the push resolves
+  for what the server derives. An offline write's push never resolves usefully, so a push-only
+  invalidation repaints nothing — the shape the food-delete path already documents.
+- **The sibling sweep is the part worth keeping, and it NARROWED the fix.** Every `pushMutations`
+  call site in `app/`, `components/` and `lib/` was read. Only **this one** had no invalidation at
+  all. The remaining findings are filed as **LB-132**, and two sites that first looked identical
+  are not: `app/more/more-content.tsx` and `components/more/sync-health-card.tsx` push without
+  writing (a manual pull-sync and a failed-mutation retry), so they are correct as they stand.
+- **⚠ `log-value-sheet.tsx` was nearly "fixed" and must NOT be.** Home's quick-log writes the same
+  `body_metrics` domain through the same shape, and a ±10-line window around its push shows no
+  invalidation — so it reads as this defect byte-for-byte. It calls `invalidateBodyMetricWrite()`
+  and `invalidateReadinessInputs()` **39 lines later, inside the same `try`**. Patching it would
+  have double-invalidated. Read the enclosing block, never a window.
+- **Pinned by `components/health/__tests__/rv108-body-metric-write-invalidates.test.ts`**, which
+  asserts both halves, that no bare `pushMutations` remains on the write path, that the reference
+  sheet still carries the pattern it was told to copy, and that `invalidateBodyMetricWrite` really
+  contains the keys the device measured as stale. Control run: reverting to the bare push fails
+  three of the five.
+- **Keep:** the device pass — log a weight on the S25 and confirm the surfaces that read
+  `body-metadata`, `day-log:` and `energy-balance:` move without waiting for TTL. The sandbox can
+  prove the calls are present and cannot watch 202 keys on a phone.
 
 ### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
 
@@ -1171,7 +1220,16 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
 
-- **Lane:** B — `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
+- **Gate: owner**
+- **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
+  and the file paths below are right; what is missing is permission to spend it. This entry ends by
+  saying its two open questions "decide whether this is worth doing at all", and both are
+  **looks** judgements on the app's most frequent interaction — is a 180 ms blink perceptible, and
+  does `bg-page` resolve transparent under the owner's wallpaper. CLAUDE.md routes a judgement about
+  whether something *feels* right to `O` and the owner, not to `DV`: the phone is where he will look
+  at it, but nobody is measuring anything. Building it first risks changing a daily interaction he
+  never asked to have changed.
+  Files when it returns: `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
   **Added:** 2026-09-22 · Review sweep 53.
 - The incoming panel gets `tab-panel-enter` and the outgoing one gets
   `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
