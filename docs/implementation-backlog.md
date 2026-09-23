@@ -1414,51 +1414,66 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] LB-129 — the day-review sheet does not open on a first flip into Nutrition
 
-- **Lane:** B — `app/nutrition/nutrition-content.tsx:191`. **Added:** 2026-09-23 · found while
-  shipping RV-110.
+- **Lane: B** · `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-23 · found while shipping
+  RV-110.
+- **Gate: device**
 - **Reproduced twice, driving the real app:** from Home, `navigateToTab` to `/nutrition?review=day`
   when Nutrition has **not yet been mounted in this shell session** leaves the End of Day sheet
-  CLOSED. The same href on a later flip, into an already-mounted Nutrition, opens it. Home's
-  "review your day" (`session-select-content.tsx:1183`) takes exactly that path, so the first tap of
-  a session is the one that does nothing.
-- **⚠ It is NOT a param-delivery problem, and that is the part worth not re-deriving.** The obvious
-  theory — that a tab flip's `replaceState` does not reach `useSearchParams` — was tested and is
-  false: instrumenting the reader showed `searchParams` arriving as `review=day` at **both** the
-  `useState` initializer and the `[searchParams]` effect on the failing run. `setReviewOpen(true)`
-  runs. The sheet still does not appear, so the defect is downstream of the param, in what the
-  sheet renders or is gated on during a cold first render of that screen.
-- **Also ruled out:** the generic "effect-only reader misses the first mount" story. Health's
-  `?openSleepDate=` is effect-only too and opened its sheet on a flip in the same probe run.
-- **Fix:** unknown — start by instrumenting `DayReviewSheet`'s own render path (what `open` reaches
-  it as, and what it is gated on) rather than the param.
-- **RULED OUT from source, 2026-09-23 (Lane B, while LB-133 was in CI — reading only):** the
-  **back-dismiss machinery cannot be the cause**, and it is the most tempting candidate because
-  `sheet-back-stack.ts` carries a documented bug in which *"the dialog closed on the frame it
-  opened"* (BF-34) — the exact symptom. `SheetContent` mounts `BackDismiss`, which calls
-  `useSheetBackDismiss` → `openSurface`, and `handlePop` closes every surface whose depth exceeds
-  the arriving state's. **But `handlePop` only runs on a `popstate`, and a tab flip never emits
-  one:** `tab-shell.tsx:103` navigates with `window.history.replaceState(null, "", href)`, and
-  `replaceState` does not fire `popstate`. Do not spend a probe on it.
-- **Also VERIFIED rather than assumed** (the entry's own claim ②, re-checked): `<EndOfDayReview>`
-  really is rendered unconditionally at the tail of `nutrition-content.tsx`'s single `return`, with
-  `open={reviewOpen}`. There is no gate above it.
-- **So the dynamic-chunk hypothesis below is now the ONLY live one** — which makes instrumenting it
-  the first action, not one option among several.
-- **Three more candidates ruled out from source, 2026-09-23** (while DV-11 was in CI — reading only,
-  nothing built). None is the cause, and each would otherwise be the obvious first guess:
-  ① **`steps` empty → `step` undefined.** `visibleReviewSteps` starts with `['day']` unconditionally
-  and always returns ≥2, so `safeIndex` is never -1 even with `mealTypes`/`logs` still loading.
-  ② **An early return before the sheet mounts.** `nutrition-content.tsx` has a single `return (` and
-  renders `<EndOfDayReview>` unconditionally — there is no loading gate above it.
-  ③ **A mount gate in the `Sheet` primitive.** Its only `return null` is `SheetSurfaceLayer`, a
-  decorative gradient that no-ops when the wallpaper is off.
-  **What remains unexamined is the one thing worth instrumenting:** `EndOfDayReview` is a SECOND
-  `dynamic(..., { ssr: false })` chunk nested inside the tab's own code-split chunk, so on a cold
-  flip it renders `null` while its chunk loads and then mounts already `open={true}`. Start there.
-- **Probe recipe:** `page.goto('/')`, `settleRouteBoundary`, then
-  `page.evaluate(() => window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/nutrition?review=day', cancelable: true })))`,
-  wait ~10 s, read `[role="dialog"]`. Allow generously for the dynamic import — a run that renders
-  nothing after 8 s is a probe artefact, not the defect.
+  CLOSED. Home's "review your day" (`session-select-content.tsx:1183`) takes that path, so the first
+  tap of a session is the one that does nothing.
+- **A speculative fix is ON `main` and is NOT demonstrated — do not read it as closed.**
+  `EndOfDayReview` is now a STATIC import rather than a second `dynamic({ ssr: false })` nested
+  inside the tab's own lazy chunk. The reasoning is sound and the reversal is one line, but **no
+  test in this repo shows it fixing anything**; the device check is what would.
+
+#### What was MEASURED in the Playwright harness (2026-09-23) — and what it does not prove
+
+- **The param is NOT the problem, confirmed by instrumenting the reader.** At the failing timing the
+  effect logs `sp=review=day loc=?review=day` and `reviewOpen` goes `false → true`. There is no
+  error and no `pageerror`. The state is correct.
+- **`EndOfDayReview`'s component body never runs** while `reviewOpen` is true — its chunk had not
+  resolved. So the defect is downstream of the param, in chunk loading, exactly where the old entry
+  pointed.
+- **It is a RACE, cleanly bracketed.** Flip the instant `settleRouteBoundary` returns and the sheet
+  does not appear within 12 s. Flip 1500 ms later and it opens; 6000 ms later, sooner still.
+
+  | wait before the flip | End of Day |
+  |---|---|
+  | 0 ms | not within 12 s |
+  | 1500 ms | opens |
+  | 6000 ms | opens |
+
+- **⚠ BUT THE HARNESS CANNOT TELL THIS FROM A DEV-COMPILER ARTEFACT, AND THAT IS THE BLOCKER.**
+  The harness drives `pnpm dev`, where a cold chunk is **compiled on demand** — seconds, visibly, in
+  the server log. With the fix reverted and the window widened to 20 s the sheet DID appear, so the
+  chunk resolves late rather than never. In a production build the chunk is prebuilt. **So the
+  measurement above may be the dev compiler, not the owner's bug.**
+  A production-mode run would settle it and **is not available in this sandbox**: `next start` sets
+  `NODE_ENV=production`, which turns the pg pool's SSL on, and the local Postgres speaks no SSL —
+  every request dies (`playwright.config.ts` records this). Only the device, or a Railway preview,
+  can separate the two.
+- **Two traps that each cost a pass, both worth not repeating:**
+  **(a)** The old probe recipe — flip, then read `[role="dialog"]` — gives a **FALSE PASS**. Home
+  auto-opens the Morning Check-in for a user who has not done one, so the role is already satisfied
+  before the flip. Assert the sheet's own heading.
+  **(b)** A spec written from this was **deleted rather than committed**: it passed with the fix AND
+  with the fix reverted, so it is a green tick that proves nothing — the LB-133 failure mode. Do not
+  re-add it without a control run showing it red.
+- **Previously ruled out, from source — do not re-derive:** param delivery; `steps` empty →
+  `step` undefined (`visibleReviewSteps` always returns ≥2); an early return above the sheet
+  (`nutrition-content.tsx` has one `return` and renders it unconditionally); a mount gate in the
+  `Sheet` primitive (its only `return null` is the decorative `SheetSurfaceLayer`); the
+  effect-only-reader story (Health's `?openSleepDate=` is effect-only and works).
+- **Also ruled out, this session:** the **back-dismiss machinery**, which is the most tempting
+  candidate because `sheet-back-stack.ts` carries a documented bug where *"the dialog closed on the
+  frame it opened"* (BF-34). `handlePop` only runs on a `popstate`, and a tab flip emits none —
+  `tab-shell.tsx:103` navigates with `window.history.replaceState`. The timeline also shows the
+  sheet **never opening** rather than opening and closing.
+- **Keep:** the device check, which is the only thing that can close this. On the S25, from a cold
+  app start, tap Home's "review your day" as the first action of the session and confirm the End of
+  Day sheet opens. If it now opens, the static import was the fix; if it still does not, the chunk
+  boundary was never the cause and the dev-compiler reading above was a red herring — say so and
+  reopen from the param-independent half.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
 
