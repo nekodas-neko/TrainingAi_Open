@@ -3089,6 +3089,87 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
+  sessions have enough content. Time wise its pretty good."*
+- **Lane: O** — nothing here is broken. The budget is real, the transitions are real, and the engine
+  trims correctly. What is missing is a DECISION about which of three levers to pull, and that is
+  the owner's.
+- **⚑ MEASURED — where a 52-minute session actually goes** (Push, 2026-09-24, the session in the
+  owner's screenshot; wall clock 51.5 min, which is what `DURATION` renders — `workoutEndMs -
+  workoutStartMs` in `workout-screen.tsx:1746`, so it counts everything):
+
+  | band | minutes | what it is |
+  |---|---|---|
+  | warm-up | 10.5 | `started_at` → `warmup_ended_at` |
+  | **setup / bar-load** | **14.9** | Σ `inter_exercise_rest_sec` |
+  | **work** | **9.8** | Σ `set_time_sec` — the actual lifting |
+  | rest | 12.0 | Σ `rest_time_sec` |
+  | unaccounted | 4.3 | idle between the last set and pressing done |
+
+  **Setup exceeds work by half again.** Across the 14 most recent completed sessions the medians are
+  wall **42.5**, warm-up **9.4**, setup **12.7**, work **8.6**, rest **8.4** — so **work is ~19% of
+  session wall clock**, steady across sessions rather than a one-off.
+- **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
+  that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
+  `is_early_deload = false`). The program's own stored styles prescribe **14 sets for Push**; **10**
+  were logged. Two is the floor `fitToBudget` never goes below — *"a primary is never touched below
+  2 sets"* (`generate-prescription.ts:456`). Hitting the floor on **every** exercise means the
+  trimmer ran out of room, not that it made a judgement.
+- **⚑ MEASURED — weekly sets against the owner's OWN configured targets** (`program_volume_targets`,
+  35 days, `core` normalized into `abs` as the engine does). **13 of 16 muscle groups are under
+  target; the total is 102.2 against 154 — 66%.**
+
+  | muscle | actual | target | | muscle | actual | target |
+  |---|---|---|---|---|---|---|
+  | calves | 3.0 | 11 (27%) | | upper back | 8.6 | 11 (78%) |
+  | abs | 5.2 | 13 (40%) | | biceps | 9.5 | 11 (86%) |
+  | forearms | 2.8 | 6 (47%) | | triceps | 10.5 | 10 (105%) |
+  | chest | 6.3 | 13 (48%) | | hamstrings | 10.8 | 10 (108%) |
+  | quads | 5.3 | 11 (48%) | | glutes | 9.7 | 8 (121%) |
+  | hip flexors | 2.4 | 5 (48%) | | shoulders | 9.5 | 13 (73%) |
+  | lats | 6.8 | 13 (52%) | | lower back | 4.8 | 6 (80%) |
+  | traps | 4.3 | 8 (54%) | | adductors | 2.7 | 5 (54%) |
+
+  So the owner's question has a number: **by the app's own standard, no — the sessions do not have
+  enough content**, and the three groups at or over target (triceps, hamstrings, glutes) are all
+  muscles that accumulate as secondary work rather than being trained directly.
+- **✅ NOT a defect in the transition estimate — checked, because that was the obvious suspect.**
+  `resolveTransitionSec` (`time-audit.ts:338`) prefers a **measured** per-exercise transition, then a
+  measured per-equipment-class one, and only then the equipment default. The owner has months of
+  measurements, so the budget is being computed against his real transition times. The 240 s default
+  in `generate-prescription.ts` is the no-data fallback and is not what is running here. **The model
+  is right; the time genuinely goes there.**
+- **So the conflict is structural: two real numbers that have never been compared.** A 60-minute
+  budget, five exercises, and ~12.7 min of measured transitions plus prescribed rest leaves roughly
+  enough for two sets each. Nothing in the app puts the volume target and the time budget on the
+  same screen, so a session can hit its floor every week and still report *"Time wise its pretty
+  good"* — which is exactly what happened.
+- **⚑ OWNER DECISION — three levers, and the recommendation is the second.**
+  1. **Raise the time budget** (60 → 75 min). Buys sets directly. Costs 15 min a session, every
+     session, and the owner has said the time is what currently works.
+  2. **⭐ Fewer exercises, more sets each** — 5 → 3 or 4 per session, at 3–4 sets. Costs **no extra
+     time**: it spends the same budget on fewer transitions. **The repo already argues this
+     position in its own code** — *"five exercises floored at two sets still overrun a 30-minute
+     ask, and two token sets each is worse training than doing fewer exercises properly"*
+     (`generate-prescription.ts:485`), and `dropToBudget` exists to do it. It only runs when the
+     duration preset is SHORTER than the session (`direction < 0`), so at the normal budget the
+     engine trims sets to a floor instead of dropping an exercise — the wrong half of its own rule.
+     Fewer muscle groups touched per session, which the weekly targets then have to cover across
+     the week rather than within one day.
+  3. **Attack the transitions** — 14.9 min of bar-loading against 9.8 min of lifting is the largest
+     recoverable block in the session. Not a code change: it is plate management, equipment
+     proximity and not leaving the rack. Worth naming because no software lever is as big.
+- **Reversal cost is near zero for all three** — the budget is a number on the program session, the
+  exercise count is the program, and none of it rewrites history.
+- **Note this is NOT a scoring change** and must not become one without the owner: per CLAUDE.md,
+  Tuning proposes calibration and the owner signs off. This entry reports measurements and asks
+  which lever to pull.
+- **Verification:** after whichever lever, re-run the weekly-sets-against-targets query over the
+  following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
+  has not been fixed regardless of what the done screen says.
+
 ### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake, found while resolving a real

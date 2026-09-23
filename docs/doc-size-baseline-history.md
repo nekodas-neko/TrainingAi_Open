@@ -16423,3 +16423,10 @@ conflict. Filed rather than left in the journal, per **No orphaned findings** �
 data-loss mode (41 archived entries deleted with no error and no dangling link) and the existing
 CLAUDE.md warning about two sessions running the same compaction chore names the hazard without
 naming the line that causes it.
+
+## 2026-09-23 — `docs/implementation-backlog.md` → BF-189
+
+BF-189, from the owner asking whether his sessions have enough content. The length is two measured
+tables the entry exists to carry: the five-band decomposition of a 52-minute session (work is 9.8 of
+it) and weekly sets against all sixteen of his own configured volume targets. The second table is
+the answer to his question, so summarising it away would leave the entry unable to make its case.
