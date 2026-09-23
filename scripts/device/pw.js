@@ -73,7 +73,7 @@ class Device {
       const top = document.elementFromPoint(x, y);
       if (!top) return { ok: false, why: 'nothing hit-tests at its centre (outside the viewport?)' };
       if (top !== el && !el.contains(top) && !top.contains(el)) {
-        return { ok: false, why: `covered by ${top.tagName.toLowerCase()}.${String(top.className).slice(0, 60)}` };
+        return { ok: false, why: `covered by ${top.tagName.toLowerCase()}.${(top.getAttribute("class") || "").slice(0, 60)}${top.closest("button,a") ? ` inside "${(top.closest("button,a").getAttribute("aria-label") || top.closest("button,a").textContent || "").trim().slice(0, 40)}"` : ""}` };
       }
       return { ok: true, x, y };
     });
@@ -90,14 +90,14 @@ class Device {
    * `/cardio` (first phone run, 2026-09-23).
    */
   async home() {
-    if (await this.page.locator('nav a[href="/"]').isVisible()) return;
+    if (await this.page.locator('nav a[href="/"]').filter({ visible: true }).first().isVisible()) return;
     await this.go('/', 1500);
-    await this.page.locator('nav a[href="/"]').waitFor({ state: 'visible', timeout: 10_000 });
+    await this.page.locator('nav a[href="/"]').filter({ visible: true }).first().waitFor({ state: 'visible', timeout: 10_000 });
   }
 
   /** Tab-bar navigation, the way a thumb does it. */
   async tab(href, settleMs = 1200) {
-    await this.tap(`nav a[href="${href}"]`);
+    await this.tap(this.page.locator(`nav a[href="${href}"]`).filter({ visible: true }).first());
     await sleep(settleMs);
   }
 
@@ -112,6 +112,32 @@ class Device {
   async inForeground() {
     if (!this.onPhone) return true;
     return /mCurrentFocus=[^\n]*com\.trainingai\.app/.test(await adb(['shell', 'dumpsys', 'window']));
+  }
+
+  /**
+   * Raw input — a real finger where `x, y` (CSS px) says, which the app then interprets. The ONLY way
+   * a script may send `adb shell input` tap/swipe. adb input is blind: it lands on whatever is on
+   * screen. On 2026-09-23 taps meant for a Nutrition row landed on the launcher after the app had
+   * left the foreground, opened another app, and closed this one — on the owner's phone. So both
+   * helpers refuse unless the app is in the foreground AND on `expectPath`, checked immediately before
+   * sending. Never call `adb shell input tap|swipe` directly from a probe.
+   */
+  async _guard(expectPath) {
+    if (!this.onPhone) throw new Error('raw input is phone-only');
+    if (!(await this.inForeground())) throw new Error('raw input refused: the app is not in the foreground');
+    const { path } = await this.state();
+    if (expectPath && path !== expectPath) throw new Error(`raw input refused: on ${path}, expected ${expectPath}`);
+    return this.page.evaluate(() => devicePixelRatio);
+  }
+
+  async rawTap(x, y, { expectPath } = {}) {
+    const dpr = await this._guard(expectPath);
+    await adb(['shell', 'input', 'tap', String(Math.round(x * dpr)), String(Math.round(y * dpr))]);
+  }
+
+  async rawSwipe(x1, y1, x2, y2, { ms = 300, expectPath } = {}) {
+    const dpr = await this._guard(expectPath);
+    await adb(['shell', 'input', 'swipe', ...[x1, y1, x2, y2].map((v) => String(Math.round(v * dpr))), String(ms)]);
   }
 
   async bringToFront() {
