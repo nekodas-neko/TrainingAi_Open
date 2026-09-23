@@ -34,6 +34,20 @@ specific merge's deploy assumed merges deploy promptly, and DV-14 shows they did
 still deploy-shaped; which deploy is no longer established. `projectOverview.md` carries the live
 half: the owner's fixes are merging and not reaching him, and the next step needs a Railway log no
 container can read.
+## 2026-09-23 — implementation-backlog → 27277 (restoring two entries PR #1481 deleted)
+
+**A raise that is really an undo.** #1481's auto-merge of `docs/implementation-backlog.md` silently
+dropped **RV-117** and **RV-118** — two Review-filed entries carrying owner-approved gates — and
+ratcheted the baseline DOWN to match the loss. Restoring them from `ef199122700` puts the lines back,
+so the number returns to roughly where it was rather than growing.
+
+The rest is the `Lane: O` handback bullet on RV-117/RV-118/RV-119 (the 2026-09-22 mockup lives in
+the Orchestrator's chat and needs exporting — LB-135), less the shipped RV-116 entry, removed
+because it owes nothing.
+
+**The lesson, recorded in the Lane B baton:** counting the headings you edited does not catch a
+merge that deleted a neighbour. Diff the FULL heading set against `origin/main` after any backlog
+merge, and require every line of that diff to be an add or remove you intended.
 
 ## 2026-09-23 — backlog → 27235 (RV-77 re-verified and moved, LA-131 filed, +33 on a shrunken base)
 
@@ -16367,7 +16381,27 @@ Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
 `known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
 back to its 52-line baseline rather than raised.
 
-## 2026-09-23 — `docs/implementation-backlog.md` 27294 → 27417 (+123)
+---
+
+## 2026-09-23 — CLAUDE.md → 966, orchestrator baton → 78, backlog → 27110 (chore/or-139-report-triage-loop)
+
+Three rises, all growth, for the in-app report triage loop the owner asked for.
+
+**CLAUDE.md +17.** A new standing session-start read (`claude_ro.feedback_submissions`), of which
+6 lines are the `curl` block the other session-start reads also carry verbatim. The first draft was
++22 and was cut rather than baselined: it repeated the measurement detail the baton holds, and the
+orientation doc should carry the instruction while the baton carries the state.
+
+**Orchestrator baton +17.** The watermark itself, its rule for moving, and the measurement that
+justified choosing a watermark over a status column — the baton is where per-role state belongs, so
+this is the growth landing in the right file.
+
+**Backlog +71.** Two entries. `OR-137` for the screenshot-fetch route: the `claude_ro` view
+withholds `screenshot_data` and exposes only its byte length, so a reported UI bug arrives without
+the picture that is most of it. `OR-138` for reading the reporting user's own data — an auth/security
+widening the owner asked for, so it carries its reasoning, its recommended restriction and one
+explicitly unverified claim rather than a one-line instruction.
+## 2026-09-23 — `docs/implementation-backlog.md` → 27531 (+123 from this branch)
 
 BF-187, filed from an owner report asking whether sleep data can sync on app open. The length is
 mostly two measured tables that the entry exists to carry: 40 h of drain cadence (57–91 min between
@@ -16376,10 +16410,16 @@ scheduled drains) and the per-night post-wake lag across the seven nights still 
 discarded as a packer-window artifact rather than read as multi-day lags — the kind of thing that
 gets re-derived wrongly if only the conclusion survives.
 
-Amended the same day, +33 on top of the +91. The owner lifted the APK constraint
+Amended the same day, +33 on top of the original +91. The owner lifted the APK constraint
 (*"Happy for new apk builds if thats more effecient"*), which flipped BF-187's recommendation from a
 JS-side cooldown to a native `drainIfStale` — and the sweep that answer prompted found the entry
 duplicates **Q-529's link 1**, filed 2026-08-20 and parked ever since on the APK cost. Both halves
 of that are recorded in the entry rather than reconciled quietly: the duplicate disclosure with the
 split between the two entries, and the two independent cadence measurements (62.0-min median then,
 57–91 min now) that agree a month apart.
+
+Amended again: BF-188, the fold-script clobber found while resolving this branch's own merge
+conflict. Filed rather than left in the journal, per **No orphaned findings** — it has a silent
+data-loss mode (41 archived entries deleted with no error and no dangling link) and the existing
+CLAUDE.md warning about two sessions running the same compaction chore names the hazard without
+naming the line that causes it.

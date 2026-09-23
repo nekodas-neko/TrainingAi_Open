@@ -61,3 +61,19 @@ trigger rather than measuring the cadence a third time.
 Four other entries were parked on the same constraint and are now unblocked as a batch: **BF-80**
 (blank-screen handling in `MainActivity.java`), **BF-105** (spoken walk cues), **Q-111** (the scale
 battery chip), and **TN-51** (overnight strap wear landing in ambient mode).
+
+## A note on the fold this PR originally carried, and why it is gone
+
+The first commit folded the ten oldest journal entries, because the foldable-entries gate sat at
+exactly its limit and one new entry tripped it. While this branch was open another agent folded
+**41** entries into a history file of the same name, and the merge conflicted.
+
+The conflict was resolved by rebuilding rather than splicing — and the rebuild exposed something
+worth recording: **`fold-journal-entries.js` writes its history file with `writeFileSync`, not an
+append**, so re-running the fold on top of a same-named file produced by a concurrent fold silently
+**discards** the other agent's work. Anchors went from 41 to 11 with no error. Splicing the conflict
+hunks by hand would have looked like it worked.
+
+With the other fold merged, the count is 24 foldable against a limit of 60, so this branch's fold
+was no longer needed and was dropped entirely. The ten entries stay loose and the history file is
+main's, untouched.

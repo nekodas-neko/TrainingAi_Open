@@ -6,6 +6,23 @@
 **Updated:** 2026-09-15 · **By:** the device-pass rounds session · **Next ID:** `OR-117`
 (`grep -rhoE '\bOR-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
+## In-app reports — the triage watermark
+
+**Last triaged:** `1970-01-01T00:00:00Z` — nothing has been triaged yet, and nothing is owed.
+**A report with `created_at` after this line is untriaged.** Move it only once every report above it
+has become a backlog entry or been recorded as not-a-defect with its reason.
+
+Read them with the query in CLAUDE.md's session-start list (`claude_ro.feedback_submissions`). The
+loop: **read → review → file at the right priority with a lane → move this timestamp.** Never reply
+to a report as the whole answer; the queue is what outlives the session.
+
+**Measured 2026-09-23:** the view returned **0 rows** while the table's lifetime `n_tup_ins` was
+**1** — the view is row-scoped to the owner, so that one report is someone else's and is invisible
+here by design. So *"no reports"* means **none of the owner's**, and the feature has effectively
+never been used. That is the reason the owner chose a watermark over a status column: a migration
+and a Lane B surface is a lot of machinery for a feature with one lifetime submission, and this
+costs nothing to abandon.
+
 ## Now
 
 **Five rounds of owner device-checks are done** (OR-111→118); 81 answers, 30 entries left the queue.

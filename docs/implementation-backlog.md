@@ -652,6 +652,77 @@ below threshold and left in place for next time.
   stays under 1 s from another client throughout.
 
 
+### [platform] OR-138 — let the triaging agent read the data of the user who filed the feedback
+
+- **Lane:** A — `app/api/admin/db-query/route.ts`. **Added:** 2026-09-23 · owner request the same
+  day: *"the orchestrator or a set agent should be able to use the claude read only feature and read
+  the data of the user who made the report. The app is in development mode so each user has consented
+  to having their data used for training."*
+- **⚠ AUTH/SECURITY — the owner has asked for it, and the carve-out still applies.** This widens
+  `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
+  the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
+  **Do not widen it further than this entry describes without going back to him.**
+- **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
+  `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
+  views do not change at all. What is fixed is **where that setting comes from**:
+  `bootstrapClaudeRoOwner` (`lib/data/postgres/claude-ro-owner.ts`) issues
+  `ALTER ROLE claude_readonly SET app.claude_ro_owner = '<uuid>'` once at boot, so the scope is bound
+  to the **role**, globally, for every request.
+- **The shape: an optional `userId` on the request body, applied with `SET LOCAL` inside a
+  transaction** — `BEGIN; SET LOCAL app.claude_ro_owner = '<uuid>'; <the caller's SELECT>; COMMIT`.
+  Absent `userId`, behaviour is byte-identical to today (the role default still applies), so this is
+  additive and trivially reverted.
+- **`SET LOCAL` is not a style preference — a bare `SET` would leak across requests.** The endpoint
+  reads through a **pool** (`readonly-client`), so a plain `SET` persists on that pooled connection
+  and silently re-scopes whichever later request happens to reuse it. `SET LOCAL` cannot outlive its
+  transaction. Note that `SET LOCAL` outside a transaction warns and does nothing, so the `BEGIN` is
+  load-bearing rather than decorative.
+- **Validate the uuid with a regex, as the existing code already does and says why.** `SET`/`ALTER
+  ROLE` take no bind parameter, so the value is interpolated; `claude-ro-owner.ts` carries the same
+  regex and calls it *"the safety boundary, not validation"*. Reuse it rather than writing a second.
+- **Recommended restriction, and the one judgement worth a second's thought: allow the pivot only to
+  a user who has actually submitted feedback** (a cheap `EXISTS` against `feedback_submissions`).
+  That keeps the widening tied to the justification the owner gave — *the user who made the report* —
+  rather than becoming general cross-user read. It is one predicate to delete if he later wants it
+  broader, so the narrow version costs nothing to reverse and the broad one cannot be un-shipped.
+- **Log the pivot.** The route already records `sql`/`ip`/`durationMs` per query; add the user id
+  that was read, so a cross-user read is attributable after the fact. Consent is not the same as
+  no audit trail.
+- **What is already safe and should stay that way.** The endpoint **rejects any SQL containing a `;`**
+  (*"Only a single statement per request"*), so a caller cannot smuggle a `SET` alongside a `SELECT`.
+  Read-only is enforced by the Postgres **role**, never by inspecting SQL — do not add keyword
+  filtering, the file's header explains why it loses to `WITH x AS (INSERT … RETURNING *)`.
+- **⚠ Unverified, and worth checking first:** whether a caller can today send a bare
+  `SET app.claude_ro_owner = …` as its own single statement and have it stick on the pooled
+  connection. Read from the source, **not** tested — a live probe was the right thing to decline.
+  If it does stick, the current single-user guarantee is already softer than it reads, and that is a
+  fix to make in this same PR rather than a reason to hurry the feature.
+- **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
+
+### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
+
+- **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
+  decision the same day.
+- **The gap.** *Report an Issue* (`/more`) accepts a screenshot up to 500 KB and stores it in
+  `feedback_submissions.screenshot_data`. `claude_ro.feedback_submissions` **withholds that column
+  on purpose** and exposes `octet_length(...) AS screenshot_bytes` instead. So the Orchestrator's
+  session-start read of the owner's reports sees *"screenshot, 240 KB"* and nothing else — and for
+  a layout or rendering bug the picture is most of the signal, which is exactly the class the owner
+  is most likely to report from a phone.
+- **The owner asked for this (2026-09-23)** when the triage loop was set up, choosing it over
+  leaving the column withheld and describing screenshots by hand.
+- **Do NOT add `screenshot_data` to the `claude_ro` view.** It is a base-64 data URI up to 500 KB;
+  putting it in the view drags it into every `SELECT *` on that table and makes the db-query
+  endpoint unusable for ordinary report triage. **A dedicated route that returns ONE screenshot by
+  id is the shape** — the size belongs in the view, the bytes do not.
+- **Fetch by id, and scope it the way the view does.** The same owner scoping
+  (`current_setting('app.claude_ro_owner', …)`, never a hard-coded uuid — Q-456) has to hold on the
+  route, or it becomes a way to read another user's attachment. Match the auth and rate-limit shape
+  of its sibling admin routes rather than inventing one.
+- **Not urgent, and say so honestly:** the feature has **one submission in its lifetime** and none
+  of the owner's (measured 2026-09-23, view 0 rows against `n_tup_ins` 1). This is worth building
+  when reports start arriving, not before — it sits here so the gap is not rediscovered.
+
 ### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
 
 - **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
@@ -1629,24 +1700,6 @@ below threshold and left in place for next time.
 - **Keep:** the device look — a 150 ms crossfade on the owner's own screen is a feel judgement, and
   the sandbox can only prove the primitive is wired in.
 
-### [nutrition][app-shell] RV-116 — the widget picker offers two entries for one question, and the second is off by default
-
-- **Lane:** B — `components/more/home-widgets-section.tsx`. **Added:** 2026-09-22 · Review sweep 53.
-  **Amended:** 2026-09-22 — narrowed after the owner corrected the premise.
-- **Batch:** `home-ia-merge`
-- **Shipped 2026-09-23** (`fix/home-ia-merge-part1`). The picker now says, under the Card Widgets
-  heading, that Energy Balance is an **alternative** to Nutrition rather than an addition, and the
-  Energy Balance chip dims while Nutrition is on and it is off.
-- **Deviation from the entry's letter, and the reason:** it said "relabel the picker entry". The
-  chips sit in a wrapping row built for 384 px, and a label long enough to carry "alternative to
-  Nutrition" wraps that row. The sentence went under the heading instead, where it has space to say
-  the whole thing. Same intent, better fit; reversal is moving one `<p>`.
-- **Dimmed, never disabled** — it is a real choice, just not one to make *on top of* Nutrition.
-  Disabling would hide the alternative rather than rank it.
-- **Keep:** nothing. The structural duplication the entry describes (both cards reading
-  `energy-balance:${today}` through one hook) is deliberate and stays; this was only ever about the
-  picker reading as though you should turn both on.
-
 ### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
 
 - **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
@@ -1654,6 +1707,13 @@ below threshold and left in place for next time.
   dark … Build to it; a departure from it needs a fresh yes."** The mockup is not in the repo.
   Searched: nothing in `docs/design/` from that date, and the sweep write-up describes the problems
   rather than the approved layouts.
+- **⚠ CORRECTED 2026-09-23 by the owner: the artefact is NOT lost — it is in the Orchestrator's
+  chat.** So this is an EXPORT gap, not a design to redo, and the recovery is cheap: that session
+  still holds what he approved. The three entries are re-channelled `Lane: O` asking the
+  Orchestrator to save it under `docs/design/` and hand them back to `B`.
+- **That makes the rule below more worth having, not less.** A mockup living only in one session's
+  transcript is invisible to every other agent, and to the owner himself later; the repo is the only
+  shared memory.
 - **So the instruction cannot be followed.** "Build to it" and "a departure needs a fresh yes" both
   require knowing what *it* was. An implementer either invents a layout — the precise departure the
   gate exists to prevent — or re-asks the owner something he already answered. **This blocked
@@ -1670,9 +1730,63 @@ below threshold and left in place for next time.
   What it prevents is a lane building a Home layout the owner never saw and only finding out when he
   opens the app.
 
+### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
+
+- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
+  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
+  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
+  ready the moment the artefact lands.
+- **Was Lane B** — `app/health/health-sections.tsx:544-604` and `:646-648`. **Added:** 2026-09-22 ·
+  Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `health-ia-merge`
+- The "Balance" tile renders `netKcal` `vs TDEE est.` in group **Body**; `CalorieBalanceBar` renders
+  `remainingKcal` + zone band in group **Activity & intake**. Same payload, two different numbers,
+  both presented as today's energy answer, with the Sleep group and eight Heart-&-recovery cards in
+  between.
+- `use-health-calcs.ts:44-47` records that these two surfaces **already disagreed once**, each
+  deriving its own TDEE. The data was unified; the presentation was not.
+- **Fix:** fold `netKcal` and `maintenance` in as a secondary line of `CalorieBalanceBar`, **behind a
+  prop** — that component is shared with Nutrition and `/health/day`, which did not ask for the extra
+  number.
+- **Fold, do not delete:** surplus/deficit and remaining-to-eat are genuinely different framings.
+
+### [body] RV-118 — "Weight Trend" exists twice in Health, and the card with that title has no trend number
+
+- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
+  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
+  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
+  ready the moment the artefact lands.
+- **Was Lane B** — `app/health/health-sections.tsx:544-573` (Body) and `:713-763` (Progress).
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
+  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
+- **Batch:** `health-ia-merge`
+- Body has a "Trend" tile with the kg/wk regression slope and **no chart**; Progress has a card
+  **titled "Weight Trend"** with a sparkline and two goal bars and **no slope number**. One question
+  — am I losing weight, how fast, how far to target — split across two sub-tabs the owner must swipe
+  between.
+- **Fix:** one card with sparkline + slope + goal bars. Body is the better home (it holds the
+  weight, body-fat and lean-mass cards it derives from). Both are plain JSX in one file sharing one
+  context, so the mechanical risk is low.
+- **What is lost:** the goal bars are Progress's subject, so **Progress becomes a 4-card tab.** Say
+  that out loud before doing it.
+- Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
+
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
 
-- **Lane:** B — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
+- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
+  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
+  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
+  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
+  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
+  ready the moment the artefact lands.
+- **Was Lane B** — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
   Review sweep 53.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
@@ -2975,6 +3089,34 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake, found while resolving a real
+  conflict). **Lane: O** — this is tooling for the compaction chore, not product code, and the right
+  answer may be a convention rather than a patch.
+- **⚑ MEASURED, not reasoned.** Two agents folded on 2026-09-23. Both wrote
+  `docs/overview/history-2026-09-23-folded-1.md` — the name is derived from the date, so a same-day
+  second fold always collides. On resolving the conflict by restoring `origin/main`'s file and
+  re-running the fold for the ten local entries, the result held **11 anchors where 51 were
+  expected**: `scripts/fold-journal-entries.js:177` writes with **`fs.writeFileSync`**, so it
+  rebuilds the file from the entries it is folding and **drops every section already in it**.
+- **⚠ The failure is silent and survives the checks that exist.** No error, no warning, and
+  `check-doc-links` passed over 819 files afterwards — the folded-away entries were not cited, so
+  nothing dangled. The count was only visible by grepping `<a id=` before and after. A conflict
+  resolved by splicing the hunks would look correct and lose nothing visible, which is the part that
+  makes this worth a queue entry rather than a comment.
+- **Fix: make the write additive, or make the filename unique per fold.** Reading an existing
+  same-named file and merging its sections in is the durable answer, because the collision is
+  structural — the name is `<date>-folded-1.md` and two folds on one day is exactly the case the
+  compaction chore invites. Appending a `-2` suffix when the file exists is the cheaper answer and
+  leaves the archive in two files per day; that is a real cost, but a smaller one than deleting
+  another agent's sweep.
+- **Note the existing rule this sits under.** CLAUDE.md already warns that two sessions running the
+  same compaction chore *"once cost a whole PR's work"*. This is the mechanism behind that sentence,
+  measured — the rule named the hazard without naming the line that causes it.
+- **Verification:** fold N entries, then fold M more into the same day without deleting the file,
+  and confirm the result holds N+M anchors. Today it holds M.
+
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Can we somehow get the
