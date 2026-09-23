@@ -716,19 +716,26 @@ said nothing, because both had skipped inside it.
   `total_count: 0` forever while CI runs normally for every other branch. That looks exactly like
   the stale-base tell above and is a different thing — chasing the wrong one cost four PRs
   (#1426, #1428, #1430, #1435, all abandoned with sound diffs).
-  **⚠ The "every time" version of this rule was WRONG and is corrected here (LA-130, 2026-09-23).**
-  It said a plain fetch re-grafts at the new tip, so one unshallow does not immunise the next fetch.
-  **Measured on a purpose-built `--depth=1` clone: it does.** After one `git fetch --unshallow
-  origin`, three bare `git fetch origin main` calls and two fetches of branch tips the clone had
-  never seen all left `.git/shallow` absent, one root, and a valid merge-base. What a bare fetch
-  cannot do is *deepen* a clone that is still shallow — so the four fetches that looked like
-  "it came back" were four fetches on a clone that had never successfully been unshallowed. It never
-  left.
-  **So: `git fetch --unshallow origin` ONCE per clone, and every fetch after it is ordinary.** It
-  fatals with *"on a complete repository does not make sense"* if the clone is already whole, so
-  guard it with `test -f .git/shallow` rather than running it blind. The session-start hook now does
-  this for `$CLAUDE_PROJECT_DIR`; a clone you make yourself in the scratchpad is yours to unshallow.
-  Two things distinguish this from a stale base, and both are cheap:
+  **⚠ THE CULPRIT WAS `pnpm check:rules`, NOT the fetch — found and fixed 2026-09-23 (LA-130).**
+  The rule used to say a plain fetch re-grafts at the new tip, so `--unshallow` was needed on
+  *every* fetch. That was wrong, and so was the first attempt to correct it. **`check:rules` runs
+  every step of the Custom Rules job against your own clone, and one of those steps was
+  `git fetch --depth=1 origin main` — which re-shallowed the clone on every run, measured 1,445
+  commits down to 2.** Since `check:rules` is run immediately before every push, the clone was
+  freshly truncated at exactly the moment its ancestry mattered, and the bare `git fetch origin
+  main` that followed got the blame for a state it merely failed to repair — a fetch cannot *deepen*
+  a shallow clone. The CI step is now guarded on `origin/main` being absent, so it still fetches in
+  CI (where a depth-1 checkout really has no base) and is a no-op locally.
+  **So a bare fetch is ordinary again**, measured 0 re-shallows in 16 across two clones once
+  `check:rules` was out of the picture. `git fetch --unshallow origin` is a one-off repair, and it
+  **fatals** with *"on a complete repository does not make sense"* when the clone is already whole —
+  so guard it with `test -f .git/shallow`, and never read its result through `| tail -1` beside
+  another command, which is how a fatal was read as a success and sent this whole diagnosis the
+  wrong way twice. The session-start hook does the one repair for `$CLAUDE_PROJECT_DIR`; a clone you
+  make yourself in the scratchpad is yours.
+  **Still check `.git/shallow` when a merge or a PR misbehaves** — it is one cheap command, and any
+  other tool that replays a CI step can reintroduce this. Two things distinguish it from a stale
+  base, and both are cheap:
   `git rev-list --max-parents=0 HEAD | wc -l` returning more than 1, and
   `git merge-base HEAD origin/main` returning empty. When a local repo has already been poisoned,
   `git clone` (no `--depth`) into the scratchpad gives a sound history — that is what unblocked it,
