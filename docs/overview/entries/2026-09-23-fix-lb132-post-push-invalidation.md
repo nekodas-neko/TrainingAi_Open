@@ -64,3 +64,19 @@ exercised: native SQLite, safe-area, Samsung WebView, drifted prod data.
 **Owed:** the device pass, recorded as `Keep:` on the entry — log a morning check-in and an
 end-of-day review on the S25 and confirm the prescription and health-trends surfaces move when the
 push lands rather than at TTL.
+
+## Found while shipping this — filed as LB-133
+
+`scripts/check-invalidate-after-push.js` is CI step 37, has no baseline, and reported
+`no write invalidates around its push` for the whole time these five sites carried the defect.
+Reverting one fixed site and re-running still reported clean, so it is blind to the shape rather
+than to a formatting variant.
+
+The cause is `WINDOW = 12` — a ±12-line text window around the push. All five sites sit further out
+(14, 26, 35, 39 and 53 lines). Its docblock already records that widening the window failed once:
+LB-6 looked six lines up, missed five written below, and the window became ±12. The fix is to match
+the **enclosing block** to its balanced close, as `check-admin-guard-catch.js` learned under Q-548,
+with the blind spots pinned as fixture cases.
+
+Recorded with the measurements because **this PR removes the evidence** — all five instances are
+fixed here, so the detector can no longer be tested against live offenders.

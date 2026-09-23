@@ -1170,6 +1170,47 @@ below threshold and left in place for next time.
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
 
+### [platform] LB-133 — the guard for the post-push class cannot see the class
+
+- **Lane: B** · **Added:** 2026-09-23 · Lane B, found while shipping LB-132.
+- **`scripts/check-invalidate-after-push.js` reported `no write invalidates around its push` while
+  five live sites carried exactly that defect.** It is CI step 37 in Custom Rules, it has no
+  baseline and no allowlist, and it exits 0. The green tick is read as evidence, which is what makes
+  this worse than having no check.
+- **Measured, by reverting one fixed site and re-running:** the ratchet still reported clean. So it
+  is blind to the shape, not merely to a formatting variant of it.
+- **The blind spot is `WINDOW = 12`** — a ±12-line text window around the `pushMutations` call.
+  Every one of LB-132's five sites puts its invalidation further away than that:
+
+  | Site | push → invalidate |
+  |------|-------------------|
+  | `end-of-day-review.tsx` | 14 lines |
+  | `mood-checkin-sheet.tsx` | 26 |
+  | `morning-checkin-sheet.tsx` | 35 |
+  | `log-value-sheet.tsx` | 39 |
+  | `exercise-review-sheet.tsx` | 53 |
+
+- **Widening the window is the fix that already failed once, and must not be tried again.** The
+  script's own docblock records it: LB-6 looked at the six lines ABOVE each call and missed five
+  written below, so the window was widened to ±12 both ways. That is how it reached today's state.
+  A window of 60 would catch these five and miss the sixth, and would start matching an unrelated
+  `invalidate*` in a neighbouring function.
+- **Fix: match the ENCLOSING BLOCK, not a line window** — walk to the balanced close of the function
+  or `try` containing the push, and ask whether any `invalidate*(` occurs inside it.
+  `check-admin-guard-catch.js` learned the same lesson under Q-548, where one regex requiring the
+  try's brace on the next line let twelve live sites through; `scripts/__tests__/admin-guard-catch.test.ts`
+  pins its blind spots as cases so a later narrowing fails. Copy that shape, test included.
+- **⚠ The evidence disappears when LB-132 merges.** All five instances are fixed there, so the
+  detector cannot be tested against live offenders afterwards. The distances are recorded above for
+  exactly that reason, and the regression test must construct the shapes as fixtures rather than
+  pointing at files.
+- **Expect new hits when it is fixed, and triage rather than sweep them.** The same rule LB-132
+  established applies: a bare `pushMutations` is only a defect where some CACHED key holds what the
+  write changed. Six sites that look like the class are already verified correct and named in LB-132
+  and its predecessors — `use-plan-meal-logging.ts`, `manual-bedtime-card.tsx`, `more-content.tsx`,
+  `sync-health-card.tsx` and the two group-① candidates. A tightened detector will flag some of
+  them; they are not regressions.
+
 ### [nutrition][app-shell] LB-129 — the day-review sheet does not open on a first flip into Nutrition
 
 - **Lane:** B — `app/nutrition/nutrition-content.tsx:191`. **Added:** 2026-09-23 · found while
