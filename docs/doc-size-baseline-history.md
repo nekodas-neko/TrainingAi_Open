@@ -16296,3 +16296,12 @@ console's hung requests during device sweep 2. Placed first because it is availa
 
 DV-14 (production has not deployed since 15:13) filed above DV-13, and DV-13 gains the deploy as a
 second explanation for its outage.
+
+---
+
+## 2026-09-23 — backlog → 27035, projectOverview → 12507 (device/sweep-2b, sweep 2 write-up)
+
+Both shrink. Sweep 2 removed nine device-verified backlog entries (Q-112e, BF-99, BF-162, RV-39,
+Q-317, BF-133, BF-186, BF-45, BF-47) and archived five Known-Issues rows to
+`known-issues-resolved.md`; it added DV-15 and ~30 one-bullet device results. The baton was trimmed
+back to its 52-line baseline rather than raised.

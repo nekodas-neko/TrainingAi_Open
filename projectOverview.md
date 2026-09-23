@@ -3238,19 +3238,6 @@ different rep opinions, and the card shows one. Judging the pair is **Lane A's**
 **NOT verified on device.** A `title` is a hover affordance; on the S25 it is reached by long press
 in the WebView. Kept as BF-163's `Keep:` ②.
 
-### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
-
-The owner, reading his Legs prescription: *"Is this right?"* The card printed **`@ 85kg (66%)`**
-against a **Hanging Leg Raise** — 66% of a stored `estimated_1rm` of 128, which for a bodyweight
-exercise is an internal index derived from reps (BF-149), not a load. There is no bar. Pull-Up showed
-`@ 90kg` the same way.
-
-Fixed by one guard using the shared `isBodyweightType`; the row falls through to the percent-only
-branch the card already rendered for exercises with no 1RM. **Check on device:** a session containing
-a bodyweight exercise shows no kg for it, while weighted exercises in the same list are unchanged.
-**The harness cannot cover this** — 27 bodyweight exercises exist in the library and none is in any
-session, so the row cannot be rendered without inventing fixture state.
-
 ### [app-shell] ⚠️ Back on a tab now goes Home, and the gesture itself is not device-verified (LB-107, 2026-09-14)
 
 Shipped in v1.456.6. The owner reported that back on a tab *"should go to the home screen"*; what it
@@ -3311,20 +3298,6 @@ source is 8,816 base64 characters. `capture-actions.tsx` works around it with a 
 to a 7 KB wire budget and drops the image rather than send a body that would fail; that workaround,
 its `THUMB_WIRE_BUDGET` constant and two assertions in `food-image-write-paths.test.ts` come out
 when the route's cap is fixed.
-
-### [nutrition][app-shell] ⚠️ The weekly recap shows its numbers now, unseen on the phone (Q-112e, 2026-09-12, v1.451.0) · needs: hardware
-
-The recap said its piece in prose and showed none of the figures behind it. It now carries the day
-review's four trend rows over five weekly points, each judged against the four completed weeks
-before it, reading LB-64's `month-window` route.
-
-**Widened, not copied.** `trendRowsFor`/`TrendRowCard` take a window (`points` + `priorAverages`)
-instead of a day-shaped response, so both surfaces share one implementation — proven by mutation:
-reading the first point instead of the last fails 6 of 19 tests across both windows.
-
-**What is owed is the phone.** Verified at 412 dp in the harness against the real route and real
-data (weight `↓ 0.3 kg below the last 4 weeks` checks by hand), but the recap is a Home banner whose
-expanded body now grows by four cards, and nobody has opened it on the S25.
 
 ### [platform][app-shell] ⚠️ The admin Exercises tab is usable now, and the S3 credentials nobody checked still gate it (BF-147, 2026-09-12, v1.450.0) · needs: owner
 
@@ -3588,18 +3561,6 @@ read of that table — returns seven days with no range parameter, so on web the
 ±4 kg/wk and the coloured branch is reachable only with an absurd fixture. The e2e proves the
 rendering, not the behaviour over a real dosing period (LB-96 asks Lane A for the range).
 **Also open:** the band is the constant 0.5–1 %/wk, not yet the owner's setting (LB-97).
-
-### [body][app-shell] ⚠️ Profile details now lists tests and scans, and nobody has seen the longer page on the phone (BF-133, 2026-09-09, v1.443.5)
-
-`fitness_tests`, `dexa_scans` and `measured_rmr` render as a "Tests and scans" section under the
-daily readings #1009 added, each row dated and each labelled apart from its same-named neighbour —
-the scan's body fat is not the scale's, and a measured resting rate is not the scale's estimate.
-[Journal](docs/overview/history-2026-09-12-folded-1.md#2026-09-09-feat-details-tests-and-scans).
-**Owed: the device check**, and it covers both halves of this screen — #1009's never had one either.
-`fitness_tests` is read local-first and the browser has no native SQLite, so only the `cachedFetch`
-fallback ran; the `getFitnessTests` branch is unexercised. And this is now a long dense list on a
-412 dp phone, which is the reading the entry itself flagged as the real check.
-**Not included:** `personal_records`, which has no route that keeps the date — filed as LB-95.
 
 ### [nutrition] ⚠️ A declined plan meal could revert; the fix has only been seen on the web path (LB-51, 2026-09-09, v1.443.4)
 
@@ -4364,14 +4325,6 @@ foreclose the answer. **This does not reopen Q-43** (degrade rather than blank).
 
 **NOT verified on device.** [`Review sweep 42 §2`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
 
-### [devices][app-shell] ⚠️ The `/more/devices` ring card flashes a skeleton on a warm repeat visit (RV-39, 2026-09-03)
-
-Measured on a second visit to an already-compiled route: `[1,1,0,0]` skeletons at 250/600/1200/2500 ms,
-against `[0,0,0,0]` on all 13 other sub-routes. Under a second, and filed because the rule has no
-threshold. The existing `expectNoSkeleton` helper polls to 20 s, so it catches *never seeds* and is
-blind to this class. **Needs the device** — the ring card's real state is BLE, unreachable on web.
-[`§3`](docs/reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
-
 ### [nutrition][app-shell] 🟡 Nutrition never asks what day it is on resume, so a log after midnight lands on yesterday (RV-35, 2026-09-03 — fixed 2026-09-04, device check owed)
 
 **Fixed by BF-117** and kept here because the device check is owed. RV-35's measurement was right and
@@ -4633,22 +4586,6 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
 - **Today's 55 reproduces exactly** (55.3) from stored contributors, and **HRV 53 ms (vs 71–72) plus resting HR 63.7 (vs 59.0) account for 15.8 of the 18-point drop** from yesterday. Sleep duration was fine at 7.75 h. **The app is right today.**
 - **⚠ Two contributors qualify it, both queued:** `recoveryIndex` scored **100** flagged provisional after 22 and 44 on the two prior days, *lifting* readiness by 5 (**Q-509**); and `checkin` sits at the placeholder 50 until logged, so the score still moves after first open (**TN-9**).
 - **Permanent, and worth knowing: two of the five numbers are not independent.** `previousNight.input` **is** the Sleep tile and `activityBalance.input` **is** the Activity tile — **22% of readiness is the two tiles beside it** (`corr` **+0.656**, against sleep~activity **+0.139**) — and Body Battery's morning anchor **is** the readiness score (**+0.838**, n=47). The screen reads as more corroboration than it is; the fix is presentational and belongs with **TN-15**.
-
-### [nutrition][devices] ⚠️ The queued-delete fix is reasoned, not reproduced (BF-47, v1.395.5)
-
-The owner reported it from the device and the fix has never been seen to work there — nor has the
-bug been seen to fail in a sandbox, because there is no sandbox in which it can. `getLocalStore`
-returns null in `pnpm dev` and in Playwright, so neither mechanism has an analogue, and the hook
-itself cannot be rendered (both vitest projects are `environment: 'node'` with no
-`@testing-library/react`).
-
-What IS proven: the rule is unit-tested, its **placement** is pinned by a source-order test (before
-`applyDelta`, not after — the difference between fixing the flicker and fixing the half that
-survives a screen swap), and 8 of 8 mutations were caught.
-
-**Smoke step:** on the S25, delete a logged food — online and offline. It should go and stay gone
-across a screen swap and a force-close. Then delete a food logged on the web on a different day,
-which is the case the filed trace did not cover.
 
 ### [nutrition][devices] ⚠️ Local SQLite v31 has not been opened on the S25 (BF-39, 2026-08-30)
 

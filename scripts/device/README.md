@@ -317,3 +317,22 @@ was the reading, not the connection:
   server that may already be stuck. Time it from the page's own requests (`recordNetwork`) instead.
 - **Watch production during a sweep:** a `curl` of the public `/api/version` from this PC is a
   database-free liveness check. If it slows, stop the sweep before doing anything else.
+
+### Sweep 2's other lessons (2026-09-23)
+
+- **`/api/nutrition/food-logs` returns a bare array.** A check written as `(j.logs || [])` reads zero
+  rows and "passes" any *it is gone* test. Sweep 2 made that mistake once; the verdict survived only
+  because a later read used the array.
+- **To fail a request the service worker fetches, use CDP `Network.setBlockedURLs`.** `page.route`
+  never sees it (RV-38 could not be checked that way); `setBlockedURLs` did fail `energy-balance`
+  (RV-103). Always clear it with `{ urls: [] }` in a `finally`.
+- **`/health/day?date=` does not re-read the query on a router push** — load a date with a hard
+  navigation, or the screen keeps the previous day.
+- **Check `navigation_mode` before any inset check** (`adb shell settings get secure
+  navigation_mode`: 0 three-button, 2 gesture). Sweep 2 ran on three-button, so every gesture-bar
+  check was void.
+- **After a deploy, force-stop and restart the app** (`am force-stop` + `am start`; never clear data)
+  and confirm the new code is in the DOM before re-checking a fix — the server's `/api/version` says
+  what is deployed, not what the WebView is running.
+- **`recordNetwork({ bodies: true })`** now keeps every body; before, it needed a RegExp and threw
+  on the first response.

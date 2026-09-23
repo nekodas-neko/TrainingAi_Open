@@ -2269,3 +2269,76 @@ fallback. [Sweep 47](../reviews/2026-09-05-delete-reports-success-for-nothing.md
   the offline ones queued and reached the server when the outbox drained. RV-45 left the queue. Two
   side findings filed separately: supplements are not tombstoned locally (DV-10); an offline queue
   drained on the next write rather than on reconnect under CDP emulation (RV-131).
+
+### [workouts] ⚠️ A bodyweight exercise no longer shows a kg target, and that is not device-verified (BF-162, 2026-09-15)
+
+The owner, reading his Legs prescription: *"Is this right?"* The card printed **`@ 85kg (66%)`**
+against a **Hanging Leg Raise** — 66% of a stored `estimated_1rm` of 128, which for a bodyweight
+exercise is an internal index derived from reps (BF-149), not a load. There is no bar. Pull-Up showed
+`@ 90kg` the same way.
+
+Fixed by one guard using the shared `isBodyweightType`; the row falls through to the percent-only
+branch the card already rendered for exercises with no 1RM. **Check on device:** a session containing
+a bodyweight exercise shows no kg for it, while weighted exercises in the same list are unchanged.
+**The harness cannot cover this** — 27 bodyweight exercises exist in the library and none is in any
+session, so the row cannot be rendered without inventing fixture state.
+
+- **📱 Device-verified 2026-09-23 (sweep 2, S25, APK 1.460.4, web v1.465.10): PASS — no kg on the bodyweight row, weighted rows unchanged.** Moved here by the Device Verification agent.
+
+### [nutrition][app-shell] ⚠️ The weekly recap shows its numbers now, unseen on the phone (Q-112e, 2026-09-12, v1.451.0) · needs: hardware
+
+The recap said its piece in prose and showed none of the figures behind it. It now carries the day
+review's four trend rows over five weekly points, each judged against the four completed weeks
+before it, reading LB-64's `month-window` route.
+
+**Widened, not copied.** `trendRowsFor`/`TrendRowCard` take a window (`points` + `priorAverages`)
+instead of a day-shaped response, so both surfaces share one implementation — proven by mutation:
+reading the first point instead of the last fails 6 of 19 tests across both windows.
+
+**What is owed is the phone.** Verified at 412 dp in the harness against the real route and real
+data (weight `↓ 0.3 kg below the last 4 weeks` checks by hand), but the recap is a Home banner whose
+expanded body now grows by four cards, and nobody has opened it on the S25.
+
+- **📱 Device-verified 2026-09-23 (sweep 2, S25, APK 1.460.4, web v1.465.10): PASS — four trend rows render at the foot of /health/week.** Moved here by the Device Verification agent.
+
+### [body][app-shell] ⚠️ Profile details now lists tests and scans, and nobody has seen the longer page on the phone (BF-133, 2026-09-09, v1.443.5)
+
+`fitness_tests`, `dexa_scans` and `measured_rmr` render as a "Tests and scans" section under the
+daily readings #1009 added, each row dated and each labelled apart from its same-named neighbour —
+the scan's body fat is not the scale's, and a measured resting rate is not the scale's estimate.
+[Journal](history-2026-09-12-folded-1.md#2026-09-09-feat-details-tests-and-scans).
+**Owed: the device check**, and it covers both halves of this screen — #1009's never had one either.
+`fitness_tests` is read local-first and the browser has no native SQLite, so only the `cachedFetch`
+fallback ran; the `getFitnessTests` branch is unexercised. And this is now a long dense list on a
+412 dp phone, which is the reading the entry itself flagged as the real check.
+**Not included:** `personal_records`, which has no route that keeps the date — filed as LB-95.
+
+- **📱 Device-verified 2026-09-23 (sweep 2, S25, APK 1.460.4, web v1.465.10): PASS on display — "Tests and scans" (DEXA, RMR 1,522 kcal, metabolic age); no fitness tests on the account to exercise that branch.** Moved here by the Device Verification agent.
+
+### [devices][app-shell] ⚠️ The `/more/devices` ring card flashes a skeleton on a warm repeat visit (RV-39, 2026-09-03)
+
+Measured on a second visit to an already-compiled route: `[1,1,0,0]` skeletons at 250/600/1200/2500 ms,
+against `[0,0,0,0]` on all 13 other sub-routes. Under a second, and filed because the rule has no
+threshold. The existing `expectNoSkeleton` helper polls to 20 s, so it catches *never seeds* and is
+blind to this class. **Needs the device** — the ring card's real state is BLE, unreachable on web.
+[`§3`](../reviews/2026-09-03-first-run-honesty-and-instant-paint.md).
+
+- **📱 Device-verified 2026-09-23 (sweep 2, S25, APK 1.460.4, web v1.465.10): PASS — no skeleton on the warm repeat visit ([0,0,0,0] pulse frames twice).** Moved here by the Device Verification agent.
+
+### [nutrition][devices] ⚠️ The queued-delete fix is reasoned, not reproduced (BF-47, v1.395.5)
+
+The owner reported it from the device and the fix has never been seen to work there — nor has the
+bug been seen to fail in a sandbox, because there is no sandbox in which it can. `getLocalStore`
+returns null in `pnpm dev` and in Playwright, so neither mechanism has an analogue, and the hook
+itself cannot be rendered (both vitest projects are `environment: 'node'` with no
+`@testing-library/react`).
+
+What IS proven: the rule is unit-tested, its **placement** is pinned by a source-order test (before
+`applyDelta`, not after — the difference between fixing the flicker and fixing the half that
+survives a screen swap), and 8 of 8 mutations were caught.
+
+**Smoke step:** on the S25, delete a logged food — online and offline. It should go and stay gone
+across a screen swap and a force-close. Then delete a food logged on the web on a different day,
+which is the case the filed trace did not cover.
+
+- **📱 Device-verified 2026-09-23 (sweep 2, S25, APK 1.460.4, web v1.465.10): PASS — a food deleted OFFLINE queued (outbox food_logs pending), drained on reconnect, stayed gone across a tab swap and a force-stop, and the server list no longer holds it. (A separate race resurrected a different deleted row the same evening — DV-15.)** Moved here by the Device Verification agent.
