@@ -232,3 +232,28 @@ specs, or a separate test account on the phone. That is an owner decision, not a
 `mCurrentFocus` on `com.sec.android.app.launcher`, and relaunching prints *"its current task has
 been brought to the front"* with the same pid and the same `performance.timeOrigin` — that is
 "minimised", as opposed to finished and reloaded.
+
+## What the first probe sitting taught — S25, 2026-09-23
+
+`pw.js`, `sweep.js` and `census.js` all worked on the phone on first contact. What needed changing
+was the reading, not the connection:
+
+- **The first `Page.captureScreenshot` after attaching can time out** (20 s); the retry succeeded.
+  Retry once before believing it.
+- **`go()` stacks history.** Four back presses from `/program` after a sweep landed on `/cardio`, not
+  Home. `home()` now returns through the router and waits for the tab bar.
+- **A swipe tray is still animating ~0.9 s after an adb swipe** — `tap()` refused Delete because an
+  svg of the row was still over it. That refusal is correct and is *not* evidence about BF-61; the
+  immediate-tap question needs a raw `adb shell input tap`.
+- **`recordNetwork({ bodies: /re/ })`** keeps response bodies. It is how BF-177's failure was told
+  apart from a stale server: the post-push response carried the right number and the card ignored it.
+- **Local-first writes make a request count lie.** Nutrition repaints from SQLite with no request, so
+  P1 reads the visible numbers too — in hidden tab panels as well, which the shell keeps mounted.
+- **`sweep.js` measures the touch box**, not the ink: `.tap-target-44` / `.tap-target-dot` add an
+  invisible `::before`. And clearance compares with a 0.5 px tolerance — the tab bar's 56 device px
+  ÷ 3.75 is 14.93, which an exact compare called short of a 15 px inset.
+- **`census.js` records metrics per round.** Round 1 mounts every tab, so only growth after it is a
+  leak signal.
+- **`offline(true)` is page-level.** Fetches fail and `navigator.onLine` is false, but no offline
+  banner appeared — the app may read Capacitor's network plugin, which this does not reach — and a
+  force-stop drops it, so "survives a restart offline" needs real airplane mode.

@@ -15703,3 +15703,14 @@ what these three entries show cannot distinguish a working subscription from a m
 
 Rewritten in full for the probe sitting; the per-entry results table moved out, since every row it
 held is now in the backlog entry it describes. Ratcheted to the new size.
+
+---
+
+## 2026-09-23 — backlog → 26973 (+150), device-verification baton → 54 (−3) (device/probe-sitting)
+
+The first probe sitting on the S25 (RV-124…RV-133). `docs/device-agent-probe-checklist.md` asks for
+each verdict to carry the measurement that produced it, quoted in the entry — so the growth is the
+measurements themselves: result bullets on seven probe entries, BF-177 rewritten from verification
+debt to failed work with its request trace, a partial on BF-61, and three new entries (DV-4 contrast,
+DV-5 rows stuck `pending`, DV-6 status-bar backing, owner-gated). Raised rather than trimmed because
+a verdict without its number is what the checklist exists to stop.
