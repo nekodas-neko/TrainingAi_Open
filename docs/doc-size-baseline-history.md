@@ -18,6 +18,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-24 — backlog → 27265 (DV-14 re-measured, DV-13 corrected), projectOverview → 12614
+
+DV-14 recurred and is worse: production serves 1.465.17 against a `main` at 1.465.22, stuck roughly
+ten hours with five user-visible merges unshipped. Both entries grew because the re-measurement
+**withdrew a conclusion** rather than adding one — DV-13's attribution of the 8-minute outage to a
+specific merge's deploy assumed merges deploy promptly, and DV-14 shows they did not. The outage is
+still deploy-shaped; which deploy is no longer established. `projectOverview.md` carries the live
+half: the owner's fixes are merging and not reaching him, and the next step needs a Railway log no
+container can read.
 ## 2026-09-23 — implementation-backlog → 27277 (restoring two entries PR #1481 deleted)
 
 **A raise that is really an undo.** #1481's auto-merge of `docs/implementation-backlog.md` silently
