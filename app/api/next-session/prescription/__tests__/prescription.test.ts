@@ -74,8 +74,9 @@ describe('GET /api/next-session/prescription', () => {
 
   it('returns source "static" for a non-ai_dynamic program', async () => {
     const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press', styleId: 'style-1' }])
-    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '' })
-    getActiveProgram.mockResolvedValue({ id: 'prog-1', phaseMode: 'automatic', sessions: [sess] })
+    const prog = { id: 'prog-1', phaseMode: 'automatic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getActiveProgram.mockResolvedValue(prog)
     listProgressionStyles.mockResolvedValue([
       { id: 'style-1', name: 'Standard', sets: [{ pct: 80, reps: 8, restSec: 90, useFor1rm: true }] },
     ])
@@ -93,8 +94,9 @@ describe('GET /api/next-session/prescription', () => {
 
   it('returns source "pending" for an ai_dynamic program with no stored prescription', async () => {
     const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press' }])
-    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '' })
-    getActiveProgram.mockResolvedValue({ id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] })
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getActiveProgram.mockResolvedValue(prog)
     getSessionPeriodization.mockResolvedValue({ prescription: null, prescriptionStatus: 'consumed', prescriptionGeneratedAt: null, prescriptionExpiresAt: null })
 
     const res = await GET()
@@ -104,8 +106,9 @@ describe('GET /api/next-session/prescription', () => {
 
   it('returns source "driving" and applies the stored prescription\'s pct/reps/rest', async () => {
     const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press' }])
-    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '' })
-    getActiveProgram.mockResolvedValue({ id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] })
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getActiveProgram.mockResolvedValue(prog)
     getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100 }]]))
     getLastRealOneRmBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, target80: 80 }]]))
     getSessionPeriodization.mockResolvedValue({
@@ -128,8 +131,9 @@ describe('GET /api/next-session/prescription', () => {
 
   it('keeps driving load even once the stored prescription is past its expiry timestamp (no auto-expiry — only an explicit dismiss changes status)', async () => {
     const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press', styleId: 'style-1' }])
-    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '' })
-    getActiveProgram.mockResolvedValue({ id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] })
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getActiveProgram.mockResolvedValue(prog)
     listProgressionStyles.mockResolvedValue([
       { id: 'style-1', name: 'Standard', sets: [{ pct: 80, reps: 8, restSec: 90, useFor1rm: true }] },
     ])
@@ -154,8 +158,9 @@ describe('GET /api/next-session/prescription', () => {
 
   it('never calls a prescription-mutating repo method', async () => {
     const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press' }])
-    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '' })
-    getActiveProgram.mockResolvedValue({ id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] })
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getActiveProgram.mockResolvedValue(prog)
     getSessionPeriodization.mockResolvedValue({
       prescriptionStatus: 'accepted',
       prescriptionGeneratedAt: new Date(),
