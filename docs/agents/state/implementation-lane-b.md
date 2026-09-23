@@ -38,6 +38,10 @@ None.
   tab panels and never unmounts, so it passed regardless. Always check the negative case — and make
   sure the negative control actually does the thing (mine dispatched a non-tab href, which
   `onNav` ignores without `preventDefault`, so nothing navigated).
+- **Run the FULL vitest suite before pushing, never a subset scoped to the dirs you changed.**
+  That cost a red CI on #1431: `lib/__tests__/activity-store-stale-setup.test.ts` is a
+  source-shape test asserting on `components/guided-walk/walk-summary.tsx`, so converting that
+  file broke a test two directories away. Source-shape tests live anywhere and assert on anything.
 - **Never pipe a gate through a short `tail`.** It hid a second merge conflict twice and a
   ratchet failure once in one night.
 - **A conflict left inside a `.size` file makes `check-doc-index-size.js` THROW, not fail cleanly.**

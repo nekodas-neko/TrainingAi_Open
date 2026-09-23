@@ -15763,5 +15763,8 @@ right either way, and the e2e written to prove it did not discriminate and was d
 shipped. An index that said only "cross-tab navigation now flips the shell" would read as though
 that had been demonstrated.
 
-Also `docs/agents/state/implementation-lane-b.md` 65 → 51: the baton was rewritten in full, as the
-rule requires, and came back shorter. It is shrink-only, so the number follows it down.
+Also `docs/agents/state/implementation-lane-b.md` 65 → 55: the baton was rewritten in full, as the
+rule requires, and came back shorter. It is shrink-only, so the number follows it down. (51 at the
+first write, then +4 for the lesson that cost this PR a red CI — run the FULL vitest suite, never a
+subset scoped to the directories you changed, because a source-shape test asserting on your file
+can live anywhere. Still well under the 65 it inherited.)
