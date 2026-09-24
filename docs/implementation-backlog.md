@@ -1620,6 +1620,13 @@ module documents has never been the live one.**
   and **29 of them contain no contributors at all** — just `{base, trained, adjustment}`. The audit
   view reads this column, so on those days it can show a score and nothing behind it. Which writer
   produces the empty shape is **not established** and is the first thing to check.
+- **⚠ Do NOT "fix" the absent `activeEnergy` by reviving its input (added 2026-09-24).** The 15-weight
+  hole above is real, and the obvious repair is the wrong one: `Q-184`'s own check says do not compute
+  `active_calories_est`, because the owner chose direction C on 2026-08-11 and `Q-204` is designed to
+  *replace* `zoneMinutes` and `activeEnergy` with a single physiologically-grounded contributor. So the
+  renormalisation this entry measures is a symptom of work already queued, not a gap to plug. Whoever
+  acts on the lane-balance finding should read Q-204 first — and note it would also subsume TN-78's
+  threshold question, since that is the other contributor B removes.
 - **`steps` has never exceeded 61/100, which is Q-524 in one number.** The lane scores against
   `getDailyGoals().stepGoal` = **10,000**; see the Q-524 amendment below — the profile goal the rest
   of the app honours is now **5,000**, so the two are 2.0× apart and the lane cannot reach 100
@@ -24311,6 +24318,23 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
   **Sequencing is unchanged:** the single-source read is still the first change and is independent of
   the formula. Ship precedence first, then provenance, then the formula.
+  **✅ THE DOUBLE-COUNT QUESTION IS ANSWERED — measured 2026-09-24 (Tuning), and the answer is "not
+  live, and probably never".** The trap above says *"deriving the step goal from an energy target
+  makes those two contributors measure the same walking twice — decide the double-count before
+  shipping"*. Decided, on evidence rather than judgement:
+  - **It is not live today.** `activeEnergy` scores `body_metrics.active_calories`, which holds a
+    value on **16 of 147 days and none since 2026-07** (Q-521). Its intended replacement,
+    `oura_daily_derived.active_calories_est`, is **NULL on all 110 days** — plumbed through schema,
+    Zod, local store, sync mapper and adapter write with **no code that computes it** (Q-184). Two
+    candidate sources, both empty, so there is currently nothing to double-count with.
+  - **And the owner's chosen direction removes the other half.** Q-184's own 2026-08-14 check says
+    do **not** build the estimate, because direction **C** was chosen on 2026-08-11 and direction
+    **B** — now `Q-204` — is designed to *replace* `zoneMinutes` and the dead `activeEnergy` with one
+    physiologically-grounded contributor. If Q-204 lands there is no `activeEnergy` term to collide
+    with; the double-count only appears if Q-184 is built instead, which that entry advises against.
+  **So this no longer blocks the formula.** Sequence it as `Needs: Q-204` if the energy derivation is
+  built before that lands; otherwise the collision cannot occur. **Do not resolve it by re-adding
+  `activeEnergy`** — that is the input Q-204 exists to remove.
 - **⚑ AMENDED 2026-09-24 (Tuning) — THE PROFILE VALUE HAS MOVED TWICE SINCE THIS ENTRY WAS WRITTEN,
   AND THE GAP HAS WIDENED FROM 1.43× TO 2.0×.** Everything above is measured against
   `users.steps_goal = 7,000`. **It reads 5,000 today.** The applied history, from
