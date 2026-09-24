@@ -95,3 +95,16 @@ warm-up also overran its 9-minute carve-out by 3.5.
 
 That is BF-197 caught live and larger than the median case: it predicts 14.2 phantom minutes and this
 session gave back 15.6. BF-196 now owns both strings rather than just the card's.
+
+## Process note — a gate run through a pipe masks its exit code
+
+While rebasing this PR onto a fast-moving `main`, `pnpm check:rules 2>&1 | tail -2 && git commit …`
+committed and pushed **despite the gate failing**: the pipeline's exit status is `tail`'s, not the
+gate's, so the `&&` saw success. What it was failing on was *"No unresolved conflict markers"* —
+`doc-size-baseline-history.md` had a real conflict that a blanket `git add -A` had staged with its
+markers intact.
+
+Caught by re-reading the gate's output rather than its exit code, and the CI step of the same name
+would have caught it before `main`, so nothing unsound could have landed. Worth remembering anyway:
+when chaining on a check's result, run the check unpiped and read the status, or the chain is
+decorative. The conflict itself was the ordinary append-only case — two additions, both kept.
