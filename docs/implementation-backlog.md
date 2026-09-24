@@ -1618,35 +1618,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   cut 10× as a de-weighting of an input whose sign is unvalidated (TN-33, TN-21, TN-22), not as a
   calibration of a trusted one. TN-33 settling that sign is what reopens it.
 
-### [platform] LA-133 — 62 entries wait on the owner and nothing ever puts a decision in front of him
-
-- **Lane: O** — the queue and the owner's attention, which is the Orchestrator's rather than an
-  implementer's. **Added:** 2026-09-24 · Lane A, after the owner asked what would unblock it and
-  then said this belongs with the Orchestrator.
-- **Measured on `main` 2026-09-24:** 426 entries; 36 ready for Lane A, 114 parked. Of the parked,
-  **62 wait on an owner decision**, 17 on the device, 40 on another entry. So the largest single
-  parked class is a decision backlog, and the oldest of them was filed **2026-08-02**.
-- **This is not RV-143's problem wearing a different hat.** There the device-gated entries are
-  invisible to the one agent that could clear them, and the fix is a selector. Here they are
-  perfectly visible — nobody is asking. A parked entry never becomes a question on its own.
-- **The shape is already specified and unused.** CLAUDE.md's *Decisions That Come Back To Me* says
-  what a decision brought to the owner looks like: the recommendation first, why it wins framed a
-  year out, the alternatives with what each is genuinely better at, the reversal cost, plain
-  English, under about fifteen lines. Nothing applies that to the parked queue in bulk.
-- **Proposed:** the Orchestrator drains the class in small batches — roughly five entries per
-  digest, each in that shape, one message. An answer releases the wait and the entry drops to
-  whichever lane the path rule gives it. Five because a digest longer than a sitting does not get
-  read, which is how the backlog got here.
-- **⚠ Re-verify before asking, and expect attrition.** Several of these resolve to *"no longer a
-  question"* once read against current `main` — LA-126's wait was released on 2026-09-23 and the
-  entry still carries the field, OR-137 and RV-77 both re-measured to nothing. A digest of stale
-  questions spends the owner's attention on work that is already dead and teaches him to skip the
-  next one.
-- **Q-272 is a live example of the adjacent problem** and is left for this sweep rather than
-  handled by TN-55's PR: it is the pre-existing Body Battery entry, its central claim was superseded
-  by TN-55, and TN-55 has now shipped. Whether it closes, keeps a residue, or stays open is queue
-  curation.
-
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
 - **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
