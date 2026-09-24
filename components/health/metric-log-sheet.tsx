@@ -111,8 +111,8 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
           invalidateBodyMetricWrite().catch(() => {})
           toast.success(`${logState.label} saved`)
           onClose()
-          const cutoff = new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000)
-          const fresh = await store.getBodyMetrics(toAestDay(cutoff))
+          const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000)
+          const fresh = await store.getBodyMetrics(toAestDay(cutoff, tz))
           const todayMeta = fresh.find(r => r.date === date) ?? null
           onSaved(todayMeta ? {
             date:             todayMeta.date,

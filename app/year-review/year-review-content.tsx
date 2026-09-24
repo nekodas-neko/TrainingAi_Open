@@ -8,13 +8,17 @@ import { TTL_LONG } from "@trainingai/shared/cache-ttl";
 import type { YearReviewResponse } from "@/app/api/year-review/route";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { displayOneRm, oneRmLabel } from "@trainingai/shared/1rm";
+import { calendarMonthInTz } from "@/lib/calendar-month";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function monthLabelsTrailing(): string[] {
-  const now = new Date();
+function monthLabelsTrailing(tz: string): string[] {
+  // The device's month labelled the trailing year, so on the first or last day of a month the
+  // axis could run one month ahead of the counts the server bucketed (RV-176).
+  const curMonth = calendarMonthInTz(tz).month;
   return Array.from({ length: 12 }, (_, i) => {
-    const idx = (now.getMonth() - (11 - i) + 24) % 12;
+    const idx = (curMonth - 1 - (11 - i) + 24) % 12;
     return MONTH_LABELS[idx];
   });
 }
@@ -36,6 +40,7 @@ function Section({ children }: { children: React.ReactNode }) {
 }
 
 export function YearReviewContent({ userId }: { userId?: string }) {
+  const tz = useUserTimezone();
   const router = useTransitionRouter();
   const [data, setData] = useState<YearReviewResponse | null>(() => {
     try {
@@ -69,7 +74,7 @@ export function YearReviewContent({ userId }: { userId?: string }) {
     );
   }
 
-  const months = monthLabelsTrailing();
+  const months = monthLabelsTrailing(tz);
   const maxMonthCount = Math.max(1, ...data.monthlySessionCounts);
   const biggestExercise = data.topExercises[0];
 

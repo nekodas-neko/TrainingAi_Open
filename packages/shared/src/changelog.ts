@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.37",
+    date: "2026-09-24",
+    changes: [
+      "Thirteen screens worked out the date, the month or the time of day from the phone's clock instead of your timezone. The readiness and activity screens asked for the wrong day's AI insight, the calendar could look up the wrong month around a month boundary, and a logged meal could land in the wrong part of the day. None of this was visible while the phone sat in Brisbane, which is why it lasted; it is now wrong nowhere rather than right in one place.",
+    ],
+  },
+  {
     version: "1.465.36",
     date: "2026-09-24",
     changes: [

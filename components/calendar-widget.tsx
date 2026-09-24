@@ -10,6 +10,7 @@ import type { ProgramSession } from "@trainingai/shared/types/program";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { readLocalCalendarOverlay, mergeCalendarOverlay, EMPTY_OVERLAY, type CalendarData } from "@/lib/calendar/local-overlay";
 import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
+import { calendarMonthInTz } from '@/lib/calendar-month';
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -32,8 +33,8 @@ interface CalendarWidgetProps {
 
 export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
   const tz = useUserTimezone();
-  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
+  const [viewYear, setViewYear] = useState(() => calendarMonthInTz(tz).year);
+  const [viewMonth, setViewMonth] = useState(() => calendarMonthInTz(tz).month);
   const mm = String(viewMonth).padStart(2, '0');
 
   const meta = useCachedValue<{ program?: { sessions?: ProgramSession[] } }>(
