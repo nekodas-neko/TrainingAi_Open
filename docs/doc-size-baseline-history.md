@@ -16833,17 +16833,8 @@ entry turns on — the reproduced foreign-key failure in the existing delete pat
 SET NULL / NO ACTION split across the 99-table schema — plus BF-193's three decision briefs. The
 schema table is the part that could not be summarised away: which keys cascade and which do not is
 the whole difference between a deletion that works and one that silently leaves rows behind.
-<<<<<<< HEAD
-
 ---
 
-### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
-
-29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782
-sets, beating raw RPE), which calibrates its sensitivity at ~0.25 points and turns the sleep/readiness
-nulls into a measured ceiling — neither moves perceived effort by a fifth of that. Filed as a Reference
-because future proposals read it for their acceptance bar rather than building from it.
-=======
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29217 (chore/or-153-route-six-more-to-tuning)
 
 Growth, +5. Six more scoring entries moved from `Gate: owner` to `Needs: OR-150`, and OR-150 grew
@@ -16858,4 +16849,12 @@ still pending, `enable_pr_auto_merge` reports an unstable-status error and never
 protection question, so the absence of the usual refusal looks like the setting landing. Re-run on
 green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
 repeating the cycle.
->>>>>>> origin/main
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
+
+29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782
+sets, beating raw RPE), which calibrates its sensitivity at ~0.25 points and turns the sleep/readiness
+nulls into a measured ceiling — neither moves perceived effort by a fifth of that. Filed as a Reference
+because future proposals read it for their acceptance bar rather than building from it.
