@@ -16488,7 +16488,7 @@ The BF-188 addition is six lines saying the defect it describes has already land
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
 
-## 2026-09-24 — `docs/implementation-backlog.md` → 27763
+## 2026-09-24 — `docs/implementation-backlog.md` → 27743
 
 TN-62, filed on a status recheck, and it records a cost of my own 2026-09-22 proposal rather than a
 new defect. The single batched recompute was meant to stop the owner's readiness history shifting four
