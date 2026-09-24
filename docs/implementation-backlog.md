@@ -1058,6 +1058,133 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
+  sessions have enough content. Time wise its pretty good."*
+- **Lane: O** — nothing here is broken. The budget is real, the transitions are real, and the engine
+  trims correctly. What is missing is a DECISION about which of three levers to pull, and that is
+  the owner's.
+- **⚑ MEASURED — where a 52-minute session actually goes** (Push, 2026-09-24, the session in the
+  owner's screenshot; wall clock 51.5 min, which is what `DURATION` renders — `workoutEndMs -
+  workoutStartMs` in `workout-screen.tsx:1746`, so it counts everything):
+
+  | band | minutes | what it is |
+  |---|---|---|
+  | warm-up | 10.5 | `started_at` → `warmup_ended_at` |
+  | **setup / bar-load** | **14.9** | Σ `inter_exercise_rest_sec` |
+  | **work** | **9.8** | Σ `set_time_sec` — the actual lifting |
+  | rest | 12.0 | Σ `rest_time_sec` |
+  | unaccounted | 4.3 | idle between the last set and pressing done |
+
+  **Setup exceeds work by half again.** Across the 14 most recent completed sessions the medians are
+  wall **42.5**, warm-up **9.4**, setup **12.7**, work **8.6**, rest **8.4** — so **work is ~19% of
+  session wall clock**, steady across sessions rather than a one-off.
+- **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
+  that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
+  `is_early_deload = false`). The program's own stored styles prescribe **14 sets for Push**; **10**
+  were logged. Two is the floor `fitToBudget` never goes below — *"a primary is never touched below
+  2 sets"* (`generate-prescription.ts:456`). Hitting the floor on **every** exercise means the
+  trimmer ran out of room, not that it made a judgement.
+- **⚑ MEASURED — weekly sets against the owner's OWN configured targets** (`program_volume_targets`,
+  35 days, `core` normalized into `abs` as the engine does). **13 of 16 muscle groups are under
+  target; the total is 102.2 against 154 — 66%.**
+
+  | muscle | actual | target | | muscle | actual | target |
+  |---|---|---|---|---|---|---|
+  | calves | 3.0 | 11 (27%) | | upper back | 8.6 | 11 (78%) |
+  | abs | 5.2 | 13 (40%) | | biceps | 9.5 | 11 (86%) |
+  | forearms | 2.8 | 6 (47%) | | triceps | 10.5 | 10 (105%) |
+  | chest | 6.3 | 13 (48%) | | hamstrings | 10.8 | 10 (108%) |
+  | quads | 5.3 | 11 (48%) | | glutes | 9.7 | 8 (121%) |
+  | hip flexors | 2.4 | 5 (48%) | | shoulders | 9.5 | 13 (73%) |
+  | lats | 6.8 | 13 (52%) | | lower back | 4.8 | 6 (80%) |
+  | traps | 4.3 | 8 (54%) | | adductors | 2.7 | 5 (54%) |
+
+  So the owner's question has a number: **by the app's own standard, no — the sessions do not have
+  enough content**, and the three groups at or over target (triceps, hamstrings, glutes) are all
+  muscles that accumulate as secondary work rather than being trained directly.
+- **✅ NOT a defect in the transition estimate — checked, because that was the obvious suspect.**
+  `resolveTransitionSec` (`time-audit.ts:338`) prefers a **measured** per-exercise transition, then a
+  measured per-equipment-class one, and only then the equipment default. The owner has months of
+  measurements, so the budget is being computed against his real transition times. The 240 s default
+  in `generate-prescription.ts` is the no-data fallback and is not what is running here. **The model
+  is right; the time genuinely goes there.**
+- **So the conflict is structural: two real numbers that have never been compared.** A 60-minute
+  budget, five exercises, and ~12.7 min of measured transitions plus prescribed rest leaves roughly
+  enough for two sets each. Nothing in the app puts the volume target and the time budget on the
+  same screen, so a session can hit its floor every week and still report *"Time wise its pretty
+  good"* — which is exactly what happened.
+- **⚑ OWNER DECISION — three levers, and the recommendation is the second.**
+  1. **Raise the time budget** (60 → 75 min). Buys sets directly. Costs 15 min a session, every
+     session, and the owner has said the time is what currently works.
+  2. **⭐ Fewer exercises, more sets each** — 5 → 3 or 4 per session, at 3–4 sets. Costs **no extra
+     time**: it spends the same budget on fewer transitions. **The repo already argues this
+     position in its own code** — *"five exercises floored at two sets still overrun a 30-minute
+     ask, and two token sets each is worse training than doing fewer exercises properly"*
+     (`generate-prescription.ts:485`), and `dropToBudget` exists to do it. It only runs when the
+     duration preset is SHORTER than the session (`direction < 0`), so at the normal budget the
+     engine trims sets to a floor instead of dropping an exercise — the wrong half of its own rule.
+     Fewer muscle groups touched per session, which the weekly targets then have to cover across
+     the week rather than within one day.
+  3. **Attack the transitions** — 14.9 min of bar-loading against 9.8 min of lifting is the largest
+     recoverable block in the session. Not a code change: it is plate management, equipment
+     proximity and not leaving the rack. Worth naming because no software lever is as big.
+- **Reversal cost is near zero for all three** — the budget is a number on the program session, the
+  exercise count is the program, and none of it rewrites history.
+- **Note this is NOT a scoring change** and must not become one without the owner: per CLAUDE.md,
+  Tuning proposes calibration and the owner signs off. This entry reports measurements and asks
+  which lever to pull.
+- **Verification:** after whichever lever, re-run the weekly-sets-against-targets query over the
+  following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
+  has not been fixed regardless of what the done screen says.
+
+### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
+  owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
+  **Split out of BF-190**, where they were buried in a `Lane: B` body and therefore invisible to the
+  Orchestrator; BF-190 keeps the half that needs no decision and can start immediately.
+- **Context, in one line.** Ending a guided walk early records it as a full session at the planned
+  duration — the owner hit it on 2026-09-24 (*"I started a walk; then closed it"*) and it wrote a
+  40-minute, 133 kcal row for a walk 27 seconds old. BF-190 fixes the duration. These two do not
+  follow from that fix.
+
+**Decision 1 — after the fix, should a sub-minute walk be saved at all?**
+
+- Passing the real elapsed time through turns the phantom into a truthful **27-second** row. Truthful
+  is not the same as wanted.
+- **⭐ Recommend a minimum-duration floor, discarded below it with a toast.** The repo already has
+  this shape — `MIN_SESSION_SEC` in `time-audit.ts:358` drops implausibly short workouts from the
+  decomposition — so it is reuse, and a floor needs no interaction at the moment the lifter is
+  walking away from a mis-tap.
+- **Alternative: keep every row.** Better if you ever want to see abandoned starts as data — which
+  is a real thing to want, and the reason this is not obvious. It loses because a 27-second row
+  still lands in activity history, the day audit and the totals, where it is noise in every reading
+  that matters.
+- **Alternative: confirm on exit** (*"discard this short walk?"*). Better in that nothing is ever
+  silently dropped. It loses on where it fires: mid-walk, one tap after a dialog that already asked
+  *"End walk?"*, which is two prompts for one intention.
+- **Reversal cost: near zero.** A constant and one branch.
+
+**Decision 2 — the phantom row already in the history.**
+
+- `b8083d04`, 2026-09-24, 40 min, 133 kcal, no HR, no steps. The day reads 80 min / 266 kcal against
+  40 / 133 actually walked.
+- **⭐ Recommend the owner soft-deletes it from the activity list.** It is one row, the app's own
+  delete is the supported path, and it produces a `deleted_at` tombstone that propagates to the
+  device — which a direct database write would not.
+- **Alternative: leave it.** Better if you would rather the history show what the app actually did,
+  warts included. It loses because nothing marks the row as spurious, so every future reading of
+  that week is wrong in a way no one will remember.
+- **Never a migration.** A corrective migration for one bad row is blast radius with no upside, and
+  data-touching migrations are the carve-out that always needs the owner anyway.
+- **⚠ Whether OTHER phantom rows exist has not been measured.** Only 2026-09-24 was checked. Before
+  acting, sweep `activity_logs` for rows whose `duration_min` equals the plan while `avg_hr` and
+  `steps` are both null — that is the signature. Do not report a count without running it.
+
+- **Verification:** this entry closes when both answers are recorded here with the date, and BF-190
+  is updated to build the one that touches code.
 ### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
 
 - **Lane:** O — `scripts/`, the queue tooling. **Added:** 2026-09-24 · orchestrator review of device
@@ -3567,15 +3694,12 @@ why the count of affected entries always understated the harm.
   `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
   type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
   133 kcal, every time, and it is indistinguishable from a real one in the row.
-- **⚠ Then decide whether a 27-second walk should be saved AT ALL, because the fix alone makes it a
-  27-second row rather than no row.** Recommend a **minimum-duration floor, discarded below it with
-  a toast** — the same shape `decomposeSessions` already uses for workouts (`MIN_SESSION_SEC`,
-  `time-audit.ts:358`), so the pattern exists rather than being invented here. A floor is better
-  than a confirm prompt: the lifter who backed out by accident does not want a dialog, and a
-  30-second walk is not data anyone wants in a trend.
-- **⚠ The two existing rows need a decision too — the phantom one is already in the history**, and
-  it feeds `build-day-audit.ts:257`. Deleting a production row is the owner's call and is not part of
-  the code fix; the app's own soft-delete from the activity list is the path, not a migration.
+- **→ Whether a sub-minute walk should be saved at all is BF-191, and so is the phantom row.** Both
+  are the owner's and were split out on 2026-09-24 so the Orchestrator can put them to him; they
+  were buried in this body, where the lane field routed them to an implementer instead. **This entry
+  does not wait on that** — passing the real elapsed time through is correct under either answer.
+- **The phantom row is already in the history** and feeds `build-day-audit.ts:257`. That is BF-191's
+  second decision, not this entry's.
 - **Sibling sweep:** `done-activity-screen.tsx` takes the same write path but navigates away the
   instant it saves (recorded under BF-107), so it has no mount-save. `walk-active.tsx` does not
   write. This is the guided-walk summary alone.
@@ -3583,87 +3707,6 @@ why the count of affected entries always understated the harm.
   whose duration matches the seconds actually walked. Then complete a full walk and confirm the
   duration still matches. **Device look owed** — the local-store branch is the one that runs on the
   APK and `getLocalStore` returns null in the sandbox.
-
-### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
-  sessions have enough content. Time wise its pretty good."*
-- **Lane: O** — nothing here is broken. The budget is real, the transitions are real, and the engine
-  trims correctly. What is missing is a DECISION about which of three levers to pull, and that is
-  the owner's.
-- **⚑ MEASURED — where a 52-minute session actually goes** (Push, 2026-09-24, the session in the
-  owner's screenshot; wall clock 51.5 min, which is what `DURATION` renders — `workoutEndMs -
-  workoutStartMs` in `workout-screen.tsx:1746`, so it counts everything):
-
-  | band | minutes | what it is |
-  |---|---|---|
-  | warm-up | 10.5 | `started_at` → `warmup_ended_at` |
-  | **setup / bar-load** | **14.9** | Σ `inter_exercise_rest_sec` |
-  | **work** | **9.8** | Σ `set_time_sec` — the actual lifting |
-  | rest | 12.0 | Σ `rest_time_sec` |
-  | unaccounted | 4.3 | idle between the last set and pressing done |
-
-  **Setup exceeds work by half again.** Across the 14 most recent completed sessions the medians are
-  wall **42.5**, warm-up **9.4**, setup **12.7**, work **8.6**, rest **8.4** — so **work is ~19% of
-  session wall clock**, steady across sessions rather than a one-off.
-- **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
-  that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
-  `is_early_deload = false`). The program's own stored styles prescribe **14 sets for Push**; **10**
-  were logged. Two is the floor `fitToBudget` never goes below — *"a primary is never touched below
-  2 sets"* (`generate-prescription.ts:456`). Hitting the floor on **every** exercise means the
-  trimmer ran out of room, not that it made a judgement.
-- **⚑ MEASURED — weekly sets against the owner's OWN configured targets** (`program_volume_targets`,
-  35 days, `core` normalized into `abs` as the engine does). **13 of 16 muscle groups are under
-  target; the total is 102.2 against 154 — 66%.**
-
-  | muscle | actual | target | | muscle | actual | target |
-  |---|---|---|---|---|---|---|
-  | calves | 3.0 | 11 (27%) | | upper back | 8.6 | 11 (78%) |
-  | abs | 5.2 | 13 (40%) | | biceps | 9.5 | 11 (86%) |
-  | forearms | 2.8 | 6 (47%) | | triceps | 10.5 | 10 (105%) |
-  | chest | 6.3 | 13 (48%) | | hamstrings | 10.8 | 10 (108%) |
-  | quads | 5.3 | 11 (48%) | | glutes | 9.7 | 8 (121%) |
-  | hip flexors | 2.4 | 5 (48%) | | shoulders | 9.5 | 13 (73%) |
-  | lats | 6.8 | 13 (52%) | | lower back | 4.8 | 6 (80%) |
-  | traps | 4.3 | 8 (54%) | | adductors | 2.7 | 5 (54%) |
-
-  So the owner's question has a number: **by the app's own standard, no — the sessions do not have
-  enough content**, and the three groups at or over target (triceps, hamstrings, glutes) are all
-  muscles that accumulate as secondary work rather than being trained directly.
-- **✅ NOT a defect in the transition estimate — checked, because that was the obvious suspect.**
-  `resolveTransitionSec` (`time-audit.ts:338`) prefers a **measured** per-exercise transition, then a
-  measured per-equipment-class one, and only then the equipment default. The owner has months of
-  measurements, so the budget is being computed against his real transition times. The 240 s default
-  in `generate-prescription.ts` is the no-data fallback and is not what is running here. **The model
-  is right; the time genuinely goes there.**
-- **So the conflict is structural: two real numbers that have never been compared.** A 60-minute
-  budget, five exercises, and ~12.7 min of measured transitions plus prescribed rest leaves roughly
-  enough for two sets each. Nothing in the app puts the volume target and the time budget on the
-  same screen, so a session can hit its floor every week and still report *"Time wise its pretty
-  good"* — which is exactly what happened.
-- **⚑ OWNER DECISION — three levers, and the recommendation is the second.**
-  1. **Raise the time budget** (60 → 75 min). Buys sets directly. Costs 15 min a session, every
-     session, and the owner has said the time is what currently works.
-  2. **⭐ Fewer exercises, more sets each** — 5 → 3 or 4 per session, at 3–4 sets. Costs **no extra
-     time**: it spends the same budget on fewer transitions. **The repo already argues this
-     position in its own code** — *"five exercises floored at two sets still overrun a 30-minute
-     ask, and two token sets each is worse training than doing fewer exercises properly"*
-     (`generate-prescription.ts:485`), and `dropToBudget` exists to do it. It only runs when the
-     duration preset is SHORTER than the session (`direction < 0`), so at the normal budget the
-     engine trims sets to a floor instead of dropping an exercise — the wrong half of its own rule.
-     Fewer muscle groups touched per session, which the weekly targets then have to cover across
-     the week rather than within one day.
-  3. **Attack the transitions** — 14.9 min of bar-loading against 9.8 min of lifting is the largest
-     recoverable block in the session. Not a code change: it is plate management, equipment
-     proximity and not leaving the rack. Worth naming because no software lever is as big.
-- **Reversal cost is near zero for all three** — the budget is a number on the program session, the
-  exercise count is the program, and none of it rewrites history.
-- **Note this is NOT a scoring change** and must not become one without the owner: per CLAUDE.md,
-  Tuning proposes calibration and the owner signs off. This entry reports measurements and asks
-  which lever to pull.
-- **Verification:** after whichever lever, re-run the weekly-sets-against-targets query over the
-  following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
-  has not been fixed regardless of what the done screen says.
 
 ### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
 
@@ -10318,7 +10361,15 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   `fix/bf-107-walk-calories` and the forced `pullDelta` inside `pushThenRevalidate`'s callback.
   The `Keep:` below is a code-tidy residue and is unaffected.
 
-- **Lane:** B — `components/guided-walk/walk-summary.tsx`, `components/ui/stat-tile.tsx`.
+- **Lane: DV** — **re-laned 2026-09-24, and the previous reading was mine to correct.** This was
+  reported back to the owner as *"your five-second check"*, which is the trap §3 names: the next
+  action is a **measurement with an objective pass/fail** — open the walk, does the tile fill — so
+  it is the device agent's, not a judgement waiting on him. The code, when there is code, is Lane B
+  (`components/guided-walk/walk-summary.tsx`, `components/ui/stat-tile.tsx`); it goes back there
+  with the result. **DV answers VERIFIED / FAILED / COULD NOT CHECK and nothing else:** the tile
+  fills on a re-open → VERIFIED, and the complaint is latency, which is a separate entry about
+  saying the number is coming. It stays a dash → FAILED, back to Lane B at the forced `pullDelta`
+  inside `pushThenRevalidate`'s callback.
 - **Verify:** device — two things the sandbox cannot produce. **(a) Offline**: finish a walk with no
   signal and the tile must read `—`, never `0`; the push never happens, so nothing fills it.
   **(b) The fill itself**: on a normal walk the tile should start `—` and become a number a moment
