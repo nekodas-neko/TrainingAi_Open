@@ -473,6 +473,51 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
+
+- **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
+  the owner leaves nobody tasked with putting it to him. This entry is that task.
+- **Added:** 2026-09-24, OR-143/OR-144 triage of the 76 `Gate: owner` entries.
+
+**The finding, and it is not what the triage expected.** The gates are mostly RIGHT about whose
+decision it is. What they are wrong about is mechanism: a gated entry disappears from the
+Orchestrator's own READY list, so the decision is recorded, correctly attributed, and never put to
+anybody. Four entries were ungated outright in OR-144 because they were `Lane: O` as well. The ones
+below keep their gate — they really are blocked pending an answer — and this entry carries the ask.
+
+**Each is one question with a recommendation. They go to him together, not one per session.**
+
+1. **`LA-89` — delete `/api/oura/hr-sync`?** It has no callers anywhere in `app/`, `components/`,
+   `lib/` or `android/`, and its name describes a Cloud sync that has not existed since the re-key.
+   *Only he can answer whether something outside this repo calls it* — a curl in a runbook, a Tasker
+   profile, an old APK. **Recommend: delete the route and its test together.** Renaming is worse; it
+   keeps a second way into the pipeline that Q-122 was closing. Reversal: restore 50 tested lines.
+2. **`LA-82` — should a heart-rate profile with an unreadable age render zones at all?** With no age
+   it silently uses a max of 190 against his real 184, a 6 bpm shift across every zone, and
+   `maxHrSource` still reads `estimated`. **Recommend: render, with the degradation marked** — the
+   alternative hides the screen on a transient read failure. The second half (a new `maxHrSource`
+   value vs a separate `degraded` flag) is structural and is the Orchestrator's; one consumer reads
+   it, so either is cheap.
+3. **`Q-231` — retire the "Exercise detected" card, or feed it from the BLE classifier?** Its only
+   writer was the Oura Cloud sync; the table's newest row is `2026-07-05` and the card has shown
+   nothing since about 2026-08-04. Either branch is a different feature and nothing in the repo
+   decides it. **No recommendation offered** — this is a genuine product preference. Note the day
+   timeline reads the same table, so retiring the card is not the whole blast radius.
+4. **The admin sitting — nine entries, one login.** `owner-admin-sitting` (3, including `LA-56`,
+   `LA-68`, `TN-1`) and `admin-console-sitting` (6) are two batch names for the same visit to
+   `/admin` → Devices on the phone: some need something *run* there, some need a *look*. They ship
+   as different PRs and must be ASKED as one sitting. Counted from the batch fields 2026-09-24;
+   `LA-56`'s own note says ten, which predates the count.
+5. **`owner-branch-protection` (`LB-52` + `Q-297`'s second residue) — asked 2026-09-24**, parked by
+   the owner for a few hours. E2E stays off the required-check list; that half is decided.
+
+- **Done when** each numbered item has an answer recorded on its own entry and that entry's gate is
+  struck. This entry leaves the queue when the list is empty, not when it has been read once.
+- **Not in scope:** the ~29 calibration gates. Those are Tuning's to bring as proposals with the
+  number of other days each change moves — a bare gate on a scoring constant is a question he
+  cannot answer, and routing them here would just move the silence.
+
+
 ### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
