@@ -16649,7 +16649,10 @@ have, so it costs twelve lines in the file every session reads.
 
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/resilience-two-regimes)
 
-28768 → 28821 (+53). TN-70: `resilience_level` published only 5 across 16 days (Jul 24 – Aug 29) and only 1–4 across 14 days
+28768 → 28891 (+123). TN-70: `resilience_level` published only 5 across 16 days (Jul 24 – Aug 29) and only 1–4 across 14 days
 (Sep 7–22), with matching confidence either side, and nothing in stored data explaining the switch. Most
 of the entry is what must NOT be concluded — PS-30 predates half the regime, and the NULL coverage column
 is the column's age rather than a missing input — plus the one cheap test that would settle it.
+TN-71 adds the post-TN-60 contributor share table LA-122 2b was parked for: temperature holds 10% of the
+weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-of-movement contributor
+"never scored".

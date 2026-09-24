@@ -44,10 +44,56 @@ engine territory and the test is a re-run rather than a calibration.
 - **`oura_daily_derived.worn_hours_ble`: NULL on all 129 days**, and `oura_daily.resilience_level` on all
   rows — so the derived resilience is ours, not a Cloud passthrough.
 
+## TN-71 — the contributor share table LA-122 2b was waiting for
+
+That item was deliberately parked until TN-60's tail fix shipped, because the fix moves the table. It has
+shipped, so the measurement is now due: each stored day's contributor `input` (Q-501) re-driven through
+the **current** composite, share of movement = weight × mean absolute deviation, normalised.
+
+| contributor | weight | share | share ÷ weight | mean | range |
+|---|---:|---:|---:|---:|---|
+| `hrvBalance` | 15% | **27.7%** | 1.85 | 39.5 | 3–94 |
+| `restingHeartRate` | 15% | 19.4% | 1.29 | 45.9 | 5–87 |
+| `recoveryIndex` | 9% | **14.4%** | 1.61 | 52.6 | 15–100 |
+| `sleepBalance` | 10% | 12.6% | 1.26 | 48.6 | 9–95 |
+| `previousNight` | 16% | 11.4% | 0.71 | 55.5 | 15–88 |
+| `checkin` | 10% | 8.5% | 0.85 | 58.2 | 30–72 |
+| `prevDayActivity` | 9% | 2.8% | 0.31 | 68.2 | 57–79 |
+| `activityBalance` | 6% | 2.1% | 0.36 | 68.3 | 54–82 |
+| **`temperature`** | **10%** | **1.1%** | **0.11** | 85.3 | **81–89** |
+
+**`temperature` is the finding:** a tenth of the model, an eight-point range across the month, 1.1% of
+the movement. Not broken — *stable*, which for an illness signal may be correct — but a constant with a
+weight suppresses the terms that do carry signal. Together, `temperature` and the two activity terms hold
+**31% of the weight and deliver 6.1% of the movement**, which makes this one weight question rather than
+three. Filed `Lane: O`; nothing changes until the owner answers, and it re-scores all history so it should
+happen once.
+
+**TN-60 worked, visibly:** `hrvBalance` was 22.8% of movement before the tail fix and is 27.7% now.
+
+### The trap I nearly published
+
+The stored `input` field is much sparser than the rows — contributors with a real input average **0.0 of
+9 in July, 1.7 in August, 8.8 in September**. My first pass covered all 71 days, fed nulls for 41 of
+them, got neutral 50s back and produced a plausible table that was **41/71 synthetic**. The real window
+is **25 days, 2026-08-26 → 09-24**, and it is stated on the entry as one month rather than a year —
+which matters most for a temperature term. Fourth time tonight that a coverage check changed a result.
+
+### A stale comment in the file that defines the model
+
+Lines 11–13 of `readiness-composite.ts` say Recovery Index *"has no calibratable hours→score mapping …
+so it's always neutral/provisional … never scored"*. It **is** scored — `recoveryIndexScore` maps hours
+linearly against `RECOVERY_INDEX_OPTIMAL_HOURS = 5`, ranges **15–100** here, and carries **14.4% of the
+movement, third largest of the nine**. The function is right and its own comment is right (`provisional`
+there means the *curve* is approximate — the Q-278 distinction); the header is stale, and it is the line
+a reader checks first. **Fix the comment, not the code.**
+
 ## Not exercised
 
 Nothing runs. Read-only `claude_ro` queries, **row-scoped to the owner**, plus source and git-history
 reading. **Not established:** why the regimes differ, whether either is correct, or whether the level-5
 month was ever right. This is a measurement and a test, not a diagnosis — and per TN-67 there is no
 external validation for this score either, so "correct" can only mean "what the vendor model yields on
-sound inputs". `pnpm check:rules` result below.
+sound inputs". `pnpm check:rules` result below. For TN-71: the share table is **25 days**, so it says nothing about a
+year, and a temperature term is exactly what would differ across seasons. It also describes which inputs
+MOVE the score, never which ones should — per TN-67 there is no external validation to appeal to.

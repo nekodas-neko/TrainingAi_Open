@@ -1004,6 +1004,76 @@ which is the right shape for something that can only be validated by living with
 - **Where the mechanism is:** `lib/health/stress-resilience.ts` (the port, `confidence` at 310, the
   coverage gate at 144), `lib/oura-ble/rollup/run.ts:1179` (the write and its Q-510 comment).
 
+### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. This is the measurement LA-122 item 2b was
+  waiting on — it was deliberately deferred until TN-60's tail fix shipped, because the fix moves the
+  table. TN-60 is live, so the numbers below supersede the pre-fix ones.
+- **Lane: O** — a weight change is the owner's under the standing scoring rule, and the brief is here
+  rather than in a chat reply.
+- **Method, and its limits stated first.** Each stored day's contributor `input` values (Q-501) re-driven
+  through the **current** `computeReadinessComposite`, so the table reflects the post-TN-60 model without
+  waiting on TN-62's re-derive. Share of movement = each contributor's weight × its mean absolute
+  deviation, normalised. **n = 25 days, 2026-08-26 → 2026-09-24** — one month, not a year.
+- **⚠ WHY ONLY 25 DAYS, and this is the trap to avoid repeating.** The stored `input` field is far
+  sparser than the rows: contributors carrying a real input average **0.0 of 9 in July, 1.7 of 9 in
+  August, 8.8 of 9 in September**. A first pass over all 71 stored days fed nulls for 41 of them, got
+  neutral 50s back, and produced a plausible-looking table that was **41/71 synthetic**. Any
+  re-derivation from stored `input` must restrict to days with a complete set.
+
+  | contributor | weight | share of movement | share ÷ weight | mean | range |
+  |---|---:|---:|---:|---:|---|
+  | `hrvBalance` | 15% | **27.7%** | 1.85 | 39.5 | 3–94 |
+  | `restingHeartRate` | 15% | 19.4% | 1.29 | 45.9 | 5–87 |
+  | `recoveryIndex` | 9% | **14.4%** | 1.61 | 52.6 | 15–100 |
+  | `sleepBalance` | 10% | 12.6% | 1.26 | 48.6 | 9–95 |
+  | `previousNight` | 16% | 11.4% | 0.71 | 55.5 | 15–88 |
+  | `checkin` | 10% | 8.5% | 0.85 | 58.2 | 30–72 |
+  | `prevDayActivity` | 9% | 2.8% | 0.31 | 68.2 | 57–79 |
+  | `activityBalance` | 6% | 2.1% | 0.36 | 68.3 | 54–82 |
+  | **`temperature`** | **10%** | **1.1%** | **0.11** | 85.3 | **81–89** |
+
+- **`temperature` is the finding.** A tenth of the model, an eight-point range across a month, and
+  **1.1% of the movement** — a share-to-weight ratio of 0.11, three times more lopsided than either
+  activity term. It is not broken; it is *stable*, which for a fever/illness signal is arguably correct
+  behaviour. But a contributor that never varies is a constant with a weight, and that weight is
+  currently suppressing the terms that do carry signal.
+- **This supersedes LA-122 item 2b's framing.** That entry asks whether `activityBalance`'s 2.8% share
+  on a 0.06 weight is worth keeping. Re-measured post-TN-60 it is **2.1% on 6%**, and the two activity
+  terms together are **4.9% of movement on 15% of weight** (the earlier reading was 7.4%). So the
+  question stands but `temperature` is the larger instance of it and should be answered in the same
+  breath.
+- **⚠ SEPARATE FINDING — the model file's header contradicts its own function.** Lines 11–13 of
+  `readiness-composite.ts` state Recovery Index *"has no calibratable hours→score mapping …, so it's
+  always neutral/provisional; its raw hours are surfaced separately for display, **never scored**"*.
+  It **is** scored: `recoveryIndexScore` (line 242) maps hours linearly to 0–100 against
+  `RECOVERY_INDEX_OPTIMAL_HOURS = 5`, and measured here it ranges **15–100** and carries **14.4% of the
+  movement — third largest of the nine.** The function is self-consistent and its own comment is right
+  (`provisional` there means the *curve* is an approximation, not that the value is neutral — the Q-278
+  distinction). **The header is stale, in the file that defines the model**, and it is the line a reader
+  checks first. Fix the comment; do not "fix" the code to match it.
+- **TN-60 worked, visibly.** `hrvBalance` was measured at 22.8% of movement before the tail fix and is
+  **27.7%** now. Freeing the extremes to vary was the point, and the largest mover gained the most.
+- **Recommendation: bring `temperature` to the owner together with the activity terms, as one weight
+  question, and change nothing until then.** Three terms hold 31% of the weight and deliver 6.1% of the
+  movement between them. Redistributing that is a single decision, not three, and it re-scores all
+  stored history — which is exactly the state TN-62 is still unwinding, so it should happen once.
+- **Alternatives, and what each is better at.**
+  - *Drop `temperature` to ~3% and give the difference to `hrvBalance`/`restingHeartRate`.* Better at
+    making the score move with the signals that carry information. Loses the illness tripwire's bite on
+    the rare day it does fire, which is the one day it exists for.
+  - *Keep every weight and accept the asymmetry.* Better if the weights are meant to encode *importance*
+    rather than *variance* — a stable temperature genuinely is reassuring information. Defensible, and it
+    means the share table is not evidence of a defect at all.
+  - *Re-measure over a year before touching anything.* Better on rigour: 25 days of late winter is a
+    poor sample for a temperature term specifically. Costs nothing but time, and the sample only grows.
+- **Reversal cost: high.** Any weight change re-scores every stored day and needs the "how many other
+  days does this move" treatment the standing rule demands. The comment fix is free.
+- **What this does NOT establish.** Whether the shares hold over a year — the window is one month, and a
+  temperature term is exactly the kind that would look different across seasons. And per TN-67 there is
+  no external validation of the composite, so this describes which inputs move the number, never which
+  ones *should*.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
