@@ -1930,6 +1930,59 @@ unverified"* is now answered: it persists.
   and every read re-decodes from `body_hex` via the adapter's `r.decoded ?? decodeEventBody(...)`
   fallback. Correct today; it does mean a decoder edit retroactively changes historical reads with
   nothing recording that it did.
+- **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
+  overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
+  `reason: 'insufficient_met'` (`training-stress.ts:82`), and that model returns null down **seven**
+  paths, only two of which are about MET length. The one that fires here is its input validator.
+  **`validate()` rejects the input if ANY `mets` value is NaN when `noOts === 0`**
+  (`lib/oura-models/inference/ots.ts:34–37`, `return 2`). The model's own type comment states the
+  contract outright:
+
+  ```
+  mets: Float32Array   // raw 1-min MET series (validated: no NaN when noOts=0, ≥720 long)
+  ```
+
+  **And the route deliberately supplies NaNs.** `metGridFromDaytimeSamples` leaves a `null` in every
+  minute with no sample — its own comment says non-wear/charger gaps *"become nulls the OTS core
+  cleans, instead of compressing the day by array index"* — and `computeTrainingStress` converts them
+  with `v == null ? NaN : v` before passing `noOts: 0` (`training-stress.ts:79`). So the producer and
+  the model disagree about the input contract, and the producer loses.
+  **The arithmetic agrees with the measurement above:** ~1,100 MET values across a ~1,375-minute span
+  is roughly **275 gap minutes per day**, and `validate` returns on the **first** one. A ring that
+  power-gates when worn-idle guarantees gaps, so **no real day can pass** — which is exactly the
+  21-of-21 pattern, and why ample data and a gate fire together.
+  **The intent was sound and the ordering defeats it:** `cleanMets` (line 117) exists to turn
+  sub-`minMetValue` readings into NaN for the windowed mean, so the downstream computation *is*
+  NaN-aware — but `validate` runs first, at line 137, and forbids what `cleanMets` is built to handle.
+- **⚑ This also corrects Q-204's effort estimate, and in the opposite direction to §11.**
+  [`activity-goal-calibration.md`](activity-goal-calibration.md) §11 Gate 1 concluded *"B has no head
+  start. Any load term is a from-scratch derivation"*, reasoning from the empty column. That reasoning
+  was sound and the conclusion is wrong: `runTrainingStressScore` is a **complete ported OTS model** —
+  195 lines with the MET weight bank, VO₂max categories, an RHR fallback and a rolling 720-minute
+  window — wired end to end through route → `computeTrainingStress` → persist. **Direction B is not a
+  from-scratch derivation; it is one input-contract bug away from producing values.** That is the
+  single biggest change to Q-204's cost, and whoever writes that proposal should start here.
+- **Three fixes, and the cheapest-looking one is a trap.**
+  **(a) Pass `noOts: 1`.** One character, and it dodges the NaN check — but `noOts` is a model flag
+  whose meaning is not established here, and line 143 shows it *changes the length test* rather than
+  merely relaxing validation. Abusing a flag to skip a contract is how a silently different model gets
+  shipped. **Do not.**
+  **(b) Fill the grid, with a documented rule.** Impute absent minutes rather than leaving them NaN,
+  and keep an explicit coverage floor so a day that is mostly gaps is still refused. **Recommended** —
+  it satisfies the contract instead of evading it, and the imputation value is a stateable assumption
+  (a non-wear minute is not the same as a resting minute, and a charger minute is neither).
+  **(c) Make the model NaN-tolerant** by moving the NaN check after `cleanMets`. Smallest diff to the
+  right place, but it edits a **ported** model against a pinned test vector — the Oura-BLE rule says
+  byte layouts and ported code come from the source, not from convenience. Only with a vector re-pin.
+  **Whichever is chosen, split the overloaded label**: a null from a failed validator must not report
+  as `insufficient_met`. That misreporting is what hid this for five weeks.
+- **What is established and what is not.** The mechanism is identified by **reading the code**, and the
+  arithmetic and the 21-of-21 pattern both agree with it — but **the route was still not run**, so this
+  is a very strong inference rather than an observation. The confirming step is unchanged and now
+  cheaper: log `validate(input)`'s return code alongside `grid.metsPerMinute.length` for 2026-09-22.
+  A `2` confirms this outright. I have not checked whether any *other* caller of
+  `runTrainingStressScore` passes a dense series and therefore works — if one does, that is the
+  contrast case and worth finding before changing anything.
 - **What to do next, in order.** (1) Run the route for 2026-09-22 and log
   `grid.metsPerMinute.length` and the `validMin` count — that single log line separates "the frames
   never arrive" from "they arrive and the grid collapses". (2) If the frames never arrive, instrument
@@ -27237,6 +27290,16 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Precedent to follow:** the volume anchor must be **absolute**, not the user's own rolling load —
   Q-190 removed exactly that self-reference from the volume lane, and a load lane anchored on a
   trailing average would reintroduce it.
+- **⚑ THE EFFORT ESTIMATE IS WRONG, corrected 2026-09-24 (TN-79).** Gate 1 above, and §11 of the
+  calibration doc, concluded from the empty column that *"any load term is a from-scratch
+  derivation"*. The reasoning was sound and the conclusion is not: `runTrainingStressScore`
+  (`lib/oura-models/inference/ots.ts`) is a **complete ported OTS model** — 195 lines with the MET
+  weight bank, VO₂max categories, an RHR fallback and a rolling 720-minute window — wired end to end
+  through `app/api/training-stress/route.ts` → `computeTrainingStress` → persist. The column is empty
+  because the model's input validator **rejects any NaN** when `noOts === 0` while the route
+  deliberately fills non-wear gaps with NaN, so every real day fails and is misreported as
+  `insufficient_met`. **So B is not a new derivation; it is one input-contract bug away from producing
+  values.** Read TN-79 before scoping this entry — it changes the cost more than anything else on it.
 - **Sequencing:** independent of Q-184. If a load lane lands, the case for reviving
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
