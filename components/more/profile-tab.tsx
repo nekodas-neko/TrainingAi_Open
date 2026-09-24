@@ -10,7 +10,7 @@ import { TTL_MEDIUM, TTL_SHORT } from '@trainingai/shared/cache-ttl'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import {
-  Bluetooth, Camera, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles, UserRound,
+  Bluetooth, Camera, Cat, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles, UserRound,
 } from 'lucide-react'
 import { signOutAndClearDevice } from '@/lib/sign-out'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
@@ -430,6 +430,18 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
           icon={Bluetooth}
           label="Ring, strap, scale &amp; permissions"
           onClick={() => router.push('/more/devices')}
+        />
+        {/* RV-121: /collection had exactly one door — a link inside the collection Home card, which
+            returns null unless that widget is on, and `DEFAULT_CARD_WIDGETS` is empty. So the route
+            existed and nothing reached it on a fresh install. The owner chose a permanent address
+            here over turning the card on by default, which would have changed Home.
+
+            This group, despite its label, because BF-82's split is *your stuff / the app* and a
+            third heading is the one-row-group defect it removed. The collection is his, not config. */}
+        <MoreRow
+          icon={Cat}
+          label="Collection"
+          onClick={() => router.push('/collection')}
         />
       </MoreRowGroup>
 
