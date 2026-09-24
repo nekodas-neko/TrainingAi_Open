@@ -16644,12 +16644,16 @@ the distinction from TN-60 — that rail inverted stored ordering, this one only
 the three alternatives with what each is better at, since any weight change here is the owner's.
 TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
 coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.
+---
+
 ## 2026-09-24 — CLAUDE.md → 1002 (chore/or-143-process-owner-gate-triage)
 
 Growth, +11 on the merged base (990 → 1002), recording the process the owner set out: the Orchestrator's primary job is the
 owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
 rather than run one. A role definition that lives only in a chat is one the next session does not
 have, so it costs twelve lines in the file every session reads.
+
+---
 
 ## 2026-09-24 — `docs/agents/state/orchestrator.md` → 97 (chore/or-144-ungate-owner-questions)
 
@@ -16658,3 +16662,15 @@ ungated and why, which three keep their gate, and the two things deliberately le
 reordering, and 69 entries still triaged only as a shape). It is +19 because a baton that says
 "triage in progress" is worth nothing — the next session needs the three keep-the-gate decisions by
 name, or it re-asks the owner questions he has already parked.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/resilience-two-regimes)
+
+28768 → 28891 (+123). TN-70: `resilience_level` published only 5 across 16 days (Jul 24 – Aug 29) and only 1–4 across 14 days
+(Sep 7–22), with matching confidence either side, and nothing in stored data explaining the switch. Most
+of the entry is what must NOT be concluded — PS-30 predates half the regime, and the NULL coverage column
+is the column's age rather than a missing input — plus the one cheap test that would settle it.
+TN-71 adds the post-TN-60 contributor share table LA-122 2b was parked for: temperature holds 10% of the
+weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-of-movement contributor
+"never scored".
