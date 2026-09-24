@@ -40,12 +40,16 @@ const RequestSchema = z.object({
   timePerSessionMinutes: z.number().int().min(20).max(180).nullable().optional(),
 }).strict()
 
+// RV-76: no mainMuscles/secondaryMuscles. `exerciseMuscleLookup` overwrites both below, and the
+// filter above that map drops every exercise the library does not hold — so the lookup is always
+// defined and the model's arrays were discarded on arrival.
+//
+// MODEL-OUTPUT schema. The request-side `GeneratedExerciseSchema` keeps both fields: it is
+// `.strict()` and the builder client posts its live program state wholesale, muscles included.
 const BuilderExerciseSchema = z.object({
   name: z.string(),
   exerciseRole: z.enum(['primary', 'secondary', 'accessory']),
   progressionStyleName: z.string(),
-  mainMuscles: z.array(z.string()),
-  secondaryMuscles: z.array(z.string()),
 })
 
 const BuilderChatObjectSchema = z.object({
@@ -222,17 +226,17 @@ When responding, mention if a change improves or worsens weekly volume balance. 
     const updatedProgram: GeneratedProgram = {
       ...program,
       ...raw.program,
-      sessions: raw.program.sessions.map((s: GeneratedProgram['sessions'][number]) => ({
+      sessions: raw.program.sessions.map(s => ({
         ...s,
         // BF-126: cap before the role is read, because the role below picks the style. After the
         // unknown-name filter, so a dropped hallucination cannot spend the session's one primary.
         exercises: capPrimariesPerSession(s.exercises
-          .filter((ex: GeneratedProgram['sessions'][number]['exercises'][number]) => {
+          .filter(ex => {
             const known = exerciseMuscleLookup.has(ex.name)
             if (!known) droppedUnknown++
             return known
           }))
-          .map((ex: GeneratedProgram['sessions'][number]['exercises'][number]) => {
+          .map(ex => {
           // Re-enforce progression styles so the AI can't switch goal families.
           let styleName = ex.progressionStyleName as string | undefined
           if (goalRules) {
@@ -244,13 +248,22 @@ When responding, mention if a change improves or worsens weekly volume balance. 
               styleName = enforced
             }
           }
-          const libraryMuscles = exerciseMuscleLookup.get(ex.name)
+          // RV-76: no `?? ex.mainMuscles` fallback, because there is nothing to fall back to. The
+          // filter above drops every exercise the library does not hold, so `libraryMuscles` is
+          // always defined here — and the model no longer emits muscles at all. The non-null
+          // assertion states that guarantee rather than hiding it behind a `?? []` that would
+          // quietly ship an exercise with no muscles if the filter were ever loosened.
+          const libraryMuscles = exerciseMuscleLookup.get(ex.name)!
           return {
             ...ex,
             progressionStyleName: styleName,
-            progressionStyleId: styleName ? styleByName.get(styleName) : ex.progressionStyleId,
-            mainMuscles: libraryMuscles?.mainMuscles ?? ex.mainMuscles ?? [],
-            secondaryMuscles: libraryMuscles?.secondaryMuscles ?? ex.secondaryMuscles ?? [],
+            // The old `: ex.progressionStyleId` arm was dead too, and differently: the model output
+            // schema has never carried that field, so it was always `undefined`. It type-checked
+            // only because this callback was annotated with the CLIENT's exercise type, which does
+            // carry it. Inferring from the model schema is what surfaced it.
+            progressionStyleId: styleName ? styleByName.get(styleName) : undefined,
+            mainMuscles: libraryMuscles.mainMuscles,
+            secondaryMuscles: libraryMuscles.secondaryMuscles,
           }
         }),
       })),
