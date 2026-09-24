@@ -16872,3 +16872,9 @@ production read. An entry that said only "fixed" would leave a reader believing 
 Second, it records that the general guard the source entry asked for was built and **withdrawn** for
 false positives, and points at LA-137 where the four parsing traps are written down — without that,
 the next session re-attempts it from scratch and rediscovers them.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 59, `review/sweep-59-queue-vs-code`.**
+29723 → 29814 (+91). 51 dated re-read notes on READY entries whose claims moved or
+expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
+parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
+a stale citation or building a finished entry.
