@@ -16835,3 +16835,13 @@ still pending, `enable_pr_auto_merge` reports an unstable-status error and never
 protection question, so the absence of the usual refusal looks like the setting landing. Re-run on
 green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
 repeating the cycle.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29674 (DV-14 root-caused)
+
++41 on DV-14, which had three rounds of measurement and no cause. It has one now: 39 of the last 40
+Railway deployments failed, all with the same `next build` heap OOM at Node's default ~4 GB cap.
+The length is the evidence — the verbatim failure, the one success that explains why production sits
+on 1.465.26, and the query shape for reaching the deploy log, which three sessions had reported as
+unreachable because `RAILWAY_API_TOKEN` answers a `Project-Access-Token` header and returns
+"Not Authorized" to the obvious `Authorization: Bearer` form. That last paragraph is the one worth
+its bytes: without it the next session repeats the same escalation.
