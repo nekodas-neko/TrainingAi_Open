@@ -16861,6 +16861,49 @@ which is the whole argument for fixing one call site rather than three screens.
 
 ---
 
+## 2026-09-24 — `projectOverview.md` → 12747 (RV-172)
+
+One Known-Issues entry, 29 lines. It records a fix that is **not device-verified**, which is what
+keeps it in the open section rather than the archive: the failure is a pull-path overwrite in native
+SQLite and the sandbox cannot run that path at all.
+
+The length is carrying two things the one-line version would lose. First, the entry names what the
+fix does **not** repair — rows whose frozen vial snapshot was already re-stamped by a re-push are
+gone and cannot be recovered from the device, with no count, because establishing one needs a
+production read. An entry that said only "fixed" would leave a reader believing the data came back.
+Second, it records that the general guard the source entry asked for was built and **withdrawn** for
+false positives, and points at LA-137 where the four parsing traps are written down — without that,
+the next session re-attempts it from scratch and rediscovers them.
+## 2026-09-24 — `docs/implementation-backlog.md` (or-154)
+
+Growth: three more entries carry `Ask: owner` (TN-64, RV-113, LA-129), and Q-551 carries a note
+saying it deliberately does not. A keyword sweep matched seven Lane-O entries as decision-shaped and
+only three were; Q-551 was the dangerous miss, because its own text says not to re-put it to the
+owner and the field would have surfaced it in the always-visible section. The note costs four lines
+and stops the next sweep undoing that.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 59, `review/sweep-59-queue-vs-code`.**
+29723 → 29790 (+67; rebased). 51 dated re-read notes on READY entries whose claims moved or
+expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
+parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
+a stale citation or building a finished entry.
+## 2026-09-24 — `docs/implementation-backlog.md` (or-155, owner answers)
+
+Growth: four owner answers recorded, and the largest is a correction rather than a decision. He said
+the device agent can run the admin sitting itself, which moved five entries (LA-56, LA-68, Q-525,
+Q-71, Q-11) off his plate and onto DV — the gate had never been his judgement, only the need for an
+admin session, and DV holds his login. He also corrected that DV cannot attach during his workouts
+at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
+would otherwise re-derive them.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 60, `review/sweep-60-security-privacy`.**
+29807 → 30004 (+197; rebased). Ten security and privacy entries (RV-190–RV-199), nine of them Lane A items
+directly under RV-188. They cannot be shorter than this: each one names the surface, who can reach
+it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
+deliberately.
+
+---
+
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/estimated-1rm-zeros)
 
 29714 → 29745 (+31). TN-74: 42 of 494 exercise logs store `estimated_1rm = 0` while carrying loaded sets, and the same input
