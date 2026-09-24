@@ -11,6 +11,7 @@ import { ChipGroup } from '@/components/ui/chip-group'
 import { invalidateMealPlans } from '@/lib/cache-groups'
 import { savePlanMealsToLibrary } from '@trainingai/shared/nutrition/save-plan-meal'
 import { RestrictionsPicker, type RestrictionSelection } from './restrictions-picker'
+import { sameRestrictions } from './restrictions-diff'
 import { MealPlanReviewStep } from './meal-plan-review-step'
 import { MyMealsPicker, type TypedMeal } from './my-meals-picker'
 import { MealCountReductionPrompt } from './meal-count-reduction-prompt'
@@ -54,6 +55,19 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
   const [step, setStep] = useState<StepIndex>(0)
   const [catalogue, setCatalogue] = useState<DietaryRestriction[]>([])
   const [restrictions, setRestrictions] = useState<RestrictionSelection[]>([])
+  /**
+   * RV-171 — what the server actually had, and whether we ever heard back.
+   *
+   * `restrictions` starts `[]`, and `handleGenerate` used to PUT it unconditionally into
+   * `replaceUserDietaryRestrictions`, which DELETES every row for the user before inserting. So one
+   * 429, 5xx or dropped request while this sheet opened erased every allergy and intolerance, and
+   * the plan was then generated without them because the generate route reads them back.
+   *
+   * `null` means no successful load: never write in that state. The snapshot is what makes the
+   * write conditional on an actual edit rather than on merely having opened the sheet.
+   */
+  const [loadedRestrictions, setLoadedRestrictions] = useState<RestrictionSelection[] | null>(null)
+  const [restrictionsFailed, setRestrictionsFailed] = useState(false)
   const [note, setNote] = useState('')
   const [stores, setStores] = useState<string[]>([])
   const [excluded, setExcluded] = useState<string[]>([])
@@ -79,16 +93,19 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
   useEffect(() => {
     if (!open) return
     setStep(0); setDraft(null); setKeepMealIds([]); setTypedMeals([]); setUseLibrary(false)
+    setLoadedRestrictions(null); setRestrictionsFailed(false); setRestrictions([])
     fetch('/api/nutrition/dietary-restrictions')
       .then(r => r.ok ? r.json() as Promise<DietaryRestrictionsResponse> : null)
       .then(d => {
-        if (!d) return
+        if (!d) { setRestrictionsFailed(true); return }
         setCatalogue(d.catalogue)
         // Seeded from what the user already has — restrictions are a property of the person, so a
         // new plan must never start from a blank slate and quietly forget an allergy.
-        setRestrictions(d.mine.map(m => ({ restrictionId: m.restrictionId, severity: m.severity })))
+        const mine = d.mine.map(m => ({ restrictionId: m.restrictionId, severity: m.severity }))
+        setRestrictions(mine)
+        setLoadedRestrictions(mine)
       })
-      .catch(() => {})
+      .catch(() => setRestrictionsFailed(true))
   }, [open])
 
   /**
@@ -140,11 +157,25 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
     try {
       // Persist the restriction set first: it is user-level data, so it should stick even if the
       // user abandons the plan at the review step.
-      await fetch('/api/nutrition/dietary-restrictions', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries: restrictions }),
-      }).catch(() => {})
+      //
+      // Two guards, both load-bearing. Writing without a successful load would send `[]` into a
+      // replace-all and erase the lot; writing an unchanged set is a delete-and-reinsert of every
+      // row for no reason, which is the same blast radius for no benefit. Skipping the write is
+      // safe either way — the generate route reads the stored restrictions back itself.
+      if (loadedRestrictions && !sameRestrictions(loadedRestrictions, restrictions)) {
+        const res = await fetch('/api/nutrition/dietary-restrictions', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entries: restrictions }),
+        }).catch(() => null)
+        if (!res?.ok) {
+          // The plan still generates against what the server has, so this is a warning rather than
+          // an abort — but silently dropping an allergy edit is exactly what RV-171 is about.
+          toast.error('Your dietary restrictions could not be saved — the plan uses your saved ones')
+        } else {
+          setLoadedRestrictions(restrictions)
+        }
+      }
 
       const res = await fetch('/api/nutrition/meal-plans/generate', {
         method: 'POST',
@@ -287,6 +318,13 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
               selected={stores}
               onToggle={v => toggle(stores, setStores, v)}
             />
+          )}
+
+          {step === 1 && restrictionsFailed && (
+            <p className="px-1 pb-3 text-sm text-destructive">
+              Couldn&rsquo;t load your dietary restrictions. Your saved ones are untouched and the
+              plan will still use them, but you can&rsquo;t change them here until this loads.
+            </p>
           )}
 
           {step === 1 && (

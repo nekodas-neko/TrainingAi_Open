@@ -5,9 +5,9 @@
 
 ## Now
 
-RV-111, RV-121 both halves, RV-164, BF-190 + BF-191 shipped. The last two went together: one flow,
-one device check, and BF-191's floor is near-meaningless without BF-190's elapsed time. LB-141 filed
-(two of three walk exits keep nothing). BF-188's fold collision fixed — it blocked a third PR.
+RV-111, RV-121, RV-164, BF-190 + BF-191, RV-171 shipped. LB-141 filed (two of three walk exits keep
+nothing — the owner's call). BF-188's fold collision fixed; it had blocked a third PR. RV-171 is the
+one to remember: a failed GET left a blank list that a replace-all PUT then wrote over every row.
 
 ## Next
 
