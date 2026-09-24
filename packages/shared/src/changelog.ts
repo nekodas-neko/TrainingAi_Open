@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.26",
+    date: "2026-09-24",
+    changes: [
+      "The Body Battery is no longer a countdown. It was losing about 48 points a day and finishing at zero on two thirds of days, because drain ran three times faster than charge and charging faded away as your heart rate climbed toward the rest ceiling — so hours of genuine rest stored almost nothing. Replayed over 66 days of your own history it now ends the day around 59 instead of 13, and no day finishes at zero, with the day-to-day spread unchanged so it still tells days apart.",
+      "These numbers are provisional on purpose. Your dose changed on 13 September, so an honest re-fit cannot happen until early October; the re-sweep is queued and is a single dial. Days already recorded keep their old scores — nothing you look at reads them.",
+    ],
+  },
+  {
     version: "1.465.25",
     date: "2026-09-24",
     changes: [
