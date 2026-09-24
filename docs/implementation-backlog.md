@@ -3066,18 +3066,12 @@ drift.
   is short by about 2,400.
 - **Fix:** store null, or scale with the coverage stated, when bin coverage is below a floor. DV's
   part is to check whether the H10 accelerometer stream starts late.
-- **✅ Code half SHIPPED 2026-09-24** (LB-142, `lib/stores/cadence-coverage.ts`). **Null below a
-  floor of 50%, not scaled** — scaling a 19%-covered stream to 100% invents the other four fifths,
-  which is the shape of the phantom walk duration BF-190 had just removed. Wired into **both** write
-  paths: the guided-walk save named here, and `lib/stores/activity-store.ts:240`, which integrates
-  off the same tracker on the manual screen and had the same defect unnamed.
-- **⚠ The floor is a judgement, not a measurement.** The nine good walks' coverage was never
-  recorded, so 50% is conservative rather than fitted. It discards the measured walk (19%) with room
-  to spare and keeps anything with a stream over half the activity.
-- **Keep:** DV — does the H10's accelerometer stream start late, and how often? A walk that trips the
-  floor now stores no steps at all, so if this is common the answer is to fix the stream rather than
-  to lower the floor. Pass/fail: start a walk with the strap already worn, and record the tSec of the
-  first cadence bin against the walk's start.
+- **✅ Code half SHIPPED 2026-09-24** (LB-142, #1574, `lib/stores/cadence-coverage.ts`) — null below
+  50% cover, not scaled, at both write paths ([journal](overview/entries/2026-09-24-fix-rv167-cadence-coverage.md)).
+  **The floor is a judgement, not a fit:** the good walks' cover was never recorded.
+- **Keep:** DV — does the H10's accelerometer stream start late, and how often? A walk under the
+  floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
+  Pass/fail: walk with the strap already worn; record the first bin's tSec against the walk's start.
 
 ### [workouts][platform] RV-168 — `session_exercises.exercise_id`, documented as the join key, is wiped by every program save
 
