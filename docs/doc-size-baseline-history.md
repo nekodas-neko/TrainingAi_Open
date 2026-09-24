@@ -16770,6 +16770,16 @@ next session needs the reason the obvious fix (a fifth lane) was rejected, or it
 
 ---
 
+## 2026-09-24 — `docs/implementation-backlog.md` → 29198 (chore/or-151-final-gates-and-recount)
+
+Growth, +6, and it closes the ratchet OR-146 opened this morning: every `Gate: owner` now says what
+it wants, baseline zero. The six lines are the last six gates plus OR-145's corrected figures — 65
+gated entries rather than the 76 it was written against, and a twelve-entry admin sitting rather
+than ten. That count moved four times in a day, every rise from reading a gate that said only
+`owner` and finding a button press behind it, so the entry now says to recount rather than quote it.
+
+---
+
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
 
 29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782

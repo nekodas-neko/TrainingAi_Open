@@ -595,7 +595,10 @@ the Orchestrator's to do.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
-- **Added:** 2026-09-24, OR-143/OR-144 triage of the 76 `Gate: owner` entries.
+- **Added:** 2026-09-24, OR-143/OR-144 triage of the 76 `Gate: owner` entries. **Recounted at the
+  end of that day: 65**, after OR-150 removed seven that owed a Tuning proposal and shipped work
+  cleared the rest. Every gate now states what it wants (`check-owner-gate-states-what-is-owed.js`,
+  baselined at zero) — so the remaining 65 are a list that can be worked, not read.
 - **Ask these WITH `RV-161`, `RV-157` and `RV-170`, which landed the same day from Review's
   sweeps 55–57.** Four entries at the head of `O` are all "questions for the owner", arrived at
   from different directions: this one from the gate triage, theirs from the reads and the device
@@ -626,13 +629,14 @@ below keep their gate — they really are blocked pending an answer — and this
    nothing since about 2026-08-04. Either branch is a different feature and nothing in the repo
    decides it. **No recommendation offered** — this is a genuine product preference. Note the day
    timeline reads the same table, so retiring the card is not the whole blast radius.
-4. **The admin sitting — ten entries, one login.** `owner-admin-sitting` (4, including `LA-56`,
-   `LA-68`, `TN-1` and `Q-525`, which OR-148 added on reading its gate) and `admin-console-sitting`
-   (6) are two batch names for the same visit to
+4. **The admin sitting — TWELVE entries, one login.** `owner-admin-sitting` (6: `LA-56`, `LA-68`,
+   `TN-1`, plus `Q-525`, `Q-71` and `Q-11`, each added on reading its gate) and
+   `admin-console-sitting` (6) are two batch names for the same visit to
    `/admin` → Devices on the phone: some need something *run* there, some need a *look*. They ship
-   as different PRs and must be ASKED as one sitting. Recounted from the batch fields after OR-148;
-   `LA-56`'s own note said ten before the count said nine, and it is ten again for a different
-   reason — read the fields, not the prose.
+   as different PRs and must be ASKED as one sitting. **The count has moved four times in one day**
+   (ten in prose → nine counted → ten → twelve) and every rise came from reading a gate that said
+   only `owner` and finding a button press behind it. **Read the batch fields, never the prose**, and
+   recount before asking rather than quoting this line.
 5. **`owner-branch-protection` (`LB-52` + `Q-297`'s second residue) — asked 2026-09-24**, parked by
    the owner for a few hours. E2E stays off the required-check list; that half is decided.
 6. **`BF-77` — is the "session to look into this" one he attends, or one an agent runs?** He asked
@@ -7908,7 +7912,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   small, scoped to one pillar, and directly closes part of the degraded-mode gap the
   device-agnostic-source goal names as still open.
 
-- **Gate:** owner
+- **Gate:** owner — NOT the tester question, which he settled on 2026-09-17 (proceed without one). The 2026-09-15 audit below found this is a change to HIS OWN Activity Score rather than a degraded-mode feature for someone else, and there is no precedence ladder to slot into. That is what needs his answer.
 - **⚠ ADDED 2026-09-15 by Lane A, from reading the merge path and measuring production. Two of this
   entry's premises do not hold, and together they make this a change to the OWNER'S OWN Activity
   Score rather than a degraded-mode feature for someone else.**
@@ -24832,7 +24836,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   as test fixtures. None of this has been done; the bands today are still the plan's initial
   priors. Grepped the backlog for a tracking entry — none exists; this gap has sat as a code
   comment only.
-- **Gate:** owner
+- **Gate:** owner — the DATA, not a decision: every path in this entry ends at labelled activity only he can produce, and the classifier's own header forbids the one thing that looks implementable (*"do not hand-tune further without real data"*). Tightening the bands from a desk is the prohibited move, not the fallback.
 - **Why it is gated rather than READY (added 2026-09-04):** every path in this entry ends at data only
   the owner can produce, and it was heading Lane A's READY list with nothing an implementer could
   start. The classifier's own header forbids the one thing that looks implementable — *"do not
@@ -25397,7 +25401,8 @@ its own maintenance hazard. Recorded here as the shape to re-enumerate rather th
   running `POST /api/oura-ble/samples/redecode` with no `date` param (forcing `fullHistory: true`)
   in production. It is session-auth-gated with no bearer path, so only the owner — or a session
   holding their login — can trigger it.
-- **Gate:** owner
+- **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). The redecode is session-auth-gated with no bearer path, so it is the same admin login `LA-56`, `LA-68`, `TN-1` and `Q-525` each need.
+- **Gate:** owner — ONE ACTION: `POST /api/oura-ble/samples/redecode` with no `date`, forcing `fullHistory`, in production. Session-auth-gated with no bearer path, so only he (or a session holding his login) can fire it.
 
 - **⚑ Re-scope condition from below is now satisfied.** This entry was blocked pending Q-139's
   decision on whether `resolveDsToMs` should interpolate or use a robust offset. **Q-139 shipped
@@ -26895,7 +26900,7 @@ whole content is that the block was released — OR-122, 2026-09-22). Struck, wi
   like `oura_raw_samples` already does and for the same reason)? Do it in the same PR as each
   table's rename — a generically-named table with no discriminator is the state that invites a
   later writer to assume portability the schema cannot deliver.
-- **Gate:** owner
+- **Gate:** owner — a schema-naming decision, reopened by the 2026-09-15 audit below: the rename as planned does not deliver what he asked for, because `colmi_*` already proves a second recording device did not share a table. Whether each renamed table carries a source discriminator is his call, and it is hard to reverse once the migration lands.
 - **⚠ AUDITED 2026-09-15 (Lane A) — the rename as planned does not deliver what was asked for, and
   the decision is the owner's:**
   [`docs/reviews/2026-09-15-vendor-table-rename-discriminator-audit.md`](reviews/2026-09-15-vendor-table-rename-discriminator-audit.md).
@@ -27542,7 +27547,7 @@ where the 2026-08-17 outage started.
 ### [devices][platform] ➡️ Q-31 — own resilience weights & own workout-energy MET table — RE-SCOPED by #999, gates released
 
 - **Lane:** A
-- **Gate:** owner
+- **Gate:** owner — ONE LINE of sequencing, stated below: is Q-31's implementation startable now, or does it still follow Q-1 and Q-30? The entry header and the plan it points at disagree, and inferring an answer from either is what put this in READY by mistake.
 - **⚠ Gated 2026-09-11 because this entry and the plan it tells you to read disagree about whether
   it is startable, and `next-item.js` was printing it READY.** The header says *"the Q-1 + Q-30 gates
   are released"*; the triage plan's own closing section — the document this entry says to read
@@ -28192,7 +28197,8 @@ indefinitely.
   workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
   has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
   old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
-- **Gate:** owner
+- **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). Its own note already said to fold this into the next batch of owner actions rather than re-ask it; this is that batch.
+- **Gate:** owner — ONE BUTTON: Admin → Tools → "Backfill per-set HR stats", which only he can press. Offered on 2026-09-01 and not taken while he took the Q-4 strap night — a scheduling answer, not a refusal, so do not re-ask it on its own.
 - **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
   they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
   refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the
