@@ -2628,6 +2628,10 @@ drift.
 
 
 ### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
+- **✅ THE CENTRAL CLAIM IS VERIFIED, and sharpened — Orchestrator, 2026-09-24.** Re-read from the API rather than taken from this entry: PR #1467 merged at **10:18:18Z**; its `Tests` job (`107136618616`) reported **failure at 10:18:29Z**, eleven seconds LATER. So what the merge went past was a **PENDING** check, not a reported failure — which falsifies CLAUDE.md's claim *"it cannot merge a genuinely pending check"* even more directly than the entry states. (`E2E` also failed, at 10:47.) The conclusion is unchanged and the wording is now exact.
+- **✅ BOTH CLAUDE.md PASSAGES ARE CORRECTED** in this PR — the Standing Instruction that claimed branch protection *"requires a PR with all CI checks passing"*, and the CI/CD line that called the merge *"the reliable green check"*. Both now say the checks are not enforced at merge and point at `get_job_logs --failed_only` as the real read.
+- **The mechanism is confirmed and is the same one `LB-52` records.** `enable_pr_auto_merge` was re-probed on a GREEN PR at 09:15 UTC 2026-09-24 and still answers *"Protected branch rules not configured for this branch"*. `main` is protected by a Ruleset with no classic rule beside it, which is why the merge API neither enforces the checks nor offers auto-merge. **One setting causes both**, so this entry's remaining half and `LB-52` are the same fix.
+- **⚠ This reframes `owner-branch-protection` from throughput to CORRECTNESS.** It was put to the owner as a merge-race annoyance. It is also the reason no merge in this repo is gated on its tests. Say that when it is next raised.
 
 - **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133 ·
   **moved above the Orchestrator's print cut 2026-09-24** by Lane B, per CLAUDE.md's new rule that an
