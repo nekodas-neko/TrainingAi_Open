@@ -815,32 +815,6 @@ which is the right shape for something that can only be validated by living with
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
-### [devices][platform] RV-180 — converting a ring timestamp re-sorts all 12,396 clock anchors on every call, once per row: the likely cause of DV-13
-
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Found by the performance half; confirmed in code and production here.
-- **The code:** `resolveDsToMs` (`clock.ts:179-186`) calls `currentEpoch`, filters to the epoch, then
-  `robustOffsetMs`, which **maps and sorts every anchor** (`clock.ts:147-150`). There is no memo.
-  Production holds **12,396 anchors, all in epoch 0** (`count(*)`), and the table grows by about
-  150–300 a day.
-- **Called once per row:**
-  - `getOuraRawSamplesForTags` (`adapter.ts:6596`, inside `rows.map`) behind
-    `/api/oura-ble/device-metrics` and the daily HRV refit (31-day lookback).
-  - `getOuraRawSamplesByTags` (`:6546`) behind `samples/raw` and `step-counter-export`.
-  - The rollup's per-bin `toDate` (`rollup/run.ts:124`).
-- **Cost:** benchmarked against the real anchors at **3.0 ms per call**, linear, on sandbox CPU.
-  device-metrics' default 3-day window is **58,856 rows ≈ 177 s of synchronous CPU** on the one
-  Node process, which blocks every other request. DV-13 saw four admin requests hang past 90 s and
-  `/api/version` time out from another PC for 8 minutes; that is this shape. The rollup pays about
-  2.6 s per pass, and it grows about 2% a week.
-- **Fix:**
-  - Compute the epoch offset once per anchor set: hoist it out of the map, or memoize by array.
-    Per-row cost becomes O(1).
-  - Read one offset per epoch in SQL rather than the whole table (RV-182).
-  - Add the row cap DV-13 already owes.
-- **⚠ Until this ships, `/admin/oura-ble` stays closed.** The device check after it ships is DV-13's
-  own pass test, which RV-186 carries.
-
 ### [nutrition][platform] RV-172 — the sync pull drops columns the device then overwrites with NULL: supplement ticks lose their time and frozen vial dose
 
 - **Lane: A** — `getSyncDelta` in `lib/data/postgres/adapter.ts`, `lib/local-store/sync-engine.ts`.
