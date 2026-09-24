@@ -16534,3 +16534,12 @@ that would disprove it. Writing the ruled-out half down is what stops Lane A re-
 entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
 re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
 to run. Offset by removing RV-126, whose results all have homes (−30).
+
+## 2026-09-24 — `CLAUDE.md` 966 → 990, `docs/implementation-backlog.md` → 28090
+
+The owner's standing instruction that a question for him becomes a task rather than a chat message,
+plus BF-191 carrying the two decisions it split out of BF-190. The CLAUDE.md growth is one rule, and
+most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, so gating an owner
+question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
+asking. Stating the rule without stating that inversion would have produced exactly the failure the
+rule is for.
