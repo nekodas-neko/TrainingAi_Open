@@ -1538,37 +1538,36 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **Pass test:** on the S25, from `/nutrition` with no active plan, tap *Prefer the step-by-step
   setup?* — the New meal plan sheet opens on the first tap.
 
-### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
+### [platform][app-shell] DV-18 — private media went through Next's image optimizer, which cannot authenticate
 
-- **Lane: A** — `app/api/admin/reference-figure/route.ts` (POST), `app/exercise-media/[...key]/route.ts`.
-  Re-laned from B after Lane B looked first, as the entry asked.
-- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147) · triaged by Lane B 2026-09-24.
-- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Admin → Exercises → **AI style reference** renders the WebView's broken-image
-  icon and the alt text *"Reference figure"*. This is the anchor the AI GIF generator styles from, so a
-  missing one may affect generations too.
-- **The entry's open question is settled: a URL IS stored.** `exercise-manager.tsx` renders
-  *"No reference — AI uses text prompts only"* when `referenceUrl` is null. The device saw the
-  broken-image icon and the alt text instead, so the GET returned a URL and the browser's fetch of
-  it failed. "Never set" is ruled out.
-- **Not a path mismatch, checked:** `REFERENCE_FIGURE_KEY` is `exercise-media/reference-figure.png`;
-  the admin GET strips that prefix to build `/exercise-media/reference-figure.png`, and the proxy
-  re-adds it. The two agree exactly.
-- **Mechanism — high confidence, NOT proven.** The POST writes **any** uploaded file to the `.png`
-  key with a hard-coded `'image/png'`, and the proxy sets Content-Type from the `.png` extension.
-  Neither inspects the bytes. The S25 shoots HEIC/JPEG, so a phone upload is stored and served as
-  PNG, which the WebView cannot decode — a broken image, while the GET's existence check (a real
-  `downloadMedia`) still succeeds. That is the observed symptom exactly.
-- **What would disprove it:** the stored object really being a valid PNG, in which case look at a
-  truncated upload or the proxy's response. Settling it needs production storage, which the sandbox
-  cannot reach — so this is a diagnosis to verify, not a conclusion to build on.
-- **Why Lane A:** the durable fix is server-side — sniff the real type on upload and store/serve it
-  under a matching key and Content-Type, or reject a non-PNG outright. `app/api/**` is Lane A by the
-  path rule.
-- **The Lane B half is deliberately not done.** Constraining the file input in
-  `components/admin/exercise-manager.tsx` is bypassable and cannot repair the already-stored object,
-  so shipping it alone would make the card look fixed while the AI generator still styles from a
-  file it cannot read. Worth adding *after* the server fix, not instead of it.
-- **Pass test:** the card shows the reference image on the S25.
+- **Lane:** A — shipped 2026-09-24. The S25 check below is the only thing left.
+- **Verify:** device
+- **Keep:** the pass test on the S25 — Admin → Exercises shows the AI style reference, and a workout
+  whose exercise has only a still frame (no GIF) shows that frame rather than a broken image.
+- **⚠ THE FILED MECHANISM WAS WRONG, and it is worth reading why before trusting the next one.** The
+  entry diagnosed a HEIC/JPEG stored and served under a `.png` key with a hard-coded `image/png`,
+  and called it *"high confidence, NOT proven"*, needing production storage to settle. The real
+  cause needed no storage at all and is measurable from a dev server:
+
+  ```
+  GET /exercise-media/reference-figure.png              -> 307 /sign-in
+  GET /_next/image?url=%2Fexercise-media%2F…&w=96&q=75  -> 400 "isn't a valid image"
+  ```
+
+  `middleware.ts` puts every non-`/api` path behind the session gate, and Next's image optimizer
+  fetches its source **server-side without the viewer's cookie** — so it is redirected, receives
+  HTML, and rejects it. It fails before storage is consulted, so what is stored under the key never
+  mattered. The device supplied the other half: the admin page itself rendered, so the session was
+  present in the browser and the image still failed.
+- **It was never one image.** Six `<Image>` call sites carried `unoptimized={src.endsWith('.gif')}`,
+  so GIFs worked by accident and every other private-media URL broke. `mediaKey` writes start/end
+  frames as `.png`, and `exercise-media-panel.tsx` falls back to that frame when an exercise has no
+  animation — so this was **user-facing in the workout screen**, not an admin-only cosmetic defect.
+  One predicate, `mustBypassImageOptimizer`, now answers it at every site.
+- **The content-type half shipped too, as a latent defect rather than this one.** The upload really
+  did store every file as `image/png` whatever the bytes were; it now sniffs the magic bytes,
+  rejects what it cannot serve, and the proxy serves the stored type rather than guessing from the
+  extension.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
 
@@ -2058,13 +2057,28 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   snapshot; `getBodyBatteryHistory` passes it through, and **nothing branches on it**. Grepped for a
   `v5`/`v6` literal, a `startsWith`, an equality — there are none. The column exists to stop exactly
   the mistake below and does not currently stop it.
-- **The live consequence, as of TN-55 shipping today.** The calibration route reads
-  `getBodyBatteryHistory(userId, start, end)` and builds `batteryByDate` from `b.endValue`, then
-  correlates it against the morning `perceived_recovery` answers. Rows before today are `v5:` — the
-  countdown, which ended at the floor on about two thirds of days — and rows from today are `v6:`,
-  centred near 59. **Any range spanning today correlates across a model change**, which the repo's
-  own rule names as not evidence. The window cap is 180 days, so this is reachable rather than
-  theoretical.
+- **⚠ CORRECTED 2026-09-24, same day this was filed — the first version blamed TN-55 and was wrong
+  about when this starts.** It read *"rows before today are `v5:` and rows from today are `v6:`"*,
+  as though the shipping of v6 created the problem. Measured in production instead of reasoned from
+  the diff:
+
+  | model | days | mean end | days at 0 | last |
+  |---|---:|---:|---:|---|
+  | v1 | 16 | 66.3 | 0 | 2026-07-15 |
+  | v2 | 1 | 21.0 | 0 | 2026-07-16 |
+  | v4 | 18 | 62.9 | 0 | 2026-08-03 |
+  | v5 | 52 | 15.2 | **27** | 2026-09-24 |
+
+  **Four model generations are already in the table, and the v4 → v5 boundary is the violent one**
+  — mean end 62.9 against 15.2. A 180-day window has spanned it since early August. v6 adds a fifth
+  boundary to a defect that has been live since June; it is not the cause. (Tuning's census of the
+  same table on the same day omitted the single v2 day, which is why this one was re-run rather than
+  copied.)
+- **The live consequence.** The calibration route reads `getBodyBatteryHistory(userId, start, end)`
+  and builds `batteryByDate` from `b.endValue`, then correlates it against the morning
+  `perceived_recovery` answers. **Any range spanning a model boundary correlates across a model
+  change**, which the repo's own rule names as not evidence. The window cap is 180 days, so this is
+  reachable rather than theoretical — and has been reachable for longer than the entry first said.
 - **⚠ Do NOT "fix" it by filtering to the current version and stopping there.** That silently
   shortens the window instead of saying it did, which is the same failure one level quieter: a
   caller asking for 90 days would get a handful of rows and a correlation computed on them, with

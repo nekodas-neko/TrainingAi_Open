@@ -2612,9 +2612,39 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [readiness][body][heart-rate] ⚠️ The Body Battery is fixed on provisional numbers, and three things are still owed (TN-55, 2026-09-24)
+### [workouts][platform] ⚠️ Broken exercise pictures — fixed, not yet seen on the phone (DV-18, 2026-09-24)
 
-Your *"it's pretty much useless"* was a rate-balance defect, and it is fixed: replayed over 66 days
+The device agent reported one broken image in the admin tools. It was six places, and one of them
+is the workout screen you use.
+
+Pictures under `/exercise-media/` sit behind your sign-in. Next's image pipeline fetches a picture
+**on the server, without your cookie**, so it was redirected to the sign-in page, got a web page
+where an image should be, and gave up — which the browser draws as a broken-image icon. Measured
+rather than guessed: the direct address answers `307 /sign-in`, and the optimiser answers
+`400 isn't a valid image`. Animations were exempted years ago for an unrelated reason, so GIFs
+worked and everything else broke, which is why it looked arbitrary. An exercise the generator made
+only a still frame for showed a broken picture in the workout screen and the warm-up list.
+
+**The filed cause was wrong and the entry said so honestly** — it diagnosed a phone photo stored
+under a `.png` name and marked itself unproven, needing production storage nobody in a container
+can reach. The real cause needed no storage at all. That upload defect was real too and is fixed
+alongside, but it was not this.
+
+**Still owed: the look on the S25.** Admin → Exercises shows the style reference, and an exercise
+with only a still frame shows it rather than a broken icon. Nothing is blocked on that check.
+
+### [readiness][body][heart-rate] ⚠️ The Body Battery's arithmetic is fixed; the result has not been seen yet, and three things are still owed (TN-55, 2026-09-24)
+
+**⚠ This heading used to say "is fixed on provisional numbers" and the paragraph below said the
+defect "is fixed". Corrected 2026-09-24: the arithmetic is fixed and demonstrated by replay; the
+outcome in production has not been observed.** The evidence is an offline replay of the shipped
+walk over real inputs, which is strong and is not the same thing as a stored day behaving. Verified
+against production the same day: the app serves **1.465.26**, so the fix is live, and
+`body_battery_daily` holds **zero v6 rows** — today's row is still `v5`, because the route rewrites
+it only when the app is opened. **The first v6 day lands on your next app open**, and TN-55's pass
+test needs several of them before it means anything. Nothing is stuck; it is waiting on use.
+
+Your *"it's pretty much useless"* was a rate-balance defect. Replayed over 66 days
 of your own history the battery went from a median **−48 points a day** ending at the floor on
 **67%** of days, to a median of **+0.2** ending at zero on **none** — with the spread intact
 (sd 25.1 → 25.2), which is what says it was calibrated rather than flattened to 50. Two things were
@@ -2628,10 +2658,20 @@ re-sweep then rather than leave it a countdown for another fortnight. The re-swe
 dial and is queued as **LA-134** — without it these numbers quietly become permanent.
 
 **The stored history does not re-score, and the plan said it would.** `body_battery_daily` is
-written only for *today*, by the `GET` itself; no backfill path exists. Every earlier row stays
-stamped `v5`. Nothing you look at reads those rows, and the one field the route does take from them
-across days is an observed heart-rate peak that none of these constants touch — so this costs
-nothing today and is recorded because the plan claimed otherwise.
+written only for *today*, by the `GET` itself; no backfill path exists. Every earlier row keeps the
+model that wrote it, permanently. Tuning reached the same conclusion independently and filed
+**TN-72** for a bounded admin re-derive; your 2026-08-26 *"recompute rather than freeze"* decision
+is **unsatisfied rather than implemented**.
+
+**⚠ So a battery trend spanning today will show a step from ~15 to ~60 that is a model change
+wearing the clothes of a recovery.** If the number looks dramatically better over the next few days,
+that jump is the new arithmetic, not you. What is worth reading is whether individual **v6** days
+stop ending at zero — not the shape of the line across the boundary.
+
+**⚠ This is older and wider than TN-55, which the first version of this row missed.** Measured in
+production 2026-09-24: the table holds **v1 (16 days), v2 (1), v4 (18), v5 (52)** — it has been
+mixing model generations since June, and v6 adds a fifth boundary rather than creating the problem.
+LA-135 covers the one place that actually correlates across it.
 
 **A workout day still barely separates from a rest day** — and it did not before either. Drain
 separates slightly better than it used to (Cohen *d* 0.31 → 0.37 across 48 workout days against 18

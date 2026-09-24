@@ -16780,6 +16780,34 @@ than ten. That count moved four times in a day, every rise from reading a gate t
 
 ---
 
+## 2026-09-24 — `projectOverview.md` → 12676
+
+12655 → 12676 (+21). DV-18's row. It earns a place for a reason the entry itself did not have: the
+defect was filed as one broken admin image and turned out to reach the workout screen, so it is
+something the owner saw and could not explain rather than an internal tidy-up. The row also records
+that the filed mechanism was wrong, which is the part worth carrying — a future reader finding the
+content-type fix in the diff would otherwise conclude that was the cause. Leaves the S25 check
+outstanding, so per the archive rule it stays open.
+
+## 2026-09-24 — `projectOverview.md` → 12695, `docs/implementation-backlog.md` → 29212
+
+12676 → 12695 (+19) and 29198 → 29212 (+14), both for the same correction rather than for new work.
+
+The TN-55 row claimed the Body Battery "is fixed". The arithmetic is, and a replay over real inputs
+demonstrates it — but no stored day had yet been written by the new model, so the outcome had not
+been observed. Verified in production: the app serves 1.465.26, so the fix is live, and the table
+holds zero v6 rows because the route rewrites today's row only when the app is opened. The first v6
+day arrives on the next open. The row now says that, and warns that a trend spanning today shows a
+step from ~15 to ~60 which is a model change rather than a recovery.
+
+LA-135 was filed the same morning blaming TN-55 for the mixed history. Re-measured rather than
+reasoned from the diff: the table already held v1, v2, v4 and v5, and the violent boundary is
+v4 → v5 (mean end 62.9 against 15.2), live since August. v6 is a fifth boundary, not the cause. The
+census was re-run rather than copied from Tuning's, which is what surfaced the single v2 day theirs
+omitted — and the growth here is mostly that table, which is the evidence the entry was missing.
+
+---
+
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
 
 29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782
