@@ -16569,13 +16569,20 @@ most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, 
 question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
 asking. Stating the rule without stating that inversion would have produced exactly the failure the
 rule is for.
+---
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
+28168 → 28240 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
+not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
+seven device gates are re-filed.
 
 ---
 
 ### 2026-09-24 — `docs/implementation-backlog.md`
 
-28168 → 28263 (+95, after three merges of `origin/main`; the earlier +81 and +95-on-28117 on this
-branch were against earlier bases). Three owed checks re-laned
+28240 → 28335 (+95, after four merges of `origin/main` — the earlier figures on this branch were
+against bases that had already moved). Three owed checks re-laned
 to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the DV-13 concurrency hazard
 and the owner's authorisation for a production write — a bare lane change would not tell the device agent
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since

@@ -1448,6 +1448,56 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   still overwrite, so the rule points at a real hazard rather than a fixed one. Check the other
   `upsert*` methods in `sqlite-backend.ts` for that list; do not reason it from this entry.
 
+### [platform] RV-156 — about 30 Known-Issues rows are already answered, several state things that are no longer true, and the old device queue has five live rows
+
+- **Lane: O** — `projectOverview.md` and the archive are the Orchestrator's.
+- **Added:** 2026-09-24 · Review sweep 55, §§3–4 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **Move to `known-issues-resolved.md`:** the §4 list. Each carries its evidence (a commit, a sweep
+  result or a production read). Five were settled by production reads this sweep:
+  - bodyweight `planned_pct` is null on 0 of 38 sets;
+  - bodyweight volume is positive on 19 of 19 exercise logs;
+  - `activity_score` is present on 31 of 31 days;
+  - `bdi_derived` is present on 31 of 31 days;
+  - `prep_time_sec` is present on 104 of 104 exercise logs.
+- **Amend:** the stale claims in §4. The heading that says "ALL QUEUED (fixes not yet shipped)" is
+  the worst one, because a reader believes it.
+- **Retire `docs/device-verification-queue.md`** to a pointer at `next-item.js --sittings`. Its five
+  still-owed rows are now in RV-155 §A (S7) and RV-157 (BF-11d, BF-31, LA-37/BF-66). S1 is folded
+  into RV-131.
+
+### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+
+- **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
+  arranged.
+- **Added:** 2026-09-24 · Review sweep 55, §2 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **The six:**
+  1. Gesture navigation switched on for one sitting. This also unblocks RV-37, RV-127's clearance
+     half and Q-168.
+  2. A morning before the check-in and the first food log.
+  3. DV attached, passively, during one of the owner's own workouts.
+  4. The chest strap worn.
+  5. A real walk or run.
+  6. One list of non-standing writes, approved once.
+- **Recommendation:** ask for 1 and 6 first. Switching navigation mode is one setting, and a
+  one-time write list replaces a question per check. Together they unblock the most rows for the
+  least of the owner's time. 3 costs him nothing extra; it only needs DV to know when he trains.
+- **Reversal cost:** nil. This only changes when checks are scheduled.
+
+### [platform] RV-158 — a Known-Issues row can owe a device check that no queue lists; stop new ones at CI
+
+- **Lane: O** — a rule plus a check in `scripts/check-backlog-pointers.js`.
+- **Added:** 2026-09-24 · Review sweep 55, §5 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **The gap:** writing *"NOT device-verified"* in a Known-Issues row was how a device check was owed
+  before the device agent existed. The agent reads only the backlog, so 155 such rows fell out of
+  every list. The same thing happened a second time with `docs/device-verification-queue.md`.
+- **The guard:** fail CI on a **new** Known-Issues heading that says it is not device-verified and
+  names no id with a `### ` heading in the backlog. Baseline today's rows shrink-only, as the
+  done-headings were (OR's first sweep). Add one line to CLAUDE.md's device-gate paragraph: an owed
+  check lives on a backlog line, and a Known-Issues row may point at it but may not be its only
+  home.
+- **Why a check and not only a rule:** RV-143 was the same shape (a gate DV could not see), and the
+  rule alone did not reach the next author.
+
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the inputs are labelled, but the ink is 21 px
@@ -1552,6 +1602,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   race in BF-47); the offline shell serves every route, not only ones visited that session.
 - Offline-first is the architecture's central claim and **no instrumented offline pass has ever
   been run.** Pair with RV-126 — same writes, network flipped.
+- **Also (sweep 55, folded in from the retired device queue's S1):** after reconnecting, pull down on More and confirm the outbox push fires. Then force-close and reopen, and confirm the row is still there.
 
 ### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
 
@@ -1870,6 +1921,30 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
 
 
+### [platform][app-shell] RV-155 — about 60 shipped changes owe a device look that no queue shows DV: run them as six stations
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review sweep 55. The station list is §1 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **Why DV has never seen these:** each lives only in a `projectOverview.md` Known-Issues row
+  saying *"NOT device-verified"*, or in `docs/device-verification-queue.md`. `next-item.js` reads
+  neither. 155 such rows were triaged. About 60 are checks the phone alone can run, under the
+  standing write permissions, on three-button navigation.
+- **The stations, cheapest first:**
+  - A: SQLite, console and `adb` reads, no screen, about 20 min.
+  - B: the Workout tab, read-only.
+  - C: Nutrition, food log/delete and a throwaway supplement.
+  - D: Health.
+  - E: Home, More and the shell.
+  - F: Cardio.
+  Each row names its `projectOverview.md` line (as of `1351f6de`), the action and what passes.
+- **Report per row, VERIFIED / FAILED / COULD NOT CHECK**, the usual way.
+  - A **VERIFIED** row: list it in the sweep journal. The Orchestrator moves the Known-Issues row
+    to the archive (RV-156).
+  - A **FAILED** row: file a new DV entry for the lane that owns the surface. Do not edit the
+    Known-Issues row.
+- **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
+  owner-present rows (RV-157).
+
 ### [app-shell][platform] RV-149 — DEVICE PROBE: the timezone census, every screen with two clocks that disagree
 
 - **Lane: DV**
@@ -1882,6 +1957,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   left on Brisbane, every visible clock time, date and day-word on every route matches the
   un-overridden walk. **FAILED** per route that differs, with the text diff. Each failing route goes
   to the lane that owns that screen.
+- **Also (sweep 55, Q-163's Known-Issues row):** the Home header's date and greeting stay in the profile's zone under the override.
 
 ### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
 
@@ -1945,6 +2021,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   tab switch or restart**. **FAILED** per surface that holds the old day.
 - **Needs an overnight sitting the owner agrees to.** Until then this is COULD NOT CHECK, not a
   failure. It is the one probe in this batch that cannot run whenever the phone is plugged in.
+- **Also a resume leg (sweep 55, RV-35's Known-Issues row):** background the app before 00:00, resume after, and without a tab switch confirm Nutrition's diary date is the new day.
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
@@ -2193,7 +2270,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 
 - **Lane: B** · `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-23 · found while shipping
   RV-110.
-- **Gate: device**
+- **Verify:** device — re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. The check is the Keep line below.
 - **Reproduced twice, driving the real app:** from Home, `navigateToTab` to `/nutrition?review=day`
   when Nutrition has **not yet been mounted in this shell session** leaves the End of Day sheet
   CLOSED. Home's "review your day" (`session-select-content.tsx:1183`) takes that path, so the first
@@ -13757,7 +13834,7 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 - **Note:** N2 passed on this same pass — the nested-sheet back stack is correct — so this is
   specific to cross-tab navigation, not the general back handling BF-27 fixed.
 
-- **Gate: device**
+- **Verify:** device — re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. Sweep 3 passed the workout row. Still owed: the food row, and Health's own timeline.
 - **⚠ It does not reproduce in the web harness, measured 2026-08-30 (Lane B).** Driven end to end in
   Playwright with the seeded workout row: Home → tap the timeline row →
   `http://localhost:3100/health/day?date=2026-08-30` → back → `http://localhost:3100/` with
@@ -14662,8 +14739,7 @@ it is a visible change on two Lane B screens with a memory cost worth stating (2
 `FOOD_ITEM_IMAGE_MAX_BYTES` 16 KB cap is ~320 KB per search), and a de-duplication PR is the wrong
 place to start rendering pictures.
 
-- **Gate:** device — the local store does not run in `pnpm dev` or Playwright, so the only way to see
-  this fixed is on the S25.
+- **Device check once it ships** (Review, 2026-09-24): the device gate is removed, because it parked unbuilt work behind a check that can only happen afterwards. Sweep 1 already read the pre-fix state: 1 of 339 rows carries a picture, so the fix is cheap to verify and cheap in memory on this device. After it ships, DV opens the Food Library and confirms that food's picture renders.
 
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
@@ -14721,9 +14797,7 @@ place to start rendering pictures.
 
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
-- **Gate:** device — **all eight phases have shipped** (BF-11h merged 2026-08-27, v1.389.0). The only
-  thing still owed is the S25 walk this entry defines below, so it is gated rather than READY: it
-  printed at the top of the Lane B queue with nothing an implementer could do.
+- **Verify:** device — **all eight phases have shipped** (BF-11h merged 2026-08-27, v1.389.0). re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. What is owed is the S25 walk this entry defines below. Creating and deleting a throwaway meal falls under the standing write permission; any other write needs the owner's go-ahead.
 - **Reference:** the spec its eight phases read. The work is in BF-11a…BF-11h, not here.
 - **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
   This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
@@ -17136,7 +17210,6 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
-- **Lane: B** — client shell. Not a server or database entry; see the ruled-out list.
 
 **⚠ A correction to the first version of this entry, which was wrong.** It concluded that production
 was served from Virginia while the owner is in Brisbane, from `x-railway-edge: iad1` in the response
@@ -17173,9 +17246,7 @@ permanently-mounted panels; DOM accumulation in long lists; and the interaction 
 churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
 lived context.
 
-- **Gate:** device — added 2026-08-27 by Lane B, which reached this as the top startable row and
-  found it says the opposite of startable: *"cannot be root-caused from a sandbox and should not be
-  attempted again from one"*, *"Surface: device only"*.
+- **Lane: DV** — re-channelled 2026-09-24 by Review (RV-143's triage). The fix will be Lane B's, and the diagnosis needs the phone, so it goes to DV as DV-12 did. The device agent was already carrying this in its baton (listener counts around writes, sheets, pushed routes and sync), but the device gate kept it out of `--lane DV`.
 - **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
   get any other way. **⚑ `Needs:` cleared on a technicality and that is worth noticing.** BF-19 has
   shipped, so the pointer resolves and this row printed as READY — but BF-19 shipped the *reporter*,
@@ -24924,8 +24995,16 @@ per-field merge where an AI write has no honest source rank to claim.
   pins it. Migration 266 matters as much as 265: the view generator emits an explicit column list,
   so without it the column is invisible to `/api/admin/db-query`, which is the only way anyone reads
   production here.
-- **Keep:** the read. **Nothing is owed in code — what is owed is one query, a few days from now**,
-  once the column has had time to be written:
+- **📊 THE READ, DONE 2026-09-24 (Review): `insufficient_met` on 20 of 20 days** (2026-09-05 →
+  09-24; 09-04, the day it shipped, is NULL). No day holds an OTS. So the route **is called and it
+  refuses**, and because an `'ok'` overwrites the reason, no day ever reached `'ok'`, even by
+  evening. **That contradicts the 2026-08-30 finding below that the MET gate clears by ~12:07 local.**
+  Two explanations fit, and this read cannot tell them apart:
+  - the day's LAST evaluation lands before midday, because the caller runs in the morning only;
+  - or the MET span the route computes is not the span measured on 08-30.
+  **Next, Lane A:** write the evaluation time and the computed MET span beside the gate reason, or
+  find which client calls `/api/training-stress` and when. The query that produced this, kept for
+  re-runs:
   ```
   SELECT day, training_load_gate, training_load_ots
     FROM claude_ro.oura_daily_derived ORDER BY day DESC LIMIT 14
@@ -25369,7 +25448,7 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Keep:** the confirmation, and it is an owner/device read, not code. On the next APK: either the
   bar stops appearing on an empty Home visit (fixed), or the log line says the replayed value did
   **not** match the capture, which refutes the replay theory and sends this back to option (a).
-- **Gate:** device
+- **Verify:** device — re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. Read-only: visit Home with no weighing in progress, then read `adb logcat` for the gate's log line. APK 1.460.4 carries the 2026-09-04 gate.
 - **Fix direction, now more concrete than "needs a capture"**: gate `onUnstableReading` itself
   against a plausibility check rather than treating it as unconditional proof — e.g. require either
   (a) a minimum elapsed time since the last captured/unstable reading before honoring a fresh one as
@@ -25411,14 +25490,7 @@ per-field merge where an AI write has no honest source rank to claim.
 > being "readability" and becomes the thing the number actually implicates. Re-measure after, using
 > the same capture.
 
-- **Gate:** device — **added 2026-09-02 by Lane B, which reached this entry at the head of its queue
-  and could not start it.** Every number in this entry came off the S25, run by the owner (Task 3
-  says so outright: *"the owner ran it on the S25"*), and the entry's own closing instruction is
-  **"Do the measurement first"** on `/workout` first-mount. That measurement cannot be taken here:
-  against `pnpm dev` a first mount includes route compilation, and `next start` sets
-  `NODE_ENV=production`, which turns on SSL for the pg pool and cannot reach the local database.
-  So the next step is an owner capture, not a refactor — and without this field the entry sat at the
-  top of a work list offering a large refactor its own text says not to start yet.
+- **Lane: O** — the device gate is ANSWERED (Review, 2026-09-24). Sweep 1 took the measurement this entry was gated on (RV-138: 90 warm visits, no outlier), and the entry's own rule says re-place it rather than build. With the owner's *"mostly fine"* (2026-09-14), the Orchestrator should close it or move it down. The perf work that now has a measurement behind it is **DV-12** (68–118 ms per tab tap), **BF-22** (tab paint 61–103 ms → 126–449 ms over two hours) and **RV-113** (60–110 ms blank on every switch).
 - **Branch:** `perf/home-nav-cold-start`
 - **Plan:** none — this entry is the spec. Task 3 is a measurement, not a build.
 - **Added:** 2026-08-02 · **renumbered from Q-50** — #1016 and #1015 both claimed 50 in parallel;
