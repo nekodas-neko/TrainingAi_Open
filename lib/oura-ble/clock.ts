@@ -176,13 +176,54 @@ function robustOffsetMs(anchors: ClockAnchor[]): number {
  * ring's own crystal drift across that epoch (seconds per day). That is the error this
  * accepts in exchange for removing an error measured in tens of minutes.
  */
-export function resolveDsToMs(ds: number, anchors: ClockAnchor[], epoch?: number): number | null {
-  const ep = epoch ?? currentEpoch(anchors)
-  if (ep == null) return null
-  const inEpoch = anchors.filter(a => a.epoch === ep)
-  if (inEpoch.length === 0) return null
+/**
+ * Per-anchor-array memo of the two O(n) steps `resolveDsToMs` used to redo for every single row:
+ * resolving the current epoch, and filtering-then-sorting that epoch's anchors for the offset.
+ *
+ * **Keyed on the array IDENTITY, deliberately.** Every caller reads its anchors once and passes the
+ * same array for every row of a batch, so identity is precisely "this batch" — no key to build, and
+ * nothing to invalidate. A `WeakMap` lets a finished request's entry be collected along with its
+ * array instead of accumulating in a cache that nothing prunes.
+ *
+ * ⚠ It assumes the array is not mutated in place between calls. Every current caller builds one
+ * from a query and treats it as read-only; a caller that appended to a live array would keep the
+ * offset computed before the append. That is a comment rather than a defensive copy because copying
+ * per row is the cost this exists to remove.
+ *
+ * RV-180: production holds **12,396 anchors**, all in epoch 0, growing 150–300 a day, and
+ * `resolveDsToMs` is called once per row inside three `rows.map`s. Benchmarked at **3.0 ms a call**,
+ * `device-metrics`' default 3-day window is 58,856 rows ≈ **177 s of synchronous CPU** on the single
+ * Node process — which blocks every other request. That is the shape DV-13 saw: four admin requests
+ * hanging past 90 s and `/api/version` timing out from another machine for 8 minutes.
+ */
+const clockMemo = new WeakMap<ClockAnchor[], { epoch: number | null; offsets: Map<number, number | null> }>()
 
-  return ds * MS_PER_DS + robustOffsetMs(inEpoch)
+function memoFor(anchors: ClockAnchor[]): { epoch: number | null; offsets: Map<number, number | null> } {
+  let memo = clockMemo.get(anchors)
+  if (!memo) {
+    memo = { epoch: currentEpoch(anchors), offsets: new Map() }
+    clockMemo.set(anchors, memo)
+  }
+  return memo
+}
+
+export function resolveDsToMs(ds: number, anchors: ClockAnchor[], epoch?: number): number | null {
+  const memo = memoFor(anchors)
+  const ep = epoch ?? memo.epoch
+  if (ep == null) return null
+
+  let offset = memo.offsets.get(ep)
+  if (offset === undefined) {
+    const inEpoch = anchors.filter(a => a.epoch === ep)
+    // Null rather than absent, so an epoch with no anchors is remembered as answered — otherwise a
+    // caller asking for the same empty epoch once per row pays the filter every time, which is the
+    // cost being removed wearing a different hat.
+    offset = inEpoch.length === 0 ? null : robustOffsetMs(inEpoch)
+    memo.offsets.set(ep, offset)
+  }
+  if (offset == null) return null
+
+  return ds * MS_PER_DS + offset
 }
 
 /**
