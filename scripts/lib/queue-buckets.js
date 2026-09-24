@@ -25,11 +25,16 @@
 //   6. **ready** — startable work.
 
 /**
- * @param {{lane: string|null, verify: object|null, keep: object|null, reference: string|null}} e
+ * @param {{lane: string|null, verify: object|null, keep: object|null, reference: string|null, ask: string|null}} e
  * @param {string[]} reasons  why the entry is blocked; empty means nothing blocks it
- * @returns {'parked'|'unclassified'|'verify'|'keep'|'reference'|'ready'}
+ * @returns {'ask'|'parked'|'unclassified'|'verify'|'keep'|'reference'|'ready'}
  */
 function bucketFor(e, reasons) {
+  // BF-194. An owner question outranks every other bucket INCLUDING `parked`, because the thing it
+  // is waiting on is the owner and hiding it is the failure. It is the only bucket above the park
+  // test, and that is deliberate: `Ask:` carries no blocking semantics of its own, so an entry only
+  // reaches here by stating outright that an answer from him is the deliverable.
+  if (e.ask) return 'ask';
   if (reasons.length) return 'parked';
   if (e.lane === '?') return 'unclassified';
   if (e.verify) return 'verify';
