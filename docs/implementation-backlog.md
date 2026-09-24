@@ -595,6 +595,42 @@ the Orchestrator's to do.
   field is tooling and wants its own tests. **Build it when a second dated case appears**, or sooner
   if `LA-134` gets picked up and dropped once — that pick-up is the cost this prevents.
 
+### [platform] OR-158 — the E2E detector looked for client roots where they are not, so browser code skipped the suite
+
+- **Lane: O** · **Added:** 2026-09-24 · found by the Orchestrator while discharging LB-108's owed
+  verification. **Shipped in the same session** — this entry is the record, not a request.
+- **Verify:** owner — nothing here needs the device, but the trade is worth a look: **more PRs now
+  run the ~34-minute browser suite**, because the previous behaviour bought its speed by skipping
+  browser code. Say so if that is the wrong trade; the alternative is accepting known-blind CI.
+- **How it surfaced, which is the part worth keeping.** `LB-108` (#1557) could not be verified by
+  reading its diff — only by watching an E2E job's **duration** on the first PR to touch a client
+  `lib/` file. Checking merged history for one found **#1569**: it changed
+  `instrumentation-client.ts` and E2E skipped. Running the detector against that file list
+  reproduced it immediately. **A fix whose only proof is a runtime observation has to be followed
+  up, or it is unverified however sound the diff reads.**
+- **Three defects, all measured 2026-09-24.**
+  1. **Roots were grepped inside `lib/` only.** Client components live in `app/` and `components/`,
+     so their own `lib/` imports were never walked — **47 `lib/` modules imported directly by a
+     `'use client'` file read as unreachable**, among them `lib/cache-groups.ts` and
+     `lib/haptics.ts`. This is a smaller copy of the bug LB-108 replaced.
+  2. **`instrumentation-client.ts` matched nothing.** Next names it by convention, so it carries no
+     directive; it is not under `lib/` and not under the `app|components|e2e` prefixes. It runs in
+     every browser session.
+  3. **`import type` counted as a runtime edge.** Correcting the roots alone took the reachable set
+     from **81 of 282 to 179**, which *looked* like a successful fix. What exposed it was one file
+     that had no business being there: `lib/data/postgres/adapter.ts`, a server-only Drizzle adapter,
+     reached behind a type the compiler erases. Dropping erased edges gives **124**, and the adapter
+     skips again.
+- **⚑ The lesson, and it is the reusable one.** A total moving in the expected direction is not
+  evidence — **179 was wrong in the same direction as 81 was wrong.** The check that worked was
+  naming a file whose presence in the set would be absurd and asking whether it was there. Apply that
+  to any future reachability, coverage or count change.
+- **Known floor, unchanged and still stated in the file:** static `from '…'` imports only, so a
+  dynamic `import()` built from a variable is not seen. A new client entry point named by convention
+  must be added to `CONVENTION_CLIENT_ROOTS` by hand.
+- **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
+  new). `Ran 78 of 78` Custom Rules steps.
+
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
