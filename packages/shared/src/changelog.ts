@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.32",
+    date: "2026-09-24",
+    changes: [
+      "Your supplement doses keep the time you logged them and the strength you actually took. Every sync quietly wiped both off each tick, and because the app rebuilds a dose from whatever it has, history started re-doing the sums against whichever vial is current instead of the one you used at the time \u2014 which is exactly what the frozen dose is there to prevent. Most ticks will fill themselves back in on the next sync, because the server still had the real values and simply was not sending them. Any dose that got re-saved while the values were missing kept the wrong vial, and those cannot be recovered.",
+      "Your recent foods are in the right order again when you are offline. The list sorts by when each food was last updated, and the app was reading a field the server has never had \u2014 so it stored the word \"undefined\", which sorts above every real date and pinned a block of arbitrary foods to the top.",
+      "Deloaded sets stop being un-marked behind your back. A set logged as a deload was being reset to \"not a deload\" on the next sync, which has been happening for months.",
+    ],
+  },
+  {
     version: "1.465.31",
     date: "2026-09-24",
     changes: [
