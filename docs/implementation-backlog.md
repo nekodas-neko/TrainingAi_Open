@@ -1067,6 +1067,133 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
+  sessions have enough content. Time wise its pretty good."*
+- **Lane: O** — nothing here is broken. The budget is real, the transitions are real, and the engine
+  trims correctly. What is missing is a DECISION about which of three levers to pull, and that is
+  the owner's.
+- **⚑ MEASURED — where a 52-minute session actually goes** (Push, 2026-09-24, the session in the
+  owner's screenshot; wall clock 51.5 min, which is what `DURATION` renders — `workoutEndMs -
+  workoutStartMs` in `workout-screen.tsx:1746`, so it counts everything):
+
+  | band | minutes | what it is |
+  |---|---|---|
+  | warm-up | 10.5 | `started_at` → `warmup_ended_at` |
+  | **setup / bar-load** | **14.9** | Σ `inter_exercise_rest_sec` |
+  | **work** | **9.8** | Σ `set_time_sec` — the actual lifting |
+  | rest | 12.0 | Σ `rest_time_sec` |
+  | unaccounted | 4.3 | idle between the last set and pressing done |
+
+  **Setup exceeds work by half again.** Across the 14 most recent completed sessions the medians are
+  wall **42.5**, warm-up **9.4**, setup **12.7**, work **8.6**, rest **8.4** — so **work is ~19% of
+  session wall clock**, steady across sessions rather than a one-off.
+- **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
+  that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
+  `is_early_deload = false`). The program's own stored styles prescribe **14 sets for Push**; **10**
+  were logged. Two is the floor `fitToBudget` never goes below — *"a primary is never touched below
+  2 sets"* (`generate-prescription.ts:456`). Hitting the floor on **every** exercise means the
+  trimmer ran out of room, not that it made a judgement.
+- **⚑ MEASURED — weekly sets against the owner's OWN configured targets** (`program_volume_targets`,
+  35 days, `core` normalized into `abs` as the engine does). **13 of 16 muscle groups are under
+  target; the total is 102.2 against 154 — 66%.**
+
+  | muscle | actual | target | | muscle | actual | target |
+  |---|---|---|---|---|---|---|
+  | calves | 3.0 | 11 (27%) | | upper back | 8.6 | 11 (78%) |
+  | abs | 5.2 | 13 (40%) | | biceps | 9.5 | 11 (86%) |
+  | forearms | 2.8 | 6 (47%) | | triceps | 10.5 | 10 (105%) |
+  | chest | 6.3 | 13 (48%) | | hamstrings | 10.8 | 10 (108%) |
+  | quads | 5.3 | 11 (48%) | | glutes | 9.7 | 8 (121%) |
+  | hip flexors | 2.4 | 5 (48%) | | shoulders | 9.5 | 13 (73%) |
+  | lats | 6.8 | 13 (52%) | | lower back | 4.8 | 6 (80%) |
+  | traps | 4.3 | 8 (54%) | | adductors | 2.7 | 5 (54%) |
+
+  So the owner's question has a number: **by the app's own standard, no — the sessions do not have
+  enough content**, and the three groups at or over target (triceps, hamstrings, glutes) are all
+  muscles that accumulate as secondary work rather than being trained directly.
+- **✅ NOT a defect in the transition estimate — checked, because that was the obvious suspect.**
+  `resolveTransitionSec` (`time-audit.ts:338`) prefers a **measured** per-exercise transition, then a
+  measured per-equipment-class one, and only then the equipment default. The owner has months of
+  measurements, so the budget is being computed against his real transition times. The 240 s default
+  in `generate-prescription.ts` is the no-data fallback and is not what is running here. **The model
+  is right; the time genuinely goes there.**
+- **So the conflict is structural: two real numbers that have never been compared.** A 60-minute
+  budget, five exercises, and ~12.7 min of measured transitions plus prescribed rest leaves roughly
+  enough for two sets each. Nothing in the app puts the volume target and the time budget on the
+  same screen, so a session can hit its floor every week and still report *"Time wise its pretty
+  good"* — which is exactly what happened.
+- **⚑ OWNER DECISION — three levers, and the recommendation is the second.**
+  1. **Raise the time budget** (60 → 75 min). Buys sets directly. Costs 15 min a session, every
+     session, and the owner has said the time is what currently works.
+  2. **⭐ Fewer exercises, more sets each** — 5 → 3 or 4 per session, at 3–4 sets. Costs **no extra
+     time**: it spends the same budget on fewer transitions. **The repo already argues this
+     position in its own code** — *"five exercises floored at two sets still overrun a 30-minute
+     ask, and two token sets each is worse training than doing fewer exercises properly"*
+     (`generate-prescription.ts:485`), and `dropToBudget` exists to do it. It only runs when the
+     duration preset is SHORTER than the session (`direction < 0`), so at the normal budget the
+     engine trims sets to a floor instead of dropping an exercise — the wrong half of its own rule.
+     Fewer muscle groups touched per session, which the weekly targets then have to cover across
+     the week rather than within one day.
+  3. **Attack the transitions** — 14.9 min of bar-loading against 9.8 min of lifting is the largest
+     recoverable block in the session. Not a code change: it is plate management, equipment
+     proximity and not leaving the rack. Worth naming because no software lever is as big.
+- **Reversal cost is near zero for all three** — the budget is a number on the program session, the
+  exercise count is the program, and none of it rewrites history.
+- **Note this is NOT a scoring change** and must not become one without the owner: per CLAUDE.md,
+  Tuning proposes calibration and the owner signs off. This entry reports measurements and asks
+  which lever to pull.
+- **Verification:** after whichever lever, re-run the weekly-sets-against-targets query over the
+  following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
+  has not been fixed regardless of what the done screen says.
+
+### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
+  owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
+  **Split out of BF-190**, where they were buried in a `Lane: B` body and therefore invisible to the
+  Orchestrator; BF-190 keeps the half that needs no decision and can start immediately.
+- **Context, in one line.** Ending a guided walk early records it as a full session at the planned
+  duration — the owner hit it on 2026-09-24 (*"I started a walk; then closed it"*) and it wrote a
+  40-minute, 133 kcal row for a walk 27 seconds old. BF-190 fixes the duration. These two do not
+  follow from that fix.
+
+**Decision 1 — after the fix, should a sub-minute walk be saved at all?**
+
+- Passing the real elapsed time through turns the phantom into a truthful **27-second** row. Truthful
+  is not the same as wanted.
+- **⭐ Recommend a minimum-duration floor, discarded below it with a toast.** The repo already has
+  this shape — `MIN_SESSION_SEC` in `time-audit.ts:358` drops implausibly short workouts from the
+  decomposition — so it is reuse, and a floor needs no interaction at the moment the lifter is
+  walking away from a mis-tap.
+- **Alternative: keep every row.** Better if you ever want to see abandoned starts as data — which
+  is a real thing to want, and the reason this is not obvious. It loses because a 27-second row
+  still lands in activity history, the day audit and the totals, where it is noise in every reading
+  that matters.
+- **Alternative: confirm on exit** (*"discard this short walk?"*). Better in that nothing is ever
+  silently dropped. It loses on where it fires: mid-walk, one tap after a dialog that already asked
+  *"End walk?"*, which is two prompts for one intention.
+- **Reversal cost: near zero.** A constant and one branch.
+
+**Decision 2 — the phantom row already in the history.**
+
+- `b8083d04`, 2026-09-24, 40 min, 133 kcal, no HR, no steps. The day reads 80 min / 266 kcal against
+  40 / 133 actually walked.
+- **⭐ Recommend the owner soft-deletes it from the activity list.** It is one row, the app's own
+  delete is the supported path, and it produces a `deleted_at` tombstone that propagates to the
+  device — which a direct database write would not.
+- **Alternative: leave it.** Better if you would rather the history show what the app actually did,
+  warts included. It loses because nothing marks the row as spurious, so every future reading of
+  that week is wrong in a way no one will remember.
+- **Never a migration.** A corrective migration for one bad row is blast radius with no upside, and
+  data-touching migrations are the carve-out that always needs the owner anyway.
+- **⚠ Whether OTHER phantom rows exist has not been measured.** Only 2026-09-24 was checked. Before
+  acting, sweep `activity_logs` for rows whose `duration_min` equals the plan while `avg_hr` and
+  `steps` are both null — that is the signature. Do not report a count without running it.
+
+- **Verification:** this entry closes when both answers are recorded here with the date, and BF-190
+  is updated to build the one that touches code.
 ### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
 
 - **Lane:** O — `scripts/`, the queue tooling. **Added:** 2026-09-24 · orchestrator review of device
@@ -1261,6 +1388,56 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   still overwrite, so the rule points at a real hazard rather than a fixed one. Check the other
   `upsert*` methods in `sqlite-backend.ts` for that list; do not reason it from this entry.
 
+### [platform] RV-156 — about 30 Known-Issues rows are already answered, several state things that are no longer true, and the old device queue has five live rows
+
+- **Lane: O** — `projectOverview.md` and the archive are the Orchestrator's.
+- **Added:** 2026-09-24 · Review sweep 55, §§3–4 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **Move to `known-issues-resolved.md`:** the §4 list. Each carries its evidence (a commit, a sweep
+  result or a production read). Five were settled by production reads this sweep:
+  - bodyweight `planned_pct` is null on 0 of 38 sets;
+  - bodyweight volume is positive on 19 of 19 exercise logs;
+  - `activity_score` is present on 31 of 31 days;
+  - `bdi_derived` is present on 31 of 31 days;
+  - `prep_time_sec` is present on 104 of 104 exercise logs.
+- **Amend:** the stale claims in §4. The heading that says "ALL QUEUED (fixes not yet shipped)" is
+  the worst one, because a reader believes it.
+- **Retire `docs/device-verification-queue.md`** to a pointer at `next-item.js --sittings`. Its five
+  still-owed rows are now in RV-155 §A (S7) and RV-157 (BF-11d, BF-31, LA-37/BF-66). S1 is folded
+  into RV-131.
+
+### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+
+- **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
+  arranged.
+- **Added:** 2026-09-24 · Review sweep 55, §2 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **The six:**
+  1. Gesture navigation switched on for one sitting. This also unblocks RV-37, RV-127's clearance
+     half and Q-168.
+  2. A morning before the check-in and the first food log.
+  3. DV attached, passively, during one of the owner's own workouts.
+  4. The chest strap worn.
+  5. A real walk or run.
+  6. One list of non-standing writes, approved once.
+- **Recommendation:** ask for 1 and 6 first. Switching navigation mode is one setting, and a
+  one-time write list replaces a question per check. Together they unblock the most rows for the
+  least of the owner's time. 3 costs him nothing extra; it only needs DV to know when he trains.
+- **Reversal cost:** nil. This only changes when checks are scheduled.
+
+### [platform] RV-158 — a Known-Issues row can owe a device check that no queue lists; stop new ones at CI
+
+- **Lane: O** — a rule plus a check in `scripts/check-backlog-pointers.js`.
+- **Added:** 2026-09-24 · Review sweep 55, §5 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **The gap:** writing *"NOT device-verified"* in a Known-Issues row was how a device check was owed
+  before the device agent existed. The agent reads only the backlog, so 155 such rows fell out of
+  every list. The same thing happened a second time with `docs/device-verification-queue.md`.
+- **The guard:** fail CI on a **new** Known-Issues heading that says it is not device-verified and
+  names no id with a `### ` heading in the backlog. Baseline today's rows shrink-only, as the
+  done-headings were (OR's first sweep). Add one line to CLAUDE.md's device-gate paragraph: an owed
+  check lives on a backlog line, and a Known-Issues row may point at it but may not be its only
+  home.
+- **Why a check and not only a rule:** RV-143 was the same shape (a gate DV could not see), and the
+  rule alone did not reach the next author.
+
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the inputs are labelled, but the ink is 21 px
@@ -1365,6 +1542,7 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   race in BF-47); the offline shell serves every route, not only ones visited that session.
 - Offline-first is the architecture's central claim and **no instrumented offline pass has ever
   been run.** Pair with RV-126 — same writes, network flipped.
+- **Also (sweep 55, folded in from the retired device queue's S1):** after reconnecting, pull down on More and confirm the outbox push fires. Then force-close and reopen, and confirm the row is still there.
 
 ### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
 
@@ -1683,6 +1861,30 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
 - **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
 
 
+### [platform][app-shell] RV-155 — about 60 shipped changes owe a device look that no queue shows DV: run them as six stations
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review sweep 55. The station list is §1 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **Why DV has never seen these:** each lives only in a `projectOverview.md` Known-Issues row
+  saying *"NOT device-verified"*, or in `docs/device-verification-queue.md`. `next-item.js` reads
+  neither. 155 such rows were triaged. About 60 are checks the phone alone can run, under the
+  standing write permissions, on three-button navigation.
+- **The stations, cheapest first:**
+  - A: SQLite, console and `adb` reads, no screen, about 20 min.
+  - B: the Workout tab, read-only.
+  - C: Nutrition, food log/delete and a throwaway supplement.
+  - D: Health.
+  - E: Home, More and the shell.
+  - F: Cardio.
+  Each row names its `projectOverview.md` line (as of `1351f6de`), the action and what passes.
+- **Report per row, VERIFIED / FAILED / COULD NOT CHECK**, the usual way.
+  - A **VERIFIED** row: list it in the sweep journal. The Orchestrator moves the Known-Issues row
+    to the archive (RV-156).
+  - A **FAILED** row: file a new DV entry for the lane that owns the surface. Do not edit the
+    Known-Issues row.
+- **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
+  owner-present rows (RV-157).
+
 ### [app-shell][platform] RV-149 — DEVICE PROBE: the timezone census, every screen with two clocks that disagree
 
 - **Lane: DV**
@@ -1695,6 +1897,7 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   left on Brisbane, every visible clock time, date and day-word on every route matches the
   un-overridden walk. **FAILED** per route that differs, with the text diff. Each failing route goes
   to the lane that owns that screen.
+- **Also (sweep 55, Q-163's Known-Issues row):** the Home header's date and greeting stay in the profile's zone under the override.
 
 ### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
 
@@ -1758,6 +1961,7 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   tab switch or restart**. **FAILED** per surface that holds the old day.
 - **Needs an overnight sitting the owner agrees to.** Until then this is COULD NOT CHECK, not a
   failure. It is the one probe in this batch that cannot run whenever the phone is plugged in.
+- **Also a resume leg (sweep 55, RV-35's Known-Issues row):** background the app before 00:00, resume after, and without a tab switch confirm Nutrition's diary date is the new day.
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
@@ -2006,7 +2210,7 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
 
 - **Lane: B** · `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-23 · found while shipping
   RV-110.
-- **Gate: device**
+- **Verify:** device — re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. The check is the Keep line below.
 - **Reproduced twice, driving the real app:** from Home, `navigateToTab` to `/nutrition?review=day`
   when Nutrition has **not yet been mounted in this shell session** leaves the End of Day sheet
   CLOSED. Home's "review your day" (`session-select-content.tsx:1183`) takes that path, so the first
@@ -3557,15 +3761,12 @@ why the count of affected entries always understated the harm.
   `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
   type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
   133 kcal, every time, and it is indistinguishable from a real one in the row.
-- **⚠ Then decide whether a 27-second walk should be saved AT ALL, because the fix alone makes it a
-  27-second row rather than no row.** Recommend a **minimum-duration floor, discarded below it with
-  a toast** — the same shape `decomposeSessions` already uses for workouts (`MIN_SESSION_SEC`,
-  `time-audit.ts:358`), so the pattern exists rather than being invented here. A floor is better
-  than a confirm prompt: the lifter who backed out by accident does not want a dialog, and a
-  30-second walk is not data anyone wants in a trend.
-- **⚠ The two existing rows need a decision too — the phantom one is already in the history**, and
-  it feeds `build-day-audit.ts:257`. Deleting a production row is the owner's call and is not part of
-  the code fix; the app's own soft-delete from the activity list is the path, not a migration.
+- **→ Whether a sub-minute walk should be saved at all is BF-191, and so is the phantom row.** Both
+  are the owner's and were split out on 2026-09-24 so the Orchestrator can put them to him; they
+  were buried in this body, where the lane field routed them to an implementer instead. **This entry
+  does not wait on that** — passing the real elapsed time through is correct under either answer.
+- **The phantom row is already in the history** and feeds `build-day-audit.ts:257`. That is BF-191's
+  second decision, not this entry's.
 - **Sibling sweep:** `done-activity-screen.tsx` takes the same write path but navigates away the
   instant it saves (recorded under BF-107), so it has no mount-save. `walk-active.tsx` does not
   write. This is the guided-walk summary alone.
@@ -3573,87 +3774,6 @@ why the count of affected entries always understated the harm.
   whose duration matches the seconds actually walked. Then complete a full walk and confirm the
   duration still matches. **Device look owed** — the local-store branch is the one that runs on the
   APK and `getLocalStore` returns null in the sandbox.
-
-### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
-  sessions have enough content. Time wise its pretty good."*
-- **Lane: O** — nothing here is broken. The budget is real, the transitions are real, and the engine
-  trims correctly. What is missing is a DECISION about which of three levers to pull, and that is
-  the owner's.
-- **⚑ MEASURED — where a 52-minute session actually goes** (Push, 2026-09-24, the session in the
-  owner's screenshot; wall clock 51.5 min, which is what `DURATION` renders — `workoutEndMs -
-  workoutStartMs` in `workout-screen.tsx:1746`, so it counts everything):
-
-  | band | minutes | what it is |
-  |---|---|---|
-  | warm-up | 10.5 | `started_at` → `warmup_ended_at` |
-  | **setup / bar-load** | **14.9** | Σ `inter_exercise_rest_sec` |
-  | **work** | **9.8** | Σ `set_time_sec` — the actual lifting |
-  | rest | 12.0 | Σ `rest_time_sec` |
-  | unaccounted | 4.3 | idle between the last set and pressing done |
-
-  **Setup exceeds work by half again.** Across the 14 most recent completed sessions the medians are
-  wall **42.5**, warm-up **9.4**, setup **12.7**, work **8.6**, rest **8.4** — so **work is ~19% of
-  session wall clock**, steady across sessions rather than a one-off.
-- **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
-  that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
-  `is_early_deload = false`). The program's own stored styles prescribe **14 sets for Push**; **10**
-  were logged. Two is the floor `fitToBudget` never goes below — *"a primary is never touched below
-  2 sets"* (`generate-prescription.ts:456`). Hitting the floor on **every** exercise means the
-  trimmer ran out of room, not that it made a judgement.
-- **⚑ MEASURED — weekly sets against the owner's OWN configured targets** (`program_volume_targets`,
-  35 days, `core` normalized into `abs` as the engine does). **13 of 16 muscle groups are under
-  target; the total is 102.2 against 154 — 66%.**
-
-  | muscle | actual | target | | muscle | actual | target |
-  |---|---|---|---|---|---|---|
-  | calves | 3.0 | 11 (27%) | | upper back | 8.6 | 11 (78%) |
-  | abs | 5.2 | 13 (40%) | | biceps | 9.5 | 11 (86%) |
-  | forearms | 2.8 | 6 (47%) | | triceps | 10.5 | 10 (105%) |
-  | chest | 6.3 | 13 (48%) | | hamstrings | 10.8 | 10 (108%) |
-  | quads | 5.3 | 11 (48%) | | glutes | 9.7 | 8 (121%) |
-  | hip flexors | 2.4 | 5 (48%) | | shoulders | 9.5 | 13 (73%) |
-  | lats | 6.8 | 13 (52%) | | lower back | 4.8 | 6 (80%) |
-  | traps | 4.3 | 8 (54%) | | adductors | 2.7 | 5 (54%) |
-
-  So the owner's question has a number: **by the app's own standard, no — the sessions do not have
-  enough content**, and the three groups at or over target (triceps, hamstrings, glutes) are all
-  muscles that accumulate as secondary work rather than being trained directly.
-- **✅ NOT a defect in the transition estimate — checked, because that was the obvious suspect.**
-  `resolveTransitionSec` (`time-audit.ts:338`) prefers a **measured** per-exercise transition, then a
-  measured per-equipment-class one, and only then the equipment default. The owner has months of
-  measurements, so the budget is being computed against his real transition times. The 240 s default
-  in `generate-prescription.ts` is the no-data fallback and is not what is running here. **The model
-  is right; the time genuinely goes there.**
-- **So the conflict is structural: two real numbers that have never been compared.** A 60-minute
-  budget, five exercises, and ~12.7 min of measured transitions plus prescribed rest leaves roughly
-  enough for two sets each. Nothing in the app puts the volume target and the time budget on the
-  same screen, so a session can hit its floor every week and still report *"Time wise its pretty
-  good"* — which is exactly what happened.
-- **⚑ OWNER DECISION — three levers, and the recommendation is the second.**
-  1. **Raise the time budget** (60 → 75 min). Buys sets directly. Costs 15 min a session, every
-     session, and the owner has said the time is what currently works.
-  2. **⭐ Fewer exercises, more sets each** — 5 → 3 or 4 per session, at 3–4 sets. Costs **no extra
-     time**: it spends the same budget on fewer transitions. **The repo already argues this
-     position in its own code** — *"five exercises floored at two sets still overrun a 30-minute
-     ask, and two token sets each is worse training than doing fewer exercises properly"*
-     (`generate-prescription.ts:485`), and `dropToBudget` exists to do it. It only runs when the
-     duration preset is SHORTER than the session (`direction < 0`), so at the normal budget the
-     engine trims sets to a floor instead of dropping an exercise — the wrong half of its own rule.
-     Fewer muscle groups touched per session, which the weekly targets then have to cover across
-     the week rather than within one day.
-  3. **Attack the transitions** — 14.9 min of bar-loading against 9.8 min of lifting is the largest
-     recoverable block in the session. Not a code change: it is plate management, equipment
-     proximity and not leaving the rack. Worth naming because no software lever is as big.
-- **Reversal cost is near zero for all three** — the budget is a number on the program session, the
-  exercise count is the program, and none of it rewrites history.
-- **Note this is NOT a scoring change** and must not become one without the owner: per CLAUDE.md,
-  Tuning proposes calibration and the owner signs off. This entry reports measurements and asks
-  which lever to pull.
-- **Verification:** after whichever lever, re-run the weekly-sets-against-targets query over the
-  following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
-  has not been fixed regardless of what the done screen says.
 
 ### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
 
@@ -10308,7 +10428,15 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   `fix/bf-107-walk-calories` and the forced `pullDelta` inside `pushThenRevalidate`'s callback.
   The `Keep:` below is a code-tidy residue and is unaffected.
 
-- **Lane:** B — `components/guided-walk/walk-summary.tsx`, `components/ui/stat-tile.tsx`.
+- **Lane: DV** — **re-laned 2026-09-24, and the previous reading was mine to correct.** This was
+  reported back to the owner as *"your five-second check"*, which is the trap §3 names: the next
+  action is a **measurement with an objective pass/fail** — open the walk, does the tile fill — so
+  it is the device agent's, not a judgement waiting on him. The code, when there is code, is Lane B
+  (`components/guided-walk/walk-summary.tsx`, `components/ui/stat-tile.tsx`); it goes back there
+  with the result. **DV answers VERIFIED / FAILED / COULD NOT CHECK and nothing else:** the tile
+  fills on a re-open → VERIFIED, and the complaint is latency, which is a separate entry about
+  saying the number is coming. It stays a dash → FAILED, back to Lane B at the forced `pullDelta`
+  inside `pushThenRevalidate`'s callback.
 - **Verify:** device — two things the sandbox cannot produce. **(a) Offline**: finish a walk with no
   signal and the tile must read `—`, never `0`; the push never happens, so nothing fills it.
   **(b) The fill itself**: on a normal walk the tile should start `—` and become a number a moment
@@ -13624,7 +13752,7 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 - **Note:** N2 passed on this same pass — the nested-sheet back stack is correct — so this is
   specific to cross-tab navigation, not the general back handling BF-27 fixed.
 
-- **Gate: device**
+- **Verify:** device — re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. Sweep 3 passed the workout row. Still owed: the food row, and Health's own timeline.
 - **⚠ It does not reproduce in the web harness, measured 2026-08-30 (Lane B).** Driven end to end in
   Playwright with the seeded workout row: Home → tap the timeline row →
   `http://localhost:3100/health/day?date=2026-08-30` → back → `http://localhost:3100/` with
@@ -14529,8 +14657,7 @@ it is a visible change on two Lane B screens with a memory cost worth stating (2
 `FOOD_ITEM_IMAGE_MAX_BYTES` 16 KB cap is ~320 KB per search), and a de-duplication PR is the wrong
 place to start rendering pictures.
 
-- **Gate:** device — the local store does not run in `pnpm dev` or Playwright, so the only way to see
-  this fixed is on the S25.
+- **Device check once it ships** (Review, 2026-09-24): the device gate is removed, because it parked unbuilt work behind a check that can only happen afterwards. Sweep 1 already read the pre-fix state: 1 of 339 rows carries a picture, so the fix is cheap to verify and cheap in memory on this device. After it ships, DV opens the Food Library and confirms that food's picture renders.
 
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
@@ -14588,9 +14715,7 @@ place to start rendering pictures.
 
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
-- **Gate:** device — **all eight phases have shipped** (BF-11h merged 2026-08-27, v1.389.0). The only
-  thing still owed is the S25 walk this entry defines below, so it is gated rather than READY: it
-  printed at the top of the Lane B queue with nothing an implementer could do.
+- **Verify:** device — **all eight phases have shipped** (BF-11h merged 2026-08-27, v1.389.0). re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. What is owed is the S25 walk this entry defines below. Creating and deleting a throwaway meal falls under the standing write permission; any other write needs the owner's go-ahead.
 - **Reference:** the spec its eight phases read. The work is in BF-11a…BF-11h, not here.
 - **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
   This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
@@ -16995,7 +17120,6 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
-- **Lane: B** — client shell. Not a server or database entry; see the ruled-out list.
 
 **⚠ A correction to the first version of this entry, which was wrong.** It concluded that production
 was served from Virginia while the owner is in Brisbane, from `x-railway-edge: iad1` in the response
@@ -17032,9 +17156,7 @@ permanently-mounted panels; DOM accumulation in long lists; and the interaction 
 churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
 lived context.
 
-- **Gate:** device — added 2026-08-27 by Lane B, which reached this as the top startable row and
-  found it says the opposite of startable: *"cannot be root-caused from a sandbox and should not be
-  attempted again from one"*, *"Surface: device only"*.
+- **Lane: DV** — re-channelled 2026-09-24 by Review (RV-143's triage). The fix will be Lane B's, and the diagnosis needs the phone, so it goes to DV as DV-12 did. The device agent was already carrying this in its baton (listener counts around writes, sheets, pushed routes and sync), but the device gate kept it out of `--lane DV`.
 - **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
   get any other way. **⚑ `Needs:` cleared on a technicality and that is worth noticing.** BF-19 has
   shipped, so the pointer resolves and this row printed as READY — but BF-19 shipped the *reporter*,
@@ -24768,8 +24890,16 @@ per-field merge where an AI write has no honest source rank to claim.
   pins it. Migration 266 matters as much as 265: the view generator emits an explicit column list,
   so without it the column is invisible to `/api/admin/db-query`, which is the only way anyone reads
   production here.
-- **Keep:** the read. **Nothing is owed in code — what is owed is one query, a few days from now**,
-  once the column has had time to be written:
+- **📊 THE READ, DONE 2026-09-24 (Review): `insufficient_met` on 20 of 20 days** (2026-09-05 →
+  09-24; 09-04, the day it shipped, is NULL). No day holds an OTS. So the route **is called and it
+  refuses**, and because an `'ok'` overwrites the reason, no day ever reached `'ok'`, even by
+  evening. **That contradicts the 2026-08-30 finding below that the MET gate clears by ~12:07 local.**
+  Two explanations fit, and this read cannot tell them apart:
+  - the day's LAST evaluation lands before midday, because the caller runs in the morning only;
+  - or the MET span the route computes is not the span measured on 08-30.
+  **Next, Lane A:** write the evaluation time and the computed MET span beside the gate reason, or
+  find which client calls `/api/training-stress` and when. The query that produced this, kept for
+  re-runs:
   ```
   SELECT day, training_load_gate, training_load_ots
     FROM claude_ro.oura_daily_derived ORDER BY day DESC LIMIT 14
@@ -25213,7 +25343,7 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Keep:** the confirmation, and it is an owner/device read, not code. On the next APK: either the
   bar stops appearing on an empty Home visit (fixed), or the log line says the replayed value did
   **not** match the capture, which refutes the replay theory and sends this back to option (a).
-- **Gate:** device
+- **Verify:** device — re-filed 2026-09-24 by Review (RV-143's triage): the change has shipped and only a look is owed, so the device gate was hiding it from `--lane DV` and `--sittings`. Read-only: visit Home with no weighing in progress, then read `adb logcat` for the gate's log line. APK 1.460.4 carries the 2026-09-04 gate.
 - **Fix direction, now more concrete than "needs a capture"**: gate `onUnstableReading` itself
   against a plausibility check rather than treating it as unconditional proof — e.g. require either
   (a) a minimum elapsed time since the last captured/unstable reading before honoring a fresh one as
@@ -25255,14 +25385,7 @@ per-field merge where an AI write has no honest source rank to claim.
 > being "readability" and becomes the thing the number actually implicates. Re-measure after, using
 > the same capture.
 
-- **Gate:** device — **added 2026-09-02 by Lane B, which reached this entry at the head of its queue
-  and could not start it.** Every number in this entry came off the S25, run by the owner (Task 3
-  says so outright: *"the owner ran it on the S25"*), and the entry's own closing instruction is
-  **"Do the measurement first"** on `/workout` first-mount. That measurement cannot be taken here:
-  against `pnpm dev` a first mount includes route compilation, and `next start` sets
-  `NODE_ENV=production`, which turns on SSL for the pg pool and cannot reach the local database.
-  So the next step is an owner capture, not a refactor — and without this field the entry sat at the
-  top of a work list offering a large refactor its own text says not to start yet.
+- **Lane: O** — the device gate is ANSWERED (Review, 2026-09-24). Sweep 1 took the measurement this entry was gated on (RV-138: 90 warm visits, no outlier), and the entry's own rule says re-place it rather than build. With the owner's *"mostly fine"* (2026-09-14), the Orchestrator should close it or move it down. The perf work that now has a measurement behind it is **DV-12** (68–118 ms per tab tap), **BF-22** (tab paint 61–103 ms → 126–449 ms over two hours) and **RV-113** (60–110 ms blank on every switch).
 - **Branch:** `perf/home-nav-cold-start`
 - **Plan:** none — this entry is the spec. Task 3 is a measurement, not a build.
 - **Added:** 2026-08-02 · **renumbered from Q-50** — #1016 and #1015 both claimed 50 in parallel;
