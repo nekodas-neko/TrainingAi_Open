@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { useWorkoutStore, applyRehydrateFixups, effectiveRestSec, type WorkoutStore } from '../workout-store'
+import { useWorkoutStore, applyRehydrateFixups, effectiveRestSec, isWorkoutActive, type WorkoutStore } from '../workout-store'
 
 describe('ExerciseBuffer carries restStartMs through stash/restore (superset alternation)', () => {
   beforeEach(() => {
@@ -242,6 +242,58 @@ describe('a workout across local midnight survives rehydrate (PS-35b)', () => {
     const e14 = src.slice(src.indexOf('// E1-4:'), src.indexOf('const sessionStale'))
     expect(e14).not.toMatch(/>4h old or from a previous day is\n\s*\/\/ abandoned/)
     expect(e14).toMatch(/WorkoutDayRollover/)
+  })
+})
+
+describe('DV-16 — a finished workout does not read as active after an app reopen', () => {
+  /**
+   * Measured on the S25, 2 of 2: the owner finished Push that morning, restarted the app, and
+   * every tab tap from /workout raised "Leave workout? Your workout is in progress", whose Leave
+   * calls resetSession on a completed day.
+   *
+   * The cause is the interaction of two correct-looking pieces. applyRehydrateFixups rewrites a
+   * persisted `done` to `pre` so DoneScreen cannot replay its confetti on reopen — and that was
+   * the only term telling isWorkoutActive the workout had ended, since workoutStartMs survives
+   * (the staleness branch clears it only past four hours).
+   */
+  const completedToday = () => ({
+    ...useWorkoutStore.getState(),
+    mode: 'done' as const,
+    workoutSessionId: 'sess-done',
+    workoutStartMs: Date.now() - 90 * 60 * 1000,
+    workoutEndMs: Date.now() - 30 * 60 * 1000,
+  })
+
+  it('rehydrate still rewrites done -> pre, which is what makes mode alone insufficient', () => {
+    const state = completedToday()
+    applyRehydrateFixups(state, null, Date.now())
+    expect(state.mode).toBe('pre')
+    expect(state.workoutStartMs, 'within four hours, so the session identity is kept')
+      .not.toBeNull()
+  })
+
+  it('is not active after that rewrite — this is the reported defect', () => {
+    const state = completedToday()
+    applyRehydrateFixups(state, null, Date.now())
+    expect(isWorkoutActive(state)).toBe(false)
+  })
+
+  it('is still active mid-workout, so the guard has not simply been disabled', () => {
+    const state = {
+      ...useWorkoutStore.getState(),
+      mode: 'active' as const,
+      workoutStartMs: Date.now() - 10 * 60 * 1000,
+      workoutEndMs: null,
+    }
+    applyRehydrateFixups(state, null, Date.now())
+    expect(isWorkoutActive(state)).toBe(true)
+  })
+
+  it('re-arms on Start Again, because startWorkout clears the end stamp', () => {
+    useWorkoutStore.getState().resetSession()
+    useWorkoutStore.getState().startWorkout('Push')
+    expect(useWorkoutStore.getState().workoutEndMs).toBeNull()
+    expect(isWorkoutActive(useWorkoutStore.getState())).toBe(true)
   })
 })
 
