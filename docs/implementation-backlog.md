@@ -602,7 +602,9 @@ the Orchestrator's to do.
   - Reversal cost: (a) is repeatable, (b) is avoided.
 - **Two more owner answers the census needs, same sitting:**
   - **RV-164:** did he mean to apply the 09-14 recommendation (1,618 kcal)? The app still budgets
-    1,660.
+    1,660. **Still his to answer — RV-164 itself shipped 2026-09-24 and left the queue, but that
+    fixed the cause going forward and not the 09-14 row, which is the divergence he is being asked
+    about.**
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
@@ -820,57 +822,6 @@ which is the right shape for something that can only be validated by living with
   it matters.
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
-
-### [devices][platform] RV-180 — converting a ring timestamp re-sorts all 12,396 clock anchors on every call, once per row: the likely cause of DV-13
-
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Found by the performance half; confirmed in code and production here.
-- **The code:** `resolveDsToMs` (`clock.ts:179-186`) calls `currentEpoch`, filters to the epoch, then
-  `robustOffsetMs`, which **maps and sorts every anchor** (`clock.ts:147-150`). There is no memo.
-  Production holds **12,396 anchors, all in epoch 0** (`count(*)`), and the table grows by about
-  150–300 a day.
-- **Called once per row:**
-  - `getOuraRawSamplesForTags` (`adapter.ts:6596`, inside `rows.map`) behind
-    `/api/oura-ble/device-metrics` and the daily HRV refit (31-day lookback).
-  - `getOuraRawSamplesByTags` (`:6546`) behind `samples/raw` and `step-counter-export`.
-  - The rollup's per-bin `toDate` (`rollup/run.ts:124`).
-- **Cost:** benchmarked against the real anchors at **3.0 ms per call**, linear, on sandbox CPU.
-  device-metrics' default 3-day window is **58,856 rows ≈ 177 s of synchronous CPU** on the one
-  Node process, which blocks every other request. DV-13 saw four admin requests hang past 90 s and
-  `/api/version` time out from another PC for 8 minutes; that is this shape. The rollup pays about
-  2.6 s per pass, and it grows about 2% a week.
-- **Fix:**
-  - Compute the epoch offset once per anchor set: hoist it out of the map, or memoize by array.
-    Per-row cost becomes O(1).
-  - Read one offset per epoch in SQL rather than the whole table (RV-182).
-  - Add the row cap DV-13 already owes.
-- **⚠ Until this ships, `/admin/oura-ble` stays closed.** The device check after it ships is DV-13's
-  own pass test, which RV-186 carries.
-
-### [nutrition][platform] RV-172 — the sync pull drops columns the device then overwrites with NULL: supplement ticks lose their time and frozen vial dose
-
-- **Lane: A** — `getSyncDelta` in `lib/data/postgres/adapter.ts`, `lib/local-store/sync-engine.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
-- **Supplement logs, the one that matters:**
-  - The delta select (`adapter.ts:4248-4259`) omits `takenAt`, `vialStrengthMg`, `vialWaterMl` and
-    `vialUnitsPerMl`, and so does the pull mapping (`sync-engine.ts:516-534`).
-  - `applyDelta` then writes `taken_at=excluded.taken_at, vial_*=excluded.vial_*`
-    (`sqlite-backend.ts:1997`). Its comment says the server's value *"IS the truth there"*, but the
-    server never sends that value, so it writes NULL.
-  - So every synced tick loses its time and its vial snapshot on the next pull, and a fresh install
-    never has them.
-  - **LA-97's rewrite comes back one layer up:** a re-push rebuilds from the local row
-    (`enrichPayload`), the vial triple is null, so `logSupplement` re-reads the current vial and
-    replaces the frozen dose. Local renders also lose the units figure.
-- **Same class, lower stakes:**
-  - `exercise_logs`: the select omits `exerciseDeloaded` and `prepTimeSec` (`adapter.ts:4269-4288`).
-    `Boolean(undefined)` then writes `exercise_deloaded=0` over synced rows. A comment claims Q-131
-    fixed this; it is half fixed.
-  - `food_items`: the pull maps `toIso(r.updatedAt)`, but the delta carries only `createdAt`
-    (`sync-engine.ts:479`). The local row stores the string `"undefined"`, which sorts above every
-    date in `searchFoodItems`' `updated_at DESC`, so the offline recent-foods order is scrambled.
-- **Fix:** add the columns to the delta select and the pull mapping. Add a test that diffs each
-  delta select against its pull mapper, so the next column cannot go missing silently.
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
@@ -1414,7 +1365,49 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
   query and both are needed, and this entry closes.
 
-### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
+### [platform] DV-14 — ROOT-CAUSED: the Railway build runs out of memory, so almost every deploy fails
+
+- **⛔ ANSWERED 2026-09-24 ~19:30 AEST (Lane A). It was never a stall.** Of the last **40**
+  deployments, **39 FAILED**; the one success was 04:24 UTC. Every failure is the same:
+
+  ```
+  FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+  [76:0x28c02000] 101405 ms: Mark-Compact 4072.1 (4176.3) -> 4071.7 (4188.3) MB
+  ... v8::internal::JsonStringifier::Stringify ...
+  ELIFECYCLE  Command failed with exit code 134
+  ```
+
+  `next build` hits Node's default ~4 GB old-space cap. **No `NODE_OPTIONS` is set anywhere** — not
+  in `package.json`, not in `nixpacks.toml`, not on the service.
+- **This retires the "it recovered on its own" reading, twice recorded above.** The build sits ON the
+  memory boundary, so it occasionally squeaks through — the 04:24 success is why production serves
+  `1.465.26` and why TN-55's battery fix is live at all. The earlier "recoveries" were lucky builds,
+  not recoveries, which is exactly why three measurement passes from outside found nothing.
+- **⚠ How to read this: the deploy log was reachable the whole time.** `RAILWAY_API_TOKEN` is in the
+  session environment and answers `https://backboard.railway.com/graphql/v2` with a
+  **`Project-Access-Token`** header (NOT `Authorization: Bearer`, which returns *Not Authorized* and
+  reads like a dead credential). Three sessions escalated this to the owner as unreachable. Query
+  `deployments(input:{projectId,environmentId})` for status and `buildLogs(deploymentId)` for the
+  reason; `projectToken { projectId environmentId }` returns both ids.
+- **CI's `Build` job passes**, so this is the Railway builder's memory rather than the code.
+- **⚠ `nixpacks.toml` may be dead config** — the build log shows `railpack-builder`, not nixpacks.
+  Worth confirming before anyone edits that file expecting it to take effect.
+- **Strong candidate for what grew, NOT proven:** `packages/shared/src/changelog.ts` is **661 KB,
+  1,257 entries, 9,883 lines** — the largest source file in the repo by a wide margin, imported into
+  **client** bundles by `about-panel.tsx` and `data-capture-console.tsx`, and appended to by **every
+  PR** under the standing version-bump rule (~7.5 KB/day at the current merge rate). The OOM frame
+  is `JsonStringify`. That fits a slow growth crossing a threshold, but 661 KB → 4 GB needs a
+  mechanism nobody has demonstrated. **The experiment that would settle it:** build twice with a
+  fixed heap cap, once with the changelog stubbed to a handful of entries, and compare peak RSS.
+- **Two fixes, and they are not alternatives — the first unblocks, the second is the actual repair.**
+  Raising the cap (`NODE_OPTIONS=--max-old-space-size=…`, in the build script or as a service
+  variable) gets 22 merges of shipped work deployed; if the container has under ~8 GB it trades a
+  clean exit-134 for a kernel OOM kill, so the value wants checking against the plan. Bounding the
+  changelog — a fragment file, or shipping only the last N entries to the client — is what stops it
+  recurring. **Owner asked 2026-09-24; the service-variable route is a production config change and
+  was not taken unilaterally.**
+
+**The history below is kept as filed — the measurements are sound, the conclusion drawn from them was not.**
 
 - **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
   `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
@@ -2553,26 +2546,6 @@ drift.
   - Show an error state when the load fails.
   - Do not PUT until a load has succeeded.
   - PUT only when the selection changed.
-
-### [nutrition][app-shell] RV-164 — applying a goal recommendation marks it "applied" and toasts success without checking any of its writes
-
-- **Lane: B** — `components/profile/goal-recommendation-sheet.tsx`.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **In production:** the 2026-09-14 recommendation (1,618 kcal / 150 P / 131 C / 55 F) is
-  `status='applied'` (21:07:19). But `nutrition_targets` still holds **1,660 / 150 / 141 / 55**, with
-  `updated_at` **2026-08-31**, and `users.calorie_goal` is 1,660. The 08-31 apply did write: targets
-  were updated 200 ms before that apply was recorded.
-- **Why nobody could tell:**
-  - The sheet ticks every row by default (`:86-91`).
-  - It `await`s the `PUT /api/nutrition/targets` and `/api/user/goals` calls **without reading the
-    response**. Only the profile PATCH checks `res.ok`.
-  - It then PATCHes the recommendation to `applied` and toasts *"Goals updated"*. Only a thrown
-    network error reaches the failure toast; a 4xx or 5xx passes as success.
-  - `app/api/nutrition-goals/recommend/route.ts:36-37` describes the 09-14 values as
-    *"stored-and-applied"*, and the database contradicts that.
-- **Fix:** check each write's response. Mark the recommendation applied only when every ticked field
-  landed, and say which one failed otherwise.
-- **The owner's half, whether he meant to apply 1,618, is in RV-170.**
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
@@ -5194,6 +5167,16 @@ why the count of affected entries always understated the harm.
   restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
   priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
   is only in git history, and nothing reports which entries went missing.
+- **⚑ SECOND LIVE INSTANCE, 2026-09-24 — and it shows the trigger is the GATE, not carelessness.**
+  `docs/overview/entries/` crossed its 60-file limit, which fails `check-doc-index-size` for **every
+  lane at once**, so two lanes independently started the fold within an hour. Both wrote
+  `history-2026-09-24-folded-1.md`: Lane A folded 25 (#1543, merged), Lane B folded 40 (#1545,
+  closed unmerged because merging it meant hand-merging two archives — exactly the resolution this
+  entry says looks correct and loses nothing visible). Nothing was destroyed this time, by luck of
+  ordering rather than by any check. **So the chore this gate demands is a race, not a task**, and
+  the fix should be read with that in mind: a unique filename per fold ends the collision, while a
+  convention ("check `main` first") cannot, because both lanes checked and both were right at the
+  time they looked.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
@@ -29469,6 +29452,45 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
+
+### [platform] LA-137 — generalise the delta/applyDelta column guard, with the false positives that defeated the first attempt
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · found by Lane A while shipping RV-172.
+- **Lane: A** — `lib/local-store/`, `lib/data/postgres/adapter.ts`, a new `scripts/check-*.js`.
+- **The invariant is real and general.** `applyDelta` writes `col = excluded.col` unconditionally,
+  so any column it writes that the delta select omits is not left alone — it is nulled, on every
+  pull, for ever. RV-172 found three instances of that (`supplement_logs.taken_at` plus the vial
+  triple, `exercise_logs.exercise_deloaded`, and `food_items` reading a field the server has never
+  had). Three in one sweep is a class, not a coincidence, and the remaining tables were checked by
+  hand rather than by anything that will still be true next month.
+- **RV-172 shipped the SPECIFIC guard only**
+  (`lib/local-store/__tests__/rv172-delta-carries-what-applydelta-writes.test.ts`) — it pins the
+  three regressions that actually happened and nothing else. The general version was written first
+  and **withdrawn for false positives**, which is why this entry exists rather than the check.
+- **The four traps, so the next attempt does not rediscover them:**
+  - **`INSERT INTO` tracking bleeds between statements.** Scanning the file linearly and attributing
+    every `col=excluded.col` to the most recent `INSERT INTO` made `supplements` inherit
+    `supplement_logs`' `taken_at`. Statements must be bounded, not accumulated.
+  - **The SQL literal's end is not the next backtick.** The supplement upsert interpolates
+    `${isMeal ? ` … ` : ` … `}`, whose branches are themselves template literals — so the first
+    backtick after the `INSERT` is a NESTED one, and slicing there truncates the statement before
+    `taken_at`, the exact column the guard exists to protect. Terminate on the backtick that opens
+    the params array (`` `,\n[ ``).
+  - **Every table has TWO upserts with an `excluded` clause** — the pull one in `applyDeltaBody` and
+    a local-write one. Picking the first by position reads whichever the file happens to list first;
+    scope to the enclosing function instead.
+  - **Snake→camel splitting produces junk columns.** `1rm` yields `rm`; `_bpm` and `max_est`
+    survived as phantom column names.
+- **And the trap that is not about parsing: a comment explaining a defect contains the defect.** A
+  note reading *"this used to read `toIso(r.updatedAt)`"* matches a search for exactly that and
+  fails a file the code passes. This bit three separate guards in one day (TN-66's prompt guard,
+  RV-143's entry parser, RV-172's own test). Strip `//` lines before matching; do not reword around
+  it, because the next comment will not know to.
+- **Done looks like:** a Custom Rules step that reads every `applyDeltaBody` upsert, resolves its
+  `excluded` columns, and fails when one is absent from the matching delta select or pull mapper —
+  with a **baseline of zero** and no skipped-site count, or, if sites must be skipped, the count
+  printed so a clean run is never mistaken for full coverage (the fetch-once scanner's lesson).
+  A guard that cries wolf is worse than no guard; this repo has paid for that twice.
 
 ### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
 

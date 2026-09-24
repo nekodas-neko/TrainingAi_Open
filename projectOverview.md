@@ -2612,6 +2612,35 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][platform] ⚠️ Supplement ticks lost their time and frozen dose on every sync — fixed, not yet seen on the phone (RV-172, 2026-09-24)
+
+`applyDelta` writes `col = excluded.col` unconditionally, so a column the sync delta omits is not
+left alone — it is **overwritten with NULL on every pull**. Three columns were in that state:
+`supplement_logs.taken_at` plus the vial triple, `exercise_logs.exercise_deloaded` (Q-131 added the
+mapper and left the SELECT, so `Boolean(undefined)` wrote `0` over synced rows for months), and
+`food_items` reading a field the server has never had, which stored the string `"undefined"` and
+sorted those rows above every real date in offline recent-foods.
+
+The supplement one was the damaging one: the vial triple is the **frozen** dose snapshot, so losing
+it made history re-render against the current vial — the retroactive rewrite the freeze exists to
+prevent, and LA-97's fix reappearing one layer up.
+
+**What is still owed:** the **device check**. The failure is a pull-path overwrite in native SQLite,
+which does not run in the sandbox, so this is verified at source and by the server-side suites only
+(`tsc`, Custom Rules 78/78, `lib/local-store` 200/200, adapter suites 109/109, 5 of 6 mutants killed
+with one equivalent control). On-device, the tell is a supplement tick **keeping** its logged time
+and units figure across a sync.
+
+**Already-synced rows are not repaired by this.** The NULLs already written locally stay NULL until
+the next pull re-sends the real values, which it now does — but any row whose server-side vial
+snapshot was itself re-stamped by a re-push before the fix is lost, and cannot be recovered from the
+device. No estimate of how many; it would need a production read of `supplement_logs` against the
+vial history.
+
+**Filed, not built:** the general version of the guard is **LA-137**. What shipped pins the three
+regressions that actually happened; the general check produced false positives and its four parsing
+traps are recorded in that entry.
+
 ### [sleep][readiness] ⚠️ A long afternoon rest could be graded as last night — fixed, two days still wrong (RV-163, 2026-09-24)
 
 Any sleep window over four hours counts as a night wherever it falls on the clock, so one date can

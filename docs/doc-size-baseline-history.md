@@ -16836,6 +16836,15 @@ protection question, so the absence of the usual refusal looks like the setting 
 green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
 repeating the cycle.
 
+## 2026-09-24 — `docs/implementation-backlog.md` → 29674 (DV-14 root-caused)
+
++41 on DV-14, which had three rounds of measurement and no cause. It has one now: 39 of the last 40
+Railway deployments failed, all with the same `next build` heap OOM at Node's default ~4 GB cap.
+The length is the evidence — the verbatim failure, the one success that explains why production sits
+on 1.465.26, and the query shape for reaching the deploy log, which three sessions had reported as
+unreachable because `RAILWAY_API_TOKEN` answers a `Project-Access-Token` header and returns
+"Not Authorized" to the obvious `Authorization: Bearer` form. That last paragraph is the one worth
+its bytes: without it the next session repeats the same escalation.
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29699 (BF-194)
 
 The owner-question visibility rule, measured failing the day it was written: three questions at
@@ -16849,6 +16858,20 @@ Low reception hanging every fetch. The length is the three-way table of what eac
 Body painting from seeds, the fetch-gated screens holding skeletons, the unseeded ones blank. That
 table is the evidence that the offline-first architecture is sound and the layer above it is not,
 which is the whole argument for fixing one call site rather than three screens.
+
+## 2026-09-24 — `projectOverview.md` → 12747 (RV-172)
+
+One Known-Issues entry, 29 lines. It records a fix that is **not device-verified**, which is what
+keeps it in the open section rather than the archive: the failure is a pull-path overwrite in native
+SQLite and the sandbox cannot run that path at all.
+
+The length is carrying two things the one-line version would lose. First, the entry names what the
+fix does **not** repair — rows whose frozen vial snapshot was already re-stamped by a re-push are
+gone and cannot be recovered from the device, with no count, because establishing one needs a
+production read. An entry that said only "fixed" would leave a reader believing the data came back.
+Second, it records that the general guard the source entry asked for was built and **withdrawn** for
+false positives, and points at LA-137 where the four parsing traps are written down — without that,
+the next session re-attempts it from scratch and rediscovers them.
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-154)
 
 Growth: three more entries carry `Ask: owner` (TN-64, RV-113, LA-129), and Q-551 carries a note
