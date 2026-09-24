@@ -89,6 +89,7 @@ const keeps = [];
 const parked = [];
 const unclassified = [];
 const references = [];
+const asks = [];
 const verifies = [];
 
 for (const e of entries) {
@@ -126,7 +127,8 @@ for (const e of entries) {
   // cases the real queue does not contain — which is how the ordering below was found to be
   // untested at all. See that file for why each step sits where it does.
   const bucket = bucketFor(e, reasons);
-  if (bucket === 'parked') parked.push({ e, reasons });
+  if (bucket === 'ask') asks.push(e);
+  else if (bucket === 'parked') parked.push({ e, reasons });
   else if (bucket === 'unclassified') unclassified.push(e);
   else if (bucket === 'verify') verifies.push(e);
   else if (bucket === 'keep') keeps.push(e);
@@ -206,6 +208,18 @@ if (sittingsOnly) {
 }
 
 console.log(`\nQueue: ${entries.length} entries${laneArg ? ` · lane ${laneArg}` : ''}\n`);
+
+// BF-194. Printed ABOVE `READY` and outside the `TOP_N` cut, because an owner question is not
+// "next" — it is blocking, and the measurement that produced this section is that two of them fell
+// from rank 1 and 2 to 16 and 17 in eight hours simply because every agent files at the head.
+// Ordering cannot hold a guarantee that the queue's own churn undoes daily.
+if (asks.length) {
+  console.log(
+    `\nWAITING ON THE OWNER (${asks.length}) — an answer from him IS the deliverable. ` +
+      `Not "next": blocking, and shown whatever its rank.`,
+  );
+  asks.forEach((e) => console.log(`      ${fmt(e)}\n        Ask: ${e.ask.slice(0, 110)}`));
+}
 
 const unlanedReady = ready.filter((e) => e.lane === null).length;
 console.log(

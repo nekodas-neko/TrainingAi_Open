@@ -523,6 +523,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
+- **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
 - **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
@@ -545,6 +546,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+- **Ask:** owner — arrange six device sittings rather than 55 separate asks. Start with gesture navigation and a one-time write list.
 
 - **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
   arranged.
@@ -564,6 +566,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
+- **Ask:** owner — the history-row policy, unasked since 09-16: recompute-from-stored-inputs yes, hand-edits no, per the BF-81 precedent.
 
 - **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
@@ -604,6 +607,7 @@ the Orchestrator's to do.
     Recommended: yes. It is how he trains (TN-24).
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
+- **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -669,6 +673,7 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
+- **Ask:** owner — does `/collection` get a permanent More-tab row, or is it a spike he does not want surfaced? Recommendation: add the row, leave Home unchanged.
 
 - **Lane: O** — a product question, ungated so the Orchestrator can put it. **Added:** 2026-09-22 ·
   Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
@@ -705,37 +710,6 @@ below keep their gate — they really are blocked pending an answer — and this
   between the card's heading and its pickers rather than a string.
 - **Also noted, not filed separately:** three step readings can be on Home at once (`stepsWidget`,
   the Steps metric tile, and the chip row's Activity score).
-
-### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
-  in the same session it was measured.
-- **Lane: O** — the queue's own routing correctness, plus a check in
-  `scripts/check-backlog-pointers.js`. No product code.
-- **What it is.** `laneFromLines` in `scripts/lib/lane.js` is **first-match-wins**, which the script
-  itself documents as the Q-529 failure. So when an entry is re-laned by adding a new field and the old
-  one is left standing lower down, the parser keeps whichever appears first — usually the stale one.
-  Nothing in `next-item.js` output says the entry was ambiguous.
-- **Measured 2026-09-24**, walking every heading in this file:
-  - **34 entries** contain more than one line matching the lane-field pattern.
-  - **8 of those 34 disagree** about the value: `LB-94`, `TN-32`, `OR-106`, `BF-111`, `Q-395`,
-    `TN-19`, `Q-420`, `PS-7`. Three of them put an implementer letter second, so they are currently
-    being served to the wrong bucket or to the unclassified one.
-  - The other 26 are duplicates that agree, which is harmless today and is how the 8 got made.
-- **⚠ Do not read "34" as "34 misrouted entries".** Only the 8 are wrong now; the 26 are the fuel, not
-  the fire. Each of the 8 needs a human-ish read of which value was meant — the later field is usually
-  the newer intent, but that is an inference and the entry text is the authority.
-- **Why a check and not just a sweep.** Fixing the 8 leaves the pattern intact: the next re-laning adds
-  a second field and the count starts again. It already happened twice to me in one session, once while
-  writing the note explaining the trap — the note contained the literal token and the parser matched it
-  inside the prose. So the check must count **field-shaped lines**, the same regex the parser uses, and
-  fail on two of them under one heading.
-- **The check has a known cost:** an entry that *explains* the trap cannot quote a field value inline
-  any more. That is the right trade — a prose example is worth less than a queue that routes.
-- **Pass test:** `pnpm check:rules` fails on a backlog with two lane fields under one heading, passes on
-  the swept file, and the count above reads **0** when re-run. Custom Rules goes 77 → 78.
-- **Where the mechanism is:** `scripts/lib/lane.js` (the first-match-wins comment and its Q-529 note),
-  `scripts/next-item.js` (which prints the parsed lane and not the ambiguity).
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 
@@ -1975,6 +1949,7 @@ drift.
   (`getLocalStore` returns null), so the wipe half is unverifiable here.
 
 ### [platform] BF-193 — three questions BF-192 cannot answer: what "delete" means for logs, the ring key, and whether it is instant
+- **Ask:** owner — account deletion: what "delete" means for logs, what happens to the ring key, and whether there is a grace period.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -2024,6 +1999,7 @@ drift.
   BF-192 is updated with whichever ones change its diff.
 
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+- **Ask:** owner — every exercise sits on the 2-set floor and weekly volume lands at 66% of his target. Which of three levers to pull is his.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
   sessions have enough content. Time wise its pretty good."*
@@ -2105,6 +2081,7 @@ drift.
   has not been fixed regardless of what the done screen says.
 
 ### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
+- **Ask:** owner — what a sub-minute walk should do, and what happens to the phantom activity row.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
   owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
@@ -2185,7 +2162,7 @@ drift.
   checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
   inference in this repo unsound. The same section's opening claim that branch protection *"requires
   a PR with all CI checks passing"* is then also wrong.
-- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
   change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
   way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
   unsound gate.
@@ -6674,7 +6651,7 @@ true mean on night 2 rather than converging for fifty.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
-- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
 - **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire), and **BF-13**, which names the line that makes the object wrong.
 - **⚑ The cause is one line, found independently and filed as BF-13 — read it before implementing.**
   `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`), then anneals its
@@ -9361,8 +9338,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   a durable doc needed that entry's reasoning; folding it without rewriting the link turns the
   citation into a 404, and the ratchet would then read as clean while the docs got worse. That is
   the failure mode the linked/unlinked split exists to prevent.
-- **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
-  no code and any lane can run it. Filed by Lane B, which found it.
+- **Superseded lane note (demoted from a field, TN-63):** this read `? ` while the entry was still deciding — a docs restructuring that also touches script paths. The `O` above resolved it on 2026-09-15 and is the live value.
 - **✅ THE OWNER DECIDED 2026-09-09: raise the ceiling to 360 and do this properly later**, rather
   than fix it under a PR that had nothing to do with the journal. So the next time the number is
   reached, **this entry is the work** — not another raise. That is ~25 PRs of headroom, chosen
@@ -9525,7 +9501,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
-- **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
 - **✅ OWNER DECISION, 2026-09-17 — RE-PIN AT 181, superseding the 178 below.** The owner parked the
@@ -9779,7 +9755,7 @@ is claiming to be both.
 - **Lane:** A — both (2 engine, 1 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
-- **Lane: B** — `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`, `packages/shared/src/health/session-picker.ts:85`.
+- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter and listed `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`. Those shared paths are the engine lane's, and the field above already applies the both-halves rule.
 - **Sibling of TN-30**, independent of it. Copy and labels only — no threshold moves.
 
 Three separate places tell the user something the zone engine does not do:
@@ -9980,7 +9956,7 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
   the VO₂max crosscheck, the water goal and the AI context, and it is a surface change.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
-- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
 - **Owner-approved 2026-09-09** — *"make all the changes you recommend."* Not gated; start here.
 - **⚑ Cross-reference BF-137 (filed 2026-09-10, the day after this entry) — and read it FIRST.** It names a cause this entry does not: **the estimator is fitting a GLP-1 (retatrutide) weight drop and reading it as metabolic rate.** `maintenance = intake − Δweight × 7700` assumes weight change reflects energy balance; under a GLP-1 it does not, so the drug's loss is booked as a higher metabolism. **This gate catches the instance through a different mechanism and does not remove the cause** — BF-137 says it will recur on every new vial. Build the two together.
 - **⚠ The urgency dropped on 2026-09-12 and the entry did not.** PR #1128 anchored the daily budget to the owner's **stored goal** rather than to this estimate, so the number is now informational rather than what he eats to. Still worth fixing — BF-137's commit says outright that TN-29 is *"about making it true"* and the estimate "still needs somewhere to show it" — but it is no longer load-bearing.
@@ -10082,7 +10058,7 @@ movement stays near 280 kcal/day.
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
-- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
 - **⚠ Amended 2026-09-13 — still valid, no longer urgent.** PR #1128 anchored the daily budget to the owner's stored goal, so this estimate no longer decides what he eats to. And **BF-137 names a deeper cause than the window**: the estimator is fitting a GLP-1 weight drop as metabolism, which no window choice fixes.
 - **Owner decision, 2026-09-09: option 3, after TN-29** — *"make all the changes you recommend."*
   The gate is cleared; this is Lane A's to build. Options 1 and 2 stay recorded below as the
@@ -10152,7 +10128,7 @@ this card offers to overwrite with 2,045.
 - **Lane:** A — both (1 engine, 2 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"let's not tune to the treadmill — like you said it changes based on location, what do you suggest we do?"*
-- **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
 - **Pairs with TN-25** — TN-25 chooses *what* the fast block should demand; this entry decides *in what unit* it is demanded and how compliance is measured.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 3).
 
@@ -12351,7 +12327,7 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
   returns early unless `Capacitor.isNativePlatform()`, so on web and in every e2e harness it renders
   nothing at all — this cannot be checked anywhere but the S25.
 
-- **Lane:** B — `components/more/update-check-card.tsx:81`.
+- **Superseded lane note (demoted from a field, TN-63):** the surface half is `components/more/update-check-card.tsx:81`. It stays the engine lane's by the both-halves rule, engine first — the field above is the live value.
 - **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
   **v1.436.2** and, two rows below, a green tick reading **"Up to date — v1.414.1 is the newest
   build."**
@@ -15756,8 +15732,7 @@ That number is more valuable than either input on its own.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
-- **Lane:** B
-  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter from before the entry was re-laned. The field above records the reason it moved: what remains is the owner's parity look, not a build.
 - **What this entry is for.** A taste request cannot be implemented from as written, so this
   separates the part that is objectively wrong (findings 1–3, each with a CI check that already
   measures it) from the part that is genuinely a design decision (findings 4–5, which need
@@ -16446,7 +16421,7 @@ two are app-wide and sit here.*
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · found by the threshold sweep the owner asked for
-- **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
 - **Batch:** temperature-baseline — the fourth consumer of the object BF-13 fixes. Same PR.
 - **Related: TN-1 / Q-525** (chronic stress has never produced a value) — a plausible contributor,
   **not a proven cause**. See the margin note below before treating it as the answer.
@@ -16528,7 +16503,7 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
-- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
 - **Owner sign-off: RECEIVED 2026-08-26** for the intent (the number must be settled at first load).
   The mechanism below is the recommendation; confirm it before shipping if it changes.
 
@@ -16613,7 +16588,7 @@ apart with no new overnight data — which the check-in half alone does not achi
 - **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-03 · owner: *"why would sleep score be so low for this? I'd imagine 80s if not 90s"*
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
 - **Sequence after TN-5 and TN-10.** All three are independent, but those two are larger and already signed off; changing three sleep inputs at once makes none of them evaluable.
 - **Reference:** [`review`](reviews/2026-09-03-why-a-good-night-scored-63.md) — reproduces the owner's 63 exactly from the stored contributors.
 
@@ -16653,7 +16628,7 @@ combined weight above ~18 of 110; and the 2026-09-02 night's blend rises by 5–
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
 - **✅ Gate: owner SIGNED OFF 2026-08-30.** The owner approved the tuning batch; this is the one of
   the four that was actually ready. It meets the bar CLAUDE.md sets for a scoring change: the blast
   radius is stated and measured — **~3.3 blend points on every night in the 7.5–8 h band**, which is
@@ -16694,7 +16669,7 @@ test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
-- **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
 - **Answers the open half of Q-522** (moveHours saturated, 100 on 48 of 59 days). Q-188 fixed the
   *denominator*; this is why the *numerator* saturates. **Supersede Q-522's "unrelated reason" line.**
 
@@ -16774,7 +16749,7 @@ called with the night's real wake/sleep hours, asserted by a test.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
-- **Lane: B**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: B**
 - **Needs: TN-11** — and this dependency is the whole point, see below.
 
 The owner reported seeing nothing for move hours. **There is exactly one surface**:
@@ -16859,7 +16834,7 @@ the day's move-hours total is below the goal.
 - **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
-- **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
 - **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing.
   **Q-524's last open half closed 2026-08-31: MANUAL WINS** (owner signed off there), so the goal this
   paces against is whatever the owner has set by hand — 7,000 today — and an AI review cannot move it
@@ -17131,7 +17106,7 @@ its consumers re-checked), and after that `stress_high_minutes` no longer correl
 count at |r| > 0.4.
 
 ### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
-- **Lane:** B — surface only: components/body-battery-card.tsx.
+- **Superseded lane note (demoted from a field, TN-63):** this read *"surface only: components/body-battery-card.tsx"* and was WRONG — and because the parser takes the first field, it was the one being served. The field below corrects it: the defect is in the model and the card must not be touched for this.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
 - **Lane: A** — the defect is in the model, not the card. `components/body-battery-card.tsx` is Lane B and **should not be touched for this**.
@@ -17249,7 +17224,7 @@ established. Until one is, this stays parked.
   (`tempZ` / the illness radar) was **not** touched — it is not firing wrongly, it cannot fire at
   all while the sd is 12x too wide, and that is TN-6's subject rather than this one's.
 - **Branch:** `lane-a/deload-temp-gate` · **Added:** 2026-08-31 · owner screenshot, 2026-08-31 06:43 Brisbane
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
 - **Do not batch** — it is one condition, and it un-does a daily false alarm the owner has reported twice.
 
 **TN-6a shipped and works.** `readiness-payload.ts:386` computes `tempLadderTrusted` from
@@ -17293,7 +17268,7 @@ count night for night.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner decision, asked and answered plainly
-- **Lane: A** — `lib/health/readiness-payload.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/health/readiness-payload.ts`
 - **Owner sign-off: RECEIVED 2026-08-24.** *"Fix baseline + suspend penalty now."*
 - **Do NOT batch with TN-6/Q-506.** The whole point is that this lands first, on its own.
 
@@ -17545,7 +17520,7 @@ and on-drug periods without either being refitted.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report + production measurement
-- **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
 - **Owner sign-off: received 2026-08-24** for the direction (anchor the rest boundary to *waking*
   rest, not sleeping rest). The exact offset is still to be fitted — see the pass test.
 - **Do not batch.** It re-scores every stored Body Battery day and needs a `MODEL_VERSION` bump.
@@ -17724,7 +17699,7 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
-- **Lane: A** — needs a Postgres migration, so Lane A only
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — needs a Postgres migration, so Lane A only
 - **Do not batch** (migration).
 - **Keep:** the back-fill of stress buckets over the stored history. The table and the forward write
   are done; re-decoding past days into it is not.
@@ -17904,7 +17879,7 @@ record explicitly why not.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
-- **Lane: B**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: B**
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that. I'd like to get stress metric to be a usable value to determine what events stress me."* **That goal reshapes the entry: the chart is the first half, not the deliverable. See TN-35 for the second.**
 - **⚑ UNPARKED 2026-09-10 — build the chart FIRST, and the owner's request is why.** *"Can we have this displayed on a widget or chart so we can see when the stress occurs. I will be able to match it up based on time to what I was doing around then."*
 - **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
@@ -17975,7 +17950,7 @@ part of this entry**, not only new surfaces.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts`
 - **Owner sign-off: RECEIVED 2026-08-24.** Asked plainly, with the caveat that this does **not** make
   the score less jumpy, and approved on that basis. Build it.
 - **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
@@ -18035,7 +18010,7 @@ Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · found on the session-start `error_events` read
-- **Lane: A**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A**
 
 `daytime-stress: constants not set — call setDaytimeStressConstants() first`, **31 occurrences
 between 10:37 and 20:59 UTC on 2026-08-23**, then nothing. `buildDaytimeStressSeriesFromModel` is
@@ -18311,7 +18286,7 @@ without a queue entry is a dropped finding.*
 
 - **Branch:** `docs/baton-compaction`
 - **Added:** 2026-08-19 · measured while adding batons to the size ratchet
-- **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
   correct, not an omission**: the runner accepts only A or B, and this is not implementer work.
   Recorded 2026-08-30 so the next gate audit does not try to classify it again. **Deliberately not A or B:** each role rewrites its own baton, so this is done by whoever hands over next rather than assigned. Left lane-agnostic on purpose, not by omission.
 
@@ -18849,7 +18824,7 @@ design decision. See the correction at the top of that entry.
   distorts both windows for weeks, and it distorts them in the direction that reads as "you are
   training far too hard".
 
-- **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
+- **Branch:** `fix/cull-implausible-session-duration`
 - **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
   sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
   fiction, and the entry's earlier guess (exclude from load, clamp for calories) is superseded.
@@ -28791,7 +28766,7 @@ that is not a device proof, and this is the code path with the worst data-loss h
 
 ### [workouts][platform] 🟡 `exercise_estimates` has no local mirror, but do not build one on its own
 
-- **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
 
 Found while building the `meal_types` local mirror (2026-07-30): mirroring
 `exercise_estimates` alone would be **inert**. `lib/local-store/program-assembler.ts`
@@ -28812,7 +28787,7 @@ reads.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 
-- **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - ✅ **`invalidateCache(` outside `lib/cache-groups.ts` — DONE 2026-07-30.** All 7 remaining raw
   call sites migrated to named group helpers (`invalidateOuraWorkoutReview`,
@@ -29491,7 +29466,7 @@ amounts — rather than showing the same subtitle as an amountless tick.
 - Plan: [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](superpowers/plans/2026-08-26-camera-form-capture.md)
 - Branch: `spike/camera-pose-feasibility`
 - Added: 2026-08-26
-- Lane: ? — a spike touching only a throwaway route and the CSP. The lane that takes it decides.
+- **Superseded lane note (demoted from a field, TN-63):** this read `?` — *"a spike touching only a throwaway route and the CSP; the lane that takes it decides"*. The field above assigned it on 2026-09-15 and is the live value.
 - Gate: device — every question in it is a measurement the sandbox cannot make.
 
 **Placed at the tail deliberately.** The owner framed it as *"a good future move"*, not as next-up,

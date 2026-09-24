@@ -16845,3 +16845,9 @@ on 1.465.26, and the query shape for reaching the deploy log, which three sessio
 unreachable because `RAILWAY_API_TOKEN` answers a `Project-Access-Token` header and returns
 "Not Authorized" to the obvious `Authorization: Bearer` form. That last paragraph is the one worth
 its bytes: without it the next session repeats the same escalation.
+## 2026-09-24 — `docs/implementation-backlog.md` → 29699 (BF-194)
+
+The owner-question visibility rule, measured failing the day it was written: three questions at
+ranks 15–17 of a 57-entry lane that prints 10. The length is the rank table plus three alternatives
+with the reason each lost — the table is the evidence that position cannot hold, which is the whole
+argument for replacing it with a section.
