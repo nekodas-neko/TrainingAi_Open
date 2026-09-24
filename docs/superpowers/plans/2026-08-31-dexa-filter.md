@@ -30,7 +30,7 @@ from the entry.
 no screen, no form, no client fetch. BF-41 shipped the table and the routes; BF-33 shipped
 `measured_rmr` and its route. **Both tables are empty in production and neither can be filled from
 the app.** The 2026-08-27 printout is transcribed in
-[`clinical-baseline-2026-08-27.md`](../../clinical-baseline-2026-08-27.md) and has been sitting there
+the clinical baseline (held privately by the owner since 2026-09-24, RV-199) and has been sitting there
 for four days with nowhere to go.
 
 That is filed separately as **LA-44** and is a *precondition for observing* this work, not for

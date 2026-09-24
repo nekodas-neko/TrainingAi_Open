@@ -1,0 +1,73 @@
+# Blood-panel analyte LABELS from the owner's April 2026 report — names only, no results.
+#
+# Extracted 2026-09-24 (OR-159) when the source document left the public repo on the owner's
+# privacy decision (RV-199). The document held results, a DEXA, an RMR, the provider's scan
+# reference and an instrument serial; NONE of that is here. A list of the tests a panel prints is
+# a standard lab menu, not a health record.
+#
+# WHY THIS FILE EXISTS RATHER THAN A LIST INSIDE THE TEST. analyte-keys.test.ts asserts that
+# ANALYTE_KEYS covers every analyte the real report prints, and its own comment says the assertion
+# must anchor on "something this module cannot edit" — a list retyped inside the test moves
+# whenever the table moves and can only agree with itself. That is how six haematology markers once
+# sat outside the table with accidentally-correct slugs. Keeping the labels in a separate data file
+# preserves the anchor; putting them in the test would not.
+#
+# DO NOT add results, units, reference ranges or flags to this file. Labels only.
+Insulin (fasting)
+Glucose (fasting)
+Serum cortisol (10am)
+Prolactin
+LH
+FSH
+Oestradiol
+Progesterone
+Testosterone (total)
+Free testosterone (calc)
+SHBG
+Growth hormone
+IGF-1
+DHEA-S
+Sodium
+Potassium
+Chloride
+Bicarbonate
+Other anions
+Urea
+Creatinine
+eGFR
+Uric acid
+Total bilirubin
+Alkaline phosphatase
+Gamma GT
+ALT
+AST
+LD
+Calcium
+Adjusted calcium
+Phosphate
+Total protein
+Albumin
+Globulins
+Cholesterol (total)
+Triglycerides
+HDL
+LDL (calculated)
+Non-HDL
+Total/HDL ratio
+Magnesium
+CRP
+Haemoglobin
+Red cell count
+Haematocrit
+MCV
+MCH
+MCHC
+RDW
+Platelets
+MPV
+WBC
+Neutrophils
+Lymphocytes
+Monocytes
+Eosinophils
+Basophils
