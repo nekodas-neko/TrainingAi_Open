@@ -123,6 +123,53 @@ export function subscribeToInvalidation(listener: InvalidationListener): () => v
   return () => { invalidationListeners.delete(listener); };
 }
 
+// ── Reachability (BF-195) ────────────────────────────────────────────────────
+//
+// **`navigator.onLine` answers "is the radio attached", and the owner's problem was a radio that
+// was attached and moving nothing.** In low reception the app is not offline — it is online with
+// no throughput — and nothing in the client had a state for that, so the offline branch below
+// never ran and screens held their skeletons.
+//
+// This is the flag that distinguishes the two, and it is deliberately derived from ONE fact: a
+// request timed out. Not a new subsystem, not a heuristic over latency.
+//
+// A settled response marks us reachable **even when the server rejected it** — a 500 is proof the
+// connection carried a request and brought an answer back, which is exactly the question being
+// asked. A hard network throw (DNS, refused, server down) deliberately does NOT clear the flag:
+// that is a different failure, it is already handled correctly below, and treating it as "no
+// reception" would put an Offline banner in front of a working connection.
+const FETCH_TIMEOUT_MS = 8000;
+
+type ReachabilityListener = (reachable: boolean) => void;
+const reachabilityListeners = new Set<ReachabilityListener>();
+let requestsAreCompleting = true;
+
+/** True while requests are completing. False once one has timed out, until the next settles. */
+export function requestsCompleting(): boolean {
+  return requestsAreCompleting;
+}
+
+export function subscribeToReachability(listener: ReachabilityListener): () => void {
+  reachabilityListeners.add(listener);
+  return () => { reachabilityListeners.delete(listener); };
+}
+
+function setReachable(reachable: boolean): void {
+  if (reachable === requestsAreCompleting) return;
+  requestsAreCompleting = reachable;
+  // Same contract as the invalidation listeners: one throwing listener must not stop the others,
+  // and must never turn a fetch into a failed one.
+  for (const listener of reachabilityListeners) {
+    try { listener(reachable); } catch (err) { console.error('Reachability listener failed:', err); }
+  }
+}
+
+/** Test seam only — the module-level flag outlives a single test otherwise. */
+export function __resetReachabilityForTests(): void {
+  requestsAreCompleting = true;
+  reachabilityListeners.clear();
+}
+
 function notifyInvalidated(keyPrefix: string): void {
   // A throwing listener must not stop the others, and must not turn a cache write into a failed
   // mutation — this runs on every write path in the app.
@@ -348,7 +395,18 @@ async function cachedFetchCore<T>(
       // (`scripts/check-api-no-store.js` keeps them there), so this is now the second of two
       // independent guarantees rather than the only one. Keep it: it is free, and it is the half
       // that holds for any response — including one from a route that regains a header.
-      const res = await fetch(url, { cache: 'no-store' });
+      // BF-195. Without this the request on a dying connection hangs until the OS gives up, and
+      // there is no path from "hanging" to any rendered state — the caller's `refreshing` stays
+      // true and the screen holds its skeleton indefinitely. The timeout makes `fetch` THROW, which
+      // lands in the catch below: machinery that already keeps the cached value and reports through
+      // `onError`/`onRevalidateError`. So this converts an unhandled state into a handled one at one
+      // call site, for every screen, rather than adding a second failure path.
+      //
+      // 8s is a starting value, not a tuned one: long enough that a slow-but-working connection
+      // still succeeds, short enough that a lifter is not staring at a skeleton mid-session.
+      const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      // The response settled, so the connection carries traffic — even if the server rejected it.
+      setReachable(true);
       if (!res.ok) {
         // Got a response the server rejected (500/429/401/…) — the device is
         // online, so this is a real error. Only surface it when nothing was
@@ -384,10 +442,16 @@ async function cachedFetchCore<T>(
       // storing that under a long TTL would serve the fallback for as long as the real answer
       // would have lived — the recap's is 24h, on a card whose only retry is a refetch.
       if (!shouldCache || shouldCache(data)) await setCached(key, toStored(data), ttlSeconds);
-    } catch {
+    } catch (err) {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
-      const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+      //
+      // BF-195: a timeout is the low-reception case specifically — the radio is attached and
+      // `navigator.onLine` is true, so without this flag the app would keep believing it is online
+      // and keep skipping the offline branch. `AbortSignal.timeout` rejects with a `TimeoutError`,
+      // which is what separates it from an ordinary network failure.
+      if (err instanceof DOMException && err.name === 'TimeoutError') setReachable(false);
+      const isOnline = typeof navigator !== 'undefined' && navigator.onLine && requestsAreCompleting;
       const online = cached === null && isOnline;
       if (online) { try { onError?.({ status: null }); } catch { /* caller's onError threw */ } }
       else if (cached !== null && isOnline) {

@@ -551,7 +551,8 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 | Weather | `lib/weather/use-weather.ts` |
 | PiP mode / actions | `hooks/use-pip-mode.ts`, `hooks/use-pip-actions.ts` |
 | Health calcs | `app/health/hooks/use-health-calcs.ts` |
-| Online/offline status | `lib/use-online-status.ts` — `navigator.onLine` + DOM events + Capacitor Network |
+| Online/offline status | **`useOnlineStatus()`** (`lib/use-online-status.ts`) — DOM events + Capacitor Network, **ANDed with whether requests are actually completing**. It answers *"can the app reach the server"*, not *"is the radio attached"*: both native sources report true in low reception, which is the state a gym is in (BF-195) |
+| "Are requests getting through?" | **`requestsCompleting()` / `subscribeToReachability()`** (`lib/sqlite/cache.ts`) — one flag, flipped false by a fetch **timeout** and true by any settled response. A rejected response still counts (a 500 proves throughput); an ordinary network throw does NOT (that is server-down, not no-reception). Do not add a second connectivity source — read this one |
 
 | Cross-cutting UI | File |
 |---|---|

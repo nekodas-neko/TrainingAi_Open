@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.36",
+    date: "2026-09-24",
+    changes: [
+      "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. Requests now give up after eight seconds and fall back to your saved data, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely.",
+    ],
+  },
+  {
     version: "1.465.35",
     date: "2026-09-24",
     changes: [

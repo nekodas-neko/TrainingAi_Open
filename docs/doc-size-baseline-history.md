@@ -16962,3 +16962,17 @@ reasoning or does it blind.
 
 The SHA-pinning bullet also records that the tags were dereferenced (`v5^{}`) rather than pinned as
 tag objects. That is the standard way to get action pinning wrong, and it is invisible in the diff.
+
+## 2026-09-24 — `projectOverview.md` → 12796 (BF-195)
+
+Twenty-five lines for the owner's own report, and three of them are the reason it cannot be struck.
+
+The fix is one sentence: connectivity was a boolean, the fetch had no timeout, so a request on a
+dying connection never settled and the screen held its skeleton. What needs the space is the list of
+what is still owed — the device look (and that the honest reproduction is throttling, **not** airplane
+mode, which exercises the path that already worked), the banner copy that still over-promises on a
+screen with nothing saved, and that the 8 s figure is a starting value nobody has measured.
+
+The separately-observed month-stale sleep card is recorded as NOT diagnosed, with the reason: a
+screenshot cannot tell a stale cache entry from the card's own fallback. Writing it as part of BF-195
+would send the next session to fix the wrong thing.

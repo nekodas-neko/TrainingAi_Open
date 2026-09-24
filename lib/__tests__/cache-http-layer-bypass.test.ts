@@ -28,7 +28,13 @@ describe('client reads bypass the browser HTTP cache', () => {
     await cachedFetch('http-bypass-key', '/api/anything', 60, () => {})
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(fetchSpy.mock.calls[0][1]).toEqual({ cache: 'no-store' })
+    // BF-195 added an `AbortSignal.timeout` to this call. The exact-match below was deliberate —
+    // it catches anything unexpected being passed to `fetch` — so it is kept as an exact KEY check
+    // rather than relaxed to a partial match, which would stop guarding that.
+    const init = fetchSpy.mock.calls[0][1] as RequestInit
+    expect(Object.keys(init).sort()).toEqual(['cache', 'signal'])
+    expect(init.cache).toBe('no-store')
+    expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('the today-envelope variant goes through the same path, so it inherits the bypass', async () => {
@@ -37,7 +43,9 @@ describe('client reads bypass the browser HTTP cache', () => {
 
     await cachedFetchToday('http-bypass-key-today', '/api/anything-today', 60, () => {})
 
-    expect(fetchSpy.mock.calls[0][1]).toEqual({ cache: 'no-store' })
+    const init = fetchSpy.mock.calls[0][1] as RequestInit
+    expect(Object.keys(init).sort()).toEqual(['cache', 'signal'])
+    expect(init.cache).toBe('no-store')
   })
 
   it('the service worker passes it through too, so a bare fetch is covered as well', () => {
