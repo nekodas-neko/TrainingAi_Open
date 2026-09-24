@@ -16430,3 +16430,11 @@ BF-189, from the owner asking whether his sessions have enough content. The leng
 tables the entry exists to carry: the five-band decomposition of a 52-minute session (work is 9.8 of
 it) and weekly sets against all sixteen of his own configured volume targets. The second table is
 the answer to his question, so summarising it away would leave the entry unable to make its case.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → BF-190 + BF-107 reopened
+
+BF-190, found while answering why a calories tile was blank: the walk summary saves on mount with the
+planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minute session. The
+length carries the two-row production table that is the evidence, and the reopening note on BF-107
+that distinguishes "the fix regressed" from "the screenshot was taken 30 seconds after the save" —
+the distinction is the whole value of the note, so it could not be shortened to a verdict.
