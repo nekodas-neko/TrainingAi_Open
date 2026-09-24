@@ -118,7 +118,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
+      # DV-14: the heap cap lives in `package.json`'s build script, so Railway's builder and this
+      # job run the SAME number. It used to be set here and nowhere else, which is why CI passed at
+      # 4096 while Railway — which sets no NODE_OPTIONS at all — died on Node's own ~4 GB default.
+      # A value set here would be overridden by the script's inline one, so it is not set here.
       # Q-311. Everything below is a throwaway literal for this ephemeral job, not a redacted
       # secret. This repo is public, and a reader cannot tell a dummy from a leak by looking, so:
       # the database is a service container destroyed with the runner, and the Google/Gemini/Tasker
