@@ -1226,23 +1226,6 @@ which is the right shape for something that can only be validated by living with
   token is long-lived, can write to Google Calendar, and outlives sign-out.
 - **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
 
-### [platform] RV-194 — Sentry scrubbing misses the parts of an event that carry query values
-- **Lane: A** — `lib/sentry-scrub.ts`.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** `scrubEvent` scrubs request, cookie and auth fields, but not:
-  - `exception.values[].value`: Drizzle's `Failed query … params: …` message, which carries row values;
-  - console-breadcrumb messages;
-  - navigation breadcrumb `from` and `to`;
-  - `extra` and `contexts`.
-  It also sets no `maxValueLength`. A throwaway test confirmed the params pass through unchanged. Every
-  uncaught database error therefore ships ids, dates and values to sentry.io. On the `users` path that
-  includes email.
-- **Fix:**
-  1. Cut exception messages at `\nparams:`.
-  2. Scrub breadcrumb `from` and `to` with the existing URL scrubber.
-  3. Drop console breadcrumbs, `extra` and `contexts`, or allowlist them.
-  4. Add a test using a real Drizzle error string.
-
 ### [platform] RV-195 — three low-severity auth and social gaps, one PR
 - **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
 - **Added:** 2026-09-24 · Review sweep 60.
