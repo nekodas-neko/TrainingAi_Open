@@ -595,6 +595,49 @@ the Orchestrator's to do.
   field is tooling and wants its own tests. **Build it when a second dated case appears**, or sooner
   if `LA-134` gets picked up and dropped once — that pick-up is the cost this prevents.
 
+### [platform] OR-158 — the E2E detector looked for client roots where they are not, so browser code skipped the suite
+
+- **Lane: O** · **Added:** 2026-09-24 · found by the Orchestrator while discharging LB-108's owed
+  verification. **Shipped in the same session** — this entry is the record, not a request.
+- **Verify:** owner — nothing here needs the device, but the trade is worth a look: **more PRs now
+  run the ~34-minute browser suite**, because the previous behaviour bought its speed by skipping
+  browser code. Say so if that is the wrong trade; the alternative is accepting known-blind CI.
+- **How it surfaced, which is the part worth keeping.** `LB-108` (#1557) could not be verified by
+  reading its diff — only by watching an E2E job's **duration** on the first PR to touch a client
+  `lib/` file. Checking merged history for one found **#1569**: it changed
+  `instrumentation-client.ts` and E2E skipped. Running the detector against that file list
+  reproduced it immediately. **A fix whose only proof is a runtime observation has to be followed
+  up, or it is unverified however sound the diff reads.**
+- **Three defects, all measured 2026-09-24.**
+  1. **Roots were grepped inside `lib/` only.** Client components live in `app/` and `components/`,
+     so their own `lib/` imports were never walked — **47 `lib/` modules imported directly by a
+     `'use client'` file read as unreachable**, among them `lib/cache-groups.ts` and
+     `lib/haptics.ts`. This is a smaller copy of the bug LB-108 replaced.
+  2. **`instrumentation-client.ts` matched nothing.** Next names it by convention, so it carries no
+     directive; it is not under `lib/` and not under the `app|components|e2e` prefixes. It runs in
+     every browser session.
+  3. **`import type` counted as a runtime edge.** Correcting the roots alone took the reachable set
+     from **81 of 282 to 179**, which *looked* like a successful fix. What exposed it was one file
+     that had no business being there: `lib/data/postgres/adapter.ts`, a server-only Drizzle adapter,
+     reached behind a type the compiler erases. Dropping erased edges gives **124**, and the adapter
+     skips again.
+- **⚑ The lesson, and it is the reusable one.** A total moving in the expected direction is not
+  evidence — **179 was wrong in the same direction as 81 was wrong.** The check that worked was
+  naming a file whose presence in the set would be absurd and asking whether it was there. Apply that
+  to any future reachability, coverage or count change.
+- **Known floor, unchanged and still stated in the file:** static `from '…'` imports only, so a
+  dynamic `import()` built from a variable is not seen. A new client entry point named by convention
+  must be added to `CONVENTION_CLIENT_ROOTS` by hand.
+- **What this PR proved in CI, and what it did NOT.** #1576 touches only `scripts/`, which no browser
+  reaches, and its **E2E job completed in 40 seconds** — so the SKIP branch is proven against the real
+  workflow, and the widening does not over-fire. **The RUN branch is still only verified locally**
+  (unit tests plus the detector run by hand against the #1569 file list). The CI-level proof of that
+  half is the next PR to touch a client `lib/` file: **its E2E job must take MINUTES, not 40
+  seconds.** Same observation LB-108 owed and nobody made for a day — so it is written here rather
+  than left as an intention.
+- **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
+  new). `Ran 78 of 78` Custom Rules steps.
+
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
@@ -1435,6 +1478,127 @@ which is the right shape for something that can only be validated by living with
   temperature term is exactly the kind that would look different across seasons. And per TN-67 there is
   no external validation of the composite, so this describes which inputs move the number, never which
   ones *should*.
+
+### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
+
+- **Branch:** `tuning/activity-contributor-behaviour`
+- **Lane:** A — `packages/shared/src/health/activity-score.ts` and `daily-goals.ts`; engine by the path rule.
+- **Added:** 2026-09-24 · Tuning agent. **Proposal only** — Tuning never ships a scoring change.
+- **Where the mechanism is:** `packages/shared/src/health/activity-score.ts` (lane weights, the taper,
+  `STRENGTH_FREQ_CURVE`), `packages/shared/src/health/daily-goals.ts` (every goal it scores against).
+- **Method — no reconstruction.** Every figure below is read from
+  `oura_daily_derived.activity_contributors`, the model's own persisted per-contributor breakdown.
+  **30 days carry one** (2026-07-28 → 2026-09-24). An earlier reconstruction from raw steps and
+  tonnage agreed with the stored score to a median of 0 and a mean of +0.3 points but an sd of 8.8,
+  so it is fit for means and not for any single day — it is not used here.
+
+**The headline: the score's largest contributor carries no information, and the lane balance the
+module documents has never been the live one.**
+
+  | contributor | weight | n/30 | sd | range | reads |
+  |---|---:|---:|---:|---|---|
+  | `strengthFreq` | **25** (largest) | 30 | **2.2** | 88–100 | **100 on 29 of 30 days** |
+  | `strengthVolume` | 20 | 30 | 12.4 | 43–100 | discriminates |
+  | `steps` | 18 | 30 | 16.2 | **1–61** | discriminates, never above 61 |
+  | `moveHours` | 12 | 30 | 11.1 | 60–100 | narrow |
+  | `zoneMinutes` | 10 | **11** | 28.6 | 0–100 | 9 of its 11 values are **0** |
+  | `activeEnergy` | 15 | **0** | — | — | structurally absent (Q-521) |
+
+- **`strengthFreq` is still saturated, and Q-137 raised the goal 3 → 5 specifically to stop that.**
+  `daily-goals.ts` records the prior state — *"`strengthFreq` (weight **25**, the largest) was
+  **exactly 100 on all 91 days** and had never once carried information"* — and predicts that at a
+  goal of 5 *"3 sessions gives ratio 0.6 → ~73"*. **Measured after the change: 100 on 29 of 30 days,
+  minimum 88, sd 2.2.** The de-saturation did not happen, because the owner trains at or above 5×/wk;
+  the curve caps at ratio 1.0 and they sit on or past it. **The largest weight in the model is a
+  constant.** Raising the goal again would repeat the same reasoning — the fix is the curve or the
+  weight, not the target.
+- **The renormalised weight base is 75 or 85, never 100** — so the documented split is not the live
+  one on any day in the window:
+
+  | base | days | strength lane | steps | documented |
+  |---:|---:|---:|---:|---|
+  | 75 (no `activeEnergy`, `zoneMinutes` suppressed) | **19** | **60%** | 24% | strength 45%, steps 18% |
+  | 85 (no `activeEnergy`) | 11 | 53% | 21% | strength 45%, steps 18% |
+
+  The module header says *"Daily-movement ≈ 55, strength ≈ 45"*. With a 15-weight contributor
+  permanently absent and a 10-weight one suppressed on training days, **the strength lane holds 60%
+  of the score on the majority of days.** Renormalisation is the designed response to missing data;
+  the documented balance being wrong by 15 points is the consequence nobody re-checked.
+- **The over-exertion taper has never fired: 0 of 30 days.** ACWR mean 0.93, p90 1.15, **max 1.32**,
+  against `ACWR_TAPER_START = ACWR_THRESHOLDS.highMax = 1.5`. So *"100 means optimal, not maximum
+  effort"* is not a property this score has exhibited.
+  **A doc/code mismatch sits here and is NOT worth acting on** — the header says the taper starts
+  *"past the ACWR optimal band"*, which is `optimalMax = 1.3`, while the code starts it at
+  `highMax = 1.5`. Measured, the difference is **0.5 points on 1 of 30 days**. Recorded so the next
+  reader does not chase it; fix the comment if the file is open anyway.
+- **Net effect on the number the owner reads: mean 67.9, sd 7.4, range 53–82** over the 30 days — a
+  0–100 score using 29 points of its range, driven by two of six contributors.
+- **Half the persisted audit trail is empty.** 59 stored rows carry an `activity_contributors` object
+  and **29 of them contain no contributors at all** — just `{base, trained, adjustment}`. The audit
+  view reads this column, so on those days it can show a score and nothing behind it. Which writer
+  produces the empty shape is **not established** and is the first thing to check.
+- **`steps` has never exceeded 61/100, which is Q-524 in one number.** The lane scores against
+  `getDailyGoals().stepGoal` = **10,000**; see the Q-524 amendment below — the profile goal the rest
+  of the app honours is now **5,000**, so the two are 2.0× apart and the lane cannot reach 100
+  without doubling the owner's own target.
+- **Proposal — one change, and it is not a weight tweak.** `strengthFreq` at weight 25 with sd 2.2
+  contributes ~0 variance while claiming a quarter of the model. Either (a) let the curve keep rising
+  past ratio 1.0 so training 5× vs 7× separates, accepting that this rewards volume the ACWR taper
+  is meant to punish and that the taper does not fire; or (b) cut its weight toward `strengthVolume`,
+  which already measures the same lane and does discriminate. **Recommendation: (b)** — it needs no
+  new curve, and the frequency signal is already inside the volume number. Per the Tuning rule this
+  proposal is incomplete until someone states **how many stored days it moves**; with 30 days of
+  contributors that is computable before shipping, and it must be, because it re-scores history.
+- **What this does NOT establish.** One user, 30 days, one activity level, one training pattern —
+  `strengthFreq`'s saturation is a fact about someone who trains 5×/wk, not about the curve's shape
+  for someone who trains twice. Nothing here says the score is *wrong*, only that four of its six
+  inputs are not moving it: per TN-73 there is a validated instrument for perceived effort and this
+  score has not been tested against it. And the 29 empty contributor rows mean the window is 30 days,
+  not 59.
+
+### [readiness][activity] TN-77 — "previous day's activity" is computed from TODAY's training window, and on a different weight base from the score it is compared with
+
+- **Branch:** `tuning/activity-contributor-behaviour`
+- **Lane:** A — `lib/health/readiness-payload.ts`, `packages/shared/src/health/score-audit/build-day-audit.ts`.
+- **Added:** 2026-09-24 · Tuning agent, found while auditing the Activity Score's contributors.
+- **Where the mechanism is:** `lib/health/readiness-payload.ts:471` and
+  `packages/shared/src/health/score-audit/build-day-audit.ts:182`. **Both call sites agree**, so this
+  is the model rather than a divergence between two copies.
+
+Readiness's `prevDayActivity` contributor (weight **0.09**) calls `computeActivityScore` a second
+time with yesterday's steps — and **today's** rolling 7-day strength window:
+
+```
+sessions7d: activityInput.sessions7d,   // today's window, not yesterday's
+volume7dKg,                             // likewise
+```
+
+- **(a) The window is off by a day, and it moves the number.** Reconstructed over 115 days
+  (2026-06-01 → 2026-09-23): the as-coded value differs from the same score on yesterday's window on
+  **83 of 115 days (72%)**, mean |difference| **4.45 points** when it differs, **≥5 points on 34
+  days**, worst **−15** (2026-06-05) and **+10** (2026-09-20). The mean signed difference is
+  **−0.15**, so it is noise rather than bias. At weight 0.09 the worst case is ~1.4 readiness points
+  — comparable to what TN-71 measured for `temperature`, which holds 10% of the weight and moves
+  1.1% of the score. **Small, and not zero.** The material case is a day the owner trains: today's
+  window contains that session and yesterday's cannot, so the contributor describing *yesterday*
+  reacts to *this morning's* workout.
+- **(b) The scale mismatch is the larger half.** The prev-day call passes **no** `zoneMinutes`,
+  `moveHours`, `strengthSessionToday` or `acwr`. With `activeEnergy` structurally absent (TN-76) its
+  weight base is `steps 18 + strengthFreq 25 + strengthVolume 20 = 63`, so **the strength lane holds
+  71% of it** — against 60% or 53% for the same-day score (TN-76's table). Two numbers built on
+  different weight bases feed one composite, and `prevDayActivity` is systematically **more
+  strength-weighted** than the activity score it sits beside. Given TN-76's finding that
+  `strengthFreq` is a constant at 100, the practical reading is that `prevDayActivity` is ~36% a
+  constant.
+- **Proposal.** Compute yesterday's window for yesterday's score, and pass the same contributor set
+  both times, or state in the code why it cannot be passed. Which of the two is the defect is worth
+  separating: (a) is plainly unintended, (b) may be deliberate — yesterday's intraday HR is available
+  and simply is not fetched — but nothing says so.
+- **What this does NOT establish.** (a) is reconstructed, not read from stored values: there is no
+  persisted `prevDayActivity` sub-score to check it against, and the reconstruction carries the sd 8.8
+  per-day error TN-76 describes, so the per-day figures above are indicative and the distribution is
+  the claim. (b) is read directly from the two call sites and needs no measurement. And neither says
+  the composite's output is wrong by that much — `prevDayActivity` is 9% of it.
 
 ### [readiness][heart-rate] TN-72 — v6 will never re-score a single stored day, and TN-55's plan said it would. That claim was mine and is retracted here
 
@@ -24064,6 +24228,49 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
   **Sequencing is unchanged:** the single-source read is still the first change and is independent of
   the formula. Ship precedence first, then provenance, then the formula.
+- **⚑ AMENDED 2026-09-24 (Tuning) — THE PROFILE VALUE HAS MOVED TWICE SINCE THIS ENTRY WAS WRITTEN,
+  AND THE GAP HAS WIDENED FROM 1.43× TO 2.0×.** Everything above is measured against
+  `users.steps_goal = 7,000`. **It reads 5,000 today.** The applied history, from
+  `goal_recommendations`:
+
+  | applied | source | recommended | 14-day mean steps at that date |
+  |---|---|---:|---:|
+  | 2026-06-30 | `scheduled` | 7,000 | 5,951 |
+  | 2026-08-11 | `scheduled` | **6,000** | 6,370 |
+  | 2026-08-31 | `on_demand` | **5,000** | 3,259 |
+  | 2026-09-14 | `scheduled` | 5,000 | 3,072 |
+
+  So the scored value stayed at 10,000 while the honoured value fell 29%. **Whoever builds the
+  single-source read is choosing between 10,000 and a number that has changed three times in ten
+  weeks** — which is an argument for sequencing precedence and provenance before the formula, exactly
+  as this entry already says, and against treating 5,000 as a settled target.
+- **NOT an automated overwrite — (a)'s "code shape, not an incident" still stands.** `source:
+  'scheduled'` describes how the recommendation was *created*, not applied; `status: 'applied'` is
+  only ever written by `handleApply` in `components/profile/goal-recommendation-sheet.tsx`, a button.
+  The owner applied each one, within a minute of it appearing. **No silent overwrite has occurred.**
+- **The sharper new half: the derived path is unanchored, and it undercut the evidence base the file
+  cites.** `recommendedStepsGoal` is emitted by the LLM (`clampRecommendation`,
+  `packages/shared/src/nutrition/goal-recommendation.ts:326`) and bounded only by **[3,000, 20,000]**
+  — a sanity range, not a calibration. The prompt hands the model both `Average daily steps: N`
+  (14-day) and `Current goals: steps N`, so a falling average and the previous goal are the two
+  anchors it has. `daily-goals.ts` cites Paluch 2022 (benefit plateaus ~7–8k) and encodes
+  `DEFAULT_STEP_GOAL = 8000`; **the live value is 37.5% below that floor, and the clamp permits
+  3,000.** This is the same self-referential treadmill the 2026-07-22 Activity rewrite removed from
+  the score's lanes — *"a lazy week lowered the bar"* — re-entering through the goal instead of the
+  lane. **It supports this entry's own "Recommended shape"** (derive the goal from a target net
+  walking energy as a fraction of BMR): a deterministic number the AI adjusts within a band, rather
+  than a number the AI emits.
+  **Deliberately not over-claimed:** `corr(14-day mean, recommended goal) = +0.857` across the four
+  applied recommendations is **n = 4 and proves nothing**, and the goal/mean ratio *rose* (1.18, 0.94,
+  1.53, 1.63) as steps fell — so the recommender tracked the decline **less than proportionally**
+  rather than chasing it down one-for-one. The monotone 7,000 → 6,000 → 5,000 sequence and the absent
+  evidence anchor are the findings; a fitted slope is not.
+- **Lane: A** — added 2026-09-24 (Tuning). This entry was fully decided on 2026-08-19 and signed off
+  again on 2026-08-31 with *"Lane A has everything it needs; nothing further is gated on the owner"*,
+  and it carried **no `Lane:` field at all**, so `next-item.js` read it as UNCLASSIFIED and no
+  implementer was ever offered it. The path rule resolves it with no ambiguity — `packages/shared/**`,
+  `app/api/**` and a migration for the provenance column are all Lane A. Assigned here rather than
+  referred onward, since the rule and not a list decides it.
 - **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
   value wins everywhere and the profile field becomes display-only or is removed — but then the
