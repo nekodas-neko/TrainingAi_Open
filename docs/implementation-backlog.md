@@ -1812,6 +1812,163 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [platform][app-shell] BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"there is no option for
+  users to delete their account and their data. This is a requirement for apple store so lets add
+  this in next."*
+- **Lane: A** — it needs a **migration** (see the blocker below), and migrations are Lane A's alone.
+  The UI half is Lane B's and can follow; the engine half lands first per §3.
+- **Needs:** BF-193 — three policy choices the owner has to make, and two of them change the diff.
+  Filed separately so they reach the Orchestrator rather than sitting in this body.
+- **⚠ This carries a store-compliance claim, so understate rather than overstate it.** Apple requires
+  an in-app account-deletion path for any app offering account creation, and **Google Play carries an
+  equivalent requirement** — which matters here because the canonical runtime is the **Android APK**
+  and there is no iOS build in this repo today. **Check the exact current guideline text before
+  citing a clause number anywhere user-facing or in a review reply**; this entry deliberately does
+  not quote one from memory.
+
+**⚑ MEASURED — the existing delete path is already broken, and it is not a user-facing one.**
+
+`deleteUser` (`adapter.ts:699`) is a bare `DELETE FROM users`, reached only from
+`/api/admin/users`. Run against the local database with all 281 migrations applied:
+
+```
+INSERT INTO users …                              INSERT 0 1
+INSERT INTO exercise_library (…, created_by) …   INSERT 0 1
+DELETE FROM users WHERE id=…
+ERROR: update or delete on table "users" violates foreign key constraint
+       "exercise_library_created_by_fkey" on table "exercise_library"
+```
+
+**Any user who has created one custom exercise cannot be deleted at all.** Reproduced, not reasoned
+about. A user-facing button wired to today's code would inherit this and fail in the one flow that
+must not fail.
+
+**⚑ MEASURED — what a `users` delete does and does not reach.** 99 base tables, 72 carry `user_id`.
+Foreign keys pointing at `users`, by delete rule:
+
+| rule | count | consequence |
+|---|---|---|
+| `CASCADE` | 72 | removed with the user — the bulk of it, including child rows reached via their parent |
+| `SET NULL` | 2 | **rows survive, anonymised** — `ai_call_log.user_id`, `error_events.user_id` |
+| `NO ACTION` | 1 | **blocks the delete** — `exercise_library.created_by` |
+
+The 24 other tables with no FK to `users` (the full list also counts `users` itself) are reference/ops data (`activity_types`, `blood_analytes`,
+`dietary_restrictions`, `exercise_media`, `rate_limits`, `seasons`, `schema_migrations`,
+`invited_emails`, `db_query_log`) or child tables that cascade through a parent (`set_logs`,
+`exercise_logs`, `session_exercises`, `style_sets`, `schedule_days`, `saved_meal_items`,
+`meal_plan_meals`). **`db_query_log` is the one worth a second look** — no FK, and its `sql_text`
+can contain the user's own data in the query body.
+
+**⚑ THE DESIGN, AND THE POINT OF THE ENTRY: do not write a new list of tables to delete.**
+
+`lib/export/export-map.ts` already enumerates every table with the user's data in it, and it is
+**exhaustive by construction** — each base table is either in `EXPORTED` with a scope
+(`user_id` / `own_row` / `via <predicate>`) or in `EXCLUDED` with a written reason, and
+`scripts/check-export-coverage.js` **fails the Custom Rules job** when a `pgTable` in `schema.ts` is
+in neither. A new table cannot be forgotten, only classified.
+
+**That file exists because the hand-written version already failed, in exactly the way a deletion
+must not.** Its own header records Q-288: `/api/export` covered **26 of 82 tables and presented as
+complete**. An export that silently misses tables is bad; **a deletion that silently misses tables
+is a false compliance claim**, and nothing in the product would reveal it.
+
+So the deletion derives its scope from the same map. One list, one CI check, no second thing to
+drift.
+
+- **⚠ One semantic FLIPS between export and delete, and missing it leaves data behind.**
+  `export-map.ts` carries `SOFT_DELETED` so a takeout does not resurrect rows the user deleted — an
+  export **filters those out**. A deletion must do the **opposite** and take them too: a soft-deleted
+  food log is still the user's data sitting in the table. Reusing the map without inverting this one
+  predicate is the most likely way this ships looking complete and is not.
+- **The device half already exists and is already CI-enforced.** `signOutAndClearDevice`
+  (`lib/sign-out.ts`) disables cache writes, clears the local store, clears the cache, then signs
+  out server-side — in that order, because in-flight `cachedFetch` calls otherwise re-seed the
+  outgoing account's data (measured: 4 of 17 keys). `scripts/check-sign-out-clears-device.js` fails
+  the build on a sign-out that skips it. **Account deletion ends by calling it** rather than
+  reimplementing a wipe.
+- **✅ The Oura ring key is NOT at risk from that call — checked, because it would be unrecoverable.**
+  `clearLocalStoreData` only issues `DELETE FROM <table>` against SQLite; the BLE key lives in native
+  SharedPreferences and is reached only by the plugin's `clearKey()`, whose sole caller is the admin
+  debug screen. So a deletion that reuses the sign-out wipe leaves the ring paired. **Whether it
+  SHOULD is BF-193's third question** — the key is credential material, and clearing it cannot be
+  undone without a factory reset and re-pair.
+
+**Shape of the work, engine half first:**
+
+1. **Migration (Lane A):** `exercise_library.created_by` → `ON DELETE SET NULL`. A custom exercise
+   that outlives its author is catalogue data with no author, which is the same state a seeded row
+   is already in — and it is the only rule here that can *block* rather than merely leave residue.
+   Ships with its regenerated `claude_ro` twin per the standing rule.
+2. **A deletion routine** driven by `export-map.ts`'s scopes, inverting `SOFT_DELETED`, inside one
+   transaction, with the `users` row last.
+3. **`DELETE /api/account`** — session-authenticated, acting only on the caller's own id, never an
+   id from the body. Rate-limited at creation like its siblings.
+4. **The UI (Lane B):** in `components/more/profile-tab.tsx`, beside Edit profile and Sign out.
+   Typed confirmation, not a single tap — this is the one irreversible control in the app.
+5. **Ends with `signOutAndClearDevice()`**, so the device holds nothing after the server row is gone.
+
+- **⚠ Not a separate plan doc, and that is a deliberate call.** CLAUDE.md's two-PR rule expects a
+  `docs/superpowers/plans/` document for a new feature; the design here is settled enough to live in
+  the entry, and a second document repeating it is one more thing to drift. If Lane A finds the
+  shape genuinely open when it picks this up, write the plan then — the trigger is unresolved design,
+  not entry length.
+- **Verification:** delete a test account that has (a) a custom exercise, (b) soft-deleted rows, and
+  (c) local-store data on the APK. Then assert against the database that **every** `EXPORTED` table
+  in `export-map.ts` returns zero rows for that id — the same map, read back as the test oracle —
+  and that a re-login is refused. **Device look owed**: the local store does not run in the sandbox
+  (`getLocalStore` returns null), so the wipe half is unverifiable here.
+
+### [platform] BF-193 — three questions BF-192 cannot answer: what "delete" means for logs, the ring key, and whether it is instant
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
+  owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
+  Split out of BF-192 so the Orchestrator can put them to him; BF-192 names this in `Needs:` because
+  two of the three change its diff.
+
+**Decision 1 — the two tables that survive as anonymised rows, plus the one with no key at all.**
+
+- `ai_call_log` and `error_events` are `ON DELETE SET NULL`: after a deletion the rows remain with a
+  null user. `db_query_log` has no foreign key and its `sql_text` can contain the user's own data.
+- **⭐ Recommend: leave the two SET NULL tables as they are, and purge `db_query_log` rows for the
+  user.** The first two are operational telemetry whose link to a person is severed, which is what
+  anonymisation means and what store policies ask for. `db_query_log` is different in kind — the
+  payload itself can carry their data, so nulling a column does not anonymise it.
+- **Alternative: delete all three outright.** Better if you want "deleted" to mean no trace,
+  and it is the easier sentence to defend to a reviewer. It loses the error and cost history that
+  `error_events` exists to provide — the table is read at every session start precisely because
+  faults that stop on their own go unnoticed.
+- **Reversal cost: none either way.** It is a predicate in the deletion routine.
+
+**Decision 2 — should deleting the account clear the Oura ring's BLE key?**
+
+- Checked and recorded on BF-192: today's sign-out wipe does **not** touch it, because the key is in
+  native SharedPreferences and only the admin screen's `clearKey()` reaches it.
+- **⭐ Recommend: do NOT clear it.** Clearing is irreversible without a factory reset and re-pair,
+  and the key is bound to the **phone**, not the account — a deletion is the user saying "remove my
+  data", not "unpair my hardware". Leaving it also keeps this entry's blast radius away from the one
+  thing in this repo that no backup can restore.
+- **Alternative: clear it.** Better on a strict reading — it is credential material and a shared
+  device would leave the next person a paired ring. It loses on asymmetry: wrongly keeping it is a
+  tap to fix, wrongly clearing it is a factory reset.
+- **⚠ This one is yours specifically because it is YOUR ring.** The general answer and the answer for
+  the only device running this app are not obviously the same.
+
+**Decision 3 — immediate, or a grace period?**
+
+- **⭐ Recommend immediate, with a typed confirmation.** Apple's requirement is that the path exists
+  and completes; a grace period adds a scheduled job, and this repo has **no cron layer**
+  (`module-map.md` §0), so "delete in 30 days" would need infrastructure that does not exist.
+- **Alternative: 30-day soft delete then purge.** Better for the genuine mis-tap, and it is what
+  larger products do. It loses here on the missing scheduler — and a "deleted" account that still
+  holds data is the claim hardest to defend if it is ever examined.
+- **Reversal cost: high in one direction.** Immediate cannot be undone by the user, which is exactly
+  why the confirmation is typed rather than a single tap.
+
+- **Verification:** this entry closes when all three answers are recorded here with the date, and
+  BF-192 is updated with whichever ones change its diff.
+
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if

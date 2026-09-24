@@ -16806,3 +16806,10 @@ omitted — and the growth here is mostly that table, which is the evidence the 
 29212 → 29518 (+306; rebased on #1540). Sixteen entries (RV-171 to RV-186): a census of the CLAUDE.md rules
 no CI step enforces, and a performance sweep with its device half as one baseline sitting. One dated
 note on DV-13 naming its probable cause (RV-180).
+## 2026-09-24 — `docs/implementation-backlog.md` → 29369 (BF-192 + BF-193)
+
+Account deletion, asked for as an app-store requirement. The length is the two measured tables the
+entry turns on — the reproduced foreign-key failure in the existing delete path, and the CASCADE /
+SET NULL / NO ACTION split across the 99-table schema — plus BF-193's three decision briefs. The
+schema table is the part that could not be summarised away: which keys cascade and which do not is
+the whole difference between a deletion that works and one that silently leaves rows behind.
