@@ -35,12 +35,12 @@ const { parseEntries, bareOwnerGates, NoQueueError } = require('./lib/backlog-en
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
 
-// Frozen 2026-09-24 at 23; 20 after OR-146 (Q-231, LA-56, BF-106), 17 after OR-147 (Q-4,
-// TN-16, Q-297), 13 after OR-148 (LA-65, PS-43, Q-525, LA-126).
-// Shrink-only: remove an id when its gate states what is owed.
-const BASELINE = new Set([
-  'PS-41', 'Q-222', 'Q-71', 'Q-44', 'Q-31', 'Q-11',
-]);
+// **BASELINED AT ZERO, 2026-09-24 — the debt is cleared.** It opened at 23 that morning and came
+// down in six slices the same day (OR-146 → OR-151); four of the last ten were not stated but
+// REMOVED, because `Q-515`/`Q-516`/`Q-522`/`Q-523` owe a Tuning proposal rather than the owner's
+// signature (OR-150). Zero is the strongest baseline a shrink-only check can carry — the same
+// shape as `check-aest-midnight-timezone.js`. There is no debt list left to weigh: any hit is new.
+const BASELINE = new Set([]);
 
 let entries;
 try {
