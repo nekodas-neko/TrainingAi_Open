@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.25",
+    date: "2026-09-24",
+    changes: [
+      "The Nutrition tab no longer flashes a grey placeholder where the meal plan would be every time you open it. If you have no plan, that is a settled answer and the tab now knows it, instead of re-asking on every visit.",
+    ],
+  },
+  {
     version: "1.465.24",
     date: "2026-09-24",
     changes: [

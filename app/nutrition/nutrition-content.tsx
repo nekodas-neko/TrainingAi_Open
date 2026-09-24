@@ -132,6 +132,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [waterLogOpen, setWaterLogOpen] = useState(false);
   const [energyBalance, setEnergyBalance] = useState<EnergyBalanceResponse | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  // DV-17: null is also the settled "no plan" answer, so it cannot mean "still loading".
+  const [planLoaded, setPlanLoaded] = useState(false);
   const [planSetupOpen, setPlanSetupOpen] = useState(false);
   const [planReviewDismissed, setPlanReviewDismissed] = useState(false);
   const [planManageOpen, setPlanManageOpen] = useState(false);
@@ -183,7 +185,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     const balance = readCacheSync<EnergyBalanceResponse>(`energy-balance:${today}`);
     if (balance) setEnergyBalance(balance);
     const plans = readCacheSync<MealPlansResponse>('meal-plans');
-    if (plans) setMealPlan(plans.plans.find(p => p.isActive) ?? null);
+    if (plans) { setMealPlan(plans.plans.find(p => p.isActive) ?? null); setPlanLoaded(true); }
   }, []);
 
   useEffect(() => {
@@ -289,7 +291,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           }
           await cachedFetch<MealPlansResponse>(
             'meal-plans', '/api/nutrition/meal-plans', TTL_MEDIUM,
-            d => setMealPlan(d?.plans.find(p => p.isActive) ?? null),
+            d => {
+              setMealPlan(d?.plans.find(p => p.isActive) ?? null);
+              if (d) setPlanLoaded(true);  // cachedFetch swallows !res.ok; undefined is not an answer
+            },
           );
         })(),
         cachedFetch<{ today: BodyMetaRow | null }>(
@@ -623,7 +628,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               <ActivePlanCard
                 plan={mealPlan}
                 onPlanChanged={setMealPlan}
-                loading={loading && mealPlan === null}
+                loading={loading && !planLoaded}
                 mealTypes={mealTypes}
                 logs={logs}
                 userId={userId}
