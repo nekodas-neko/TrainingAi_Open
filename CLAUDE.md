@@ -16,7 +16,7 @@
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
   Anything new gets a `projectOverview.md` Known-Issues row or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
-- **The Orchestrator reads the owner's in-app reports at session start** — *Report an Issue* on
+- **BugFix reads the in-app reports at session start; the Orchestrator does too, as a backstop** — *Report an Issue* on
   `/more` writes to `feedback_submissions`, and the read is one query on the same endpoint:
   ```
   curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \
@@ -106,14 +106,26 @@ Full contract: [`docs/agents/README.md`](docs/agents/README.md). The rules below
 must bind even if that file is never opened.
 
 **The roles.** **Orchestrator** owns the queue and the docs — it clears completed entries, assigns
-batches, resolves lanes, and reconciles docs against reality on a weekly sweep. **Implementation**
+batches, resolves lanes, and reconciles docs against reality on a weekly sweep. **Its PRIMARY job,
+set by the owner 2026-09-24, is the owner-gated queue**: work through every entry that needs his
+input, establish what is genuinely his to decide, put that to him in the shape **Decisions That Come
+Back To Me** defines, and **assign the entry to a lane once it is unblocked**. 78 entries carried
+`Gate: owner` when that instruction was given. Most of them are not really his — they are engineering
+calls, Tuning's calibration, or a measurement nobody has taken — and **separating those from the few
+that are is the work**, not a preamble to it. **Implementation**
 runs in two lanes and is the only role that writes code — Lane A
 owns the engine (`lib/data/**` including every migration, `lib/local-store/**`, `lib/sqlite/**`,
 `lib/cache-groups.ts`, `app/api/**`, `packages/shared/**` except `changelog.ts`, the domain-math and
 device pipelines, auth/security, `android/**`), Lane B owns the surface (`app/**` except
 `app/api/**`, `components/**`, `app/globals.css`, `lib/hooks/**`, `lib/stores/**`). **BugFix** turns
-owner reports into backlog entries. **Tuning** turns lived feedback into calibration proposals.
-**Review** sweeps the running app weekly and files what it finds. **Device Verification** runs
+owner reports into backlog entries — **and it owns the in-app feedback intake** (owner, 2026-09-24):
+*Report an Issue* on `/more` is a report arriving the same way a spoken one does, so BugFix reads
+`claude_ro.feedback_submissions` at session start and files what it finds. The query and the
+watermark rule are in the session-start list above; the Orchestrator's copy of that read is now a
+backstop for when BugFix is not running, not the owner of it. **Tuning** turns lived feedback into calibration proposals.
+**Review** sweeps the running app weekly and files what it finds — **and may commission a sweep
+rather than run one**, handing the device agent a question with an objective pass/fail via
+`Lane: DV` and reading the answer back off the entry. **Device Verification** runs
 **locally, on the owner's machine with the S25 on USB** — the only role that can see the real app in
 the real APK, driving it over the DevTools protocol (`scripts/device/**`). Those five end at a
 docs-only PR and never write product code, which keeps the collision surface to Lane A against
