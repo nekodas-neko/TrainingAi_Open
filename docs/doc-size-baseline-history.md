@@ -16636,3 +16636,12 @@ the distinction from TN-60 — that rail inverted stored ordering, this one only
 the three alternatives with what each is better at, since any weight change here is the owner's.
 TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
 coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/resilience-two-regimes)
+
+28768 → 28821 (+53). TN-70: `resilience_level` published only 5 across 16 days (Jul 24 – Aug 29) and only 1–4 across 14 days
+(Sep 7–22), with matching confidence either side, and nothing in stored data explaining the switch. Most
+of the entry is what must NOT be concluded — PS-30 predates half the regime, and the NULL coverage column
+is the column's age rather than a missing input — plus the one cheap test that would settle it.

@@ -951,6 +951,59 @@ which is the right shape for something that can only be validated by living with
   `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
+### [readiness][devices] TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while looking for any score with an
+  independent comparator.
+- **Lane: A** — the producer is the BLE rollup (`lib/oura-ble/rollup/run.ts`), engine territory, and the
+  decisive test below is a re-run rather than a calibration.
+- **Measured 2026-09-24 over 129 derived days.**
+
+  | regime | days | levels seen | mean `resilience_confidence` |
+  |---|---:|---|---:|
+  | 2026-07-24 → 2026-08-29 | **16** | **5, and only 5** | 0.464 |
+  | 2026-09-07 → 2026-09-22 | **14** | **1, 2, 3, 4 — never 5** | 0.434 |
+  | everything else | 99 | none published | — |
+
+  Two regimes with **no value in common**, separated by an eight-day gap (30 Aug → 6 Sep). A metric on a
+  1–5 band spent five weeks pinned at the top and has not reached it once since.
+- **The model was not less sure while emitting a constant.** `confidence` is ~0.45 in both regimes, so
+  whatever changed is not visible in the model's own self-assessment.
+- **⚠ And `confidence` is not a gate — it is a coverage fraction.**
+  `lib/health/stress-resilience.ts:310` computes it as `validCount / C.windowLength`, so **0.464 means
+  fewer than half the window's days were valid and the level published anyway.** Worth knowing before
+  anyone reads a published level as a settled one; this is a description of the port's behaviour, not a
+  claim that the vendor model is wrong.
+- **Candidate mechanisms, none established.** Five rollup/stress commits land in or just before the gap:
+  **PS-30** (#923, 2026-09-08) is the most interesting — it repaired a wear-time defect that held
+  **22 consecutive days, 2026-08-14 → 09-04, at 81,000–85,500 s of non-wear**, a span overlapping the
+  tail of the level-5 run. Resilience gates on daytime-stress coverage
+  (`minDaytimeStressHours`), so corrupted wear could plausibly starve it into a degenerate output.
+  **But the level-5 run starts 2026-07-24, three weeks before PS-30's span begins, so PS-30 cannot
+  explain the whole regime** and must not be written up as the cause.
+- **⚠ One tempting reading is wrong.** `daytime_stress_coverage_min` is NULL across the entire level-5
+  regime and 191.4 min on average across the September one, which looks like the missing input. It is
+  not evidence: the column was only added on **2026-09-02** (#817, *"Persist the daytime-stress coverage
+  the resilience gate already computed"*), so its absence before that date is the column's age, not a
+  missing measurement.
+- **The decisive test, and it is cheap: re-run the rollup over 2026-07-24 → 2026-08-29 now that PS-30
+  and the September fixes are in, and see whether those 16 days still come back as 5.** If they change,
+  the regime was an artefact of the producer and the levels the owner saw that month were wrong. If they
+  do not, the switch is physiological or sits somewhere this entry has not looked. Either outcome is
+  worth more than further reading.
+- **Two dead columns found in the same pass, recorded so nobody re-derives them:**
+  - **`sleep_sessions.sleep_score` is populated on 0 of 123 nights.** That is the Oura Cloud sleep
+    score, and it being empty means **no independent comparator for our sleep score exists at all** —
+    zero nights carry both. Another validation route closed, alongside TN-67's.
+  - **`oura_daily_derived.worn_hours_ble` is NULL on all 129 days**, and `oura_daily.resilience_level`
+    on all rows, so the derived resilience is entirely ours rather than a Cloud passthrough.
+- **What this does NOT establish.** Why the regimes differ. Whether the 16 level-5 days were ever
+  correct. Whether the September spread is correct. The entry is a measurement and a test, not a
+  diagnosis — and per TN-67 no external validation exists for this score either, so "correct" here can
+  only mean "what the vendor model yields on sound inputs".
+- **Where the mechanism is:** `lib/health/stress-resilience.ts` (the port, `confidence` at 310, the
+  coverage gate at 144), `lib/oura-ble/rollup/run.ts:1179` (the write and its Q-510 comment).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
