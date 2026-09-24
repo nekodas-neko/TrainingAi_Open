@@ -16487,3 +16487,10 @@ names a cause instead of a symptom.
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
+## 2026-09-24 — `docs/implementation-backlog.md` → BF-190 + BF-107 reopened
+
+BF-190, found while answering why a calories tile was blank: the walk summary saves on mount with the
+planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minute session. The
+length carries the two-row production table that is the evidence, and the reopening note on BF-107
+that distinguishes "the fix regressed" from "the screenshot was taken 30 seconds after the save" —
+the distinction is the whole value of the note, so it could not be shortened to a verdict.
