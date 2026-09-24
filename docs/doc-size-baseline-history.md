@@ -16707,6 +16707,20 @@ records why that cannot happen (`handlePop` closes only surfaces deeper than the
 and popping the scanner's lands on the sheet's) and why the stack itself needed no change. Without
 it the next reader re-derives the same safety argument from scratch.
 
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29087 (fix/rv121-readiness-label-collision)
+
+29065 → 29087 (+22 on the merged base).
+
+The 22 are RV-121 turning from a two-part Lane B entry into a one-part owner question. The label
+half shipped, so what is left is `/collection` having exactly one door, and that is a decision
+rather than a task: it needs the recommendation, the two alternatives with what each is genuinely
+better at, and the reversal cost, or the Orchestrator has to reconstruct all of it before it can put
+the question. Fifteen lines of brief is what stops the question being asked badly once and then
+re-asked. The other seven are the shipped-half record and the note that all ten card widgets are off
+by default — without which the next reader re-derives that this is not a Collection-specific
+oversight.
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29071 (chore/or-147-state-more-owner-gates)
 
 Growth, +6. Three owner gates now say what they are waiting for instead of saying `owner`, and
