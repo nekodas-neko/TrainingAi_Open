@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.35",
+    date: "2026-09-24",
+    changes: [
+      "Your dietary restrictions can no longer be wiped by opening the meal-plan setup. If the request that loads them failed, the screen started from a blank list and then saved that blank list over the top \u2014 erasing every allergy and intolerance, and building the plan without them. It now says the list could not load, leaves your saved ones alone, and only saves when you have actually changed something.",
+    ],
+  },
+  {
     version: "1.465.34",
     date: "2026-09-24",
     changes: [

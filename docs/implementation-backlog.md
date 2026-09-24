@@ -2885,24 +2885,6 @@ drift.
     10-04, Q-507 10-16, TN-50 10-17, TN-25 10-18, LA-110's evidence expiring 10-06.
 - **Reversal cost:** delete the field and one print block.
 
-### [nutrition] RV-171 — opening the meal-plan setup with a failed request silently deletes every saved dietary restriction
-
-- **Lane: B** — `components/nutrition/meal-plan-setup-sheet.tsx`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
-- **The path:**
-  1. The sheet loads restrictions with a bare `fetch` (`:82`). On failure it does
-     `if (!d) return` / `.catch(() => {})`, so `restrictions` stays at its initial `[]`.
-  2. `handleGenerate` always PUTs `{ entries: restrictions }` first (`:143`).
-  3. That lands in `replaceUserDietaryRestrictions` (`slices/meal-plans.ts:541`), which **deletes
-     every row for the user** before inserting.
-- **So one 429, 5xx or network blip while the sheet opens erases his allergies and intolerances.**
-  The plan is then generated without them, because the generate route reads them back
-  (`generate/route.ts:127,189`). The only visible hint is an empty restrictions step.
-- **Fix:**
-  - Show an error state when the load fails.
-  - Do not PUT until a load has succeeded.
-  - PUT only when the selection changed.
-
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
 - **Lane: A** — `lib/scale-ble/composition.ts`, `packages/shared/src/health/body-fat-calibration.ts`.

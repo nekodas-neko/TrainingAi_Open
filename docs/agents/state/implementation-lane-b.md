@@ -5,9 +5,9 @@
 
 ## Now
 
-RV-111, RV-121 both halves, RV-164, BF-190 + BF-191 shipped. The last two went together: one flow,
-one device check, and BF-191's floor is near-meaningless without BF-190's elapsed time. LB-141 filed
-(two of three walk exits keep nothing). BF-188's fold collision fixed — it blocked a third PR.
+RV-111, RV-121, RV-164, BF-190 + BF-191, RV-171 shipped. LB-141 filed (two of three walk exits keep
+nothing — the owner's call). BF-188's fold collision fixed; it had blocked a third PR. RV-171 is the
+one to remember: a failed GET left a blank list that a replace-all PUT then wrote over every row.
 
 ## Next
 
@@ -47,8 +47,8 @@ Orchestrator's chat, being exported to `docs/design/`. Do not re-ask him, do not
 - **READ THE CODE BEFORE THE ENTRY.** Seven for seven — BF-190/191 missed that two of the three
   walk exits keep nothing.
 - **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a
-  gating vitest file. **A source-scanning test can pass locally and fail in CI on ITSELF**:
-  `git ls-files` skips it while untracked, and `ls-files A B -- '*.tsx'` UNIONS pathspecs, so
-  `__tests__` returns too — filter in JS.
+  gating vitest file. **A source-scanning test can fail in CI on ITSELF**: `git ls-files` skips it
+  while untracked, and `ls-files A B -- '*.tsx'` UNIONS pathspecs — filter in JS.
 - **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; and COMMIT before `git stash`/`checkout`.
-- **`pnpm build` compiles an auth-gated page and typechecks tests** — `tsc --noEmit` does neither.
+- **`tsc --noEmit` typechecks NEITHER an auth-gated page nor tests.** Before pushing a new spec run
+  `node scripts/check-test-typecheck.js` — shrink-only per file, and it caught an invented enum.
