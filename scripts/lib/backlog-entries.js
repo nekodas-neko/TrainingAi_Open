@@ -26,6 +26,7 @@ const { idPattern } = require('./entry-id');
  * @property {string[]} laneLines
  * @property {string[]} needs
  * @property {string[]} gates
+ * @property {string[]} gateLines
  * @property {string|null} batch
  * @property {string|null} legacyBlocked
  * @property {boolean} schemaRisk
@@ -59,7 +60,7 @@ function parseEntries(lines) {
     const id = line.match(idPattern());
     const title = line.replace(/^###\s*/, '');
     current = id
-      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false, keep: null }
+      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], gateLines: [], batch: null, legacyBlocked: null, schemaRisk: false, keep: null }
       : null;
     if (current) entries.push(current);
     continue;
@@ -75,7 +76,10 @@ function parseEntries(lines) {
   if (needs) for (const m of needs[1].matchAll(idPattern('g'))) current.needs.push(m[1]);
 
   const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
-  if (gate) current.gates.push(gate[1].toLowerCase());
+  if (gate) {
+    current.gates.push(gate[1].toLowerCase());
+    current.gateLines.push(line);
+  }
 
   const batch = line.match(/^\s*[-*]\s*\*{0,2}Batch:\*{0,2}\s*`?([^`\s]+)`?/i);
   if (batch && !current.batch) current.batch = batch[1];
@@ -135,6 +139,35 @@ function parkReasons(e, inQueue) {
   return reasons;
 }
 
+
+/**
+ * An owner gate that does not say WHAT IS OWED (OR-146).
+ *
+ * `Gate: owner` parks an entry until the owner acts. It does not say what he is being asked for —
+ * a decision, a production write, a reading someone has to take — and those need different things
+ * of him. Twenty-five of the seventy-two owner gates measured on 2026-09-24 were the bare field
+ * with nothing after it, so establishing what each one owed meant reading the body: 29 lines for
+ * `Q-231`, 209 for `Q-1b`. That read is the whole cost of the Orchestrator's primary job, paid
+ * again by every session that looks.
+ *
+ * **What counts as stating it:** anything after `owner` on the same line. This is deliberately a
+ * shape check, not a judgement about whether the reason is a GOOD one — the sibling
+ * `check-prose-parked-entries.js` records what happens when a detector tries to read intent (a 75%
+ * false-positive rate, and it parked the entry describing the bug for three weeks). A one-word
+ * reason passes here and a human is still the one who decides it is enough.
+ *
+ * @param {BacklogEntry[]} entries
+ * @returns {BacklogEntry[]}
+ */
+function bareOwnerGates(entries) {
+  return entries.filter((e) => {
+    const owner = (e.gateLines || []).filter((l) => /\*{0,2}Gate:\*{0,2}\s*owner/i.test(l));
+    if (!owner.length) return false;
+    // Stated on ANY of its gate lines is enough — an entry may carry more than one.
+    return !owner.some((l) => l.replace(/^.*?owner\*{0,2}/i, '').replace(/^[\s.·:—-]+/, '').trim().length >= 8);
+  });
+}
+
 /**
  * Entries parked by the legacy prose marker and nothing else (TN-59).
  *
@@ -154,4 +187,5 @@ function proseParkedOnly(entries) {
   );
 }
 
-module.exports = { parseEntries, parkReasons, proseParkedOnly, NoQueueError };
+module.exports = {
+  bareOwnerGates, parseEntries, parkReasons, proseParkedOnly, NoQueueError };

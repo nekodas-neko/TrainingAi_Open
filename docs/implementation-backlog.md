@@ -11784,7 +11784,7 @@ on a production measurement.
   implementer lane; `Gate: owner` below parks it regardless. (Was `Lane: none`, which the lane
   reader cannot parse — LB-59.) Filed so it is not lost, and so the reading that follows it has
   somewhere to land.
-- **Gate:** owner
+- **Gate:** owner — a `VACUUM FULL` on a production table, which cannot be run from the app. Acknowledged and deferred by him 2026-09-15; the gate records that the timing is his.
 - **Added:** 2026-09-01 · found in the session-start database-size read, following up the third
   reading that `projectOverview.md`'s growth row asked for.
 
@@ -22202,7 +22202,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   for a longer false success, and the one-at-a-time index means a genuinely dead job then blocks
   every retry for the new window instead of the old one.
 - **Verify:** device
-- **Gate:** owner
+- **Gate:** owner — a **fullHistory** redecode he has to fire from an admin session on the phone. Batched as `owner-admin-sitting`; nothing here is buildable without that run.
 
 ### [readiness][devices] ⛔ LA-57 — REFUTED: the night-HRV "step" at the re-key is a ramp
 
@@ -24575,7 +24575,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 - **Lane:** A
 - **Branch:** `fix/detected-activity-has-no-source`
-- **Gate:** owner
+- **Gate:** owner — a product decision, not a code change: does the card retire, or does the BLE classifier feed it? Either branch is a different feature and the repo cannot answer it.
 - **⚠ THE FIX IS A PRODUCT DECISION, NOT A CODE CHANGE (marked 2026-09-02).** The entry's own
   Fix line asks whether detected activities should come from the BLE classifier — feeding them
   into the existing review UI and retiring the Cloud-shaped `OuraWorkout` — or whether the card
