@@ -18,6 +18,13 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
+
+Growth, and it is the cheap kind: the device agent re-reported DV-15 from a sitting on v1.465.17,
+which cannot contain the v1.465.23 fix, and asked after three DV-13 sibling routes that were checked
+and need no fix. Both answers went onto the entries rather than into a reply, so the next session
+does not re-fix a shipped guard or burn a device sitting on a build that predates it.
+
 ## 2026-09-24 — backlog → 27294 (DV-15 reproduced and fixed), projectOverview → 12638
 
 DV-15 stays queued for its device pass test, and grew because the entry now carries the
