@@ -16728,3 +16728,10 @@ Growth, +6. Three owner gates now say what they are waiting for instead of sayin
 required-check list) plus the fact a session got wrong when re-asking it (*Allow auto-merge* is
 already on). Six lines against a read of up to 209 lines per entry, paid by every session that
 looks at the gate and cannot tell what it wants.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29096 (chore/or-148-state-more-owner-gates)
+
+Growth, +3. Four more owner gates say what they want — and reading them is what found that `Q-525`
+needs the same hand-fired `fullHistory` pass as `LA-56`, `LA-68` and `TN-1`, so it joined
+`owner-admin-sitting` and `OR-145`'s count of that sitting went from nine to ten. That is the
+argument for the gate text in three lines: the batching was invisible while the gate said `owner`.
