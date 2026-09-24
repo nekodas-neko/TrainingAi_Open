@@ -16727,6 +16727,15 @@ the question. Fifteen lines of brief is what stops the question being asked badl
 re-asked. The other seven are the shipped-half record and the note that all ten card widgets are off
 by default — without which the next reader re-derives that this is not a Collection-specific
 oversight.
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29071 (chore/or-147-state-more-owner-gates)
+
+Growth, +6. Three owner gates now say what they are waiting for instead of saying `owner`, and
+`LB-52` records the half of its question the owner answered the same evening (E2E stays off the
+required-check list) plus the fact a session got wrong when re-asking it (*Allow auto-merge* is
+already on). Six lines against a read of up to 209 lines per entry, paid by every session that
+looks at the gate and cannot tell what it wants.
 
 ---
 
