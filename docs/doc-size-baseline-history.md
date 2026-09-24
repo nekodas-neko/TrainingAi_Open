@@ -16812,3 +16812,11 @@ Growth, +5. Six more scoring entries moved from `Gate: owner` to `Needs: OR-150`
 the paragraph that matters: `Q-279` was checked and deliberately left gated, because its gate
 already states the number a proposal owes. A sweep that assumed every scoring gate was premature
 would have moved a ready entry backwards, so the test is written down rather than the conclusion.
+
+## 2026-09-24 — `docs/implementation-backlog.md` (or-153, second raise)
+
+LB-52 gains the reason the auto-merge probe gave a false positive: run against a PR with checks
+still pending, `enable_pr_auto_merge` reports an unstable-status error and never reaches the branch
+protection question, so the absence of the usual refusal looks like the setting landing. Re-run on
+green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
+repeating the cycle.

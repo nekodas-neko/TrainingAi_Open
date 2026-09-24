@@ -12213,6 +12213,17 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
+- **⚠ THE PROBE IS ONLY VALID ON A GREEN PR — measured 2026-09-24, after it produced a false
+  positive.** Run against `#1544` while four checks were still `in_progress`,
+  `enable_pr_auto_merge` answered *"The pull request is in unstable status (required checks are
+  failing)"* — with **nothing failing**; that is the tool's paraphrase of GitHub's `unstable` state,
+  which here meant *pending*. The absence of the usual refusal read as evidence the rule had been
+  added. It had not: re-run eight minutes later on the same PR, all checks green, it returned
+  **"Pull request Protected branch rules not configured for this branch"** exactly as always. The
+  API checks mergeability BEFORE branch protection, so a pending PR never reaches the question you
+  are asking. **Re-probe only on green, and treat any other error as no answer.**
+- **Re-checked 2026-09-24 09:15 UTC: still not configured.** Put to the owner earlier that day; he
+  parked it for a few hours. Not re-asked since — the entry is the record.
 - **✅ HALF-ANSWERED 2026-09-24: E2E stays OFF the required-check list.** Put to him with `Q-297`
   as this batch; he chose to leave E2E advisory until `LB-56` establishes whether it gates anything
   real. **What is still owed is the classic branch-protection rule itself**, which he parked for a
