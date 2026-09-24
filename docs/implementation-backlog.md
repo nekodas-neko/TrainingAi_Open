@@ -826,18 +826,31 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **Keep:** the device pass test — three warm Nutrition visits on an account with no plan, zero
   skeleton frames. Needs the APK and a per-frame scan, so it stays owed.
 
-### [app-shell] LB-139 — `nutrition-content.tsx` is at 800 of 800 lines, so the next edit to it fails CI
+### [nutrition][app-shell] LB-140 — "Prefer the step-by-step setup?" does nothing; the sheet never mounts
 
-- **Lane:** B — `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-24 · found shipping DV-17.
-- DV-17's six-line fix took the file from 795 to exactly the 800-line ceiling
-  `check-component-size` enforces. It passes, and **the next line anyone adds does not** — including
-  a one-line bug fix, which is the worst moment to be forced into an extraction.
-- Not extracted as part of DV-17: pulling a section out of a 795-line screen to make room for six
-  lines is a change with more risk than the fix it carries, and it would have shipped unreviewed
-  inside a device-reported defect.
-- **The extraction is the work here**, not a baseline raise. The file is a tab screen that already
-  delegates to `components/nutrition/*`; the candidates are the sheet/dialog wiring near the bottom
-  and the plan-related state cluster.
+- **Lane:** B — `app/nutrition/nutrition-content.tsx`, `components/nutrition/meal-plan-sheets.tsx`.
+  **Added:** 2026-09-24 · Lane B, found while verifying LB-139's extraction.
+- **Measured (web, `pnpm dev`, seeded e2e account with no meal plan, mobile-chromium 384 px).** Tap
+  the stepper link under *Build a meal plan* and **nothing happens**: 0 elements with `role=dialog`
+  and 0 `[data-slot="sheet-content"]` in the tree **20 seconds** after the tap, with no console
+  error, no page error and no failed chunk request. The accessibility snapshot shows the screen
+  unchanged. Waiting 3 s after the route boundary settles before tapping makes no difference.
+- **Not caused by LB-139's extraction — control-run against `origin/main`'s `nutrition-content.tsx`
+  (stash out, same spec, same account) and it fails identically.** The wiring is intact either way:
+  `onStepByStep` → `openPlanSetup` → `setPlanSetupOpen(true)`, threaded through `ActivePlanCard` to
+  `MealPlanSection`, and `MealPlanSetupSheet` has no early `return null`.
+- **The one asymmetry worth starting from.** The two overlays that DO open on this screen —
+  `FoodLoggerSheet` and the settings sheet — are **statically** imported. The one that does not is
+  `dynamic({ ssr: false })`. That is precisely the shape **LB-129** measured for `EndOfDayReview`
+  ("`reviewOpen` goes true, the element is in the tree, and the component body never runs") and
+  fixed by making it static. Its comment says reverting that reopens the bug; this may be the same
+  bug still live on a sibling.
+- **NOT verified against a production build or the APK.** `next start` would not come up in this
+  container (`routesManifest.dataRoutes is not iterable`), so everything above is the dev server —
+  and `next/dynamic` behaves differently there. **First action is to reproduce on a real build**,
+  because if it is dev-only there is nothing to fix.
+- **Pass test:** on the S25, from `/nutrition` with no active plan, tap *Prefer the step-by-step
+  setup?* — the New meal plan sheet opens on the first tap.
 
 ### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
 

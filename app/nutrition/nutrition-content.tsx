@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useDayRolloverRefresh } from "@/components/shell/local-day-provider";
 import { useRefreshOnTabShow, useTabVisibility } from "@/components/shell/tab-visibility";
-import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Settings, ChevronLeft, ChevronRight } from "lucide-react";
@@ -17,11 +16,6 @@ import { MealCard } from "@/components/nutrition/meal-card";
 import { useSavedMealSummaries } from "@/lib/hooks/use-saved-meal-summaries";
 import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
 import { QuickEditLogSheet } from "@/components/nutrition/quick-edit-log-sheet";
-const MealTypeManager = dynamic(
-  () => import("@/components/nutrition/meal-type-manager").then(m => m.MealTypeManager),
-  { ssr: false },
-);
-
 // LB-129 — STATIC on purpose, and reverting it to `dynamic` reopens the bug.
 //
 // This screen is itself a lazily-loaded chunk (the shell code-splits every tab and warms them on
@@ -32,11 +26,7 @@ const MealTypeManager = dynamic(
 // never runs. Wait 1.5s before the same flip and it opens. That is the whole of "the first tap of
 // a session does nothing".
 import { EndOfDayReview } from "@/components/nutrition/end-of-day/end-of-day-review";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/shell/screen-header";
-import { Switch } from "@/components/ui/switch";
 import type { MealType, FoodLogWithItem, NutritionTargets, MealPlan } from "@trainingai/shared/types/nutrition";
 import { useSupplements } from "@/lib/hooks/use-supplements";
 import { toast } from "sonner";
@@ -53,19 +43,10 @@ import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card"
 import { EnergyCard } from "@/components/nutrition/energy-card";
 import { ActivePlanCard } from "@/components/nutrition/active-plan-card";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
-const MealPlanEditSheet = dynamic(
-  () => import("@/components/nutrition/meal-plan-edit-sheet").then(m => m.MealPlanEditSheet),
-  { ssr: false },
-);
-const MealPlanManageSheet = dynamic(
-  () => import("@/components/nutrition/meal-plan-manage-sheet").then(m => m.MealPlanManageSheet),
-  { ssr: false },
-);
+import { MealPlanSheets } from "@/components/nutrition/meal-plan-sheets";
+import { NutritionSettingsSheet } from "@/components/nutrition/nutrition-settings-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { MealPlansResponse } from "@/app/api/nutrition/meal-plans/route";
-const MealPlanSetupSheet = dynamic(
-  () => import("@/components/nutrition/meal-plan-setup-sheet").then(m => m.MealPlanSetupSheet),
-  { ssr: false },
-);
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { useEnergyBalanceRefetch } from "./use-energy-balance-refetch";
 import { useNutritionDerivedRefresh } from "./use-nutrition-derived-refresh";
@@ -719,67 +700,35 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         logDate={selectedDate}
       />
 
-      <MealPlanManageSheet
-        plan={planManageOpen ? mealPlan : null}
-        onOpenChange={o => setPlanManageOpen(o)}
-        onChanged={p => { setMealPlan(p); setPlanManageOpen(false); }}
-        onRebuild={() => { setPlanManageOpen(false); setPlanSetupOpen(true); }}
-        onEditMeals={() => { setPlanManageOpen(false); setPlanEditOpen(true); }}
-      />
-
-      <MealPlanEditSheet
-        plan={planEditOpen ? mealPlan : null}
-        onOpenChange={o => setPlanEditOpen(o)}
-        onChanged={setMealPlan}
-      />
-
-      <MealPlanSetupSheet
-        open={planSetupOpen}
-        onOpenChange={setPlanSetupOpen}
-        onSaved={setMealPlan}
+      <MealPlanSheets
+        plan={mealPlan}
+        onPlanChanged={setMealPlan}
+        manageOpen={planManageOpen}
+        onManageOpenChange={setPlanManageOpen}
+        editOpen={planEditOpen}
+        onEditOpenChange={setPlanEditOpen}
+        setupOpen={planSetupOpen}
+        onSetupOpenChange={setPlanSetupOpen}
         userId={userId}
       />
 
       <QuickEditLogSheet key={editingLog?.id} log={editingLog} onClose={() => setEditingLog(null)} onSaved={handleQuickEditSaved} onDelete={requestDeleteLog} userId={userId} />
 
-      <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">
-          <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
-            <SheetTitle>Nutrition Settings</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6">
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Meal Reminders</h3>
-              <div className="rounded-xl bg-muted px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">Remind me to log meals</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Get a notification if a meal window ends with nothing logged
-                  </p>
-                </div>
-                <Switch checked={mealRemindersEnabled} onCheckedChange={toggleMealReminders} aria-label="Remind me to log meals" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Meal Types</h3>
-              <MealTypeManager />
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <NutritionSettingsSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        mealRemindersEnabled={mealRemindersEnabled}
+        onToggleMealReminders={toggleMealReminders}
+      />
 
-      <Dialog open={confirmDeleteLogId !== null} onOpenChange={open => { if (!open) setConfirmDeleteLogId(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete food log?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">This cannot be undone.</p>
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setConfirmDeleteLogId(null)}>Cancel</Button>
-            <Button variant="destructive" className="flex-1" onClick={handleConfirmDelete}>Delete</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmDeleteLogId !== null}
+        onOpenChange={open => { if (!open) setConfirmDeleteLogId(null); }}
+        title="Delete food log?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={handleConfirmDelete}
+      />
 
       <EndOfDayReview
         open={reviewOpen}
