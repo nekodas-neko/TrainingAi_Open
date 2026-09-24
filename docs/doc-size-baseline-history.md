@@ -16679,18 +16679,32 @@ weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
 was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
 
+## 2026-09-24 — `docs/implementation-backlog.md` → 29054 (chore/or-145-owner-questions-owed)
+
+Growth, +45 for OR-145. It is long for one entry because the entry IS the asks: each numbered item
+carries the question, the recommendation and the reversal cost, so the owner can answer from the
+queue instead of from a scrollback. A one-line "ask him about LA-89" would cost five lines and
+reproduce the failure it exists to fix — the gate already recorded that the decision was his, and
+nobody could act on that.
+
+Rebased: the number above is the merged figure. Review's sweeps 55–57 added RV-161, RV-157 and
+RV-170 at the same queue head in the same hour — three more owner-question entries, no content
+overlap with OR-145. OR-145 gained a five-line cross-reference so all four are asked as one
+sitting; four separate interruptions for one sitting's answers was the failure worth five lines.
+
 ---
 
-## 2026-09-24 — `docs/implementation-backlog.md` → 29027 (fix/rv121-readiness-label-collision)
+---
 
-28974 → 29027. This branch adds **23** lines; the remaining 30 are slack main was already carrying —
-main's recorded 28974 sat under its own 29004, so the next recount was always going to bank it.
+## 2026-09-24 — `docs/implementation-backlog.md` → 29076 (fix/rv121-readiness-label-collision)
 
-The 23 are RV-121 turning from a two-part Lane B entry into a one-part owner question. The label
+29054 → 29076 (+22 on the merged base).
+
+The 22 are RV-121 turning from a two-part Lane B entry into a one-part owner question. The label
 half shipped, so what is left is `/collection` having exactly one door, and that is a decision
 rather than a task: it needs the recommendation, the two alternatives with what each is genuinely
 better at, and the reversal cost, or the Orchestrator has to reconstruct all of it before it can put
 the question. Fifteen lines of brief is what stops the question being asked badly once and then
-re-asked. The other eight are the shipped-half record and the note that all ten card widgets are off
+re-asked. The other seven are the shipped-half record and the note that all ten card widgets are off
 by default — without which the next reader re-derives that this is not a Collection-specific
 oversight.
