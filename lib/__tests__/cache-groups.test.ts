@@ -46,7 +46,7 @@ describe('cache group helpers', () => {
       'workout-data', 'next-session', 'progression-styles', 'muscle-recovery', 'program-week',
       'workout-card:', 'phase-sets',
       // A program edit voids the server prescription, so its seed + overview must drop too.
-      'ai-periodization-session:', 'ai-periodization-overview', 'weekly-volume-target',
+      'ai-periodization-session:', 'ai-periodization-overview',
     ]))
   })
 
@@ -148,9 +148,22 @@ describe('cache group helpers', () => {
     expect(invalidated).toEqual(['more-user-profile'])
   })
 
-  it('invalidateAiPeriodization clears the overview + weekly-volume-target', async () => {
+  it('invalidateAiPeriodization clears the overview', async () => {
     await invalidateAiPeriodization()
-    expect(invalidated).toEqual(expect.arrayContaining(['ai-periodization-overview', 'weekly-volume-target']))
+    expect(invalidated).toEqual(expect.arrayContaining(['ai-periodization-overview']))
+  })
+
+  // LB-137. RV-120 deleted `AiWeeklyVolumeCard`, the only reader of `weekly-volume-target`, and the
+  // route behind it went with LB-137. Asserted as an absence across EVERY group rather than removed
+  // from three lists quietly: an invalidation aimed at nothing is the defect this closes, and the
+  // cheap way for it to come back is someone re-adding the key beside its neighbours.
+  it('no group clears weekly-volume-target — nothing reads it', async () => {
+    for (const run of [invalidateProgramStructure, invalidateAiPeriodization,
+                       () => invalidatePrescriptionChanged('sess-1'), invalidateWorkoutSummaries]) {
+      invalidated.length = 0
+      await run()
+      expect(invalidated, `${run.name} still clears it`).not.toContain('weekly-volume-target')
+    }
   })
 
   it('invalidateExerciseLibrary clears the exercise-library cache', async () => {
@@ -171,7 +184,7 @@ describe('cache group helpers', () => {
   it('invalidatePrescriptionChanged clears workout-data, the workout-card:<id> key, and AI periodization caches', async () => {
     await invalidatePrescriptionChanged('sess-1')
     expect(invalidated).toEqual(expect.arrayContaining([
-      'workout-data', 'workout-card:sess-1', 'ai-periodization-overview', 'weekly-volume-target',
+      'workout-data', 'workout-card:sess-1', 'ai-periodization-overview',
     ]))
   })
 
