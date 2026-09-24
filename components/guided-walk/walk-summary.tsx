@@ -28,6 +28,7 @@ import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import type { PhaseBand } from '@/components/activity/activity-hr-chart'
 import type { WalkHrSample } from './walk-active'
 import { cadenceFieldsForSave, type CadenceSummary } from '@trainingai/shared/health/cadence'
+import { stepsEstimateIfCovered } from '@/lib/stores/cadence-coverage'
 import { navigateToTab } from "@/lib/shell-nav";
 
 const ActivityHrChart = dynamic(
@@ -172,7 +173,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     // Steps were hardcoded null here (Q-230); they integrate the strap cadence series this same walk
     // already persists. Calories are derived server-side in saveActivityLog — the MET table behind
     // estWorkoutKcal is read through node:path, so it cannot be imported into a client bundle.
-    const stepsEstimate = cadence?.stepsEstimate ?? null
+    // RV-167: only if the cadence series actually covers the walk. A strap whose accelerometer
+    // stream starts late integrates a fraction of the steps and looks normal doing it.
+    const stepsEstimate = stepsEstimateIfCovered(cadence, actualSec)
 
     // Mirrors done-activity-screen's contract exactly (One write path per domain).
     try {

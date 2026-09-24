@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
@@ -446,7 +446,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     // current time-of-day bucket when the sheet was opened without one (the
     // bottom "Saved Meals" button, which isn't bucket-scoped).
     const mealTypeId = preselectedMealTypeId
-      ?? mealTypeForHour(mealTypes, new Date().getHours())
+      ?? mealTypeForHour(mealTypes, Math.floor(secondsSinceLocalMidnight(tz) / 3600))
     if (!mealTypeId) { toast.error('No meal type available'); return }
     setLogging(meal.id)
     const targetDate = logDate ?? todayInTz(tz)

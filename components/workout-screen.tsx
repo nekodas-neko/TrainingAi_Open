@@ -37,6 +37,7 @@ import { useWorkoutStore, effectiveRestSec } from "@/lib/stores/workout-store";
 import { useShallow } from "zustand/react/shallow";
 import { cachedFetch, readCacheSync, setCached, isWorkoutDataToday } from "@/lib/sqlite/cache";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
+import { calendarMonthInTz } from '@/lib/calendar-month';
 import { useDeloadChoice } from "@/components/workout/use-deload-choice";
 import { useDurationPreset } from "@/components/workout/use-duration-preset";
 import { WorkoutLoadError } from "@/components/workout/workout-load-error";
@@ -1498,8 +1499,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         ? trainedDays
         : { ...trainedDays, [todayKey]: [...existing, name] };
     };
-    const now = new Date();
-    const calendarKey = `calendar-data:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const cur = calendarMonthInTz(tz);
+    const calendarKey = `calendar-data:${cur.year}-${cur.mm}`;
     const cachedCal = readCacheSync<{ trainedDays: Record<string, string[]>; activityDays: Record<string, string[]> }>(calendarKey);
     const cachedStreak = readCacheSync<{ trainedDays: Record<string, string[]> }>('streak-data');
     void (async () => {

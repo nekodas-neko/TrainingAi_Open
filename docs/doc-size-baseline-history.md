@@ -17016,6 +17016,22 @@ PR #1467 merged eleven seconds before its Tests job reported failure, so it merg
 check — which is what one of those passages said was impossible. The corrections cost lines in the
 file every session reads because the wrong version is load-bearing: it is quoted as the reason not
 to poll the checks endpoint.
+
+## 2026-09-24 — `docs/implementation-backlog.md` 30119 → 30126 (LB-142, #1574)
+
+Seven lines, across two entries the queue runner reads.
+
+Six are RV-167's amendment. The code half shipped, and the entry stays in the queue because its
+device half is genuinely owed — whether the H10's accelerometer stream starts late, and how often.
+A walk under the new coverage floor now stores no steps at all, so if that is common the answer is
+to fix the stream rather than lower the floor, and that question cannot be settled from a container.
+The amendment states what shipped, that the 50% floor is a judgement rather than a fit, and a
+pass/fail DV can act on without reading the journal.
+
+The seventh is a `Needs: RV-170` on RV-166. The entry was already blocked, but said so only in prose
+inside its `Lane:` line, so `next-item.js` offered it as Lane B's ready work twice in one session.
+One line in the field the runner actually reads is cheaper than the two pick-ups it cost.
+
 ## 2026-09-24 — `projectOverview.md` → 12796 (BF-195)
 
 Twenty-five lines for the owner's own report, and three of them are the reason it cannot be struck.

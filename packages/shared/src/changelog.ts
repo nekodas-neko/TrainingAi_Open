@@ -6,10 +6,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.36",
+    version: "1.465.38",
     date: "2026-09-24",
     changes: [
       "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. It now notices when answers have stopped arriving and shows you your saved data instead of a spinner, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely. Slow requests are never cancelled \u2014 on a weak connection your data still arrives, it just tells you honestly that the connection is struggling while you wait.",
+    ],
+  },
+  {
+    version: "1.465.37",
+    date: "2026-09-24",
+    changes: [
+      "Thirteen screens worked out the date, the month or the time of day from the phone's clock instead of your timezone. The readiness and activity screens asked for the wrong day's AI insight, the calendar could look up the wrong month around a month boundary, and a logged meal could land in the wrong part of the day. None of this was visible while the phone sat in Brisbane, which is why it lasted; it is now wrong nowhere rather than right in one place.",
+    ],
+  },
+  {
+    version: "1.465.36",
+    date: "2026-09-24",
+    changes: [
+      "A walk whose strap starts reporting your cadence late no longer records a fraction of your steps as though it were the whole walk. One treadmill walk logged 584 steps where a normal one logs around 3,000, because the strap only picked up the last eight minutes \u2014 and the pace looked completely normal, because it was averaged over just those eight minutes. When the cadence reading covers less than half the walk, the step count is now left out rather than quietly counted short.",
     ],
   },
   {

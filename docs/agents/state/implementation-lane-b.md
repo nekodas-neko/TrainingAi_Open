@@ -1,35 +1,34 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-142 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-144 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111, RV-121, RV-164, BF-190 + BF-191, RV-171 shipped. LB-141 filed (two of three walk exits keep
-nothing — the owner's call). BF-188's fold collision fixed; it had blocked a third PR. RV-171 is the
-one to remember: a failed GET left a blank list that a replace-all PUT then wrote over every row.
+RV-111, RV-121, RV-164, BF-190/191, RV-171, RV-167, RV-176 shipped. LB-141 filed (two of three walk
+exits keep nothing — his call). Four of eight named one surface and had a second.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`, and
-do not cut a branch until there is something to commit: two Review sweeps reordered the head in
-one day, so it moves between sessions.
-
-Today: BF-191, then RV-171 — read RV-171 early, a failed request while the meal-plan setup opens
-silently deletes every saved dietary restriction.
-**RV-117/118/119 are `Lane: O` — leave them.** Their owner gate IS satisfied; the mockup is in the
-Orchestrator's chat, being exported to `docs/design/`. Do not re-ask him, do not re-make it.
-**BF-177's plan is STALE** — LB-128 (#1456) may have voided its `cachedFetch`/`onError` premise.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; two
+Review sweeps reordered the head in one day. It last offered **RV-183**, then RV-185, RV-178, RV-122.
+**RV-166 is parked properly now** — blocked on RV-170's unanswered rider but saying so in prose only,
+so the runner offered it twice; it carries `Needs: RV-170`. If an entry looks blocked but reads
+READY, check for that shape.
+**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is in the Orchestrator's chat;
+do not re-ask or re-make). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
 ## Blocked / owed
 
-- **LB-134 is the owner's** — branch protection. Until he rules, read the five job CONCLUSIONS
-  before every merge and expect the merge race below.
-- **A QUESTION FILED `Lane: O` COMES BACK.** RV-121's owner half was answered within hours and
-  returned as Lane B work. Write the brief properly — he takes the recommendation — then build it.
-- Device checks are DV's to RUN, mine to RECORD. A FAILED check comes BACK as work.
+- **LB-134 is the owner's** (branch protection). Until he rules, read the five job CONCLUSIONS before every merge and expect the merge race below.
+- **A QUESTION FILED `Lane: O` COMES BACK** — RV-121's owner half returned as Lane B work within
+  hours, so write the brief properly (he takes the recommendation), then build it. Device checks are
+  DV's to RUN and mine to RECORD; a FAILED one comes back as work too.
 
-## Claimed paths — none.
+## Claimed paths
+
+- `lib/calendar-month.ts` (LB-143) — a bare `lib/*.ts` module is the rule's ambiguous case; nothing
+  under `app/api/**` reaches it, so B. Release on merge.
 
 ## Lessons that cost real time
 
@@ -37,18 +36,19 @@ Orchestrator's chat, being exported to `docs/design/`. Do not re-ask him, do not
   via `list_workflow_jobs` (`resource_id`, not `run_id`).
 - **THE MERGE RACE IS ARITHMETIC — seven lost cycles on one PR.** CI ~7 min vs a commit to `main`
   every ~4. Merge the INSTANT the five are green; no run for your head = conflicted PR.
-- **THE FOLD IS SAFE AGAIN** — writes `-2` when `-1` exists (BF-188). Verify by anchor count: the
-  loss is silent and `check-doc-links` passes over it.
+- **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
+  entry when the floor is a judgement rather than a fit.
+- **⚠ RE-RUN THE GATES AFTER MERGING THE BASE, NOT BEFORE.** The doc-size ratchet is BASE-RELATIVE:
+  `check:rules` passed, the merge of `main` consumed the slack, CI went red on #1574. Another lane
+  hit the same thing within four minutes, so it is the ordering, not a slip.
 - **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS** — two sweeps inserting at one point is two
-  ADDITIONS, keep both. Read the headings on each side, every time.
-- **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481 silently deleted RV-117/118.
+  ADDITIONS, keep both; read the headings on each side, then DIFF THE FULL HEADING SET after the
+  merge, every time (#1481 silently deleted RV-117/118).
 - **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — a shared header means a splice drops
   the other PR's entry. It conflicts on EVERY merge.
-- **READ THE CODE BEFORE THE ENTRY.** Seven for seven — BF-190/191 missed that two of the three
-  walk exits keep nothing.
 - **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a
-  gating vitest file. **A source-scanning test can fail in CI on ITSELF**: `git ls-files` skips it
-  while untracked, and `ls-files A B -- '*.tsx'` UNIONS pathspecs — filter in JS.
-- **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; and COMMIT before `git stash`/`checkout`.
-- **`tsc --noEmit` typechecks NEITHER an auth-gated page nor tests.** Before pushing a new spec run
-  `node scripts/check-test-typecheck.js` — shrink-only per file, and it caught an invented enum.
+  gating vitest file. **Writing a source scanner has four traps, all of which have bitten:** it
+  matches ITSELF (`git ls-files` hides it only while untracked, and `ls-files A B -- '*.tsx'` UNIONS
+  pathspecs — filter in JS); it matches the COMMENTS explaining the fix (strip them); a regex cannot
+  balance parens (`f\([^,)]+\)` flags the corrected `f(g(x), tz)`); arity is per-function.
+- **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; COMMIT before `git stash`/`checkout`; `tsc --noEmit` typechecks NEITHER an auth-gated page nor tests, so run `node scripts/check-test-typecheck.js` before pushing a spec; and vitest's unit project does not transform JSX, so a testable helper goes in a `.ts`.

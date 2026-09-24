@@ -478,7 +478,7 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] OR-150 — thirteen scoring entries owe a Tuning proposal, not the owner's signature
+### [platform] OR-150 — fifteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
 - **Added:** 2026-09-24 · OR-150, the last slice of the `Gate: owner` triage.
@@ -510,16 +510,22 @@ brake in reach. **There is no `Lane:` value for Tuning** — the lanes are `A`, 
 entry that owes a Tuning proposal has no field that says so. That is the gap, and it is why a
 correct triage could not act on itself.
 
-**What this entry does about it:** each of the thirteen now carries `Needs: OR-150` in place of the
+**⚑ FIFTEEN as of 2026-09-24, not thirteen.** RV-189 added two more on the same test: **`TN-11`**
+(*"moved this hour"* redefines what counts as an active hour) and **`OR-155`** (the `activityBalance`
+half, split out of `TN-9` because a question buried inside another entry does not get routed). Both
+arrived by the independent route the six of 09-24 did — a scoring change with no proposal and no
+days-moved figure — which is now three separate sweeps reaching the same conclusion.
+
+**What this entry does about it:** each of the fifteen now carries `Needs: OR-150` in place of the
 owner gate. They stay parked, for the true reason, and they stop counting as owner debt. When the
 proposals exist this entry leaves the queue and all thirteen unpark together.
 
-**The deliverable is thirteen Tuning proposals**, each stating **how many other days the change moves**
+**The deliverable is fifteen Tuning proposals**, each stating **how many other days the change moves**
 — which is what `CLAUDE.md` already requires of a proposal and what none of these has. Tuning reads
 the backlog, so an `O` entry naming them is the channel; writing into another agent's baton is not
 the Orchestrator's to do.
 
-- **Done when** every one of the thirteen has a proposal, or has been withdrawn with a reason. Not when
+- **Done when** every one of the fifteen has a proposal, or has been withdrawn with a reason. Not when
   this has been read.
 - **Deliberately NOT done here: inventing a `Lane: T`.** Tuning picks its work from its own sweeps
   rather than a lane queue, so a fifth lane value would be a channel nobody reads, and it would need
@@ -527,34 +533,110 @@ the Orchestrator's to do.
   that a standing channel is needed rather than one entry.
 
 
-### [platform] RV-189 — the implementer queue re-read against code: 5 entries to remove, 5 to park or reroute
+### [readiness] OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call
 
-- **Lane: O** — removing and parking entries is the Orchestrator's job. Every entry below carries a
-  dated `🔎 Re-read … (Review sweep 59)` note with its evidence.
-- **Added:** 2026-09-24 · Review sweep 59 ([`docs/reviews/2026-09-24-sweep-59-queue-against-code.md`](reviews/2026-09-24-sweep-59-queue-against-code.md)). The sweep re-read 59 READY entries in Lanes A and
-  B; the ones filed today were left out.
-- **Remove (already shipped or nothing left):**
-  - **LB-123** (#1394). This also clears RV-79's `Needs:`.
-  - **LB-114** (#1345).
-  - **Q-272** (#1521 via TN-55; its residue is LA-134).
-  - **Q-3b** (both halves closed).
-  - **Q-112** (every child shipped).
-- **Remove or reword and park:** **RV-77**. Its own re-verification says the calls are not
-  duplicates, and the path has never run.
-- **Park (READY, but not startable as written):**
-  - **LA-134:** its calibration window opens 2026-10-04.
-  - **OR-137:** its own verdict is don't build; 0 feedback rows.
-  - **Q-28:** its own verdict is don't build; the tripwire is already enforced. Consider `Reference:`.
-  - **TN-37:** step 3 needs a plan that does not exist.
-- **Reroute:**
-  - **TN-11** and **TN-9's activityBalance half**: scoring choices without a sign-off, so Tuning or
-    the owner.
-  - **TN-53**: remaining cause undiagnosed and probably engine-side, so not Lane B yet.
-  - **Q-48**: docs and planning, so Lane O.
-- **Already done in this PR:** `Needs: TN-5` on TN-10, and `Needs: TN-33` on Q-507, so neither shows
-  READY ahead of what it depends on.
-- **The rest are buildable.** 17 have corrected line numbers or a missing step in their note, which
-  saves the implementer the re-derivation. 19 are VALID as written.
+- **Lane: A** · **Added:** 2026-09-24 · split out of `TN-9` by RV-189, on Review sweep 59's reading.
+- **Needs: OR-150**
+- **Why it is its own entry.** `TN-9` is two halves under one owner sign-off. The check-in half has a
+  chosen mechanism (drop `checkin` from the composite and renormalise over the remaining eight) and is
+  buildable. **This half has no chosen mechanism** — the entry offers *"point `activityBalance` at a
+  completed day, or drop it"* and picks neither. A question buried inside another entry is invisible
+  to whoever routes the queue, which is why it is split rather than annotated.
+- **The finding, from TN-9 and unchanged.** `READINESS_WEIGHTS.activityBalance = 0.06`
+  (`packages/shared/src/health/readiness-composite.ts:29-30`) reads the CURRENT day, so it moves as
+  the day accumulates — the same "the number must be settled at first load" violation the owner ruled
+  out, and worse than the check-in half because nothing the owner does settles it.
+- **Why `Needs: OR-150` rather than a gate.** Both options change the score, and neither states **how
+  many other days it moves** — the thing CLAUDE.md requires of a Tuning proposal. Releasing it into
+  Lane A's READY list would hand an implementer a scoring change with no proposal; gating it on the
+  owner would ask him to sign a blank page. `OR-150` is the standing hold for that class.
+- **Done when** a proposal picks one option and states the days moved. Then this unparks with the
+  other fourteen.
+
+### [readiness][platform] OR-156 — TN-37 step 3 has no plan, and its own text forbids starting without one
+
+- **Lane: O** · **Added:** 2026-09-24 · filed by RV-189 so `TN-37` has a real `Needs:` target instead
+  of a prose block nothing enforces.
+- **The deliverable is a plan document** in `docs/superpowers/plans/`, not the change itself.
+- **Why it cannot be skipped.** `TN-37` step 3 says *"do not start without its own plan"*, and Review
+  sweep 59 found no plan exists — so the entry has been printing READY for Lane A while being
+  unstartable by its own instruction. **And the obvious shortcut is a trap the sweep caught:**
+  skimming step 2 as *"drop the reads"* would **disable wear filtering on the HRV and RHR baselines**
+  (`lib/health/readiness-payload.ts:329-334`, filter at `:376`/`:388`). A plan that does not say what
+  replaces the wear filter is not a plan.
+- **What the plan must settle:** which of the four device-specific stores readiness may read, what
+  preserves wear filtering once they are removed, and whether the connector guide's invariant or the
+  code is the thing that changes. **If it moves scores, it is Tuning's first** — say so in the plan
+  rather than leaving Lane A to discover it.
+- **Done when** the plan is written and `TN-37`'s `Needs:` is cleared by this entry leaving the queue.
+
+### [platform] OR-157 — an entry blocked until a DATE has no field to say so, so it prints as READY
+
+- **Lane: O** · **Added:** 2026-09-24 · found by RV-189 while trying to park `LA-134` and finding
+  nothing to park it with.
+- **The gap.** `next-item.js` parks on exactly three things (`scripts/lib/backlog-entries.js:139-141`):
+  an unmet `Needs:` naming another entry, a `Gate:` of `owner` or `device`, and the legacy prose
+  marker (the no-entry glyph followed by the word the parser looks for — not written out here,
+  because writing it out parks this entry). **None expresses "not before a date"**, so an entry whose blocker is the calendar has three
+  bad options: print as READY and waste an implementer's pick-up, take a `Gate:` that names the wrong
+  blocker, or carry a `Needs:` pointed at an entry that is not really its dependency. All three are
+  worse than the field.
+- **The live case.** `LA-134` — the Body Battery constants cannot be fitted before **2026-10-04**,
+  because the window needs days the clock has not produced yet. It is left READY deliberately rather
+  than parked with a false reason, and its date is stated in the entry. It is the only current case,
+  which is the honest argument against building this immediately.
+- **Recommendation: `Until: YYYY-MM-DD`**, pushing a park reason while the date is in the future, and
+  clearing itself with no edit when it passes. That last property is the point — every other park in
+  this file needs someone to come back and remove it, and a date does not.
+- **Cost to reverse: low.** It is a parse in `backlog-entries.js`, a reason line, and a validator case
+  in `check-backlog-pointers.js`, matching the shape of `Ask:` and `Reference:`. Deleting it later is
+  deleting one branch.
+- **Deliberately not built inside RV-189**, which is queue hygiene against verified evidence; a new
+  field is tooling and wants its own tests. **Build it when a second dated case appears**, or sooner
+  if `LA-134` gets picked up and dropped once — that pick-up is the cost this prevents.
+
+### [platform] OR-158 — the E2E detector looked for client roots where they are not, so browser code skipped the suite
+
+- **Lane: O** · **Added:** 2026-09-24 · found by the Orchestrator while discharging LB-108's owed
+  verification. **Shipped in the same session** — this entry is the record, not a request.
+- **Verify:** owner — nothing here needs the device, but the trade is worth a look: **more PRs now
+  run the ~34-minute browser suite**, because the previous behaviour bought its speed by skipping
+  browser code. Say so if that is the wrong trade; the alternative is accepting known-blind CI.
+- **How it surfaced, which is the part worth keeping.** `LB-108` (#1557) could not be verified by
+  reading its diff — only by watching an E2E job's **duration** on the first PR to touch a client
+  `lib/` file. Checking merged history for one found **#1569**: it changed
+  `instrumentation-client.ts` and E2E skipped. Running the detector against that file list
+  reproduced it immediately. **A fix whose only proof is a runtime observation has to be followed
+  up, or it is unverified however sound the diff reads.**
+- **Three defects, all measured 2026-09-24.**
+  1. **Roots were grepped inside `lib/` only.** Client components live in `app/` and `components/`,
+     so their own `lib/` imports were never walked — **47 `lib/` modules imported directly by a
+     `'use client'` file read as unreachable**, among them `lib/cache-groups.ts` and
+     `lib/haptics.ts`. This is a smaller copy of the bug LB-108 replaced.
+  2. **`instrumentation-client.ts` matched nothing.** Next names it by convention, so it carries no
+     directive; it is not under `lib/` and not under the `app|components|e2e` prefixes. It runs in
+     every browser session.
+  3. **`import type` counted as a runtime edge.** Correcting the roots alone took the reachable set
+     from **81 of 282 to 179**, which *looked* like a successful fix. What exposed it was one file
+     that had no business being there: `lib/data/postgres/adapter.ts`, a server-only Drizzle adapter,
+     reached behind a type the compiler erases. Dropping erased edges gives **124**, and the adapter
+     skips again.
+- **⚑ The lesson, and it is the reusable one.** A total moving in the expected direction is not
+  evidence — **179 was wrong in the same direction as 81 was wrong.** The check that worked was
+  naming a file whose presence in the set would be absurd and asking whether it was there. Apply that
+  to any future reachability, coverage or count change.
+- **Known floor, unchanged and still stated in the file:** static `from '…'` imports only, so a
+  dynamic `import()` built from a variable is not seen. A new client entry point named by convention
+  must be added to `CONVENTION_CLIENT_ROOTS` by hand.
+- **What this PR proved in CI, and what it did NOT.** #1576 touches only `scripts/`, which no browser
+  reaches, and its **E2E job completed in 40 seconds** — so the SKIP branch is proven against the real
+  workflow, and the widening does not over-fire. **The RUN branch is still only verified locally**
+  (unit tests plus the detector run by hand against the #1569 file list). The CI-level proof of that
+  half is the next PR to touch a client `lib/` file: **its E2E job must take MINUTES, not 40
+  seconds.** Same observation LB-108 owed and nobody made for a day — so it is written here rather
+  than left as an intention.
+- **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
+  new). `Ran 78 of 78` Custom Rules steps.
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
@@ -1396,6 +1478,352 @@ which is the right shape for something that can only be validated by living with
   temperature term is exactly the kind that would look different across seasons. And per TN-67 there is
   no external validation of the composite, so this describes which inputs move the number, never which
   ones *should*.
+
+### [activity][heart-rate] TN-78 — the zone-minutes goal is WHO's MODERATE target scored at a VIGOROUS threshold, so walking can never earn it
+
+- **Branch:** `tuning/zone-minutes-intensity-floor`
+- **Lane:** O — the deliverable is an owner decision on the threshold, and **getting** that answer is
+  the Orchestrator's work. Filed **ungated on purpose**: `Gate: owner` would PARK this in
+  `next-item.js`, so the question would sit in the queue with nobody tasked to put it. Once the
+  threshold is settled the build is Lane A by the path rule (`packages/shared/src/health/hr-zones.ts`,
+  `zone-minutes.ts`, `daily-goals.ts`) — reroute it then, do not pre-assign it.
+- **Added:** 2026-09-24 · Tuning agent, found while checking TN-76's `zoneMinutes` contributor.
+- **Ask:** owner — does a moderate-activity minute start at 40% of heart-rate reserve (ACSM, which the 22-min goal's own WHO citation implies) or stay at the 60% the zone map uses? At 60% the floor is 134 bpm, hit on 3 of 31 days; at 40% it is 107, hit on 24.
+- **The decision, in one line:** does a minute of moderate activity start at 40% of heart-rate
+  reserve (ACSM's definition, which the 22-minute goal's own WHO citation implies) or stay at the
+  60% the zone map uses? Scoring calibration, so his — everything needed to answer it is below.
+- **Where the mechanism is:** `ZONE_DEFS` (`hr-zones.ts:38`) sets the Light band's floor at
+  `lowerFrac: 0.6`; `computeHrZones` turns that into `restingHr + 0.6 × reserve`;
+  `activeMinutesFromZoneSeconds` (`zone-minutes.ts:80`) names that band `moderateMin` and doubles
+  zones 3–5 as `vigorousMin`; `DEFAULT_ZONE_MINUTES_GOAL = 22` cites *"WHO ≥150 min/wk moderate"*.
+
+**Two intensity taxonomies are spliced together, and the seam is a whole band.** The goal is WHO's
+moderate-activity target. The threshold it is scored against is **60% of heart-rate reserve** —
+which is where ACSM's *vigorous* range begins. ACSM puts moderate at **40–59% HRR** and vigorous at
+60–89%. So the app requires vigorous effort to earn a minute it then calls moderate, and genuine
+moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSeconds` discards.
+
+  **Measured for the owner** (resting HR 54 from 36 readings, `hrMaxFromAge(33)` = 187, reserve 133):
+
+  | threshold | bpm | reached on |
+  |---|---:|---:|
+  | app's zone-2 "Light" floor (60% HRR) | **134** | **3 of 31 days** |
+  | ~50% HRR | 120 | 11 of 31 |
+  | ACSM moderate floor (40% HRR) | **107** | **24 of 31 days** |
+
+  Daily max HR: median **118** — between the two floors. So the owner's ordinary days sit in the band
+  the app scores as nothing, and the contributor is unreachable by walking at any duration.
+
+- **This is the mechanism behind TN-76's `zoneMinutes` column.** That entry measured the contributor
+  as present on 11 of 30 days and **zero on 9 of them**. This is why: not missing data, and not
+  inactivity, but a floor set one band too high.
+- **The contributor therefore only ever subtracts.** On a training day a zero is excluded (the Q-190
+  suppression, correct); on a rest day a zero is included at full weight. With `activeEnergy`
+  structurally absent the weight base is 85, so the zero costs a **measured mean of 8.1 points
+  (range +7 to +9)** across those 9 days — larger than the whole score's standard deviation of 7.4
+  (TN-76). A 10-weight term that cannot be earned by the owner's actual movement is, in practice, a
+  flat rest-day penalty.
+- **⛔ TWO HYPOTHESES OF MINE WERE WRONG AND ARE RECORDED AS WRONG, because both would have sent a
+  lane somewhere useless.**
+  **(a) "The suppression rule is leaking onto rest days."** It is not. Crossed against the stored
+  `trained` flag: `zoneMinutes` is absent on **19 of 19** training days and present on **9 of 9**
+  rest days plus the 2 training days where it was non-zero and so not suppressed. The rule does
+  exactly what its comment says, including *"deliberately NOT extended to rest days"*.
+  **(b) "The zeros are the ring's PPG power-gating, not real inactivity."** Also wrong, and it was
+  the plausible one — the ring's radio sleeps when worn-idle, which is what a rest day is. But the
+  stored zeros carry real coverage: 203–2,395 samples across 21–24 distinct hours on each of the 9
+  days, and the day's **maximum** HR was **93–124 bpm** — never once within 10 bpm of the 134 floor.
+  The zeros are true readings of "no vigorous activity", and the defect is the threshold, not the
+  sensor.
+- **Recommendation: move the moderate floor to 40% HRR and keep the vigorous double at 60%.** That
+  makes the two halves of `activeMinutesFromZoneSeconds` mean what WHO means by the words the goal is
+  written in, and it needs no new data — it is two fractions in `ZONE_DEFS`. It would reclassify
+  zone 1's upper half as moderate, which is the point.
+  **What it costs:** the five-band zone map is also rendered as a legend and used by the interval-walk
+  targets, so changing `ZONE_DEFS` moves a display users read, not only this score. If that coupling
+  is unwanted, the alternative is a **separate moderate/vigorous pair of fractions owned by
+  `zone-minutes.ts`**, leaving the display bands alone — more code, no shared-constant drift risk,
+  and it loses One Formula One Place for the zone boundaries. **I recommend the first** and would take
+  the legend change as correct rather than collateral: a band labelled "Light" that starts at the
+  vigorous boundary is mislabelled on the display too.
+  **Alternative considered and rejected: lower the 22-minute goal.** It treats a threshold error as a
+  target error, and would leave the same minutes uncounted while making the goal easier — the score
+  would look better without measuring anything new.
+- **Incomplete until it states how many days it moves, per the Tuning rule.** Not computable from the
+  stored contributors, which hold only the finished sub-score; it needs the zone accumulator re-run
+  over `oura_heartrate` for the window. **That is the first task for whoever picks this up**, and the
+  number belongs in this entry before any change ships, because it re-scores history the owner reads.
+- **What this does NOT establish.** One user, one resting-HR baseline, 31 days. `hrMaxFromAge` is
+  `220 − age`, itself a population estimate with roughly ±10 bpm of individual spread, so the 134
+  figure carries that error — but the finding survives it: at a maxHr 10 bpm lower the floor is still
+  128, and the median day still peaks at 118. HR sampling is sparse on rest days (~10/hour against
+  ~82/hour overall), so any *minutes* estimate from this data would be unreliable; the table above
+  deliberately counts **days with any qualifying sample**, which sparsity can only bias downward.
+  And nothing here says more moderate minutes would make the owner healthier — only that the app is
+  not counting the ones its own stated goal is about.
+
+### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
+
+- **Branch:** `tuning/training-load-gate-diagnosis`
+- **Lane:** A — `app/api/training-stress/route.ts`, `lib/data/postgres/adapter.ts`
+  (`getOuraDaytimeSignals`), `packages/shared/src/health/training-stress.ts`. Engine by the path rule.
+- **Added:** 2026-09-24 · Tuning agent, while checking whether `Q-204` was startable.
+- **Why this matters beyond itself:** `Q-204` (Q-137 direction B) carries `Needs: Q-270`, and Q-204 is
+  what would retire **TN-76**'s lane-balance finding and **TN-78**'s threshold question by replacing
+  `zoneMinutes` and the dead `activeEnergy` with one contributor. So Q-270 is the gate on three open
+  entries, and it has sat 🔴 and unexplained for five weeks.
+
+**⚑ Q-270's own framing is out of date and this is the correction.** Its title says
+*"`training_load_ots` is still 0 of 104 days, and the route is neither failing nor succeeding"*.
+Measured 2026-09-24: **`training_load_ots` is still NULL on all 110 days, but `training_load_gate` is
+now populated on 21** — every day from **2026-09-05 to 2026-09-25**, every one reading
+**`insufficient_met`**. So the route runs, reaches its gate, and persists the result. **The
+2026-08-15 warm-once-per-launch fix DID take**, and Q-204's caveat that *"the persist is
+unverified"* is now answered: it persists.
+
+**And the gate is firing on days whose data satisfies it.** `computeTrainingStress` gates on
+`metsPerMinute.length < 720 || validMin < 360`. Measured from the stored frames for tag `0x50`
+(`activity_information`, the MET stream), per Brisbane day:
+
+  | day | frames | MET values (from hex) | span (min) | needs ≥720 | needs ≥360 |
+  |---|---:|---:|---:|---|---|
+  | 2026-09-17 | 19 | 219 | 263 | fail | fail |
+  | 2026-09-18 | 84 | 981 | 1378 | **ok** | **ok** |
+  | 2026-09-19 | 93 | 1109 | 1417 | **ok** | **ok** |
+  | 2026-09-20 | 82 | 879 | 1342 | **ok** | **ok** |
+  | 2026-09-21 | 99 | 1137 | 1400 | **ok** | **ok** |
+  | 2026-09-22 | 117 | 1188 | 1364 | **ok** | **ok** |
+  | 2026-09-23 | 88 | 1086 | 1389 | **ok** | **ok** |
+  | 2026-09-24 | 116 | 1172 | 1375 | **ok** | **ok** |
+  | 2026-09-25 | 21 | 273 | 384 | fail | fail |
+
+  Seven of nine clear **both** floors with room. The two that do not are the partial days at the edges
+  of the 7-day hot window, which is expected. **So the input exists and the gate still fires**, which
+  places the loss between `oura_raw_samples` and `computeTrainingStress` — in
+  `getOuraDaytimeSignals` / `readRawFrames` / the ds conversion — and **not** in data availability.
+  That is the narrowing this entry contributes: Q-270 can stop asking whether the producer runs.
+- **Gate ordering rules out three causes for free.** `no_readiness`, `readiness_learning` and
+  `no_profile` are all checked **before** `insufficient_met`, so readiness is present and
+  `ble-derived`, the baseline is past `BASELINE_MIN_NIGHTS`, and age/sex/RHR are all set. Whatever is
+  wrong is downstream of those.
+- **⛔ TWO CAUSES CHECKED AND RULED OUT — do not re-spend a session on either.**
+  **(a) A missing decoder.** `decodeEventBody` handles `0x50` via `decodeActivityInfo`, which returns
+  `{state, met}` with the documented `b < 128 → b×0.1` scale. It is present and looks correct.
+  **(b) The clock-anchor window missing the frames.** It does not. Using the newest anchor
+  (`id 12544`, ds 70460518 ↔ 2026-09-24T21:04:19.802Z), the computed ds window **overlaps the real
+  frame range on all 9 days**.
+- **BUT (b) surfaced a separate inconsistency worth its own look.** The anchor set is **not
+  self-consistent**, and which anchor is chosen shifts the day window materially. Five anchors written
+  within **8 seconds** of wall-clock time carry `anchor_ds` values spanning **15,285 ds ≈ 25 minutes**
+  of ring time — so at most one of them is a true `(ds ↔ utc)` correspondence and the rest pair a ring
+  timestamp with its *ingest* instant. `getOuraClockAnchor` takes **newest by `created_at`**, and with
+  that one the computed window sits **~48 to ~97 minutes later** than the day's actual frame range
+  (2026-09-18: real 64129365–64963642 against computed 64157919–65021919). It still overlaps, so it is
+  not obviously the gate's cause — but a day window off by up to 1.6 hours is wrong on its own terms
+  and would silently mis-bucket any per-day aggregate built this way. **Not filed as its own entry
+  pending a Lane A read**, because the correct anchor-selection rule is a judgement about the ingest
+  contract rather than a measurement.
+- **Incidental, and cosmetic unless a decoder changes:** `decoded` is **NULL on all 719** tag-`0x50`
+  rows in the hot window, and `decoded` is **not** a withheld column in `claude_ro` (checked against
+  `_meta_withheld_columns`, which lists 8 entries, none of them this). So nothing persisted a decode
+  and every read re-decodes from `body_hex` via the adapter's `r.decoded ?? decodeEventBody(...)`
+  fallback. Correct today; it does mean a decoder edit retroactively changes historical reads with
+  nothing recording that it did.
+- **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
+  overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
+  `reason: 'insufficient_met'` (`training-stress.ts:82`), and that model returns null down **seven**
+  paths, only two of which are about MET length. The one that fires here is its input validator.
+  **`validate()` rejects the input if ANY `mets` value is NaN when `noOts === 0`**
+  (`lib/oura-models/inference/ots.ts:34–37`, `return 2`). The model's own type comment states the
+  contract outright:
+
+  ```
+  mets: Float32Array   // raw 1-min MET series (validated: no NaN when noOts=0, ≥720 long)
+  ```
+
+  **And the route deliberately supplies NaNs.** `metGridFromDaytimeSamples` leaves a `null` in every
+  minute with no sample — its own comment says non-wear/charger gaps *"become nulls the OTS core
+  cleans, instead of compressing the day by array index"* — and `computeTrainingStress` converts them
+  with `v == null ? NaN : v` before passing `noOts: 0` (`training-stress.ts:79`). So the producer and
+  the model disagree about the input contract, and the producer loses.
+  **The arithmetic agrees with the measurement above:** ~1,100 MET values across a ~1,375-minute span
+  is roughly **275 gap minutes per day**, and `validate` returns on the **first** one. A ring that
+  power-gates when worn-idle guarantees gaps, so **no real day can pass** — which is exactly the
+  21-of-21 pattern, and why ample data and a gate fire together.
+  **The intent was sound and the ordering defeats it:** `cleanMets` (line 117) exists to turn
+  sub-`minMetValue` readings into NaN for the windowed mean, so the downstream computation *is*
+  NaN-aware — but `validate` runs first, at line 137, and forbids what `cleanMets` is built to handle.
+- **⚑ This also corrects Q-204's effort estimate, and in the opposite direction to §11.**
+  [`activity-goal-calibration.md`](activity-goal-calibration.md) §11 Gate 1 concluded *"B has no head
+  start. Any load term is a from-scratch derivation"*, reasoning from the empty column. That reasoning
+  was sound and the conclusion is wrong: `runTrainingStressScore` is a **complete ported OTS model** —
+  195 lines with the MET weight bank, VO₂max categories, an RHR fallback and a rolling 720-minute
+  window — wired end to end through route → `computeTrainingStress` → persist. **Direction B is not a
+  from-scratch derivation; it is one input-contract bug away from producing values.** That is the
+  single biggest change to Q-204's cost, and whoever writes that proposal should start here.
+- **Three fixes, and the cheapest-looking one is a trap.**
+  **(a) Pass `noOts: 1`.** One character, and it dodges the NaN check — but `noOts` is a model flag
+  whose meaning is not established here, and line 143 shows it *changes the length test* rather than
+  merely relaxing validation. Abusing a flag to skip a contract is how a silently different model gets
+  shipped. **Do not.**
+  **(b) Fill the grid, with a documented rule.** Impute absent minutes rather than leaving them NaN,
+  and keep an explicit coverage floor so a day that is mostly gaps is still refused. **Recommended** —
+  it satisfies the contract instead of evading it, and the imputation value is a stateable assumption
+  (a non-wear minute is not the same as a resting minute, and a charger minute is neither).
+  **(c) Make the model NaN-tolerant** by moving the NaN check after `cleanMets`. Smallest diff to the
+  right place, but it edits a **ported** model against a pinned test vector — the Oura-BLE rule says
+  byte layouts and ported code come from the source, not from convenience. Only with a vector re-pin.
+  **Whichever is chosen, split the overloaded label**: a null from a failed validator must not report
+  as `insufficient_met`. That misreporting is what hid this for five weeks.
+- **What is established and what is not.** The mechanism is identified by **reading the code**, and the
+  arithmetic and the 21-of-21 pattern both agree with it — but **the route was still not run**, so this
+  is a very strong inference rather than an observation. The confirming step is unchanged and now
+  cheaper: log `validate(input)`'s return code alongside `grid.metsPerMinute.length` for 2026-09-22.
+  A `2` confirms this outright. I have not checked whether any *other* caller of
+  `runTrainingStressScore` passes a dense series and therefore works — if one does, that is the
+  contrast case and worth finding before changing anything.
+- **What to do next, in order.** (1) Run the route for 2026-09-22 and log
+  `grid.metsPerMinute.length` and the `validMin` count — that single log line separates "the frames
+  never arrive" from "they arrive and the grid collapses". (2) If the frames never arrive, instrument
+  `readRawFrames` for tag `0x50` across the hot/packed boundary. (3) Only then touch the thresholds —
+  **do not lower 720/360 to make the gate pass**, which would fabricate a load score from a series
+  nobody has shown is complete.
+- **What this does NOT establish.** I did not run the route, so I have **not** identified the cause —
+  this narrows it and rules two candidates out, nothing more. The MET value counts are estimated as
+  `(length(body_hex)/2) − 1` per frame (the decoder emits one value per body byte after the state
+  byte), not by running `decodeActivityInfo`, so they are close rather than exact; the margin over the
+  360 floor is wide enough that the conclusion holds either way. The span is `max(measured_at) −
+  min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
+  one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
+  not measured, so the 21-day gate run is only partly explained by this table.
+
+### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
+
+- **Branch:** `tuning/activity-contributor-behaviour`
+- **Lane:** A — `packages/shared/src/health/activity-score.ts` and `daily-goals.ts`; engine by the path rule.
+- **Added:** 2026-09-24 · Tuning agent. **Proposal only** — Tuning never ships a scoring change.
+- **Where the mechanism is:** `packages/shared/src/health/activity-score.ts` (lane weights, the taper,
+  `STRENGTH_FREQ_CURVE`), `packages/shared/src/health/daily-goals.ts` (every goal it scores against).
+- **Method — no reconstruction.** Every figure below is read from
+  `oura_daily_derived.activity_contributors`, the model's own persisted per-contributor breakdown.
+  **30 days carry one** (2026-07-28 → 2026-09-24). An earlier reconstruction from raw steps and
+  tonnage agreed with the stored score to a median of 0 and a mean of +0.3 points but an sd of 8.8,
+  so it is fit for means and not for any single day — it is not used here.
+
+**The headline: the score's largest contributor carries no information, and the lane balance the
+module documents has never been the live one.**
+
+  | contributor | weight | n/30 | sd | range | reads |
+  |---|---:|---:|---:|---|---|
+  | `strengthFreq` | **25** (largest) | 30 | **2.2** | 88–100 | **100 on 29 of 30 days** |
+  | `strengthVolume` | 20 | 30 | 12.4 | 43–100 | discriminates |
+  | `steps` | 18 | 30 | 16.2 | **1–61** | discriminates, never above 61 |
+  | `moveHours` | 12 | 30 | 11.1 | 60–100 | narrow |
+  | `zoneMinutes` | 10 | **11** | 28.6 | 0–100 | 9 of its 11 values are **0** |
+  | `activeEnergy` | 15 | **0** | — | — | structurally absent (Q-521) |
+
+- **`strengthFreq` is still saturated, and Q-137 raised the goal 3 → 5 specifically to stop that.**
+  `daily-goals.ts` records the prior state — *"`strengthFreq` (weight **25**, the largest) was
+  **exactly 100 on all 91 days** and had never once carried information"* — and predicts that at a
+  goal of 5 *"3 sessions gives ratio 0.6 → ~73"*. **Measured after the change: 100 on 29 of 30 days,
+  minimum 88, sd 2.2.** The de-saturation did not happen, because the owner trains at or above 5×/wk;
+  the curve caps at ratio 1.0 and they sit on or past it. **The largest weight in the model is a
+  constant.** Raising the goal again would repeat the same reasoning — the fix is the curve or the
+  weight, not the target.
+- **The renormalised weight base is 75 or 85, never 100** — so the documented split is not the live
+  one on any day in the window:
+
+  | base | days | strength lane | steps | documented |
+  |---:|---:|---:|---:|---|
+  | 75 (no `activeEnergy`, `zoneMinutes` suppressed) | **19** | **60%** | 24% | strength 45%, steps 18% |
+  | 85 (no `activeEnergy`) | 11 | 53% | 21% | strength 45%, steps 18% |
+
+  The module header says *"Daily-movement ≈ 55, strength ≈ 45"*. With a 15-weight contributor
+  permanently absent and a 10-weight one suppressed on training days, **the strength lane holds 60%
+  of the score on the majority of days.** Renormalisation is the designed response to missing data;
+  the documented balance being wrong by 15 points is the consequence nobody re-checked.
+- **The over-exertion taper has never fired: 0 of 30 days.** ACWR mean 0.93, p90 1.15, **max 1.32**,
+  against `ACWR_TAPER_START = ACWR_THRESHOLDS.highMax = 1.5`. So *"100 means optimal, not maximum
+  effort"* is not a property this score has exhibited.
+  **A doc/code mismatch sits here and is NOT worth acting on** — the header says the taper starts
+  *"past the ACWR optimal band"*, which is `optimalMax = 1.3`, while the code starts it at
+  `highMax = 1.5`. Measured, the difference is **0.5 points on 1 of 30 days**. Recorded so the next
+  reader does not chase it; fix the comment if the file is open anyway.
+- **Net effect on the number the owner reads: mean 67.9, sd 7.4, range 53–82** over the 30 days — a
+  0–100 score using 29 points of its range, driven by two of six contributors.
+- **Half the persisted audit trail is empty.** 59 stored rows carry an `activity_contributors` object
+  and **29 of them contain no contributors at all** — just `{base, trained, adjustment}`. The audit
+  view reads this column, so on those days it can show a score and nothing behind it. Which writer
+  produces the empty shape is **not established** and is the first thing to check.
+- **⚠ Do NOT "fix" the absent `activeEnergy` by reviving its input (added 2026-09-24).** The 15-weight
+  hole above is real, and the obvious repair is the wrong one: `Q-184`'s own check says do not compute
+  `active_calories_est`, because the owner chose direction C on 2026-08-11 and `Q-204` is designed to
+  *replace* `zoneMinutes` and `activeEnergy` with a single physiologically-grounded contributor. So the
+  renormalisation this entry measures is a symptom of work already queued, not a gap to plug. Whoever
+  acts on the lane-balance finding should read Q-204 first — and note it would also subsume TN-78's
+  threshold question, since that is the other contributor B removes.
+- **`steps` has never exceeded 61/100, which is Q-524 in one number.** The lane scores against
+  `getDailyGoals().stepGoal` = **10,000**; see the Q-524 amendment below — the profile goal the rest
+  of the app honours is now **5,000**, so the two are 2.0× apart and the lane cannot reach 100
+  without doubling the owner's own target.
+- **Proposal — one change, and it is not a weight tweak.** `strengthFreq` at weight 25 with sd 2.2
+  contributes ~0 variance while claiming a quarter of the model. Either (a) let the curve keep rising
+  past ratio 1.0 so training 5× vs 7× separates, accepting that this rewards volume the ACWR taper
+  is meant to punish and that the taper does not fire; or (b) cut its weight toward `strengthVolume`,
+  which already measures the same lane and does discriminate. **Recommendation: (b)** — it needs no
+  new curve, and the frequency signal is already inside the volume number. Per the Tuning rule this
+  proposal is incomplete until someone states **how many stored days it moves**; with 30 days of
+  contributors that is computable before shipping, and it must be, because it re-scores history.
+- **What this does NOT establish.** One user, 30 days, one activity level, one training pattern —
+  `strengthFreq`'s saturation is a fact about someone who trains 5×/wk, not about the curve's shape
+  for someone who trains twice. Nothing here says the score is *wrong*, only that four of its six
+  inputs are not moving it: per TN-73 there is a validated instrument for perceived effort and this
+  score has not been tested against it. And the 29 empty contributor rows mean the window is 30 days,
+  not 59.
+
+### [readiness][activity] TN-77 — "previous day's activity" is computed from TODAY's training window, and on a different weight base from the score it is compared with
+
+- **Branch:** `tuning/activity-contributor-behaviour`
+- **Lane:** A — `lib/health/readiness-payload.ts`, `packages/shared/src/health/score-audit/build-day-audit.ts`.
+- **Added:** 2026-09-24 · Tuning agent, found while auditing the Activity Score's contributors.
+- **Where the mechanism is:** `lib/health/readiness-payload.ts:471` and
+  `packages/shared/src/health/score-audit/build-day-audit.ts:182`. **Both call sites agree**, so this
+  is the model rather than a divergence between two copies.
+
+Readiness's `prevDayActivity` contributor (weight **0.09**) calls `computeActivityScore` a second
+time with yesterday's steps — and **today's** rolling 7-day strength window:
+
+```
+sessions7d: activityInput.sessions7d,   // today's window, not yesterday's
+volume7dKg,                             // likewise
+```
+
+- **(a) The window is off by a day, and it moves the number.** Reconstructed over 115 days
+  (2026-06-01 → 2026-09-23): the as-coded value differs from the same score on yesterday's window on
+  **83 of 115 days (72%)**, mean |difference| **4.45 points** when it differs, **≥5 points on 34
+  days**, worst **−15** (2026-06-05) and **+10** (2026-09-20). The mean signed difference is
+  **−0.15**, so it is noise rather than bias. At weight 0.09 the worst case is ~1.4 readiness points
+  — comparable to what TN-71 measured for `temperature`, which holds 10% of the weight and moves
+  1.1% of the score. **Small, and not zero.** The material case is a day the owner trains: today's
+  window contains that session and yesterday's cannot, so the contributor describing *yesterday*
+  reacts to *this morning's* workout.
+- **(b) The scale mismatch is the larger half.** The prev-day call passes **no** `zoneMinutes`,
+  `moveHours`, `strengthSessionToday` or `acwr`. With `activeEnergy` structurally absent (TN-76) its
+  weight base is `steps 18 + strengthFreq 25 + strengthVolume 20 = 63`, so **the strength lane holds
+  71% of it** — against 60% or 53% for the same-day score (TN-76's table). Two numbers built on
+  different weight bases feed one composite, and `prevDayActivity` is systematically **more
+  strength-weighted** than the activity score it sits beside. Given TN-76's finding that
+  `strengthFreq` is a constant at 100, the practical reading is that `prevDayActivity` is ~36% a
+  constant.
+- **Proposal.** Compute yesterday's window for yesterday's score, and pass the same contributor set
+  both times, or state in the code why it cannot be passed. Which of the two is the defect is worth
+  separating: (a) is plainly unintended, (b) may be deliberate — yesterday's intraday HR is available
+  and simply is not fetched — but nothing says so.
+- **What this does NOT establish.** (a) is reconstructed, not read from stored values: there is no
+  persisted `prevDayActivity` sub-score to check it against, and the reconstruction carries the sd 8.8
+  per-day error TN-76 describes, so the per-day figures above are indicative and the distribution is
+  the claim. (b) is read directly from the two call sites and needs no measurement. And neither says
+  the composite's output is wrong by that much — `prevDayActivity` is 9% of it.
 
 ### [readiness][heart-rate] TN-72 — v6 will never re-score a single stored day, and TN-55's plan said it would. That claim was mine and is retracted here
 
@@ -2738,6 +3166,15 @@ drift.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
 
+- **⏳ NOT STARTABLE BEFORE 2026-10-04, and it is NOT parked — read this before picking it up.**
+  RV-189 tried to park it and found nothing to park it with: `next-item.js` parks only on a `Needs:`
+  naming another entry, a `Gate:` of owner or device, or the legacy prose marker, and none of those is
+  true here. The blocker is the calendar. Rather than borrow a field that names the wrong reason, the
+  gap is filed as **`OR-157`** (an `Until:` field) and this entry stays READY with the date stated
+  here. **The fit needs days the clock has not produced yet** — picking it up earlier produces a
+  calibration fitted to a window that is still filling, which is the exact error BF-55 spent three
+  weeks on.
+
 - **Lane:** A — `app/api/body-battery/route.ts` (the constants only). **Added:** 2026-09-24 · Lane A,
   as the stated residue of TN-55.
 - **⚠ CARRIED FORWARD FROM TN-55, and it is a precondition on the fit rather than a note.** Review
@@ -3015,6 +3452,7 @@ drift.
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
+- **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
 - **In production:** `prescribed_runs` has **26 rows: 0 completed and 0 with `activity_log_id`**.
   22 are pending (21 of them in the past) and 4 are skipped. **17 of the pending days and 3 of the
@@ -3033,7 +3471,7 @@ drift.
 
 ### [activity][devices] RV-167 — a walk whose strap cadence stream started late stores a fifth of its steps, and nothing flags it
 
-- **Lane: B** — `components/guided-walk/walk-summary.tsx:171`.
+- **Lane: DV** — the code half shipped; what is left is a measurement on the strap.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
 - **In production:** the 2026-09-04 treadmill walk `d66aa0d7` has **34 cadence bins, the first at
   tSec 1470** of an 1,800-second walk, and stores **584 steps**. The other nine full strap walks store
@@ -3044,6 +3482,12 @@ drift.
   is short by about 2,400.
 - **Fix:** store null, or scale with the coverage stated, when bin coverage is below a floor. DV's
   part is to check whether the H10 accelerometer stream starts late.
+- **✅ Code half SHIPPED 2026-09-24** (LB-142, #1574, `lib/stores/cadence-coverage.ts`) — null below
+  50% cover, not scaled, at both write paths ([journal](overview/entries/2026-09-24-fix-rv167-cadence-coverage.md)).
+  **The floor is a judgement, not a fit:** the good walks' cover was never recorded.
+- **Keep:** DV — does the H10's accelerometer stream start late, and how often? A walk under the
+  floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
+  Pass/fail: walk with the strap already worn; record the first bin's tSec against the walk's start.
 
 ### [workouts][platform] RV-168 — `session_exercises.exercise_id`, documented as the join key, is wiped by every program save
 
@@ -3172,27 +3616,6 @@ drift.
   leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
 - **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
 
-### [readiness][app-shell] RV-176 — timezone-rule escapes the CI checks do not see: one medium, several latent
-
-- **Lane: B**
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **MEDIUM: `components/health/health-score-detail.tsx:138` uses `todayInTz(DEFAULT_TZ)`.** The
-  readiness and activity detail screens key the AI insight date (`:279`) and the offline seed
-  (`:148`) to Brisbane's date, so a user in another zone asks for tomorrow's insight.
-  `app/health/heart-rate/page.tsx:26` records the same bug, already fixed on the sibling screen.
-- **LOW, and harmless for the owner in Brisbane:**
-  - Device-local clock text in `components/activity/exercise-detected-card.tsx:9-15`
-    (`getHours()`). Use `formatTimeOfDay(ms, tz)`.
-  - Window starts from tz-less `todayMidnightUtc()` + `toAestDay()`: `session-select-content.tsx`
-    `:357,456,742`, `log-value-sheet.tsx:120`, `health-content.tsx:226`, `sleep-content.tsx:49`
-    and `metric-log-sheet.tsx:114`.
-  - Device month for calendar cache keys: `session-select-content.tsx:266-276,385-389`,
-    `workout-screen.tsx:1501`, `calendar-widget.tsx:35` and `year-review-content.tsx:14`.
-  - Device hour for the meal bucket: `nutrition-content.tsx:592`, `food-logger-sheet.tsx:250`,
-    `saved-meals-sheet.tsx:449` and `assign-step.tsx:51,58`. assign-step also re-implements
-    `mealTypeForHour`, which breaks One Formula.
-- **The CI blind spots behind these are in RV-179.**
-
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
 - **Lane: B** (callers), Lane A for `lib/local-store/push-then-revalidate.ts` / `cache-groups.ts`.
@@ -3289,6 +3712,12 @@ written entity.
     `Intl.DateTimeFormat` (RV-176).
   - **`check-client-today-timezone`** misses `todayInTz(DEFAULT_TZ)` and bare
     `todayMidnightUtc()`/`toAestDay()` (RV-176).
+- **RV-176's instances all SHIPPED 2026-09-24 (LB-143) — the two blind spots above did not close,
+  and that is still this entry's work.** Nothing in Custom Rules would catch a reintroduction; what
+  holds them at zero today is `lib/__tests__/rv176-timezone-escapes.test.ts`, a vitest scan of every
+  client `.tsx`. Widening the two scripts should let that file shrink to the helper's unit tests.
+  Note the arity trap it documents: the tz is `todayMidnightUtc`'s FIRST argument and `toAestDay`'s
+  SECOND, and a naive `toAestDay\([^,)]+\)` flags the CORRECTED form by stopping at an inner paren.
   - **`check-memo-prop-stability`** misses a render-body function passed by name (RV-178).
   - **`prose-guards.test.ts`** uses a hand-written route list (RV-173).
 - **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11
@@ -4997,32 +5426,6 @@ written entity.
   after; `grep -rn REST_DAY_CARB_REDUCTION app/` returns one definition.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** `generate/route.ts` declares at `:98` and uses at `:357-360`, **plus a third use at `:306`** (`restDayCarbLine(dailyCarbs * REST_DAY_CARB_REDUCTION)`). The helper should cover the prompt line too. `structure/route.ts` is unchanged at `:47,129-131`.
 
-### [platform] LB-123 — `cachedFetch` caches any 2xx body, so a route that can answer `null` cannot use it
-
-- **Lane: A** — `lib/sqlite/cache.ts:366`. **Added:** 2026-09-21 · found by Lane B while taking
-  RV-79. The `LB-` letter records who found it, not who ships it.
-- `cachedFetchCore` ends a successful fetch with `await setCached(key, toStored(data), ttlSeconds)`
-  — **unconditional**, outside every null check. `onData` runs before it and cannot veto it, and
-  the only opts are `freshWithinTtl` and `onError`. So a caller cannot say *"paint this, but do not
-  persist it"*.
-- **Why that matters beyond style.** `setCached` writes sessionStorage, localStorage **and**
-  SQLite, and `readCacheSync` parses a stored `"null"` back to `null` rather than treating it as a
-  miss. A route that legitimately answers `null` therefore **overwrites a good cached value with an
-  absence**, and every `readCacheSync` seed downstream reads that absence as fact.
-- **Measured 2026-09-21, not read off the source.** Seed `mood:<date>` with a log, run `cachedFetch`
-  against a stubbed 200 returning `null`: `onData` fires twice (`[{…}, null]`) and
-  `readCacheSync` then reads `null`. That is the session-167 mood re-prompt bug, reachable through
-  the helper the standing cache rule tells every client GET to use.
-- **Fix:** `opts.shouldCache?: (data: T) => boolean`, defaulting to always, threaded into
-  `cachedFetchCore` to guard that one `setCached` call. Additive — every existing caller is
-  unaffected — and it lands for **any** nullable-payload key, not just mood. A narrower `skipNull`
-  boolean also works; the predicate is preferred because the next case will not be `null` (an empty
-  array reads the same way to a seed).
-- **Unblocks RV-79**, which is currently a rule violation that cannot be fixed without it.
-- **Not established:** how many other GET routes can answer `null` or `[]` was not swept — this was
-  found from one call site. A sweep is worth doing when the option lands, and is not a blocker for it.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **ALREADY SHIPPED — do not build.** #1394 (0fc1581e) added `shouldCache?: (data: T) => boolean` (`lib/sqlite/cache.ts:279`), used at `:386`, threaded through `:443/449`, tested at `cache-fetch.test.ts:331`, used at `done-screen.tsx:125`. Removal is in RV-189. **RV-79's `Needs: LB-123` then clears**, and its *"no shouldCache option"* text is stale.
-
 ### [workouts][platform] RV-79 — Home reads today's mood with a bare `fetch`, against the standing rule
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:613`. **Added:** 2026-09-20 ·
@@ -5039,8 +5442,9 @@ written entity.
   Lane B.** `onData` has no power over the write:
   `cachedFetchCore` (`lib/sqlite/cache.ts:366`) calls `await setCached(key, toStored(data),
   ttlSeconds)` **unconditionally** after any 2xx, outside every null check, and `toStored` is
-  identity for `cachedFetch`. There is no `shouldCache`/`skipNull` option — the only opts are
-  `freshWithinTtl` and `onError`.
+  identity for `cachedFetch`. There was no `shouldCache`/`skipNull` option when this was
+  measured — the only opts were `freshWithinTtl` and `onError`. **That is no longer true; see the
+  unblocked note below.**
 - **Proven, not read off the source.** A probe seeded `mood:<date>` with an optimistic log, then
   ran `cachedFetch` against a stubbed 200 returning `null`:
   - `onData` fired **twice** — `[{logDate…, energyLevel:'high'}, null]`, so React state is clobbered
@@ -5050,10 +5454,16 @@ written entity.
     than treating it as a miss — so the seeds at `session-select-content.tsx:211` and `:319` call
     `setMoodLog(null)` on the next visit and **the check-in card re-prompts**. That is the
     session-167 bug exactly.
-- **Needs: LB-123** — the enabling change is in `lib/sqlite/**`, which is Lane A's. Converting
-  `loadTodayMood` is one line once that option exists, and **this entry stays Lane B**.
-- **Do NOT convert this call site before then.** The bare `fetch` is the rule violation; caching
-  the null is a live bug. Trading the first for the second is a loss.
+- **✅ UNBLOCKED 2026-09-24 (RV-189) — the enabling option SHIPPED and this entry is now buildable
+  as one line.** `LB-123` asked for it; #1394 landed it and `LB-123` is removed, so the `Needs:` is
+  gone. `cachedFetch` takes **`shouldCache?: (data: T) => boolean`** (`lib/sqlite/cache.ts:279`,
+  guarding the `setCached` at `:386`, threaded at `:443`/`:449`); `done-screen.tsx:125` is a live
+  caller. **The two bullets above are now stale where they say the option does not exist** — struck
+  rather than deleted, because the measurement under them is what justifies passing the predicate
+  and is still true.
+- **So the fix is:** `cachedFetch('mood:'+today, …, MOOD_TTL, …, { shouldCache: (d) => d != null })`.
+  Without that option the conversion trades a rule violation for a live bug; with it, neither.
+  **Still Lane B** — the engine half is done.
 - **Not established:** on the APK the local-store branch short-circuits before this fetch, so how
   often it fires on device is unmeasured. Filed for the rule as much as the cost.
 
@@ -5375,6 +5785,14 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the five sites are now `readiness-payload.ts:628, 657, 661, 675, 817` (plus the `ouraScore` passthrough at `:847`); `computeBlendedScore` is at `:249`. **Strike step (1) of "What to do, in order": the owner answered it on 2026-09-22**, and the entry contradicts itself.
 
 ### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
+
+- **Reference:** don't build **yet**, and the reason is a count rather than a judgement — converted
+  2026-09-24 by RV-189 on the entry's own verdict. `feedback_submissions` holds **zero** rows, so a
+  route to serve the withheld `screenshot_data` would be built against no traffic and verified
+  against nothing. **This is the known gap `CLAUDE.md` names** — a UI bug arrives with
+  `screenshot_bytes` (a size) and not the image — so the finding must not be lost, which is why this
+  is `Reference:` and not a removal. **Revisit the moment the table is non-empty**: the first real
+  report is both the reason to build it and the fixture to test it with.
 
 - **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
   decision the same day.- **✅ RE-MEASURED 2026-09-24 (Lane A) — the deferral below still holds, so this was NOT built.**
@@ -6496,6 +6914,18 @@ existing 65 days moves by less than 5 points on every one of them.
   three are 1 point out, and 25 of 65 are stamped.
 
 ### [nutrition][platform] RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
+
+- **Reference:** re-verified and NOT buildable as written — kept so the next sweep recognises it in a
+  minute instead of re-deriving it. Converted 2026-09-24 by RV-189, on Review sweep 59's reading and
+  Lane A's 2026-09-23 re-verification below. Three findings, all still true: the `Promise.all`
+  structure is real, the two calls are **not** duplicates (the rest variant subtracts
+  `REST_DAY_CARB_REDUCTION`, so the variants scale toward different targets and reach different
+  shortfalls), and the path has **never executed** — zero `meal-plan-top-up` rows, and
+  `meal-plan-generate` has fired twice ever, last 2026-09-01. The proposed key would collapse the two
+  calls only when the shortfalls happen to round together, so a fix built to this description is a
+  near-no-op that reads as done. **If the path ever runs, build the entry's SECOND option instead**
+  (one top-up on the training variant, re-scaled for rest) — it changes plan output, so it needs a
+  sign-off.
 
 - **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts:355-380`,
   `lib/nutrition/meal-top-up.ts:88`. **Added:** 2026-09-20 · Review sweep 51.
@@ -8161,105 +8591,6 @@ composite reports which of its inputs were inferred.
 - **Do NOT fix this by raising `retries`.** That hides it, and the run-1 `la109` case shows why the
   hiding is expensive: the failures it produces are indistinguishable from real ones until re-run.
 
-### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for TWO hours a day
-
-- **Lane:** A — `packages/shared/src/health/body-battery-inputs.ts:125`. Filed by Lane B on
-  2026-09-16 after `e2e/rv38-body-battery-no-data-badge.spec.ts` failed CI on an unrelated PR.
-- **⚠ RED ON `main`, and it fires on a CLOCK — TWO separate hours: 00:00–01:00 AND 07:00–08:00
-  Brisbane (14:00–15:00 and 21:00–22:00 UTC), every day, on every branch.** That is why it reads as
-  a flake and is not one. It is the hour-dependence class CLAUDE.md documents at length, in its
-  nastiest form: the test is CORRECT and the payload is wrong.
-- **✏️ CORRECTED 2026-09-17 by Lane B, and the correction is the point: this entry said ONE hour and
-  named the wrong mechanism for half of it.** It was filed from a single 07:55 observation and the
-  clause was then read backwards from that one data point — which is the "an entry's numbers are
-  prose until something checks them" trap, committed by the entry's own author. There is a SECOND
-  window with a SECOND cause, in `app/api/body-battery/route.ts:172` rather than the clause:
-  ```ts
-  const rawWakeTime = todaySleep?.sleepEnd?.getTime() ?? firstHrTime
-    ?? (todayMid.getTime() + 7 * 3_600_000)   // default 07:00
-  const wakeTime = rawWakeTime > now.getTime() ? (firstHrTime ?? todayMid.getTime()) : rawWakeTime
-  ```
-  Before 07:00 local the 07:00 default is **in the future**, so the future-wake guard fires and
-  `wakeTime` falls back to `firstHrTime ?? todayMid` — and a zero-data account has no HR rows, so it
-  lands on **local midnight**. `wakingMinutes` is then minutes-since-midnight, which is under 60 for
-  the first hour of the day. So the grace clause short-circuits at 00:00–01:00 for that reason and
-  again at 07:00–08:00 for the reason already filed. Between 01:00 and 07:00 it is over 60 and the
-  spec passes.
-- **Measured, not inferred.** `GET /api/body-battery` for the `zero@local.dev` fixture, captured
-  2026-09-17 07:55 Brisbane:
-  ```json
-  { "current": 50, "label": "Good", "hasData": false, "anchorSource": "default",
-    "confidence": { "sampleCount": 0, "wakingMinutes": 55, "samplesPerHour": 0, "sufficient": true } }
-  ```
-  **Zero samples, zero per hour, `sufficient: true`.**
-- **The clause that does it:**
-  ```ts
-  sufficient: mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR
-  ```
-  `MIN_WAKING_MINUTES_TO_JUDGE` is 60, and `mins` is `Math.max(0, wakingMinutes)`. The fixture's wake
-  anchor is **07:00 local** after 07:00 and **local midnight** before it (see the correction above),
-  so `wakingMinutes` is under 60 in each of the two windows and the grace clause short-circuits to
-  true. Outside them it goes false, the badge returns, and the spec passes again.
-  **The recommended one-condition fix below closes BOTH windows**, because it keys on
-  `sampleCount === 0` rather than on the window — which is why the correction changes the entry's
-  scope and urgency without changing its fix.
-- **✅ CONFIRMED BY NATURAL EXPERIMENT, not just by reading the clause.** The same commit
-  (`1bc4332afa`, PR #1264) ran E2E twice: the run starting **21:15 UTC failed** on this spec, and the
-  run starting **22:00 UTC passed**. Identical code, identical fixture, different side of 22:00 UTC —
-  which is 08:00 Brisbane, the minute `wakingMinutes` crosses 60. That forecloses the "it is just
-  flaky" reading, which is the reading this defect otherwise invites.
-- **Cause: #1256** (*"Stop counting sleep as daytime stress"*, LA-112) narrowed the route's waking
-  window. Before it, the window was effectively the whole calendar day, so `mins` cleared 60 at any
-  hour and zero samples always read as insufficient. Nothing is wrong with that change; it exposed a
-  clause that was only ever correct by accident of a wide window.
-- **The grace clause is right for a day that is young and wrong for an account that has never had
-  data**, and the two are not the same state — `hasData: false` and `anchorSource: "default"` both say
-  so in the same payload. **Recommended:** `sufficient` is false when `sampleCount === 0`, whatever
-  the window; keep the grace for a genuinely young day that has *some* readings. One condition.
-- **⚠ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
-  nothing must qualify the 50 it prints — and it is the whole point of the entry. The card
-  (`components/body-battery-card.tsx`) is also correct and unchanged since #1214: its guard is
-  `conf != null && !conf.sufficient`, which is right; it is being told `true`.
-- **Secondary observation from the same CI run**, recorded so it is not lost rather than diagnosed:
-  three specs went flaky-but-passed (`bf5-week-in-review-page.spec.ts:106`,
-  `nutrition-day-navigation.spec.ts:92`, `one-calorie-budget.spec.ts:135`) and the log carries a
-  `chrome-headless-shell` crash stack. One runner, three retries and a browser crash reads as runner
-  instability rather than three spec defects.
-- **⚠ IT REPEATED — twice on 2026-09-17, on PR #1280's two E2E runs, so it is no longer "worth a
-  second look".** Both runs carry a `chrome-headless-shell` **SIGSEGV** (`Received signal 11
-  SEGV_MAPERR`, faulting address `0x1b0` both times, identical stack). Run 1 lost two specs to
-  `browser.newContext: Target page, context or browser has been closed` — no test body ran —
-  including `diary-nested-meal.spec.ts:231`; run 2 lost three more to retries. **Every one of them
-  passed on the other run or on retry**, and `la109-back-from-subroute.spec.ts:87`, which failed run
-  1 on a real 30 s timeout, passed run 2 and passed four times locally. So the pattern is a browser
-  that dies mid-suite and takes whatever was on that worker with it. **Filed as its own item is the
-  right next step rather than more notes here** — the practical cost today is that an E2E result has
-  to be read twice before it means anything, which is exactly the "flake is not a root cause" reading
-  this repo forbids relying on.
-- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` inside EITHER red window —
-  **00:00–01:00 or 07:00–08:00 Brisbane** — and it must pass. Outside both it passes regardless and
-  proves nothing. **Verify in both**, not one: they have different causes (the clause, and the
-  future-wake fallback to midnight), and the recommended one-condition fix is what makes passing in
-  one predict passing in the other. A fix verified only at 07:30 has not been shown to close the
-  midnight window at all.
-- **✅ THE MIDNIGHT WINDOW IS CONFIRMED BY NATURAL EXPERIMENT TOO, not only by reading the guard**
-  (2026-09-17, PR #1280, one checkout, no code change between runs):
-
-  | Brisbane local | result |
-  |---|---|
-  | 00:41 · 00:46 · 00:50 | **failed**, three for three |
-  | 01:06 | **passed** |
-
-  Opposite sides of 01:00, so the boundary is where the guard says it is. The CI runs bracket it
-  from the other side: #1280's first E2E run (23:36–00:01) passed this spec and its re-run
-  (00:06–00:40) failed it on the identical commit. Same shape as the 21:15/22:00 experiment above,
-  at the other window.
-- **The control that establishes a red run here is NOT the PR's, for whoever hits it next:** check
-  the wall clock in Brisbane first. A local repro at 00:41 on a checkout differing from `main` only
-  in four nutrition files is what settled ownership on #1280; it took minutes, where reading the
-  spec's assertion would have suggested a real regression.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **ALREADY SHIPPED — do not build.** #1345 (99994349) set `sufficient: sampleCount > 0 && (…)` at `body-battery-inputs.ts:139`, the single condition this entry recommends, and it closes both the 00:00 and 07:00 windows. The SIGSEGV side-note is LB-119. Removal is in RV-189.
-
 ### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 
 - **Verify:** device — Health Connect only runs natively (`syncHealthConnect` returns immediately off
@@ -8488,6 +8819,11 @@ task A settles.
 supply; and a rendered score can say what it was computed without.
 
 ### [platform][readiness] TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
+
+- **Needs: OR-156** — added 2026-09-24 by RV-189. **Step 1 shipped** (#1259, guide §5.4/§5.5) and
+  step 2 was withdrawn inside this entry, so step 3 is all that is left — and step 3's own text says
+  *"do not start without its own plan"*, which no plan satisfies. `OR-156` is that plan. This entry
+  was printing READY for Lane A while being unstartable by its own instruction.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*
 - **Lane: A** for steps 2–3 (`lib/health/readiness-payload.ts:278-291`); **step 1 is docs-only and should not wait.**
@@ -17055,6 +17391,13 @@ test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again
 - **Needs:** TN-5 — added 2026-09-24 by Review sweep 59: its own sequencing note says build after TN-5, which sat below it.
 
 ### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
+
+- **Needs: OR-150** — added 2026-09-24 by RV-189, on Review sweep 59's reading. This changes what
+  counts as an active hour, so it is a **scoring change**, and CLAUDE.md is explicit that Tuning
+  proposes, the owner signs and Lane A implements. No proposal exists and none of the three options
+  states **how many other days it moves**, which is what a proposal owes. `OR-150` is the hold for
+  exactly this class; this makes it fourteen rather than thirteen. **There is no `Lane:` value for
+  Tuning**, which is why the hold is a `Needs:` and not a lane change.
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_
@@ -17694,11 +18037,22 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   nothing was observed in production.
 ### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate
 
+- **⚠ NOT STARTABLE AS LANE B — rerouted 2026-09-24 by RV-189** (Review sweep 59). The lane field
+  above reads `B` for *"what is left"*, but what is left is an **undiagnosed cause** rather than a
+  surface change: the engine half shipped and the trend is still wrong, so the next action is a
+  diagnosis, and the evidence points engine-side. Handing a surface lane a defect whose cause is
+  unknown produces a guess at the render layer. **Re-lane it once the cause is named** — to `A` if it
+  is engine-side as expected, back to `B` if the diagnosis lands in `components/health/**` after all.
+
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** HR recovery still plots **0-value points** (Thu,
   Fri, Wed), and there is **no gap** over 09-15…09-20 even though data is present 15–17. Breaks do
   render for a real gap elsewhere, so the break logic works; the zeros are the fault.
 
-- **Lane:** B for what is left — `components/health/**`, by the path rule. The engine half was
+- **Lane: A** — **re-laned 2026-09-24 by RV-189** from `B`. The field below reads `B` for *"what is
+  left"*, and what is left is a DIAGNOSIS whose evidence points engine-side, not a surface change;
+  the path rule sends an item spanning both to `A`. **Re-lane back to `B` if the cause lands in
+  `components/health/**` after all.** Superseded, kept for the reasoning: Lane B for what is left —
+  `components/health/**`, by the path rule. The engine half was
   Lane A's and is done; this entry carried no `Lane:` field at all, so it printed as UNCLASSIFIED
   while its remaining work sat named in the body.
 - **Branch:** `lane-a/tn53-hrr-density-gate` (engine) · `feat/tn53-sparkline-gaps` (render) ·
@@ -22553,69 +22907,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
   (Q-500 was on this list and is retired — shipped 2026-08-18, follow-up answered 2026-08-26.)
 
-### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
-
-- **✅ THE PROPOSAL EXISTS NOW, AND THE OWNER HAS SIGNED IT (2026-09-22).** This entry waited from
-  2026-08-15 for a Tuning proposal. It is
-  [`2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md),
-  filed as **TN-55**, fitted offline against 64 days with a committed harness
-  (`scripts/tuning/body-battery-replay.cjs`). **Q-272 and TN-55 are one line of work — build from the
-  plan, and read §6a first.** Gate lifted.
-- **⚠ THIS ENTRY'S OWN ACCEPTANCE TEST DOES NOT REPLICATE — do not use it.** The *"v5 end-of-day
-  battery → next-day readiness is r = +0.67 (n = 11)"* below, and the instruction to re-run it after
-  the change, were re-measured 2026-09-23 over **70 days**: **r = +0.252**, against readiness's own
-  day-to-day autocorrelation of **+0.361**. The battery's end value predicts tomorrow's readiness
-  *worse than yesterday's readiness does*. So the conclusion drawn from it — *"v5's level carries real
-  signal; its shape within the day is wrong"* — keeps its second half (the four defects are measured
-  independently) and **loses its first**. Use the plan's distributional pass test instead; a change
-  cannot be validated against a relationship that is not there.
-- **⚠ Direction 1 below is refuted twice over and direction 2 is the survivor.** Q-502 refuted raising
-  `CHARGE_RATE` alone; TN-55 additionally found that overnight charging must **not** be added, because
-  this entry is right that the wake anchor already accounts for the night — re-fitting without it is
-  strictly better (0% of days ending at zero, against 5% with it). Direction 2 (feed daytime HRV into
-  the charge term, from `rr_intervals`) remains open and unmeasured.
-
-- **Branch:** `fix/body-battery-daytime-recovery`
-- **Plan:** none yet · tuning notes live in [`docs/body-battery-tuning.md`](body-battery-tuning.md)
-- **Added:** 2026-08-15 · from the comprehensive review §1.5
-- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: the Body Battery walk is `packages/shared/src/health/body-battery-walk.ts` with its constants in `app/api/body-battery`.
-- **Measured, grouped by `model_version` over 40 production days:**
-
-  | model_version | n | charge/day | drain/day | ratio | hit 0 | ended at daily min |
-  |---|---|---|---|---|---|---|
-  | `v1:…chg0.4:drn0.6` | 9 | 34.2 | 22.1 | 0.6× | 0 | 1 |
-  | `v4:…chg0.4:drn0.6:str0.2` | 18 | 34.9 | 30.3 | 0.9× | 0 | 7 |
-  | **`v5:…chg0.2:drn0.6:hrmax-observed`** | **12** | **10.5** | **52.4** | **5.0×** | **3** | **10** |
-
-  Across all 40 days: `end_value == day_min` on **19**, and `day_max == anchor` on **13** — on a
-  third of days the battery never rises above where it woke up.
-- **Cause is known and was deliberate.** Q-57 halved `CHARGE_RATE` 0.40 → 0.20 to stop days pinning
-  at the 100 ceiling. It fixed that (ceiling days 14 → 0) and overshot into the opposite failure.
-- **The deferred validation says tune, not abandon.** The same review re-ran the check the
-  Known-Issues row asked for: **v5 end-of-day battery → next-day readiness is r = +0.67 (n = 11)**.
-  v5's *level* carries real signal; its *shape* within the day is wrong.
-- **What "wrong shape" means concretely.** Garmin's Body Battery — the model this is built against —
-  recovers during waking rest; that is the feature's headline behaviour, and Firstbeat drives it
-  from beat-to-beat HRV rather than heart rate alone. Overnight recharge here is handled by the
-  morning anchor reset rather than accumulated charge, which is a defensible difference. Near-zero
-  *daytime* recovery is not.
-- **Directions, in preference order:**
-  1. Raise `CHARGE_RATE` back toward v4 **and** keep v5's `hrmax-observed` reserve — the ceiling
-     problem v5 solved was mostly the reserve, not the charge rate. Backtest both changes
-     independently against the stored HR series before picking.
-  2. Feed daytime HRV into the charge term. `rr_intervals` holds ~49,900 rows and
-     `daytime_stress_scaled` exists on 22 of 40 days; neither reaches the battery model today.
-- **Re-measure:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
-  the before/after comparison is not interpretable.
-- **⚠️ Read [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md)
-  (Q-502) before starting. It re-measured this entry (still true — 5.6× on 14 v5 days now) and found
-  two things that change how to work it:** (a) **direction #1 above is refuted** — the charge window
-  is reachable on a median 6.7% of waking samples (0.8% on 2026-08-14), so raising `CHARGE_RATE`
-  scales a term that is barely active; `REST_THRESHOLD`/the reserve is the lever. (b) The stored
-  snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
-  is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **ALREADY SHIPPED — do not build.** #1521 (266f5178) shipped v6 via TN-55: net −48 → +0.2/day, days ending at zero 67% → 0%. The only residue is LA-134, the constants re-sweep after 2026-10-04. Direction 2 (daytime HRV in the charge term) is unmeasured and waits on TN-33's stress sign; re-file it as a Tuning idea if it is still wanted. Removal is in RV-189.
-
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
 
 - **Needs:** Q-523
@@ -24141,6 +24432,66 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
   **Sequencing is unchanged:** the single-source read is still the first change and is independent of
   the formula. Ship precedence first, then provenance, then the formula.
+  **✅ THE DOUBLE-COUNT QUESTION IS ANSWERED — measured 2026-09-24 (Tuning), and the answer is "not
+  live, and probably never".** The trap above says *"deriving the step goal from an energy target
+  makes those two contributors measure the same walking twice — decide the double-count before
+  shipping"*. Decided, on evidence rather than judgement:
+  - **It is not live today.** `activeEnergy` scores `body_metrics.active_calories`, which holds a
+    value on **16 of 147 days and none since 2026-07** (Q-521). Its intended replacement,
+    `oura_daily_derived.active_calories_est`, is **NULL on all 110 days** — plumbed through schema,
+    Zod, local store, sync mapper and adapter write with **no code that computes it** (Q-184). Two
+    candidate sources, both empty, so there is currently nothing to double-count with.
+  - **And the owner's chosen direction removes the other half.** Q-184's own 2026-08-14 check says
+    do **not** build the estimate, because direction **C** was chosen on 2026-08-11 and direction
+    **B** — now `Q-204` — is designed to *replace* `zoneMinutes` and the dead `activeEnergy` with one
+    physiologically-grounded contributor. If Q-204 lands there is no `activeEnergy` term to collide
+    with; the double-count only appears if Q-184 is built instead, which that entry advises against.
+  **So this no longer blocks the formula.** Sequence it as `Needs: Q-204` if the energy derivation is
+  built before that lands; otherwise the collision cannot occur. **Do not resolve it by re-adding
+  `activeEnergy`** — that is the input Q-204 exists to remove.
+- **⚑ AMENDED 2026-09-24 (Tuning) — THE PROFILE VALUE HAS MOVED TWICE SINCE THIS ENTRY WAS WRITTEN,
+  AND THE GAP HAS WIDENED FROM 1.43× TO 2.0×.** Everything above is measured against
+  `users.steps_goal = 7,000`. **It reads 5,000 today.** The applied history, from
+  `goal_recommendations`:
+
+  | applied | source | recommended | 14-day mean steps at that date |
+  |---|---|---:|---:|
+  | 2026-06-30 | `scheduled` | 7,000 | 5,951 |
+  | 2026-08-11 | `scheduled` | **6,000** | 6,370 |
+  | 2026-08-31 | `on_demand` | **5,000** | 3,259 |
+  | 2026-09-14 | `scheduled` | 5,000 | 3,072 |
+
+  So the scored value stayed at 10,000 while the honoured value fell 29%. **Whoever builds the
+  single-source read is choosing between 10,000 and a number that has changed three times in ten
+  weeks** — which is an argument for sequencing precedence and provenance before the formula, exactly
+  as this entry already says, and against treating 5,000 as a settled target.
+- **NOT an automated overwrite — (a)'s "code shape, not an incident" still stands.** `source:
+  'scheduled'` describes how the recommendation was *created*, not applied; `status: 'applied'` is
+  only ever written by `handleApply` in `components/profile/goal-recommendation-sheet.tsx`, a button.
+  The owner applied each one, within a minute of it appearing. **No silent overwrite has occurred.**
+- **The sharper new half: the derived path is unanchored, and it undercut the evidence base the file
+  cites.** `recommendedStepsGoal` is emitted by the LLM (`clampRecommendation`,
+  `packages/shared/src/nutrition/goal-recommendation.ts:326`) and bounded only by **[3,000, 20,000]**
+  — a sanity range, not a calibration. The prompt hands the model both `Average daily steps: N`
+  (14-day) and `Current goals: steps N`, so a falling average and the previous goal are the two
+  anchors it has. `daily-goals.ts` cites Paluch 2022 (benefit plateaus ~7–8k) and encodes
+  `DEFAULT_STEP_GOAL = 8000`; **the live value is 37.5% below that floor, and the clamp permits
+  3,000.** This is the same self-referential treadmill the 2026-07-22 Activity rewrite removed from
+  the score's lanes — *"a lazy week lowered the bar"* — re-entering through the goal instead of the
+  lane. **It supports this entry's own "Recommended shape"** (derive the goal from a target net
+  walking energy as a fraction of BMR): a deterministic number the AI adjusts within a band, rather
+  than a number the AI emits.
+  **Deliberately not over-claimed:** `corr(14-day mean, recommended goal) = +0.857` across the four
+  applied recommendations is **n = 4 and proves nothing**, and the goal/mean ratio *rose* (1.18, 0.94,
+  1.53, 1.63) as steps fell — so the recommender tracked the decline **less than proportionally**
+  rather than chasing it down one-for-one. The monotone 7,000 → 6,000 → 5,000 sequence and the absent
+  evidence anchor are the findings; a fitted slope is not.
+- **Lane: A** — added 2026-09-24 (Tuning). This entry was fully decided on 2026-08-19 and signed off
+  again on 2026-08-31 with *"Lane A has everything it needs; nothing further is gated on the owner"*,
+  and it carried **no `Lane:` field at all**, so `next-item.js` read it as UNCLASSIFIED and no
+  implementer was ever offered it. The path rule resolves it with no ambiguity — `packages/shared/**`,
+  `app/api/**` and a migration for the provenance column are all Lane A. Assigned here rather than
+  referred onward, since the rule and not a list decides it.
 - **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
   value wins everywhere and the profile field becomes display-only or is removed — but then the
@@ -26676,6 +27027,16 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Precedent to follow:** the volume anchor must be **absolute**, not the user's own rolling load —
   Q-190 removed exactly that self-reference from the volume lane, and a load lane anchored on a
   trailing average would reintroduce it.
+- **⚑ THE EFFORT ESTIMATE IS WRONG, corrected 2026-09-24 (TN-79).** Gate 1 above, and §11 of the
+  calibration doc, concluded from the empty column that *"any load term is a from-scratch
+  derivation"*. The reasoning was sound and the conclusion is not: `runTrainingStressScore`
+  (`lib/oura-models/inference/ots.ts`) is a **complete ported OTS model** — 195 lines with the MET
+  weight bank, VO₂max categories, an RHR fallback and a rolling 720-minute window — wired end to end
+  through `app/api/training-stress/route.ts` → `computeTrainingStress` → persist. The column is empty
+  because the model's input validator **rejects any NaN** when `noOts === 0` while the route
+  deliberately fills non-wear gaps with NaN, so every real day fails and is misreported as
+  `insufficient_met`. **So B is not a new derivation; it is one input-contract bug away from producing
+  values.** Read TN-79 before scoping this entry — it changes the cost more than anything else on it.
 - **Sequencing:** independent of Q-184. If a load lane lands, the case for reviving
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
@@ -27026,17 +27387,6 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Native-only APK caveat**: `CYCLE_BUDGET_MS` is also the real retry-give-up budget, not just a
   visual duration — shortening it trades away retry margin for slower-than-typical connections, so
   reconcile + shorten carefully and re-verify on-device, not just visually.
-
-### [nutrition][app-shell] Q-112 — the unified day review: the read-through already exists, so this is a flow
-
-- **Branch:** _umbrella_ · **Lane: B** · **Plan:** [`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)
-- **Needs: Q-112e**
-- **Added:** 2026-08-06 · **re-planned 2026-08-25 — Task 27 is now stale in its central premise.** It
-  asked for a new merged day screen; `/health/day` shipped two days later and already draws body
-  composition, energy in/out, per-session volume, steps, scores, sleep and a day HR trace from
-  reusable components. What is missing is one entry point instead of two, three stats, a 7-day
-  comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **UMBRELLA WITH EVERY CHILD SHIPPED — do not build.** Q-112a #587, Q-112b #592, Q-112c #868, Q-112d #951 (+#953), Q-112e #1129. Removal is in RV-189.
 
 ### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 
@@ -27606,7 +27956,7 @@ describing a safety net that no longer exists.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
-- **Lane:** A — migrations and `scripts/check-push-mutations.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
+- **Lane: O** — **re-laned 2026-09-24 by RV-189** (Review sweep 59) from `A`. What is left in this entry is roadmap reconciliation and planning, not migrations: the OR-116 sweep assigned `A` from the paths its oldest bullets name, and those halves have since shipped. Planning is the Orchestrator's per the lane rule. Re-lane to `A` if a concrete migration falls out of the planning.
 
 - **The `Gate: owner` was removed 2026-09-01 — nothing here is the owner's any more.** F1, F2, F3
   and F7 are all answered (dates and quotes in the table below); F8 was fixed in this entry's own
@@ -28441,38 +28791,6 @@ means no public server deploy: their asset files move to `.gitignore` and stay o
 private build machine. Implement in the new public repo once it exists, per owner preference — this
 repo's production path is unaffected until then.
 
-### [readiness] 🟡 Q-3b — awakenings-calibrated restfulness + the chronic-stress two-scale column
-
-- **Lane:** A
-> **⚑ The data gate is CLEARED (2026-08-04).** This entry says *"No code without that data. ⛔
-> owner/data-gated"* — the data exists: **32 rated nights** in `day_checkins.sleep_quality_feel`,
-> collected automatically by the morning check-in since 2026-07-03. See **Q-72** for the analysis of
-> what those ratings say, which is stronger than expected and reframes this item.
-
-Two independent findings, both low-urgency:
-
-- **(a) Awakenings-calibrated restfulness term — TRIED 2026-08-06, REJECTED, superseded by a
-  different mechanism.** `restlessPeriods` (the ring's 0–5 wake-event count) was tested as the
-  driving signal for exactly this: production data showed the SAME value (4) on both a real
-  disrupted night (2026-08-06) and the single best-rated night of the prior month (2026-07-17) —
-  it carries no separating information for this ring, confirmed empirically, not assumed. Do not
-  revisit this specific approach without new evidence it's more informative than that. What
-  shipped instead: an awake-TIME-fraction fragmentation cap (not an awakenings-count term) — see
-  [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
-  Closed.
-- **(b) `chronic-stress-assembly.ts:65`'s `gotUps` two-scale concern — RE-INVESTIGATED
-  2026-07-30, does not reproduce on current `main`.** Traced the full input chain:
-  `oura_daily_summary` (migration 116, "Oura BLE Phase 5 addendum A3") is written only
-  by two paths — the server-side `aggregateOuraRawSamples` rollup (`nightInputsByDate`
-  in `lib/data/postgres/adapter.ts`, built exclusively from `oura_raw_samples`, i.e.
-  BLE-only, post-2026-07-07-re-key) and the on-device push path
-  (`pushMutations`'s `oura_daily_summary` branch, same device-computed
-  `model.awakenings` scale). No code path ever writes Oura Cloud's
-  `sleep_sessions.restless_periods` (138–330 scale) into `oura_daily_summary` — the
-  table didn't exist before the BLE era, so there's nothing pre-cutover for a 31-night
-  window to straddle. Downgrading — no action needed unless new evidence surfaces.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **NOTHING LEFT TO BUILD.** Half (a) was closed and rejected (`AWAKE_FRAGMENTATION_CAP` shipped instead). Half (b) is recorded here as *"does not reproduce, no action needed"*. Removal is in RV-189.
-
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
 - **Lane:** A
@@ -29091,6 +29409,12 @@ and the whole dataset's **maximum `bpm_at_end` is 128**, which is what makes Q-1
 degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
+
+- **Reference:** don't build — the entry's own verdict, made a field 2026-09-24 by RV-189 so it stops
+  printing as READY. The measured win did not justify the change, and the tripwire that guards the
+  regression **is already enforced** in the Custom Rules job (*"applyDelta's domain list is frozen
+  (Q-28 tripwire)"*, step 76 of 78). It is kept because the measurement is the answer to *"should we
+  batch the bridge crossing?"* and re-deriving it costs a session.
 
 - **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
   instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
