@@ -473,7 +473,7 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] OR-150 — seven scoring entries have carried a gate their own text calls premature since 2026-09-16
+### [platform] OR-150 — thirteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
 - **Added:** 2026-09-24 · OR-150, the last slice of the `Gate: owner` triage.
@@ -484,7 +484,19 @@ sign a blank page — and it has been counting as owner debt in every sweep mean
 is Tuning's, not theirs."* **The paragraph went in and the field did not come out.** Eight days
 later all seven still carried the gate, and every sweep since has counted them as the owner's.
 
-**The seven:** `Q-275` · `Q-508` · `Q-515` · `Q-516` · `Q-522` · `Q-523` · `Q-149`.
+**The original seven, all carrying OR-117's paragraph:** `Q-275` · `Q-508` · `Q-515` · `Q-516` ·
+`Q-522` · `Q-523` · `Q-149`.
+
+**Six more, added 2026-09-24 by OR-153** after reading every remaining owner gate: `BF-174` ·
+`LA-113` · `PS-27` · `RV-43` · `Q-289` · `Q-290`. These did not carry the paragraph — their gates
+said *"a scoring change: Tuning proposes, the owner signs off, Lane A implements"* and then
+gated on the owner anyway. Same shape, arrived at independently.
+
+**`Q-279` was checked and deliberately NOT moved.** Its gate already states the number a proposal
+owes — *"moves ~20% of days at the deload boundary and turns 4 taper days"* — so it is genuinely
+ready for him. **A scoring gate is not automatically premature**; the test is whether the
+days-moved figure is there, and a sweep that skips that test would have moved a ready entry
+backwards.
 
 **Why the field survived a correct diagnosis — and this is the part worth keeping.** Removing the
 gate would have released them into Lane A's READY list, and a scoring change with no proposal is
@@ -493,24 +505,25 @@ brake in reach. **There is no `Lane:` value for Tuning** — the lanes are `A`, 
 entry that owes a Tuning proposal has no field that says so. That is the gap, and it is why a
 correct triage could not act on itself.
 
-**What this entry does about it:** each of the seven now carries `Needs: OR-150` in place of the
+**What this entry does about it:** each of the thirteen now carries `Needs: OR-150` in place of the
 owner gate. They stay parked, for the true reason, and they stop counting as owner debt. When the
-proposals exist this entry leaves the queue and all seven unpark together.
+proposals exist this entry leaves the queue and all thirteen unpark together.
 
-**The deliverable is seven Tuning proposals**, each stating **how many other days the change moves**
+**The deliverable is thirteen Tuning proposals**, each stating **how many other days the change moves**
 — which is what `CLAUDE.md` already requires of a proposal and what none of these has. Tuning reads
 the backlog, so an `O` entry naming them is the channel; writing into another agent's baton is not
 the Orchestrator's to do.
 
-- **Done when** every one of the seven has a proposal, or has been withdrawn with a reason. Not when
+- **Done when** every one of the thirteen has a proposal, or has been withdrawn with a reason. Not when
   this has been read.
 - **Deliberately NOT done here: inventing a `Lane: T`.** Tuning picks its work from its own sweeps
   rather than a lane queue, so a fifth lane value would be a channel nobody reads, and it would need
-  `next-item.js`, `lane.js` and `entry-id.js` changed to carry it. Revisit only if these seven prove
+  `next-item.js`, `lane.js` and `entry-id.js` changed to carry it. Revisit only if these thirteen prove
   that a standing channel is needed rather than one entry.
 
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
+- **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
 - **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
@@ -533,6 +546,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+- **Ask:** owner — arrange six device sittings rather than 55 separate asks. Start with gesture navigation and a one-time write list.
 
 - **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
   arranged.
@@ -552,6 +566,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
+- **Ask:** owner — the history-row policy, unasked since 09-16: recompute-from-stored-inputs yes, hand-edits no, per the BF-81 precedent.
 
 - **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
@@ -594,6 +609,7 @@ the Orchestrator's to do.
     Recommended: yes. It is how he trains (TN-24).
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
+- **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -659,6 +675,7 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
+- **Ask:** owner — does `/collection` get a permanent More-tab row, or is it a spike he does not want surfaced? Recommendation: add the row, leave Home unchanged.
 
 - **Lane: O** — a product question, ungated so the Orchestrator can put it. **Added:** 2026-09-22 ·
   Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
@@ -695,37 +712,6 @@ below keep their gate — they really are blocked pending an answer — and this
   between the card's heading and its pickers rather than a string.
 - **Also noted, not filed separately:** three step readings can be on Home at once (`stepsWidget`,
   the Steps metric tile, and the chip row's Activity score).
-
-### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
-  in the same session it was measured.
-- **Lane: O** — the queue's own routing correctness, plus a check in
-  `scripts/check-backlog-pointers.js`. No product code.
-- **What it is.** `laneFromLines` in `scripts/lib/lane.js` is **first-match-wins**, which the script
-  itself documents as the Q-529 failure. So when an entry is re-laned by adding a new field and the old
-  one is left standing lower down, the parser keeps whichever appears first — usually the stale one.
-  Nothing in `next-item.js` output says the entry was ambiguous.
-- **Measured 2026-09-24**, walking every heading in this file:
-  - **34 entries** contain more than one line matching the lane-field pattern.
-  - **8 of those 34 disagree** about the value: `LB-94`, `TN-32`, `OR-106`, `BF-111`, `Q-395`,
-    `TN-19`, `Q-420`, `PS-7`. Three of them put an implementer letter second, so they are currently
-    being served to the wrong bucket or to the unclassified one.
-  - The other 26 are duplicates that agree, which is harmless today and is how the 8 got made.
-- **⚠ Do not read "34" as "34 misrouted entries".** Only the 8 are wrong now; the 26 are the fuel, not
-  the fire. Each of the 8 needs a human-ish read of which value was meant — the later field is usually
-  the newer intent, but that is an inference and the entry text is the authority.
-- **Why a check and not just a sweep.** Fixing the 8 leaves the pattern intact: the next re-laning adds
-  a second field and the count starts again. It already happened twice to me in one session, once while
-  writing the note explaining the trap — the note contained the literal token and the parser matched it
-  inside the prose. So the check must count **field-shaped lines**, the same regex the parser uses, and
-  fail on two of them under one heading.
-- **The check has a known cost:** an entry that *explains* the trap cannot quote a field value inline
-  any more. That is the right trade — a prose example is worth less than a queue that routes.
-- **Pass test:** `pnpm check:rules` fails on a backlog with two lane fields under one heading, passes on
-  the swept file, and the count above reads **0** when re-run. Custom Rules goes 77 → 78.
-- **Where the mechanism is:** `scripts/lib/lane.js` (the first-match-wins comment and its Q-529 note),
-  `scripts/next-item.js` (which prints the parsed lane and not the ambiguity).
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 
@@ -835,6 +821,57 @@ which is the right shape for something that can only be validated by living with
   it matters.
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
+
+### [devices][platform] RV-180 — converting a ring timestamp re-sorts all 12,396 clock anchors on every call, once per row: the likely cause of DV-13
+
+- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Found by the performance half; confirmed in code and production here.
+- **The code:** `resolveDsToMs` (`clock.ts:179-186`) calls `currentEpoch`, filters to the epoch, then
+  `robustOffsetMs`, which **maps and sorts every anchor** (`clock.ts:147-150`). There is no memo.
+  Production holds **12,396 anchors, all in epoch 0** (`count(*)`), and the table grows by about
+  150–300 a day.
+- **Called once per row:**
+  - `getOuraRawSamplesForTags` (`adapter.ts:6596`, inside `rows.map`) behind
+    `/api/oura-ble/device-metrics` and the daily HRV refit (31-day lookback).
+  - `getOuraRawSamplesByTags` (`:6546`) behind `samples/raw` and `step-counter-export`.
+  - The rollup's per-bin `toDate` (`rollup/run.ts:124`).
+- **Cost:** benchmarked against the real anchors at **3.0 ms per call**, linear, on sandbox CPU.
+  device-metrics' default 3-day window is **58,856 rows ≈ 177 s of synchronous CPU** on the one
+  Node process, which blocks every other request. DV-13 saw four admin requests hang past 90 s and
+  `/api/version` time out from another PC for 8 minutes; that is this shape. The rollup pays about
+  2.6 s per pass, and it grows about 2% a week.
+- **Fix:**
+  - Compute the epoch offset once per anchor set: hoist it out of the map, or memoize by array.
+    Per-row cost becomes O(1).
+  - Read one offset per epoch in SQL rather than the whole table (RV-182).
+  - Add the row cap DV-13 already owes.
+- **⚠ Until this ships, `/admin/oura-ble` stays closed.** The device check after it ships is DV-13's
+  own pass test, which RV-186 carries.
+
+### [nutrition][platform] RV-172 — the sync pull drops columns the device then overwrites with NULL: supplement ticks lose their time and frozen vial dose
+
+- **Lane: A** — `getSyncDelta` in `lib/data/postgres/adapter.ts`, `lib/local-store/sync-engine.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
+- **Supplement logs, the one that matters:**
+  - The delta select (`adapter.ts:4248-4259`) omits `takenAt`, `vialStrengthMg`, `vialWaterMl` and
+    `vialUnitsPerMl`, and so does the pull mapping (`sync-engine.ts:516-534`).
+  - `applyDelta` then writes `taken_at=excluded.taken_at, vial_*=excluded.vial_*`
+    (`sqlite-backend.ts:1997`). Its comment says the server's value *"IS the truth there"*, but the
+    server never sends that value, so it writes NULL.
+  - So every synced tick loses its time and its vial snapshot on the next pull, and a fresh install
+    never has them.
+  - **LA-97's rewrite comes back one layer up:** a re-push rebuilds from the local row
+    (`enrichPayload`), the vial triple is null, so `logSupplement` re-reads the current vial and
+    replaces the frozen dose. Local renders also lose the units figure.
+- **Same class, lower stakes:**
+  - `exercise_logs`: the select omits `exerciseDeloaded` and `prepTimeSec` (`adapter.ts:4269-4288`).
+    `Boolean(undefined)` then writes `exercise_deloaded=0` over synced rows. A comment claims Q-131
+    fixed this; it is half fixed.
+  - `food_items`: the pull maps `toIso(r.updatedAt)`, but the delta carries only `createdAt`
+    (`sync-engine.ts:479`). The local row stores the string `"undefined"`, which sorts above every
+    date in `searchFoodItems`' `updated_at DESC`, so the offline recent-foods order is scrambled.
+- **Fix:** add the columns to the delta select and the pull mapping. Add a test that diffs each
+  delta select against its pull mapper, so the next column cannot go missing silently.
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
@@ -1318,6 +1355,44 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 `computed_at` as the answer — that is the field that already lied.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** still **26 / 19 of 71** stuck, as filed, but **`computed_at` moved today at 02:37 UTC with no change to the values**. See RV-159: 106 of 129 `oura_daily_derived` rows were re-stamped in the same second, and nothing on `main` records who ran it. If that was this entry's backfill, it ran without `rederive-baselines` first (BF-13 is still unrun), which would explain the unchanged rails.
 
+### [platform][app-shell] RV-186 — DEVICE: the performance sitting, run BEFORE the fixes so each one has a "before"
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **This is sweep 58's device half.** Review measured the server side (`pg_stat_statements`,
+code, `next build`); these are the numbers only the phone can give. Run it **now**, so RV-180 to
+RV-185 each ship against a recorded baseline, then re-run each row after its fix lands.
+- **Read-only except where noted.** Record the screen, orientation and navigation mode on every row.
+  **Never open `/admin/oura-ble` before RV-180 ships**: by the measured arithmetic it occupies
+  production for minutes.
+- **The rows (CDP Network and Profiler):**
+  1. **Cold launch → Home:** count `/api/*` requests from navigation start to 10 s idle, grouped by
+     URL. The code estimate is 25–30 warm and ~45 cold. Also record script evaluation time in the
+     launch profile (RV-185).
+  2. **Resume:** background and foreground 5 times on Home, and count `/api/*` within 3 s of each
+     visible. Pass after RV-183: at most 2 from the reconcilers.
+  3. **One switch to each tab:** requests per switch. The code estimate is Home 4, Health 5–7,
+     Workout 3, Nutrition 1–2, More 2 (Friends 5–6).
+  4. **Food log** (standing write, then delete): visit Home, Health and Nutrition, then log one
+     food. Count `/api/*` from the tap until 5 s after `POST /api/sync/push`. Expected now: 2N+1.
+     Pass after RV-183: N+1, with energy balance showing the new kcal.
+  5. **Server wait (`responseStart − requestStart`), 3–5 samples each:**
+     - `/api/sleep-sessions` (cold open) and `/api/oura-ble/freshness` (More → Oura), for RV-180
+       and RV-182;
+     - `/api/hr-profile`, `/api/zone-minutes` and `/api/cardio-week`, plus encoded bytes, for
+       RV-181. Pass: hr-profile and zone-minutes under 100–150 ms;
+     - `/api/health/trends` on Health → Body. Pass: at least 50% lower after RV-181.
+  6. **Workout re-shows:** `/api/exercise-library` requests and bytes. Pass after RV-183: 0 within
+     its TTL.
+  7. **Passive, during one of the owner's own workouts:** count `/api/hr-profile` requests over
+     20 min with the ring connected (pass: at most 1 per screen mount); check whether
+     `POST …/prescribe` fires at open on a day the last completion pre-generated it (RV-184).
+  8. **Idle 30 min on Home, ring connected:** requests per hour, and per drain burst.
+  9. **After RV-180 ships:** DV-13's own pass test. Open `/admin/oura-ble`; every request answers
+     within 5 s, and `/api/version` stays under 1 s from another client throughout.
+- **Folds in rather than duplicates:** DV-12 (tab-tap long task), RV-153 (per-tap `setItem`),
+  RV-145 (Home's second workout-data request) and BF-22 (long-session slowdown). Run them in the
+  same sitting where the screen is the same.
+
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 
 - **Lane: DV** — the deliverable is an attribution only the running app can give.
@@ -1676,7 +1751,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   cannot occupy the process.
 - **Pass test:** open `/admin/oura-ble` in the APK; every request answers within 5 s, and `/api/version`
   stays under 1 s from another client throughout.
-
+- **📊 Probable cause found 2026-09-24 (Review sweep 58): RV-180.** `resolveDsToMs` re-sorts all 12,396 clock anchors on every call and is called once per row. `/api/oura-ble/device-metrics`' default window is 58,856 rows ≈ 177 s of synchronous CPU (sandbox-benchmarked 3.0 ms per call), which blocks the one Node process. That matches the four hung admin requests and the 8-minute `/api/version` timeout. Not yet proven on production. The pass test above is the proof, and it runs only after RV-180 ships (RV-186 row 9).
 
 ### [platform] OR-138 — let the triaging agent read the data of the user who filed the feedback
 
@@ -1725,7 +1800,166 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [platform][app-shell] BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"there is no option for
+  users to delete their account and their data. This is a requirement for apple store so lets add
+  this in next."*
+- **Lane: A** — it needs a **migration** (see the blocker below), and migrations are Lane A's alone.
+  The UI half is Lane B's and can follow; the engine half lands first per §3.
+- **Needs:** BF-193 — three policy choices the owner has to make, and two of them change the diff.
+  Filed separately so they reach the Orchestrator rather than sitting in this body.
+- **⚠ This carries a store-compliance claim, so understate rather than overstate it.** Apple requires
+  an in-app account-deletion path for any app offering account creation, and **Google Play carries an
+  equivalent requirement** — which matters here because the canonical runtime is the **Android APK**
+  and there is no iOS build in this repo today. **Check the exact current guideline text before
+  citing a clause number anywhere user-facing or in a review reply**; this entry deliberately does
+  not quote one from memory.
+
+**⚑ MEASURED — the existing delete path is already broken, and it is not a user-facing one.**
+
+`deleteUser` (`adapter.ts:699`) is a bare `DELETE FROM users`, reached only from
+`/api/admin/users`. Run against the local database with all 281 migrations applied:
+
+```
+INSERT INTO users …                              INSERT 0 1
+INSERT INTO exercise_library (…, created_by) …   INSERT 0 1
+DELETE FROM users WHERE id=…
+ERROR: update or delete on table "users" violates foreign key constraint
+       "exercise_library_created_by_fkey" on table "exercise_library"
+```
+
+**Any user who has created one custom exercise cannot be deleted at all.** Reproduced, not reasoned
+about. A user-facing button wired to today's code would inherit this and fail in the one flow that
+must not fail.
+
+**⚑ MEASURED — what a `users` delete does and does not reach.** 99 base tables, 72 carry `user_id`.
+Foreign keys pointing at `users`, by delete rule:
+
+| rule | count | consequence |
+|---|---|---|
+| `CASCADE` | 72 | removed with the user — the bulk of it, including child rows reached via their parent |
+| `SET NULL` | 2 | **rows survive, anonymised** — `ai_call_log.user_id`, `error_events.user_id` |
+| `NO ACTION` | 1 | **blocks the delete** — `exercise_library.created_by` |
+
+The 24 other tables with no FK to `users` (the full list also counts `users` itself) are reference/ops data (`activity_types`, `blood_analytes`,
+`dietary_restrictions`, `exercise_media`, `rate_limits`, `seasons`, `schema_migrations`,
+`invited_emails`, `db_query_log`) or child tables that cascade through a parent (`set_logs`,
+`exercise_logs`, `session_exercises`, `style_sets`, `schedule_days`, `saved_meal_items`,
+`meal_plan_meals`). **`db_query_log` is the one worth a second look** — no FK, and its `sql_text`
+can contain the user's own data in the query body.
+
+**⚑ THE DESIGN, AND THE POINT OF THE ENTRY: do not write a new list of tables to delete.**
+
+`lib/export/export-map.ts` already enumerates every table with the user's data in it, and it is
+**exhaustive by construction** — each base table is either in `EXPORTED` with a scope
+(`user_id` / `own_row` / `via <predicate>`) or in `EXCLUDED` with a written reason, and
+`scripts/check-export-coverage.js` **fails the Custom Rules job** when a `pgTable` in `schema.ts` is
+in neither. A new table cannot be forgotten, only classified.
+
+**That file exists because the hand-written version already failed, in exactly the way a deletion
+must not.** Its own header records Q-288: `/api/export` covered **26 of 82 tables and presented as
+complete**. An export that silently misses tables is bad; **a deletion that silently misses tables
+is a false compliance claim**, and nothing in the product would reveal it.
+
+So the deletion derives its scope from the same map. One list, one CI check, no second thing to
+drift.
+
+- **⚠ One semantic FLIPS between export and delete, and missing it leaves data behind.**
+  `export-map.ts` carries `SOFT_DELETED` so a takeout does not resurrect rows the user deleted — an
+  export **filters those out**. A deletion must do the **opposite** and take them too: a soft-deleted
+  food log is still the user's data sitting in the table. Reusing the map without inverting this one
+  predicate is the most likely way this ships looking complete and is not.
+- **The device half already exists and is already CI-enforced.** `signOutAndClearDevice`
+  (`lib/sign-out.ts`) disables cache writes, clears the local store, clears the cache, then signs
+  out server-side — in that order, because in-flight `cachedFetch` calls otherwise re-seed the
+  outgoing account's data (measured: 4 of 17 keys). `scripts/check-sign-out-clears-device.js` fails
+  the build on a sign-out that skips it. **Account deletion ends by calling it** rather than
+  reimplementing a wipe.
+- **✅ The Oura ring key is NOT at risk from that call — checked, because it would be unrecoverable.**
+  `clearLocalStoreData` only issues `DELETE FROM <table>` against SQLite; the BLE key lives in native
+  SharedPreferences and is reached only by the plugin's `clearKey()`, whose sole caller is the admin
+  debug screen. So a deletion that reuses the sign-out wipe leaves the ring paired. **Whether it
+  SHOULD is BF-193's third question** — the key is credential material, and clearing it cannot be
+  undone without a factory reset and re-pair.
+
+**Shape of the work, engine half first:**
+
+1. **Migration (Lane A):** `exercise_library.created_by` → `ON DELETE SET NULL`. A custom exercise
+   that outlives its author is catalogue data with no author, which is the same state a seeded row
+   is already in — and it is the only rule here that can *block* rather than merely leave residue.
+   Ships with its regenerated `claude_ro` twin per the standing rule.
+2. **A deletion routine** driven by `export-map.ts`'s scopes, inverting `SOFT_DELETED`, inside one
+   transaction, with the `users` row last.
+3. **`DELETE /api/account`** — session-authenticated, acting only on the caller's own id, never an
+   id from the body. Rate-limited at creation like its siblings.
+4. **The UI (Lane B):** in `components/more/profile-tab.tsx`, beside Edit profile and Sign out.
+   Typed confirmation, not a single tap — this is the one irreversible control in the app.
+5. **Ends with `signOutAndClearDevice()`**, so the device holds nothing after the server row is gone.
+
+- **⚠ Not a separate plan doc, and that is a deliberate call.** CLAUDE.md's two-PR rule expects a
+  `docs/superpowers/plans/` document for a new feature; the design here is settled enough to live in
+  the entry, and a second document repeating it is one more thing to drift. If Lane A finds the
+  shape genuinely open when it picks this up, write the plan then — the trigger is unresolved design,
+  not entry length.
+- **Verification:** delete a test account that has (a) a custom exercise, (b) soft-deleted rows, and
+  (c) local-store data on the APK. Then assert against the database that **every** `EXPORTED` table
+  in `export-map.ts` returns zero rows for that id — the same map, read back as the test oracle —
+  and that a re-login is refused. **Device look owed**: the local store does not run in the sandbox
+  (`getLocalStore` returns null), so the wipe half is unverifiable here.
+
+### [platform] BF-193 — three questions BF-192 cannot answer: what "delete" means for logs, the ring key, and whether it is instant
+- **Ask:** owner — account deletion: what "delete" means for logs, what happens to the ring key, and whether there is a grace period.
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
+  owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
+  Split out of BF-192 so the Orchestrator can put them to him; BF-192 names this in `Needs:` because
+  two of the three change its diff.
+
+**Decision 1 — the two tables that survive as anonymised rows, plus the one with no key at all.**
+
+- `ai_call_log` and `error_events` are `ON DELETE SET NULL`: after a deletion the rows remain with a
+  null user. `db_query_log` has no foreign key and its `sql_text` can contain the user's own data.
+- **⭐ Recommend: leave the two SET NULL tables as they are, and purge `db_query_log` rows for the
+  user.** The first two are operational telemetry whose link to a person is severed, which is what
+  anonymisation means and what store policies ask for. `db_query_log` is different in kind — the
+  payload itself can carry their data, so nulling a column does not anonymise it.
+- **Alternative: delete all three outright.** Better if you want "deleted" to mean no trace,
+  and it is the easier sentence to defend to a reviewer. It loses the error and cost history that
+  `error_events` exists to provide — the table is read at every session start precisely because
+  faults that stop on their own go unnoticed.
+- **Reversal cost: none either way.** It is a predicate in the deletion routine.
+
+**Decision 2 — should deleting the account clear the Oura ring's BLE key?**
+
+- Checked and recorded on BF-192: today's sign-out wipe does **not** touch it, because the key is in
+  native SharedPreferences and only the admin screen's `clearKey()` reaches it.
+- **⭐ Recommend: do NOT clear it.** Clearing is irreversible without a factory reset and re-pair,
+  and the key is bound to the **phone**, not the account — a deletion is the user saying "remove my
+  data", not "unpair my hardware". Leaving it also keeps this entry's blast radius away from the one
+  thing in this repo that no backup can restore.
+- **Alternative: clear it.** Better on a strict reading — it is credential material and a shared
+  device would leave the next person a paired ring. It loses on asymmetry: wrongly keeping it is a
+  tap to fix, wrongly clearing it is a factory reset.
+- **⚠ This one is yours specifically because it is YOUR ring.** The general answer and the answer for
+  the only device running this app are not obviously the same.
+
+**Decision 3 — immediate, or a grace period?**
+
+- **⭐ Recommend immediate, with a typed confirmation.** Apple's requirement is that the path exists
+  and completes; a grace period adds a scheduled job, and this repo has **no cron layer**
+  (`module-map.md` §0), so "delete in 30 days" would need infrastructure that does not exist.
+- **Alternative: 30-day soft delete then purge.** Better for the genuine mis-tap, and it is what
+  larger products do. It loses here on the missing scheduler — and a "deleted" account that still
+  holds data is the claim hardest to defend if it is ever examined.
+- **Reversal cost: high in one direction.** Immediate cannot be undone by the user, which is exactly
+  why the confirmation is typed rather than a single tap.
+
+- **Verification:** this entry closes when all three answers are recorded here with the date, and
+  BF-192 is updated with whichever ones change its diff.
+
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+- **Ask:** owner — every exercise sits on the 2-set floor and weekly volume lands at 66% of his target. Which of three levers to pull is his.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
   sessions have enough content. Time wise its pretty good."*
@@ -1807,6 +2041,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   has not been fixed regardless of what the done screen says.
 
 ### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
+- **Ask:** owner — what a sub-minute walk should do, and what happens to the phantom activity row.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
   owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
@@ -1887,7 +2122,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
   inference in this repo unsound. The same section's opening claim that branch protection *"requires
   a PR with all CI checks passing"* is then also wrong.
-- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
   change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
   way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
   unsound gate.
@@ -2231,35 +2466,23 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
     10-04, Q-507 10-16, TN-50 10-17, TN-25 10-18, LA-110's evidence expiring 10-06.
 - **Reversal cost:** delete the field and one print block.
 
-### [sleep][readiness] RV-163 — "last night" is picked by four different rules, so a long daytime rest can become the night the scores grade
+### [nutrition] RV-171 — opening the meal-plan setup with a failed request silently deletes every saved dietary restriction
 
-- **Lane: A** — shared night selection in `packages/shared/src/health/sleep-night.ts` and its consumers.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **The rules, confirmed in code:**
-  - The rollup and `nightForDate` take the **longest** night period (`nightPeriodsByDate`,
-    `sleep-night.ts:164`). Its own comment says *"this is where it is made"*.
-  - The live readiness payload takes the **latest**: `nights[nights.length - 1]`
-    (`lib/health/readiness-payload.ts:360`).
-  - Body Battery also takes the **latest**, `nights.findLast(n => n.date === todayIso)`, and anchors
-    `wakeTime` on its `sleepEnd` (`app/api/body-battery/route.ts:164-166`).
-  - The score audit and backfill take the **earliest**, `nights.find(...)`
-    (`score-audit/sleep.ts:45`). So does `app/api/ai/health-insight/route.ts:119`.
-- **Why they disagree:** any window of at least `ALWAYS_NIGHT_MIN_HOURS = 4` h counts as a night
-  wherever it sits on the clock, so one date can hold two night periods.
-- **09-23 in production:** the overnight was 21:27–06:01 (7.92 h, efficiency 92). A daytime window
-  ran 10:42–17:25 (6.17 h, efficiency 91).
-  - The stored sleep contributors are total_sleep 49, efficiency 72, timing 10 and latency 72. They
-    match the **daytime** window; the overnight gives about 76 / 76 / 71 / 50.
-  - So the sleep score was **42**, and readiness, which took 42 as its previous night, was **44**.
-  - Body Battery stored `hr_sample_count` **2** and 0 drained, flat all day at its anchor of 41,
-    against 203 ring samples. Only a 17:25 wake leaves 2 samples.
-  - 08-27 has the same shape.
-  - TN-20's guard refuses only a drop from populated to 0, so a 2-sample read passes it; 09-23 came
-    two days after the guard shipped. **This is TN-20's unidentified trigger** for its non-zero cases.
-- **Fix shape:**
-  - Route every consumer through `nightPeriodsByDate` / `nightForDate`.
-  - Make Body Battery refuse a near-empty snapshot, not only an exactly empty one.
-  - Re-scoring 09-23 and 08-27 is the recompute path (RV-170).
+- **Lane: B** — `components/nutrition/meal-plan-setup-sheet.tsx`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
+- **The path:**
+  1. The sheet loads restrictions with a bare `fetch` (`:82`). On failure it does
+     `if (!d) return` / `.catch(() => {})`, so `restrictions` stays at its initial `[]`.
+  2. `handleGenerate` always PUTs `{ entries: restrictions }` first (`:143`).
+  3. That lands in `replaceUserDietaryRestrictions` (`slices/meal-plans.ts:541`), which **deletes
+     every row for the user** before inserting.
+- **So one 429, 5xx or network blip while the sheet opens erases his allergies and intolerances.**
+  The plan is then generated without them, because the generate route reads them back
+  (`generate/route.ts:127,189`). The only visible hint is an empty restrictions step.
+- **Fix:**
+  - Show an error state when the load fails.
+  - Do not PUT until a load has succeeded.
+  - PUT only when the selection changed.
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
@@ -2348,6 +2571,225 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   - The day-strip changes shape at 09-17.
 - **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
   recompute from stored inputs (RV-170).
+
+### [app-shell][platform] RV-173 — the Coach streams prose about the owner's data without PROSE_GUARDS, and the test that enforces it misses it
+
+- **Lane: A** — `app/api/coach/route.ts`, `lib/ai/__tests__/prose-guards.test.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The gap:** Coach streams free prose through `loggedStreamText` (`:218`), and its SYSTEM prompt
+  (`:44`) carries none of the guards: quote the given numbers, no superlatives, metric units only.
+  Q-292's failures (Fahrenheit, *"perfect"*) can come back there.
+- **Why no test caught it:** `prose-guards.test.ts:25-40` is a hand-written list of 10 routes, and
+  Coach is not on it. The route's own docstring (`:181`) still says *"no user-facing entry point
+  yet"*, but `app/coach/coach-content.tsx:51` drives it.
+- **Fix:** add the guards and the route. Better, make the test discover prose routes by their
+  `loggedStreamText`/`generateText` import rather than by list.
+
+### [heart-rate][platform] RV-181 — the HR profile pulls 90 days of raw heart rate to compute three numbers: 51% of all database time
+
+- **Lane: A** — `packages/shared/src/health/hr-profile.ts:98-102`, `lib/data/postgres/slices/oura.ts:801`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
+- **`pg_stat_statements`, 25.2 days:** the `getHrForWindow` range select ran **12,463 calls, 558 s of
+  1,083 s total DB time (51.5%)**, and returned **209 M rows**. The 90-day window alone is
+  **133,727 rows** today.
+- **Callers:** `hr-profile`, `zone-minutes`, `cardio-week`, `cardio-trends`, `computeWorkoutHr`,
+  `computeHrRecoveryProfile`, and the SSR of Baselines and guided walk.
+- **Why it repeats:** it is in `invalidateOuraSync`, and `useHrProfile` is mounted on the active
+  workout and exercise summary screens, so **every ring drain during a workout refetches it**. Drains
+  run 20–32 an hour at 07–09.
+- **Evidence it is fixable:** sweep 51 measured the same statistic as a SQL aggregate at **54 ms,
+  one row**. RV-64 only hoisted the fetch.
+- **Fix:** compute the observed-max statistic in SQL (`percentile_disc`, or top-k). Fetch 30 days,
+  not 90, for `cardio-week`, which needs the series. Memo per user per local day.
+- **Same shape, smaller:** `/api/health/trends` (`route.ts:73-84`) re-derives HR recovery from raw
+  HR, with 2 queries per session over 14 days (~20). But `workout_hr_stats.hrr1_best` is stored for
+  **10 of 10** of those sessions. Read it, after checking the two agree per day.
+
+### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
+
+- **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/rollup/run.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **A backfill UPDATE that has matched nothing in 25 days** (`adapter.ts:6089-6094`,
+  `… SET measured_at … WHERE measured_at IS NULL`): **4,756 calls, 18.15 ms each, 0 rows
+  updated**. `measured_at` has 0 nulls in 192,772 rows. No index serves it, so it seq-scans the
+  whole hot window on every ingest, and it accounts for most of `oura_raw_samples`' **1.0 billion**
+  sequential tuple reads.
+  - **Fix: delete the statement.** It is not destructive. Dropping the column is a data-dropping
+    migration and needs the owner's sign-off.
+- **The clock-anchor table is read whole and only grows.**
+  - The full read is **2,125 × 48.8 ms = 104 s (9.6% of DB time)**.
+  - `getOuraClockEpochHead` (`:5698`) does a `GROUP BY` over everything, and
+    `getNewestOuraClockAnchorByUtc` (`:5721`) orders by an unindexed `anchor_utc`. That is 11,554
+    seq scans.
+  - An anchor is inserted on almost every batch.
+  - **Fix:** `ORDER BY epoch DESC, anchor_ds DESC LIMIT 1` on the existing index, an index on
+    `(user_id, anchor_utc DESC)`, thinner inserts, and one offset per epoch (RV-180).
+- **The rollup deletes and reinserts ~880 HR rows per pass even when nothing changed**
+  (`run.ts:877-878`): 535k deletes against 137k live rows. `oura_heartrate_pkey` (6.8 MB) has
+  **0 scans**.
+  - **Fix:** upsert with `IS DISTINCT FROM`, and delete only the timestamps that disappeared.
+- **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
+  not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
+
+### [workouts][platform] RV-174 — a deleted program or progression style never leaves the device's mirror
+
+- **Lane: A** — `lib/data/postgres/slices/programs.ts:435,866`, `lib/local-store/sqlite-backend.ts` `applyDelta`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The gap:** both are hard deletes on tables with no `deleted_at`, and both tables are in the
+  delta by `updated_at`. The local `applyDelta` only upserts them, so deleted parents stay on the
+  device forever.
+- **Failure:** `assembleLocalActiveProgram` takes `find(isActive) ?? programs[0]`
+  (`program-assembler.ts:37`). After deleting active program A and activating B, the mirror can hold
+  two rows with `is_active=1`. Offline with no cached workout-data, the Workout screen then shows
+  the stale/reselect state (`workout-screen.tsx:376-395`). Online recovers it.
+- **Fix:** add a tombstone, or delete by absence as saved meals already do (`sqlite-backend.ts:2696`).
+
+### [workouts][platform] RV-175 — editing or deleting a logged exercise or session offline is lost, after a success toast
+
+- **Lane: A** — a mutation domain for these edits. Lane B for `lib/hooks/use-day-entry-mutations.ts:50,90,132`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The gap:** PATCH `/api/workout-entry`, DELETE `/api/workout-entry` and DELETE
+  `/api/workout-sessions` are API-first, and mirror to the local store only after a 2xx.
+  `pushMutations` has no domain for them.
+- **Failure:** offline, *"Updated"/"Deleted"* toasts first, then *"Failed to …"*. Nothing is queued,
+  so the edit is gone. That breaks the offline-first checklist's item 1. Only `handleDeleteActivity`
+  in the same hook was converted (Q-328).
+
+### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
+
+- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **From `ai_call_log` joined to workouts:** 35 prescription calls, 23 fingerprints.
+  - 10 of the 12 repeats are by design: generation at open, then at completion for the next run.
+  - **On 8 of 20 workout days an open-time generation ran although the previous completion had
+    already produced one.** That is ~2.1 s of *"Preparing your AI workout"* the owner waits through.
+  - Two near-duplicates came within the 30 s cooldown (09-06, 09-16).
+- **Why it cannot be diagnosed today:** the fingerprint is only `{programSessionId, today}`. It
+  leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
+- **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
+
+### [readiness][app-shell] RV-176 — timezone-rule escapes the CI checks do not see: one medium, several latent
+
+- **Lane: B**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **MEDIUM: `components/health/health-score-detail.tsx:138` uses `todayInTz(DEFAULT_TZ)`.** The
+  readiness and activity detail screens key the AI insight date (`:279`) and the offline seed
+  (`:148`) to Brisbane's date, so a user in another zone asks for tomorrow's insight.
+  `app/health/heart-rate/page.tsx:26` records the same bug, already fixed on the sibling screen.
+- **LOW, and harmless for the owner in Brisbane:**
+  - Device-local clock text in `components/activity/exercise-detected-card.tsx:9-15`
+    (`getHours()`). Use `formatTimeOfDay(ms, tz)`.
+  - Window starts from tz-less `todayMidnightUtc()` + `toAestDay()`: `session-select-content.tsx`
+    `:357,456,742`, `log-value-sheet.tsx:120`, `health-content.tsx:226`, `sleep-content.tsx:49`
+    and `metric-log-sheet.tsx:114`.
+  - Device month for calendar cache keys: `session-select-content.tsx:266-276,385-389`,
+    `workout-screen.tsx:1501`, `calendar-widget.tsx:35` and `year-review-content.tsx:14`.
+  - Device hour for the meal bucket: `nutrition-content.tsx:592`, `food-logger-sheet.tsx:250`,
+    `saved-meals-sheet.tsx:449` and `assign-step.tsx:51,58`. assign-step also re-implements
+    `mealTypeForHour`, which breaks One Formula.
+- **The CI blind spots behind these are in RV-179.**
+
+### [app-shell][platform] RV-183 — requests the client sends for data it already has
+
+- **Lane: B** (callers), Lane A for `lib/local-store/push-then-revalidate.ts` / `cache-groups.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Counted from code; RV-186 counts them on the phone.
+- **Every launch and every resume sends 6 reminder-reconcile GETs** (`sync-provider.tsx:253-383`):
+  meal-types, today's food logs, next-session, supplements, readiness-score and body-battery.
+  - Two of them are local-first domains whose data is already on the device.
+  - Three duplicate Home's own fetches.
+  - Readiness alone is 11 parallel reads.
+- **After a food log, the first refetch round is wasted when online.** `logFoodEntries`
+  (`log-food.ts:296-297`) invalidates 13 prefixes before the push, so every server aggregate
+  refetches pre-write data, then refetches again after the push. That is 2N+1 requests where N+1
+  would do; sweep 1 saw 3×2+1. **Offline, and when the push fails, keep the immediate round**
+  (LB-4/LB-132's reason still holds).
+- **The exercise catalogue (~113 KB) is refetched and re-cached on every Workout tab show**
+  (`workout-select-content.tsx:176`). It changes only on admin edits. The server read the whole
+  table 3,040 times.
+- **`app/more/more-content.tsx:101-104`'s comment is false:** a re-show sends 2 GETs (5–6 on
+  Friends), not "nothing".
+
+### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
+
+- **Lane: B** — measure first (RV-186), then trim.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **`next build` on `main` (e5a5b9e7), First Load JS:**
+  - Home, Health, Nutrition and More: **457 kB** each.
+  - Workout: **506 kB**.
+  - Shared by all pages: 193 kB (React and Next).
+  - The tab shell adds about 264 kB on top.
+- **In Home's chunks, compressed:** framer-motion **~44 kB** and zod **~20 kB** load eagerly,
+  beside ~46 kB of app components.
+  - Candidates: `LazyMotion` + `m`, or lazy-load motion.
+  - Keep zod out of the client first-load where only types are used.
+- **A false lead, recorded so nobody chases it:** the build's module list shows
+  `@sentry/conventions` at 499 KB. That is **source size before tree-shaking**; the shipped chunk is
+  **657 bytes**. The module list's sizes cannot be read as shipped bytes.
+- **Worth doing only if RV-186 shows script evaluation matters at cold start.** FCP is already
+  1.02 s, and the service worker caches the chunks after the first load.
+
+### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
+
+- **Lane: A**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
+gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
+- **No rate limit:**
+  - `nutrition/meal-plans/meals/[mealId]/route.ts:66` (PATCH `scaleToTarget` → model call; its
+    siblings cap at 40/h and 10/h).
+  - `log-calendar-event/route.ts:20` (a Google write, with an unvalidated `startMs`).
+- **No clock bound on a written weight date (Q-494's missed siblings):**
+  - `sync-health/route.ts:108-111`, where an invalid date also poisons the whole batch.
+  - `body-metadata/route.ts:288-292`.
+- **Date params skip `normalizeDateParam`, so `2026-02-31` becomes a bodiless 500:**
+  - `ai/health-insight/route.ts:60`, which also never converts slashes, so `new Date` goes Invalid
+    at `:144,152,158`;
+  - `food-logging-complete/route.ts:49`;
+  - `activity-logs/route.ts:38`;
+  - `fitness-tests/route.ts:38`.
+- **No Zod on phase-set writes:** `phase-sets/[id]/route.ts:30`, `phase-sets/route.ts:34` and
+  `phase-sets/clone/route.ts:21`. `durationCycles` is unchecked, and a bad body gives a bodiless 500.
+- **`calendar-data/route.ts:8-9`:** a NaN year slips past the range check, and params are validated
+  before auth.
+- **Body ids reach the uuid cast unguarded on POST**, which RV-47 did not cover:
+  `nutrition/food-logs/route.ts:44` and `oura/hr-sync/route.ts:29`.
+- **Unscoped and dead code:**
+  - `createFoodItem`'s read-back is not user-scoped (`slices/nutrition.ts:300`; latent).
+  - `logExerciseWithId` (`adapter.ts:947`) and `logSets` (`:968`) write with no user parameter and
+    have no callers. Delete them.
+
+### [app-shell] RV-178 — client-side gaps from the rules census: one card, two guards, three small fetches
+
+- **Lane: B**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **CLEAN:** bottom action rows use floored safe-area utilities, and write callbacks carry the
+written entity.
+- **`components/home-day-timeline.tsx:251-252`:** a failure and an empty day both render nothing,
+  with no `onError`, so Home's timeline vanishes on a failed cold load.
+- **No in-flight guard:**
+  - `config-screen.tsx:309` `clonePhaseSet`: a double tap makes two copies, and it has no
+    try/catch.
+  - `ai-insight-card.tsx:93` Refresh: repeated taps spend the 10-per-hour AI limit.
+- **`React.memo` defeated by a render-body function passed by name:** `mood-checkin-sheet.tsx:394`
+  and `saved-meals-sheet.tsx:545`.
+- **Bare GETs with no seed:** `components/more/oura-section.tsx:89` (the "last synced" line is blank
+  until the network answers) and `app/profile/[userId]/page.tsx:26`.
+
+### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
+
+- **Lane: O** — decide which to widen. Each is a small script change, and each one has a live
+  miss behind it.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The five:**
+  - The **JSON.parse-of-LLM-output** grep (`ci.yml:280`) scans only files importing `@ai-sdk`,
+    which today is just Coach. 15 of 16 AI routes and all of `lib/` go unscanned.
+  - **`check-timezone-rendering`** misses `getHours()` formatting, `.toLocaleString(` on a Date and
+    `Intl.DateTimeFormat` (RV-176).
+  - **`check-client-today-timezone`** misses `todayInTz(DEFAULT_TZ)` and bare
+    `todayMidnightUtc()`/`toAestDay()` (RV-176).
+  - **`check-memo-prop-stability`** misses a render-body function passed by name (RV-178).
+  - **`prose-guards.test.ts`** uses a hand-written route list (RV-173).
+- **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11
+  across 9 files"*. The script now reports **23 across 18**, because RV-105 widened what it counts,
+  and the "can-bite is EMPTY" claim has not been re-verified against the wider population.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
@@ -6149,7 +6591,7 @@ true mean on night 2 rather than converging for fifty.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
-- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
 - **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire), and **BF-13**, which names the line that makes the object wrong.
 - **⚑ The cause is one line, found independently and filed as BF-13 — read it before implementing.**
   `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`), then anneals its
@@ -6332,10 +6774,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   window did for them. **The owner's two ideas pull in opposite directions on this day** — that is
   the finding, and it is the argument for fitting this properly rather than shipping a plausible
   table.
-- **Gate: owner** — and the proposal is incomplete until it states **how many other days it moves**,
-  per the standing Tuning rule. One day cannot settle it: every margin in the table above is inside
-  two points, and a calibration fitted to a single snapshot that silently re-scores months of history
-  is a rewrite, not a tuning.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Needs: BF-173** — that entry decides whether soreness double-counts at all. Fitting recovery
   constants underneath a scorer that then overrides them with a flat 40 would be fitting the wrong
   function.
@@ -7022,9 +7461,7 @@ helper the call site calls.
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
 - **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
-- **Gate: owner** — this is a scoring change. Tuning proposes, the owner signs off, Lane A implements.
-  TN-39 said so outright: *"Do NOT change the model on the strength of this before the owner sees the
-  result. The output is a number and a verdict, not a patch."*
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Measured**, model vs `rmssdFromRr` over the app's own 30-minute grid: **×0.30 of measured over 84
   buckets / 37 days**, ×0.32 over the 54 densest / 30 days, ×0.31 on the 14 buckets that join a scored
   stress bucket. The spread (sd of log-ratio 0.40) is far smaller than the bias, so it is a level
@@ -8841,8 +9278,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   a durable doc needed that entry's reasoning; folding it without rewriting the link turns the
   citation into a 404, and the ratchet would then read as clean while the docs got worse. That is
   the failure mode the linked/unlinked split exists to prevent.
-- **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
-  no code and any lane can run it. Filed by Lane B, which found it.
+- **Superseded lane note (demoted from a field, TN-63):** this read `? ` while the entry was still deciding — a docs restructuring that also touches script paths. The `O` above resolved it on 2026-09-15 and is the live value.
 - **✅ THE OWNER DECIDED 2026-09-09: raise the ceiling to 360 and do this properly later**, rather
   than fix it under a PR that had nothing to do with the journal. So the next time the number is
   reached, **this entry is the work** — not another raise. That is ~25 PRs of headroom, chosen
@@ -9005,7 +9441,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
-- **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
 - **✅ OWNER DECISION, 2026-09-17 — RE-PIN AT 181, superseding the 178 below.** The owner parked the
@@ -9259,7 +9695,7 @@ is claiming to be both.
 - **Lane:** A — both (2 engine, 1 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
-- **Lane: B** — `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`, `packages/shared/src/health/session-picker.ts:85`.
+- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter and listed `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`. Those shared paths are the engine lane's, and the field above already applies the both-halves rule.
 - **Sibling of TN-30**, independent of it. Copy and labels only — no threshold moves.
 
 Three separate places tell the user something the zone engine does not do:
@@ -9460,7 +9896,7 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
   the VO₂max crosscheck, the water goal and the AI context, and it is a surface change.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
-- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
 - **Owner-approved 2026-09-09** — *"make all the changes you recommend."* Not gated; start here.
 - **⚑ Cross-reference BF-137 (filed 2026-09-10, the day after this entry) — and read it FIRST.** It names a cause this entry does not: **the estimator is fitting a GLP-1 (retatrutide) weight drop and reading it as metabolic rate.** `maintenance = intake − Δweight × 7700` assumes weight change reflects energy balance; under a GLP-1 it does not, so the drug's loss is booked as a higher metabolism. **This gate catches the instance through a different mechanism and does not remove the cause** — BF-137 says it will recur on every new vial. Build the two together.
 - **⚠ The urgency dropped on 2026-09-12 and the entry did not.** PR #1128 anchored the daily budget to the owner's **stored goal** rather than to this estimate, so the number is now informational rather than what he eats to. Still worth fixing — BF-137's commit says outright that TN-29 is *"about making it true"* and the estimate "still needs somewhere to show it" — but it is no longer load-bearing.
@@ -9562,7 +9998,7 @@ movement stays near 280 kcal/day.
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
-- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
 - **⚠ Amended 2026-09-13 — still valid, no longer urgent.** PR #1128 anchored the daily budget to the owner's stored goal, so this estimate no longer decides what he eats to. And **BF-137 names a deeper cause than the window**: the estimator is fitting a GLP-1 weight drop as metabolism, which no window choice fixes.
 - **Owner decision, 2026-09-09: option 3, after TN-29** — *"make all the changes you recommend."*
   The gate is cleared; this is Lane A's to build. Options 1 and 2 stay recorded below as the
@@ -9632,7 +10068,7 @@ this card offers to overwrite with 2,045.
 - **Lane:** A — both (1 engine, 2 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"let's not tune to the treadmill — like you said it changes based on location, what do you suggest we do?"*
-- **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
 - **Pairs with TN-25** — TN-25 chooses *what* the fast block should demand; this entry decides *in what unit* it is demanded and how compliance is measured.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 3).
 
@@ -10688,7 +11124,7 @@ calories or the stage mapping (PS-16, PS-19).
 ### [workouts] PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours
 
 - **Lane:** A — `packages/shared/src/1rm.ts`. Sibling of RV-43.
-- **Gate:** owner — the calibration halves.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P4.
 
 All coordinator-verified through the shipped module. (a) `amrapScaleFactor`'s step table makes the
@@ -11065,7 +11501,7 @@ instead is the option that loses: a replay with no window gets one wrong answer 
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
 - **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
-- **Gate:** owner — the fix is a scoring decision, see below.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Added:** 2026-09-03, Review sweep 46 —
   [`write-up §2`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
 - **The module states this invariant and the 2026-07-10 workout review repeated it as a strength:**
@@ -11831,7 +12267,7 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
   returns early unless `Capacitor.isNativePlatform()`, so on web and in every e2e harness it renders
   nothing at all — this cannot be checked anywhere but the S25.
 
-- **Lane:** B — `components/more/update-check-card.tsx:81`.
+- **Superseded lane note (demoted from a field, TN-63):** the surface half is `components/more/update-check-card.tsx:81`. It stays the engine lane's by the both-halves rule, engine first — the field above is the live value.
 - **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
   **v1.436.2** and, two rows below, a green tick reading **"Up to date — v1.414.1 is the newest
   build."**
@@ -11862,6 +12298,17 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
+- **⚠ THE PROBE IS ONLY VALID ON A GREEN PR — measured 2026-09-24, after it produced a false
+  positive.** Run against `#1544` while four checks were still `in_progress`,
+  `enable_pr_auto_merge` answered *"The pull request is in unstable status (required checks are
+  failing)"* — with **nothing failing**; that is the tool's paraphrase of GitHub's `unstable` state,
+  which here meant *pending*. The absence of the usual refusal read as evidence the rule had been
+  added. It had not: re-run eight minutes later on the same PR, all checks green, it returned
+  **"Pull request Protected branch rules not configured for this branch"** exactly as always. The
+  API checks mergeability BEFORE branch protection, so a pending PR never reaches the question you
+  are asking. **Re-probe only on green, and treat any other error as no answer.**
+- **Re-checked 2026-09-24 09:15 UTC: still not configured.** Put to the owner earlier that day; he
+  parked it for a few hours. Not re-asked since — the entry is the record.
 - **✅ HALF-ANSWERED 2026-09-24: E2E stays OFF the required-check list.** Put to him with `Q-297`
   as this batch; he chose to leave E2E advisory until `LB-56` establishes whether it gates anything
   real. **What is still owed is the classic branch-protection rule itself**, which he parked for a
@@ -15225,8 +15672,7 @@ That number is more valuable than either input on its own.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
-- **Lane:** B
-  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter from before the entry was re-laned. The field above records the reason it moved: what remains is the owner's parity look, not a build.
 - **What this entry is for.** A taste request cannot be implemented from as written, so this
   separates the part that is objectively wrong (findings 1–3, each with a CI check that already
   measures it) from the part that is genuinely a design decision (findings 4–5, which need
@@ -15915,7 +16361,7 @@ two are app-wide and sit here.*
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · found by the threshold sweep the owner asked for
-- **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
 - **Batch:** temperature-baseline — the fourth consumer of the object BF-13 fixes. Same PR.
 - **Related: TN-1 / Q-525** (chronic stress has never produced a value) — a plausible contributor,
   **not a proven cause**. See the margin note below before treating it as the answer.
@@ -15997,7 +16443,7 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
-- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
 - **Owner sign-off: RECEIVED 2026-08-26** for the intent (the number must be settled at first load).
   The mechanism below is the recommendation; confirm it before shipping if it changes.
 
@@ -16082,7 +16528,7 @@ apart with no new overnight data — which the check-in half alone does not achi
 - **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-03 · owner: *"why would sleep score be so low for this? I'd imagine 80s if not 90s"*
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
 - **Sequence after TN-5 and TN-10.** All three are independent, but those two are larger and already signed off; changing three sleep inputs at once makes none of them evaluable.
 - **Reference:** [`review`](reviews/2026-09-03-why-a-good-night-scored-63.md) — reproduces the owner's 63 exactly from the stored contributors.
 
@@ -16122,7 +16568,7 @@ combined weight above ~18 of 110; and the 2026-09-02 night's blend rises by 5–
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
 - **✅ Gate: owner SIGNED OFF 2026-08-30.** The owner approved the tuning batch; this is the one of
   the four that was actually ready. It meets the bar CLAUDE.md sets for a scoring change: the blast
   radius is stated and measured — **~3.3 blend points on every night in the 7.5–8 h band**, which is
@@ -16163,7 +16609,7 @@ test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
-- **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
 - **Answers the open half of Q-522** (moveHours saturated, 100 on 48 of 59 days). Q-188 fixed the
   *denominator*; this is why the *numerator* saturates. **Supersede Q-522's "unrelated reason" line.**
 
@@ -16243,7 +16689,7 @@ called with the night's real wake/sleep hours, asserted by a test.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
-- **Lane: B**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: B**
 - **Needs: TN-11** — and this dependency is the whole point, see below.
 
 The owner reported seeing nothing for move hours. **There is exactly one surface**:
@@ -16328,7 +16774,7 @@ the day's move-hours total is below the goal.
 - **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
-- **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
 - **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing.
   **Q-524's last open half closed 2026-08-31: MANUAL WINS** (owner signed off there), so the goal this
   paces against is whatever the owner has set by hand — 7,000 today — and an AI review cannot move it
@@ -16600,7 +17046,7 @@ its consumers re-checked), and after that `stress_high_minutes` no longer correl
 count at |r| > 0.4.
 
 ### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
-- **Lane:** B — surface only: components/body-battery-card.tsx.
+- **Superseded lane note (demoted from a field, TN-63):** this read *"surface only: components/body-battery-card.tsx"* and was WRONG — and because the parser takes the first field, it was the one being served. The field below corrects it: the defect is in the model and the card must not be touched for this.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
 - **Lane: A** — the defect is in the model, not the card. `components/body-battery-card.tsx` is Lane B and **should not be touched for this**.
@@ -16718,7 +17164,7 @@ established. Until one is, this stays parked.
   (`tempZ` / the illness radar) was **not** touched — it is not firing wrongly, it cannot fire at
   all while the sd is 12x too wide, and that is TN-6's subject rather than this one's.
 - **Branch:** `lane-a/deload-temp-gate` · **Added:** 2026-08-31 · owner screenshot, 2026-08-31 06:43 Brisbane
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
 - **Do not batch** — it is one condition, and it un-does a daily false alarm the owner has reported twice.
 
 **TN-6a shipped and works.** `readiness-payload.ts:386` computes `tempLadderTrusted` from
@@ -16762,7 +17208,7 @@ count night for night.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner decision, asked and answered plainly
-- **Lane: A** — `lib/health/readiness-payload.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/health/readiness-payload.ts`
 - **Owner sign-off: RECEIVED 2026-08-24.** *"Fix baseline + suspend penalty now."*
 - **Do NOT batch with TN-6/Q-506.** The whole point is that this lands first, on its own.
 
@@ -17014,7 +17460,7 @@ and on-drug periods without either being refitted.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report + production measurement
-- **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
 - **Owner sign-off: received 2026-08-24** for the direction (anchor the rest boundary to *waking*
   rest, not sleeping rest). The exact offset is still to be fitted — see the pass test.
 - **Do not batch.** It re-scores every stored Body Battery day and needs a `MODEL_VERSION` bump.
@@ -17193,7 +17639,7 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
-- **Lane: A** — needs a Postgres migration, so Lane A only
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — needs a Postgres migration, so Lane A only
 - **Do not batch** (migration).
 - **Keep:** the back-fill of stress buckets over the stored history. The table and the forward write
   are done; re-decoding past days into it is not.
@@ -17373,7 +17819,7 @@ record explicitly why not.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
-- **Lane: B**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: B**
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that. I'd like to get stress metric to be a usable value to determine what events stress me."* **That goal reshapes the entry: the chart is the first half, not the deliverable. See TN-35 for the second.**
 - **⚑ UNPARKED 2026-09-10 — build the chart FIRST, and the owner's request is why.** *"Can we have this displayed on a widget or chart so we can see when the stress occurs. I will be able to match it up based on time to what I was doing around then."*
 - **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
@@ -17444,7 +17890,7 @@ part of this entry**, not only new surfaces.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts`
 - **Owner sign-off: RECEIVED 2026-08-24.** Asked plainly, with the caveat that this does **not** make
   the score less jumpy, and approved on that basis. Build it.
 - **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
@@ -17504,7 +17950,7 @@ Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · found on the session-start `error_events` read
-- **Lane: A**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A**
 
 `daytime-stress: constants not set — call setDaytimeStressConstants() first`, **31 occurrences
 between 10:37 and 20:59 UTC on 2026-08-23**, then nothing. `buildDaytimeStressSeriesFromModel` is
@@ -17780,7 +18226,7 @@ without a queue entry is a dropped finding.*
 
 - **Branch:** `docs/baton-compaction`
 - **Added:** 2026-08-19 · measured while adding batons to the size ratchet
-- **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
   correct, not an omission**: the runner accepts only A or B, and this is not implementer work.
   Recorded 2026-08-30 so the next gate audit does not try to classify it again. **Deliberately not A or B:** each role rewrites its own baton, so this is done by whoever hands over next rather than assigned. Left lane-agnostic on purpose, not by omission.
 
@@ -18318,7 +18764,7 @@ design decision. See the correction at the top of that entry.
   distorts both windows for weeks, and it distorts them in the direction that reads as "you are
   training far too hard".
 
-- **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
+- **Branch:** `fix/cull-implausible-session-duration`
 - **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
   sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
   fiction, and the entry's earlier guess (exclude from load, clamp for calories) is superseded.
@@ -21013,9 +21459,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
-- **Gate:** owner — a SCORING change, so the route is Tuning proposes → owner signs off → Lane A
-  implements (CLAUDE.md). This entry's own Lane bullet already said *"not an implementer's to take at
-  all"*; stated as prose it left the entry at the head of Lane A's READY list.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Needs:** Q-290 — the input signal's own variance bounds what any calibration can achieve. Was
   prose (*"Depends on Q-290"*) and therefore invisible to the queue tool.
 
@@ -21090,8 +21534,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
 
-- **Gate:** owner — a scoring question: Tuning proposes, the owner signs off, Lane A implements. The
-  entry said so in prose, which the queue tool cannot read.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 
 - **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
   `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
@@ -24063,6 +24506,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
+- **✅ NOT rerouted to OR-150, checked 2026-09-24 (OR-153) — this one IS owner-ready.** Every other scoring gate went to Tuning because no proposal existed; this entry's gate already states the number a proposal owes (*"moves ~20% of days at the deload boundary and turns 4 taper days"*). A scoring gate is not automatically premature — check for the days-moved figure before assuming it is.
 - **Gate:** owner — the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
   firings into 1. Measured 2026-09-03, so this is a decision with numbers rather than a guess.
 - **Added:** 2026-08-15 · from the comprehensive review §2.2
@@ -28262,7 +28706,7 @@ that is not a device proof, and this is the code path with the worst data-loss h
 
 ### [workouts][platform] 🟡 `exercise_estimates` has no local mirror, but do not build one on its own
 
-- **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
 
 Found while building the `meal_types` local mirror (2026-07-30): mirroring
 `exercise_estimates` alone would be **inert**. `lib/local-store/program-assembler.ts`
@@ -28283,7 +28727,7 @@ reads.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 
-- **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - ✅ **`invalidateCache(` outside `lib/cache-groups.ts` — DONE 2026-07-30.** All 7 remaining raw
   call sites migrated to named group helpers (`invalidateOuraWorkoutReview`,
@@ -28962,7 +29406,7 @@ amounts — rather than showing the same subtitle as an amountless tick.
 - Plan: [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](superpowers/plans/2026-08-26-camera-form-capture.md)
 - Branch: `spike/camera-pose-feasibility`
 - Added: 2026-08-26
-- Lane: ? — a spike touching only a throwaway route and the CSP. The lane that takes it decides.
+- **Superseded lane note (demoted from a field, TN-63):** this read `?` — *"a spike touching only a throwaway route and the CSP; the lane that takes it decides"*. The field above assigned it on 2026-09-15 and is the live value.
 - Gate: device — every question in it is a measurement the sandbox cannot make.
 
 **Placed at the tail deliberately.** The owner framed it as *"a good future move"*, not as next-up,
