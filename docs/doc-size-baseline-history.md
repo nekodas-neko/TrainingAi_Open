@@ -16636,3 +16636,11 @@ the distinction from TN-60 — that rail inverted stored ordering, this one only
 the three alternatives with what each is better at, since any weight change here is the owner's.
 TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
 coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.
+
+## 2026-09-24 — `docs/agents/state/orchestrator.md` → 97 (chore/or-144-ungate-owner-questions)
+
+Growth, +19. The owner-gate triage's state: which of the seven self-parked `Lane: O` entries were
+ungated and why, which three keep their gate, and the two things deliberately left owed (the queue
+reordering, and 69 entries still triaged only as a shape). It is +19 because a baton that says
+"triage in progress" is worth nothing — the next session needs the three keep-the-gate decisions by
+name, or it re-asks the owner questions he has already parked.

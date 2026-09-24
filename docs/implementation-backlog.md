@@ -2753,7 +2753,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
   toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
 
-- **Gate: owner**
+- **Ungated 2026-09-24 (OR-143).** It IS the owner's call — a daily interaction he never asked to have changed — but nobody has put it to him, and `Gate:` parks the entry out of the Orchestrator's own READY list, so the gate was what stopped it being asked. Asking is the work; the work is `Lane: O`.
 - **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
   and the file paths below are right; what is missing is permission to spend it. This entry ends by
   saying its two open questions "decide whether this is worth doing at all", and both are
@@ -11974,8 +11974,8 @@ one. A swipe on the single Start button adds an affordance that does not current
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
 - **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
-- **Gate: owner** — a deliberate client-side throw in **production** may page someone. Ask before it
-  is fired; once he says yes it is a measurement with one objective answer and goes straight to `DV`.
+- **Ungated 2026-09-24 (OR-143).** A deliberate client-side throw in **production** may page someone, so it is still asked before it is fired — but that ask is one sentence and it is the Orchestrator's to make. `Gate:` parked it instead, which is why thirteen days of silence went thirteen more.
+  Once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
@@ -14707,7 +14707,7 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 
 - **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
 - **Lane: O**
-- **Gate: owner** — re-laned 2026-09-24; was `B` with a device gate. Every buildable item below is
+- **Ungated 2026-09-24 (OR-143), re-laned the same day from `B` + device gate.** Every buildable item below is
   closed with a reason (② shipped, ③ ⑥ ⑦ each decided), so what remains is **artboard parity plus
   the owner's ④ watching brief on grouped-section backgrounds**. Whether a screen matches a drawing
   is a judgement about whether it looks right, which per CLAUDE.md waits on the owner even though
@@ -14833,7 +14833,7 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Gate: owner** — re-laned 2026-09-24; was a device gate. *"Do the drawn screens match what
+- **Ungated 2026-09-24 (OR-143), re-laned the same day from a device gate.** *"Do the drawn screens match what
   shipped"* is a judgement, not a measurement, and **`RV-143` already read this entry as mis-gated
   rather than device-blocked** — both sweep plans exclude it for that reason. See the ⚠ below. Every phase has shipped and this is the completion
   checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
