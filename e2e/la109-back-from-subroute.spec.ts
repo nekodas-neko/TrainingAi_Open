@@ -83,6 +83,24 @@ test('back from a tab sub-route returns to that tab, not Home', async ({ page })
  * mounts, and the reverse direction — flip to Home, push off it, come back — is the thing a naive
  * version of that fix would break. It pins behaviour that is already correct. It must never be read
  * as having confirmed BF-49, and a green run here says nothing about the device.
+ *
+ * **LB-138 — "come back" is NOT `page.goBack()`, and using it made this guard assert a behaviour
+ * the product deliberately does not have.** It went red at `ef95595c11d` (#1431), which converted
+ * the streak card to `navigateToTab`. `show()` flips tabs with `replaceState` on purpose — "tab
+ * flips are peers, not a history trail" — so after the flip AND the push there is one entry, and a
+ * browser back leaves the page: the assertion received `"blank"`, i.e. `about:blank`.
+ *
+ * **That is a web-harness outcome, not a device one, and the app says so in its own source.** On
+ * the APK the Capacitor `backButton` listener intercepts first, and for a tab route
+ * `backActionForPath` answers `"home"`, so the listener calls `navigateToTab(router, "/")` and
+ * never touches history — its comment reads *"The shell replaced rather than pushed to get here,
+ * so there is nothing to pop."* There is no native listener in Chromium, which is the whole of the
+ * difference.
+ *
+ * So this now drives the back path the product actually implements. What it proves is unchanged and
+ * is what the paragraph above says it must: that **Home's own tree renders** rather than the tab
+ * whose tree is stale. `components/shell/__tests__/back-action-on-tab.test.ts` separately pins that
+ * every tab href answers `"home"`, so the decision and its consequence are both covered.
  */
 test('back from a push off Home returns to Home, not the tab whose tree is stale', async ({ page }) => {
   test.setTimeout(180_000)
@@ -110,7 +128,12 @@ test('back from a push off Home returns to Home, not the tab whose tree is stale
   await page.waitForFunction(() => window.location.pathname.startsWith('/health'))
   await settleRouteBoundary(page)
 
-  await page.goBack()
+  // The device's back, not the browser's: exactly what the Capacitor listener does on a tab route.
+  // `page.goBack()` would pop a history entry the shell never pushed — see the LB-138 note above.
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('ta:tab-navigate', { detail: '/', cancelable: true }))
+  })
+  await page.waitForFunction(() => window.location.pathname === '/')
   await settleRouteBoundary(page)
 
   expect(new URL(page.url()).pathname, 'the URL half was never the bug').toBe('/')
