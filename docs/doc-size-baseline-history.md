@@ -16768,6 +16768,8 @@ itself: removing the gate would have released a scoring change with no proposal 
 there is no `Lane:` value for Tuning, so nothing else could hold them. The entry is long because the
 next session needs the reason the obvious fix (a fifth lane) was rejected, or it will add one.
 
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29198 (chore/or-151-final-gates-and-recount)
 
 Growth, +6, and it closes the ratchet OR-146 opened this morning: every `Gate: owner` now says what
@@ -16775,6 +16777,8 @@ it wants, baseline zero. The six lines are the last six gates plus OR-145's corr
 gated entries rather than the 76 it was written against, and a twelve-entry admin sitting rather
 than ten. That count moved four times in a day, every rise from reading a gate that said only
 `owner` and finding a button press behind it, so the entry now says to recount rather than quote it.
+
+---
 
 ## 2026-09-24 — `projectOverview.md` → 12676
 
@@ -16802,6 +16806,8 @@ v4 → v5 (mean end 62.9 against 15.2), live since August. v6 is a fifth boundar
 census was re-run rather than copied from Tuning's, which is what surfaced the single v2 day theirs
 omitted — and the growth here is mostly that table, which is the evidence the entry was missing.
 
+---
+
 ## 2026-09-24 — `projectOverview.md` → 12718
 
 12695 → 12718 (+23). RV-163's row. It earns a place because the defect changed numbers the owner
@@ -16810,10 +16816,16 @@ of 44 built on top of it. A row that only said "night selection unified" would n
 those two days to a cause, and the two days are still wrong — re-scoring them is a stored-data
 rewrite queued as RV-170, so the entry stays open until he authorises that.
 
+---
+
+
+
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 58, `review/sweep-58-rules-and-perf`.**
 29212 → 29518 (+306; rebased on #1540). Sixteen entries (RV-171 to RV-186): a census of the CLAUDE.md rules
 no CI step enforces, and a performance sweep with its device half as one baseline sitting. One dated
 note on DV-13 naming its probable cause (RV-180).
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29369 (BF-192 + BF-193)
 
 Account deletion, asked for as an app-store requirement. The length is the two measured tables the
@@ -16821,6 +16833,8 @@ entry turns on — the reproduced foreign-key failure in the existing delete pat
 SET NULL / NO ACTION split across the 99-table schema — plus BF-193's three decision briefs. The
 schema table is the part that could not be summarised away: which keys cascade and which do not is
 the whole difference between a deletion that works and one that silently leaves rows behind.
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29217 (chore/or-153-route-six-more-to-tuning)
 
 Growth, +5. Six more scoring entries moved from `Gate: owner` to `Needs: OR-150`, and OR-150 grew
@@ -16835,6 +16849,8 @@ still pending, `enable_pr_auto_merge` reports an unstable-status error and never
 protection question, so the absence of the usual refusal looks like the setting landing. Re-run on
 green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
 repeating the cycle.
+
+---
 
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29674 (DV-14 root-caused)
 
@@ -16874,6 +16890,8 @@ production read. An entry that said only "fixed" would leave a reader believing 
 Second, it records that the general guard the source entry asked for was built and **withdrawn** for
 false positives, and points at LA-137 where the four parsing traps are written down — without that,
 the next session re-attempts it from scratch and rediscovers them.
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-154)
 
 Growth: three more entries carry `Ask: owner` (TN-64, RV-113, LA-129), and Q-551 carries a note
@@ -16887,6 +16905,8 @@ and stops the next sweep undoing that.
 expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
 parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
 a stale citation or building a finished entry.
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-155, owner answers)
 
 Growth: four owner answers recorded, and the largest is a correction rather than a decision. He said
@@ -16896,11 +16916,15 @@ admin session, and DV holds his login. He also corrected that DV cannot attach d
 at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
 would otherwise re-derive them.
 
+---
+
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 60, `review/sweep-60-security-privacy`.**
 29807 → 30004 (+197; rebased). Ten security and privacy entries (RV-190–RV-199), nine of them Lane A items
 directly under RV-188. They cannot be shorter than this: each one names the surface, who can reach
 it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
 deliberately.
+
+---
 
 ---
 
@@ -16911,6 +16935,10 @@ condition (no eligible flagged set) yields a positive estimate on 138 other logs
 function of the log's own sets. Much of the entry is what must NOT be concluded: they are not bodyweight
 movements, and the high-rep guard is present and careful, contrary to my first reading of a rising
 1RM-to-weight ratio that turned out to be a join artefact.
+---
+
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-156)
 
 Growth: BF-191's two answers and RV-170's policy answer. BF-191 costs the most lines because the
@@ -16962,3 +16990,29 @@ reasoning or does it blind.
 
 The SHA-pinning bullet also records that the tags were dereferenced (`v5^{}`) rather than pinned as
 tag objects. That is the standard way to get action pinning wrong, and it is invisible in the diff.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/planned-pct-coverage)
+
+29745 → 29843 (+98). TN-75: the load prescription is followed (50% of sets within half a percentage point, reps exact on 53%),
+but `planned_pct` coverage fell from 93% in August to 72% in September with a five-session hole. Includes
+the measurement that kills the tempting unification with TN-74 — a zero 1RM is more common among sets
+that DO carry a plan, not fewer.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
+
+29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782
+sets, beating raw RPE), which calibrates its sensitivity at ~0.25 points and turns the sleep/readiness
+nulls into a measured ceiling — neither moves perceived effort by a fifth of that. Filed as a Reference
+because future proposals read it for their acceptance bar rather than building from it.
+
+## 2026-09-24 — `CLAUDE.md` and the backlog (lb-134, unsound merge gate)
+
+Two CLAUDE.md passages told every agent that a successful merge proves the checks passed. Measured:
+PR #1467 merged eleven seconds before its Tests job reported failure, so it merged past a pending
+check — which is what one of those passages said was impossible. The corrections cost lines in the
+file every session reads because the wrong version is load-bearing: it is quoted as the reason not
+to poll the checks endpoint.
