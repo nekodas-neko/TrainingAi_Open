@@ -16885,6 +16885,22 @@ and stops the next sweep undoing that.
 expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
 parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
 a stale citation or building a finished entry.
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` (or-155, owner answers)
+
+Growth: four owner answers recorded, and the largest is a correction rather than a decision. He said
+the device agent can run the admin sitting itself, which moved five entries (LA-56, LA-68, Q-525,
+Q-71, Q-11) off his plate and onto DV — the gate had never been his judgement, only the need for an
+admin session, and DV holds his login. He also corrected that DV cannot attach during his workouts
+at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
+would otherwise re-derive them.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 60, `review/sweep-60-security-privacy`.**
+29807 → 30004 (+197; rebased). Ten security and privacy entries (RV-190–RV-199), nine of them Lane A items
+directly under RV-188. They cannot be shorter than this: each one names the surface, who can reach
+it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
+deliberately.
 
 ---
 
