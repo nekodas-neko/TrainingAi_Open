@@ -1222,6 +1222,56 @@ which is the right shape for something that can only be validated by living with
   write at 385), `lib/data/postgres/slices/body-battery.ts:33` (the only upsert),
   `app/api/admin/backfill-derived-scores` (the pattern to copy).
 
+### [workouts] TN-74 — `estimated_1rm` is stored as 0 on 42 loaded exercise logs, and it is not a function of the log's own sets
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, pointing TN-73's validated instrument at the
+  thing that actually sets prescribed load.
+- **Lane: A** — the write path (`app/api/log-exercise`, the repository mapper), engine territory.
+- **Why tuning cares.** `target_80` is derived from `estimated_1rm`, and target80 is the prescribed
+  weight. A wrong 1RM does not just mislabel history; it sets what the owner is told to lift.
+- **Measured 2026-09-24 over 494 non-deleted exercise logs.** **42 store `estimated_1rm = 0`** (8.5%) and
+  **38 store `target_80 = 0`**. None are NULL — every row has a number, and for 42 of them that number
+  is zero.
+- **⚠ These are NOT bodyweight movements — that was my first hypothesis and it is wrong.** The zero logs
+  carry real load: Sumo Deadlift at **82.5 kg**, Barbell Shrug **87.5 kg**, Barbell Hip Thrust **85 kg**,
+  Bent-Over Row **45 kg**, at normal rep counts (mean 7–11). Only Pull-Up and Hanging Leg Raise among the
+  25 affected exercises have a max set weight of 0.
+- **The dominant mechanism, measured.** Logs with **no `use_for_1rm` set carrying weight**:
+  - among the 42 zero logs: **30 (71%)**
+  - among the 452 non-zero logs: **138 (31%)**
+
+  Mean flagged sets per log is **0.76** on the zeros against **1.79** on the rest. So "no eligible set to
+  compute from" explains most of the zeros, and `calc1RM` returning `weight` when `weight <= 0`
+  (`packages/shared/src/1rm.ts:26`) is how that becomes a stored 0 rather than a NULL.
+- **⚠ But it does not explain all of it, and the leftover is the real finding.** **12 of the 42 zero logs
+  DO have a loaded flagged set** and still store zero. And **138 non-zero logs have NO loaded flagged
+  set** yet store a positive 1RM. The same input condition yields 0 in 30 cases and a positive number in
+  138 — so **`estimated_1rm` is not a function of the log's own sets.** Something else supplies it much
+  of the time (a carry-forward from a previous session, a program-configured value, or a second write
+  path), and when that something is absent the field falls to 0. **Identifying that supplier is the
+  first task**, not changing the formula.
+- **⚠ CORRECTION TO MY OWN FIRST READING — the high-rep guard is present and careful.** I measured the
+  stored 1RM-to-weight ratio rising monotonically with the rep count of the contributing set — **1.246
+  (1–6 reps) → 1.352 (7–10) → 1.467 (11–14) → 1.663 (15+, mean 17.4)** — and took it for an uncapped
+  formula, which would have been the historical "wrong high-rep guard → inflated PRs" bug.
+  `packages/shared/src/1rm.ts` shows otherwise: `repFactor` averages Epley with a **Brzycki term frozen
+  at its 20-rep value** (its own comment explains Brzycki blows up toward rep 36), and
+  `amrapScaleFactor` **de-rates high reps deliberately** — 1.0 / 0.97 / 0.93 / 0.88 by rep band.
+  **And my ratio measurement cannot test the guard anyway**: `estimated_1rm` is stored per exercise-log,
+  so dividing it by each contributing set's weight attributes one log's estimate to several sets. The
+  rising ratio is largely that join artefact. Recorded so nobody re-runs it and files the wrong defect.
+- **Acceptance criteria:** no exercise log stores `estimated_1rm = 0` while carrying a loaded set; a log
+  with genuinely no eligible set stores **NULL** rather than 0, so downstream can tell "no estimate" from
+  "an estimate of zero"; and `target_80` is never 0 where the 1RM is positive (four logs currently pair a
+  zero 1RM with a *positive* target80 — Overhead Press 15.8, Skull Crusher 12.5, Cable Pulldown 9.6,
+  Cable Preacher Curl 5.0 — which is the inverse inconsistency and needs the same answer).
+- **What this does NOT establish.** What supplies the positive 1RM on the 138 logs with no eligible set.
+  Why 12 loaded logs still read zero. Whether a zero ever reached a prescribed weight the owner actually
+  saw — that needs the surface, not the table, and is the one part a device pass could answer.
+- **Where the mechanism is:** `packages/shared/src/1rm.ts` (`calc1RM` at 25, `repFactor` at 18,
+  `amrapScaleFactor` at 32), `app/api/log-exercise/route.ts` (writes the estimate),
+  `claude_ro.exercise_logs.estimated_1rm` / `target_80`.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
