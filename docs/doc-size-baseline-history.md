@@ -16512,3 +16512,9 @@ this is that handover rather than a new entry. The +22 is the triage: what was r
 URL exists — the component renders a "No reference" string when it is null, and the device saw a
 broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
 that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review, `review/dv-results-and-new-probes`.**
+27843 → 27949 (+106). Nine new Review entries: three findings from device sweeps 1–3 that had no
+entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
+re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
+to run. Offset by removing RV-126, whose results all have homes (−30).

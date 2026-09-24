@@ -473,6 +473,28 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
+
+- **Lane: DV** — the deliverable is an attribution only the running app can give.
+- **Added:** 2026-09-24 · Review, reading device sweep 1. **Found by** RV-139 (P13), which failed
+  its own pass line (*"no endpoint requested twice for one screen"*) and was closed without the
+  failure being filed; the result sat only in the sweep-1 journal.
+- **The measurement (S25 · web v1.465.10 · gesture nav · sweep 1):** every Home visit requests
+  `/api/workout-data` twice. Home and Health each also carry one 2-deep serial chain.
+- **What the source says, and why it does not settle it:** nothing under `components/home/` fetches
+  that endpoint. The client callers are `workout-screen.tsx` (`:412`, `:1557`, mounted persistently
+  in the tab shell), the sync-provider warm list (`workout-data:meta`), `calendar-widget.tsx`
+  (Health), `ai-periodization-status-card.tsx` (Health), and the two select screens. So the second
+  Home request is probably the hidden Workout panel revalidating, or the warm list, and reading
+  cannot tell which.
+- **The method:** P13 again with `Network.requestWillBeSent`'s **`initiator.stack`** recorded, which
+  names the calling function for each of the two requests. Add `Network.setBypassServiceWorker(true)`
+  for the same pass: that gives RV-139 the **byte half** it could not read through the service worker.
+- **The falsifiable claim:** both requests carry the same query string and one of them comes from a
+  panel that is not on screen. **FAILED** means the fix belongs to the lane that owns that caller
+  (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
+  query and both are needed, and this entry closes.
+
 ### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
 
 - **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
@@ -880,10 +902,13 @@ below threshold and left in place for next time.
 
 ### [nutrition][app-shell] RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?
 
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
+- **Lane: DV** — re-laned from `O` 2026-09-24 by Review, which filed this probe. Only the food row
+  has been measured, and its finding is BF-177. **Five of the seven rows are COULD NOT CHECK**, so
+  the device is still what this entry needs. The weigh-in row has since been answered by RV-108 in
+  sweep 2. **Still owed:** activity confirm (covered by the 2026-09-23 standing write permission),
+  ring sync (read-only: watch the surfaces after the next drain), and the offline rows (run them
+  with RV-131). Macro targets and workout completion need the owner's go-ahead per write; until then
+  they are COULD NOT CHECK.
 
 - **📱 MEASURED ON THE S25 (food rows only), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. **Log a food:** the write goes
   local-first + `POST /api/sync/push`; within 3 s `energy-balance`, `weekly-summary` and
@@ -954,36 +979,6 @@ below threshold and left in place for next time.
 - Needs a `window.fetch` wrapper installed at app start; that is a harness change under
   `scripts/device/**`, which the role owns.
 
-### [body][devices] RV-126 — DEVICE PROBE: the local-store write path, which no sandbox can execute
-
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
-
-- **📱 MEASURED ON THE S25, 2026-09-23 — the first read of the on-device store.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js`
-  `localQuery` through the app's own `CapacitorSQLite` connection (SELECT only). **Every
-  offline-first log table carries `deleted_at`** (food, supplements, activity, mood, body metrics,
-  injuries). **Food renders offline:** `food_logs` holds `food_item_id` and the local `food_items`
-  (339 rows) holds name, brand and macros. **Deletes are tombstoned** — three test deletes kept their
-  rows with `deleted_at` set. **But a pushed row does not always return to `synced`:** all **33**
-  tombstoned food logs (since 2026-08-19) sit at `sync_status='pending'` with the outbox **empty**,
-  and one set log has been `pending` since 2026-09-19 although the server has it — filed as
-  **DV-5**. **COULD NOT CHECK:** the weigh-in eviction question RV-108 turns on (no weigh-in was
-  written this sitting).
-
-- **Verify:** device — no build half. Method: **P3**.
-- **The falsifiable claim, three parts.** (a) A weigh-in evicts the body-metric cache keys **and**
-  `invalidateBiometrics` fires from the `pushMutations` → `pullDelta` round trip on the device that
-  wrote it — **RV-108 turns entirely on this.** (b) For each offline-first domain (food,
-  supplements, activity, mood, body metrics, injuries) the local row holds everything needed to
-  **render** it offline, not just a foreign key. (c) Every delete in those domains writes a
-  tombstone rather than hard-deleting.
-- **This is the project's largest blind spot and it is structural:** `getLocalStore` returns null in
-  the web sandbox, so *every* local-first write path is untested by construction in `pnpm dev`. The
-  food-disappearing bug was exactly (b) — a `food_item_id` with no name or macros.
-- **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
-
 ### [app-shell] RV-144 — three inputs on `/more/details` sit under the 44 px touch floor
 
 - **Lane:** B — `/more/details`. **Added:** 2026-09-24 · filed out of `RV-127`, whose remaining work
@@ -1002,6 +997,37 @@ below threshold and left in place for next time.
 - **Sibling sweep before closing**: the probe covered 13 routes and found these three, but it
   measured what was on screen. Check the other text inputs in the same form family rather than only
   the three named.
+
+### [app-shell][platform] RV-146 — two fonts only the meal-label printer uses are preloaded on every page
+
+- **Lane:** B — `app/layout.tsx`.
+- **Added:** 2026-09-24 · Review, reading RV-130's walk half (S25 · web v1.465.4 · gesture nav):
+  **4 font files × 10 visits** logged *"preloaded using link preload but not used within a few
+  seconds"*. That finding has had no entry until now.
+- **The cause, read from source:** `app/layout.tsx` loads `Archivo` and `Instrument_Serif` for
+  Q-389's printable meal label only (`--font-archivo` and `--font-instrument-serif` each have one
+  user). `next/font/google` sets **`preload: true` by default**, so every cold start downloads both
+  faces before first paint. `display: "swap"` keeps them off the *render* path, as the code comment
+  says, but not off the *network* path. Cold-start FCP is **1020 ms** (sweep 1, P11).
+- **The fix:** `preload: false` on those two. The label renderer already awaits
+  `document.fonts.ready` before drawing, so the faces still load before the label needs them. Geist
+  and Geist Mono stay preloaded.
+- **The device check once it ships:** the four console warnings are gone on a cold start, the
+  printed label still renders in its own faces, and P11's FCP is re-read to see whether it moved.
+
+### [platform] RV-147 — `docs/data-layer-rules.md` still names `metric-log-sheet` as the save that overwrites every column
+
+- **Lane: O** — a rule document.
+- **Added:** 2026-09-24 · Review, from device sweep 1's note *"the local row kept every other column
+  — `upsertBodyMetric` merges"*, which was written down and not filed.
+- **The stale line:** `docs/data-layer-rules.md:19` — *"Local upserts overwrite all columns by
+  default — a single-field save must read-merge first (copy `water-log-sheet`'s pattern, not
+  `metric-log-sheet`'s)."* Since the fix at `lib/local-store/sqlite-backend.ts:1084`,
+  `upsertBodyMetric` reads the existing row and COALESCEs every field itself, and the S25 confirmed
+  it. So `metric-log-sheet` is no longer the counter-example.
+- **What to write instead:** name which local upserts merge (body metrics, in the store) and which
+  still overwrite, so the rule points at a real hazard rather than a fixed one. Check the other
+  `upsert*` methods in `sqlite-backend.ts` for that list; do not reason it from this entry.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
@@ -1047,10 +1073,12 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
 
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
+- **Lane: DV** — re-laned from `O` 2026-09-24 by Review. The walk half's two findings are now
+  filed: the **font-preload warnings are RV-146** (Lane B), and the **~50 forced layouts per visit
+  inside hidden panels** point at the same mechanism as **DV-12**'s lead, where chart.js re-measures
+  when a panel leaves `content-visibility: hidden`. Answer them together: DV-12's attribution should
+  say whether it also accounts for these. **The resume half was never run**, and every fault in
+  `error_events` for the last 7 days is `bf110 resume`, so that half is the one that matters.
 
 - **📱 MEASURED ON THE S25 (walk half), 2026-09-23.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Two `census.js` walks (10 and 15
   visits): **0 non-2xx and 0 failed requests** of 161. Console, the full list: **499×** *"Rendering
@@ -1079,10 +1107,11 @@ below threshold and left in place for next time.
   Under CDP emulation only — a real reconnect fires Capacitor's network event, which emulation does
   not — so this needs real airplane mode before it is a finding.
 
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
+- **Lane: DV** — re-laned from `O` 2026-09-24 by Review. The emulated half is answered. What is left
+  needs **real airplane mode**, which the owner toggles. That covers the suspected **offline writes
+  not pushing on reconnect** (sweep 1: a delete sat `pending`, `attempts: 0`, for 40 s), survival of
+  a force-stop while offline, and the other five domains. Ask the owner for the toggle at the start
+  of a sitting. Until then these are COULD NOT CHECK.
 
 - **📱 MEASURED ON THE S25, 2026-09-23 — mostly clean.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `pw.js` `offline(true)`
   (`navigator.onLine` false, page fetches fail). Food, one domain only: logged offline, **row on
@@ -1107,10 +1136,11 @@ below threshold and left in place for next time.
 
 ### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
 
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
+- **Lane: DV** — re-laned from `O` 2026-09-24 by Review. **Correction: this probe was never run.**
+  OR-135's note said it had been. Sweeps 1 and 2 planned it (`tour.js`, station H), sweep 3 left it
+  out, and no measurement was ever recorded. It still needs the device. The warm half can run
+  whenever the phone is plugged in. The fresh-install half stays COULD NOT CHECK, per the warning
+  below.
 
 - **Verify:** device — no build half. Method: **P9**; `tour.js` already walks routes.
 - **The falsifiable claim:** every route in the build is reachable **by tapping only**, from a fresh
@@ -1420,6 +1450,82 @@ below threshold and left in place for next time.
   one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
 - **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
 
+
+### [app-shell][platform] RV-149 — DEVICE PROBE: the timezone census, every screen with two clocks that disagree
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review. Method: **P17** in
+  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
+- **Why:** rendering in the device's zone rather than the user's is a strict CLAUDE.md rule, and it
+  has broken six screens at once before (2026-08-03). Every check since has been one screen at a
+  time: DV-7's Sleep check is the only device run. The override is read-only and costs one walk.
+- **The falsifiable claim:** with the device zone overridden to `America/New_York` and the profile
+  left on Brisbane, every visible clock time, date and day-word on every route matches the
+  un-overridden walk. **FAILED** per route that differs, with the text diff. Each failing route goes
+  to the lane that owns that screen.
+
+### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review. Method: **P18**.
+- **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
+  `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
+  a stale number with no failure line, **by hand, on one screen**. `Fetch.enable` can fail any single
+  `GET /api/*` on the phone, so the whole app can be checked in one sitting.
+- **The falsifiable claim:** for each read endpoint, every card that reads it shows an error or
+  offline state when that endpoint returns 500 or never answers. **FAILED** per card that vanishes or
+  shows a stale value as current. Report it as a table (endpoint × card × outcome).
+  - **Never fail a write or `/api/sync/*`.** This probe is read-only by construction.
+
+### [platform] RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review. Method: **P19**.
+- **Why:** the sweep-2 runbook says to restart the app after a deploy before re-checking a fix, so
+  the running WebView does not pick up a deploy on its own. CLAUDE.md says *"merging is the
+  delivery"*. Nobody has measured the gap between those two statements. It sets the delay on all
+  105 owed device checks, and it is how long the owner runs a fix's predecessor. DV-14 showed that
+  production itself can lag `main`, so the two lags stack.
+- **The falsifiable claim:** after `/api/version` flips, the running bundle reaches the new version
+  within one background-to-resume cycle. **FAILED** if it needs a force-stop. That is not
+  necessarily a bug, but then CLAUDE.md's delivery sentence needs a qualifier, and that part goes to
+  Lane O. Report which step, if any, picked it up, and what the service worker's cache still held.
+
+### [app-shell] RV-152 — DEVICE PROBE: accessibility tree and broken-image census on every route
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review. Method: **P20**.
+- **Why:** DV-11 (unnamed switches) and DV-18 (a broken admin image) were each found by eye on one
+  screen, and #1462's guard covers switches only. `Accessibility.getFullAXTree` plus a
+  `naturalWidth === 0` scan covers every route in one read-only walk.
+- **The falsifiable claim:** no interactive node on any route has an empty accessible name, and no
+  image is broken. **FAILED** per offender, with its role, route and nearest text. The fixes go to
+  Lane B.
+
+### [app-shell][platform] RV-153 — DEVICE PROBE: which localStorage keys a tab tap writes, and how full the store is
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review. Method: **P21**. Feeds **DV-12**, whose profile found
+  `localStorage.setItem` at 1–15 ms on every tab tap and left the caller unnamed.
+- **The suspect, from source:** `lib/sqlite/cache.ts:82` writes `JSON.stringify(entry)` of the
+  whole cached payload, synchronously, on every cache write, and `cachedFetch` revalidates on every
+  visit. Six Zustand stores persist as well; four have no `partialize`.
+- **The falsifiable claim:** a tab tap writes only small keys (< 10 kB each), and total
+  `localStorage` use is under half its quota. **FAILED** names the keys and sizes, and the fix goes
+  to Lane A if it is the cache layer (`lib/sqlite/**`) or to Lane B if it is a store. A store near
+  quota is the more urgent half, because `setItem` then throws.
+
+### [app-shell][platform] RV-154 — DEVICE PROBE: the app left open across local midnight
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review. Method: **P22**.
+- **Why:** the "yesterday's data after midnight" class (session 52) is guarded only by reading code
+  for date-embedded cache keys. Nothing has watched a running app cross 00:00.
+- **The falsifiable claim:** with the app in the foreground from 23:55 Brisbane, Home's day,
+  Nutrition's diary date, the readiness card and the timeline each move to the new day **without a
+  tab switch or restart**. **FAILED** per surface that holds the old day.
+- **Needs an overnight sitting the owner agrees to.** Until then this is COULD NOT CHECK, not a
+  failure. It is the one probe in this batch that cannot run whenever the phone is plugged in.
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
 
