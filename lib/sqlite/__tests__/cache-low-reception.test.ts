@@ -30,10 +30,12 @@ describe('BF-195 — low reception, not offline', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   it('passes an abort signal, so the request cannot hang forever', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(ok({ v: 1 }))
+    // Declared with the parameters the assertion reads: indexing a zero-argument `vi.fn()` is the
+    // shape `check-zero-arg-mock-indexed` exists to stop, and it removes the cast as well.
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ok({ v: 1 }))
     vi.stubGlobal('fetch', fetchMock)
     await cachedFetch('bf195-signal', '/x', 60, vi.fn())
-    const init = fetchMock.mock.calls[0][1] as RequestInit
+    const init = fetchMock.mock.calls[0][1]!
     expect(init.signal, 'the fetch is issued with a timeout signal').toBeInstanceOf(AbortSignal)
   })
 
