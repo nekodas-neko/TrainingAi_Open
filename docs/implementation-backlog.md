@@ -738,53 +738,6 @@ below threshold and left in place for next time.
   stays under 1 s from another client throughout.
 
 
-### [platform] OR-138 — let the triaging agent read the data of the user who filed the feedback
-
-- **Lane:** A — `app/api/admin/db-query/route.ts`. **Added:** 2026-09-23 · owner request the same
-  day: *"the orchestrator or a set agent should be able to use the claude read only feature and read
-  the data of the user who made the report. The app is in development mode so each user has consented
-  to having their data used for training."*
-- **⚠ AUTH/SECURITY — the owner has asked for it, and the carve-out still applies.** This widens
-  `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
-  the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
-  **Do not widen it further than this entry describes without going back to him.**
-- **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
-  `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
-  views do not change at all. What is fixed is **where that setting comes from**:
-  `bootstrapClaudeRoOwner` (`lib/data/postgres/claude-ro-owner.ts`) issues
-  `ALTER ROLE claude_readonly SET app.claude_ro_owner = '<uuid>'` once at boot, so the scope is bound
-  to the **role**, globally, for every request.
-- **The shape: an optional `userId` on the request body, applied with `SET LOCAL` inside a
-  transaction** — `BEGIN; SET LOCAL app.claude_ro_owner = '<uuid>'; <the caller's SELECT>; COMMIT`.
-  Absent `userId`, behaviour is byte-identical to today (the role default still applies), so this is
-  additive and trivially reverted.
-- **`SET LOCAL` is not a style preference — a bare `SET` would leak across requests.** The endpoint
-  reads through a **pool** (`readonly-client`), so a plain `SET` persists on that pooled connection
-  and silently re-scopes whichever later request happens to reuse it. `SET LOCAL` cannot outlive its
-  transaction. Note that `SET LOCAL` outside a transaction warns and does nothing, so the `BEGIN` is
-  load-bearing rather than decorative.
-- **Validate the uuid with a regex, as the existing code already does and says why.** `SET`/`ALTER
-  ROLE` take no bind parameter, so the value is interpolated; `claude-ro-owner.ts` carries the same
-  regex and calls it *"the safety boundary, not validation"*. Reuse it rather than writing a second.
-- **Recommended restriction, and the one judgement worth a second's thought: allow the pivot only to
-  a user who has actually submitted feedback** (a cheap `EXISTS` against `feedback_submissions`).
-  That keeps the widening tied to the justification the owner gave — *the user who made the report* —
-  rather than becoming general cross-user read. It is one predicate to delete if he later wants it
-  broader, so the narrow version costs nothing to reverse and the broad one cannot be un-shipped.
-- **Log the pivot.** The route already records `sql`/`ip`/`durationMs` per query; add the user id
-  that was read, so a cross-user read is attributable after the fact. Consent is not the same as
-  no audit trail.
-- **What is already safe and should stay that way.** The endpoint **rejects any SQL containing a `;`**
-  (*"Only a single statement per request"*), so a caller cannot smuggle a `SET` alongside a `SELECT`.
-  Read-only is enforced by the Postgres **role**, never by inspecting SQL — do not add keyword
-  filtering, the file's header explains why it loses to `WITH x AS (INSERT … RETURNING *)`.
-- **⚠ Unverified, and worth checking first:** whether a caller can today send a bare
-  `SET app.claude_ro_owner = …` as its own single statement and have it stick on the pooled
-  connection. Read from the source, **not** tested — a live probe was the right thing to decline.
-  If it does stick, the current single-user guarantee is already softer than it reads, and that is a
-  fix to make in this same PR rather than a reason to hurry the feature.
-- **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
-
 ### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
 
 - **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
