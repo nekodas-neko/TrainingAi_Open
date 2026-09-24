@@ -454,8 +454,18 @@ export const useWorkoutStore = create<WorkoutStore>()(
 // (between exercises, after a solo log, or after an app reopen mid-workout via
 // onRehydrateStorage above), so it must NOT be excluded here — only exclude "done",
 // which means the workout was already saved and leaving is safe.
-export function isWorkoutActive(state: Pick<WorkoutState, 'workoutStartMs' | 'mode'>): boolean {
-  return !!state.workoutStartMs && state.mode !== 'done'
+//
+// DV-16: `mode` alone cannot carry that, because `applyRehydrateFixups` deliberately rewrites
+// `done` to `pre` on reopen so DoneScreen does not replay its confetti. That rewrite discarded
+// the only term saying the workout had finished, so after a restart a COMPLETED day read as
+// active and every tab tap raised "Leave workout?" — measured on the S25, 2 of 2. `workoutEndMs`
+// is the durable fact the transient mode is not: written once, at completion
+// (`workout-screen.tsx`), and nulled by both `startWorkout` and `resetSession`, so the guard
+// re-arms on Start Again.
+export function isWorkoutActive(
+  state: Pick<WorkoutState, 'workoutStartMs' | 'workoutEndMs' | 'mode'>,
+): boolean {
+  return !!state.workoutStartMs && !state.workoutEndMs && state.mode !== 'done'
 }
 
 // The single shared rest-target derivation (TMR-1/TMR-5) — a style-less set (no

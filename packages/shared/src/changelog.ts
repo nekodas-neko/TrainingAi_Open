@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.24",
+    date: "2026-09-24",
+    changes: [
+      "Leaving the Workout tab after you have finished the day's workout no longer asks \u201cLeave workout? Your workout is in progress\u201d. Reopening the app quietly put a completed session back into an in-progress state, so every tab tap raised the warning \u2014 and answering Leave reset a workout that was already saved.",
+    ],
+  },
+  {
     version: "1.465.23",
     date: "2026-09-24",
     changes: [

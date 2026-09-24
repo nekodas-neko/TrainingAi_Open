@@ -14,6 +14,7 @@ export function TabSwipeNavigator() {
   const router = useRouter();
   const mode = useWorkoutStore(s => s.mode);
   const workoutStartMs = useWorkoutStore(s => s.workoutStartMs);
+  const workoutEndMs = useWorkoutStore(s => s.workoutEndMs);
 
   useEffect(() => {
     let startX = 0, startY = 0, fromEdge: "left" | "right" | null = null;
@@ -25,7 +26,7 @@ export function TabSwipeNavigator() {
       if (target < 0 || target >= TABS.length) return;
       const href = TABS[target].href;
       // Same guard as bottom-nav taps: never swipe-exit an active workout.
-      if (isWorkoutActive({ workoutStartMs, mode }) && pathname.startsWith("/workout")) return;
+      if (isWorkoutActive({ workoutStartMs, workoutEndMs, mode }) && pathname.startsWith("/workout")) return;
 
       navigateToTab(router, href);
     }
@@ -81,7 +82,7 @@ export function TabSwipeNavigator() {
       document.removeEventListener("touchmove", onMove);
       document.removeEventListener("touchend", onEnd);
     };
-  }, [pathname, router, mode, workoutStartMs]);
+  }, [pathname, router, mode, workoutStartMs, workoutEndMs]);
 
   return null;
 }

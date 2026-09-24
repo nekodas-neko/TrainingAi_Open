@@ -56,11 +56,15 @@ describe('BF-168 — "Leave workout?" must not fire on the session-select tab', 
       .not.toContain('window.location.pathname.startsWith("/workout")')
   })
 
-  it('leaves isWorkoutActive alone — both of its terms are load-bearing elsewhere', () => {
+  it('keeps both original terms of isWorkoutActive — each is load-bearing elsewhere', () => {
     // The same predicate guards the beforeunload warning in workout-screen.tsx, and its own
     // comment records that 'pre' must NOT be excluded because it is also the mid-workout hub.
-    const store = read('lib/stores/workout-store.ts')
-    expect(store).toContain("return !!state.workoutStartMs && state.mode !== 'done'")
+    // DV-16 ADDED a third term rather than altering either of these two: see the test below.
+    const store = code('lib/stores/workout-store.ts')
+    expect(store).toContain("!!state.workoutStartMs")
+    expect(store).toContain("state.mode !== 'done'")
+    expect(store, "'pre' is the mid-workout hub and must never be excluded")
+      .not.toContain("state.mode !== 'pre'")
   })
 
   it('dismisses a raised prompt when its subject ends, so it cannot ride a navigation', () => {
