@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.38",
+    date: "2026-09-24",
+    changes: [
+      "Switching tabs no longer blanks the screen. The panel you were leaving was hidden in the same instant the new one appeared, but the new one then faded in from nothing \u2014 so for about a tenth of a second every switch showed neither, just the background. The fade is gone and the new tab is drawn straight away. This is the flicker, not the lag: the tab switch is still doing too much work behind the scenes, and that is being worked on separately.",
+    ],
+  },
+  {
     version: "1.465.37",
     date: "2026-09-24",
     changes: [

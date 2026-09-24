@@ -17078,3 +17078,15 @@ are **not** the sweep — they came from following two known defects outward ove
 recording them as the answer is the LB-108 shape, a result computed from the wrong starting set that
 looks complete. It also carries two structural gaps found while filing: no `Lane:` value for Review,
 and the device agent archived behind a 🟢 title.
+
+## 2026-09-24 — `projectOverview.md` 12771 → 12785 (LB-144, #…)
+
+Fourteen lines: the Known-Issues row CLAUDE.md requires for a change that shipped without a device
+pass. The tab switch no longer blanks (RV-113), and the check owed is a *look*, not a measurement —
+the Device Verification session is archived.
+
+Most of the row is there to stop a specific wrong conclusion. RV-113 removes a blank, not a delay,
+so the obvious verification (`perf.js longtasks`) will show no improvement; without the row saying
+so, the next reader measures it, sees nothing, and records a working fix as a failed one. The 68–118
+ms long task under it is DV-12, still open. A row that only said "not verified on device" would have
+cost more than the lines it saved.
