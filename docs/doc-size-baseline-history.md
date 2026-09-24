@@ -16911,3 +16911,10 @@ condition (no eligible flagged set) yields a positive estimate on 138 other logs
 function of the log's own sets. Much of the entry is what must NOT be concluded: they are not bodyweight
 movements, and the high-rep guard is present and careful, contrary to my first reading of a rising
 1RM-to-weight ratio that turned out to be a join artefact.
+## 2026-09-24 — `docs/implementation-backlog.md` (or-156)
+
+Growth: BF-191's two answers and RV-170's policy answer. BF-191 costs the most lines because the
+owner chose a MIX of two options that were framed as alternatives, and the literal build of that mix
+reintroduces the objection one of them lost on — two dialogs in the mis-tap path. The resolution is
+written as the Orchestrator's reading rather than his words, so he can correct it. RV-170 keeps a
+warning that its ✅ covers the policy and not its two unanswered riders.
