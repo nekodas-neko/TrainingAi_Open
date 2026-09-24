@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.29",
+    version: "1.465.30",
     date: "2026-09-24",
     changes: [
       "Applying a goal recommendation now checks that each change actually saved. It used to say \"Goals updated\" and tick the recommendation off whatever the server answered, so a refused save left the recommendation marked as applied while your targets kept their old values \u2014 which is what happened to the 14 September suggestion. If a save is refused now, the sheet stays open, tells you which goals did not save, and leaves the recommendation unapplied so you can try again.",
+    ],
+  },
+  {
+    version: "1.465.29",
+    date: "2026-09-24",
+    changes: [
+      "Home no longer says \"Sleep: OK\" under your mood card. That was not something you told it — the check-in stopped asking about sleep quality back in June, and the app has been filling the blank with the same word ever since and showing it back to you as your own answer. It is gone rather than replaced; whether your morning sleep rating belongs there instead is a question for you.",
+      "The nutrition goal recommendations no longer feed that same made-up value to the model. It still gets your measured sleep hours and your real energy rating, which are both genuine.",
     ],
   },
   {
