@@ -16487,3 +16487,19 @@ names a cause instead of a symptom.
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27763
+
+TN-62, filed on a status recheck, and it records a cost of my own 2026-09-22 proposal rather than a
+new defect. The single batched recompute was meant to stop the owner's readiness history shifting four
+times; measured today, the interim it creates is **worse than the defect being fixed** — 26 stored
+`hrvBalance` and 19 `sleepBalance` values still carry the pre-fix clip, so 2026-09-23 at z −3.24
+stores 4 while 2026-09-15 at z −1.63 stores 0 and the worse night reads better. Pre-fix the series was
+at least monotonic.
+
+Two blocks earn their lines. **DV-14's deploy stall was ruled out before the finding was written** —
+the tail shipped in 1.465.13 and production is live on 1.465.17 — because "production is ten hours
+behind" is the explanation a later session would reach for first. And **`computed_at` is recorded as
+misleading**: 57 of 71 rows carry a timestamp of 2026-09-23 or later and were not re-derived, so the
+one field that looks like the answer is the trap. The verification test is stated as a property of the
+model (it cannot emit 0 or 100 for any realistic z) rather than as a timestamp check.

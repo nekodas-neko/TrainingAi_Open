@@ -473,6 +473,63 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
+  consequence of my own 2026-09-22 proposal** (LA-122 item 2a, the single batched recompute), not a
+  defect in TN-60's fix.
+- **Lane: A** — no code change is required for the fix; it is a decision about *when* to run
+  `POST /api/admin/rederive-baselines`.
+- **Gate: owner** — see the options below. (Its own bullet: written inline on the line above, the
+  field is silently ignored and the entry prints READY. `check-backlog-pointers.js` caught that on
+  this very entry.)
+
+**The fix is live and correct. This is about the interim.** TN-60's compressive tail shipped in
+**1.465.13** (#1461, 2026-09-23 19:18 AEST); production is live on **1.465.17**, so it is deployed —
+**DV-14's deploy stall does NOT explain this and was checked first.** Driving the shipped
+`computeReadinessComposite` directly over the measured z range confirms it is monotonic and separates
+the days that used to collapse:
+
+| z | −0.93 | −1.63 | −2.46 | −3.24 | −4.37 |
+|---|---:|---:|---:|---:|---:|
+| **new score** | 19 | 9 | 6 | 4 | 3 |
+| old score | 19 | **0** | **0** | **0** | **0** |
+
+**But stored history was not re-derived — by design, because the recompute is batched behind TN-6,
+BF-13 and LA-121.** Measured on production 2026-09-24 over **71 stored days**:
+
+- **26 rows** carry `hrvBalance` at exactly 0 or 100, and **19 rows** carry `sleepBalance` at 0 or 100.
+- The live formula **cannot produce either**: it reaches 0 only at about **z = −50**, and never
+  returns 100 (z = +20 gives 99). So every one of those 45 values is a pre-fix clip.
+
+**The consequence, which is the entry:** the stored series now mixes two formulas, and the mix
+**inverts ordering**. 2026-09-23 at z = −3.24 stores **4**; 2026-09-15 at z = −1.63 stores **0**. The
+worse night reads better. Pre-fix the data was at least monotonic — everything past the rail was 0
+together — so for any trend or chart the owner reads before the recompute fires, **this interim is
+worse than the defect it is fixing.** I proposed the batch to stop his history shifting four times and
+did not price this.
+
+**⚠ `computed_at` is actively misleading and will fool the next session.** **57 of the 71 rows carry
+`computed_at` ≥ 2026-09-23**, so they *look* re-derived. They are not — the timestamp moved and the
+contributor scores did not. Do not use `computed_at` to decide whether a row reflects the current
+model; test the value against what the model can produce, as above.
+
+**Options for the owner.**
+1. **Recommended — fire `rederive-baselines` now for the rail fix alone, and again after the batch.**
+   Two visible shifts instead of one, which is exactly what batching was meant to avoid — but the
+   thing batching was protecting was *legibility*, and a series that inverts its own ordering is the
+   least legible state of all. Reversal cost is nil; it is a re-derive, repeatable at will.
+2. **Hold for the batch as decided.** Cheapest, and right if he does not read readiness history in the
+   next fortnight. The cost is that any trend he does read is misleading in a new way.
+3. **Hold, but suppress history.** Hide readiness days older than the fix until the recompute runs.
+   Better at preventing a wrong read than (1), and worse at everything else — it is UI work for a
+   temporary condition, and it hides data rather than fixing it.
+
+**⚠ Whatever runs, verify it rather than trusting the exit code.** Something already bumped
+`computed_at` on 57 rows without re-deriving them, which is the whole reason this entry exists. The
+check is the table above: after the recompute, **no stored `hrvBalance` or `sleepBalance` may read
+exactly 0 or 100**, because the live model cannot emit those values for any z this owner produces.
+
 ### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
 
 - **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
