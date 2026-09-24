@@ -16674,3 +16674,7 @@ is the column's age rather than a missing input — plus the one cheap test that
 TN-71 adds the post-TN-60 contributor share table LA-122 2b was parked for: temperature holds 10% of the
 weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-of-movement contributor
 "never scored".
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 57, `review/sweep-57-data-census`.**
+28809 → 28974 (+165; rebased on #1525). Eight new entries from a census of the owner's production data
+(RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
+was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.

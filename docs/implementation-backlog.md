@@ -473,6 +473,87 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] RV-161 — five owner decisions the reads just made answerable
+
+- **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
+- **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
+- **1. Run `rederive-baselines` before TN-62's backfill, from the same page, dry-run first.**
+  Recommended. It is a recompute from stored inputs, repeatable at will. It unblocks **BF-13, TN-6,
+  Q-506, TN-8 and TN-42**, all of whose pass tests fail today only because it has never run. It
+  also makes TN-62's backfill mean something. The owner authorised the device agent for the backfill
+  only, and BF-13 says this run is his to fire, so it needs one more yes.
+- **2. Q-72 — there have been no sleep ratings since 08-17** (35 of 36 mornings left on the neutral
+  3). Recommended: ask whether he will rate again. If not, retire the rank re-validation rather than
+  wait for a clock that cannot unblock it.
+- **3. Q-30 — the raw archive passed his ~20 MB condition** (25 MB, growing ~0.7 MB/day).
+  Recommended: re-open it with the rate attached. The cost is cents a month, so the question is
+  whether the reason for keeping the archive still holds, not the money.
+- **4. Q-527 — the corrupt 07-29 row now passes the 4% screen.** Recommended: null it under the
+  pending history-row policy before Q-521 reads BMR.
+- **5. Queue position: move PS-17 up.** A missing night on 12 of 27 recent dates is a
+  data-correctness defect the owner sees daily, on every sleep surface. That outranks most of what
+  sits above it.
+
+
+### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+
+- **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
+  arranged.
+- **Added:** 2026-09-24 · Review sweep 55, §2 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
+- **The six:**
+  1. Gesture navigation switched on for one sitting. This also unblocks RV-37, RV-127's clearance
+     half and Q-168.
+  2. A morning before the check-in and the first food log.
+  3. DV attached, passively, during one of the owner's own workouts.
+  4. The chest strap worn.
+  5. A real walk or run.
+  6. One list of non-standing writes, approved once.
+- **Recommendation:** ask for 1 and 6 first. Switching navigation mode is one setting, and a
+  one-time write list replaces a question per check. Together they unblock the most rows for the
+  least of the owner's time. 3 costs him nothing extra; it only needs DV to know when he trains.
+- **Reversal cost:** nil. This only changes when checks are scheduled.
+
+
+### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
+
+- **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **What it is:** OR-118 grouped *"a fix is forward-only; do we edit the history behind it?"* as
+  **`history-row-policy`** on 2026-09-16. But it only ever existed as a paragraph inside Q-298, Q-527
+  and LA-21, never as an `O` entry. Its own text says it *"has been sitting unasked for weeks"*. The
+  census adds members.
+- **Offer the precedent with it:** BF-81 (2026-09-01), where the owner chose **no recompute** on
+  38 rows. A partial re-derivation leaves a mixed-provenance column, and overwriting stored history
+  is irreversible.
+- **Recommendation, first line: split by kind, not by entry.**
+  - **(a) Recompute-from-stored-inputs: YES.** These are deterministic and repeatable at will, and
+    they correct the history toward what the current code says.
+    - 09-23 and 08-27 re-scored once RV-163 lands.
+    - A wide rollup pass for 09-01 → 09-16 stress (RV-169).
+    - Scale composition re-derived at 158 cm (RV-165).
+    - `rederive-baselines` before TN-62's backfill (RV-161 item 1).
+  - **(b) Hand-edits of rows: NO, per BF-81.** Mark them visibly as known-bad rather than rewriting
+    them.
+    - Q-298's **15** zero one-rep-max rows (not 10; the 08-09 and 08-16 Pull clusters sat on
+      deload sessions).
+    - Q-527's 07-29 body-composition row. It now reads 6.2%, which **passes** the 4% screen, so the
+      mark has to be explicit.
+    - LA-21's midnight `started_at` rows.
+    - **3 exercises with logs and no personal-record row** (Cable Curls, Single Arm Cable Row, Machine
+      Calf Raise, all May).
+    - **3 May–July workouts whose first exercise landed in an incomplete sibling session** (06-17,
+      06-21, 07-03; 13 sets). This stopped after 07-03, unexplained.
+    - **07-30's step total of 18,761**, about 3× its neighbours on the Q-56 future-dating day. The
+      known inflated-days row lists only 07-24, 07-27 and 07-28.
+  - Alternatives: all-no, which leaves visibly wrong scores on 09-23/08-27 and a stale DEXA offset;
+    or all-yes, which rewrites irreversible user history on inference.
+  - Reversal cost: (a) is repeatable, (b) is avoided.
+- **Two more owner answers the census needs, same sitting:**
+  - **RV-164:** did he mean to apply the 09-14 recommendation (1,618 kcal)? The app still budgets
+    1,660.
+  - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
+    Recommended: yes. It is how he trains (TN-24).
+
 ### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
@@ -1577,6 +1658,8 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 
 - **Verification:** this entry closes when both answers are recorded here with the date, and BF-190
   is updated to build the one that touches code.
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **there are two more live phantom rows**, measured rather than assumed: `ea77ce16` (07-30, a 30-min interval walk, 0.037 km, pace 49,104 s/km) and `a85568a4` (09-14, a 22-min treadmill session, 74 kcal, HR 65). A third, from 07-29, the owner already deleted. **The signature proposed above (`avg_hr` and `steps` both null) finds only 09-24**, because the older two carry HR from their first ~90 s. The reliable signature is *the local time of `created_at` falls before `end_time` minus 2 min, on the same day*.
+
 ### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
 
 - **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133 ·
@@ -1911,24 +1994,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   still-owed rows are now in RV-155 §A (S7) and RV-157 (BF-11d, BF-31, LA-37/BF-66). S1 is folded
   into RV-131.
 
-### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
-
-- **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
-  arranged.
-- **Added:** 2026-09-24 · Review sweep 55, §2 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
-- **The six:**
-  1. Gesture navigation switched on for one sitting. This also unblocks RV-37, RV-127's clearance
-     half and Q-168.
-  2. A morning before the check-in and the first food log.
-  3. DV attached, passively, during one of the owner's own workouts.
-  4. The chest strap worn.
-  5. A real walk or run.
-  6. One list of non-standing writes, approved once.
-- **Recommendation:** ask for 1 and 6 first. Switching navigation mode is one setting, and a
-  one-time write list replaces a question per check. Together they unblock the most rows for the
-  least of the owner's time. 3 costs him nothing extra; it only needs DV to know when he trains.
-- **Reversal cost:** nil. This only changes when checks are scheduled.
-
 ### [platform] RV-158 — a Known-Issues row can owe a device check that no queue lists; stop new ones at CI
 
 - **Lane: O** — a rule plus a check in `scripts/check-backlog-pointers.js`.
@@ -1961,6 +2026,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   the order that entry warns against, which fits the rails staying put.
 - **Done when:** a journal line names the run (who, dry-run or commit, which days), or Lane A names
   the trigger.
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **ANSWERED, and this entry can close.** The 104 rows stamped at 02:37 are **exactly the 104 rows carrying `body_comp`**. The 2 later rows that also have it, and the 23 without it, were not touched. **None picked up the current readiness stamp `v4:tail20`.** So this was the rollup's whole-history body-comp re-stamp that LB-53 describes. It was **not** TN-62's backfill, and **no score was recomputed**. The 07-29 row changed because body comp is recomputed from the current profile, which is RV-165's mechanism.
 
 ### [platform] RV-160 — nine entries and four Known-Issues rows are answered by a read or a commit; close them
 
@@ -1981,27 +2047,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   - **Q-144:** already in `known-issues-resolved.md`; this also clears RV-156's conditional 8117.
   - **Q-453/454/455:** shipped in #335. The 2026-08-17 "first sweep to RUN the app" row keeps only
     Q-450's device look, which is RV-155 station E.
-
-### [platform] RV-161 — five owner decisions the reads just made answerable
-
-- **Lane: O** — each is the owner's; the recommendation comes first.
-- **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
-- **1. Run `rederive-baselines` before TN-62's backfill, from the same page, dry-run first.**
-  Recommended. It is a recompute from stored inputs, repeatable at will. It unblocks **BF-13, TN-6,
-  Q-506, TN-8 and TN-42**, all of whose pass tests fail today only because it has never run. It
-  also makes TN-62's backfill mean something. The owner authorised the device agent for the backfill
-  only, and BF-13 says this run is his to fire, so it needs one more yes.
-- **2. Q-72 — there have been no sleep ratings since 08-17** (35 of 36 mornings left on the neutral
-  3). Recommended: ask whether he will rate again. If not, retire the rank re-validation rather than
-  wait for a clock that cannot unblock it.
-- **3. Q-30 — the raw archive passed his ~20 MB condition** (25 MB, growing ~0.7 MB/day).
-  Recommended: re-open it with the rate attached. The cost is cents a month, so the question is
-  whether the reason for keeping the archive still holds, not the money.
-- **4. Q-527 — the corrupt 07-29 row now passes the 4% screen.** Recommended: null it under the
-  pending history-row policy before Q-521 reads BMR.
-- **5. Queue position: move PS-17 up.** A missing night on 12 of 27 recent dates is a
-  data-correctness defect the owner sees daily, on every sleep surface. That outranks most of what
-  sits above it.
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** two Known-Issues rows gained production evidence that their device half works. **BF-155:** every set has `set_end_ms` on all 7 sessions since 09-15, against 5 of 10 on 09-14 and 0 before. **TN-57:** the 09-24 check-in stored NULL / NULL for untouched scales. The 09-23 07:08 row still stored 3, most likely because the build had not deployed yet (unconfirmed). The Orchestrator or DV decides whether this discharges the owed look.
 
 ### [platform] RV-162 — an owed read has no date and no reminder, so it waits until someone happens to look
 
@@ -2020,6 +2066,144 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   - The first set of dates comes from this sweep's TOO-EARLY list: TN-58 09-29 / 10-06, TN-55
     10-04, Q-507 10-16, TN-50 10-17, TN-25 10-18, LA-110's evidence expiring 10-06.
 - **Reversal cost:** delete the field and one print block.
+
+### [sleep][readiness] RV-163 — "last night" is picked by four different rules, so a long daytime rest can become the night the scores grade
+
+- **Lane: A** — shared night selection in `packages/shared/src/health/sleep-night.ts` and its consumers.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **The rules, confirmed in code:**
+  - The rollup and `nightForDate` take the **longest** night period (`nightPeriodsByDate`,
+    `sleep-night.ts:164`). Its own comment says *"this is where it is made"*.
+  - The live readiness payload takes the **latest**: `nights[nights.length - 1]`
+    (`lib/health/readiness-payload.ts:360`).
+  - Body Battery also takes the **latest**, `nights.findLast(n => n.date === todayIso)`, and anchors
+    `wakeTime` on its `sleepEnd` (`app/api/body-battery/route.ts:164-166`).
+  - The score audit and backfill take the **earliest**, `nights.find(...)`
+    (`score-audit/sleep.ts:45`). So does `app/api/ai/health-insight/route.ts:119`.
+- **Why they disagree:** any window of at least `ALWAYS_NIGHT_MIN_HOURS = 4` h counts as a night
+  wherever it sits on the clock, so one date can hold two night periods.
+- **09-23 in production:** the overnight was 21:27–06:01 (7.92 h, efficiency 92). A daytime window
+  ran 10:42–17:25 (6.17 h, efficiency 91).
+  - The stored sleep contributors are total_sleep 49, efficiency 72, timing 10 and latency 72. They
+    match the **daytime** window; the overnight gives about 76 / 76 / 71 / 50.
+  - So the sleep score was **42**, and readiness, which took 42 as its previous night, was **44**.
+  - Body Battery stored `hr_sample_count` **2** and 0 drained, flat all day at its anchor of 41,
+    against 203 ring samples. Only a 17:25 wake leaves 2 samples.
+  - 08-27 has the same shape.
+  - TN-20's guard refuses only a drop from populated to 0, so a 2-sample read passes it; 09-23 came
+    two days after the guard shipped. **This is TN-20's unidentified trigger** for its non-zero cases.
+- **Fix shape:**
+  - Route every consumer through `nightPeriodsByDate` / `nightForDate`.
+  - Make Body Battery refuse a near-empty snapshot, not only an exactly empty one.
+  - Re-scoring 09-23 and 08-27 is the recompute path (RV-170).
+
+### [nutrition][app-shell] RV-164 — applying a goal recommendation marks it "applied" and toasts success without checking any of its writes
+
+- **Lane: B** — `components/profile/goal-recommendation-sheet.tsx`.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **In production:** the 2026-09-14 recommendation (1,618 kcal / 150 P / 131 C / 55 F) is
+  `status='applied'` (21:07:19). But `nutrition_targets` still holds **1,660 / 150 / 141 / 55**, with
+  `updated_at` **2026-08-31**, and `users.calorie_goal` is 1,660. The 08-31 apply did write: targets
+  were updated 200 ms before that apply was recorded.
+- **Why nobody could tell:**
+  - The sheet ticks every row by default (`:86-91`).
+  - It `await`s the `PUT /api/nutrition/targets` and `/api/user/goals` calls **without reading the
+    response**. Only the profile PATCH checks `res.ok`.
+  - It then PATCHes the recommendation to `applied` and toasts *"Goals updated"*. Only a thrown
+    network error reaches the failure toast; a 4xx or 5xx passes as success.
+  - `app/api/nutrition-goals/recommend/route.ts:36-37` describes the 09-14 values as
+    *"stored-and-applied"*, and the database contradicts that.
+- **Fix:** check each write's response. Mark the recommendation applied only when every ticked field
+  landed, and say which one failed otherwise.
+- **The owner's half, whether he meant to apply 1,618, is in RV-170.**
+
+### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
+
+- **Lane: A** — `lib/scale-ble/composition.ts`, `packages/shared/src/health/body-fat-calibration.ts`.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **The step:** body fat goes from **25.2 to 26.3 overnight on 08-30 → 09-01** at +0.25 kg; BMR
+  drops 10 and metabolic age goes from 38 to 39.
+- **The cause:** composition is computed once, at ingest, from the profile of that moment
+  (`scale-ble/samples/route.ts:97`, the pending confirm route `:36`, and
+  `computeBodyComposition` at `composition.ts:118-161`). Solving the formula from the stored outputs,
+  the 08-30 reading reproduces **only at h=160.1**, and 09-01 fits **h≈157.3–157.9**. The BF-78
+  journal records the height being corrected from 160 to 158 to match the DEXA printout.
+- **Why it matters:** the calibration is derived live from `dexa_scans` × the same-day stored scale
+  value (`body-fat-calibration.ts:68`). The 08-27 pair is DEXA 28.5 against a stored 25.3 computed at
+  160 cm, giving an offset of **+3.2**. At 158 cm that weigh-in reads 26.26, which gives **+2.2**.
+  So every corrected body-fat value since 09-01 reads about **1 point high** (28.6 against ~27.6),
+  lean mass about 0.7 kg low, and RMR/Cunningham moves by ~15 kcal/day. The trend also shows a false
+  +1.1 jump.
+- **Fix shape:**
+  - Store what composition needs from the raw sample, and re-derive when height, date of birth or
+    sex changes.
+  - At the least, recompute the calibration pair at the current profile.
+- **Rewriting the stored rows is a history edit (RV-170).** Fixing the live offset is not: it is
+  derived at read time.
+
+### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
+
+- **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **In production:** `prescribed_runs` has **26 rows: 0 completed and 0 with `activity_log_id`**.
+  22 are pending (21 of them in the past) and 4 are skipped. **17 of the pending days and 3 of the
+  skipped days have a walk, treadmill session or run logged that day.**
+- **Why:** the only writer of `completed` is `linkPrescribedRun`
+  (`components/activity/done-activity-screen.tsx:34-50`). It runs only when
+  `activityType === 'run' && prescribedRunId` (`:270`, `:307`). The guided-walk save never touches
+  `prescribed_runs`.
+- **What the owner sees:**
+  - *"Today's run is done — nice work"* (`running-plan-content.tsx:273`) never appears.
+  - `RunTypeStatsCard` is **permanently empty**: its route filters `completed && activityLogId`
+    (`run-type-stats/route.ts:35`).
+  - Every past prescription reads as pending.
+- **Needs the owner's answer (RV-170):** does a guided or treadmill walk on a prescribed day count?
+  If yes, link it at the walk save, and backfill the 20 past days only under the history policy.
+
+### [activity][devices] RV-167 — a walk whose strap cadence stream started late stores a fifth of its steps, and nothing flags it
+
+- **Lane: B** — `components/guided-walk/walk-summary.tsx:171`.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **In production:** the 2026-09-04 treadmill walk `d66aa0d7` has **34 cadence bins, the first at
+  tSec 1470** of an 1,800-second walk, and stores **584 steps**. The other nine full strap walks store
+  2,888–3,870. Its `cadence_spm` of 116.9 looks normal because it averages only the bins that exist.
+  HR is present, so the strap was connected and only the accelerometer stream came late.
+- **Why:** the save stores `cadence?.stepsEstimate`, which integrates only the bins present. There
+  is no coverage check. body-metadata adds treadmill steps on top of ring steps, so that day's total
+  is short by about 2,400.
+- **Fix:** store null, or scale with the coverage stated, when bin coverage is below a floor. DV's
+  part is to check whether the H10 accelerometer stream starts late.
+
+### [workouts][platform] RV-168 — `session_exercises.exercise_id`, documented as the join key, is wiped by every program save
+
+- **Lane: A** — `lib/data/postgres/slices/programs.ts:313-323`.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **In production:** the active program Bankai has **0 of 25** ids set. The other programs have 1 of
+  25, 2 of 25 and 1 of 17. Only "Main", last saved 06-28, has 20 of 20.
+- **Why:** `saveProgram` deletes and re-inserts the rows without `exerciseId`. Migration 099 calls it
+  *"the join key"* and backfilled it once. Only the coach swap writes it, which explains the strays.
+- **Effect:** none today. Programs resolve exercises by name, and `exercise_logs.exercise_id` is
+  100% filled with 0 mismatches. It is Q-474's trap: a documented key that is empty in practice, so
+  the first join on it returns nothing.
+- **Fix:** set it in `saveProgram` by library lookup, or mark it dead as `unusedProgramSessionId` was.
+
+### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen: 09-01 → 09-16 still count sleep as daytime stress
+
+- **Lane: A** — `lib/oura-ble/rollup/run.ts:1040-1041`, and the claim itself.
+- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+- **In production:** from 09-17 on, no stress bucket falls before 06:00, except 09-18, whose night is
+  missing (RV-163 and PS-17). **09-01 → 09-16 still hold 9–12 sleeping (pre-06:00) buckets a day.**
+  Each day was written once, at about 01:00 the next day, and never again.
+- **Why:** `RESILIENCE_MAX_DAYS = 21` is applied over `summaryRows`, which holds only the rows the
+  current pass covers. A routine incremental pass covers about one night, so only a full rollup
+  pass would reach back 21 days, and none has run.
+- **Effect:**
+  - Those days' `stress_high_minutes` and resilience daily indices still count sleep. #1256 put that
+    at about a fifth of the figure.
+  - Resilience's trailing 14-day window still reads them.
+  - The day-strip changes shape at 09-17.
+- **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
+  recompute from stored inputs (RV-170).
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
@@ -10311,6 +10495,7 @@ daytime values. Readiness for the 27th was computed from a nap that did not happ
 **Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
 recompute has to run over the affected days once the selection is fixed.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **12 of the last 27 dates (since 08-29) have NO overnight `sleep_sessions` row**, only a daytime fragment of 0.0–4.1 h: 08-29, 08-30, 09-03, 09-07, 09-08, 09-09, 09-14, 09-15, 09-16, 09-18, 09-20, 09-22. On those nights the ring's overnight HR is complete (~96–103 samples) and `oura_daily_summary` holds 7–9 h. This was 5 of 13 on 09-17, so defect 1 is getting worse, not holding steady. Every surface reading `sleep_sessions` shows the nap as the night.
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **correction to sweep 56's note above:** on **09-18** `oura_daily_summary` does **not** hold a 7–9 h night. It holds the **4.08 h afternoon window** (14:49–19:00), although the ring's overnight HR (113 samples, hourly averages 62–73) is night-shaped. The knock-on: sleepBalance z went from −4.99 to 0 and readiness was 36. Nights with two candidates are chosen by four different rules (**RV-163**).
 
 ### [devices][platform] PS-21 — the Colmi background sync service: Kotlin carries bytes, the server reads them
 
@@ -14191,6 +14376,7 @@ the match. `Gate: owner` when it is next picked up.
 - **Verification (for the barcode half, when it is built).** Scan the same barcode twice → one row —
   and *first* confirm a non-null `barcode` actually lands in the column, per the external-field rule:
   a wrong or missing field reads as `undefined` and fails silently.
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **the exact-match rule is not holding in production.** **19 `food_items` rows created after #598 (2026-08-30) are identical** on name, brand, serving and all four macros to an earlier row. 16 are `barcode` and 2 are `ai`. The `ai` ones are the exact case the shipped rule claims to stop (for example Cooked White Rice on 09-17, identical to a 07-04 row). New duplicates arrive about every 1–2 days. The Known-Issues row *"the device half has not been seen"* now reads **FAILED on real data**, not merely unverified.
 
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 
@@ -16147,6 +16333,7 @@ control test.
 **Pass test:** re-running the recompute on 2026-08-31 restores drain ≈113 from the 3,815 stored
 samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`. **The second half is
 now enforced going forward by the guard; the first half is the owed backfill.**
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **the trigger for the non-zero cases is identified: RV-163.** Body Battery anchors wake on the **latest** night period for the date. When a daytime window of 4 h or more also qualifies as a night, the wake moves to its end. On **09-23** that stored `hr_sample_count` **2**, drained 0, and left the day flat at 41 against 203 ring samples, two days after this entry's guard shipped. The guard refuses only a drop to 0, so a near-empty read gets through.
 
 ### [readiness] TN-22 — the stored `stress_high_minutes` disagrees with the model's own buckets on 8 of 9 days, and that is Q-507
 
@@ -20356,6 +20543,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   `OneRmEstimate.estimated1rm` is typed `number`, so making it nullable ripples through every
   consumer of `calculate1RM`. With every read path now gating on `> 0`, the sentinel is a
   correctness improvement rather than a live defect — worth doing deliberately, not as a rider.
+- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **15 zero one-rep-max rows before the fix, not 10** (UTC 08-06 ×5, 08-09 ×5, 08-16 ×5). The 08-09 and 08-16 Pull clusters sit on sessions with `phase_type='deload'`, so they were deliberate deloads; only the `exercise_deloaded` stamp was missing. The history question is now asked once, in **RV-170**.
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
 
