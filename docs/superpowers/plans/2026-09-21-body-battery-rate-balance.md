@@ -125,7 +125,15 @@ validated. Two consequences to carry:
 - **Bump `MODEL_VERSION`.** It encodes the constants (`v5:rest0.05:chg0.2:...`) and stored rows are
   compared across it.
 - **History recompute:** the owner decided 2026-08-26 to recompute rather than freeze. That decision
-  stands and this change re-scores all 84 stored days.
+  stands — **⚠ but the claim that followed it here, that "this change re-scores all 84 stored days",
+  was WRONG and is retracted (TN-72, 2026-09-24).** The route persists `date: todayIso` only and
+  `upsertBodyBatteryDaily` has exactly one caller, so there is no path that rewrites a stored day: v6
+  appears one day at a time going forward and every historical row keeps the model that wrote it.
+  Measured after the fix deployed — v1 16 days (mean end 66.3), v4 18 (62.9), v5 52 (**15.2**, 27 at
+  zero, running to 2026-09-24), **v6 zero**. A trend spanning today therefore shows a step from ~15 to
+  ~60 that is a model change and reads as a recovery. The bump to `MODEL_VERSION` only *labels* which
+  model wrote a row; it rewrites nothing, and this plan inferred a recompute from it without checking
+  for a backfill. TN-72 carries the fix and the owner's options.
 - `body-battery-walk.test.ts` pins the shipped shape against hand-computed values — update it, and
   keep a case covering the flat ramp at `hrr` just under the ceiling, which is where the old and new
   models differ most.

@@ -16681,6 +16681,8 @@ weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
 was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
 
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29054 (chore/or-145-owner-questions-owed)
 
 Growth, +45 for OR-145. It is long for one entry because the entry IS the asks: each numbered item
@@ -16698,6 +16700,8 @@ sitting; four separate interruptions for one sitting's answers was the failure w
 
 ---
 
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → RV-111 shipped, device re-check kept
 
 29054 → 29065 (+11 on the merged base). RV-111's fix is two lines; the eleven are what was checked rather than assumed.
@@ -16706,6 +16710,8 @@ scanner's `body.scanner-active` rule hides every other body child until it unmou
 records why that cannot happen (`handlePop` closes only surfaces deeper than the arriving entry,
 and popping the scanner's lands on the sheet's) and why the stack itself needed no change. Without
 it the next reader re-derives the same safety argument from scratch.
+
+---
 
 ---
 
@@ -16721,6 +16727,8 @@ the question. Fifteen lines of brief is what stops the question being asked badl
 re-asked. The other seven are the shipped-half record and the note that all ten card widgets are off
 by default — without which the next reader re-derives that this is not a Collection-specific
 oversight.
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29071 (chore/or-147-state-more-owner-gates)
 
 Growth, +6. Three owner gates now say what they are waiting for instead of saying `owner`, and
@@ -16729,6 +16737,14 @@ required-check list) plus the fact a session got wrong when re-asking it (*Allow
 already on). Six lines against a read of up to 209 lines per entry, paid by every session that
 looks at the gate and cannot tell what it wants.
 
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/battery-v6-has-no-backfill)
+
+29008 → 29060 (+52). TN-72: the battery's v6 constants shipped and deployed, but the route persists today's row only and has
+one caller, so no stored day will ever be re-scored — retracting my own plan's claim that the change
+re-scores all 84 days. Most of the entry is the consequence (a v5→v6 step that reads as a recovery), the
+three options with what each is better at, and the acceptance test stated as NOT run.
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29096 (chore/or-148-state-more-owner-gates)
 
 Growth, +3. Four more owner gates say what they want — and reading them is what found that `Q-525`
