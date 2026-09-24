@@ -546,7 +546,11 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
-- **Ask:** owner — arrange six device sittings rather than 55 separate asks. Start with gesture navigation and a one-time write list.
+- **✅ ANSWERED 2026-09-24 — NOT NOW, and the reason reframes this entry:** *"I don't particularly want to do any of these right now. The DV agent needs more of a backlog before testing."* So the blocker is not his calendar; it is that DV has too little queued to make a sitting worth arranging. **Do not re-ask for sittings until DV's lane is full.** Filling it is the unblock, and `Q-525` and `Q-11` were moved there the same day.
+- **⚠ TWO PREMISES OF THIS ENTRY ARE WRONG, corrected by the owner the same day.**
+  **(a) The admin sitting is NOT his** — *"It should be able to do the admin sitting too."* DV runs on his machine holding his login, so an action needing an admin session is DV's, not his. Five entries (`LA-56`, `LA-68`, `Q-525`, `Q-71`, `Q-11`) were re-laned on this and are no longer owner debt.
+  **(b) DV CANNOT attach during one of his workouts** — *"DV cannot be attached during a workout as it needs to be plugged into computer. It can run its own workout if it needs."* The sitting that costs him nothing was the one thing physically impossible; a DV-run workout replaces it.
+  The remaining sittings that genuinely need him are gesture navigation, a morning before check-in (he was unsure), a real walk and the chest strap.
 
 - **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
   arranged.
@@ -675,9 +679,10 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
-- **Ask:** owner — does `/collection` get a permanent More-tab row, or is it a spike he does not want surfaced? Recommendation: add the row, leave Home unchanged.
+- **✅ DECIDED BY THE OWNER, 2026-09-24 — add the More-tab row.** He took the recommendation: a screen worth building gets a permanent address, and `DEFAULT_CARD_WIDGETS` stays empty so Home is unchanged. **Now ordinary Lane B work, ungated** — one row in the More tab pointing at `/collection`.
+- **Lane:** B — `app/more/**`. Re-laned from `O` on the answer; there is no decision left in it.
 
-- **Lane: O** — a product question, ungated so the Orchestrator can put it. **Added:** 2026-09-22 ·
+- **Superseded lane note (demoted from a field, OR-155):** this read `O` while the question was open — *a product question, ungated so the Orchestrator can put it*. Answered 2026-09-24; the field above is live. **Added:** 2026-09-22 ·
   Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
   shipped, leaving only the part that is the owner's.
 - **Recommendation: add a `Collection` row to the More tab, and leave `DEFAULT_CARD_WIDGETS` empty.**
@@ -1996,7 +2001,11 @@ drift.
   (`getLocalStore` returns null), so the wipe half is unverifiable here.
 
 ### [platform] BF-193 — three questions BF-192 cannot answer: what "delete" means for logs, the ring key, and whether it is instant
-- **Ask:** owner — account deletion: what "delete" means for logs, what happens to the ring key, and whether there is a grace period.
+- **✅ ALL THREE ANSWERED BY THE OWNER, 2026-09-24 — he took every recommendation.**
+  **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are deleted outright, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
+  **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
+  **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: it would need a scheduled job and this repo has no cron layer.
+- **This entry is now DONE as a decision and hands its answers to `BF-192`**, which names it in `Needs:` because two of the three change its diff. Nothing here is buildable — `BF-192` builds it.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -2046,7 +2055,10 @@ drift.
   BF-192 is updated with whichever ones change its diff.
 
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
-- **Ask:** owner — every exercise sits on the 2-set floor and weekly volume lands at 66% of his target. Which of three levers to pull is his.
+- **⚑ THE OWNER DECLINED THE THREE LEVERS AND RESTATED THE GOAL, 2026-09-24:** *"not sure what the best plan of attack is here. the goal was to be able to add more exercises/sets in when the time permitted. happy to go with fewer exercises and more sets if that's gonna be better results than more exercises. but ideally it was dynamic and could adjust itself."*
+- **So this is no longer a choice between three static levers.** What he wants is a prescription that FILLS the budget — more work when time permits, fewer exercises with more sets when it does not — rather than a fixed exercise count chosen once. The three levers were framed as alternatives and he is asking for the mechanism that makes the choice per session.
+- **He is open to fewer-exercises-more-sets IF it produces better results.** That is an evidence question, not a preference, and nobody has put the evidence to him. **Do not answer it from general training knowledge dressed up as a measurement of his data** — say which it is.
+- **Next action is Tuning's, not the owner's:** a proposal for a dynamic set/exercise allocator that states how many of his past sessions it would change. `Ask:` removed — he has answered as far as he can until that exists.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
   sessions have enough content. Time wise its pretty good."*
@@ -11254,6 +11266,8 @@ chat/running none — and the owner's active program has `started_at = NULL` (ve
 July's early-deload consumed live ACWR while the card said "baselining".
 
 ### [devices][readiness] LA-68 — restore the 22 wear-time days PS-30 overwrote
+- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
+- **Needs:** RV-170 — it REWRITES stored history rather than filling a gap, which is exactly the split that entry puts to him (recompute-from-stored-inputs yes, hand-edits no). Authorising DV to press the button is not the same as deciding the rows may be rewritten, so this waits on that answer rather than on another sitting.
 
 - **⚠ `owner-admin-sitting` and `admin-console-sitting` are the SAME VISIT** (noted 2026-09-16,
   OR-118). There is one device and one person: the entries that need a *look* at `/admin` → Devices
@@ -11267,8 +11281,7 @@ July's early-deload consumed live ACWR while the card said "baselining".
   an admin session**, which is the owner's to run and nobody else's. Asking for them separately costs
   three sittings for one login. Whoever picks any of them up presents all three together.
 
-- **Lane:** A — `oura_daily.non_wear_time_sec`, production data only. No code change.
-- **Gate:** owner — only a **fullHistory** Redecode rewrites those days, and it needs an admin session.
+- **Lane:** DV — `oura_daily.non_wear_time_sec`, production data only. No code change.
 - **Added:** 2026-09-07, Lane A — [journal](overview/history-2026-09-10-folded-6.md#2026-09-07-fix-oura-nonwear-overwrite).
 
 PS-30's overwrite is fixed forward, but 2026-08-14→09-04 still hold the sliver values (worn
@@ -22668,6 +22681,8 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the title is now false in both halves.** Resilience carries a level on **30** rows (was 13, newest 09-22), falling **5 → 4 → 3 → 2 → 1** from 09-07. It sits **pinned at the bottom clamp (1.01) on 09-21 and 09-22**, and the daily sleep-recovery term is 0.0 on most recent days. So it no longer saturates at the top; it saturates at the other clamp. Re-measure before any proposal is written.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
+- **Needs:** RV-170 — it REWRITES stored history rather than filling a gap, which is exactly the split that entry puts to him (recompute-from-stored-inputs yes, hand-edits no). Authorising DV to press the button is not the same as deciding the rows may be rewritten, so this waits on that answer rather than on another sitting.
 
 - **⚠ `owner-admin-sitting` and `admin-console-sitting` are the SAME VISIT** (noted 2026-09-16,
   OR-118). There is one device and one person: the entries that need a *look* at `/admin` → Devices
@@ -22778,7 +22793,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 > **This does not fix the redecode**; it means the next failure names itself instead of being
 > reconstructed from `created_at` arithmetic, which is how this entry got here.
 
-- **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
+- **Branch:** `fix/redecode-job-heartbeat` · **Lane:** DV
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.
 - **Measured — every attempt that has ever existed has failed the same way.** `oura_redecode_jobs`
   holds exactly two rows, both `fullHistory: true`, both `result: null`:
@@ -22835,7 +22850,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   for a longer false success, and the one-at-a-time index means a genuinely dead job then blocks
   every retry for the new window instead of the old one.
 - **Verify:** device
-- **Gate:** owner — a **fullHistory** redecode he has to fire from an admin session on the phone. Batched as `owner-admin-sitting`; nothing here is buildable without that run.
 
 ### [readiness][devices] ⛔ LA-57 — REFUTED: the night-HRV "step" at the re-key is a ramp
 
@@ -23934,8 +23948,10 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
+- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
+- **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
 
-- **Branch:** `fix/chronic-stress-gate` · **Lane:** A
+- **Branch:** `fix/chronic-stress-gate` · **Lane:** DV
 - **Plan:** none yet — **the question is whether to trigger the wide pass or relax the gate**, and the
   first is owner/device-gated. Evidence:
   [`docs/reviews/2026-08-19-score-audit-trail.md`](reviews/2026-08-19-score-audit-trail.md) §2.
@@ -23972,7 +23988,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   that reaches the model, and therefore the only path that will write a number. Until that runs the
   column is NULL everywhere and nothing more can be concluded here.
 - **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-148). Like `LA-56`, `LA-68` and `TN-1`, the only thing this needs is a **fullHistory** pass fired by hand from an admin session. Same screen, same login; asking for it separately costs another sitting.
-- **Gate:** owner — ONE ACTION, not a decision: a hand-triggered `fullHistory` rollup pass. It is the only path that reaches the model, so until it runs the column is NULL everywhere and nothing more can be concluded.
 - **First action:** **instrument, do not relax.** Log the count of complete granular nights the pass
   actually assembled. Relaxing `CHRONIC_STRESS_MIN_DAYS` without that is Q-504's mistake — loosening a
   threshold whose input has not been checked.
@@ -25816,15 +25831,16 @@ its own maintenance hazard. Recorded here as the shape to re-enumerate rather th
   and this was a misattribution.
 
 ### [devices][platform][sleep] 🟡 Q-71 — the historical redecode that rewrites stored ring history has not been run
+- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
+- **Needs:** RV-170 — it REWRITES stored history rather than filling a gap, which is exactly the split that entry puts to him (recompute-from-stored-inputs yes, hand-edits no). Authorising DV to press the button is not the same as deciding the rows may be rewritten, so this waits on that answer rather than on another sitting.
 
-- **Lane:** A
+- **Lane:** DV
 - **Keep:** the historical redecode. The 2026-08-12 code fix corrects **future** rollups only;
   already-stored `sleep_sessions` rows still carry the single-anchor times. Closing this means
   running `POST /api/oura-ble/samples/redecode` with no `date` param (forcing `fullHistory: true`)
   in production. It is session-auth-gated with no bearer path, so only the owner — or a session
   holding their login — can trigger it.
 - **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). The redecode is session-auth-gated with no bearer path, so it is the same admin login `LA-56`, `LA-68`, `TN-1` and `Q-525` each need.
-- **Gate:** owner — ONE ACTION: `POST /api/oura-ble/samples/redecode` with no `date`, forcing `fullHistory`, in production. Session-auth-gated with no bearer path, so only he (or a session holding his login) can fire it.
 
 - **⚑ Re-scope condition from below is now satisfied.** This entry was blocked pending Q-139's
   decision on whether `resolveDsToMs` should interpolate or use a robust offset. **Q-139 shipped
@@ -28613,14 +28629,15 @@ indefinitely.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
 
 ### [heart-rate][workouts] 🟡 Q-11 — 22 of 78 completed sessions still hold no per-set HR attribution, and only the owner can backfill them
+- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
+- **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
 
-- **Lane:** A
+- **Lane:** DV
 - **Keep:** the one-off backfill over pre-fix sessions. Measured 2026-08-20: **56 of 78 completed
   workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
   has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
   old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
 - **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). Its own note already said to fold this into the next batch of owner actions rather than re-ask it; this is that batch.
-- **Gate:** owner — ONE BUTTON: Admin → Tools → "Backfill per-set HR stats", which only he can press. Offered on 2026-09-01 and not taken while he took the Q-4 strap night — a scheduling answer, not a refusal, so do not re-ask it on its own.
 - **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
   they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
   refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the

@@ -16858,3 +16858,12 @@ Low reception hanging every fetch. The length is the three-way table of what eac
 Body painting from seeds, the fetch-gated screens holding skeletons, the unseeded ones blank. That
 table is the evidence that the offline-first architecture is sound and the layer above it is not,
 which is the whole argument for fixing one call site rather than three screens.
+
+## 2026-09-24 — `docs/implementation-backlog.md` (or-155, owner answers)
+
+Growth: four owner answers recorded, and the largest is a correction rather than a decision. He said
+the device agent can run the admin sitting itself, which moved five entries (LA-56, LA-68, Q-525,
+Q-71, Q-11) off his plate and onto DV — the gate had never been his judgement, only the need for an
+admin session, and DV holds his login. He also corrected that DV cannot attach during his workouts
+at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
+would otherwise re-derive them.
