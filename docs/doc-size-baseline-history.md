@@ -16914,6 +16914,14 @@ would otherwise re-derive them.
 
 ---
 
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 60, `review/sweep-60-security-privacy`.**
+29807 → 30004 (+197; rebased). Ten security and privacy entries (RV-190–RV-199), nine of them Lane A items
+directly under RV-188. They cannot be shorter than this: each one names the surface, who can reach
+it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
+deliberately.
+
+---
+
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
 
 29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782

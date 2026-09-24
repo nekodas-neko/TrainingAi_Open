@@ -272,6 +272,11 @@ below threshold and left in place for next time.
   (`patched_versions: <0.0.0`), so there is nothing to bump. Down from **36 findings,
   23 high and 2 critical**, cleared 2026-09-10 in `chore/dependabot-remediation`
   ([journal](overview/history-2026-09-12-folded-1.md#2026-09-10-chore-dependabot-remediation)).
+- **🔎 2026-09-24 (Review sweep 60):** `pnpm audit --prod` now reports **1 high and 1 moderate**, both
+  from `adm-zip` via `onnxruntime-node`. The high is GHSA-7q85-xj36-vmfc, fixed in 0.6.1, which appears
+  to clear the moderate as well. **Still below threshold.** The fix is a version-keyed override
+  `"adm-zip@<0.6.1": ">=0.6.1 <0.7.0"`. adm-zip only runs during onnxruntime's install-time binary
+  fetch, so exposure is nil either way.
 - **What that pass did, so the next one starts from the pattern rather than rediscovering it:**
   two direct patch bumps within the same major (`next` ^15.5.22 → ^15.5.24, which resolved
   15.5.25 and cleared the **critical**; `sharp` ^0.35.3 → ^0.35.4) plus six `pnpm.overrides`
@@ -640,6 +645,30 @@ the Orchestrator's to do.
     about.**
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
+
+### [platform] RV-199 — three privacy questions about what is public and what gets backed up
+- **Ask:** owner — three privacy decisions from security sweep 60: the clinical baseline doc in the public repo, the personal email on 1,528 commits, and whether Android backup carries the ring key and health store.
+
+- **Lane: O** — each is the owner's, and the recommendation comes first. Filed as a task per #1508.
+- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
+- **1. The clinical baseline is in the public repo.** `docs/clinical-baseline-2026-08-27.md` holds a
+  full blood panel, a DEXA and RMR result, a scan ID and an instrument serial number. Its figures are
+  repeated in the backlog, a plan and a history archive.
+  **Recommended:** move the doc to the private archive repo, and replace the figures elsewhere with a
+  pointer, in a docs-only PR. **This does not remove them from git history.** A history rewrite of a
+  public repo is irreversible and breaks every open clone and PR. Only do that if the exposure matters
+  more than that cost; the recommendation is not to.
+- **2. 1,528 of 1,529 commits carry the owner's personal email.** **Recommended:** turn on GitHub's
+  *keep my email private* and *block pushes that expose it*. That is a setting, not a repo change,
+  and it does nothing for existing history, for the same reason as item 1.
+- **3. `android:allowBackup="true"` with no backup rules** (`AndroidManifest.xml:14`). The local
+  store is over the 25 MB quota today, so nothing is backed up. Once D4's pruning lands, Drive backup
+  would carry the health store, the ring key and the WebView session cookie.
+  **Recommended:** exclude the cookie store, and decide on the ring key deliberately. A backed-up key
+  is the only way to survive an uninstall, which is the upside, and the Google account then becomes
+  the key's guard, which is the cost. Lane A implements whichever is chosen.
+- **Reversal cost:** 1 and 2 are cheap and forward-only. 3 is one XML file plus an APK.
+
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
@@ -1080,6 +1109,171 @@ which is the right shape for something that can only be validated by living with
   Railway's next deploy is SUCCESS with `/api/version` matching `main`.
 - **Not the changelog:** cutting it to 9.8 KB changed nothing. Bounding it is still reasonable
   hygiene, but it is not this fix.
+
+### [platform][app-shell] RV-191 — the feedback screenshot is stored unchecked and the admin panel opens it as a URL
+- **Lane: A** first (validation), then **B** (render). One PR covers both halves.
+- **⚠ SECURITY, HIGH — the owner confirms before this merges.**
+- **Added:** 2026-09-24 · Review sweep 60. **Ahead of RV-190 because any signed-in user can reach it, and it is the script-execution precondition for RV-193 and RV-196.**
+- **What:**
+  - `POST /api/feedback` checks only that `screenshotData` is a string of 500 KB or less. The avatar
+    route validates image data with `isAllowedImageMime`; this route has no equivalent.
+  - `app/admin/admin-content.tsx` renders the value as an `<img src>` and opens it with
+    `window.open` on click.
+  - The CSP still allows `'unsafe-inline'` (SEC-H7).
+- **Who can reach it:** any user who can sign in can submit feedback. An admin who clicks the
+  thumbnail then runs code with the admin's session in the app's origin. This was reasoned from
+  source and not executed.
+- **Fix shape:**
+  1. **A:** accept only `data:image/(png|jpeg|webp);base64,` and reuse the avatar route's MIME check.
+     Reject anything else with 400.
+  2. **B:** render the thumbnail without navigating to the stored value. Open a blob made from the
+     decoded bytes, or show it in the existing lightbox.
+  3. **Existing rows:** the `claude_ro` view omits `screenshot_data`, so this sweep could not check
+     them. The implementer checks them locally with a migration-free script. **Any delete of a
+     production row is the owner's call.**
+
+### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
+
+- **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
+  `lib/data/postgres/readonly-client.ts`, `lib/data/postgres/claude-ro-owner.ts`.
+- **⚠ AUTH/SECURITY — the owner confirms before this merges.** The fix is small; the carve-out applies anyway.
+- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
+- **What:** the route's comment says read-only is enforced by the `claude_readonly` role. The role
+  only sets **session defaults**: the owner scope (`app.claude_ro_owner`), `default_transaction_read_only`
+  and `statement_timeout`. A caller can override all three, and they persist, because each query runs
+  in autocommit on a 2-connection pool that is never reset. **Reproduced on the local database only.
+  Nothing was probed on production.**
+- **Who can reach it:** only a holder of `CLAUDE_DB_QUERY_SECRET` or an admin session. In practice
+  that is the owner and every agent session with the secret in its environment, including one steered
+  by prompt injection from fetched content. What it gets:
+  - other users' rows through the `claude_ro` views;
+  - writes the role was meant to refuse, including writes large enough to recreate the 2026-08-17
+    `disk_full` outage;
+  - queries with no time limit.
+  **Because the pool reuses connections, a later honest query can silently read another user's rows.**
+- **Fix shape:**
+  1. Wrap every db-query and db-snapshot query as `BEGIN TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` →
+     `SET LOCAL app.claude_ro_owner` → query → `ROLLBACK`. The final `ROLLBACK` reverts any session-level
+     setting made inside the transaction; this was verified locally.
+  2. Second layer: `RESET ALL` (or `DISCARD ALL`) when a client is released.
+  3. Regression test: run a query that changes a setting, then assert that the next query on the same
+     pool sees the defaults.
+- **Interaction with OR-138:** OR-138 widens the owner scope on purpose, using `SET LOCAL`. Build this
+  first, or together with it. OR-138 without the transaction wrapper is the same hole with a legitimate
+  entry point.
+- **Reversal cost:** low. No migration is needed, and the views do not change.
+
+### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
+- **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
+- **⚠ AUTH — the owner confirms before this merges.**
+- **Added:** 2026-09-24 · Review sweep 60.
+- **What:**
+  - Registering with an email that has been **invited but not yet registered** activates the account
+    immediately (`isActive = isInvited(email)`). Nothing proves the registrant owns that inbox.
+  - When the real person later signs in with Google, the signIn callback links Google onto that
+    existing password account. The password that created the account keeps working.
+- **Who and what:** anyone who knows an invited address can take the invite. When the invitee then
+  signs in with Google, they land in an account whose password someone else holds. The owner's own
+  account is not exposed, because registering an existing email returns 409. Reasoned from source;
+  not executed.
+- **Fix shape (recommended first):**
+  1. Do not treat an invite as proof of email ownership. A password account stays inactive until the
+     email is verified.
+  2. When Google links onto a password account, clear `password_hash` unless the email is verified,
+     or require the password before linking.
+- **Alternatives:** drop email and password registration and keep only Google, since every current
+  user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
+
+### [platform] RV-193 — the Google refresh token is copied into the session JSON that page scripts can read
+- **Lane: A** — `auth.config.ts:51`, `app/api/log-calendar-event/route.ts:22`.
+- **⚠ AUTH — the owner confirms before this merges.** The change is one line.
+- **Added:** 2026-09-24 · Review sweep 60.
+- **What:** the refresh token belongs in the encrypted, httpOnly JWT, and it is there. It is **also**
+  copied to `session.refreshToken`, which `GET /api/auth/session` returns to page JavaScript. No
+  client code uses it; its only consumer runs on the server.
+- **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
+  token is long-lived, can write to Google Calendar, and outlives sign-out.
+- **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
+
+### [platform] RV-194 — Sentry scrubbing misses the parts of an event that carry query values
+- **Lane: A** — `lib/sentry-scrub.ts`.
+- **Added:** 2026-09-24 · Review sweep 60.
+- **What:** `scrubEvent` scrubs request, cookie and auth fields, but not:
+  - `exception.values[].value`: Drizzle's `Failed query … params: …` message, which carries row values;
+  - console-breadcrumb messages;
+  - navigation breadcrumb `from` and `to`;
+  - `extra` and `contexts`.
+  It also sets no `maxValueLength`. A throwaway test confirmed the params pass through unchanged. Every
+  uncaught database error therefore ships ids, dates and values to sentry.io. On the `users` path that
+  includes email.
+- **Fix:**
+  1. Cut exception messages at `\nparams:`.
+  2. Scrub breadcrumb `from` and `to` with the existing URL scrubber.
+  3. Drop console breadcrumbs, `extra` and `contexts`, or allowlist them.
+  4. Add a test using a real Drizzle error string.
+
+### [platform] RV-195 — three low-severity auth and social gaps, one PR
+- **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
+- **Added:** 2026-09-24 · Review sweep 60.
+1. **Mobile sign-in challenge is not bound to the browser that started it** (`app/auth-mobile-bridge/page.tsx`).
+   Exploiting it needs a malicious app on the phone plus a tapped link. Fix: `/mobile-signin` sets a
+   short-lived httpOnly cookie holding the challenge, and the bridge mints a token only if the query
+   value matches that cookie.
+2. **A deleted user stays signed in** (`lib/auth/is-active-refresh.ts`). A missing row is treated as
+   "no change". Fix: `auth()` returns null when the lookup succeeds and finds no row. The fail-open
+   for database outages stays.
+3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
+   `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
+   only what the requester typed.
+
+### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
+- **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
+  **⚠ SECURITY — the owner confirms before this merges.**
+- **Added:** 2026-09-24 · Review sweep 60.
+- **What:** Capacitor exposes these to the Railway origin:
+  - `OuraBle.revealKey`, which returns the key;
+  - `OuraBle.clearKey`, which deletes it with no confirmation. **The key cannot be recovered.**
+  - `setIngestUrl`, which accepts any absolute URL, persists it, and makes the native service post raw
+    ring frames there. `ScaleBlePlugin` and `PolarBlePlugin` have the same `setIngestUrl` shape.
+
+  The Kotlin comment argues that every caller is already app JavaScript. That is true, and it means the
+  CSP is the only boundary. The CSP allows `'unsafe-inline'` and (RV-197) WebSockets to any host.
+- **Precondition:** script execution in the origin, which RV-191 currently provides. Given that:
+  - the ring key can be stolen or permanently destroyed;
+  - ring uploads can be silently redirected to another host, and the redirect survives restarts.
+- **Fix shape:**
+  1. `setIngestUrl` rejects any origin other than the WebView's own, or a compiled-in allowlist.
+  2. `revealKey` and `clearKey` require a native confirmation dialog, which script cannot click through.
+- **Reversal cost:** low. The Kotlin change is small, but it costs an APK cycle. Batch it with the next
+  native change rather than cutting an APK for it alone, **unless RV-191 cannot land first**.
+
+### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
+- **Lane: A** — `lib/security/csp.ts` and its existing test.
+- **Added:** 2026-09-24 · Review sweep 60.
+- **What:** `connect-src` ends in `wss: ws:`. No `WebSocket` is used anywhere in
+  app/components/lib/packages; the only consumer is dev HMR. `connect-src` is the directive that would
+  otherwise stop injected script from sending data off-origin.
+- **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
+  `generativelanguage.googleapis.com` at the same time.
+
+### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
+- **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
+- **Added:** 2026-09-24 · Review sweep 60.
+- **What:**
+  - Every action is pinned to a major tag, not a SHA.
+  - `dependabot.yml` has no `github-actions` ecosystem.
+  - `android.yml` gives PR runs `contents: write` and decodes the debug keystore on them, although PR
+    APKs are never published.
+  - `ci.yml` has no `permissions:` block.
+- **Who:** a compromised upstream action tag would run with the keystore (the key the owner's
+  installed APK is signed with) and a write token. Fork PRs get nothing, and collaborators already
+  have write access.
+- **Fix:**
+  1. SHA-pin the third-party actions: `pnpm/action-setup`, `reactivecircus/android-emulator-runner`.
+  2. Add the `github-actions` ecosystem to dependabot.
+  3. Split `android.yml` so PR runs get `contents: read` and no keystore, and only the `push` job
+     restores the key.
+  4. Add a top-level `permissions: contents: read` to `ci.yml`.
 
 ### [readiness][devices] TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again
 
@@ -1894,6 +2088,9 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
+- **⚠ Build RV-190 first or with this (Review sweep 60).** The owner scope is a setting any caller
+  can change, and it persists on the pooled connection. A `SET LOCAL` without RV-190's transaction
+  wrapper leaves that hole open.
 - **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
   `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
   views do not change at all. What is fixed is **where that setting comes from**:
