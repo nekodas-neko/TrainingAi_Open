@@ -598,6 +598,16 @@ below keep their gate — they really are blocked pending an answer — and this
    reason — read the fields, not the prose.
 5. **`owner-branch-protection` (`LB-52` + `Q-297`'s second residue) — asked 2026-09-24**, parked by
    the owner for a few hours. E2E stays off the required-check list; that half is decided.
+6. **`BF-77` — is the "session to look into this" one he attends, or one an agent runs?** He asked
+   for it on 2026-09-20 instead of picking from the A/B/C sizing he was offered. If an agent runs it,
+   the docs-only planning PR is startable today and that gate comes off; if he wants to be in it, it
+   is a calendar item. One sentence either way, and it is the only thing between this entry and
+   progress.
+7. **`LB-53` — back-fill readiness over the 58 derived rows that have no score?** A production write
+   that rewrites months of history in one pass, and a re-scored trend is not silently reversible.
+   **Ask it inside `RV-170`'s history-row policy**, not separately — it is the same question that
+   entry splits by kind, and `RV-170`'s recommendation (recompute-from-stored-inputs: yes) already
+   covers this shape.
 
 - **Done when** each numbered item has an answer recorded on its own entry and that entry's gate is
   struck. This entry leaves the queue when the list is empty, not when it has been read once.
@@ -14553,7 +14563,7 @@ the match. `Gate: owner` when it is next picked up.
 
 
 - **Lane:** A if a server path is chosen; B for anything built on the QR payload.
-- **Gate:** owner
+- **Gate:** owner — and the gate has MOVED. He declined the A/B/C sizing on 2026-09-20 and asked for *"a session to look into this one"*; what is owed now is one clarification, not a choice: is that a session HE attends, or one an agent runs and reports back? If the latter, the planning PR is startable today and this gate comes off. Filed with `OR-145`.
 - **Planning item** — the request contains two products and they resolve differently. Needs a
   decision from the owner before implementation. **The `Gate:` field above is what makes that
   legible to `next-item.js`** (added 2026-09-02): the prose said it from the day the entry was
@@ -17680,7 +17690,7 @@ without a queue entry is a dropped finding.*
   route only ever writes today and nothing has back-filled the rest. The tool to fix it already
   exists and now stamps correctly; running it is a **`Gate: owner`** action, not a code change,
   because it writes months of history in one pass and a re-scored trend is not silently reversible.
-- **Gate:** owner
+- **Gate:** owner — a PRODUCTION WRITE, not a decision: back-filling readiness across the 58 of his 109 derived rows that carry no score. The tool exists and now stamps correctly; what stops it is that it rewrites months of history in one pass and a re-scored trend is not silently reversible. Same class as `RV-170`'s history-row policy — ask them together.
 - **Not a defect, recorded so it is not re-opened:** a day's score freezing when the day ends is
   correct behaviour, not staleness. The narrow real case is a day whose last app open happened
   before the ring synced — that day's stored score is built from an incomplete night and nothing
@@ -26166,7 +26176,7 @@ per-field merge where an AI write has no honest source rank to claim.
      training-load, muscle-recovery and the HR chart; **the manual button does not bump it at all**,
      so it is strictly narrower, not merely redundant. That supports removing it — against the real
      counter-consideration that a visible button is discoverable and a gesture is not. **His call.**
-- **Gate:** owner
+- **Gate:** owner — one call, measured and written up below: whether the header REFRESH BUTTON goes. Pull-to-sync bumps `refreshTick` and the button does not, so the button is strictly narrower rather than redundant — which argues for removing it, against a button being discoverable where a gesture is not. The scale chip itself is native work he already flagged a stretch.
 - **Verify:** device
 - **✅ SHIPPED** (`feat/home-device-battery-chips`, 2026-09-02, v1.430.0). `components/home/header-chips.tsx`
   renders the weather chip plus a ring chip and a strap chip, each drawn by the shared
