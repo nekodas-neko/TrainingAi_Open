@@ -613,8 +613,29 @@ below threshold and left in place for next time.
   from `sqlite-backend.ts` at test time and run against `node:sqlite`, so it cannot drift from the
   implementation or pass against a stale copy. It also pins the two cases the guard must not buy:
   an ordinary pull still updates a live row, and a `pending` local edit is still protected.
-- **Keep:** the device pass test below. The race needs a real pull/push overlap on the S25, which no
-  container can stage — the reproduction is of the SQL, not of the timing.
+- **⚠ DEVICE SWEEP 3 RE-REPORTED THIS (#1491) — ON A BUILD THAT CANNOT CONTAIN THE FIX. Read this
+  before re-fixing anything.** The fix shipped in **v1.465.23** (#1485); production was serving
+  **v1.465.17** when the sweep ran and still is (DV-14). So a reproduction from that sitting is
+  expected and is **not** evidence the guard failed.
+- **The sweep's traced path is the SAME upsert the guard protects**, checked rather than assumed.
+  Its trace: local row DEL/pending at +118 ms, `GET /api/nutrition/food-logs` at +184 ms,
+  `POST /api/sync/push` at +194 ms confirming at +476 ms, row DEL/synced at +555 ms — with the
+  mechanism given as *"if the GET resolves after the push confirms, BF-47's queued-delete guard no
+  longer sees a pending delete, and hydration writes the pre-delete copy back as live+synced"*.
+  **That mechanism is exactly right**, and `use-food-logs-loader.ts:100` performs that write through
+  `store.applyDelta` — the guarded statement. Every other local food-log writer was enumerated:
+  `quick-edit-log-sheet.tsx` (a user edit, not hydration) and the sync-engine confirm arm, which for
+  a delete calls `markFoodLogSynced` and for a non-delete reads `getFoodLogs`, which filters
+  `deleted_at IS NULL` and so cannot find a tombstoned row. **`applyDelta` is the only hydration
+  writer**, so BF-47's screen-level guard is now the second line of defence rather than the only one.
+- **One datum from the sweep is genuinely new and does not change the fix:** it reproduced with a
+  delete **1.5 minutes after the log**, so the window is not only the quick log→delete. The guard
+  does not depend on the window — it depends on the tombstone being present, which every one of the
+  sweep's traces shows (DEL/pending → DEL/synced).
+- **Keep:** the device pass test below, **run against v1.465.23 or later** — which needs DV-14
+  resolved first, since production has not advanced past 1.465.17. The race needs a real pull/push
+  overlap on the S25, which no container can stage: the reproduction is of the SQL, not of the
+  timing.
 - **⚠ One window remains open and is NOT fixed here.** The guard protects a tombstone the device
   still holds. If a server tombstone delta has already hard-DELETEd the local row (the
   `if (r.deletedAt)` branch) and a stale pull arrives *after* that, the INSERT re-creates it with
@@ -692,6 +713,13 @@ below threshold and left in place for next time.
   now keyed by minute — exact for every timezone, since no UTC offset is finer than a minute — and
   pinned by `dv13-minute-keyed-day-bucketing.test.ts`, whose zone set includes Kathmandu and Chatham
   because an hour-keyed memo passes every whole-hour zone and is silently wrong in those two.
+- **The three sibling routes were checked and need no fix — that is why there is no recorded one.**
+  Device sweep 3 asked after `samples/summary`, `rollup-state` and `samples/pack`. None of them
+  carries a per-row `toAestDay`/`formatInTimeZone` loop; that was verified by reading all four
+  routes before #1473, and it is the reason a single-row `rollup-state` appearing to hang is the
+  signature of an occupied process rather than of that route being slow. If the console still hangs
+  after v1.465.23 reaches the device, the remaining suspect is the row CAP that `device-metrics`
+  still lacks (the `Keep:` below), not the siblings.
 - **Still NOT established, and this entry stays queued for it:** that `device-metrics` caused the
   **outage**. 656 ms — or even 3 s — does not account for a 90-second abort, and the deploy
   correlation above is the better explanation for that window. Do not close this by pointing at the
