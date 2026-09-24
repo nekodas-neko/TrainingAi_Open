@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-24 — backlog → 27625 (device sweep 3 answered on DV-15 and DV-13)
+## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
 
 Growth, and it is the cheap kind: the device agent re-reported DV-15 from a sitting on v1.465.17,
 which cannot contain the v1.465.23 fix, and asked after three DV-13 sibling routes that were checked
@@ -16445,3 +16445,45 @@ the answer to his question, so summarising it away would leave the entry unable 
 Both shrink. Sweep 3 closed two probes (RV-128, RV-129) and removed three verified entries (BF-95,
 BF-161, OR-118), filed DV-16/17/18, annotated about a dozen entries, and archived BF-161's
 Known-Issues row.
+
+---
+
+## 2026-09-24 — backlog → 27641 (chore/or-140-device-sweep-handover)
+
+Growth, +43, acting on the Device Verification agent's sweep 2/3 handover.
+
+One new entry, `RV-144` — three inputs on `/more/details` measured at ~33 px of vertical touch area
+against the 44 px floor. It is `RV-127`'s one actionable finding, handed to the lane that owns the
+surface; the rest of that probe's results were either by design, already filed, or looked at and
+harmless.
+
+The remainder is reasons rather than entries, on four corrections: `RV-111`'s gate discharged (the
+device answered it), `RV-127`'s shipped-look field removed (it failed, and a FAILED is work),
+`RV-127` re-laned to DV for the one half three-button navigation cannot answer, and `Q-168` held for
+sweep 4 with the argument written out — the device agent asked for it to be re-laned and it is
+staying, so the reason has to outlive the exchange.
+
+---
+
+## 2026-09-24 — backlog → 27648 (chore/or-141-salvage-1465)
+
+Growth, +7: the three re-lanings salvaged from #1465, each carrying its reason. `BF-92` to an owner
+gate because the check is a deliberate throw in production that may page someone; `BF-24` and
+`Q-395` to owner gates because artboard parity is a judgement about whether a screen looks right,
+which the phone cannot settle — `RV-143` had already read both as mis-gated rather than
+device-blocked.
+
+---
+
+## 2026-09-23 — `docs/implementation-backlog.md` → LB-138 + a note on BF-188
+
+Two findings from gating PR #1489, then bisected in the same session. LB-138 was rewritten rather
+than extended and came out the same 24 lines: the bisect replaced two red tests with one commit,
+one of the failures turned out to be the spec keying itself to a renamed storage slot and is fixed
+in this PR rather than queued, and what remains is a single real regression carrying the value that
+proves it (`about:blank`) plus the two device reports that corroborate it. Same length, and it now
+names a cause instead of a symptom.
+
+The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
+that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
+dropping twelve entries of which two survived nowhere but git history.

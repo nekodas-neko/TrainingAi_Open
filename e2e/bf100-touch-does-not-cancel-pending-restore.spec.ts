@@ -34,6 +34,21 @@ const RESTORE_WINDOW_MS = (() => {
   return Number(m[1].replace(/_/g, ''))
 })()
 
+/**
+ * Read from the source too, for the same reason the window is. RV-112 (#1431) gave `/more` its own
+ * scroll slot via `scrollKey`, so the hook's key became `${pathname}#${suffix}` — and this spec went
+ * on seeding the bare `ta_scroll:/more`, a key nothing reads. The restore then never armed, the
+ * container sat at 0, and the assertion below reported that 0 as the BF-100 cancellation. The fix
+ * BF-100 shipped was never involved. Deriving the suffix is what stops the next rename repeating it.
+ */
+const SCROLL_KEY_SUFFIX = (() => {
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'app/more/more-content.tsx'), 'utf8')
+  const m = /scrollKey="([^"]+)"/.exec(src)
+  if (!m) throw new Error('scrollKey not found in app/more/more-content.tsx — this spec keys itself off it')
+  return m[1]
+})()
+const KEY = `ta_scroll:/more#${SCROLL_KEY_SUFFIX}`
+
 /** Confirmed by instrumenting `addEventListener` on a live `/more`, not guessed from the markup. */
 const CONTAINER = 'div.flex-1.overflow-y-auto.pb-nav-safe.scrollbar-hide'
 const SCROLL_TOP = `Math.max(0, ...[...document.querySelectorAll('*')]
@@ -56,7 +71,7 @@ async function armUnreachableRestore(page: Page): Promise<number> {
     .toBeGreaterThan(200)
 
   // Far enough above the range that revalidation growing the page cannot accidentally reach it.
-  await page.evaluate((target) => sessionStorage.setItem('ta_scroll:/more', String(target)), gap + 5000)
+  await page.evaluate(([k, target]) => sessionStorage.setItem(k, String(target)), [KEY, String(gap + 5000)] as const)
   await page.reload()
   // The hook reads the key in its mount effect; give the screen a beat to get there, while staying
   // well inside the window.

@@ -973,15 +973,34 @@ below threshold and left in place for next time.
   food-disappearing bug was exactly (b) — a `food_item_id` with no name or macros.
 - **⚠ Production writes** — owner go-ahead per domain; a refused domain is COULD NOT CHECK.
 
+### [app-shell] RV-144 — three inputs on `/more/details` sit under the 44 px touch floor
+
+- **Lane:** B — `/more/details`. **Added:** 2026-09-24 · filed out of `RV-127`, whose remaining work
+  was getting its findings to the lanes that own them. The letter stays `RV-` because Review's probe
+  found it; the lane says who builds it.
+- **📱 Measured twice on the S25, and the second pass is what settles it.** The first sweep recorded
+  three **318 × 21** inputs — display name, birth year, height — and said *"not judged; whether their
+  row or label widens the target is the next question"*. **Sweep 2 asked that question**: the real
+  vertical touch area is **~33 px**, against the repo's own 44 px floor. So the label does not rescue
+  it and this is a defect rather than an open measurement.
+- **Not the same as the session dots.** `RV-127` also found `tap-target-dot` at 24 × 44 on Workout,
+  which is **by design** in `globals.css` — 44 in the axis that matters. Do not "fix" those.
+- **Do not fix this with a bare `button`/`a` rule in `globals.css`.** CLAUDE.md's *No global
+  element-selector styling*: tap-target floors belong in the shared component, and any unavoidable
+  global rule ships its opt-outs in the same PR.
+- **Sibling sweep before closing**: the probe covered 13 routes and found these three, but it
+  measured what was on screen. Check the other text inputs in the same form family rather than only
+  the three named.
+
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the inputs are labelled, but the ink is 21 px
   and the vertical touch area measures **~33 px**, under the 44 px floor.
 
-- **Lane: O** — assigned 2026-09-23 (OR-135). **This probe has already been RUN on the S25**
-  and its result is recorded above, so the device is no longer what it needs. What it needs now
-  is its findings filed to the lanes that own them. Not DV's: re-running a probe that has
-  answered is the device agent's time spent on a question nobody is asking.
+- **Lane: DV** — was `O` (OR-135, for filing its findings); re-laned 2026-09-24 once that filing was
+  done. The probe has been RUN and its result is recorded below, so the device was not what it
+  needed — but the **clearance half could not be answered** on three-button navigation, and that is
+  now the only thing left. See the sweep-4 note at the foot of this entry.
 
 - **📱 MEASURED ON THE S25, 2026-09-23 — every claim, including clearance.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `sweep.js` over
   13 routes (tab roots + cardio, health/day, health/readiness, more/details, more/settings,
@@ -997,7 +1016,11 @@ below threshold and left in place for next time.
   Clipped overflow (`hidden`, working `truncate`) is by design. Found alongside it: **DV-4**
   (a sleep-stage colour used as text) and **DV-6** (no status-bar backing).
 
-- **Verify:** device — no build half. Method: **P4**. `tour.js` already emits part of this digest.
+- **Its shipped-look field was removed 2026-09-24 (device sweep handover) — it FAILED, and a
+  FAILED is work.** The field said *"device — no build half. Method: P4"*, which files an entry under *shipped, a look is
+  owed*. Sweep 2 ran it and the inputs came back at **21 px of ink**, so there is a build half after
+  all and it is not verification debt. Leaving `Verify:` on a failed probe is the exact shape
+  CLAUDE.md warns about: it reads as finished to everyone who scans the queue.
 - **The falsifiable claims:** no element overflows horizontally at 384 px (`scrollWidth >
   clientWidth`); no interactive element renders under 44 × 44 px; no element carrying `truncate`
   computes to `display: flex` (the class does nothing there — RV-92 is one, the question is whether
@@ -1006,6 +1029,10 @@ below threshold and left in place for next time.
   phone on **three-button navigation**, where the inset is generous and a broken floored utility
   passes anyway. Until the owner switches to gesture nav, clearance is COULD NOT CHECK; the four
   claims above are unaffected and can run today.
+- **Sweep 4 — what is actually left.** The filing work this entry was held in `O` for is **done**: its one actionable finding is now `RV-144` (Lane B), the session
+  dots are by design, the horizontal overflow was looked at and overlaps nothing, and `DV-4`/`DV-6`
+  were already filed. **What remains is only the clearance half**, which needs the owner on gesture
+  navigation — the same group as `RV-37`, deferred to sweep 4 for the same reason.
 
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
 
@@ -1507,7 +1534,12 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
   `components/nutrition/ingredient-picker.tsx:302`. **Added:** 2026-09-22 · Review sweep 53.
-- **Gate: device** — the hardware back path only exists on the APK.
+- **Gate removed 2026-09-23 (device sweep handover) — it has been ANSWERED.** It read *"the
+  hardware back path only exists on the APK"*, which was true and is now discharged: sweep 2
+  **CONFIRMED the defect on the S25**, and the open question OR-137 raised — whether the native
+  barcode activity swallows back before the JS listener runs — is settled by that confirmation, so
+  the fix below is the right fix. This is Lane B work now, not a check. A gate that outlives its
+  answer parks the entry for a question nobody is still asking.
 - The scanner **replaces the sheet's body** rather than opening a surface of its own, and neither
   file registers a back-stack entry (`grep` for `useSheetBackDismiss`/`sheet-back-stack` in both →
   none). `SheetContent` renders `BackDismiss` once, so the native listener sees one open surface and
@@ -1916,6 +1948,29 @@ below threshold and left in place for next time.
   Both files are Lane A's, which is why this is an entry and not part of RV-120's diff.
 - **Whoever takes it decides**: keep the route as a debug surface and drop just the two
   invalidations, or retire route + key + tests together. An invalidation aimed at nothing is the fix.
+
+### [app-shell] LB-138 — back from a push off Home lands on `about:blank`; a tab flip loses the history entry
+
+- **Lane:** B — `ef95595c11d` (#1431, RV-110/RV-112), `lib/navigation` tab-flip path,
+  `e2e/la109-back-from-subroute.spec.ts:87`. **Added:** 2026-09-23 · found gating #1489, bisected
+  the same session. **This is Lane B's own regression** — #1431 is a Lane B change.
+- **⚑ BISECTED, not guessed.** `e2e` on both specs at `75805c1800a` (#1438) → **4 passed**; at
+  `ef95595c11d` (#1431) → **2 failed**. One commit turned both red.
+- **The failing assertion is the URL one, and the value is the finding:**
+  `expect(pathname).toBe('/')` received **`"blank"`** — i.e. `about:blank`. After `/health` → flip
+  to Home → in-app push to `/health?tab=training` → `goBack()`, **there is no history entry to go
+  back to**. In the WebView that is the back gesture leaving the app or landing on nothing, not a
+  wrong-tab landing.
+- **The spec is a guard doing its job, not drift.** Its own header says it pins "the reverse
+  direction — flip to Home, push off it, come back — the thing a naive version of that fix would
+  break". #1431 converted 15 destinations to `navigateToTab`; the flip no longer leaves a history
+  entry the push can return to.
+- **Corroborated on device, independently.** Device sweep 3 reports BF-49 still failing (*"back
+  from a timeline row lands on Health, not where you started"*) and RV-111 (*"one hardware back
+  from the barcode scanner closes the whole Log Food sheet"*). Same class, same surface. Whoever
+  takes this should read those two together with it rather than in isolation.
+- **Start from the history semantics of `navigateToTab`** — push vs replace vs neither — against the
+  three reports above. Do not start from the spec.
 
 ### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
 
@@ -3280,6 +3335,13 @@ why the count of affected entries always understated the harm.
   measured — the rule named the hazard without naming the line that causes it.
 - **Verification:** fold N entries, then fold M more into the same day without deleting the file,
   and confirm the result holds N+M anchors. Today it holds M.
+- **⚑ IT HAS ALSO LANDED ON `main`, which the above does not cover — this entry was filed from a
+  conflict caught before merge; the same defect shipped.** PR #1484's fold was a same-day second
+  fold: it archived 40 entries and removed the **12** another session had archived an hour earlier.
+  Ten came back as loose files when #1488 dropped its own fold; **two existed nowhere** and were
+  restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
+  priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
+  is only in git history, and nothing reports which entries went missing.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
@@ -10909,7 +10971,9 @@ one. A swipe on the single Start button adds an affordance that does not current
 > the `Gate: device` below, unchanged, and it is still the only thing that proves this.
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
-- **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
+- **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
+- **Gate: owner** — a deliberate client-side throw in **production** may page someone. Ask before it
+  is fired; once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
@@ -11008,7 +11072,6 @@ experiment, not an inference.
 - **Do not treat this as a reason to distrust the integration.** `beforeSend: scrubEvent`,
   `sendDefaultPii: false`, `tracesSampleRate: 0` and no replay are all deliberate and all correct for
   a health app. The code is right; the environment and one header are not.
-- **Gate:** device
 - **Verification:** a deliberate client-side throw in production appears in Sentry within a minute,
   **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
   violation for the ingest host.
@@ -13621,8 +13684,12 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 ### [nutrition] BF-24 — artboard 1 parity: the header and the meal grouping shipped; the energy block and the tile row did not
 
 - **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
-- **Lane: B**
-- **Gate: device**
+- **Lane: O**
+- **Gate: owner** — re-laned 2026-09-24; was `B` with a device gate. Every buildable item below is
+  closed with a reason (② shipped, ③ ⑥ ⑦ each decided), so what remains is **artboard parity plus
+  the owner's ④ watching brief on grouped-section backgrounds**. Whether a screen matches a drawing
+  is a judgement about whether it looks right, which per CLAUDE.md waits on the owner even though
+  the phone is where he will look at it.
 - **Spec:** BF-28 — read it first for the parity rules, chiefly that an artboard is one screenful and
   a section absent from it is not thereby deleted.
 - **Read first:** artboard **1 · Nutrition — the day** in
@@ -13736,7 +13803,7 @@ That number is more valuable than either input on its own.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
-- **Lane:** B
+- **Lane:** O — was `B`; the remaining work is the owner's parity look, not a build.
 - **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
   269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
   work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
@@ -13744,7 +13811,9 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Gate:** device — see the ⚠ immediately below. Every phase has shipped and this is the completion
+- **Gate: owner** — re-laned 2026-09-24; was a device gate. *"Do the drawn screens match what
+  shipped"* is a judgement, not a measurement, and **`RV-143` already read this entry as mis-gated
+  rather than device-blocked** — both sweep plans exclude it for that reason. See the ⚠ below. Every phase has shipped and this is the completion
   checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
   never drawn, then leave the queue), but its own instruction is to **wait**, so it is gated rather
   than READY: it printed second in the Lane B queue while telling any taker not to start it.
@@ -24082,11 +24151,23 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   The entry's own *What is actually left* section names it: `/coach` and `/coach/confirm/[toolCallId]`
   are navless full-screen routes with bottom-anchored controls, the shape that has regressed 11+
   times. Run the **AI Coach** section of `docs/device-smoke-checklist.md`.
-- **Lane: DV** — reassigned 2026-09-23 (OR-136) from B. The blocking work is that check, and it is
-  one the phone ANSWERS: bottom-anchored controls either clear the gesture bar or they do not, and
-  a safe-area inset is a number rather than a matter of taste. The **cardio-goals** half was
-  dropped rather than built, so nothing here is waiting on Lane B. A FAILED result goes back to B
-  with what reproduces it.
+- **Lane: DV · deferred to SWEEP 4** — reassigned from `B` on 2026-09-23 (OR-136); the deferral
+  added 2026-09-24 in the device-sweep handover.
+- **⚠ The device agent asked for this to be re-laned off `DV`, and it is staying — with the reason,
+  because the reason is its own.** Its ask was *"Q-168 is tagged Lane DV but isn't a device check"*.
+  Read literally that is not what the entry says: its *What is actually left* section has **one**
+  item, and that item is running the AI Coach section of the smoke checklist on two navless
+  full-screen routes. **Sending it to `B` would give Lane B nothing to build** — the cardio-goals
+  half was dropped rather than deferred — so it would sit in `B` unstartable, which is worse than
+  sitting here.
+- **What is true is the constraint the same message supplied: the phone is on three-button
+  navigation.** In that mode **every safe-area inset reports `0`**, so a bottom-anchored control
+  clears the bar trivially and a broken floored utility passes anyway — running this now would
+  manufacture a false VERIFIED, which is worse than not running it. That is exactly why `RV-37` and
+  `RV-127`'s clearance half were already held for sweep 4. **This belongs in that group; it was not
+  a fourth kind of thing.**
+- **So: not startable until the owner switches back to gesture navigation**, and it goes in sweep 4
+  alongside the other inset checks. A FAILED result then goes to `B` with what reproduces it.
 
 
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
