@@ -16534,3 +16534,19 @@ that would disprove it. Writing the ruled-out half down is what stops Lane A re-
 entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
 re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
 to run. Offset by removing RV-126, whose results all have homes (−30).
+
+---
+
+## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
+
+Growth from the orchestrator's review of device sweep 3.
+
+**Backlog +66.** One new entry, `OR-139` — a device FAILURE does not clear the field that makes an
+entry read as finished, found after fixing five instances by hand (`BF-61`, `BF-139`, `BF-96`,
+`RV-103`, `TN-53`). The rest is the corrections themselves: each of the five needed its field
+removed, its title made true, and an acceptance criterion written, because a failed check is work
+and the old wording said otherwise.
+
+**CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
+contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
+available fix is telling agents to ignore it, with the reason.
