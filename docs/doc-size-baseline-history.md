@@ -16813,3 +16813,10 @@ entry turns on — the reproduced foreign-key failure in the existing delete pat
 SET NULL / NO ACTION split across the 99-table schema — plus BF-193's three decision briefs. The
 schema table is the part that could not be summarised away: which keys cascade and which do not is
 the whole difference between a deletion that works and one that silently leaves rows behind.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29699 (BF-194)
+
+The owner-question visibility rule, measured failing the day it was written: three questions at
+ranks 15–17 of a 57-entry lane that prints 10. The length is the rank table plus three alternatives
+with the reason each lost — the table is the evidence that position cannot hold, which is the whole
+argument for replacing it with a section.

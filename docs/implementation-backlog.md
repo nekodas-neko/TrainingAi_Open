@@ -1812,6 +1812,58 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [platform] BF-194 — an owner question is only visible if it ranks top-10, and three of them already do not
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — this is queue
+  tooling and the Orchestrator owns the queue. The change itself is a handful of lines in
+  `scripts/next-item.js`; whoever takes it writes them, since BugFix does not.
+- **⚑ MEASURED — the rule written 2026-09-24 has already failed, the same day.** CLAUDE.md says an
+  owner question goes to `Lane: O` and gets *"a queue position near the top."* Checked against `main`
+  at `2cda697a`, **lane O holds 57 READY entries and prints 10**:
+
+  | entry | rank | what it is waiting on |
+  |---|---|---|
+  | BF-193 | **15** | account-deletion policy — logs, the ring key, grace period |
+  | BF-189 | **16** | session content — which of three levers to pull |
+  | BF-191 | **17** | sub-minute walks, and the phantom activity row |
+
+  BF-189 and BF-191 were filed **at ranks 1 and 2** the previous evening. Fourteen entries were
+  inserted above them by other agents within about eight hours. Nothing went wrong and no agent
+  misbehaved — **every agent files at the head, which is what the convention asks for, so the head is
+  exactly where the churn is.**
+- **So position is the wrong mechanism, and re-ordering is not the fix.** Moving these three back to
+  the top would buy roughly a day and assert this session's priority over four other agents'
+  deliberate ones. The next filing sweep undoes it. A convention that needs re-applying every few
+  hours is not holding anything.
+- **⭐ Recommend: print owner questions in their own section, the way `Reference:` already does.**
+  `next-item.js:290` gives `REFERENCE` an unconditional section outside the `TOP_N` cut, precisely
+  because those entries must stay visible without heading the work list. An owner question wants the
+  same treatment for the mirror reason: it is not "next", it is **blocking**, and it must be seen
+  whatever its rank.
+- **Why this one, framed a year out.** It makes the guarantee structural rather than behavioural —
+  the owner's instruction was that his questions get *worked*, and a question nobody can see is not
+  being worked no matter how correctly it was filed. It also scales the right way: at 57 lane-O
+  entries today, any convention resting on ordering is already lost, and the queue only grows.
+- **Alternatives, each with what it is genuinely better at:**
+  - **Raise `TOP_N` for lane O.** One number, no new concept. Better at being trivial to do — but it
+    is a treadmill: 57 entries means showing 20 still hides 37, and a longer list is read less
+    carefully, which is the failure wearing different clothes.
+  - **A new field, e.g. `Owner:`,** parsed and sectioned. Better if owner questions ever need
+    behaviour beyond visibility. It loses today because `Lane: O` already identifies them and a
+    second field is a second thing to get wrong — the `Gate: owner` trap in this same rule is what a
+    spare field costs.
+  - **Re-order on a schedule** (the Orchestrator lifts them each sweep). Better in needing no code.
+    It loses because it is the manual version of what a section does for free, and it fails silently
+    whenever a sweep is skipped.
+- **Reversal cost: near zero.** A section in one script, deleted by removing it. No data, no
+  migration, no product surface.
+- **⚠ Deliberately NOT re-ordering the three entries in this PR.** They are at 15–17 and they stay
+  there: the fix is to make rank stop mattering, and quietly promoting my own filings above four
+  other agents' would both decay and misrepresent priority I have not been given.
+- **Verification:** with the section in place, `node scripts/next-item.js --lane O` shows BF-189,
+  BF-191 and BF-193 without `--all`, while the READY list stays capped at 10 and still leads with
+  whatever genuinely ranks first.
+
 ### [platform][app-shell] BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"there is no option for
