@@ -620,8 +620,117 @@ it is no longer visibly broken.
   any more. That is the right trade — a prose example is worth less than a queue that routes.
 - **Pass test:** `pnpm check:rules` fails on a backlog with two lane fields under one heading, passes on
   the swept file, and the count above reads **0** when re-run. Custom Rules goes 77 → 78.
-- **Reference:** `scripts/lib/lane.js` (the first-match-wins comment and its Q-529 note),
+- **Where the mechanism is:** `scripts/lib/lane.js` (the first-match-wins comment and its Q-529 note),
   `scripts/next-item.js` (which prints the parsed lane and not the ambiguity).
+
+### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while testing whether the readiness score
+  predicts anything about training.
+- **Lane: O** — this needs the owner's call on what the app should *do*, which is product behaviour
+  rather than a structural choice, and the decision brief is below rather than in a chat reply.
+- **What the code says.** `earlyDeloadRecommended` (`lib/health/readiness-payload.ts:665`) is the only
+  place a readiness score automatically changes what the app prescribes. It is wrapped in
+  `if (program?.phaseMode === 'automatic')`, and fires on `score < EARLY_DELOAD_SCORE_MAX` (45) **and**
+  `acwr > EARLY_DELOAD_ACWR_MIN` (1.2).
+- **What production says, measured 2026-09-24.** The active program (**Bankai**) is `phase_mode =
+  'ai_dynamic'`. So the recommender is excluded from it by construction — no readiness score, however
+  low, can propose a deload on the program the owner is actually running.
+- **And it has never fired on ANY program, ever, under either mode:**
+  - `early_deload_week_start` is **NULL on all 5 programs**, including the two `automatic` ones that
+    ran from 2026-06-14.
+  - `is_early_deload` is **false on all 117 workout sessions** (2026-04-30 → 2026-09-23).
+  - 12 of 71 scored days are **below 45**, so the score half of the condition was reachable; the ACWR
+    half cannot be checked retrospectively because **ACWR is not stored anywhere** (no column matches
+    `%acwr%` in any table). That is the one leg of this finding that is inference rather than
+    measurement, and it is why the ask below includes persisting it.
+- **⚠ The consumption side is NOT the bug — it was already fixed.** `isEarlyDeloadWeek`
+  (`packages/shared/src/phase-engine.ts:125`) exists precisely so an `ai_dynamic` program honours a
+  confirmed deload week, and its own comment records that until Q-175 a confirmed deload never reached
+  the AI prescription. So the machinery to *honour* a deload works and the machinery to *offer* one is
+  switched off for the mode the owner uses. Fixing the wrong half would change nothing.
+- **Two paths can set it and neither has:** `POST /api/confirm-early-deload` (owner-confirmed) and the
+  coach domain (`lib/coach/domains/early-deload.ts:162`). So this is not "the owner declined the
+  prompt" — measured, there was never a prompt to decline.
+
+**Why this outranks calibration work.** Every tuning entry in the queue sharpens a number. This one
+asks whether the number is connected to anything. A readiness score that cannot alter a single
+prescription is a dashboard reading, and re-weighting its contributors (LA-122 item 2b) or fixing its
+tail (TN-60, shipped) improves a figure nobody's training responds to. That is not an argument against
+those entries — it is an argument that this one should be answered before more of them are worked.
+
+**Recommendation: extend the recommender to `ai_dynamic` and persist ACWR, keeping the
+owner-confirmation step.** The consumption path already exists, so this is a condition change plus a
+stored column, not a feature. Keeping confirmation matters: it stays a suggestion the owner accepts,
+which is the right shape for something that can only be validated by living with it.
+
+- **Alternatives, and what each is better at.**
+  - *Leave it off deliberately.* Better if the owner does not want the app proposing deloads at all —
+    in which case the honest move is to delete the recommender rather than leave a dead gate that
+    reads as a safety net. Nothing currently records that this is the intent.
+  - *Lower the thresholds so it fires.* Better at producing visible behaviour quickly, and wrong: the
+    gate is not too strict on the active program, it is *absent*. Moving 45 or 1.2 changes nothing
+    while `phaseMode` excludes it, which is exactly the kind of fix that looks like progress.
+- **Reversal cost: low.** One condition, one persisted column, one owner-facing prompt that already
+  has a route. If the deload prompts turn out to be noise, the condition goes back and the stored ACWR
+  stays useful for every other analysis.
+- **Supporting observation, explained rather than filed separately:** `phase_id` and
+  `program_session_id` are NULL on all 117 sessions. `phase_id` is expected — `ai_dynamic` programs
+  have no `ProgramPhase` rows at all. `program_session_id` duplicates `session_id` (populated on 70),
+  and `app/api/workout-entry/route.ts:187` reads the program session from `session_id`, so no signal is
+  lost; it is a redundant column, not a capture gap. Recorded here so neither is re-investigated.
+- **Where the mechanism is:** `lib/health/readiness-payload.ts` (the gate and its two constants),
+  `packages/shared/src/phase-engine.ts` (the consumption path Q-175 fixed).
+
+### [readiness][workouts] TN-65 — set RPE is a dense lived-feedback signal nobody is validating scores against, and the first measurement against it is a null
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, from the same measurement pass as TN-64.
+- **Lane: O** — the deliverable is a standing validation method for scoring work, which is queue and
+  method rather than product code.
+- **The signal exists and is dense.** `set_logs.rpe` is populated on **864 of 1,286 sets (67.2%)**,
+  mean **7.40**, sd **0.94**, range 6–10. Every tuning discussion so far has treated lived feedback as
+  unavailable — `perceived_recovery_touched` is **0 of 96** over 81 days (TN-57) and `session_rpe` is
+  **20 of 103** completed sessions. Both are true and both are about a *daily* self-report. The
+  per-set one has been collected all along.
+- **First test, and it is a null.** Controlling for exercise and planned-intensity band (each set's RPE
+  against the mean for that exercise at that band), **509 sets**: correlation with readiness
+  **−0.060**; mean RPE deviation **−0.009** on days readiness calls poor (<50, n=94) against **−0.046**
+  on days it calls ready (70+, n=254). A gap of **0.04 RPE points on a signal whose sd is 0.94** —
+  about 4% of one standard deviation.
+- **⚠ That null does NOT convict the readiness score, because the load moves too.** Measured on 591
+  sets, relative to each exercise's own mean weight: load runs **0.940** on poor days against **1.036**
+  on ready days — about **9% lighter** — and `intensity_pct` sits **1.43 points** below its exercise
+  mean on poor days against **0.08** on ready ones. Equal perceived effort at a lighter load is the
+  shape you *want*; reading the flat RPE alone as "readiness is meaningless" would be wrong.
+- **What this cannot distinguish, and it is the interesting part.** Whether that 9% came from the app
+  or from the owner. Nothing stored says which. **TN-64 measured that no automatic path can reduce a
+  prescription** — the early-deload recommender is excluded on the active program and has never fired
+  on any program — which makes self-regulation the more plausible reading. If that holds, the owner is
+  already doing what a working readiness score would advise, and the score's marginal contribution is
+  unmeasured rather than absent.
+- **⚠ DO NOT CITE the per-session breakdown this pass also produced.** Within one session name, n=10
+  each, readiness against volume: Legs **+0.54**, Upper **+0.57**, Lower **+0.47**, Push **+0.005**,
+  Pull **+0.048** — a tidy story about systemic fatigue mattering on compound days and not on split
+  days. **It is the exact shape of Q-272's `r = +0.67 (n = 11)`, which did not replicate** (0.252 over
+  70 days) and whose failure is already on the record in
+  `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §6a. At n=10 an r of 0.54 is not
+  significant. Recorded so the next session does not rediscover it and believe it.
+- **The proposal: make a load-normalised RPE residual the standing acceptance test for scoring work.**
+  One value per training day — observed RPE minus the expected RPE for that exercise at that load —
+  which is an *external* signal, unlike every test the scoring work currently uses (distributional
+  spread, monotonicity, internal correlation between one derived column and another). A calibration
+  that improves the score's agreement with how the work actually felt is a calibration that earned it.
+- **Acceptance criteria for this entry** — the method is built when: the residual is computed from a
+  named helper rather than an ad-hoc query, the 509-set baseline above reproduces, and the residual is
+  reported alongside the distributional test for the next scoring change (TN-55's battery re-fit is the
+  first candidate).
+- **Two limits to state up front.** RPE is self-reported and its sd of 0.94 across 864 sets is narrow,
+  so it may be too anchored to resolve small effects — the residual's own sensitivity needs measuring
+  before a null from it means anything. And 33% of sets carry no RPE; whether those are missing at
+  random is unchecked, and a set skipped *because* it was hard would bias the residual precisely where
+  it matters.
+- **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
+  `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
