@@ -36,6 +36,9 @@ const { referenceFromLines, hasProseMarker, PROSE_MARKERS } = require('./lib/ref
 const { verifyFromLines, verifyProblem } = require('./lib/verify');
 const { laneDrift } = require('./lib/lane-drift');
 const { laneFieldProblem, LANE_LOOSE_RE } = require('./lib/lane');
+
+/** A lane FIELD line: a list bullet whose first content is `Lane:`. Prose mentions never match. */
+const LANE_FIELD_LINE_RE = /^\s*[-*]\s*\*{0,2}Lane:/;
 const { keepFromLines } = require('./lib/keep');
 const { keepKind, keepIsSettled } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
@@ -139,6 +142,14 @@ for (let i = 0; i < queue.length; i++) {
       const lane = line.match(LANE_LOOSE_RE);
       if (lane && !meta.get(currentId).lane) meta.get(currentId).lane = lane[1].trim();
 
+      // TN-63. `laneFromLines` is first-match-wins, so a re-laning that ADDS a field and leaves the
+      // old one standing is served the stale value, silently. Measured 2026-09-24: 28 entries carried
+      // two lane fields and 6 disagreed — `TN-19` among them, served to Lane B by a line its own text
+      // says must not be touched. Counting FIELD-SHAPED lines, the same bullet anchor `laneFieldProblem`
+      // uses, is what makes this checkable: a prose mention of the token does not match, which matters
+      // because the note explaining this trap has to quote it.
+      if (LANE_FIELD_LINE_RE.test(line)) meta.get(currentId).laneFields += 1;
+
       const laneProblem = laneFieldProblem(line);
       if (laneProblem) {
         failures.push(
@@ -180,7 +191,7 @@ for (let i = 0; i < queue.length; i++) {
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);
   currentId = id;
-  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0, lines: [], heading: line });
+  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, laneFields: 0, keep: false, body: 0, lines: [], heading: line });
 
   if (seen.has(id)) {
     failures.push(
@@ -212,6 +223,21 @@ for (let i = 0; i < queue.length; i++) {
 // work stays queued with a `Keep:` line. The stronger check wants git history (was this id ever
 // deleted from the backlog on `main`?), and CI checks out shallow at depth 1, so it would cost a
 // deepened fetch on every run to catch a case that has not yet occurred.
+// TN-63. Two lane fields under one heading: the parser keeps the FIRST, so the newer intent loses
+// silently and nothing in `next-item.js` says the entry was ambiguous. Swept to zero 2026-09-24 —
+// 6 of the 28 duplicates disagreed, and the agreeing 26 are how a disagreeing pair gets made, so
+// the check counts duplicates rather than only conflicts.
+for (const [id, m] of meta) {
+  if (m.laneFields > 1) {
+    failures.push(
+      `${id} has ${m.laneFields} lane FIELDS. \`laneFromLines\` keeps the first, so a re-laning that ` +
+        `adds a field and leaves the old one standing is routed by the stale value and nothing says ` +
+        `so. Keep one field and demote the other to prose — the text can stay, it just must not ` +
+        `start a bullet with \`Lane:\`.`,
+    );
+  }
+}
+
 for (const [id, m] of meta) {
   if (m.body === 0) {
     failures.push(
