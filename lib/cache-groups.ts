@@ -48,7 +48,6 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     invalidateCache('zone-minutes:'),
     invalidateCache('sleep-performance-correlation'),
     invalidateCache('ai-periodization-overview'),
-    invalidateCache('weekly-volume-target'),
     invalidateCache('workout-data:meta'),
     // the home/workout-select ?tab=all batch that seeds every workout-card:<id>
     invalidateCache('workout-data:all'),
@@ -396,12 +395,14 @@ export async function invalidateRingBattery(): Promise<void> {
   await invalidateCache('oura-ble-battery-latest')
 }
 
-/** AI periodization state regenerated/overridden. */
+/** AI periodization state regenerated/overridden.
+ *
+ *  LB-137: `weekly-volume-target` was cleared here and in `invalidateWorkoutSummaries` until
+ *  RV-120 deleted `AiWeeklyVolumeCard`, the only thing that ever read it. The key and the route
+ *  behind it (`/api/ai-periodization/weekly-volume`) went with this change; the COMPUTATION did
+ *  not — `getWeeklySetsByMuscleGroup` still grades a week for the AI engine through `signals.ts`. */
 export async function invalidateAiPeriodization(): Promise<void> {
-  await Promise.all([
-    invalidateCache('ai-periodization-overview'),
-    invalidateCache('weekly-volume-target'),
-  ])
+  await invalidateCache('ai-periodization-overview')
 }
 
 /** A prescription was accepted/dismissed or a phase transition executed (CCH-1) —
