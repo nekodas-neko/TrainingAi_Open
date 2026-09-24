@@ -16550,3 +16550,12 @@ and the old wording said otherwise.
 **CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
 contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
 available fix is telling agents to ignore it, with the reason.
+
+---
+
+## 2026-09-24 — CLAUDE.md → 978 (chore/or-143-process-owner-gate-triage)
+
+Growth, +12, recording the process the owner set out: the Orchestrator's primary job is the
+owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
+rather than run one. A role definition that lives only in a chat is one the next session does not
+have, so it costs twelve lines in the file every session reads.
