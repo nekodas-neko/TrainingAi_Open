@@ -11,7 +11,7 @@ import { findDuplicateMeal } from './meal-duplicate'
 import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem, SavedMeal, MealType } from '@trainingai/shared/types/nutrition'
 import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { saveSharedMealToLibrary, sharedMealTotals } from './save-shared-meal'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { scanOriginToSource, logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
@@ -247,7 +247,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         const r = await fetch('/api/nutrition/meal-types')
         if (r.ok) mealTypes = (await r.json()) as MealType[]
       }
-      const bucket = preselectedMealTypeId ?? mealTypeForHour(mealTypes, new Date().getHours())
+      const bucket = preselectedMealTypeId ?? mealTypeForHour(mealTypes, Math.floor(secondsSinceLocalMidnight(tz) / 3600))
       if (!bucket) { toast.error('No meal type available'); return }
 
       const logs = await logMealItems(meal, logDate ?? todayInTz(tz), bucket, userId, tz)

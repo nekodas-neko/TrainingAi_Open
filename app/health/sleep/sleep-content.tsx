@@ -32,6 +32,7 @@ interface SleepSessionRow {
 }
 
 export function SleepContent({ userId }: { userId?: string }) {
+  const tz = useUserTimezone();
   const [sleepRows, setSleepRows] = useState<SleepSessionRow[]>([]);
 
   useEffect(() => {
@@ -46,8 +47,8 @@ export function SleepContent({ userId }: { userId?: string }) {
     if (userId) {
       const store = getLocalStore(userId);
       if (store) {
-        const cutoff = new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000);
-        store.getSleepSessions(toAestDay(cutoff)).then(localSleep => {
+        const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
+        store.getSleepSessions(toAestDay(cutoff, tz)).then(localSleep => {
           if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleep as unknown as SleepSessionRow[]));
         });
       }
@@ -55,7 +56,7 @@ export function SleepContent({ userId }: { userId?: string }) {
     cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, rows => {
       if (rows) setSleepRows(rows);
     });
-  }, [userId]);
+  }, [userId, tz]);
 
   // Q-91: a BLE drain settling or an admin Redecode both invalidate the 'sleep-sessions'
   // cache entry (invalidateOuraSync) but this screen, once mounted, never learned to
@@ -67,7 +68,6 @@ export function SleepContent({ userId }: { userId?: string }) {
     });
   });
 
-  const tz = useUserTimezone();
   // Rows are ordered most-recent-first — the latest logged night.
   const latest = sleepRows[0];
   const recentStarts = sleepRows.slice(0, 7).map(r => r.sleepStart).filter((s): s is string => s != null);
