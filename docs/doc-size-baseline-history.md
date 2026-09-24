@@ -16859,6 +16859,8 @@ Body painting from seeds, the fetch-gated screens holding skeletons, the unseede
 table is the evidence that the offline-first architecture is sound and the layer above it is not,
 which is the whole argument for fixing one call site rather than three screens.
 
+---
+
 ## 2026-09-24 — `projectOverview.md` → 12747 (RV-172)
 
 One Known-Issues entry, 29 lines. It records a fix that is **not device-verified**, which is what
@@ -16894,6 +16896,21 @@ admin session, and DV holds his login. He also corrected that DV cannot attach d
 at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
 would otherwise re-derive them.
 
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 60, `review/sweep-60-security-privacy`.**
+29807 → 30004 (+197; rebased). Ten security and privacy entries (RV-190–RV-199), nine of them Lane A items
+directly under RV-188. They cannot be shorter than this: each one names the surface, who can reach
+it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
+deliberately.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/estimated-1rm-zeros)
+
+29714 → 29745 (+31). TN-74: 42 of 494 exercise logs store `estimated_1rm = 0` while carrying loaded sets, and the same input
+condition (no eligible flagged set) yields a positive estimate on 138 other logs — so the field is not a
+function of the log's own sets. Much of the entry is what must NOT be concluded: they are not bodyweight
+movements, and the high-rep guard is present and careful, contrary to my first reading of a rising
+1RM-to-weight ratio that turned out to be a join artefact.
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-156)
 
 Growth: BF-191's two answers and RV-170's policy answer. BF-191 costs the most lines because the
