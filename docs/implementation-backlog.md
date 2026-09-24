@@ -523,6 +523,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
+- **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
 - **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
@@ -545,6 +546,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+- **Ask:** owner — arrange six device sittings rather than 55 separate asks. Start with gesture navigation and a one-time write list.
 
 - **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
   arranged.
@@ -564,6 +566,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
+- **Ask:** owner — the history-row policy, unasked since 09-16: recompute-from-stored-inputs yes, hand-edits no, per the BF-81 precedent.
 
 - **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
@@ -599,11 +602,14 @@ the Orchestrator's to do.
   - Reversal cost: (a) is repeatable, (b) is avoided.
 - **Two more owner answers the census needs, same sitting:**
   - **RV-164:** did he mean to apply the 09-14 recommendation (1,618 kcal)? The app still budgets
-    1,660.
+    1,660. **Still his to answer — RV-164 itself shipped 2026-09-24 and left the queue, but that
+    fixed the cause going forward and not the 09-14 row, which is the divergence he is being asked
+    about.**
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
+- **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -669,6 +675,7 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
+- **Ask:** owner — does `/collection` get a permanent More-tab row, or is it a spike he does not want surfaced? Recommendation: add the row, leave Home unchanged.
 
 - **Lane: O** — a product question, ungated so the Orchestrator can put it. **Added:** 2026-09-22 ·
   Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
@@ -705,37 +712,6 @@ below keep their gate — they really are blocked pending an answer — and this
   between the card's heading and its pickers rather than a string.
 - **Also noted, not filed separately:** three step readings can be on Home at once (`stepsWidget`,
   the Steps metric tile, and the chip row's Activity score).
-
-### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
-  in the same session it was measured.
-- **Lane: O** — the queue's own routing correctness, plus a check in
-  `scripts/check-backlog-pointers.js`. No product code.
-- **What it is.** `laneFromLines` in `scripts/lib/lane.js` is **first-match-wins**, which the script
-  itself documents as the Q-529 failure. So when an entry is re-laned by adding a new field and the old
-  one is left standing lower down, the parser keeps whichever appears first — usually the stale one.
-  Nothing in `next-item.js` output says the entry was ambiguous.
-- **Measured 2026-09-24**, walking every heading in this file:
-  - **34 entries** contain more than one line matching the lane-field pattern.
-  - **8 of those 34 disagree** about the value: `LB-94`, `TN-32`, `OR-106`, `BF-111`, `Q-395`,
-    `TN-19`, `Q-420`, `PS-7`. Three of them put an implementer letter second, so they are currently
-    being served to the wrong bucket or to the unclassified one.
-  - The other 26 are duplicates that agree, which is harmless today and is how the 8 got made.
-- **⚠ Do not read "34" as "34 misrouted entries".** Only the 8 are wrong now; the 26 are the fuel, not
-  the fire. Each of the 8 needs a human-ish read of which value was meant — the later field is usually
-  the newer intent, but that is an inference and the entry text is the authority.
-- **Why a check and not just a sweep.** Fixing the 8 leaves the pattern intact: the next re-laning adds
-  a second field and the count starts again. It already happened twice to me in one session, once while
-  writing the note explaining the trap — the note contained the literal token and the parser matched it
-  inside the prose. So the check must count **field-shaped lines**, the same regex the parser uses, and
-  fail on two of them under one heading.
-- **The check has a known cost:** an entry that *explains* the trap cannot quote a field value inline
-  any more. That is the right trade — a prose example is worth less than a queue that routes.
-- **Pass test:** `pnpm check:rules` fails on a backlog with two lane fields under one heading, passes on
-  the swept file, and the count above reads **0** when re-run. Custom Rules goes 77 → 78.
-- **Where the mechanism is:** `scripts/lib/lane.js` (the first-match-wins comment and its Q-529 note),
-  `scripts/next-item.js` (which prints the parsed lane and not the ambiguity).
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 
@@ -845,57 +821,6 @@ which is the right shape for something that can only be validated by living with
   it matters.
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
-
-### [devices][platform] RV-180 — converting a ring timestamp re-sorts all 12,396 clock anchors on every call, once per row: the likely cause of DV-13
-
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Found by the performance half; confirmed in code and production here.
-- **The code:** `resolveDsToMs` (`clock.ts:179-186`) calls `currentEpoch`, filters to the epoch, then
-  `robustOffsetMs`, which **maps and sorts every anchor** (`clock.ts:147-150`). There is no memo.
-  Production holds **12,396 anchors, all in epoch 0** (`count(*)`), and the table grows by about
-  150–300 a day.
-- **Called once per row:**
-  - `getOuraRawSamplesForTags` (`adapter.ts:6596`, inside `rows.map`) behind
-    `/api/oura-ble/device-metrics` and the daily HRV refit (31-day lookback).
-  - `getOuraRawSamplesByTags` (`:6546`) behind `samples/raw` and `step-counter-export`.
-  - The rollup's per-bin `toDate` (`rollup/run.ts:124`).
-- **Cost:** benchmarked against the real anchors at **3.0 ms per call**, linear, on sandbox CPU.
-  device-metrics' default 3-day window is **58,856 rows ≈ 177 s of synchronous CPU** on the one
-  Node process, which blocks every other request. DV-13 saw four admin requests hang past 90 s and
-  `/api/version` time out from another PC for 8 minutes; that is this shape. The rollup pays about
-  2.6 s per pass, and it grows about 2% a week.
-- **Fix:**
-  - Compute the epoch offset once per anchor set: hoist it out of the map, or memoize by array.
-    Per-row cost becomes O(1).
-  - Read one offset per epoch in SQL rather than the whole table (RV-182).
-  - Add the row cap DV-13 already owes.
-- **⚠ Until this ships, `/admin/oura-ble` stays closed.** The device check after it ships is DV-13's
-  own pass test, which RV-186 carries.
-
-### [nutrition][platform] RV-172 — the sync pull drops columns the device then overwrites with NULL: supplement ticks lose their time and frozen vial dose
-
-- **Lane: A** — `getSyncDelta` in `lib/data/postgres/adapter.ts`, `lib/local-store/sync-engine.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
-- **Supplement logs, the one that matters:**
-  - The delta select (`adapter.ts:4248-4259`) omits `takenAt`, `vialStrengthMg`, `vialWaterMl` and
-    `vialUnitsPerMl`, and so does the pull mapping (`sync-engine.ts:516-534`).
-  - `applyDelta` then writes `taken_at=excluded.taken_at, vial_*=excluded.vial_*`
-    (`sqlite-backend.ts:1997`). Its comment says the server's value *"IS the truth there"*, but the
-    server never sends that value, so it writes NULL.
-  - So every synced tick loses its time and its vial snapshot on the next pull, and a fresh install
-    never has them.
-  - **LA-97's rewrite comes back one layer up:** a re-push rebuilds from the local row
-    (`enrichPayload`), the vial triple is null, so `logSupplement` re-reads the current vial and
-    replaces the frozen dose. Local renders also lose the units figure.
-- **Same class, lower stakes:**
-  - `exercise_logs`: the select omits `exerciseDeloaded` and `prepTimeSec` (`adapter.ts:4269-4288`).
-    `Boolean(undefined)` then writes `exercise_deloaded=0` over synced rows. A comment claims Q-131
-    fixed this; it is half fixed.
-  - `food_items`: the pull maps `toIso(r.updatedAt)`, but the delta carries only `createdAt`
-    (`sync-engine.ts:479`). The local row stores the string `"undefined"`, which sorts above every
-    date in `searchFoodItems`' `updated_at DESC`, so the offline recent-foods order is scrambled.
-- **Fix:** add the columns to the delta select and the pull mapping. Add a test that diffs each
-  delta select against its pull mapper, so the next column cannot go missing silently.
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
@@ -1506,7 +1431,49 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
   query and both are needed, and this entry closes.
 
-### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
+### [platform] DV-14 — ROOT-CAUSED: the Railway build runs out of memory, so almost every deploy fails
+
+- **⛔ ANSWERED 2026-09-24 ~19:30 AEST (Lane A). It was never a stall.** Of the last **40**
+  deployments, **39 FAILED**; the one success was 04:24 UTC. Every failure is the same:
+
+  ```
+  FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+  [76:0x28c02000] 101405 ms: Mark-Compact 4072.1 (4176.3) -> 4071.7 (4188.3) MB
+  ... v8::internal::JsonStringifier::Stringify ...
+  ELIFECYCLE  Command failed with exit code 134
+  ```
+
+  `next build` hits Node's default ~4 GB old-space cap. **No `NODE_OPTIONS` is set anywhere** — not
+  in `package.json`, not in `nixpacks.toml`, not on the service.
+- **This retires the "it recovered on its own" reading, twice recorded above.** The build sits ON the
+  memory boundary, so it occasionally squeaks through — the 04:24 success is why production serves
+  `1.465.26` and why TN-55's battery fix is live at all. The earlier "recoveries" were lucky builds,
+  not recoveries, which is exactly why three measurement passes from outside found nothing.
+- **⚠ How to read this: the deploy log was reachable the whole time.** `RAILWAY_API_TOKEN` is in the
+  session environment and answers `https://backboard.railway.com/graphql/v2` with a
+  **`Project-Access-Token`** header (NOT `Authorization: Bearer`, which returns *Not Authorized* and
+  reads like a dead credential). Three sessions escalated this to the owner as unreachable. Query
+  `deployments(input:{projectId,environmentId})` for status and `buildLogs(deploymentId)` for the
+  reason; `projectToken { projectId environmentId }` returns both ids.
+- **CI's `Build` job passes**, so this is the Railway builder's memory rather than the code.
+- **⚠ `nixpacks.toml` may be dead config** — the build log shows `railpack-builder`, not nixpacks.
+  Worth confirming before anyone edits that file expecting it to take effect.
+- **Strong candidate for what grew, NOT proven:** `packages/shared/src/changelog.ts` is **661 KB,
+  1,257 entries, 9,883 lines** — the largest source file in the repo by a wide margin, imported into
+  **client** bundles by `about-panel.tsx` and `data-capture-console.tsx`, and appended to by **every
+  PR** under the standing version-bump rule (~7.5 KB/day at the current merge rate). The OOM frame
+  is `JsonStringify`. That fits a slow growth crossing a threshold, but 661 KB → 4 GB needs a
+  mechanism nobody has demonstrated. **The experiment that would settle it:** build twice with a
+  fixed heap cap, once with the changelog stubbed to a handful of entries, and compare peak RSS.
+- **Two fixes, and they are not alternatives — the first unblocks, the second is the actual repair.**
+  Raising the cap (`NODE_OPTIONS=--max-old-space-size=…`, in the build script or as a service
+  variable) gets 22 merges of shipped work deployed; if the container has under ~8 GB it trades a
+  clean exit-134 for a kernel OOM kill, so the value wants checking against the plan. Bounding the
+  changelog — a fragment file, or shipping only the last N entries to the client — is what stops it
+  recurring. **Owner asked 2026-09-24; the service-variable route is a production config change and
+  was not taken unilaterally.**
+
+**The history below is kept as filed — the measurements are sound, the conclusion drawn from them was not.**
 
 - **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
   `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
@@ -1891,6 +1858,77 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [platform][app-shell] BF-195 — the app handles OFFLINE and hangs on BARELY ONLINE, which is the state a gym is in
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"I went to an area with
+  low reception and nothing really worked on the app. It should still have most functionality."*
+- **Lane: A** — `lib/sqlite/cache.ts` is the fetch layer every screen reads through. The surface
+  symptoms are Lane B's, but one change upstream fixes all of them and three separate UI patches
+  would not.
+- **⚑ THE DEFECT IS THAT CONNECTIVITY IS MODELLED AS A BOOLEAN.** `useOnlineStatus`
+  (`lib/use-online-status.ts`) is `navigator.onLine` plus Capacitor's
+  `Network.addListener('networkStatusChange', s => s.connected)`. **Both report TRUE whenever the
+  radio is attached**, regardless of whether anything completes. Low reception is not offline — it
+  is *online with no throughput*, and the app has no state for it.
+- **⚑ MEASURED — there is NO fetch timeout anywhere in the client data layer.** Grepped
+  `lib/sqlite/`, `lib/hooks/` and `lib/local-store/` for `AbortController` and
+  `AbortSignal.timeout`: **zero matches**. So a request issued on a dying connection hangs until the
+  OS gives up, and **there is no path from "hanging" to any rendered state** — not to the cached
+  value, not to an error card, not to an empty state.
+- **The chain, end to end, and each link is in the code rather than inferred:**
+  1. Reception drops but the radio stays attached → `online === true`, so the offline branch of
+     `cachedFetchCore` (which explicitly paints saved data — `cache.ts:286`, *"Offline with saved
+     data is the sanctioned offline-first case"*) **never runs**.
+  2. The fetch is issued with no timeout and does not settle.
+  3. `refreshing` stays `true` forever. `session-select-content.tsx:1036` —
+     `showHomeSkeleton = refreshing && activeSessions.length === 0 && recommendation === null &&
+     readiness === null` — so the Workout tab holds its skeleton indefinitely.
+  4. **The in-flight map compounds it:** a second caller for the same key joins the hanging
+     request's waiter list rather than firing its own, so one stuck request can hold several
+     screens at once.
+- **⚑ The owner's screenshots show three distinct behaviours, and the split is the evidence:**
+
+  | surface | what it did | why |
+  |---|---|---|
+  | Health → **Body** | **worked** — RHR 55, HRV 54, SpO₂ 93.5, −0.6 kg/wk | painted from `readCacheSync` seeds; never waits on the fetch |
+  | Health → Training, **AI Periodization** / muscle volume | empty skeletons | gated on a fetch that never settles |
+  | **Workout** tab | blank card, no sessions | seed empty *and* `refreshing` stuck — cannot start a workout at all |
+  | Training **calendar**, September | zero days marked | `calendar-data:` seed absent or empty |
+  | Progress → **Trends** | empty | same |
+
+  **The Body tab working is the important half of this table.** It proves the offline-first
+  architecture is sound where it was applied, and that what fails is the layer above it.
+- **⚠ THE BANNER IS CURRENTLY A FALSE PROMISE.** *"Offline — showing saved data"* was on screen
+  while the surfaces behind it showed nothing. Whatever else is done, that string must not claim
+  saved data is being shown on a screen that is showing none.
+- **⚑ THE PRODUCT CONSEQUENCE, stated plainly: a gym is the canonical low-reception location for
+  this app.** The one screen that must work on bad signal is the session list, and it is the one
+  that renders nothing. Everything else here is secondary to that.
+- **Fix: give the fetch a timeout, so "hanging" collapses into the failure path that already
+  exists.** `cachedFetchCore` already handles a failed revalidation correctly — it keeps the cached
+  value and reports through `onRevalidateError`. A timeout converts the unhandled state into the
+  handled one, at one call site, for every screen. **Suggested 8 s, not tuned** — long enough that a
+  slow-but-working connection still succeeds, short enough that a lifter is not staring at a
+  skeleton. If it reads wrong in use that is a finding about the number, not about the approach.
+- **Second half: treat a timed-out fetch as offline for display purposes.** `online` should mean
+  *"requests are completing"*, not *"the radio is attached"* — otherwise the banner keeps lying and
+  the offline branch keeps not running. One flag, derived from the timeout, not a new subsystem.
+- **⚠ Do NOT fix this by seeding more screens.** A seed is a first-paint accelerator; adding seeds
+  to the three blank surfaces would paper over the hang for those three and leave the next screen
+  to rediscover it. The timeout is the one that generalises.
+- **⚠ Separately observed, NOT diagnosed: the sleep card read "Last: 2026-08-25"** — a month stale,
+  on a day when production holds sleep through 2026-09-24. `sleep-sessions` IS warmed at every app
+  open by the sync provider (`sync-provider.tsx:78`, `TTL_MEDIUM`), so a month-old payload is
+  anomalous. **A screenshot cannot distinguish a stale cache entry from the card's own fallback, and
+  guessing between them is how the wrong thing gets fixed.** Read the device's cache entry before
+  treating this as part of BF-195 — it may be its own defect.
+- **Verification:** the honest reproduction is **network throttling, not airplane mode** — airplane
+  mode exercises the path that already works. On the device, set the WebView/proxy to a very slow or
+  lossy profile, or stand where the owner was, and confirm: the session list renders from cache
+  within the timeout, the banner appears only when requests are actually failing, and no screen
+  holds a skeleton indefinitely. **Device look owed** — none of this reproduces in the sandbox,
+  where the network is fast and `getLocalStore` returns null.
+
 ### [platform][app-shell] BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"there is no option for
@@ -2000,6 +2038,7 @@ drift.
   (`getLocalStore` returns null), so the wipe half is unverifiable here.
 
 ### [platform] BF-193 — three questions BF-192 cannot answer: what "delete" means for logs, the ring key, and whether it is instant
+- **Ask:** owner — account deletion: what "delete" means for logs, what happens to the ring key, and whether there is a grace period.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -2049,6 +2088,7 @@ drift.
   BF-192 is updated with whichever ones change its diff.
 
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+- **Ask:** owner — every exercise sits on the 2-set floor and weekly volume lands at 66% of his target. Which of three levers to pull is his.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
   sessions have enough content. Time wise its pretty good."*
@@ -2130,6 +2170,7 @@ drift.
   has not been fixed regardless of what the done screen says.
 
 ### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
+- **Ask:** owner — what a sub-minute walk should do, and what happens to the phantom activity row.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
   owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
@@ -2210,7 +2251,7 @@ drift.
   checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
   inference in this repo unsound. The same section's opening claim that branch protection *"requires
   a PR with all CI checks passing"* is then also wrong.
-- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
   change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
   way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
   unsound gate.
@@ -2571,26 +2612,6 @@ drift.
   - Show an error state when the load fails.
   - Do not PUT until a load has succeeded.
   - PUT only when the selection changed.
-
-### [nutrition][app-shell] RV-164 — applying a goal recommendation marks it "applied" and toasts success without checking any of its writes
-
-- **Lane: B** — `components/profile/goal-recommendation-sheet.tsx`.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **In production:** the 2026-09-14 recommendation (1,618 kcal / 150 P / 131 C / 55 F) is
-  `status='applied'` (21:07:19). But `nutrition_targets` still holds **1,660 / 150 / 141 / 55**, with
-  `updated_at` **2026-08-31**, and `users.calorie_goal` is 1,660. The 08-31 apply did write: targets
-  were updated 200 ms before that apply was recorded.
-- **Why nobody could tell:**
-  - The sheet ticks every row by default (`:86-91`).
-  - It `await`s the `PUT /api/nutrition/targets` and `/api/user/goals` calls **without reading the
-    response**. Only the profile PATCH checks `res.ok`.
-  - It then PATCHes the recommendation to `applied` and toasts *"Goals updated"*. Only a thrown
-    network error reaches the failure toast; a 4xx or 5xx passes as success.
-  - `app/api/nutrition-goals/recommend/route.ts:36-37` describes the 09-14 values as
-    *"stored-and-applied"*, and the database contradicts that.
-- **Fix:** check each write's response. Mark the recommendation applied only when every ticked field
-  landed, and say which one failed otherwise.
-- **The owner's half, whether he meant to apply 1,618, is in RV-170.**
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
@@ -5210,6 +5231,16 @@ why the count of affected entries always understated the harm.
   restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
   priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
   is only in git history, and nothing reports which entries went missing.
+- **⚑ SECOND LIVE INSTANCE, 2026-09-24 — and it shows the trigger is the GATE, not carelessness.**
+  `docs/overview/entries/` crossed its 60-file limit, which fails `check-doc-index-size` for **every
+  lane at once**, so two lanes independently started the fold within an hour. Both wrote
+  `history-2026-09-24-folded-1.md`: Lane A folded 25 (#1543, merged), Lane B folded 40 (#1545,
+  closed unmerged because merging it meant hand-merging two archives — exactly the resolution this
+  entry says looks correct and loses nothing visible). Nothing was destroyed this time, by luck of
+  ordering rather than by any check. **So the chore this gate demands is a race, not a task**, and
+  the fix should be read with that in mind: a unique filename per fold ends the collision, while a
+  convention ("check `main` first") cannot, because both lanes checked and both were right at the
+  time they looked.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
@@ -6699,7 +6730,7 @@ true mean on night 2 rather than converging for fifty.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
-- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
 - **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire), and **BF-13**, which names the line that makes the object wrong.
 - **⚑ The cause is one line, found independently and filed as BF-13 — read it before implementing.**
   `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`), then anneals its
@@ -9386,8 +9417,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
   a durable doc needed that entry's reasoning; folding it without rewriting the link turns the
   citation into a 404, and the ratchet would then read as clean while the docs got worse. That is
   the failure mode the linked/unlinked split exists to prevent.
-- **Lane:** ? — it is a docs restructuring, so Orchestrator's by the standing split, but it touches
-  no code and any lane can run it. Filed by Lane B, which found it.
+- **Superseded lane note (demoted from a field, TN-63):** this read `? ` while the entry was still deciding — a docs restructuring that also touches script paths. The `O` above resolved it on 2026-09-15 and is the live value.
 - **✅ THE OWNER DECIDED 2026-09-09: raise the ceiling to 360 and do this properly later**, rather
   than fix it under a PR that had nothing to do with the journal. So the next time the number is
   reached, **this entry is the work** — not another raise. That is ~25 PRs of headroom, chosen
@@ -9550,7 +9580,7 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"we should only have one calculation for our heart rate zones so try make them consistent."*
-- **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/observed-hr.ts:110` (`resolveMaxHr`), `health/hr-profile.ts:86` (`targetAnchorMax`), `health/body-battery-inputs.ts:51` (`resolveBatteryHrMax`), `health/hr-zones.ts:9` (`hrMaxFromAge`), plus `lib/health/readiness-payload.ts:397`.
 - **✅ OWNER DECISION, 2026-09-09 — blend the two at 50/50 and PIN it: `(168 + 187) / 2 = 177.5 → 178`.** *"Just because my HR got up to 168 doesn't mean it's the MAX… then when the Cooper 12-minute run is done and a new max is gotten, we can assess what's better."* Gate cleared; build to the spec below.
 - **Needs: TN-25** — unifying the anchor at 178 raises the walk's 0.70 target from **133 to 140**, so it must not land before the walk stops using 0.70. Sequencing, not a blocker on the anchor itself.
 - **✅ OWNER DECISION, 2026-09-17 — RE-PIN AT 181, superseding the 178 below.** The owner parked the
@@ -9804,7 +9834,7 @@ is claiming to be both.
 - **Lane:** A — both (2 engine, 1 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
-- **Lane: B** — `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`, `packages/shared/src/health/session-picker.ts:85`.
+- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter and listed `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`. Those shared paths are the engine lane's, and the field above already applies the both-halves rule.
 - **Sibling of TN-30**, independent of it. Copy and labels only — no threshold moves.
 
 Three separate places tell the user something the zone engine does not do:
@@ -10005,7 +10035,7 @@ moving, which is the failure mode BF-134 was filed about on the same screen.
   the VO₂max crosscheck, the water goal and the AI context, and it is a surface change.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"I wonder if we could estimate the activity level value or tune how we do ours."*
-- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`estimateMaintenance`, the `minMaintenanceKcal` floor), fed from `lib/health/energy-balance-service.ts:236-260` where both estimates already sit in scope.
 - **Owner-approved 2026-09-09** — *"make all the changes you recommend."* Not gated; start here.
 - **⚑ Cross-reference BF-137 (filed 2026-09-10, the day after this entry) — and read it FIRST.** It names a cause this entry does not: **the estimator is fitting a GLP-1 (retatrutide) weight drop and reading it as metabolic rate.** `maintenance = intake − Δweight × 7700` assumes weight change reflects energy balance; under a GLP-1 it does not, so the drug's loss is booked as a higher metabolism. **This gate catches the instance through a different mechanism and does not remove the cause** — BF-137 says it will recur on every new vial. Build the two together.
 - **⚠ The urgency dropped on 2026-09-12 and the entry did not.** PR #1128 anchored the daily budget to the owner's **stored goal** rather than to this estimate, so the number is now informational rather than what he eats to. Still worth fixing — BF-137's commit says outright that TN-29 is *"about making it true"* and the estimate "still needs somewhere to show it" — but it is no longer load-bearing.
@@ -10107,7 +10137,7 @@ movement stays near 280 kcal/day.
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-09 · owner: *"this is the maint calories derived from the app — i don't think it's right. with RMR at 1350 and calories well under that and barely maintaining weight."*
-- **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/nutrition/adaptive-tdee.ts` (`MIN_LOGGED_FRACTION`, `resolveMaintenance`), consumed by `lib/health/energy-balance-service.ts:260`.
 - **⚠ Amended 2026-09-13 — still valid, no longer urgent.** PR #1128 anchored the daily budget to the owner's stored goal, so this estimate no longer decides what he eats to. And **BF-137 names a deeper cause than the window**: the estimator is fitting a GLP-1 weight drop as metabolism, which no window choice fixes.
 - **Owner decision, 2026-09-09: option 3, after TN-29** — *"make all the changes you recommend."*
   The gate is cleared; this is Lane A's to build. Options 1 and 2 stay recorded below as the
@@ -10177,7 +10207,7 @@ this card offers to overwrite with 2,045.
 - **Lane:** A — both (1 engine, 2 surface) → A, engine half first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-08 · owner: *"let's not tune to the treadmill — like you said it changes based on location, what do you suggest we do?"*
-- **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/walk/walk-pacer.ts:66` (cadence targets), `components/guided-walk/walk-active.tsx:67-68` (HR targets), `components/guided-walk/walk-summary.tsx:141-146` (what is stored).
 - **Pairs with TN-25** — TN-25 chooses *what* the fast block should demand; this entry decides *in what unit* it is demanded and how compliance is measured.
 - **Reference:** [`review`](reviews/2026-09-08-walk-intensity-calibration.md) (addendum 3).
 
@@ -12376,7 +12406,7 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
   returns early unless `Capacitor.isNativePlatform()`, so on web and in every e2e harness it renders
   nothing at all — this cannot be checked anywhere but the S25.
 
-- **Lane:** B — `components/more/update-check-card.tsx:81`.
+- **Superseded lane note (demoted from a field, TN-63):** the surface half is `components/more/update-check-card.tsx:81`. It stays the engine lane's by the both-halves rule, engine first — the field above is the live value.
 - **Added:** 2026-09-02 · noticed while tracing BF-110, not reported. The About screen shows the app as
   **v1.436.2** and, two rows below, a green tick reading **"Up to date — v1.414.1 is the newest
   build."**
@@ -15781,8 +15811,7 @@ That number is more valuable than either input on its own.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
-- **Lane:** B
-  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter from before the entry was re-laned. The field above records the reason it moved: what remains is the owner's parity look, not a build.
 - **What this entry is for.** A taste request cannot be implemented from as written, so this
   separates the part that is objectively wrong (findings 1–3, each with a CI check that already
   measures it) from the part that is genuinely a design decision (findings 4–5, which need
@@ -16471,7 +16500,7 @@ two are app-wide and sit here.*
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · found by the threshold sweep the owner asked for
-- **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
 - **Batch:** temperature-baseline — the fourth consumer of the object BF-13 fixes. Same PR.
 - **Related: TN-1 / Q-525** (chronic stress has never produced a value) — a plausible contributor,
   **not a proven cause**. See the margin note below before treating it as the answer.
@@ -16553,7 +16582,7 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
-- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
 - **Owner sign-off: RECEIVED 2026-08-26** for the intent (the number must be settled at first load).
   The mechanism below is the recommendation; confirm it before shipping if it changes.
 
@@ -16638,7 +16667,7 @@ apart with no new overnight data — which the check-in half alone does not achi
 - **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-03 · owner: *"why would sleep score be so low for this? I'd imagine 80s if not 90s"*
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
 - **Sequence after TN-5 and TN-10.** All three are independent, but those two are larger and already signed off; changing three sleep inputs at once makes none of them evaluable.
 - **Reference:** [`review`](reviews/2026-09-03-why-a-good-night-scored-63.md) — reproduces the owner's 63 exactly from the stored contributors.
 
@@ -16678,7 +16707,7 @@ combined weight above ~18 of 110; and the 2026-09-02 night's blend rises by 5–
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
 - **✅ Gate: owner SIGNED OFF 2026-08-30.** The owner approved the tuning batch; this is the one of
   the four that was actually ready. It meets the bar CLAUDE.md sets for a scoring change: the blast
   radius is stated and measured — **~3.3 blend points on every night in the 7.5–8 h band**, which is
@@ -16719,7 +16748,7 @@ test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
-- **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
 - **Answers the open half of Q-522** (moveHours saturated, 100 on 48 of 59 days). Q-188 fixed the
   *denominator*; this is why the *numerator* saturates. **Supersede Q-522's "unrelated reason" line.**
 
@@ -16799,7 +16828,7 @@ called with the night's real wake/sleep hours, asserted by a test.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
-- **Lane: B**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: B**
 - **Needs: TN-11** — and this dependency is the whole point, see below.
 
 The owner reported seeing nothing for move hours. **There is exactly one surface**:
@@ -16884,7 +16913,7 @@ the day's move-hours total is below the goal.
 - **Lane:** A — engine only: packages/shared.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
-- **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
 - **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing.
   **Q-524's last open half closed 2026-08-31: MANUAL WINS** (owner signed off there), so the goal this
   paces against is whatever the owner has set by hand — 7,000 today — and an AI review cannot move it
@@ -17156,7 +17185,7 @@ its consumers re-checked), and after that `stress_high_minutes` no longer correl
 count at |r| > 0.4.
 
 ### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
-- **Lane:** B — surface only: components/body-battery-card.tsx.
+- **Superseded lane note (demoted from a field, TN-63):** this read *"surface only: components/body-battery-card.tsx"* and was WRONG — and because the parser takes the first field, it was the one being served. The field below corrects it: the defect is in the model and the card must not be touched for this.
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
 - **Lane: A** — the defect is in the model, not the card. `components/body-battery-card.tsx` is Lane B and **should not be touched for this**.
@@ -17274,7 +17303,7 @@ established. Until one is, this stays parked.
   (`tempZ` / the illness radar) was **not** touched — it is not firing wrongly, it cannot fire at
   all while the sd is 12x too wide, and that is TN-6's subject rather than this one's.
 - **Branch:** `lane-a/deload-temp-gate` · **Added:** 2026-08-31 · owner screenshot, 2026-08-31 06:43 Brisbane
-- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
 - **Do not batch** — it is one condition, and it un-does a daily false alarm the owner has reported twice.
 
 **TN-6a shipped and works.** `readiness-payload.ts:386` computes `tempLadderTrusted` from
@@ -17318,7 +17347,7 @@ count night for night.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner decision, asked and answered plainly
-- **Lane: A** — `lib/health/readiness-payload.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `lib/health/readiness-payload.ts`
 - **Owner sign-off: RECEIVED 2026-08-24.** *"Fix baseline + suspend penalty now."*
 - **Do NOT batch with TN-6/Q-506.** The whole point is that this lands first, on its own.
 
@@ -17570,7 +17599,7 @@ and on-drug periods without either being refitted.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report + production measurement
-- **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
 - **Owner sign-off: received 2026-08-24** for the direction (anchor the rest boundary to *waking*
   rest, not sleeping rest). The exact offset is still to be fitted — see the pass test.
 - **Do not batch.** It re-scores every stored Body Battery day and needs a `MODEL_VERSION` bump.
@@ -17749,7 +17778,7 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
-- **Lane: A** — needs a Postgres migration, so Lane A only
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — needs a Postgres migration, so Lane A only
 - **Do not batch** (migration).
 - **Keep:** the back-fill of stress buckets over the stored history. The table and the forward write
   are done; re-decoding past days into it is not.
@@ -17929,7 +17958,7 @@ record explicitly why not.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
-- **Lane: B**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: B**
 - **✅ OWNER-APPROVED 2026-09-10** — *"yes lets do all that. I'd like to get stress metric to be a usable value to determine what events stress me."* **That goal reshapes the entry: the chart is the first half, not the deliverable. See TN-35 for the second.**
 - **⚑ UNPARKED 2026-09-10 — build the chart FIRST, and the owner's request is why.** *"Can we have this displayed on a widget or chart so we can see when the stress occurs. I will be able to match it up based on time to what I was doing around then."*
 - **⚠ TN-3a's persistence SHIPPED** (verified: 478 buckets over 18 days), so this entry's stated blocker is gone. **And the Q-507 parking no longer applies to the chart half** — see below.
@@ -18000,7 +18029,7 @@ part of this entry**, not only new surfaces.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts`
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A** — `packages/shared/src/health/sleep-score.ts`
 - **Owner sign-off: RECEIVED 2026-08-24.** Asked plainly, with the caveat that this does **not** make
   the score less jumpy, and approved on that basis. Build it.
 - **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
@@ -18060,7 +18089,7 @@ Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · found on the session-start `error_events` read
-- **Lane: A**
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: A**
 
 `daytime-stress: constants not set — call setDaytimeStressConstants() first`, **31 occurrences
 between 10:37 and 20:59 UTC on 2026-08-23**, then nothing. `buildDaytimeStressSeriesFromModel` is
@@ -18336,7 +18365,7 @@ without a queue entry is a dropped finding.*
 
 - **Branch:** `docs/baton-compaction`
 - **Added:** 2026-08-19 · measured while adding batons to the size ratchet
-- **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
   correct, not an omission**: the runner accepts only A or B, and this is not implementer work.
   Recorded 2026-08-30 so the next gate audit does not try to classify it again. **Deliberately not A or B:** each role rewrites its own baton, so this is done by whoever hands over next rather than assigned. Left lane-agnostic on purpose, not by omission.
 
@@ -18874,7 +18903,7 @@ design decision. See the correction at the top of that entry.
   distorts both windows for weeks, and it distorts them in the direction that reads as "you are
   training far too hard".
 
-- **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
+- **Branch:** `fix/cull-implausible-session-duration`
 - **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
   sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
   fiction, and the entry's earlier guess (exclude from load, clamp for calories) is superseded.
@@ -28816,7 +28845,7 @@ that is not a device proof, and this is the code path with the worst data-loss h
 
 ### [workouts][platform] 🟡 `exercise_estimates` has no local mirror, but do not build one on its own
 
-- **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane:** A — `lib/local-store/program-assembler.ts`; it is a local-store mirror, so storage by the first clause of the rule. (Assigned 2026-09-15, OR-116 lane sweep. This entry has no ID in its heading, which is why every previous lane count missed it — the scanner keys on the ID.)
 
 Found while building the `meal_types` local mirror (2026-07-30): mirroring
 `exercise_estimates` alone would be **inert**. `lib/local-store/program-assembler.ts`
@@ -28837,7 +28866,7 @@ reads.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 
-- **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
+- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane:** A — `lib/cache-groups.ts` and `scripts/migrate.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
 
 - ✅ **`invalidateCache(` outside `lib/cache-groups.ts` — DONE 2026-07-30.** All 7 remaining raw
   call sites migrated to named group helpers (`invalidateOuraWorkoutReview`,
@@ -29487,6 +29516,45 @@ intake traced it, it did not design it.
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
 
+### [platform] LA-137 — generalise the delta/applyDelta column guard, with the false positives that defeated the first attempt
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · found by Lane A while shipping RV-172.
+- **Lane: A** — `lib/local-store/`, `lib/data/postgres/adapter.ts`, a new `scripts/check-*.js`.
+- **The invariant is real and general.** `applyDelta` writes `col = excluded.col` unconditionally,
+  so any column it writes that the delta select omits is not left alone — it is nulled, on every
+  pull, for ever. RV-172 found three instances of that (`supplement_logs.taken_at` plus the vial
+  triple, `exercise_logs.exercise_deloaded`, and `food_items` reading a field the server has never
+  had). Three in one sweep is a class, not a coincidence, and the remaining tables were checked by
+  hand rather than by anything that will still be true next month.
+- **RV-172 shipped the SPECIFIC guard only**
+  (`lib/local-store/__tests__/rv172-delta-carries-what-applydelta-writes.test.ts`) — it pins the
+  three regressions that actually happened and nothing else. The general version was written first
+  and **withdrawn for false positives**, which is why this entry exists rather than the check.
+- **The four traps, so the next attempt does not rediscover them:**
+  - **`INSERT INTO` tracking bleeds between statements.** Scanning the file linearly and attributing
+    every `col=excluded.col` to the most recent `INSERT INTO` made `supplements` inherit
+    `supplement_logs`' `taken_at`. Statements must be bounded, not accumulated.
+  - **The SQL literal's end is not the next backtick.** The supplement upsert interpolates
+    `${isMeal ? ` … ` : ` … `}`, whose branches are themselves template literals — so the first
+    backtick after the `INSERT` is a NESTED one, and slicing there truncates the statement before
+    `taken_at`, the exact column the guard exists to protect. Terminate on the backtick that opens
+    the params array (`` `,\n[ ``).
+  - **Every table has TWO upserts with an `excluded` clause** — the pull one in `applyDeltaBody` and
+    a local-write one. Picking the first by position reads whichever the file happens to list first;
+    scope to the enclosing function instead.
+  - **Snake→camel splitting produces junk columns.** `1rm` yields `rm`; `_bpm` and `max_est`
+    survived as phantom column names.
+- **And the trap that is not about parsing: a comment explaining a defect contains the defect.** A
+  note reading *"this used to read `toIso(r.updatedAt)`"* matches a search for exactly that and
+  fails a file the code passes. This bit three separate guards in one day (TN-66's prompt guard,
+  RV-143's entry parser, RV-172's own test). Strip `//` lines before matching; do not reword around
+  it, because the next comment will not know to.
+- **Done looks like:** a Custom Rules step that reads every `applyDeltaBody` upsert, resolves its
+  `excluded` columns, and fails when one is absent from the matching delta select or pull mapper —
+  with a **baseline of zero** and no skipped-site count, or, if sites must be skipped, the count
+  printed so a clean run is never mistaken for full coverage (the fetch-once scanner's lesson).
+  A guard that cries wolf is worse than no guard; this repo has paid for that twice.
+
 ### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · found by Lane A while shipping RV-59.
@@ -29516,7 +29584,7 @@ amounts — rather than showing the same subtitle as an amountless tick.
 - Plan: [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](superpowers/plans/2026-08-26-camera-form-capture.md)
 - Branch: `spike/camera-pose-feasibility`
 - Added: 2026-08-26
-- Lane: ? — a spike touching only a throwaway route and the CSP. The lane that takes it decides.
+- **Superseded lane note (demoted from a field, TN-63):** this read `?` — *"a spike touching only a throwaway route and the CSP; the lane that takes it decides"*. The field above assigned it on 2026-09-15 and is the live value.
 - Gate: device — every question in it is a measurement the sandbox cannot make.
 
 **Placed at the tail deliberately.** The owner framed it as *"a good future move"*, not as next-up,

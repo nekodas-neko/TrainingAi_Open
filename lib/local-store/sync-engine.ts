@@ -476,7 +476,14 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     satFatG:      (r.satFatG as number) ?? null,
     source:       r.source ? String(r.source) : null,
     imageDataUri: r.imageDataUri ? String(r.imageDataUri) : null,
-    updatedAt:    toIso(r.updatedAt),
+    // RV-172 — read from `createdAt`, because `food_items` HAS no `updated_at` server-side. This
+    // read `toIso(r.updatedAt)`, and `toIso` is `String(v)` for a non-Date, so it stored the
+    // literal string "undefined" — which sorts ABOVE every ISO date under `updated_at DESC` and
+    // pinned those rows to the top of offline recent-foods.
+    //
+    // A food item's definition is near-immutable, so its creation time is the honest ordering key.
+    // Giving the server a real `updated_at` is a migration, and a migration ships alone.
+    updatedAt:    toIso(r.createdAt),
   } satisfies LocalFoodItem));
 
   const foodLogs = ((raw.foodLogs ?? []) as Record<string, unknown>[]).map(r => ({
@@ -528,6 +535,15 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // when `source` is absent.
     source:       r.source === 'meal' ? ('meal' as const) : ('manual' as const),
     sourceRef:    r.sourceRef ? String(r.sourceRef) : null,
+    // RV-172 — WHEN it was taken, and the vial it was measured against. `applyDelta` writes both
+    // from `excluded` unconditionally, so leaving them out of the pull wrote NULL over the local
+    // values on every sync rather than leaving them alone. The vial triple is the FROZEN dose:
+    // `frozenReconstitution` returns null unless all three are present, and falling back to the
+    // current vial is the retroactive rewrite the freeze exists to prevent.
+    takenAt:      r.takenAt ? toIso(r.takenAt) : null,
+    vialStrengthMg:  typeof r.vialStrengthMg === 'number' ? r.vialStrengthMg : null,
+    vialWaterMl:     typeof r.vialWaterMl === 'number' ? r.vialWaterMl : null,
+    vialUnitsPerMl:  typeof r.vialUnitsPerMl === 'number' ? r.vialUnitsPerMl : null,
     updatedAt:    toIso(r.updatedAt),
     deletedAt:    r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:   'synced' as const,
