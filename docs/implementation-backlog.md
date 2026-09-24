@@ -846,6 +846,57 @@ which is the right shape for something that can only be validated by living with
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
+### [devices][platform] RV-180 — converting a ring timestamp re-sorts all 12,396 clock anchors on every call, once per row: the likely cause of DV-13
+
+- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Found by the performance half; confirmed in code and production here.
+- **The code:** `resolveDsToMs` (`clock.ts:179-186`) calls `currentEpoch`, filters to the epoch, then
+  `robustOffsetMs`, which **maps and sorts every anchor** (`clock.ts:147-150`). There is no memo.
+  Production holds **12,396 anchors, all in epoch 0** (`count(*)`), and the table grows by about
+  150–300 a day.
+- **Called once per row:**
+  - `getOuraRawSamplesForTags` (`adapter.ts:6596`, inside `rows.map`) behind
+    `/api/oura-ble/device-metrics` and the daily HRV refit (31-day lookback).
+  - `getOuraRawSamplesByTags` (`:6546`) behind `samples/raw` and `step-counter-export`.
+  - The rollup's per-bin `toDate` (`rollup/run.ts:124`).
+- **Cost:** benchmarked against the real anchors at **3.0 ms per call**, linear, on sandbox CPU.
+  device-metrics' default 3-day window is **58,856 rows ≈ 177 s of synchronous CPU** on the one
+  Node process, which blocks every other request. DV-13 saw four admin requests hang past 90 s and
+  `/api/version` time out from another PC for 8 minutes; that is this shape. The rollup pays about
+  2.6 s per pass, and it grows about 2% a week.
+- **Fix:**
+  - Compute the epoch offset once per anchor set: hoist it out of the map, or memoize by array.
+    Per-row cost becomes O(1).
+  - Read one offset per epoch in SQL rather than the whole table (RV-182).
+  - Add the row cap DV-13 already owes.
+- **⚠ Until this ships, `/admin/oura-ble` stays closed.** The device check after it ships is DV-13's
+  own pass test, which RV-186 carries.
+
+### [nutrition][platform] RV-172 — the sync pull drops columns the device then overwrites with NULL: supplement ticks lose their time and frozen vial dose
+
+- **Lane: A** — `getSyncDelta` in `lib/data/postgres/adapter.ts`, `lib/local-store/sync-engine.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
+- **Supplement logs, the one that matters:**
+  - The delta select (`adapter.ts:4248-4259`) omits `takenAt`, `vialStrengthMg`, `vialWaterMl` and
+    `vialUnitsPerMl`, and so does the pull mapping (`sync-engine.ts:516-534`).
+  - `applyDelta` then writes `taken_at=excluded.taken_at, vial_*=excluded.vial_*`
+    (`sqlite-backend.ts:1997`). Its comment says the server's value *"IS the truth there"*, but the
+    server never sends that value, so it writes NULL.
+  - So every synced tick loses its time and its vial snapshot on the next pull, and a fresh install
+    never has them.
+  - **LA-97's rewrite comes back one layer up:** a re-push rebuilds from the local row
+    (`enrichPayload`), the vial triple is null, so `logSupplement` re-reads the current vial and
+    replaces the frozen dose. Local renders also lose the units figure.
+- **Same class, lower stakes:**
+  - `exercise_logs`: the select omits `exerciseDeloaded` and `prepTimeSec` (`adapter.ts:4269-4288`).
+    `Boolean(undefined)` then writes `exercise_deloaded=0` over synced rows. A comment claims Q-131
+    fixed this; it is half fixed.
+  - `food_items`: the pull maps `toIso(r.updatedAt)`, but the delta carries only `createdAt`
+    (`sync-engine.ts:479`). The local row stores the string `"undefined"`, which sorts above every
+    date in `searchFoodItems`' `updated_at DESC`, so the offline recent-foods order is scrambled.
+- **Fix:** add the columns to the delta select and the pull mapping. Add a test that diffs each
+  delta select against its pull mapper, so the next column cannot go missing silently.
+
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
@@ -1328,6 +1379,44 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 `computed_at` as the answer — that is the field that already lied.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** still **26 / 19 of 71** stuck, as filed, but **`computed_at` moved today at 02:37 UTC with no change to the values**. See RV-159: 106 of 129 `oura_daily_derived` rows were re-stamped in the same second, and nothing on `main` records who ran it. If that was this entry's backfill, it ran without `rederive-baselines` first (BF-13 is still unrun), which would explain the unchanged rails.
 
+### [platform][app-shell] RV-186 — DEVICE: the performance sitting, run BEFORE the fixes so each one has a "before"
+
+- **Lane: DV**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **This is sweep 58's device half.** Review measured the server side (`pg_stat_statements`,
+code, `next build`); these are the numbers only the phone can give. Run it **now**, so RV-180 to
+RV-185 each ship against a recorded baseline, then re-run each row after its fix lands.
+- **Read-only except where noted.** Record the screen, orientation and navigation mode on every row.
+  **Never open `/admin/oura-ble` before RV-180 ships**: by the measured arithmetic it occupies
+  production for minutes.
+- **The rows (CDP Network and Profiler):**
+  1. **Cold launch → Home:** count `/api/*` requests from navigation start to 10 s idle, grouped by
+     URL. The code estimate is 25–30 warm and ~45 cold. Also record script evaluation time in the
+     launch profile (RV-185).
+  2. **Resume:** background and foreground 5 times on Home, and count `/api/*` within 3 s of each
+     visible. Pass after RV-183: at most 2 from the reconcilers.
+  3. **One switch to each tab:** requests per switch. The code estimate is Home 4, Health 5–7,
+     Workout 3, Nutrition 1–2, More 2 (Friends 5–6).
+  4. **Food log** (standing write, then delete): visit Home, Health and Nutrition, then log one
+     food. Count `/api/*` from the tap until 5 s after `POST /api/sync/push`. Expected now: 2N+1.
+     Pass after RV-183: N+1, with energy balance showing the new kcal.
+  5. **Server wait (`responseStart − requestStart`), 3–5 samples each:**
+     - `/api/sleep-sessions` (cold open) and `/api/oura-ble/freshness` (More → Oura), for RV-180
+       and RV-182;
+     - `/api/hr-profile`, `/api/zone-minutes` and `/api/cardio-week`, plus encoded bytes, for
+       RV-181. Pass: hr-profile and zone-minutes under 100–150 ms;
+     - `/api/health/trends` on Health → Body. Pass: at least 50% lower after RV-181.
+  6. **Workout re-shows:** `/api/exercise-library` requests and bytes. Pass after RV-183: 0 within
+     its TTL.
+  7. **Passive, during one of the owner's own workouts:** count `/api/hr-profile` requests over
+     20 min with the ring connected (pass: at most 1 per screen mount); check whether
+     `POST …/prescribe` fires at open on a day the last completion pre-generated it (RV-184).
+  8. **Idle 30 min on Home, ring connected:** requests per hour, and per drain burst.
+  9. **After RV-180 ships:** DV-13's own pass test. Open `/admin/oura-ble`; every request answers
+     within 5 s, and `/api/version` stays under 1 s from another client throughout.
+- **Folds in rather than duplicates:** DV-12 (tab-tap long task), RV-153 (per-tap `setItem`),
+  RV-145 (Home's second workout-data request) and BF-22 (long-session slowdown). Run them in the
+  same sitting where the screen is the same.
+
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 
 - **Lane: DV** — the deliverable is an attribution only the running app can give.
@@ -1686,7 +1775,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   cannot occupy the process.
 - **Pass test:** open `/admin/oura-ble` in the APK; every request answers within 5 s, and `/api/version`
   stays under 1 s from another client throughout.
-
+- **📊 Probable cause found 2026-09-24 (Review sweep 58): RV-180.** `resolveDsToMs` re-sorts all 12,396 clock anchors on every call and is called once per row. `/api/oura-ble/device-metrics`' default window is 58,856 rows ≈ 177 s of synchronous CPU (sandbox-benchmarked 3.0 ms per call), which blocks the one Node process. That matches the four hung admin requests and the 8-minute `/api/version` timeout. Not yet proven on production. The pass test above is the proof, and it runs only after RV-180 ships (RV-186 row 9).
 
 ### [platform] OR-138 — let the triaging agent read the data of the user who filed the feedback
 
@@ -2271,6 +2360,24 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   - Make Body Battery refuse a near-empty snapshot, not only an exactly empty one.
   - Re-scoring 09-23 and 08-27 is the recompute path (RV-170).
 
+### [nutrition] RV-171 — opening the meal-plan setup with a failed request silently deletes every saved dietary restriction
+
+- **Lane: B** — `components/nutrition/meal-plan-setup-sheet.tsx`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
+- **The path:**
+  1. The sheet loads restrictions with a bare `fetch` (`:82`). On failure it does
+     `if (!d) return` / `.catch(() => {})`, so `restrictions` stays at its initial `[]`.
+  2. `handleGenerate` always PUTs `{ entries: restrictions }` first (`:143`).
+  3. That lands in `replaceUserDietaryRestrictions` (`slices/meal-plans.ts:541`), which **deletes
+     every row for the user** before inserting.
+- **So one 429, 5xx or network blip while the sheet opens erases his allergies and intolerances.**
+  The plan is then generated without them, because the generate route reads them back
+  (`generate/route.ts:127,189`). The only visible hint is an empty restrictions step.
+- **Fix:**
+  - Show an error state when the load fails.
+  - Do not PUT until a load has succeeded.
+  - PUT only when the selection changed.
+
 ### [nutrition][app-shell] RV-164 — applying a goal recommendation marks it "applied" and toasts success without checking any of its writes
 
 - **Lane: B** — `components/profile/goal-recommendation-sheet.tsx`.
@@ -2378,6 +2485,225 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   - The day-strip changes shape at 09-17.
 - **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
   recompute from stored inputs (RV-170).
+
+### [app-shell][platform] RV-173 — the Coach streams prose about the owner's data without PROSE_GUARDS, and the test that enforces it misses it
+
+- **Lane: A** — `app/api/coach/route.ts`, `lib/ai/__tests__/prose-guards.test.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The gap:** Coach streams free prose through `loggedStreamText` (`:218`), and its SYSTEM prompt
+  (`:44`) carries none of the guards: quote the given numbers, no superlatives, metric units only.
+  Q-292's failures (Fahrenheit, *"perfect"*) can come back there.
+- **Why no test caught it:** `prose-guards.test.ts:25-40` is a hand-written list of 10 routes, and
+  Coach is not on it. The route's own docstring (`:181`) still says *"no user-facing entry point
+  yet"*, but `app/coach/coach-content.tsx:51` drives it.
+- **Fix:** add the guards and the route. Better, make the test discover prose routes by their
+  `loggedStreamText`/`generateText` import rather than by list.
+
+### [heart-rate][platform] RV-181 — the HR profile pulls 90 days of raw heart rate to compute three numbers: 51% of all database time
+
+- **Lane: A** — `packages/shared/src/health/hr-profile.ts:98-102`, `lib/data/postgres/slices/oura.ts:801`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
+- **`pg_stat_statements`, 25.2 days:** the `getHrForWindow` range select ran **12,463 calls, 558 s of
+  1,083 s total DB time (51.5%)**, and returned **209 M rows**. The 90-day window alone is
+  **133,727 rows** today.
+- **Callers:** `hr-profile`, `zone-minutes`, `cardio-week`, `cardio-trends`, `computeWorkoutHr`,
+  `computeHrRecoveryProfile`, and the SSR of Baselines and guided walk.
+- **Why it repeats:** it is in `invalidateOuraSync`, and `useHrProfile` is mounted on the active
+  workout and exercise summary screens, so **every ring drain during a workout refetches it**. Drains
+  run 20–32 an hour at 07–09.
+- **Evidence it is fixable:** sweep 51 measured the same statistic as a SQL aggregate at **54 ms,
+  one row**. RV-64 only hoisted the fetch.
+- **Fix:** compute the observed-max statistic in SQL (`percentile_disc`, or top-k). Fetch 30 days,
+  not 90, for `cardio-week`, which needs the series. Memo per user per local day.
+- **Same shape, smaller:** `/api/health/trends` (`route.ts:73-84`) re-derives HR recovery from raw
+  HR, with 2 queries per session over 14 days (~20). But `workout_hr_stats.hrr1_best` is stored for
+  **10 of 10** of those sessions. Read it, after checking the two agree per day.
+
+### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
+
+- **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/rollup/run.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **A backfill UPDATE that has matched nothing in 25 days** (`adapter.ts:6089-6094`,
+  `… SET measured_at … WHERE measured_at IS NULL`): **4,756 calls, 18.15 ms each, 0 rows
+  updated**. `measured_at` has 0 nulls in 192,772 rows. No index serves it, so it seq-scans the
+  whole hot window on every ingest, and it accounts for most of `oura_raw_samples`' **1.0 billion**
+  sequential tuple reads.
+  - **Fix: delete the statement.** It is not destructive. Dropping the column is a data-dropping
+    migration and needs the owner's sign-off.
+- **The clock-anchor table is read whole and only grows.**
+  - The full read is **2,125 × 48.8 ms = 104 s (9.6% of DB time)**.
+  - `getOuraClockEpochHead` (`:5698`) does a `GROUP BY` over everything, and
+    `getNewestOuraClockAnchorByUtc` (`:5721`) orders by an unindexed `anchor_utc`. That is 11,554
+    seq scans.
+  - An anchor is inserted on almost every batch.
+  - **Fix:** `ORDER BY epoch DESC, anchor_ds DESC LIMIT 1` on the existing index, an index on
+    `(user_id, anchor_utc DESC)`, thinner inserts, and one offset per epoch (RV-180).
+- **The rollup deletes and reinserts ~880 HR rows per pass even when nothing changed**
+  (`run.ts:877-878`): 535k deletes against 137k live rows. `oura_heartrate_pkey` (6.8 MB) has
+  **0 scans**.
+  - **Fix:** upsert with `IS DISTINCT FROM`, and delete only the timestamps that disappeared.
+- **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
+  not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
+
+### [workouts][platform] RV-174 — a deleted program or progression style never leaves the device's mirror
+
+- **Lane: A** — `lib/data/postgres/slices/programs.ts:435,866`, `lib/local-store/sqlite-backend.ts` `applyDelta`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The gap:** both are hard deletes on tables with no `deleted_at`, and both tables are in the
+  delta by `updated_at`. The local `applyDelta` only upserts them, so deleted parents stay on the
+  device forever.
+- **Failure:** `assembleLocalActiveProgram` takes `find(isActive) ?? programs[0]`
+  (`program-assembler.ts:37`). After deleting active program A and activating B, the mirror can hold
+  two rows with `is_active=1`. Offline with no cached workout-data, the Workout screen then shows
+  the stale/reselect state (`workout-screen.tsx:376-395`). Online recovers it.
+- **Fix:** add a tombstone, or delete by absence as saved meals already do (`sqlite-backend.ts:2696`).
+
+### [workouts][platform] RV-175 — editing or deleting a logged exercise or session offline is lost, after a success toast
+
+- **Lane: A** — a mutation domain for these edits. Lane B for `lib/hooks/use-day-entry-mutations.ts:50,90,132`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The gap:** PATCH `/api/workout-entry`, DELETE `/api/workout-entry` and DELETE
+  `/api/workout-sessions` are API-first, and mirror to the local store only after a 2xx.
+  `pushMutations` has no domain for them.
+- **Failure:** offline, *"Updated"/"Deleted"* toasts first, then *"Failed to …"*. Nothing is queued,
+  so the edit is gone. That breaks the offline-first checklist's item 1. Only `handleDeleteActivity`
+  in the same hook was converted (Q-328).
+
+### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
+
+- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **From `ai_call_log` joined to workouts:** 35 prescription calls, 23 fingerprints.
+  - 10 of the 12 repeats are by design: generation at open, then at completion for the next run.
+  - **On 8 of 20 workout days an open-time generation ran although the previous completion had
+    already produced one.** That is ~2.1 s of *"Preparing your AI workout"* the owner waits through.
+  - Two near-duplicates came within the 30 s cooldown (09-06, 09-16).
+- **Why it cannot be diagnosed today:** the fingerprint is only `{programSessionId, today}`. It
+  leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
+- **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
+
+### [readiness][app-shell] RV-176 — timezone-rule escapes the CI checks do not see: one medium, several latent
+
+- **Lane: B**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **MEDIUM: `components/health/health-score-detail.tsx:138` uses `todayInTz(DEFAULT_TZ)`.** The
+  readiness and activity detail screens key the AI insight date (`:279`) and the offline seed
+  (`:148`) to Brisbane's date, so a user in another zone asks for tomorrow's insight.
+  `app/health/heart-rate/page.tsx:26` records the same bug, already fixed on the sibling screen.
+- **LOW, and harmless for the owner in Brisbane:**
+  - Device-local clock text in `components/activity/exercise-detected-card.tsx:9-15`
+    (`getHours()`). Use `formatTimeOfDay(ms, tz)`.
+  - Window starts from tz-less `todayMidnightUtc()` + `toAestDay()`: `session-select-content.tsx`
+    `:357,456,742`, `log-value-sheet.tsx:120`, `health-content.tsx:226`, `sleep-content.tsx:49`
+    and `metric-log-sheet.tsx:114`.
+  - Device month for calendar cache keys: `session-select-content.tsx:266-276,385-389`,
+    `workout-screen.tsx:1501`, `calendar-widget.tsx:35` and `year-review-content.tsx:14`.
+  - Device hour for the meal bucket: `nutrition-content.tsx:592`, `food-logger-sheet.tsx:250`,
+    `saved-meals-sheet.tsx:449` and `assign-step.tsx:51,58`. assign-step also re-implements
+    `mealTypeForHour`, which breaks One Formula.
+- **The CI blind spots behind these are in RV-179.**
+
+### [app-shell][platform] RV-183 — requests the client sends for data it already has
+
+- **Lane: B** (callers), Lane A for `lib/local-store/push-then-revalidate.ts` / `cache-groups.ts`.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Counted from code; RV-186 counts them on the phone.
+- **Every launch and every resume sends 6 reminder-reconcile GETs** (`sync-provider.tsx:253-383`):
+  meal-types, today's food logs, next-session, supplements, readiness-score and body-battery.
+  - Two of them are local-first domains whose data is already on the device.
+  - Three duplicate Home's own fetches.
+  - Readiness alone is 11 parallel reads.
+- **After a food log, the first refetch round is wasted when online.** `logFoodEntries`
+  (`log-food.ts:296-297`) invalidates 13 prefixes before the push, so every server aggregate
+  refetches pre-write data, then refetches again after the push. That is 2N+1 requests where N+1
+  would do; sweep 1 saw 3×2+1. **Offline, and when the push fails, keep the immediate round**
+  (LB-4/LB-132's reason still holds).
+- **The exercise catalogue (~113 KB) is refetched and re-cached on every Workout tab show**
+  (`workout-select-content.tsx:176`). It changes only on admin edits. The server read the whole
+  table 3,040 times.
+- **`app/more/more-content.tsx:101-104`'s comment is false:** a re-show sends 2 GETs (5–6 on
+  Friends), not "nothing".
+
+### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
+
+- **Lane: B** — measure first (RV-186), then trim.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **`next build` on `main` (e5a5b9e7), First Load JS:**
+  - Home, Health, Nutrition and More: **457 kB** each.
+  - Workout: **506 kB**.
+  - Shared by all pages: 193 kB (React and Next).
+  - The tab shell adds about 264 kB on top.
+- **In Home's chunks, compressed:** framer-motion **~44 kB** and zod **~20 kB** load eagerly,
+  beside ~46 kB of app components.
+  - Candidates: `LazyMotion` + `m`, or lazy-load motion.
+  - Keep zod out of the client first-load where only types are used.
+- **A false lead, recorded so nobody chases it:** the build's module list shows
+  `@sentry/conventions` at 499 KB. That is **source size before tree-shaking**; the shipped chunk is
+  **657 bytes**. The module list's sizes cannot be read as shipped bytes.
+- **Worth doing only if RV-186 shows script evaluation matters at cold start.** FCP is already
+  1.02 s, and the service worker caches the chunks after the first load.
+
+### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
+
+- **Lane: A**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
+gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
+- **No rate limit:**
+  - `nutrition/meal-plans/meals/[mealId]/route.ts:66` (PATCH `scaleToTarget` → model call; its
+    siblings cap at 40/h and 10/h).
+  - `log-calendar-event/route.ts:20` (a Google write, with an unvalidated `startMs`).
+- **No clock bound on a written weight date (Q-494's missed siblings):**
+  - `sync-health/route.ts:108-111`, where an invalid date also poisons the whole batch.
+  - `body-metadata/route.ts:288-292`.
+- **Date params skip `normalizeDateParam`, so `2026-02-31` becomes a bodiless 500:**
+  - `ai/health-insight/route.ts:60`, which also never converts slashes, so `new Date` goes Invalid
+    at `:144,152,158`;
+  - `food-logging-complete/route.ts:49`;
+  - `activity-logs/route.ts:38`;
+  - `fitness-tests/route.ts:38`.
+- **No Zod on phase-set writes:** `phase-sets/[id]/route.ts:30`, `phase-sets/route.ts:34` and
+  `phase-sets/clone/route.ts:21`. `durationCycles` is unchecked, and a bad body gives a bodiless 500.
+- **`calendar-data/route.ts:8-9`:** a NaN year slips past the range check, and params are validated
+  before auth.
+- **Body ids reach the uuid cast unguarded on POST**, which RV-47 did not cover:
+  `nutrition/food-logs/route.ts:44` and `oura/hr-sync/route.ts:29`.
+- **Unscoped and dead code:**
+  - `createFoodItem`'s read-back is not user-scoped (`slices/nutrition.ts:300`; latent).
+  - `logExerciseWithId` (`adapter.ts:947`) and `logSets` (`:968`) write with no user parameter and
+    have no callers. Delete them.
+
+### [app-shell] RV-178 — client-side gaps from the rules census: one card, two guards, three small fetches
+
+- **Lane: B**
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **CLEAN:** bottom action rows use floored safe-area utilities, and write callbacks carry the
+written entity.
+- **`components/home-day-timeline.tsx:251-252`:** a failure and an empty day both render nothing,
+  with no `onError`, so Home's timeline vanishes on a failed cold load.
+- **No in-flight guard:**
+  - `config-screen.tsx:309` `clonePhaseSet`: a double tap makes two copies, and it has no
+    try/catch.
+  - `ai-insight-card.tsx:93` Refresh: repeated taps spend the 10-per-hour AI limit.
+- **`React.memo` defeated by a render-body function passed by name:** `mood-checkin-sheet.tsx:394`
+  and `saved-meals-sheet.tsx:545`.
+- **Bare GETs with no seed:** `components/more/oura-section.tsx:89` (the "last synced" line is blank
+  until the network answers) and `app/profile/[userId]/page.tsx:26`.
+
+### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
+
+- **Lane: O** — decide which to widen. Each is a small script change, and each one has a live
+  miss behind it.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **The five:**
+  - The **JSON.parse-of-LLM-output** grep (`ci.yml:280`) scans only files importing `@ai-sdk`,
+    which today is just Coach. 15 of 16 AI routes and all of `lib/` go unscanned.
+  - **`check-timezone-rendering`** misses `getHours()` formatting, `.toLocaleString(` on a Date and
+    `Intl.DateTimeFormat` (RV-176).
+  - **`check-client-today-timezone`** misses `todayInTz(DEFAULT_TZ)` and bare
+    `todayMidnightUtc()`/`toAestDay()` (RV-176).
+  - **`check-memo-prop-stability`** misses a render-body function passed by name (RV-178).
+  - **`prose-guards.test.ts`** uses a hand-written route list (RV-173).
+- **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11
+  across 9 files"*. The script now reports **23 across 18**, because RV-105 widened what it counts,
+  and the "can-bite is EMPTY" claim has not been re-verified against the wider population.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 
