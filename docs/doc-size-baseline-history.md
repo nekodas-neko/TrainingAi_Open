@@ -16592,7 +16592,7 @@ any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 d
 
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/readiness-gates-nothing)
 
-28335 → 28434 (+99). Two entries. TN-64 records that readiness gates nothing — its only automatic
+28338 → 28437 (+99, recounted on the merged base). Two entries. TN-64 records that readiness gates nothing — its only automatic
 protective action is excluded on the active `ai_dynamic` program and has never fired on any program —
 and carries the owner decision brief in the entry rather than a chat reply. TN-65 records that set RPE
 is a dense signal (864 of 1,286 sets) available to validate scoring, the load-controlled null it
