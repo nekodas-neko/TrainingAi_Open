@@ -16674,3 +16674,11 @@ is the column's age rather than a missing input — plus the one cheap test that
 TN-71 adds the post-TN-60 contributor share table LA-122 2b was parked for: temperature holds 10% of the
 weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-of-movement contributor
 "never scored".
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 28831 (chore/or-145-owner-questions-owed)
+
+Growth, +45 for OR-145. It is long for one entry because the entry IS the asks: each numbered item
+carries the question, the recommendation and the reversal cost, so the owner can answer from the
+queue instead of from a scrollback. A one-line "ask him about LA-89" would cost five lines and
+reproduce the failure it exists to fix — the gate already recorded that the decision was his, and
+nobody could act on that.
