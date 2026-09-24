@@ -3205,6 +3205,7 @@ drift.
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
+- **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
 - **In production:** `prescribed_runs` has **26 rows: 0 completed and 0 with `activity_log_id`**.
   22 are pending (21 of them in the past) and 4 are skipped. **17 of the pending days and 3 of the
@@ -3223,7 +3224,7 @@ drift.
 
 ### [activity][devices] RV-167 — a walk whose strap cadence stream started late stores a fifth of its steps, and nothing flags it
 
-- **Lane: B** — `components/guided-walk/walk-summary.tsx:171`.
+- **Lane: DV** — the code half shipped; what is left is a measurement on the strap.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
 - **In production:** the 2026-09-04 treadmill walk `d66aa0d7` has **34 cadence bins, the first at
   tSec 1470** of an 1,800-second walk, and stores **584 steps**. The other nine full strap walks store
@@ -3234,6 +3235,12 @@ drift.
   is short by about 2,400.
 - **Fix:** store null, or scale with the coverage stated, when bin coverage is below a floor. DV's
   part is to check whether the H10 accelerometer stream starts late.
+- **✅ Code half SHIPPED 2026-09-24** (LB-142, #1574, `lib/stores/cadence-coverage.ts`) — null below
+  50% cover, not scaled, at both write paths ([journal](overview/entries/2026-09-24-fix-rv167-cadence-coverage.md)).
+  **The floor is a judgement, not a fit:** the good walks' cover was never recorded.
+- **Keep:** DV — does the H10's accelerometer stream start late, and how often? A walk under the
+  floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
+  Pass/fail: walk with the strap already worn; record the first bin's tSec against the walk's start.
 
 ### [workouts][platform] RV-168 — `session_exercises.exercise_id`, documented as the join key, is wiped by every program save
 
