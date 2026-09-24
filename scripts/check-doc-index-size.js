@@ -174,7 +174,8 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     }
     slack.push(
       `${rel} is ${lines} lines against a ${limit}-line baseline — ${gap} line${gap === 1 ? '' : 's'} of slack, over its ${slackBand(limit)}-line band.\n` +
-        `      Lower the number in ${baselinePathFor(rel)} to ${lines}, in this PR, with a note in\n` +
+        `      Run \`node scripts/check-doc-index-size.js --tighten\` to write ${lines}, or set it by\n` +
+        `      hand in ${baselinePathFor(rel)}, in this PR, with a note in\n` +
         `      docs/doc-size-baseline-history.md. Left as it is, the document can regrow into that\n` +
         `      slack without the ratchet saying anything.`,
     );
@@ -194,8 +195,11 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     `${rel} is ${lines} lines, over its ${limit}-line baseline by ${lines - limit}` +
       (grew === null ? '.' : ` — ${grew} of which this branch added.`) + `\n` +
       `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
-      `      doc — or raise the number in ${baselinePathFor(rel)} in the same PR, with a note\n` +
-      `      in docs/doc-size-baseline-history.md, if the growth is genuinely part of the index.`,
+      `      doc — or, if the growth is genuinely part of the index, raise the baseline in the same\n` +
+      `      PR with a note in docs/doc-size-baseline-history.md. To raise it, run\n` +
+      `      \`node scripts/check-doc-index-size.js --fix\` rather than editing\n` +
+      `      ${baselinePathFor(rel)} by hand — the file's own line count and this check's count\n` +
+      `      differ by one, so a hand-set number usually needs a second round to land.`,
   );
 }
 
