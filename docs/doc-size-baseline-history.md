@@ -16801,3 +16801,11 @@ reasoned from the diff: the table already held v1, v2, v4 and v5, and the violen
 v4 → v5 (mean end 62.9 against 15.2), live since August. v6 is a fifth boundary, not the cause. The
 census was re-run rather than copied from Tuning's, which is what surfaced the single v2 day theirs
 omitted — and the growth here is mostly that table, which is the evidence the entry was missing.
+
+## 2026-09-24 — `projectOverview.md` → 12718
+
+12695 → 12718 (+23). RV-163's row. It earns a place because the defect changed numbers the owner
+reads and then argues with: a sleep score of 42 where the night deserved about 76, and a readiness
+of 44 built on top of it. A row that only said "night selection unified" would not let him connect
+those two days to a cause, and the two days are still wrong — re-scoring them is a stored-data
+rewrite queued as RV-170, so the entry stays open until he authorises that.

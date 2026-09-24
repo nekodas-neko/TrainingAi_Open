@@ -19,7 +19,7 @@ import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
@@ -357,7 +357,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // a Sleep Score of 5 against a 7.86 h night. `nightSessions` classifies by circadian position and
   // reassembles fragmented nights, so a wake-up in the middle no longer splits one night into two.
   const nights = nightSessions(sleepSessions, tz)
-  const lastSleep  = nights[nights.length - 1]
+  const lastSleep  = canonicalLatestNight(nights)
   const sleepHours = lastSleep?.durationHours ?? null
   // Personal baselines for the Sleep Score's opt-in contributors (overnight HRV, overnight HR, and
   // habitual bed/wake times), derived from the *prior* nights only so the night being scored never

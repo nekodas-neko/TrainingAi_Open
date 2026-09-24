@@ -186,13 +186,62 @@ export function nightForDate<T extends SleepWindow>(
   return nightPeriodsByDate(nights).get(date) ?? null
 }
 
-/** The most recent night at or before `date`, or null. Used where a caller wants "last night". */
+/**
+ * The most recent night, or null. Used where a caller wants "last night".
+ *
+ * ⚠ **`nights[nights.length - 1]` is NOT this**, and the difference is the whole of RV-163. A wake
+ * date can hold two night periods, because `ALWAYS_NIGHT_MIN_HOURS` promotes any window over four
+ * hours wherever it sat on the clock. The last element is then whichever ran LATER — so a long
+ * afternoon rest beats the night it followed. Measured in production on 2026-09-23: an overnight of
+ * 21:27–06:01 (7.92 h) lost to a 10:42–17:25 window (6.17 h), the sleep score came out 42 instead
+ * of about 76, and readiness took that 42 as the previous night and scored 44.
+ *
+ * So the latest DATE is resolved first, and `nightPeriodsByDate` then picks that date's real night.
+ */
 export function latestNight<T extends SleepWindow>(
   sessions: T[],
   tz: string = DEFAULT_TZ,
 ): SleepPeriod<T> | null {
   const { nights } = groupSleepPeriods(sessions, tz)
-  return nights.length ? nights[nights.length - 1] : null
+  let latest: SleepPeriod<T> | null = null
+  for (const period of nightPeriodsByDate(nights).values()) {
+    if (!latest || period.date > latest.date) latest = period
+  }
+  return latest
+}
+
+/**
+ * The same two questions, for a caller holding the AGGREGATED output of {@link nightSessions}
+ * rather than the raw sessions.
+ *
+ * `nightSessions` maps EVERY night period to a session, so a two-period date comes back as two
+ * entries and every caller has had to break the tie itself. Six did, by four different rules
+ * (RV-163) — longest, latest, latest-for-date and earliest — which is why one date could be graded
+ * as a nap by one surface and as a real night by the next.
+ *
+ * Deliberately NOT fixed inside `nightSessions`: eighteen call sites read it, most of them summing
+ * weekly and trend totals, and collapsing a date there would also decide whether a long daytime
+ * rest counts as sleep at all. That is a different question and nobody asked it.
+ */
+export function canonicalNightForDate<T extends { date: string; durationHours?: number | null }>(
+  nights: T[],
+  date: string,
+): T | null {
+  let best: T | null = null
+  for (const n of nights) {
+    if (n.date !== date) continue
+    if (!best || (n.durationHours ?? 0) > (best.durationHours ?? 0)) best = n
+  }
+  return best
+}
+
+/** The canonical night of the most recent night date — see {@link canonicalNightForDate}. */
+export function canonicalLatestNight<T extends { date: string; durationHours?: number | null }>(
+  nights: T[],
+): T | null {
+  let latestDate: string | null = null
+  for (const n of nights) if (!latestDate || n.date > latestDate) latestDate = n.date
+  return latestDate ? canonicalNightForDate(nights, latestDate) : null
 }
 
 // ── Aggregating a fragmented night into one scoreable session ────────────────
