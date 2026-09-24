@@ -1935,20 +1935,6 @@ below threshold and left in place for next time.
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
 
-### [platform] LB-137 — `weekly-volume-target` is invalidated for a reader that no longer exists
-
-- **Lane:** A — `lib/cache-groups.ts:51,403`, `app/api/ai-periodization/weekly-volume/route.ts`.
-  **Added:** 2026-09-23 · found while shipping RV-120.
-- RV-120 deleted `AiWeeklyVolumeCard`, which was the **only client consumer** of both the
-  `weekly-volume-target` cache key and the `/api/ai-periodization/weekly-volume` route. Two
-  invalidation groups still clear that key, and nothing reads it.
-- **Not dead code, which is why this is filed rather than deleted.** `getWeeklySetsByMuscleGroup`
-  stays live via `signals.ts`, grading a week against the programme's targets for the AI engine. So
-  the question is whether the *HTTP route* still earns its place, not whether the computation does.
-  Both files are Lane A's, which is why this is an entry and not part of RV-120's diff.
-- **Whoever takes it decides**: keep the route as a debug surface and drop just the two
-  invalidations, or retire route + key + tests together. An invalidation aimed at nothing is the fix.
-
 ### [app-shell] LB-138 — back from a push off Home lands on `about:blank`; a tab flip loses the history entry
 
 - **Lane:** B — `ef95595c11d` (#1431, RV-110/RV-112), `lib/navigation` tab-flip path,
