@@ -208,7 +208,7 @@ knows what is startable right now.
 | Quantity sheet = **option A** (total leads, three macro tiles) | BF-46 ③, drawn at <https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> |
 
 **The clinical measurements are in the repo, de-identified**, at
-[`docs/clinical-baseline-2026-08-27.md`](../../clinical-baseline-2026-08-27.md) — DEXA and RMR
+the clinical baseline (held privately, RV-199) — DEXA and RMR
 (2026-08-27) and a 58-analyte blood panel (2026-04). **The owner's name and DOB were on the RMR
 report and must never enter this repository.** Three numbers a successor should not re-derive: the
 scale under-reads body fat by **3.2 points** (DEXA 28.5 vs Renpho 25.3, same day); measured RMR
