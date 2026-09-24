@@ -16615,3 +16615,12 @@ the owner's own answer — Home's card and an LLM prompt. Most of the entry is t
 it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.
 TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
 energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-autonomic-collinearity)
+
+28632 → 28692 (+60). TN-68: the sleep model's `hrv` and `hr` contributors correlate at +0.873 over 60 nights, so 28 of its
+110 weight is one effective axis, and both pin at 100 together on 17% of nights. Most of the entry is
+the distinction from TN-60 — that rail inverted stored ordering, this one only loses resolution — and
+the three alternatives with what each is better at, since any weight change here is the owner's.

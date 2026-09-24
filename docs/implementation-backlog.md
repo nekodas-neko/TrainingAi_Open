@@ -833,6 +833,66 @@ which is the right shape for something that can only be validated by living with
 - **Two things not to do.** Do not quote the monotonic table as evidence of anything. Do not read the
   post-fix r = 0.000 as the score failing — it is five days.
 
+### [sleep] TN-68 — the sleep score's two autonomic contributors are one axis: r = +0.873, 25% of the model, and both pinned at 100 on 17% of nights
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, checking whether the sleep composite has
+  the rail TN-60 fixed in the readiness composite. It has a different one.
+- **Lane: O** — a weight change is the owner's per the standing scoring rule, and this needs a decision
+  about the model's shape before any constant moves.
+- **Measured 2026-09-24, n = 60 nights with both terms present.** `corr(hrv, hr) = +0.873`. For
+  contrast, in the same rows `corr(hrv, total_sleep) = 0.559`, `corr(hr, total_sleep) = 0.498`,
+  `corr(total_sleep, efficiency) = 0.681`. So the two autonomic terms track each other far more
+  tightly than any other pair in the model.
+- **What that means for the weights.** `SLEEP_WEIGHTS` gives `hrv` **14** and `hr` **14** out of a
+  total of **110**, and `sleep-score.ts:20` states the intent: *"Autonomic state (hrv + hr) is now 28
+  of 110 (25%) rather than 12 of 100 (12%)."* At r = 0.873 that is **one effective axis carrying 25%**,
+  not two axes carrying 12.7% each. The consequence is not that the share is wrong — the owner chose
+  25% — it is that **a single bad night's autonomic reading moves a quarter of the score**, where two
+  genuinely independent terms would have partly cancelled.
+- **And at the top they go flat together.** `hrv` reads exactly 100 on **12 of 60** nights (20%), `hr`
+  on **10 of 60** (17%), and **all 10 of the `hr` ceiling nights are also `hrv` ceiling nights**. On
+  those nights 28 of 110 weight is a constant and contributes no discrimination at all.
+- **The anchor tables say why, and the two ceilings are not symmetric.**
+  `HRV_RATIO` (`sleep-score.ts:76`) reaches 100 at a ratio of **1.35** — HRV 35% above the personal
+  baseline, genuinely rare. `HR_RATIO` (line 81) reaches 100 at **0.85** and that is its **first
+  anchor**, so *every* night with overnight HR at or below 85% of baseline scores exactly 100, with no
+  resolution beyond it. The HR ceiling is an open-ended plateau; the HRV one is a bound.
+- **⚠ This is not the TN-60 defect and must not be described as one.** TN-60's floor rail was
+  demonstrably wrong: stored history inverted its own ordering, a worse night reading better than a
+  milder one. Here the final score still discriminates — nights with one railed contributor average
+  **82.6** (range 36–94) and nights with two average **79.9** (range 42–92), so railing does not even
+  monotonically inflate the total. **The loss is resolution at the top of one axis, not a wrong
+  ordering**, and anyone quoting this entry as "the sleep score has TN-60's bug" would be wrong.
+- **Distribution for the record**, nights by count of contributors at exactly 100: 0 → 43 nights (mean
+  score 60.9) · 1 → 12 (82.6) · 2 → 8 (79.9) · 3 → 5 (91.4) · 4 → 3 (95.3) · 5 → 1 (95.0). So **29 of
+  72 nights (40%) have at least one contributor at the ceiling.**
+- **Recommendation: leave the weights alone and fix the HR ceiling's shape first.** Extending
+  `HR_RATIO` below 0.85 (say anchors at 0.80 and 0.75) costs one line, cannot reorder any night against
+  another, and is the only change here that adds information rather than redistributing it. Re-measure
+  the collinearity afterwards — part of the 0.873 is the shared plateau, and it is worth knowing how
+  much before touching a weight.
+- **Alternatives, and what each is better at.**
+  - *Merge the two terms into one autonomic contributor at 28.* Better at honesty — it would describe
+    what the model already does — and it discards the chance that they diverge on exactly the nights
+    that matter most, which is untested at n=60.
+  - *Cut one term to ~7 and keep the other at 14.* Better if the goal is to stop a single reading
+    moving 25% of the score. It re-scores every stored night, so it is a proposal needing the full
+    "how many other days does this move" treatment, not a constant tweak.
+  - *Do nothing.* Defensible: HRV and overnight HR both index parasympathetic tone, so r = 0.873 is
+    physiologically expected rather than a modelling error, and the owner picked 25% knowing it was
+    autonomic state.
+- **Reversal cost: low for the anchor change** (one array, re-derivable), **high for any weight
+  change** — it re-scores all stored nights and invites the same half-applied-history problem TN-62 is
+  still waiting on.
+- **What this does NOT establish.** Whether the collinearity is physiological or an artefact of both
+  terms being computed from the same night's BLE stream — a shared-input artefact and a shared-biology
+  signal look identical here. And the correlation is between two of **our own** derived numbers, so it
+  describes the model's internal geometry and is **not** a validation claim about either; per TN-67,
+  no external validation of any score currently exists.
+- **Where the mechanism is:** `packages/shared/src/health/sleep-score.ts` — `SLEEP_WEIGHTS` (line 22),
+  `HRV_RATIO` (76), `HR_RATIO` (81), `clamp100` (157) and the July recalibration's own rationale
+  (lines 15–21), which cites [`docs/reviews/2026-07-27-night-2026-07-25-case-study.md`](reviews/2026-07-27-night-2026-07-25-case-study.md).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
