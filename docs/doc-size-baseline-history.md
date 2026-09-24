@@ -16843,6 +16843,12 @@ ranks 15–17 of a 57-entry lane that prints 10. The length is the rank table pl
 with the reason each lost — the table is the evidence that position cannot hold, which is the whole
 argument for replacing it with a section.
 
+## 2026-09-24 — `docs/implementation-backlog.md` → 29723 (BF-195)
+
+Low reception hanging every fetch. The length is the three-way table of what each surface did —
+Body painting from seeds, the fetch-gated screens holding skeletons, the unseeded ones blank. That
+table is the evidence that the offline-first architecture is sound and the layer above it is not,
+which is the whole argument for fixing one call site rather than three screens.
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-154)
 
 Growth: three more entries carry `Ask: owner` (TN-64, RV-113, LA-129), and Q-551 carries a note
