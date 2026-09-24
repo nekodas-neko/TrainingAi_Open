@@ -719,6 +719,7 @@ below keep their gate — they really are blocked pending an answer — and this
   the Steps metric tile, and the chip row's Activity score).
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
+- **Ask:** owner — readiness currently changes NOTHING the app prescribes: its one automatic action has never fired in 117 sessions and cannot on the active program. What should a low readiness day actually do? Decision brief in the entry.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while testing whether the readiness score
   predicts anything about training.
@@ -3668,6 +3669,7 @@ written entity.
   reopen from the param-independent half.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
+- **Ask:** owner — every tab switch shows 58–109 ms with neither panel painted, measured on the S25 over 10 of 10 switches. The fix is one line. Is a blink on the app's most frequent interaction worth changing it for?
 
 - **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
   `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
@@ -4451,6 +4453,7 @@ written entity.
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+- **Ask:** owner — generate the doc-size baselines in CI instead of committing them? RV-134 already did the cheap half and rejected this one with a reason; re-measure the tax before deciding.
 
 - **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
   REJECTED this one with a reason.** The two were filed hours apart by different sessions and
@@ -8603,34 +8606,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   the card shows one. Not urgent: the chip no longer asserts anything false without it.
   ② the device check — on the S25, confirm no exercise row shows a zone whose tooltip contradicts the
   reps prescribed on the same line.
-
-### [platform] LB-108 — E2E reports green without running whenever a change lives in `lib/`, and `lib/hooks/**` is UI
-- **Lane:** O — `.github/workflows/ci.yml`, the *"Does this change touch the UI?"* step (~line 637).
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-14 · found shipping BF-110's recheck.
-- **Observed, not reasoned.** PR #1173's E2E check went **green in 40 seconds** on a suite that takes
-  ~28 minutes. The job log is Postgres starting and stopping and **nothing else** — no Playwright
-  invocation at all. The PR changes `lib/resume-repaint.ts` and `lib/hooks/use-resume-repaint.ts`.
-- **The detector matches four prefixes** and `lib/` is not among them:
-  `grep -vE '^app/api/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'`.
-- **`lib/hooks/**` is UI by the repo's own lane rule** — CLAUDE.md puts `lib/hooks/**` and
-  `lib/stores/**` in Lane B, the surface lane, beside `components/**`. **26 files under `lib/` carry
-  `'use client'`**, including `use-cached-value.ts`, `use-scroll-restoration.ts` and
-  `use-resume-repaint.ts` — the last two mounted on the shell container **every screen inherits**.
-  A change to any of them currently ships with E2E green having tested nothing.
-- **LA-22's design is right and this is not an argument against it.** The job deliberately always
-  runs and always reports, skipping its expensive half, so that a required check never leaves a PR
-  pending. LA-63 then dropped `app/api/**` because no browser reaches it. Both are sound. **The
-  prefix list simply never grew a `lib/` clause**, and `lib/` was not a browser-reached directory
-  when it was written.
-- **Recommended shape:** add the client-reachable `lib/` subtrees to the same positive match —
-  `lib/hooks/`, `lib/stores/`, and `lib/media/` — rather than matching all of `lib/`, which would
-  re-buy the full suite for every engine change and undo LA-63.
-- **⚠ Do not verify this by reading the diff of the workflow.** The failure mode is a check that
-  passes without running, so the evidence is the JOB DURATION and the absence of a Playwright line in
-  the log. A 40-second E2E is the tell; confirm the fix the same way, by a run that takes minutes.
-- **Pass test:** a PR touching only `lib/hooks/**` runs the browser suite.
-- **Reversal cost:** none, one line of shell in a workflow.
 
 ### [platform] LB-106 — `preferences-survive-reinstall` fails on CI and passes everywhere else, twice in one day
 - **Lane:** B — `e2e/preferences-survive-reinstall.spec.ts`, or the launch-time hydration it waits on.
@@ -19667,6 +19642,7 @@ Measured against `lib/walk/segment-stats.ts`:
   matters. Start from Profile → **Auto-detect timezone**, the button that triggers the whole class.
   `Gate: device`.
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+- **⚠ Deliberately carries NO `Ask:` field (OR-154).** It reads like an owner question and a keyword sweep picks it up, but the entry's own text says *"do not re-put this to the owner"* until Q-545 lands. Surfacing it in the always-visible section would do exactly that. Add the field when Q-545 clears it, not before.
 
 - **Lane:** O — an owner decision about hosting with no code in either lane's paths. (Assigned 2026-09-15, OR-116 lane sweep.)
 

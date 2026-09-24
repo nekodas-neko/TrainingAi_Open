@@ -685,12 +685,16 @@ jobs:
           # (app/session-explain/__tests__/bf172-fit-not-readiness.test.ts) and bought four full
           # ~34-minute runs, drifting out of date during three of them. `e2e/` specs are NOT under
           # a `__tests__/` directory (checked: zero), so the browser suite still gates on itself.
-          if echo "$FILES" | grep -vE '^app/api/' | grep -vE '(^|/)__tests__/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No app/, components/, e2e/ or playwright.config.ts changes — skipping the browser run."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
+          # LB-108: the prefix list missed `lib/`, and E2E reported GREEN IN 40 SECONDS on a
+          # ~28-minute suite for a PR that changed `lib/resume-repaint.ts` and
+          # `lib/hooks/use-resume-repaint.ts` — the log is Postgres starting and stopping, with no
+          # Playwright invocation. A longer prefix list does not fix it: `lib/` holds 282 source
+          # files, 81 reachable from a client module and 201 not, and the reachable set includes
+          # `lib/sqlite/cache.ts`, which every screen reads through. So reachability is COMPUTED
+          # from the `'use client'` roots. `app/api/**` and `__tests__/` stay excluded (LA-63), so
+          # an engine change still skips the browser and LA-63's saving is intact.
+          CHANGED=$(printf '%s\n' "$FILES" | node scripts/e2e-ui-touched.js)
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v5
         if: steps.ui.outputs.changed == 'true'
         with:
