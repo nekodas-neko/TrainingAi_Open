@@ -93,6 +93,42 @@ describe.skipIf(!canRun)('an empty snapshot never flattens a populated day (TN-2
     expect(Number(row.total_drained)).toBe(113)
   })
 
+  // RV-163 — the case that slipped through the ORIGINAL guard, which asked only whether the
+  // incoming count was above zero. Production 2026-09-23: 2 samples against the ring's 203, with 0
+  // charged, 0 drained and `end_value` sitting on the anchor. The cause was upstream — a daytime
+  // rest won "last night", so the wake anchor landed at 17:25 and only 2 samples fell after it —
+  // but the guard is what should have refused to store the result, and `2 > 0` let it through.
+  it('a read that saw two samples and no movement does not flatten the day either', async () => {
+    await repo.upsertBodyBatteryDaily(USER, snapshot(3767))
+    await repo.upsertBodyBatteryDaily(USER, {
+      ...snapshot(0),          // the flattened shape: charged 0, drained 0, end = anchor
+      hrSampleCount: 2,        // …but not an EMPTY read, which is the whole point
+    })
+
+    const row = await read()
+    expect(row.hr_sample_count).toBe(3767)
+    expect(Number(row.total_drained)).toBe(113)
+    expect(Number(row.end_value)).toBe(42)
+  })
+
+  // CONTROL 3 — and a day that moved only a little still writes. The rule is "recorded no movement
+  // at all", not "recorded less than before": a quiet day with 2 samples and a single point of
+  // drain is a real measurement and must not be refused. A threshold on sample count would fail
+  // this, which is why the guard tests the shape instead.
+  it('a small but genuinely moving read still overwrites', async () => {
+    await repo.upsertBodyBatteryDaily(USER, snapshot(3767))
+    await repo.upsertBodyBatteryDaily(USER, {
+      ...snapshot(0),
+      hrSampleCount: 2,
+      totalDrained: 1,
+      endValue: 54,
+    })
+
+    const row = await read()
+    expect(row.hr_sample_count).toBe(2)
+    expect(Number(row.total_drained)).toBe(1)
+  })
+
   // CONTROL 1 — the guard must not block the ordinary case it looks like. Counts grow through the
   // day and every read is meant to win; a fix that only ever allowed increases would pass the two
   // tests above and still be wrong here.

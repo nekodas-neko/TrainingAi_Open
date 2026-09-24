@@ -2487,36 +2487,6 @@ drift.
     10-04, Q-507 10-16, TN-50 10-17, TN-25 10-18, LA-110's evidence expiring 10-06.
 - **Reversal cost:** delete the field and one print block.
 
-### [sleep][readiness] RV-163 — "last night" is picked by four different rules, so a long daytime rest can become the night the scores grade
-
-- **Lane: A** — shared night selection in `packages/shared/src/health/sleep-night.ts` and its consumers.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **The rules, confirmed in code:**
-  - The rollup and `nightForDate` take the **longest** night period (`nightPeriodsByDate`,
-    `sleep-night.ts:164`). Its own comment says *"this is where it is made"*.
-  - The live readiness payload takes the **latest**: `nights[nights.length - 1]`
-    (`lib/health/readiness-payload.ts:360`).
-  - Body Battery also takes the **latest**, `nights.findLast(n => n.date === todayIso)`, and anchors
-    `wakeTime` on its `sleepEnd` (`app/api/body-battery/route.ts:164-166`).
-  - The score audit and backfill take the **earliest**, `nights.find(...)`
-    (`score-audit/sleep.ts:45`). So does `app/api/ai/health-insight/route.ts:119`.
-- **Why they disagree:** any window of at least `ALWAYS_NIGHT_MIN_HOURS = 4` h counts as a night
-  wherever it sits on the clock, so one date can hold two night periods.
-- **09-23 in production:** the overnight was 21:27–06:01 (7.92 h, efficiency 92). A daytime window
-  ran 10:42–17:25 (6.17 h, efficiency 91).
-  - The stored sleep contributors are total_sleep 49, efficiency 72, timing 10 and latency 72. They
-    match the **daytime** window; the overnight gives about 76 / 76 / 71 / 50.
-  - So the sleep score was **42**, and readiness, which took 42 as its previous night, was **44**.
-  - Body Battery stored `hr_sample_count` **2** and 0 drained, flat all day at its anchor of 41,
-    against 203 ring samples. Only a 17:25 wake leaves 2 samples.
-  - 08-27 has the same shape.
-  - TN-20's guard refuses only a drop from populated to 0, so a 2-sample read passes it; 09-23 came
-    two days after the guard shipped. **This is TN-20's unidentified trigger** for its non-zero cases.
-- **Fix shape:**
-  - Route every consumer through `nightPeriodsByDate` / `nightForDate`.
-  - Make Body Battery refuse a near-empty snapshot, not only an exactly empty one.
-  - Re-scoring 09-23 and 08-27 is the recompute path (RV-170).
-
 ### [nutrition] RV-171 — opening the meal-plan setup with a failed request silently deletes every saved dietary restriction
 
 - **Lane: B** — `components/nutrition/meal-plan-setup-sheet.tsx`.

@@ -65,10 +65,29 @@ export async function upsertBodyBatteryDaily(db: Db, userId: string, row: BodyBa
         modelVersion:  row.modelVersion,
         updatedAt:     sql`now()`,
       },
-      // Never overwrite a day that HAS samples with one that has none. An empty row is still
-      // insertable (a genuinely sample-less day) and still replaceable by another empty one — what
-      // cannot happen is populated → empty.
-      setWhere: sql`excluded.hr_sample_count > 0 OR ${s.bodyBatteryDaily.hrSampleCount} = 0`,
+      // Never overwrite a day that RECORDED MOVEMENT with one that recorded none. A row that
+      // measured nothing is still insertable (a genuinely sample-less day) and still replaceable by
+      // another such row — what cannot happen is measured → unmeasured.
+      //
+      // ⚠ RV-163 widened this from `hr_sample_count > 0`, which counted a day as measured on a
+      // single sample. 2026-09-23 stored **2** samples against the ring's 203, with 0 charged, 0
+      // drained and `end_value` sitting on the anchor — the flattened shape exactly, passing a
+      // guard written to stop it. That was TN-20's unidentified trigger.
+      //
+      // It is deliberately still a SHAPE test rather than a threshold. TN-20 ruled out a monotonic
+      // `excluded >= stored` because it freezes a day at a bad value and blocks a legitimate
+      // downward correction, and that reasoning holds; a "fewer than N samples" floor would just be
+      // the same rule with an invented constant. All four days TN-20 measured, and this one, share
+      // charged = 0 AND drained = 0 — a day that genuinely moved never looks like that, whatever
+      // its sample count. So no constant is chosen here, and a corrected day with real movement
+      // still writes.
+      //
+      // It still repairs: a later read that does see movement passes and overwrites the flat row.
+      setWhere: sql`
+        (excluded.hr_sample_count > 0 AND (excluded.total_charged > 0 OR excluded.total_drained > 0))
+        OR ${s.bodyBatteryDaily.hrSampleCount} = 0
+        OR (${s.bodyBatteryDaily.totalCharged} = 0 AND ${s.bodyBatteryDaily.totalDrained} = 0)
+      `,
     })
 }
 
