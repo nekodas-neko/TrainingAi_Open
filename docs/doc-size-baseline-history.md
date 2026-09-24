@@ -16932,3 +16932,18 @@ The rest is the cause itself, which is one sentence of finding and several of ev
 was set in `ci.yml` and nowhere else, and Node's default is sized from container RAM rather than
 fixed — ~4,051 MB on Railway's builder against 2,096 MB in the sandbox. Without both numbers the
 claim reads as a guess, and the entry has already been wrong twice about this failure.
+
+## 2026-09-24 — `projectOverview.md` → 12771 (RV-194)
+
+Twenty-four lines for a privacy fix, and the length is two disclaimers rather than description.
+
+The first is what the fix does **not** establish: nothing was sent to sentry.io to check it. The
+scrubber is a pure function tested against a message built from the pinned `drizzle-orm`
+constructor, so what is verified is that the documented shape gets scrubbed — not that production
+throws only that shape. `enabled` is false outside production, so no local capture was possible
+either. A row reading "fixed" without that sentence would overstate it.
+
+The second is that **already-sent events are not recalled**. Anything forwarded before today sits in
+sentry.io and stays there; clearing it is an account-side action nobody has taken, and no one has
+measured how many events carry values. A reader who takes "fixed" to mean the leak is undone would
+be wrong about the part that matters.
