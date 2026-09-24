@@ -5,9 +5,9 @@
 
 ## Now
 
-RV-111 (#1520), RV-121 both halves (#1529 + this), RV-164 (#1546) shipped. He answered RV-121: a
-More-tab row, `DEFAULT_CARD_WIDGETS` stays empty so Home is unchanged. #1545, my redundant fold,
-is closed.
+RV-111, RV-121 both halves, RV-164 shipped. Now BF-190 + BF-191 together — one flow, one device
+check, and BF-191's floor is near-meaningless without BF-190's real elapsed time. Also fixed
+BF-188's fold collision (unique `-N` per fold) since it blocked a third PR.
 
 ## Next
 
@@ -37,8 +37,8 @@ Orchestrator's chat, being exported to `docs/design/`. Do not re-ask him, do not
   conclusions via `list_workflow_jobs` (`resource_id`, not `run_id`); E2E is advisory.
 - **THE MERGE RACE IS ARITHMETIC AND I LOST IT SEVEN TIMES ON ONE PR.** CI ~7 min vs a commit to
   `main` ~every 4. Merge the INSTANT the five are green; no run for your head = conflicted PR.
-- **A CHORE THE GATE DEMANDS IS A RACE** — the 60-entry limit fails for every lane at once, so
-  several start the same fold at once. Check `main` first; finish your own PR instead. (BF-188.)
+- **THE FOLD IS SAFE AGAIN** — it writes `-2` when `-1` exists (BF-188, fixed 2026-09-24). Still
+  verify by anchor count: the loss is silent and `check-doc-links` passes over it.
 - **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS.** Two sweeps inserting different entries at one
   point is two ADDITIONS — keep both. Read the headings on each side before choosing, every time.
 - **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481 silently deleted RV-117/118.

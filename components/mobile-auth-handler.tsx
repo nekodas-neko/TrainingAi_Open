@@ -183,6 +183,8 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
       />
       <LeaveWalkDialog
         open={confirmLeaveWalkOpen}
+        // This path calls reset(): nothing is saved, whatever was walked.
+        outcome="discard"
         onStay={() => setConfirmLeaveWalkOpen(false)}
         onLeave={() => {
           setConfirmLeaveWalkOpen(false);

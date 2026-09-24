@@ -2450,60 +2450,62 @@ drift.
   following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
   has not been fixed regardless of what the done screen says.
 
-### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
-- **✅ BOTH ANSWERED BY THE OWNER, 2026-09-24.**
-  **Decision 1 — he chose a MIX, not either alternative:** *"A mix of min floor duration + confirm on exit."* So a sub-minute walk is neither saved silently nor discarded silently.
-  **Decision 2 — he soft-deletes the phantom row himself** in the activity list, so it writes a `deleted_at` tombstone that propagates to the device. Row `b8083d04`, 2026-09-24.
-- **⚠ THE MIX NEEDS ONE DESIGN DECISION HE DID NOT MAKE, and the naive build gets it wrong.** Implemented literally — floor, then a confirm — the mis-tap path is **two dialogs**: *"End walk?"* then *"Discard this short walk?"*. That is the exact objection the confirm-on-exit alternative lost on, so a literal reading reintroduces it in the one case he cares about.
-  **Recommended implementation, and it is the Orchestrator's reading rather than his words:** when elapsed is under the floor, the EXISTING end-walk dialog becomes the confirm — *"End and discard this 27-second walk?"* with Discard / Keep — instead of a second prompt after it. One dialog, one tap, nothing silently dropped, and above the floor the flow is unchanged. **If he meant two separate prompts, say so and this is wrong.**
-  Reuse `MIN_SESSION_SEC`'s shape (`time-audit.ts:358`) for the floor rather than a new constant.
-- **Lane:** B — the remaining work is the walk UI's end-of-session path; there is no decision left in it beyond the note above.
+### [activity] BF-191 — the walk-end fix shipped; three phantom rows are still in the history
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Superseded lane note (OR-156):** this read `O` while both questions were open — *both are the
-  owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply*. Answered 2026-09-24; the field above is live.
-  **Split out of BF-190**, where they were buried in a `Lane: B` body and therefore invisible to the
-  Orchestrator; BF-190 keeps the half that needs no decision and can start immediately.
-- **Context, in one line.** Ending a guided walk early records it as a full session at the planned
-  duration — the owner hit it on 2026-09-24 (*"I started a walk; then closed it"*) and it wrote a
-  40-minute, 133 kcal row for a walk 27 seconds old. BF-190 fixes the duration. These two do not
-  follow from that fix.
+- **Lane: O** — what is left needs the owner's hand and a phone, not code. **Added:** 2026-09-24 ·
+  BugFix intake. **Code shipped 2026-09-24 (Lane B)** together with BF-190: the elapsed seconds now
+  travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and
+  below `MIN_WALK_SEC` (60s) the existing end-walk dialog becomes a discard confirm instead of being
+  followed by a second prompt.
+- **Keep ①, the owner's:** **three** phantom rows are already in `activity_logs` and nothing marks
+  them spurious. `b8083d04` (09-24, 40 min, 133 kcal) is the one he reported; Review sweep 57
+  measured **two more** — `ea77ce16` (07-30, 30-min interval walk, 0.037 km, pace 49,104 s/km) and
+  `a85568a4` (09-14, 22-min treadmill, 74 kcal, HR 65). He soft-deletes them from the activity list,
+  which writes a `deleted_at` tombstone that propagates; a direct database write would not. **Never
+  a corrective migration** for three rows.
+  **The signature to find any others is NOT `avg_hr`/`steps` both null** — that finds only 09-24,
+  because the older two carry HR from their first ~90 seconds. It is `created_at` falling more than
+  2 minutes before `end_time` on the same local day.
+- **Keep ②, the device check:** start a guided walk, end it inside a minute, and confirm the dialog
+  offers Discard and no row is written; then end one after a few minutes and confirm the row's
+  duration matches the clock; then complete a full walk and confirm it is unchanged. **Lane: DV.**
+  The sandbox cannot reach it — `getLocalStore` returns null there, so the branch that writes the
+  row is exactly the one a browser here cannot exercise.
+- **⚠ A third finding, from the same surface, that neither entry named:** the back gesture and the
+  tab bar raise the same dialog and call `reset()` — they keep **nothing**, at any duration, so
+  walking away from a 39-minute walk discards it. That is now stated honestly in the dialog rather
+  than fixed, because making those paths save is a behaviour change he has not been asked about.
+  Filed as LB-141.
 
-**Decision 1 — after the fix, should a sub-minute walk be saved at all?**
 
-- Passing the real elapsed time through turns the phantom into a truthful **27-second** row. Truthful
-  is not the same as wanted.
-- **⭐ Recommend a minimum-duration floor, discarded below it with a toast.** The repo already has
-  this shape — `MIN_SESSION_SEC` in `time-audit.ts:358` drops implausibly short workouts from the
-  decomposition — so it is reuse, and a floor needs no interaction at the moment the lifter is
-  walking away from a mis-tap.
-- **Alternative: keep every row.** Better if you ever want to see abandoned starts as data — which
-  is a real thing to want, and the reason this is not obvious. It loses because a 27-second row
-  still lands in activity history, the day audit and the totals, where it is noise in every reading
-  that matters.
-- **Alternative: confirm on exit** (*"discard this short walk?"*). Better in that nothing is ever
-  silently dropped. It loses on where it fires: mid-walk, one tap after a dialog that already asked
-  *"End walk?"*, which is two prompts for one intention.
-- **Reversal cost: near zero.** A constant and one branch.
+### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
 
-**Decision 2 — the phantom row already in the history.**
+- **Lane: O** — a product decision about what happens to a walk, not a defect with one right answer.
+  **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
+  written per call site, which is what surfaced it).
+- **Measured in source, three callers of `LeaveWalkDialog`:**
+  | Exit | What it does |
+  |---|---|
+  | **End walk** button (`walk-active.tsx`) | saves the walk at the elapsed time |
+  | **Back gesture** (`mobile-auth-handler.tsx:184`) | `reset()` — keeps nothing |
+  | **Tab bar** (`bottom-nav.tsx:159`) | `reset()` — keeps nothing |
+- **So walking away from a 39-minute walk by tapping another tab discards it**, with no row and
+  nothing in history. Until 2026-09-24 all three showed the same sentence — *"Ending now will stop
+  it early"* — which was false at every one of them.
+- **Shipped alongside: the copy is now honest**, each caller naming its outcome. That is the half
+  that needed no decision. Making the other two exits SAVE is the half that does.
+- **Recommended: make all three save**, on the reading that a walk the lifter actually did is data
+  they did not ask to throw away, and the app now knows the real elapsed time (BF-190) so saving is
+  no longer lossy or wrong.
+- **Alternative: keep discarding.** Better if leaving by the tab bar is meant to read as "I am not
+  doing this" rather than "I am done" — which is a real distinction, and the reason this is his
+  call rather than mine. It also avoids rows he never deliberately ended.
+- **Alternative: make the two paths ASK** (save or discard) rather than assume. Better at never
+  guessing wrong; worse in that it puts a two-option dialog in front of a tab tap, which is the
+  interruption BF-191 just finished removing from the other exit.
+- **Reversal cost: near zero.** Each path is one call — `reset()` or the same finish the End-walk
+  button uses.
 
-- `b8083d04`, 2026-09-24, 40 min, 133 kcal, no HR, no steps. The day reads 80 min / 266 kcal against
-  40 / 133 actually walked.
-- **⭐ Recommend the owner soft-deletes it from the activity list.** It is one row, the app's own
-  delete is the supported path, and it produces a `deleted_at` tombstone that propagates to the
-  device — which a direct database write would not.
-- **Alternative: leave it.** Better if you would rather the history show what the app actually did,
-  warts included. It loses because nothing marks the row as spurious, so every future reading of
-  that week is wrong in a way no one will remember.
-- **Never a migration.** A corrective migration for one bad row is blast radius with no upside, and
-  data-touching migrations are the carve-out that always needs the owner anyway.
-- **⚠ Whether OTHER phantom rows exist has not been measured.** Only 2026-09-24 was checked. Before
-  acting, sweep `activity_logs` for rows whose `duration_min` equals the plan while `avg_hr` and
-  `steps` are both null — that is the signature. Do not report a count without running it.
-
-- **Verification:** this entry closes when both answers are recorded here with the date, and BF-190
-  is updated to build the one that touches code.
-- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **there are two more live phantom rows**, measured rather than assumed: `ea77ce16` (07-30, a 30-min interval walk, 0.037 km, pace 49,104 s/km) and `a85568a4` (09-14, a 22-min treadmill session, 74 kcal, HR 65). A third, from 07-29, the owner already deleted. **The signature proposed above (`avg_hr` and `steps` both null) finds only 09-24**, because the older two carry HR from their first ~90 s. The reliable signature is *the local time of `created_at` falls before `end_time` minus 2 min, on the same day*.
 
 ### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
 
@@ -5412,96 +5414,6 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
-### [activity] BF-190 — reaching the walk summary saves a whole walk, at the PLANNED duration, 27 seconds in
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake, found while answering the owner's
-  question about a blank calories tile). **Lane: B** — `components/guided-walk/walk-summary.tsx`.
-- **⚑ MEASURED — two rows in production for one walk, both claiming 40 minutes and 133 kcal.**
-  `activity_logs` for 2026-09-24:
-
-  | id | created (Brisbane) | start–end | duration | steps | avg HR | cadence | kcal |
-  |---|---|---|---|---|---|---|---|
-  | `b8083d04` | **09:18:27** | 09:18 → 09:58 | **40** | — | — | no | **133** |
-  | `d0231b08` | 09:59:28 | 09:19 → 09:59 | 40 | 3190 | 92 | yes | 133 |
-
-  The second row is the real walk. **The first was written 27 seconds after its walk started** and
-  claims the whole session — a 40-minute end time that had not happened yet, and the calories to
-  match. The day now holds 80 minutes and 266 kcal of treadmill walking against 40 and 133 actually
-  done.
-- **⚑ OWNER CONFIRMED THE TRIGGER 2026-09-24, and it sharpens the root cause below.** *"I started a
-  walk; then closed it - I guess it didnt fully close it? that should be looked at too."* So the
-  09:18 row came from **End walk**, not a crash or a mis-tap — which makes this reproducible on
-  demand and moves the defect earlier than the mount-save.
-- **⚑ THE REAL ROOT CAUSE: the two exits are the SAME CALL, and neither carries how long the walk
-  ran.** In `walk-active.tsx`, finishing naturally —
-  ```ts
-  if (e >= plan.totalSec && !finishedRef.current) {   // :142
-    finishedRef.current = true
-    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
-  }
-  ```
-  and ending early —
-  ```ts
-  onLeave={() => {                                    // :279
-    if (finishedRef.current) return
-    finishedRef.current = true
-    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
-  }}
-  ```
-  are **byte-for-byte the same callback with the same two arguments**. `WalkSummary` then receives
-  only `config`, `samples`, `cadence` and `startedAtMs` — nothing that says whether the walk ran to
-  completion or was stopped after 27 seconds. **It cannot tell, so it assumes the plan.** The
-  elapsed time is right there in the same component (`elapsedSec`, `:140`) and is dropped at the
-  boundary.
-- **⚠ This is an instance of a bug class CLAUDE.md already names.** *"Mutation-callback contract:
-  completion callbacks must carry the written entity, not fire as a parameterless 'please
-  refetch'."* Same shape — the callback fires without the fact that matters and the receiver
-  reconstructs it wrongly. Worth citing in the fix so the rule earns another example rather than
-  being rediscovered.
-- **⚠ And the UI already promises the distinction it does not keep.** `leave-walk-dialog.tsx` reads
-  *"Ending now will stop it early."* The lifter is told the walk will be recorded as stopped early;
-  it is recorded as a full session at the planned duration. That is the sentence the fix has to make
-  true.
-- **So the fix has two halves, and the first is the one that matters.** Pass the elapsed seconds
-  through `onFinish` and have `WalkSummary` use it for `durationMin` and `endTime`. The plan stays
-  the right source for the *interval structure* (`buildIntervalPlan` drives the per-segment stats) —
-  only the wall-clock fields move to the clock.
-- **Secondary — the mount-save makes it unrecoverable.** `walk-summary.tsx:130` saves on **mount**,
-  guarded only by a ref that lives for one mount:
-  ```ts
-  useEffect(() => {
-    if (savedRef.current) return
-    savedRef.current = true
-    void saveWalk()
-  }, [])
-  ```
-  and what it saves is the **plan**, not what happened:
-  ```ts
-  const durationMin = Math.round(plan.totalSec / 60)              // :61 — the PLAN
-  const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000) // :140 — start + the PLAN
-  ```
-  So the row is written before the lifter can see what it says, let alone decline it. Even with the
-  duration fixed, there is no beat at which a 27-second walk could be discarded — which is why the
-  floor below is part of the fix and not a nicety.
-- **The calories follow the duration, which is why both rows read exactly 133.**
-  `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
-  type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
-  133 kcal, every time, and it is indistinguishable from a real one in the row.
-- **→ Whether a sub-minute walk should be saved at all is BF-191, and so is the phantom row.** Both
-  are the owner's and were split out on 2026-09-24 so the Orchestrator can put them to him; they
-  were buried in this body, where the lane field routed them to an implementer instead. **This entry
-  does not wait on that** — passing the real elapsed time through is correct under either answer.
-- **The phantom row is already in the history** and feeds `build-day-audit.ts:257`. That is BF-191's
-  second decision, not this entry's.
-- **Sibling sweep:** `done-activity-screen.tsx` takes the same write path but navigates away the
-  instant it saves (recorded under BF-107), so it has no mount-save. `walk-active.tsx` does not
-  write. This is the guided-walk summary alone.
-- **Verification:** start a guided walk, leave within a minute, and confirm either no row or a row
-  whose duration matches the seconds actually walked. Then complete a full walk and confirm the
-  duration still matches. **Device look owed** — the local-store branch is the one that runs on the
-  APK and `getLocalStore` returns null in the sandbox.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the natural finish is at `walk-active.tsx:143-145`, leave at `:279-283`, `elapsedSec` at `:57`; `walk-summary.tsx` mount-save is at `:131-133`. **Also `:160` `computeAvgPaceSecPerKm(…, plan.totalSec)`**, a third plan-derived field. Remove *"the floor below is part of the fix"*: the floor moved to BF-191.
-
 ### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake, found while resolving a real
@@ -5546,6 +5458,26 @@ why the count of affected entries always understated the harm.
   the fix should be read with that in mind: a unique filename per fold ends the collision, while a
   convention ("check `main` first") cannot, because both lanes checked and both were right at the
   time they looked.
+
+- **✅ THE COLLISION IS FIXED, 2026-09-24 (Lane B) — the cheaper of the two answers this entry
+  names.** `part` now starts past the highest `-N` already on disk for that date, so a second fold
+  writes `-2` and cannot overwrite a file it has never touched. Taken as a tooling call rather than
+  brought back here, because the measurement below rules out the alternative: a convention cannot
+  close a race whose window IS the check.
+  Verified by count, since the failure is silent and passes `check-doc-links`: the second fold of
+  2026-09-24 left `folded-1` at **26** anchors untouched and wrote **41** into `folded-2`; anchors
+  across all history files went 645 → 686, entries 69 → 29.
+- **Keep ①: the additive write is still the better long-term answer** and is not done. One file per
+  day is tidier than N, and it is what makes a same-day fold idempotent rather than merely safe. It
+  loses today only because it has to merge two documents correctly and corrupts the archive when it
+  does not — which is the failure this entry exists for.
+- **Keep ②: the recovery path, untouched.** Nothing reports which entries a past fold dropped, and
+  #1484's losses are only in git history. That half is unaffected by the fix above.
+- **📊 Second live instance, and the reason the fix could not wait:** it happened again on
+  2026-09-24. The 60-entry limit fails for EVERY lane at once, so two lanes started the same fold
+  within an hour — Lane A folded 25 (#1543, merged) and Lane B 40 (#1545, closed unmerged). Nothing
+  was destroyed that time by ordering rather than by any check. It then blocked a third PR the same
+  evening, which is what prompted this.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 

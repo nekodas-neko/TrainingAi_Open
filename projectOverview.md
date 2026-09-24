@@ -3035,7 +3035,7 @@ and nothing asks for a new value. No invalidation was added: all five keys were 
 and are now checked against `lib/cache-groups.ts` in the test. Owed: the device check, which is the
 Device Verification agent's — and **RV-124's device probe settles this class by measurement**,
 these three included. Detail:
-[`docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md`](docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md).
+[`2026-09-23-rv106-rv107-rv109-stale-surfaces`](docs/overview/history-2026-09-24-folded-2.md#2026-09-23-rv106-rv107-rv109-stale-surfaces).
 
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 
