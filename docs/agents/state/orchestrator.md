@@ -75,3 +75,22 @@ ids are composites covering several entries.
   for every lane (#1247, 2026-09-16): restructuring Q-305's `Keep:` removed a gate that
   `keep-gate-set-off.test.ts` pins **by name**. **A queue restructure is a code change to those
   tests.**
+
+## Owner-gate triage — where it got to (2026-09-24, OR-143/OR-144)
+
+76 entries carry `Gate: owner`. Seven of them were `Lane: O` as well, which PARKS them out of the
+Orchestrator's own READY list — the exact inversion CLAUDE.md now warns about. Four were ungated in
+OR-144 (`RV-113`, `BF-92`, `BF-24`, `Q-395`): each is genuinely the owner's judgement, and in each
+case nobody had put it to him, so the gate was what stopped it being asked.
+
+Three keep their gate correctly: `BF-106` (acknowledged, deferred, his action), `LB-52` (asked
+2026-09-24, he parked it ~5 h), `Q-551` (explicitly *"do not re-put this"* until Q-545 lands).
+
+**Owed, deliberately not done in OR-144:** the four sit at ranks 23, 40, 41 and below the cut, and
+CLAUDE.md says an owner question belongs near the top of `O`. Physically moving entries is the
+highest-conflict edit possible on the backlog, so it is its own pass rather than a rider on the
+ungate — doing both together risked losing both.
+
+**Also owed:** the other 69 gated entries are triaged only as a shape (~29 calibration that should
+arrive as a Tuning proposal, ~25 engineering calls wearing an owner gate, the rest product
+preference). Each still needs reading before it moves.

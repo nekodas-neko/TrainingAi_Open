@@ -473,126 +473,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [readiness][body][heart-rate] TN-55 — Body Battery loses 30 points a day net, so it is a countdown rather than a battery; the threshold is not what is wrong with it 🔴 LIVE
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-21 · Tuning, measured against production while
-  writing up an owner-approved change that this measurement then overturned.
-- **Lane: A** — `app/api/body-battery/route.ts` (the constants), `packages/shared/src/health/body-battery-walk.ts`.
-- **Owner sign-off: RECEIVED 2026-09-21 for the direction** (the owner approved "fix the charge
-  threshold"; the threshold turned out not to be the binding constraint — see below — so the
-  *direction* stands and the *mechanism* is replaced). **The final rate constants are a scoring
-  change and need his sign-off on the numbers before they ship.**
-- **Supersedes the blocked half of TN-2** and demotes TN-52's quantile from "the fix" to "worth
-  having anyway". Both stay queued; neither is the answer to *"it's pretty much useless"*.
-
-**Measured on production, 2026-09-21, 84 days of `body_battery_daily`:**
-
-| | value |
-|---|---|
-| mean charge/day | **14.3** |
-| mean drain/day | **44.1** |
-| **mean net/day** | **−29.8** |
-| days ending at exactly 0 | **24 of 84 (29%)** |
-| days that charged *nothing* | **17 of 84 (20%)** |
-
-**A battery that nets −30/day is not a battery.** Nothing about it is informative: it is pinned to
-the floor on a third of days, and the only reason it is not always zero is the daily re-anchor at
-wake. That is the whole of the owner's report, and it is a *rate-balance* defect.
-
-**⚠ THE THRESHOLD IS NOT THE BINDING CONSTRAINT, AND THIS ENTRY EXISTS BECAUSE THAT WAS ASSUMED.**
-TN-2 and TN-52 both frame the problem as the charge ceiling (`HR_REST_THRESHOLD = 0.05` of reserve)
-sitting below the owner's quietest waking hour. Measured, time-weighted, binned in
-`Australia/Brisbane`:
-
-| date | mins below ceiling | of which awake | charge stored |
-|---|---:|---:|---:|
-| 2026-09-18 | 220 | 104 | **0** |
-| 2026-09-19 | 255 | 55 | 5 |
-| 2026-09-13 | 105 | 37 | 3 |
-
-**220 minutes below the charge ceiling produced zero charge.** Widening the ceiling to TN-52's p10
-quantile moves it from 60.1 → 61 bpm and buys **2.8% → 3.7%** of the day. It is not the lever.
-
-**The three multiplicative losses, in order of size.** Each was measured, not reasoned:
-
-1. **Sleep is excluded entirely.** `walkBodyBattery()` opens with
-   `samples.filter(s => s.tsMs >= p.wakeTime)`, so the longest low-HR stretch of the day cannot
-   charge. Modelled charge over the whole day vs waking-only, same formula: **12.7 → 6.1** on
-   2026-09-18. Roughly half the loss.
-2. **The charge ramp zeroes at the ceiling.** `delta = chargeRate × (1 − hrr/restThreshold) × dt`
-   reaches full rate only at or below resting HR — and the owner logs **0 minutes below his own
-   resting HR** on almost every day, which is near-tautological given how resting HR is derived. The
-   time-weighted mean multiplier is **0.30–0.50**, so the ramp costs about another 3×. Widening the
-   ceiling adds time at the *bottom* of this multiplier, which is why it buys so little.
-3. **`DRAIN_RATE` is 3× `CHARGE_RATE`** (0.60 vs 0.20 points/min per unit reserve) on top of both.
-
-**✅ THE FIT IS DONE — the plan is
-[`2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md)
-and the harness is committed** at `scripts/tuning/body-battery-replay.cjs`. This entry is now
-*implement the plan*, not *investigate*. Measured over 64 days, full-day replay of the shipped
-`walkBodyBattery`:
-
-| | shipped | proposed |
-|---|---:|---:|
-| median daily net | −85.1 | **−0.2** |
-| mean end value | 14.8 | **59.2** |
-| sd of end value (spread) | 26.4 | **28.0** |
-| days ending at 0 | **66%** | **5%** |
-
-**⚠ THE BIGGEST FINDING IS NOT ARITHMETIC: 61% of all drain is the STRESS term**, it exceeds HR drain
-on **49 of 65 days**, and it correlates **−0.61** with the day's end value. The Body Battery is mostly
-a rendering of the daytime-stress metric — whose **sign is unvalidated** (TN-33, TN-21, TN-22), and
-which the owner declined to validate on 2026-09-21. The plan's `STRESS_DRAIN_RATE = 0.05` is a
-deliberate **de-weighting of an untrusted input**, not a calibration of a trusted one. Do not raise it
-back until TN-33 settles the sign.
-
-**⚠ NO REPLAY ENDPOINT WAS NEEDED, and TN-2 was wrong that one would be.** `walkBodyBattery` is
-already a pure function of its inputs (LA extracted it for exactly this), so the fit runs offline
-against production reads. TN-56 is still worth building for the 25 sleep-staging constants, whose
-inputs are never persisted — but it does **not** gate this entry.
-
-**⚠ RE-MEASURED 2026-09-24 — IT IS WORSE THAN THIS ENTRY'S HEADLINE, and the owner moved it to the
-top of Lane A on that basis.** Still `model_version` `v5`, and over the **last 40 days**: charge
-**1.6**/day against drain **56.4**, so net **−54.8**, with **25 of 40 days ending at zero (63%)** and a
-mean end value of **12.1**. The entry's "−30 a day" came from 84 days; the recent window is roughly
-twice as bad and charge has nearly stopped. **Do not treat the plan's before-figures as current** —
-re-run `scripts/tuning/body-battery-replay.cjs --validate` and re-read them before quoting any of them.
-
-**⚠ TN-55 IS Q-272's MISSING PROPOSAL, and the plan was REVISED 2026-09-23 after reading it.** Q-272
-(`[readiness][body]`, filed 2026-08-15) is the pre-existing entry for this defect and had been waiting
-for a Tuning proposal the whole time; TN-55 did not check for it before filing. Two things changed as a
-result, both in the plan's **§6a**: **overnight charging is OUT** (Q-272 is right that the wake anchor
-already accounts for the night, and the re-fit without it is strictly better — 0% of days ending at zero
-against 5%), and **Q-272's `r = +0.67` acceptance test does not replicate** (0.252 over 70 days, below
-readiness's own 0.361 autocorrelation), so it must not be used to sign this off. **Build from the plan,
-not from this entry's first version.**
-
-**✅ OWNER DECIDED 2026-09-22 — ship the four structural changes NOW with the provisional constants,
-and re-sweep after 2026-10-04.** He accepted that the battery re-scores twice as the price of not
-leaving it a countdown for another fortnight. So: build it, note in the changelog that the numbers are
-provisional, and re-run `scripts/tuning/body-battery-replay.cjs` once the window opens — the gain is a
-single dial, so the second pass is small. **The battery's recompute is NOT part of the batched
-readiness re-score** (LA-122): it writes `body_battery_daily`, a different table, so it stands alone.
-
-**⚠ THE CONSTANTS CANNOT BE FINALISED BEFORE 2026-10-04.** The dose stepped 0.5 mg → 1 mg on
-**2026-09-13**, so the calibration-period rule at the head of this file puts the earliest honest fit
-three weeks after that. The four **structural** changes do not depend on the window and can ship now;
-re-run the sweep afterwards and adjust the single gain dial.
-
-**How many other days this moves — all 84, and that is the point.** Any fix re-scores the whole
-history (the owner chose recompute over freeze, 2026-08-26). The pass test is distributional:
-**median net within ±5 of zero, days-at-zero under ~10%, and the spread preserved** — a fix that
-flattens every day to 50 has destroyed the signal rather than calibrated it.
-
-**⚠ Fit against a window that excludes the titration ramp-up.** The owner confirmed 2026-09-21 that
-the dose is now stable at 1 mg. Use data from **21 days after the last dose change onward**, and
-require ≥28 days — see the calibration-period rule at the head of this file.
-
-**⚠ Do not "fix" this by raising the anchor.** A higher start value hides the net drain for a few
-more hours and makes the same countdown read better, which is worse than the current state because
-it is no longer visibly broken.
-- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** still model v5, and **27 of 52 v5 days end at 0**. The constants cannot be fitted before **2026-10-04**. Side finding for Lane A: **09-23 stores charge 0, drain 0, end 41 on a day the ring wrote 203 HR samples**. Find out why that walk saw no HR before fitting.
-
 ### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
@@ -1700,6 +1580,44 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
   because a reader in either place stops looking. The selector is the defect, not the entries.
 
+### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
+
+- **Lane:** A — `app/api/body-battery/route.ts` (the constants only). **Added:** 2026-09-24 · Lane A,
+  as the stated residue of TN-55.
+- **⚠ CARRIED FORWARD FROM TN-55, and it is a precondition on the fit rather than a note.** Review
+  sweep 56 added this to TN-55 on `main` on 2026-09-24, hours before TN-55 was removed; it would
+  otherwise have gone with it. Verbatim: *"still model v5, and 27 of 52 v5 days end at 0. The
+  constants cannot be fitted before 2026-10-04. Side finding for Lane A: 09-23 stores charge 0,
+  drain 0, end 41 on a day the ring wrote 203 HR samples. Find out why that walk saw no HR before
+  fitting."*
+- **The first half is now shipped and the second half is not.** TN-55 landed the rebalance, and the
+  27-of-52 measurement corroborates it (independently replayed at 67% of 66 days ending at zero).
+  **The 09-23 row does not.** A walk that sees no heart rate on a day with 203 stored samples is a
+  separate defect, and the obvious suspects are the ones that have bitten this route before: a wake
+  anchor landing after the day's samples (the Q-17 nap shape), or the TN-20 empty-read path. Settle
+  it **before** fitting — a fit whose input includes days the walk could not see is fitted to the
+  wrong thing.
+- **⚠ CANNOT START BEFORE 2026-10-04, and that is a date rather than a blocker** — written as prose
+  because the queue's fields express another entry or an owner/device wait, and this is neither.
+  The dose stepped 0.5 mg → 1 mg on 2026-09-13; the calibration-period rule at the head of this file
+  puts the earliest honest fit three weeks after that. An implementer reaching this before the date
+  should skip it rather than fit against the ramp-up.
+- **What shipped, and why it is provisional.** TN-55 landed the flat charge ramp plus
+  `CHARGE_RATE` 0.120 / `DRAIN_RATE` 0.080 / `STRESS_DRAIN_RATE` 0.020 — a base fit (0.30 / 0.20 /
+  0.05) scaled by a global gain of 0.40. The owner chose on 2026-09-22 to ship inside the dirty
+  window and re-sweep after it, accepting that the battery re-scores twice rather than staying a
+  countdown for another fortnight. **This entry is the second half of that decision**, and without it
+  the provisional numbers simply become permanent.
+- **It is one dial.** Balance holds at zero across the gain range, so the re-sweep adjusts the gain
+  and nothing else. Re-run `scripts/tuning/body-battery-replay.cjs`; the pass test is unchanged —
+  median daily net within ±5 of zero, days-at-zero under ~10%, and the spread preserved rather than
+  flattened.
+- **Bump the model version prefix again** (v6 → v7) if the walk's shape changes; a constants-only
+  change is already carried by the interpolated string.
+- **Do not raise `STRESS_DRAIN_RATE` back** on the argument that stress "should" matter more. It was
+  cut 10× as a de-weighting of an input whose sign is unvalidated (TN-33, TN-21, TN-22), not as a
+  calibration of a trusted one. TN-33 settling that sign is what reopens it.
+
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
 - **Lane:** O — the owner authorises closing PRs (CLAUDE.md Safety & Reversibility), exactly as he
@@ -2764,7 +2682,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
   toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
 
-- **Gate: owner**
+- **Ungated 2026-09-24 (OR-143).** It IS the owner's call — a daily interaction he never asked to have changed — but nobody has put it to him, and `Gate:` parks the entry out of the Orchestrator's own READY list, so the gate was what stopped it being asked. Asking is the work; the work is `Lane: O`.
 - **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
   and the file paths below are right; what is missing is permission to spend it. This entry ends by
   saying its two open questions "decide whether this is worth doing at all", and both are
@@ -11985,8 +11903,8 @@ one. A swipe on the single Start button adds an affordance that does not current
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
 - **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
-- **Gate: owner** — a deliberate client-side throw in **production** may page someone. Ask before it
-  is fired; once he says yes it is a measurement with one objective answer and goes straight to `DV`.
+- **Ungated 2026-09-24 (OR-143).** A deliberate client-side throw in **production** may page someone, so it is still asked before it is fired — but that ask is one sentence and it is the Orchestrator's to make. `Gate:` parked it instead, which is why thirteen days of silence went thirteen more.
+  Once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
@@ -14718,7 +14636,7 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 
 - **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
 - **Lane: O**
-- **Gate: owner** — re-laned 2026-09-24; was `B` with a device gate. Every buildable item below is
+- **Ungated 2026-09-24 (OR-143), re-laned the same day from `B` + device gate.** Every buildable item below is
   closed with a reason (② shipped, ③ ⑥ ⑦ each decided), so what remains is **artboard parity plus
   the owner's ④ watching brief on grouped-section backgrounds**. Whether a screen matches a drawing
   is a judgement about whether it looks right, which per CLAUDE.md waits on the owner even though
@@ -14844,7 +14762,7 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Gate: owner** — re-laned 2026-09-24; was a device gate. *"Do the drawn screens match what
+- **Ungated 2026-09-24 (OR-143), re-laned the same day from a device gate.** *"Do the drawn screens match what
   shipped"* is a judgement, not a measurement, and **`RV-143` already read this entry as mis-gated
   rather than device-blocked** — both sweep plans exclude it for that reason. See the ⚠ below. Every phase has shipped and this is the completion
   checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
