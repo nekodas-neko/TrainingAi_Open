@@ -16587,3 +16587,9 @@ to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the D
 and the owner's authorisation for a production write — a bare lane change would not tell the device agent
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
 `laneFromLines` is first-match-wins.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 56, `review/sweep-56-owed-reads`.**
+28335 → 28424 (+89). Twenty-three dated reading notes on entries whose owed read was run
+today, and four new entries (RV-159 an unattributed rewrite, RV-160 closures, RV-161 owner decisions,
+RV-162 a `Due:` field). Reading notes are the point of this sweep: each replaces a claim with a
+measurement on the entry that made the claim.
