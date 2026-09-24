@@ -473,7 +473,7 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] OR-150 — seven scoring entries have carried a gate their own text calls premature since 2026-09-16
+### [platform] OR-150 — thirteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
 - **Added:** 2026-09-24 · OR-150, the last slice of the `Gate: owner` triage.
@@ -484,7 +484,19 @@ sign a blank page — and it has been counting as owner debt in every sweep mean
 is Tuning's, not theirs."* **The paragraph went in and the field did not come out.** Eight days
 later all seven still carried the gate, and every sweep since has counted them as the owner's.
 
-**The seven:** `Q-275` · `Q-508` · `Q-515` · `Q-516` · `Q-522` · `Q-523` · `Q-149`.
+**The original seven, all carrying OR-117's paragraph:** `Q-275` · `Q-508` · `Q-515` · `Q-516` ·
+`Q-522` · `Q-523` · `Q-149`.
+
+**Six more, added 2026-09-24 by OR-153** after reading every remaining owner gate: `BF-174` ·
+`LA-113` · `PS-27` · `RV-43` · `Q-289` · `Q-290`. These did not carry the paragraph — their gates
+said *"a scoring change: Tuning proposes, the owner signs off, Lane A implements"* and then
+gated on the owner anyway. Same shape, arrived at independently.
+
+**`Q-279` was checked and deliberately NOT moved.** Its gate already states the number a proposal
+owes — *"moves ~20% of days at the deload boundary and turns 4 taper days"* — so it is genuinely
+ready for him. **A scoring gate is not automatically premature**; the test is whether the
+days-moved figure is there, and a sweep that skips that test would have moved a ready entry
+backwards.
 
 **Why the field survived a correct diagnosis — and this is the part worth keeping.** Removing the
 gate would have released them into Lane A's READY list, and a scoring change with no proposal is
@@ -493,20 +505,20 @@ brake in reach. **There is no `Lane:` value for Tuning** — the lanes are `A`, 
 entry that owes a Tuning proposal has no field that says so. That is the gap, and it is why a
 correct triage could not act on itself.
 
-**What this entry does about it:** each of the seven now carries `Needs: OR-150` in place of the
+**What this entry does about it:** each of the thirteen now carries `Needs: OR-150` in place of the
 owner gate. They stay parked, for the true reason, and they stop counting as owner debt. When the
-proposals exist this entry leaves the queue and all seven unpark together.
+proposals exist this entry leaves the queue and all thirteen unpark together.
 
-**The deliverable is seven Tuning proposals**, each stating **how many other days the change moves**
+**The deliverable is thirteen Tuning proposals**, each stating **how many other days the change moves**
 — which is what `CLAUDE.md` already requires of a proposal and what none of these has. Tuning reads
 the backlog, so an `O` entry naming them is the channel; writing into another agent's baton is not
 the Orchestrator's to do.
 
-- **Done when** every one of the seven has a proposal, or has been withdrawn with a reason. Not when
+- **Done when** every one of the thirteen has a proposal, or has been withdrawn with a reason. Not when
   this has been read.
 - **Deliberately NOT done here: inventing a `Lane: T`.** Tuning picks its work from its own sweeps
   rather than a lane queue, so a fifth lane value would be a channel nobody reads, and it would need
-  `next-item.js`, `lane.js` and `entry-id.js` changed to carry it. Revisit only if these seven prove
+  `next-item.js`, `lane.js` and `entry-id.js` changed to carry it. Revisit only if these thirteen prove
   that a standing channel is needed rather than one entry.
 
 
@@ -2541,36 +2553,6 @@ drift.
   - The first set of dates comes from this sweep's TOO-EARLY list: TN-58 09-29 / 10-06, TN-55
     10-04, Q-507 10-16, TN-50 10-17, TN-25 10-18, LA-110's evidence expiring 10-06.
 - **Reversal cost:** delete the field and one print block.
-
-### [sleep][readiness] RV-163 — "last night" is picked by four different rules, so a long daytime rest can become the night the scores grade
-
-- **Lane: A** — shared night selection in `packages/shared/src/health/sleep-night.ts` and its consumers.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **The rules, confirmed in code:**
-  - The rollup and `nightForDate` take the **longest** night period (`nightPeriodsByDate`,
-    `sleep-night.ts:164`). Its own comment says *"this is where it is made"*.
-  - The live readiness payload takes the **latest**: `nights[nights.length - 1]`
-    (`lib/health/readiness-payload.ts:360`).
-  - Body Battery also takes the **latest**, `nights.findLast(n => n.date === todayIso)`, and anchors
-    `wakeTime` on its `sleepEnd` (`app/api/body-battery/route.ts:164-166`).
-  - The score audit and backfill take the **earliest**, `nights.find(...)`
-    (`score-audit/sleep.ts:45`). So does `app/api/ai/health-insight/route.ts:119`.
-- **Why they disagree:** any window of at least `ALWAYS_NIGHT_MIN_HOURS = 4` h counts as a night
-  wherever it sits on the clock, so one date can hold two night periods.
-- **09-23 in production:** the overnight was 21:27–06:01 (7.92 h, efficiency 92). A daytime window
-  ran 10:42–17:25 (6.17 h, efficiency 91).
-  - The stored sleep contributors are total_sleep 49, efficiency 72, timing 10 and latency 72. They
-    match the **daytime** window; the overnight gives about 76 / 76 / 71 / 50.
-  - So the sleep score was **42**, and readiness, which took 42 as its previous night, was **44**.
-  - Body Battery stored `hr_sample_count` **2** and 0 drained, flat all day at its anchor of 41,
-    against 203 ring samples. Only a 17:25 wake leaves 2 samples.
-  - 08-27 has the same shape.
-  - TN-20's guard refuses only a drop from populated to 0, so a 2-sample read passes it; 09-23 came
-    two days after the guard shipped. **This is TN-20's unidentified trigger** for its non-zero cases.
-- **Fix shape:**
-  - Route every consumer through `nightPeriodsByDate` / `nightForDate`.
-  - Make Body Battery refuse a near-empty snapshot, not only an exactly empty one.
-  - Re-scoring 09-23 and 08-27 is the recompute path (RV-170).
 
 ### [nutrition] RV-171 — opening the meal-plan setup with a failed request silently deletes every saved dietary restriction
 
@@ -6900,10 +6882,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   window did for them. **The owner's two ideas pull in opposite directions on this day** — that is
   the finding, and it is the argument for fitting this properly rather than shipping a plausible
   table.
-- **Gate: owner** — and the proposal is incomplete until it states **how many other days it moves**,
-  per the standing Tuning rule. One day cannot settle it: every margin in the table above is inside
-  two points, and a calibration fitted to a single snapshot that silently re-scores months of history
-  is a rewrite, not a tuning.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Needs: BF-173** — that entry decides whether soreness double-counts at all. Fitting recovery
   constants underneath a scorer that then overrides them with a flat 40 would be fitting the wrong
   function.
@@ -7590,9 +7569,7 @@ helper the call site calls.
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
 - **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
-- **Gate: owner** — this is a scoring change. Tuning proposes, the owner signs off, Lane A implements.
-  TN-39 said so outright: *"Do NOT change the model on the strength of this before the owner sees the
-  result. The output is a number and a verdict, not a patch."*
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Measured**, model vs `rmssdFromRr` over the app's own 30-minute grid: **×0.30 of measured over 84
   buckets / 37 days**, ×0.32 over the 54 densest / 30 days, ×0.31 on the 14 buckets that join a scored
   stress bucket. The spread (sd of log-ratio 0.40) is far smaller than the bias, so it is a level
@@ -11256,7 +11233,7 @@ calories or the stage mapping (PS-16, PS-19).
 ### [workouts] PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours
 
 - **Lane:** A — `packages/shared/src/1rm.ts`. Sibling of RV-43.
-- **Gate:** owner — the calibration halves.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P4.
 
 All coordinator-verified through the shipped module. (a) `amrapScaleFactor`'s step table makes the
@@ -11633,7 +11610,7 @@ instead is the option that loses: a replay with no window gets one wrong answer 
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
 - **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
-- **Gate:** owner — the fix is a scoring decision, see below.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Added:** 2026-09-03, Review sweep 46 —
   [`write-up §2`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
 - **The module states this invariant and the 2026-07-10 workout review repeated it as a strength:**
@@ -12430,6 +12407,17 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
+- **⚠ THE PROBE IS ONLY VALID ON A GREEN PR — measured 2026-09-24, after it produced a false
+  positive.** Run against `#1544` while four checks were still `in_progress`,
+  `enable_pr_auto_merge` answered *"The pull request is in unstable status (required checks are
+  failing)"* — with **nothing failing**; that is the tool's paraphrase of GitHub's `unstable` state,
+  which here meant *pending*. The absence of the usual refusal read as evidence the rule had been
+  added. It had not: re-run eight minutes later on the same PR, all checks green, it returned
+  **"Pull request Protected branch rules not configured for this branch"** exactly as always. The
+  API checks mergeability BEFORE branch protection, so a pending PR never reaches the question you
+  are asking. **Re-probe only on green, and treat any other error as no answer.**
+- **Re-checked 2026-09-24 09:15 UTC: still not configured.** Put to the owner earlier that day; he
+  parked it for a few hours. Not re-asked since — the entry is the record.
 - **✅ HALF-ANSWERED 2026-09-24: E2E stays OFF the required-check list.** Put to him with `Q-297`
   as this batch; he chose to leave E2E advisory until `LB-56` establishes whether it gates anything
   real. **What is still owed is the classic branch-protection rule itself**, which he parked for a
@@ -21581,9 +21569,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
-- **Gate:** owner — a SCORING change, so the route is Tuning proposes → owner signs off → Lane A
-  implements (CLAUDE.md). This entry's own Lane bullet already said *"not an implementer's to take at
-  all"*; stated as prose it left the entry at the head of Lane A's READY list.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 - **Needs:** Q-290 — the input signal's own variance bounds what any calibration can achieve. Was
   prose (*"Depends on Q-290"*) and therefore invisible to the queue tool.
 
@@ -21658,8 +21644,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
 
-- **Gate:** owner — a scoring question: Tuning proposes, the owner signs off, Lane A implements. The
-  entry said so in prose, which the queue tool cannot read.
+- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
 
 - **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
   `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
@@ -24631,6 +24616,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
+- **✅ NOT rerouted to OR-150, checked 2026-09-24 (OR-153) — this one IS owner-ready.** Every other scoring gate went to Tuning because no proposal existed; this entry's gate already states the number a proposal owes (*"moves ~20% of days at the deload boundary and turns 4 taper days"*). A scoring gate is not automatically premature — check for the days-moved figure before assuming it is.
 - **Gate:** owner — the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
   firings into 1. Measured 2026-09-03, so this is a decision with numbers rather than a guess.
 - **Added:** 2026-08-15 · from the comprehensive review §2.2

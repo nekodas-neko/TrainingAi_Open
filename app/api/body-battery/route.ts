@@ -10,7 +10,7 @@ import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { walkBodyBattery } from '@trainingai/shared/health/body-battery-walk'
 import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { resolveAnchor, type AnchorSource } from './anchor'
@@ -177,7 +177,7 @@ async function buildBodyBattery(userId: string, tz: string) {
   // was discarded. On 2026-07-26 that produced a flat battery of 29 all day with
   // `hr_sample_count = 0`, while 164 ring samples sat unused after the real 05:54 wake (Q-17).
   const nights = nightSessions(sleepSessions, tz)
-  const todaySleep = nights.findLast(n => n.date === todayIso)
+  const todaySleep = canonicalNightForDate(nights, todayIso) ?? undefined
   const firstHrTime = hrRows.length ? hrRows[0].timestamp.getTime() : null
   const rawWakeTime = todaySleep?.sleepEnd?.getTime()
     ?? firstHrTime

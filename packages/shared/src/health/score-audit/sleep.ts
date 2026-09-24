@@ -12,7 +12,7 @@ import {
   sleepComponentsToContributors,
 } from '@trainingai/shared/health/sleep-score'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 
 import type { SleepSession } from '@trainingai/shared/types/body'
 import type { OuraDailyDerivedRow } from '@/lib/data/repository'
@@ -42,7 +42,7 @@ function splitNights(sessions: SleepSession[], date: string, tz: string) {
   // Nights, not sessions — a post-waking nap must never be picked as "the night" (F-1/Q-1), and a
   // night broken by a wake-up must come back as one. Shared derivation: lib/health/sleep-night.ts.
   const nights = nightSessions(sessions, tz)
-  const night = nights.find(s => s.date === date) ?? null
+  const night = canonicalNightForDate(nights, date)
   const prior = night
     ? nights.filter(s => s.sleepEnd.getTime() < night.sleepEnd.getTime())
     : nights.filter(s => s.date < date)

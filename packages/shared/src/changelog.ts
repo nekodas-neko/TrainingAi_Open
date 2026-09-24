@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.30",
+    date: "2026-09-24",
+    changes: [
+      "A long daytime rest can no longer be graded as last night. Any sleep over four hours counted as a night wherever it fell on the clock, and five parts of the app disagreed about which one to use when a day had two — so on 23 September your afternoon rest was scored instead of your actual night, giving a sleep score of 42 where the night deserved about 76, and a readiness of 44 built on top of that. They all use one rule now: the longest window on a day is that day's night.",
+      "Your Body Battery was flat that day for the same reason — it started counting from the end of the afternoon rest, so it saw 2 of the ring's 203 heart-rate readings. It now refuses to save a day that recorded no movement at all over one that did.",
+      "23 September and 27 August keep their old scores for now. Recalculating days you have already seen is a change to your stored history, so it needs your say-so first.",
+    ],
+  },
+  {
     version: "1.465.29",
     date: "2026-09-24",
     changes: [

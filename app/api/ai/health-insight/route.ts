@@ -17,7 +17,7 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { computeActivityScore } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { metric, splitMeasured, buildPrompt, type MetricLine } from './prompt'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     // so an evening nap could be handed to the model as last night's sleep — and the fallback to the
     // last row has the same exposure.
     const nights = nightSessions(sleepRows, tz)
-    const todaySleep = nights.find(r => r.date === date) ?? nights.at(-1) ?? null
+    const todaySleep = canonicalNightForDate(nights, date) ?? canonicalLatestNight(nights)
     entries = [
       metric('Sleep score', todayOura?.sleepScore != null ? `${todayOura.sleepScore}/100` : null),
       metric('Duration', todaySleep?.durationHours != null ? `${Math.round(todaySleep.durationHours * 60)} min` : null),
