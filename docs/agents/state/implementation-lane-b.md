@@ -22,8 +22,7 @@ do not re-ask or re-make). **BF-177's plan is STALE** — LB-128 (#1456) may hav
 ## Blocked / owed
 
 - **LB-134 is the owner's** (branch protection). Until he rules, read the five job CONCLUSIONS before every merge and expect the merge race below.
-- **A QUESTION FILED `Lane: O` COMES BACK** — RV-121's owner half returned as Lane B work in hours;
-  write the brief properly, then build it. Device checks are DV's to RUN, mine to RECORD.
+- **A QUESTION FILED `Lane: O` COMES BACK** — write the brief properly, then build it. Device checks are DV's to RUN, mine to RECORD.
 
 ## Claimed paths
 
@@ -37,12 +36,12 @@ do not re-ask or re-make). **BF-177's plan is STALE** — LB-128 (#1456) may hav
   instant the five are green; no run for your head = conflicted PR.
 - **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
   entry when the floor is a judgement rather than a fit.
-- **A BATCH CAN SHIP HALF.** `tab-switch-speed` said ship as one PR; the other half needed a device
-  measurement that does not exist. Shipping the measurable half and sharpening the rest beats a
-  speculative perf change nobody can verify — but SAY which half, in the PR and the entry.
-- **⚠ RE-RUN THE GATES AFTER MERGING THE BASE, NOT BEFORE.** The doc-size ratchet is BASE-RELATIVE:
-  `check:rules` passed, the merge of `main` consumed the slack, CI went red on #1574. Another lane
-  hit the same thing within four minutes, so it is the ordering, not a slip.
+- **A BATCH CAN SHIP HALF** — `tab-switch-speed`'s other half needed a device measurement that does not exist. Ship the measurable half and sharpen the rest; SAY which half, in the PR and the entry.
+- **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
+  lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
+  #1587 red; `no-console` allows info/warn/error) · `pnpm test` · `pnpm build` · `tsc`. The doc-size
+  ratchet is BASE-RELATIVE, so a clean run before merging `main` proves nothing — that put #1574
+  red, and another lane hit it four minutes later.
 - **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS** — two sweeps inserting at one point is two
   ADDITIONS; read the headings each side, then DIFF THE FULL HEADING SET after every merge (#1481
   silently deleted RV-117/118).

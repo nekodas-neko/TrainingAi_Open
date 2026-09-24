@@ -35,7 +35,7 @@ test('OR-162 — census: canvases mounted per tab, and how many are hidden at an
   // Visit every tab so each panel has mounted and fetched; TabShell keeps them alive afterwards.
   for (const label of TABS) {
     const link = page.locator('nav').getByRole('link', { name: label, exact: true })
-    if (!(await link.count())) { console.log(`OR-162 census: no nav link for ${label}, skipped`); continue }
+    if (!(await link.count())) { console.info(`OR-162 census: no nav link for ${label}, skipped`); continue }
     await link.click()
     // Charts fetch before they draw; a short settle is what makes this a census of the steady
     // state rather than of whatever had loaded by the time the click returned.
@@ -63,7 +63,7 @@ test('OR-162 — census: canvases mounted per tab, and how many are hidden at an
     }
   })
 
-  console.log('OR-162 canvas census:', JSON.stringify(census, null, 2))
+  console.info('OR-162 canvas census:', JSON.stringify(census, null, 2))
 
   expect(census.panels).toBeGreaterThan(0)
 
