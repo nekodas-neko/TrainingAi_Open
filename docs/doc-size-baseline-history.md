@@ -14941,7 +14941,6 @@ need a backfill that does not exist and is a production write, and the condition
 reads see nothing is still unidentified.
 
 
-
 ## 2026-09-21 — TN-35's overlay half, and how it came to be startable
 
 `docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
@@ -16537,3 +16536,62 @@ and each would otherwise be invisible: the constants are provisional until the 2
 the stored history does not re-score although the plan said it would, and a workout day still barely
 separates from a rest day. Per the archive rule an entry stays here while anything is outstanding,
 so this is the row that has to exist, and it is written to the owner rather than about the code.
+**2026-09-24 · `docs/implementation-backlog.md` · Review, `review/dv-results-and-new-probes`.**
+27947 → 28052 (+105; rebased on #1498). Nine new Review entries: three findings from device sweeps 1–3 that had no
+entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
+re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
+to run. Offset by removing RV-126, whose results all have homes (−30).
+
+
+## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
+
+Growth from the orchestrator's review of device sweep 3.
+
+**Backlog +66.** One new entry, `OR-139` — a device FAILURE does not clear the field that makes an
+entry read as finished, found after fixing five instances by hand (`BF-61`, `BF-139`, `BF-96`,
+`RV-103`, `TN-53`). The rest is the corrections themselves: each of the five needed its field
+removed, its title made true, and an acceptance criterion written, because a failed check is work
+and the old wording said otherwise.
+
+**CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
+contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
+available fix is telling agents to ignore it, with the reason.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → LB-139 out, LB-140 in
+
+28104 → 28117 (+13 on the merged base). Net of a 13-line removal and a 26-line
+addition, landing under Review's sweep in the same hour. LB-139 shipped, so it left the
+queue. LB-140 is what verifying LB-139 turned up: the step-by-step meal-plan setup sheet does not
+open at all, on `main` as well as on the branch. The entry is longer than the defect because most of
+it is what has already been ruled out — the control run against `main`, the intact wiring, the
+absence of any console error — and the one thing that has NOT been checked, which is whether it
+reproduces outside the dev server. Writing that down is what stops the next session re-running the
+same four probes.
+## 2026-09-24 — `CLAUDE.md` 966 → 990, `docs/implementation-backlog.md` → 28090
+
+The owner's standing instruction that a question for him becomes a task rather than a chat message,
+plus BF-191 carrying the two decisions it split out of BF-190. The CLAUDE.md growth is one rule, and
+most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, so gating an owner
+question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
+asking. Stating the rule without stating that inversion would have produced exactly the failure the
+rule is for.
+---
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
+28168 → 28240 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
+not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
+seven device gates are re-filed.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md`
+
+28240 → 28335 (+95, after four merges of `origin/main` — the earlier figures on this branch were
+against bases that had already moved). Three owed checks re-laned
+to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the DV-13 concurrency hazard
+and the owner's authorisation for a production write — a bare lane change would not tell the device agent
+any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
+`laneFromLines` is first-match-wins.

@@ -1,12 +1,12 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-140 (LB-139 filed 2026-09-24) — allocate by grep, and check the JOURNAL too: a
+**Next ID:** LB-141 (LB-140 filed 2026-09-24) — allocate by grep, and check the JOURNAL too: a
 shipped entry leaves the queue, so the backlog alone reads low.
 
 ## Now
 
-DV-16 shipped (#1501). DV-17 in flight (#1504). Eleven PRs merged in the 2026-09-23/24 run.
+DV-16/17, the DV-18 handover, LB-139, RV-144 shipped. LB-140 → `DV`: no prod-mode boot in a container.
 
 ## Next
 
