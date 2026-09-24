@@ -1519,6 +1519,126 @@ which is the right shape for something that can only be validated by living with
   that the stored-1RM-to-set-weight ratio is a join artefact. Both stand; do not re-measure them.
 
 
+### [workouts] TN-75 — the load prescription IS followed; what regressed is the field that lets anyone check, from 93% coverage in August to 72% in September
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, completing TN-64's question from the other
+  side: readiness gates no prescription, so does the prescription itself reach the bar?
+- **Lane: A** — `planned_*` is written on the set-log path, engine territory.
+- **The good news first, and it is a real non-finding worth recording.** Where both planned and actual
+  are present (432 sets): mean load deviation **−0.81 percentage points** (sd 3.45), with **214 of 432
+  (50%) inside half a point of plan**. Reps: **228 of 432 exact**, mean deviation **+0.45**, and only
+  **17 sets under** the prescribed reps. So the owner follows the prescribed load closely and overshoots
+  reps slightly rather than falling short. **The prescription path works.** What TN-64 found disconnected
+  is the readiness *input* to it, not the mechanism — worth separating, because "the app's advice is
+  ignored" would be the wrong conclusion to draw from TN-64 alone.
+- **The regression.** `planned_pct` coverage by month, over sets joined to their sessions:
+
+  | month | sets | with a plan | coverage |
+  |---|---:|---:|---:|
+  | 2026-05 | 332 | 0 | **0%** |
+  | 2026-06 | 165 | 0 | **0%** |
+  | 2026-07 | 372 | 147 | 40% |
+  | 2026-08 | 266 | 247 | **93%** |
+  | 2026-09 | 151 | 109 | **72%** |
+
+  The field arrives in July, reaches 93% in August, then **falls 21 points in September**. Coverage going
+  backwards is the finding; the 0% before July is just the field's age.
+- **Two distinct shapes inside the September gap.**
+  - **A five-session hole, 2026-09-07 → 09-12: 24 sets, ZERO with a plan.** Those five sessions also ran
+    **4–5 sets each against 10 in every session either side**, and all carry `intensity_mode` NULL where
+    the 2–6 September sessions carry `'deload'`. A different regime, not scattered loss.
+  - **A steady residue elsewhere**: sessions from 09-14 on sit at 8 of 10 with striking consistency.
+    Measured against set position, the loss is **even — 7 of 40 missing on set 1 and 7 of 40 on set 2** —
+    so it is **whole exercises lacking a plan, not late sets losing one.**
+- **⚠ THE OBVIOUS UNIFICATION WITH TN-74 IS FALSE, and I nearly filed it.** `planned_pct` derives from a
+  1RM, so a log with `estimated_1rm = 0` should have no prescribable percentage — which would have made
+  TN-74 and this one defect. Measured over sets since 2026-07-01: **16% of sets WITH a plan sit on a
+  zero-1RM log (81 of 503), against only 4% of sets WITHOUT one (11 of 286).** The association runs the
+  *opposite* way to the prediction. Missing `style_id` does not explain it either (13 of 286).
+  **They are two independent defects** and must be worked as such.
+- **Why this matters for tuning specifically.** `planned_pct` is the only column that makes
+  prescription-adherence measurable at all. The adherence figures at the top of this entry could only be
+  computed on **39% of sets** (503 of 1,286), and on the five-session hole they cannot be computed at
+  all. Every future claim about whether the app's advice was taken is limited by this coverage, so the
+  regression costs the analysis, not just the record.
+- **Acceptance criteria:** September-onward coverage returns to August's level or better; the five-session
+  window's cause is identified (whatever produced 4–5-set sessions with no plan and a null intensity
+  mode); and a set written with no available plan is distinguishable from one never asked, rather than
+  both reading NULL.
+- **What this does NOT establish.** Why those five sessions differ. Which exercises carry the steady
+  residue — the even split by set position says it is per-exercise, but the exercises were not named.
+  And whether the −0.81-point mean deviation is the owner rounding to available plates or genuinely
+  under-loading; a plate-rounding check would settle it and was not run.
+- **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
+  written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
+
+### [readiness][sleep][workouts] TN-73 — the RPE residual PASSES a positive control, which turns the scores' null into a measured ceiling: they move perceived effort ~5× less than doing one more set
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. **This is the first thing all session to
+  pass a validation rather than fail one**, and it upgrades TN-65 from a proposal to a calibrated
+  instrument.
+- **Lane: O** — it settles what the scoring work may claim and sets the acceptance bar for future
+  calibration; no code follows directly.
+- **Reference:** every future scoring proposal reads this for its acceptance bar; nothing is built FROM
+  it. **This is the field used correctly**, in contrast to TN-56, TN-59, TN-63 and TN-64, where I wrote
+  `Reference:` meaning "background reading" and so filed buildable work as read-only. The distinction:
+  those entries had work in them, this one has a standard in it.
+- **The positive control, which TN-65 never ran.** A residual is worthless unless it detects something
+  known. Within-session fatigue is the obvious candidate: later sets of the same exercise at the same
+  load should feel harder. Residual = RPE minus the mean for that exercise at that planned-intensity
+  band, by set number:
+
+  | set | n | mean residual |
+  |---:|---:|---:|
+  | 1 | 303 | **−0.094** |
+  | 2 | 253 | −0.021 |
+  | 3 | 145 | **+0.154** |
+  | 4 | 80 | +0.129 |
+
+  `corr(set_number, residual)` = **+0.156 over 782 sets** (p ≈ 1×10⁻⁵). **And the residual beats raw
+  RPE at this**: raw gives +0.148, so removing the load effect *strengthens* the fatigue signal rather
+  than washing it out — which is exactly what a sound residual does, and is the evidence that the
+  correction is doing real work.
+- **⚠ The raw comparison alone would have been a false positive.** Mean RPE rises 7.30 → 7.84 across
+  sets 1→4, but mean planned intensity rises too (73.0% → 77.8%), so the raw rise is partly just
+  heavier sets. Only the residual separates the two.
+- **So the instrument's sensitivity is now known: it resolves an effect of about 0.25 RPE points**
+  (set 1 → set 3) at this sample size. That number is what makes every null below meaningful instead of
+  merely absent.
+- **The scores, measured against it — at matched exercise, load band AND set number (527 sets):**
+
+  | | correlation with residual | poor days | good days | difference |
+  |---|---:|---:|---:|---:|
+  | `sleep_score` | **+0.001** | −0.113 (<50, n=98) | −0.068 (≥70, n=342) | **0.045**, wrong sign |
+  | `readiness_score` | −0.053 | — | — | ~0.04 (TN-69's figure) |
+
+- **The finding, stated as a ceiling rather than an absence.** The instrument demonstrably sees
+  **0.25**; neither score moves perceived effort by even **a fifth** of that, and the sleep-score
+  difference points the wrong way (a night the app scores under 50 feels marginally *easier*). **Doing
+  one more set of the same exercise at the same load changes how hard training feels roughly five times
+  more than the difference between the app's best and worst sleep nights.**
+- **⚠ What this does NOT license, and the distinction matters.** It is a statement about **perceived
+  effort during training**, which is one narrow outcome. The scores may well predict things this cannot
+  see — injury risk, long-run adaptation, mood, illness onset — and RPE is self-reported with an sd of
+  0.94, so it is a blunt instrument even when working. **Do not write "the readiness score is
+  meaningless" anywhere on the strength of this.** Write: *it does not predict how a session will feel,
+  by a measured margin.*
+- **What it changes for calibration work.** Any future scoring proposal now has a real acceptance test
+  with a known floor: **a change that claims to make a score better reflect the owner's state should
+  move the residual, and the bar to beat is 0.25.** A calibration that shifts the residual by 0.04 has
+  not been validated by this instrument — it has been shown to be below its resolution. That is a far
+  more useful standard than the distributional tests the scoring work has been using, which only ever
+  compare a score to itself.
+- **Assumptions worth checking before leaning harder on this.** `oura_daily_derived.day` is taken to key
+  the sleep score to the night *ending* that morning, so "poor sleep" means the night before the
+  session — not verified against the sleep-session boundary. And the 527 sets come from the same ~40
+  training days, so sets within a day are correlated; the set-level n overstates independent
+  observations, which inflates confidence in the *correlations* while leaving the *group means*
+  (the 0.045) sound.
+- **Where the mechanism is:** `claude_ro.set_logs.rpe` / `intensity_pct` / `set_number`, joined through
+  `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`; the residual partitions on
+  `(exercise_name, width_bucket(intensity_pct, 60, 100, 4), set_number)`.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
