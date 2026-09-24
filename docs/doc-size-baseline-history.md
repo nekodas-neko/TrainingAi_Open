@@ -16606,7 +16606,6 @@ today, and four new entries (RV-159 an unattributed rewrite, RV-160 closures, RV
 RV-162 a `Due:` field). Reading notes are the point of this sweep: each replaces a claim with a
 measurement on the entry that made the claim.
 
----
 
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-quality-is-a-default)
 
@@ -16615,3 +16614,12 @@ the owner's own answer — Home's card and an LLM prompt. Most of the entry is t
 it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.
 TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
 energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → RV-103's sweep-2 failure explained
+
+28633 → 28645 (+12 on the merged base). RV-103 shipped and then failed its device check, and the twelve lines are the
+explanation rather than a new entry: the failure line is fifteen seconds away because
+`fetchWithRetry` makes four attempts with 2.5 + 5 + 7.5 s of backoff, and `onRevalidateError` cannot
+cover the gap because the write's own invalidation has emptied the key. Measured with fake timers.
+Writing the arithmetic down is what stops the next session reading the sweep result as "the
+reporting never worked" and rebuilding a channel that already exists.
