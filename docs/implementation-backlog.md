@@ -912,6 +912,129 @@ which is the right shape for something that can only be validated by living with
   `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
+### [readiness][devices] TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while looking for any score with an
+  independent comparator.
+- **Lane: A** — the producer is the BLE rollup (`lib/oura-ble/rollup/run.ts`), engine territory, and the
+  decisive test below is a re-run rather than a calibration.
+- **Measured 2026-09-24 over 129 derived days.**
+
+  | regime | days | levels seen | mean `resilience_confidence` |
+  |---|---:|---|---:|
+  | 2026-07-24 → 2026-08-29 | **16** | **5, and only 5** | 0.464 |
+  | 2026-09-07 → 2026-09-22 | **14** | **1, 2, 3, 4 — never 5** | 0.434 |
+  | everything else | 99 | none published | — |
+
+  Two regimes with **no value in common**, separated by an eight-day gap (30 Aug → 6 Sep). A metric on a
+  1–5 band spent five weeks pinned at the top and has not reached it once since.
+- **The model was not less sure while emitting a constant.** `confidence` is ~0.45 in both regimes, so
+  whatever changed is not visible in the model's own self-assessment.
+- **⚠ And `confidence` is not a gate — it is a coverage fraction.**
+  `lib/health/stress-resilience.ts:310` computes it as `validCount / C.windowLength`, so **0.464 means
+  fewer than half the window's days were valid and the level published anyway.** Worth knowing before
+  anyone reads a published level as a settled one; this is a description of the port's behaviour, not a
+  claim that the vendor model is wrong.
+- **Candidate mechanisms, none established.** Five rollup/stress commits land in or just before the gap:
+  **PS-30** (#923, 2026-09-08) is the most interesting — it repaired a wear-time defect that held
+  **22 consecutive days, 2026-08-14 → 09-04, at 81,000–85,500 s of non-wear**, a span overlapping the
+  tail of the level-5 run. Resilience gates on daytime-stress coverage
+  (`minDaytimeStressHours`), so corrupted wear could plausibly starve it into a degenerate output.
+  **But the level-5 run starts 2026-07-24, three weeks before PS-30's span begins, so PS-30 cannot
+  explain the whole regime** and must not be written up as the cause.
+- **⚠ One tempting reading is wrong.** `daytime_stress_coverage_min` is NULL across the entire level-5
+  regime and 191.4 min on average across the September one, which looks like the missing input. It is
+  not evidence: the column was only added on **2026-09-02** (#817, *"Persist the daytime-stress coverage
+  the resilience gate already computed"*), so its absence before that date is the column's age, not a
+  missing measurement.
+- **The decisive test, and it is cheap: re-run the rollup over 2026-07-24 → 2026-08-29 now that PS-30
+  and the September fixes are in, and see whether those 16 days still come back as 5.** If they change,
+  the regime was an artefact of the producer and the levels the owner saw that month were wrong. If they
+  do not, the switch is physiological or sits somewhere this entry has not looked. Either outcome is
+  worth more than further reading.
+- **Two dead columns found in the same pass, recorded so nobody re-derives them:**
+  - **`sleep_sessions.sleep_score` is populated on 0 of 123 nights.** That is the Oura Cloud sleep
+    score, and it being empty means **no independent comparator for our sleep score exists at all** —
+    zero nights carry both. Another validation route closed, alongside TN-67's.
+  - **`oura_daily_derived.worn_hours_ble` is NULL on all 129 days**, and `oura_daily.resilience_level`
+    on all rows, so the derived resilience is entirely ours rather than a Cloud passthrough.
+- **What this does NOT establish.** Why the regimes differ. Whether the 16 level-5 days were ever
+  correct. Whether the September spread is correct. The entry is a measurement and a test, not a
+  diagnosis — and per TN-67 no external validation exists for this score either, so "correct" here can
+  only mean "what the vendor model yields on sound inputs".
+- **Where the mechanism is:** `lib/health/stress-resilience.ts` (the port, `confidence` at 310, the
+  coverage gate at 144), `lib/oura-ble/rollup/run.ts:1179` (the write and its Q-510 comment).
+
+### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. This is the measurement LA-122 item 2b was
+  waiting on — it was deliberately deferred until TN-60's tail fix shipped, because the fix moves the
+  table. TN-60 is live, so the numbers below supersede the pre-fix ones.
+- **Lane: O** — a weight change is the owner's under the standing scoring rule, and the brief is here
+  rather than in a chat reply.
+- **Method, and its limits stated first.** Each stored day's contributor `input` values (Q-501) re-driven
+  through the **current** `computeReadinessComposite`, so the table reflects the post-TN-60 model without
+  waiting on TN-62's re-derive. Share of movement = each contributor's weight × its mean absolute
+  deviation, normalised. **n = 25 days, 2026-08-26 → 2026-09-24** — one month, not a year.
+- **⚠ WHY ONLY 25 DAYS, and this is the trap to avoid repeating.** The stored `input` field is far
+  sparser than the rows: contributors carrying a real input average **0.0 of 9 in July, 1.7 of 9 in
+  August, 8.8 of 9 in September**. A first pass over all 71 stored days fed nulls for 41 of them, got
+  neutral 50s back, and produced a plausible-looking table that was **41/71 synthetic**. Any
+  re-derivation from stored `input` must restrict to days with a complete set.
+
+  | contributor | weight | share of movement | share ÷ weight | mean | range |
+  |---|---:|---:|---:|---:|---|
+  | `hrvBalance` | 15% | **27.7%** | 1.85 | 39.5 | 3–94 |
+  | `restingHeartRate` | 15% | 19.4% | 1.29 | 45.9 | 5–87 |
+  | `recoveryIndex` | 9% | **14.4%** | 1.61 | 52.6 | 15–100 |
+  | `sleepBalance` | 10% | 12.6% | 1.26 | 48.6 | 9–95 |
+  | `previousNight` | 16% | 11.4% | 0.71 | 55.5 | 15–88 |
+  | `checkin` | 10% | 8.5% | 0.85 | 58.2 | 30–72 |
+  | `prevDayActivity` | 9% | 2.8% | 0.31 | 68.2 | 57–79 |
+  | `activityBalance` | 6% | 2.1% | 0.36 | 68.3 | 54–82 |
+  | **`temperature`** | **10%** | **1.1%** | **0.11** | 85.3 | **81–89** |
+
+- **`temperature` is the finding.** A tenth of the model, an eight-point range across a month, and
+  **1.1% of the movement** — a share-to-weight ratio of 0.11, three times more lopsided than either
+  activity term. It is not broken; it is *stable*, which for a fever/illness signal is arguably correct
+  behaviour. But a contributor that never varies is a constant with a weight, and that weight is
+  currently suppressing the terms that do carry signal.
+- **This supersedes LA-122 item 2b's framing.** That entry asks whether `activityBalance`'s 2.8% share
+  on a 0.06 weight is worth keeping. Re-measured post-TN-60 it is **2.1% on 6%**, and the two activity
+  terms together are **4.9% of movement on 15% of weight** (the earlier reading was 7.4%). So the
+  question stands but `temperature` is the larger instance of it and should be answered in the same
+  breath.
+- **⚠ SEPARATE FINDING — the model file's header contradicts its own function.** Lines 11–13 of
+  `readiness-composite.ts` state Recovery Index *"has no calibratable hours→score mapping …, so it's
+  always neutral/provisional; its raw hours are surfaced separately for display, **never scored**"*.
+  It **is** scored: `recoveryIndexScore` (line 242) maps hours linearly to 0–100 against
+  `RECOVERY_INDEX_OPTIMAL_HOURS = 5`, and measured here it ranges **15–100** and carries **14.4% of the
+  movement — third largest of the nine.** The function is self-consistent and its own comment is right
+  (`provisional` there means the *curve* is an approximation, not that the value is neutral — the Q-278
+  distinction). **The header is stale, in the file that defines the model**, and it is the line a reader
+  checks first. Fix the comment; do not "fix" the code to match it.
+- **TN-60 worked, visibly.** `hrvBalance` was measured at 22.8% of movement before the tail fix and is
+  **27.7%** now. Freeing the extremes to vary was the point, and the largest mover gained the most.
+- **Recommendation: bring `temperature` to the owner together with the activity terms, as one weight
+  question, and change nothing until then.** Three terms hold 31% of the weight and deliver 6.1% of the
+  movement between them. Redistributing that is a single decision, not three, and it re-scores all
+  stored history — which is exactly the state TN-62 is still unwinding, so it should happen once.
+- **Alternatives, and what each is better at.**
+  - *Drop `temperature` to ~3% and give the difference to `hrvBalance`/`restingHeartRate`.* Better at
+    making the score move with the signals that carry information. Loses the illness tripwire's bite on
+    the rare day it does fire, which is the one day it exists for.
+  - *Keep every weight and accept the asymmetry.* Better if the weights are meant to encode *importance*
+    rather than *variance* — a stable temperature genuinely is reassuring information. Defensible, and it
+    means the share table is not evidence of a defect at all.
+  - *Re-measure over a year before touching anything.* Better on rigour: 25 days of late winter is a
+    poor sample for a temperature term specifically. Costs nothing but time, and the sample only grows.
+- **Reversal cost: high.** Any weight change re-scores every stored day and needs the "how many other
+  days does this move" treatment the standing rule demands. The comment fix is free.
+- **What this does NOT establish.** Whether the shares hold over a year — the window is one month, and a
+  temperature term is exactly the kind that would look different across seasons. And per TN-67 there is
+  no external validation of the composite, so this describes which inputs move the number, never which
+  ones *should*.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
@@ -2855,7 +2978,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
   toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
 
-- **Gate: owner**
+- **Ungated 2026-09-24 (OR-143).** It IS the owner's call — a daily interaction he never asked to have changed — but nobody has put it to him, and `Gate:` parks the entry out of the Orchestrator's own READY list, so the gate was what stopped it being asked. Asking is the work; the work is `Lane: O`.
 - **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
   and the file paths below are right; what is missing is permission to spend it. This entry ends by
   saying its two open questions "decide whether this is worth doing at all", and both are
@@ -3065,29 +3188,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
-
-### [app-shell] LB-138 — back from a push off Home lands on `about:blank`; a tab flip loses the history entry
-
-- **Lane:** B — `ef95595c11d` (#1431, RV-110/RV-112), `lib/navigation` tab-flip path,
-  `e2e/la109-back-from-subroute.spec.ts:87`. **Added:** 2026-09-23 · found gating #1489, bisected
-  the same session. **This is Lane B's own regression** — #1431 is a Lane B change.
-- **⚑ BISECTED, not guessed.** `e2e` on both specs at `75805c1800a` (#1438) → **4 passed**; at
-  `ef95595c11d` (#1431) → **2 failed**. One commit turned both red.
-- **The failing assertion is the URL one, and the value is the finding:**
-  `expect(pathname).toBe('/')` received **`"blank"`** — i.e. `about:blank`. After `/health` → flip
-  to Home → in-app push to `/health?tab=training` → `goBack()`, **there is no history entry to go
-  back to**. In the WebView that is the back gesture leaving the app or landing on nothing, not a
-  wrong-tab landing.
-- **The spec is a guard doing its job, not drift.** Its own header says it pins "the reverse
-  direction — flip to Home, push off it, come back — the thing a naive version of that fix would
-  break". #1431 converted 15 destinations to `navigateToTab`; the flip no longer leaves a history
-  entry the push can return to.
-- **Corroborated on device, independently.** Device sweep 3 reports BF-49 still failing (*"back
-  from a timeline row lands on Health, not where you started"*) and RV-111 (*"one hardware back
-  from the barcode scanner closes the whole Log Food sheet"*). Same class, same surface. Whoever
-  takes this should read those two together with it rather than in isolation.
-- **Start from the history semantics of `navigateToTab`** — push vs replace vs neither — against the
-  three reports above. Do not start from the spec.
 
 ### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
 
@@ -12077,8 +12177,8 @@ one. A swipe on the single Start button adds an affordance that does not current
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
 - **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
-- **Gate: owner** — a deliberate client-side throw in **production** may page someone. Ask before it
-  is fired; once he says yes it is a measurement with one objective answer and goes straight to `DV`.
+- **Ungated 2026-09-24 (OR-143).** A deliberate client-side throw in **production** may page someone, so it is still asked before it is fired — but that ask is one sentence and it is the Orchestrator's to make. `Gate:` parked it instead, which is why thirteen days of silence went thirteen more.
+  Once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
@@ -14811,7 +14911,7 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 
 - **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
 - **Lane: O**
-- **Gate: owner** — re-laned 2026-09-24; was `B` with a device gate. Every buildable item below is
+- **Ungated 2026-09-24 (OR-143), re-laned the same day from `B` + device gate.** Every buildable item below is
   closed with a reason (② shipped, ③ ⑥ ⑦ each decided), so what remains is **artboard parity plus
   the owner's ④ watching brief on grouped-section backgrounds**. Whether a screen matches a drawing
   is a judgement about whether it looks right, which per CLAUDE.md waits on the owner even though
@@ -14937,7 +15037,7 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Gate: owner** — re-laned 2026-09-24; was a device gate. *"Do the drawn screens match what
+- **Ungated 2026-09-24 (OR-143), re-laned the same day from a device gate.** *"Do the drawn screens match what
   shipped"* is a judgement, not a measurement, and **`RV-143` already read this entry as mis-gated
   rather than device-blocked** — both sweep plans exclude it for that reason. See the ⚠ below. Every phase has shipped and this is the completion
   checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
