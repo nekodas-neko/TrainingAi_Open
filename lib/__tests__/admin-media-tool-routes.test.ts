@@ -275,14 +275,38 @@ describe('/api/admin/reference-figure', () => {
     expect(uploadExerciseMedia).not.toHaveBeenCalled()
   })
 
+  // The fixture below used to be four bytes, `[137, 80, 78, 71]`. That is the front of a PNG
+  // signature but not a PNG signature, which is eight — and it passed only because the route
+  // declared `image/png` for whatever arrived rather than reading the bytes (DV-18).
+  const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+
   it('uploads under the reference key as a PNG', async () => {
     uploadExerciseMedia.mockResolvedValue('https://cdn.example/reference-figure.png')
-    const res = await uploadReq(new File([new Uint8Array([137, 80, 78, 71])], 'f.png'))
+    const res = await uploadReq(new File([PNG_SIGNATURE], 'f.png'))
     expect(res.status).toBe(200)
     const [key, buf, mime] = uploadExerciseMedia.mock.calls[0] as [string, Buffer, string]
     expect(key).toBe('exercise-media/reference-figure.png')
     expect(mime).toBe('image/png')
     expect(Buffer.isBuffer(buf)).toBe(true)
     expect(await res.json()).toEqual({ url: 'https://cdn.example/reference-figure.png' })
+  })
+
+  it('stores a JPEG as a JPEG, whatever the file is called', async () => {
+    // The live case: the S25 uploads a camera photo, the picker names it `.png` or the route is
+    // handed something it never inspects, and the object is written with a type that contradicts
+    // its bytes. The declared name must not reach the stored Content-Type.
+    uploadExerciseMedia.mockResolvedValue('https://cdn.example/reference-figure.png')
+    const res = await uploadReq(new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'photo.png'))
+    expect(res.status).toBe(200)
+    const [, , mime] = uploadExerciseMedia.mock.calls[0] as [string, Buffer, string]
+    expect(mime).toBe('image/jpeg')
+  })
+
+  it('refuses a file that is not an image we can serve, and stores nothing', async () => {
+    // HEIC is the one that matters — it is what the phone camera actually produces.
+    const heic = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63])
+    const res = await uploadReq(new File([heic], 'IMG_0001.HEIC'))
+    expect(res.status).toBe(400)
+    expect(uploadExerciseMedia).not.toHaveBeenCalled()
   })
 })

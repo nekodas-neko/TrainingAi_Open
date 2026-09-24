@@ -18,6 +18,7 @@ import { useExerciseMedia } from '@/lib/hooks/use-exercise-media'
 import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
 import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL, exerciseRoleLabel, exerciseRoleBadge } from '@/components/workout/exercise-role-labels'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
+import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
 
 interface Props {
   program: GeneratedProgram
@@ -518,7 +519,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                               alt=""
                               fill
                               sizes="44px"
-                              unoptimized={usableSrc.endsWith('.gif')}
+                              unoptimized={mustBypassImageOptimizer(usableSrc)}
                               className="object-cover"
                               onError={() => setFailedSrcs(prev => new Set([...prev, usableSrc]))}
                             />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Dumbbell } from "lucide-react";
 import type { ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { useExerciseMediaFor } from "@/lib/hooks/use-exercise-media";
+import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   barbell: "Barbell", dumbbell: "Dumbbell", cable: "Cable",
@@ -55,7 +56,7 @@ export function ExercisePreviewSheet({ open, onOpenChange, exercise, onSelect }:
                 alt={exercise.name}
                 fill
                 sizes="100vw"
-                unoptimized={gif.media.gifUrl.endsWith('.gif')}
+                unoptimized={mustBypassImageOptimizer(gif.media.gifUrl)}
                 className="object-contain"
               />
             ) : (

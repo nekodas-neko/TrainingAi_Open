@@ -4,6 +4,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin';
 import { rateLimit } from '@/lib/rate-limit';
 import { uploadExerciseMedia, downloadMedia, REFERENCE_FIGURE_KEY, isStorageConfigured } from '@/lib/exercise-storage';
 import { StatusCodes } from 'http-status-codes';
+import { sniffImageMime } from '@trainingai/shared/http/request-guards';
 
 export async function GET() {
   const session = await auth();
@@ -53,6 +54,18 @@ export async function POST(req: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const url = await uploadExerciseMedia(REFERENCE_FIGURE_KEY, buffer, 'image/png');
+  // The bytes decide, not the filename and not a constant. This used to store every upload as
+  // `image/png` whatever arrived, and the phone that feeds it shoots HEIC and JPEG — so a wrong
+  // type was written silently and only showed up later as a picture that would not decode (DV-18).
+  // Rejecting here rather than converting: an unsupported file is the admin's to re-export, and a
+  // clear 400 is a better answer than a transcode this route has no business doing.
+  const detected = sniffImageMime(buffer);
+  if (!detected) {
+    return NextResponse.json(
+      { error: 'Unsupported image — send a PNG, JPEG or WebP (HEIC from the phone camera is not one)' },
+      { status: StatusCodes.BAD_REQUEST },
+    );
+  }
+  const url = await uploadExerciseMedia(REFERENCE_FIGURE_KEY, buffer, detected);
   return NextResponse.json({ url });
 }

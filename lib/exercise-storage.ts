@@ -72,6 +72,33 @@ export async function uploadExerciseMedia(
 
 export const REFERENCE_FIGURE_KEY = 'exercise-media/reference-figure.png';
 
+/**
+ * Like `downloadMedia`, plus the Content-Type the object was stored with.
+ *
+ * The proxy used to derive the type from the key's extension, which is a guess about the bytes
+ * rather than a fact about them — and a wrong guess is what makes a picture fail to decode (DV-18).
+ * `uploadExerciseMedia` has always written a real `ContentType`; nothing read it back until now.
+ *
+ * Separate from `downloadMedia` rather than replacing it: that has seven callers, five of which
+ * want bytes only (the Oura model files among them), and widening its return for one caller is
+ * churn without a reader.
+ */
+export async function downloadMediaWithType(
+  key: string,
+): Promise<{ buffer: Buffer; contentType: string | null } | null> {
+  const s3 = getS3();
+  if (!s3) return null;
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: getBucket(), Key: key }));
+    if (!res.Body) return null;
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of res.Body as AsyncIterable<Uint8Array>) chunks.push(chunk);
+    return { buffer: Buffer.concat(chunks), contentType: res.ContentType ?? null };
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadMedia(key: string): Promise<Buffer | null> {
   const s3 = getS3();
   if (!s3) return null;
