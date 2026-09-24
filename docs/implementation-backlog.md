@@ -517,23 +517,22 @@ below threshold and left in place for next time.
 - **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
 
 
-### [workouts][app-shell] DV-16 — "Leave workout? Your workout is in progress" after the day's workout is already done
+### [workouts][app-shell] DV-16 — "Leave workout? Your workout is already done" — shipped, device pass owed
 
-- **Lane:** B — `components/shell/bottom-nav.tsx` (`handleNavClick`), `lib/stores/workout-store.ts`.
-- **Added:** 2026-09-24 · Device Verification, sweep 3.
-- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** The owner finished **Push** that morning: persisted `ta_workout_state` read
-  `mode: "done"`, `workoutStartMs` and `workoutEndMs` set, `storedDate 2026-09-24`, and the Workout
-  tab showed the card stamped **COMPLETED** with *Start Again*. After an app restart, tapping another
-  tab from `/workout` raised **"Leave workout? Your workout is in progress. Leaving now will end the
-  session and unsaved sets will be lost."** — **2 of 2**. *Stay* was pressed both times; nothing was
-  reset.
-- **Why it is odd:** `isWorkoutActive` is `!!workoutStartMs && mode !== 'done'`, which is **false**
-  for the persisted state. So either the in-memory `mode` differs from what is persisted after a
-  restart, or a different guard raised the same dialog. **Not established which.**
-- **Cost to the owner:** after every workout, leaving the Workout tab asks to "end" a session that
-  is over, and *Leave* calls `resetSession` on the completed day.
-- **Pass test (device):** with a completed workout today, restart the app, open Workout, tap another
-  tab — it switches with no dialog.
+- **Lane:** B · **Branch:** `fix/dv16-completed-workout-leave-prompt` · v1.465.24.
+- **Found:** Device Verification sweep 3, 2026-09-24 (S25, three-button nav, 2 of 2).
+- **Cause** (the entry left this "not established", and neither guess was right as framed):
+  `applyRehydrateFixups` rewrites a persisted `done` to `pre` on reopen so `DoneScreen` cannot
+  replay its confetti, and that was the only term telling `isWorkoutActive` the workout had ended —
+  `workoutStartMs` survives anything under four hours. The card read COMPLETED off `workoutEndMs`
+  while the guard read active. Full write-up in the journal entry.
+- **Fix:** `isWorkoutActive` also requires `!workoutEndMs`, a stamp written once at completion and
+  nulled by `startWorkout`/`resetSession`, so it re-arms on Start Again. A third term, not a change
+  to either existing one — `pre` is the mid-workout hub and stays included. Four tests, control-run:
+  exactly one goes red against the pre-fix predicate.
+- **Keep:** the device pass test this entry specified. With a completed workout today, restart the
+  app, open Workout, tap another tab — it should switch with no dialog. Not runnable here: the
+  path needs the APK and a real completed day.
 
 ### [nutrition][app-shell] DV-17 — Nutrition paints a meal-plan skeleton on every warm visit when there is no plan
 

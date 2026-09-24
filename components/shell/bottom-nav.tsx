@@ -26,6 +26,7 @@ export function BottomNav({
   const router = useRouter();
   const mode = useWorkoutStore(s => s.mode);
   const workoutStartMs = useWorkoutStore(s => s.workoutStartMs);
+  const workoutEndMs = useWorkoutStore(s => s.workoutEndMs);
   const resetSession = useWorkoutStore(s => s.resetSession);
   const walkMode = useGuidedWalkStore(s => s.mode);
   const resetWalk = useGuidedWalkStore(s => s.reset);
@@ -52,7 +53,7 @@ export function BottomNav({
     ).catch(() => {});
   }, [isAdmin]);
 
-  const workoutActive = isWorkoutActive({ workoutStartMs, mode });
+  const workoutActive = isWorkoutActive({ workoutStartMs, workoutEndMs, mode });
   const walkActive = isGuidedWalkActive({ mode: walkMode });
   const activityActive = isActivityActive({ mode: activityMode });
 
