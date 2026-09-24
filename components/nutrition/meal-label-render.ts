@@ -21,9 +21,21 @@ import {
  */
 function resolveFamily(spec: StyleSpec): string {
   if (typeof window === 'undefined') return spec.fallback
-  const v = getComputedStyle(document.documentElement).getPropertyValue(spec.fontVar).trim()
+  // `document.body`, NOT `documentElement` — `app/layout.tsx` puts every `next/font` variable on the
+  // BODY class, and a custom property inherits downward only, so reading <html> returned '' for all
+  // four styles and this function silently answered `sans-serif`/`serif` every time. Measured in a
+  // browser on 2026-09-24: on <html> all four variables are empty, on <body> all four resolve.
+  const v = getComputedStyle(document.body).getPropertyValue(spec.fontVar).trim()
   return v ? `${v}, ${spec.fallback}` : spec.fallback
 }
+
+/** The first family in a CSS family list — what `document.fonts.load` matches unambiguously. */
+function primaryFamily(family: string): string {
+  return family.split(',')[0].trim()
+}
+
+/** Every weight `ctx.font` is set to below. Size is irrelevant to a font load; family and weight are not. */
+const DRAWN_WEIGHTS = ['400', '500', '700'] as const
 
 /** Shrink a string's font size until it fits `maxWidth`, so a long meal name never overruns. */
 function fitText(ctx: CanvasRenderingContext2D, text: string, family: string, weight: string, size: number, maxWidth: number): number {
@@ -490,9 +502,24 @@ export async function renderMealLabel(
     namedInCode: shared.named, rolledInCode: shared.rolled, payloadBytes: shared.bytes,
   }
 
+  const family = resolveFamily(spec)
+
   // Without this the first draw uses a fallback face and the layout reflows on the second — the
   // exact silent substitution the spec warns about.
-  if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready
+  //
+  // `document.fonts.ready` settles PENDING loads; it does not START one. That distinction became
+  // load-bearing with RV-146, which took `preload: false` off the two label-only faces: nothing on
+  // the page renders in them, so the browser never begins the fetch, `ready` resolves against a font
+  // set that does not contain the face, and canvas falls back without saying so. Asking for each
+  // weight the renderer uses is what actually triggers the load; `ready` then waits for it.
+  if (typeof document !== 'undefined' && document.fonts) {
+    await Promise.all(
+      // A rejection here can only be a malformed font shorthand — a network failure resolves with an
+      // empty match list. Either way the draw continues on the fallback, as it did before.
+      DRAWN_WEIGHTS.map(w => document.fonts.load(`${w} 12px ${primaryFamily(family)}`).catch(() => [])),
+    )
+    await document.fonts.ready
+  }
 
   const px = SHEET * scale
   canvas.width = px
@@ -501,7 +528,6 @@ export async function renderMealLabel(
   if (!ctx) throw new Error('2d context unavailable')
   ctx.scale(scale, scale)
 
-  const family = resolveFamily(spec)
   const INK = '#000000'
   const PAPER = '#ffffff'
 

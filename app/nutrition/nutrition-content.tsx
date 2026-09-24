@@ -290,8 +290,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
   // BF-177. Balance-only refetch; the hook carries why it is not `fetchData` and not a
   // client-side subtraction.
-  const { refetch: refetchBalance, failed: balanceRefetchFailed, retry: retryBalance } =
-    useEnergyBalanceRefetch(setEnergyBalance)
+  const { refetch: refetchBalance, failed: balanceRefetchFailed, retry: retryBalance,
+    refreshing: balanceRefreshing } = useEnergyBalanceRefetch(setEnergyBalance)
 
   const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
     if (newLog) {
@@ -570,6 +570,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               goalCalories={effectiveCalorieGoal}
               earnedKcal={earnedForSelectedDate}
               balanceStale={balanceRefetchFailed}
+              balanceRefreshing={balanceRefreshing}
               onRetryBalance={retryBalance}
               targets={effectiveTargets}
             />
