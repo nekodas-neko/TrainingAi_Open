@@ -2823,7 +2823,7 @@ would have made both routes behave as though there were no active program, and `
 because the field is optional. **No latency figure** — the entry could not measure one and neither
 could this; filed as shape, not speed. **No per-user memo was added**, per the entry's own
 prohibition: it trades against config-save freshness and needs its own decision. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md`](docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md).
+[`2026-09-23-lane-a-rv82-program-double-fetch`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-rv82-program-double-fetch).
 
 ### [nutrition][platform] ⚠️ Deleting a supplement left no tombstone and blanked five columns — NOT device-verified (DV-10, 2026-09-23)
 
@@ -2860,7 +2860,7 @@ A contributor at ±1.5σ now scores 90/10 rather than 100/0; a perfect day with 
 re-derivation is deliberately batched behind TN-6, BF-13 and LA-121, so existing rows keep their old
 scores and the pass test's "share-of-movement moves toward the declared weights" is **not claimed**
 until that single run. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-tn60-compressive-tail.md`](docs/overview/entries/2026-09-23-lane-a-tn60-compressive-tail.md).
+[`2026-09-23-lane-a-tn60-compressive-tail`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-tn60-compressive-tail).
 
 ### [platform][nutrition] ⚠️ A failed refresh of a cached key was unreportable — NOT device-verified (LB-128, 2026-09-23)
 
@@ -2877,7 +2877,7 @@ sanctioned offline-first case. `use-energy-balance-refetch` now takes both chann
 ⚠️ **Owed: the device check** (RV-103's `Keep:` ①) — the failure line and its Retry at S25 width in
 the card carrying "kcal left". Tests are jsdom against localStorage; the native SQLite cache path
 and a real offline transition are not exercised. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-lb128-revalidate-error.md`](docs/overview/entries/2026-09-23-lane-a-lb128-revalidate-error.md).
+[`2026-09-23-lane-a-lb128-revalidate-error`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-lb128-revalidate-error).
 
 ### [sleep][platform] ⚠️ `minutesFromNoon` read the device's clock, and its test only passed in UTC (DV-7, 2026-09-23)
 
@@ -2894,7 +2894,7 @@ helper and wake through its own device-local read, which a red consumer test exp
 now takes a `tz` and resolves both modes through one clock. **LB-131 carries what is left** — the
 card still takes the default, so every user gets Brisbane rather than their own zone, which ships
 with DV-9. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-dv7-sleep-consistency-timezone.md`](docs/overview/entries/2026-09-23-lane-a-dv7-sleep-consistency-timezone.md).
+[`2026-09-23-lane-a-dv7-sleep-consistency-timezone`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-dv7-sleep-consistency-timezone).
 
 ### [platform] ⚠️ 162 test files can delete a user under a running migration; two are now guarded (DV-3, 2026-09-23)
 

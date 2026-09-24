@@ -1340,6 +1340,23 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 
 ### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
 
+- **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
+  `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
+  **`1.465.28`** with its newest commit at **18:45**. **At least 8 first-parent merges are on `main`
+  and not live**, across roughly 3½ hours.
+- **The pattern is now the finding, not the individual stall.** Three stalls in about a day, two of
+  which ended on their own with no cause established. Per the repo's own rule, something that stops
+  is not something that was fixed — so the two recoveries are not evidence of health, and this third
+  one should not be waited out either.
+- **It is costing shipped work.** #1538 (DV-18, the broken exercise pictures) and #1539 merged into
+  this window, so the fix for a defect the owner can see is merged and not running. TN-55's battery
+  rebalance is the exception and only by luck: it IS live, because 1.465.26 is the version
+  production happens to be stuck on.
+- **⚠ Still blocked on the same thing, and it is now concrete rather than precautionary.** The
+  Railway deploy log is the only surface that distinguishes *failing* from *queued* from *never
+  triggered*, and those three have different fixes. No container can read it. Everything measurable
+  from here has been measured three times; the next useful step is not another measurement.
+
 - **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
   "caught up by itself" update below was the lull, not the end.** Live `/api/version` answers
   **`1.465.17`**; `main`'s `package.json` is **`1.465.22`**. 1.465.17 landed with **#1473 at
@@ -1960,51 +1977,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   **shipped**, the protocol warns against that misuse twice, and doing it to 24 unbuilt entries files
   them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
   because a reader in either place stops looking. The selector is the defect, not the entries.
-
-### [readiness][platform] LA-135 — the battery calibration route correlates across a model change, and `model_version` is written but never read
-
-- **Lane:** A — `app/api/admin/battery-recovery-calibration/route.ts`. **Added:** 2026-09-24 · Lane A,
-  found while re-reading TN-55's own diff for consequences rather than for correctness.
-- **The stamp has no reader anywhere in the codebase.** `MODEL_VERSION` is built in
-  `app/api/body-battery/route.ts` and written to `body_battery_daily.model_version` on every
-  snapshot; `getBodyBatteryHistory` passes it through, and **nothing branches on it**. Grepped for a
-  `v5`/`v6` literal, a `startsWith`, an equality — there are none. The column exists to stop exactly
-  the mistake below and does not currently stop it.
-- **⚠ CORRECTED 2026-09-24, same day this was filed — the first version blamed TN-55 and was wrong
-  about when this starts.** It read *"rows before today are `v5:` and rows from today are `v6:`"*,
-  as though the shipping of v6 created the problem. Measured in production instead of reasoned from
-  the diff:
-
-  | model | days | mean end | days at 0 | last |
-  |---|---:|---:|---:|---|
-  | v1 | 16 | 66.3 | 0 | 2026-07-15 |
-  | v2 | 1 | 21.0 | 0 | 2026-07-16 |
-  | v4 | 18 | 62.9 | 0 | 2026-08-03 |
-  | v5 | 52 | 15.2 | **27** | 2026-09-24 |
-
-  **Four model generations are already in the table, and the v4 → v5 boundary is the violent one**
-  — mean end 62.9 against 15.2. A 180-day window has spanned it since early August. v6 adds a fifth
-  boundary to a defect that has been live since June; it is not the cause. (Tuning's census of the
-  same table on the same day omitted the single v2 day, which is why this one was re-run rather than
-  copied.)
-- **The live consequence.** The calibration route reads `getBodyBatteryHistory(userId, start, end)`
-  and builds `batteryByDate` from `b.endValue`, then correlates it against the morning
-  `perceived_recovery` answers. **Any range spanning a model boundary correlates across a model
-  change**, which the repo's own rule names as not evidence. The window cap is 180 days, so this is
-  reachable rather than theoretical — and has been reachable for longer than the entry first said.
-- **⚠ Do NOT "fix" it by filtering to the current version and stopping there.** That silently
-  shortens the window instead of saying it did, which is the same failure one level quieter: a
-  caller asking for 90 days would get a handful of rows and a correlation computed on them, with
-  nothing in the response saying so. Whatever it does, the payload has to state which versions the
-  rows carried and how many of each — **an honest refusal or a labelled answer, never a quiet
-  truncation**.
-- **Worth deciding at the same time:** whether `getBodyBatteryHistory` should expose the stamp to
-  every caller or whether this one route filters. Two callers today — this and the battery route
-  itself, which uses the window only for `hrMaxObserved`, a measured heart rate that no model
-  constant touches and which must **not** be filtered. So the filter belongs at this call site, not
-  in the repository method.
-- **Verification:** a range spanning 2026-09-24 either refuses or returns a labelled per-version
-  breakdown; a range wholly inside one version behaves exactly as it does today.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
 
