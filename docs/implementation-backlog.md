@@ -523,6 +523,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
+- **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
 - **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
@@ -545,6 +546,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks
+- **Ask:** owner — arrange six device sittings rather than 55 separate asks. Start with gesture navigation and a one-time write list.
 
 - **Lane: O** — scheduling the owner is not DV's to do. Each sitting is DV's to run once it is
   arranged.
@@ -564,6 +566,7 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
+- **Ask:** owner — the history-row policy, unasked since 09-16: recompute-from-stored-inputs yes, hand-edits no, per the BF-81 precedent.
 
 - **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
@@ -604,6 +607,7 @@ the Orchestrator's to do.
     Recommended: yes. It is how he trains (TN-24).
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
+- **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -669,6 +673,7 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
+- **Ask:** owner — does `/collection` get a permanent More-tab row, or is it a spike he does not want surfaced? Recommendation: add the row, leave Home unchanged.
 
 - **Lane: O** — a product question, ungated so the Orchestrator can put it. **Added:** 2026-09-22 ·
   Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
@@ -1793,58 +1798,6 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
-### [platform] BF-194 — an owner question is only visible if it ranks top-10, and three of them already do not
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — this is queue
-  tooling and the Orchestrator owns the queue. The change itself is a handful of lines in
-  `scripts/next-item.js`; whoever takes it writes them, since BugFix does not.
-- **⚑ MEASURED — the rule written 2026-09-24 has already failed, the same day.** CLAUDE.md says an
-  owner question goes to `Lane: O` and gets *"a queue position near the top."* Checked against `main`
-  at `2cda697a`, **lane O holds 57 READY entries and prints 10**:
-
-  | entry | rank | what it is waiting on |
-  |---|---|---|
-  | BF-193 | **15** | account-deletion policy — logs, the ring key, grace period |
-  | BF-189 | **16** | session content — which of three levers to pull |
-  | BF-191 | **17** | sub-minute walks, and the phantom activity row |
-
-  BF-189 and BF-191 were filed **at ranks 1 and 2** the previous evening. Fourteen entries were
-  inserted above them by other agents within about eight hours. Nothing went wrong and no agent
-  misbehaved — **every agent files at the head, which is what the convention asks for, so the head is
-  exactly where the churn is.**
-- **So position is the wrong mechanism, and re-ordering is not the fix.** Moving these three back to
-  the top would buy roughly a day and assert this session's priority over four other agents'
-  deliberate ones. The next filing sweep undoes it. A convention that needs re-applying every few
-  hours is not holding anything.
-- **⭐ Recommend: print owner questions in their own section, the way `Reference:` already does.**
-  `next-item.js:290` gives `REFERENCE` an unconditional section outside the `TOP_N` cut, precisely
-  because those entries must stay visible without heading the work list. An owner question wants the
-  same treatment for the mirror reason: it is not "next", it is **blocking**, and it must be seen
-  whatever its rank.
-- **Why this one, framed a year out.** It makes the guarantee structural rather than behavioural —
-  the owner's instruction was that his questions get *worked*, and a question nobody can see is not
-  being worked no matter how correctly it was filed. It also scales the right way: at 57 lane-O
-  entries today, any convention resting on ordering is already lost, and the queue only grows.
-- **Alternatives, each with what it is genuinely better at:**
-  - **Raise `TOP_N` for lane O.** One number, no new concept. Better at being trivial to do — but it
-    is a treadmill: 57 entries means showing 20 still hides 37, and a longer list is read less
-    carefully, which is the failure wearing different clothes.
-  - **A new field, e.g. `Owner:`,** parsed and sectioned. Better if owner questions ever need
-    behaviour beyond visibility. It loses today because `Lane: O` already identifies them and a
-    second field is a second thing to get wrong — the `Gate: owner` trap in this same rule is what a
-    spare field costs.
-  - **Re-order on a schedule** (the Orchestrator lifts them each sweep). Better in needing no code.
-    It loses because it is the manual version of what a section does for free, and it fails silently
-    whenever a sweep is skipped.
-- **Reversal cost: near zero.** A section in one script, deleted by removing it. No data, no
-  migration, no product surface.
-- **⚠ Deliberately NOT re-ordering the three entries in this PR.** They are at 15–17 and they stay
-  there: the fix is to make rank stop mattering, and quietly promoting my own filings above four
-  other agents' would both decay and misrepresent priority I have not been given.
-- **Verification:** with the section in place, `node scripts/next-item.js --lane O` shows BF-189,
-  BF-191 and BF-193 without `--all`, while the READY list stays capped at 10 and still leads with
-  whatever genuinely ranks first.
-
 ### [platform][app-shell] BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"there is no option for
@@ -1954,6 +1907,7 @@ drift.
   (`getLocalStore` returns null), so the wipe half is unverifiable here.
 
 ### [platform] BF-193 — three questions BF-192 cannot answer: what "delete" means for logs, the ring key, and whether it is instant
+- **Ask:** owner — account deletion: what "delete" means for logs, what happens to the ring key, and whether there is a grace period.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -2003,6 +1957,7 @@ drift.
   BF-192 is updated with whichever ones change its diff.
 
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
+- **Ask:** owner — every exercise sits on the 2-set floor and weekly volume lands at 66% of his target. Which of three levers to pull is his.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
   sessions have enough content. Time wise its pretty good."*
@@ -2084,6 +2039,7 @@ drift.
   has not been fixed regardless of what the done screen says.
 
 ### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
+- **Ask:** owner — what a sub-minute walk should do, and what happens to the phantom activity row.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
   owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
