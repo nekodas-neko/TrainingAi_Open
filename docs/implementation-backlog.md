@@ -846,55 +846,6 @@ which is the right shape for something that can only be validated by living with
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
-### [sleep][app-shell] TN-66 — `sleep_quality` has been a hard-coded `'ok'` for 91 days, and two surfaces present it as the owner's own answer
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while looking for a second external signal
-  to validate scores against.
-- **Lane: A** — it straddles both halves (an `app/api` prompt and a Home component), so the path rule
-  sends it to Lane A, engine half first.
-- **This is the TN-57 class, at a second site TN-57 did not cover.** TN-57 fixed the *unanswered*
-  self-report by storing `null` for an untouched scale. This one stores a **value**, so nothing
-  downstream can tell it was never answered.
-- **Measured 2026-09-24.** `mood_logs` holds **108 rows across 108 distinct days** (2026-05-27 →
-  today), with `energy_level`, `sleep_quality` and `body_state` all **100% populated**. `energy_level`
-  carries real spread — drained 6, low 18, ok 50, good 34. `sleep_quality` carries **two values of its
-  five**: `ok` 93, `good` 15, and never `terrible`, `poor` or `great`.
-- **The date split is the proof, not the distribution.** Every `good` falls between **2026-05-27 and
-  2026-06-25**; every row since 2026-06-25 is `ok`. The field went constant 91 days ago.
-- **It is deliberate, documented, and not itself the defect.**
-  `packages/shared/src/validation/mood-log.ts:13` says so outright: *"the check-in no longer collects
-  it, so a queued mutation omits it and the write path defaults to `'ok'` — without that default the
-  `NOT NULL` column rejects the insert and the mutation strands in the outbox forever, which is how the
-  check-in came back on every app open (#47)."* The default is load-bearing. **Do not remove the
-  default** — that reintroduces #47.
-- **The defect is the two readers that cannot tell a default from an answer:**
-  - **`components/home/home-card-widget.tsx:220`** renders `Sleep: {SLEEP_LABEL[moodLog.sleepQuality]}`.
-    So Home has displayed **"Sleep: OK"** every day for 91 days, sourced from a constant, in the card
-    that otherwise shows what the owner reported. He is being told what he said about his sleep and he
-    never said it.
-  - **`app/api/nutrition-goals/recommend/route.ts:110`** puts `sleep quality=${m.sleepQuality}` into an
-    **LLM prompt** for nutrition-goal recommendations, beside genuinely measured `Xh sleep` and a real
-    `energy=`. The model receives 93 days of a constant presented as observation. The route's own
-    neighbouring comment (Q-76) exists because feeding the model an untrue sleep figure means it
-    *"learns nothing true"* — the same hazard, one field over.
-- **Fix, both halves:** stop rendering and stop prompting with a value that was not collected. The write
-  default stays; the readers must distinguish "defaulted" from "reported". The cheapest honest form is a
-  `sleep_quality_reported` boolean (or reusing TN-57's `*_touched` convention, which already exists for
-  exactly this) — the readers then omit the line rather than print or prompt a fabricated one.
-  **Backfill is decidable from the dates above:** rows on or before 2026-06-25 were collected, later
-  ones were not.
-- **Acceptance criteria:** Home shows no sleep line on a day the field was defaulted; the nutrition
-  prompt omits `sleep quality=` for those days; the 15 genuinely-collected rows still render and still
-  reach the prompt; #47 does not regress (a queued mutation with no `sleepQuality` still inserts).
-- **⚠ What this closes off for Tuning, which is why the entry exists at all.** I went looking for a
-  second daily self-report to validate readiness against, after TN-65 established that set RPE is the
-  only dense one. On its face `mood_logs` looked ideal — 108 days, 100% capture. **`energy_level` is
-  usable and `sleep_quality` is not**, and an analysis that had not checked the date split would have
-  read a 91-day constant as agreement between the sleep score and the owner's perception.
-- **Where the mechanism is:** `packages/shared/src/validation/mood-log.ts` (the documented default and
-  #47), `app/api/mood/route.ts:62` and `lib/data/postgres/adapter.ts:4715` (the two write paths that
-  apply it), `components/mood-checkin-sheet.tsx:256` (the client hard-codes it too).
-
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
@@ -1063,6 +1014,35 @@ which is the right shape for something that can only be validated by living with
 - **Where the mechanism is:** `lib/health/daytime-stress.ts` (the scaled level and its convention),
   `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
+
+### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+
+- **Lane: O** — it needs a product preference before it needs code, and the code half is then Lane B
+  (`components/home/**`). **Added:** 2026-09-24 · Lane A, as the stated residue of TN-66.
+- **What TN-66 removed and why.** Home showed *"Sleep: OK"* under the mood card. It came from
+  `mood_logs.sleep_quality`, a `NOT NULL` column the check-in stopped collecting on 2026-06-25, so
+  the write path's `'ok'` default was the stored value on 93 of 108 rows. Home was telling the owner
+  what he had said about his sleep, every day for 91 days, and he had never said it. The line is
+  gone; nothing replaced it.
+- **⚠ THE SIGNAL EXISTS, and TN-66 did not notice it.** `morning-checkin-sheet.tsx` collects
+  **`sleepQualityFeel`** on a 1–5 scale **with its own touched flag** — TN-57's convention, built for
+  exactly this question — and stores it in `day_checkins`, a different table from the dead field.
+  The names differ by one word, which is why a grep for the dead one reports that nothing collects
+  sleep quality at all.
+- **The question is the owner's, not an implementer's:** does he want his own morning sleep-feel on
+  Home in that spot, or is the mood card better without it? Removing a fabricated line needed no
+  permission. Putting a different number in its place is an information-architecture choice on a
+  screen he reads daily, which CLAUDE.md sends to him with a mockup rather than to a lane.
+- **⚠ It is not a one-line swap, and the cost belongs in the question.** Neither surface holds
+  check-in data today: `home-card-widget.tsx` has no reference to it, and Home is inside the
+  persistent tab shell — so a new read there needs `useCachedValue`, a canonical TTL, and
+  registration in every write group that touches `day_checkins`, or it paints once and never
+  refreshes (the Q-402 shape). A "just show the real one" that skips this is the bug class this
+  repo has fixed twelve times.
+- **The nutrition prompt is the cheap half, if it is wanted at all.** That route already runs a
+  `Promise.all` of repository reads, so `listDayCheckins` + `answeredMorningScales` is one more line
+  — but it feeds an LLM, and adding a self-reported scale to a prompt is a change to what the model
+  is told rather than a rendering fix. Decide it with the Home half, not separately.
 
 ### [readiness][devices] TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again
 
@@ -1371,6 +1351,23 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   query and both are needed, and this entry closes.
 
 ### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
+
+- **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
+  `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
+  **`1.465.28`** with its newest commit at **18:45**. **At least 8 first-parent merges are on `main`
+  and not live**, across roughly 3½ hours.
+- **The pattern is now the finding, not the individual stall.** Three stalls in about a day, two of
+  which ended on their own with no cause established. Per the repo's own rule, something that stops
+  is not something that was fixed — so the two recoveries are not evidence of health, and this third
+  one should not be waited out either.
+- **It is costing shipped work.** #1538 (DV-18, the broken exercise pictures) and #1539 merged into
+  this window, so the fix for a defect the owner can see is merged and not running. TN-55's battery
+  rebalance is the exception and only by luck: it IS live, because 1.465.26 is the version
+  production happens to be stuck on.
+- **⚠ Still blocked on the same thing, and it is now concrete rather than precautionary.** The
+  Railway deploy log is the only surface that distinguishes *failing* from *queued* from *never
+  triggered*, and those three have different fixes. No container can read it. Everything measurable
+  from here has been measured three times; the next useful step is not another measurement.
 
 - **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
   "caught up by itself" update below was the lull, not the end.** Live `/api/version` answers
@@ -1992,51 +1989,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   **shipped**, the protocol warns against that misuse twice, and doing it to 24 unbuilt entries files
   them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
   because a reader in either place stops looking. The selector is the defect, not the entries.
-
-### [readiness][platform] LA-135 — the battery calibration route correlates across a model change, and `model_version` is written but never read
-
-- **Lane:** A — `app/api/admin/battery-recovery-calibration/route.ts`. **Added:** 2026-09-24 · Lane A,
-  found while re-reading TN-55's own diff for consequences rather than for correctness.
-- **The stamp has no reader anywhere in the codebase.** `MODEL_VERSION` is built in
-  `app/api/body-battery/route.ts` and written to `body_battery_daily.model_version` on every
-  snapshot; `getBodyBatteryHistory` passes it through, and **nothing branches on it**. Grepped for a
-  `v5`/`v6` literal, a `startsWith`, an equality — there are none. The column exists to stop exactly
-  the mistake below and does not currently stop it.
-- **⚠ CORRECTED 2026-09-24, same day this was filed — the first version blamed TN-55 and was wrong
-  about when this starts.** It read *"rows before today are `v5:` and rows from today are `v6:`"*,
-  as though the shipping of v6 created the problem. Measured in production instead of reasoned from
-  the diff:
-
-  | model | days | mean end | days at 0 | last |
-  |---|---:|---:|---:|---|
-  | v1 | 16 | 66.3 | 0 | 2026-07-15 |
-  | v2 | 1 | 21.0 | 0 | 2026-07-16 |
-  | v4 | 18 | 62.9 | 0 | 2026-08-03 |
-  | v5 | 52 | 15.2 | **27** | 2026-09-24 |
-
-  **Four model generations are already in the table, and the v4 → v5 boundary is the violent one**
-  — mean end 62.9 against 15.2. A 180-day window has spanned it since early August. v6 adds a fifth
-  boundary to a defect that has been live since June; it is not the cause. (Tuning's census of the
-  same table on the same day omitted the single v2 day, which is why this one was re-run rather than
-  copied.)
-- **The live consequence.** The calibration route reads `getBodyBatteryHistory(userId, start, end)`
-  and builds `batteryByDate` from `b.endValue`, then correlates it against the morning
-  `perceived_recovery` answers. **Any range spanning a model boundary correlates across a model
-  change**, which the repo's own rule names as not evidence. The window cap is 180 days, so this is
-  reachable rather than theoretical — and has been reachable for longer than the entry first said.
-- **⚠ Do NOT "fix" it by filtering to the current version and stopping there.** That silently
-  shortens the window instead of saying it did, which is the same failure one level quieter: a
-  caller asking for 90 days would get a handful of rows and a correlation computed on them, with
-  nothing in the response saying so. Whatever it does, the payload has to state which versions the
-  rows carried and how many of each — **an honest refusal or a labelled answer, never a quiet
-  truncation**.
-- **Worth deciding at the same time:** whether `getBodyBatteryHistory` should expose the stamp to
-  every caller or whether this one route filters. Two callers today — this and the battery route
-  itself, which uses the window only for `hrMaxObserved`, a measured heart rate that no model
-  constant touches and which must **not** be filtered. So the filter belongs at this call site, not
-  in the repository method.
-- **Verification:** a range spanning 2026-09-24 either refuses or returns a labelled per-version
-  breakdown; a range wholly inside one version behaves exactly as it does today.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
 
