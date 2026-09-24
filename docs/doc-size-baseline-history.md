@@ -16803,6 +16803,6 @@ census was re-run rather than copied from Tuning's, which is what surfaced the s
 omitted — and the growth here is mostly that table, which is the evidence the entry was missing.
 
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 58, `review/sweep-58-rules-and-performance`.**
-29212 → 29538 (+326). Sixteen entries (RV-171 to RV-186): a census of the CLAUDE.md rules
+29212 → 29518 (+306; rebased on #1540). Sixteen entries (RV-171 to RV-186): a census of the CLAUDE.md rules
 no CI step enforces, and a performance sweep with its device half as one baseline sitting. One dated
 note on DV-13 naming its probable cause (RV-180).
