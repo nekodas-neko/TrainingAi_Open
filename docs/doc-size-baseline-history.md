@@ -17008,3 +17008,11 @@ that DO carry a plan, not fewer.
 sets, beating raw RPE), which calibrates its sensitivity at ~0.25 points and turns the sleep/readiness
 nulls into a measured ceiling — neither moves perceived effort by a fifth of that. Filed as a Reference
 because future proposals read it for their acceptance bar rather than building from it.
+
+## 2026-09-24 — `CLAUDE.md` and the backlog (lb-134, unsound merge gate)
+
+Two CLAUDE.md passages told every agent that a successful merge proves the checks passed. Measured:
+PR #1467 merged eleven seconds before its Tests job reported failure, so it merged past a pending
+check — which is what one of those passages said was impossible. The corrections cost lines in the
+file every session reads because the wrong version is load-bearing: it is quoted as the reason not
+to poll the checks endpoint.
