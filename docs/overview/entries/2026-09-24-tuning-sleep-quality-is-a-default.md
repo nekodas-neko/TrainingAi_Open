@@ -34,6 +34,38 @@ Filed **TN-66, Lane A** (it straddles an `app/api` prompt and a Home component, 
 it to the engine half first), with the fix being to distinguish defaulted from reported — TN-57's
 `*_touched` convention already exists for exactly this — and **not** to remove the write default.
 
+## TN-67 — and the field that *is* real still cannot validate anything
+
+`energy_level` survived TN-66 as a usable signal, so the obvious next test was readiness against it.
+The result looked like the best news of the session: **n = 67, r = +0.619**, group means monotonic —
+drained 40.0, low 52.1, ok 67.8, good 72.8. Sleep score against the same target, r = +0.411.
+
+It does not survive a date split, and the split is a natural experiment I had already created:
+
+| era | n | r(energy, readiness) |
+|---|---:|---:|
+| before 2026-09-19 — picker **seeded from readiness** | **62** | **+0.664** |
+| after 2026-09-19 — picker **starts unset** | **5** | **0.000** |
+
+TN-50 removed the `readinessToEnergy(readiness)` default on **2026-09-19** (#1320), and its own
+measurement is the mechanism: the saved level matched what the auto-fill would have picked on **45 of
+62 days (73%, against ~20–25% by chance)**. So 62 of my 67 days are the app agreeing with itself, and
+the clean window is five days spanning two energy levels — unusable in the other direction too.
+
+**No external validation of the readiness score exists today.** This extends the correction already in
+[`docs/reviews/2026-09-18-what-the-score-can-and-cannot-say.md`](../../reviews/2026-09-18-what-the-score-can-and-cannot-say.md)
+(lines 70–74) from *"the `checkin` contributor share is not independent"* to *"`energy_level` cannot
+serve as a validation target either"* — which is the use I was about to put it to.
+
+The post-fix sample reaches n ≈ 30 around **2026-10-20**; TN-67 says to re-run the split then, and
+which answer means what. One confound survives even that: the sheet still shows readiness beside the
+picker by design, and **86 of 108 check-ins are filed 05:00–09:00**, when Home renders the score.
+Removing the seeding closed the mechanical loop and left an anchoring one. Separating those needs the
+score hidden until the check-in saves, which is a product change and the owner's call.
+
+**This also raises TN-65.** Set RPE was never derived from a score, so it is the only validator usable
+on historical data and the only route to an answer before late October.
+
 ## Why this is a tuning entry and not just a bug
 
 It closes off the signal I was looking for. `energy_level` is usable as an external validator;

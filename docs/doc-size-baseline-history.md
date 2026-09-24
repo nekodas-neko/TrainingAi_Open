@@ -16610,6 +16610,8 @@ measurement on the entry that made the claim.
 
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-quality-is-a-default)
 
-28532 → 28581 (+49, recounted on the merged base). TN-66: `sleep_quality` has been a hard-coded `'ok'` since 2026-06-25, and two live readers present it as
+28532 → 28632 (+100, recounted on the merged base). TN-66: `sleep_quality` has been a hard-coded `'ok'` since 2026-06-25, and two live readers present it as
 the owner's own answer — Home's card and an LLM prompt. Most of the entry is the distinction that makes
 it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.
+TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
+energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
