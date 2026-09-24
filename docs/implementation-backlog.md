@@ -741,46 +741,6 @@ below keep their gate — they really are blocked pending an answer — and this
   number of other days each change moves — a bare gate on a scoring constant is a question he
   cannot answer, and routing them here would just move the silence.
 
-### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
-- **✅ DECIDED BY THE OWNER, 2026-09-24 — add the More-tab row.** He took the recommendation: a screen worth building gets a permanent address, and `DEFAULT_CARD_WIDGETS` stays empty so Home is unchanged. **Now ordinary Lane B work, ungated** — one row in the More tab pointing at `/collection`.
-- **Lane:** B — `app/more/**`. Re-laned from `O` on the answer; there is no decision left in it.
-
-- **Superseded lane note (demoted from a field, OR-155):** this read `O` while the question was open — *a product question, ungated so the Orchestrator can put it*. Answered 2026-09-24; the field above is live. **Added:** 2026-09-22 ·
-  Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
-  shipped, leaving only the part that is the owner's.
-- **Recommendation: add a `Collection` row to the More tab, and leave `DEFAULT_CARD_WIDGETS` empty.**
-  A screen worth building is worth having a permanent address; a Home card is a *shortcut* to it, not
-  its only entrance.
-- **What is true.** `/collection` is navigated to from exactly one place in the app —
-  `home-card-widget.tsx:330`, inside `case 'card_collectionWidget'`, which returns `null` unless the
-  widget is enabled. `DEFAULT_CARD_WIDGETS` is `[]` (`lib/home/home-prefs.ts:110`), so on a fresh
-  install the route exists and nothing reaches it. **This is not a Collection-specific oversight** —
-  all ten card widgets are off by default and the card's own docstring says so deliberately. What is
-  specific to Collection is that it is the only one whose card is the sole route to a *whole screen*;
-  the other nine summarise data reachable elsewhere.
-- **Why, a year out.** The More tab is where every other secondary screen lives, so a row there costs
-  one line and makes the route independent of a Home preference nobody remembers setting. Turning the
-  widget on by default instead puts a card on Home permanently to solve a navigation problem, and
-  Home is the screen the owner reads daily.
-- **Alternatives.**
-  - *Turn `collectionWidget` on by default.* Better at discovery — he would see it without being
-    told. But it changes what Home shows on every install, which is the **owner-gated mockup** class,
-    and it still leaves the route with one door.
-  - *Leave it as is.* Better at nothing, unless the answer is that Collection is a spike he does not
-    want surfaced — which is a real possible answer and the reason this is his call, not Lane B's.
-- **Reversal cost: near zero either way.** A More row is one line to add or remove; a default-on
-  widget is one array literal. Nothing migrates and no data moves.
-- **Note his install is probably not fresh** — if the widget is already on for him, this is invisible
-  to him today and is about what a reinstall or a second user would get.
-- **✅ Shipped 2026-09-24 (Lane B), the other half of this entry:** the three affordances that select
-  the `moodWidget` card labelled it **"Readiness"**, colliding with `oura-score-chip-row.tsx`'s label
-  for the computed readiness score, while the card itself renders **"Exercise Readiness"**. All three
-  now name the card — the More-tab picker, Home's colour swatch, and the hidden-sections restore
-  panel. The entry named one site; there were three, which is why the test asserts the *agreement*
-  between the card's heading and its pickers rather than a string.
-- **Also noted, not filed separately:** three step readings can be on Home at once (`stepsWidget`,
-  the Steps metric tile, and the chip row's Activity score).
-
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 - **Ask:** owner — readiness currently changes NOTHING the app prescribes: its one automatic action has never fired in 117 sessions and cannot on the active program. What should a low readiness day actually do? Decision brief in the entry.
 
@@ -3365,8 +3325,10 @@ written entity.
 - **Verify:** device — no build half. Method: **P9**; `tour.js` already walks routes.
 - **The falsifiable claim:** every route in the build is reachable **by tapping only**, from a fresh
   install and from a warm one, and no picker or menu label names a different metric from what its
-  target screen shows. RV-121 says `/collection` fails the first half and one widget label fails the
-  second — confirm both and find the rest.
+  target screen shows. RV-121 found one of each and **both shipped 2026-09-24** — `/collection` now
+  has a More-tab row, and the `moodWidget` pickers name the card rather than the readiness score.
+  So neither is a live instance any more: re-walk to confirm the fixes hold on device, and the
+  value of this check is now finding the ones nobody has looked for.
 - **⚠ Never uninstall to get a fresh install** — an uninstall destroys the Oura ring's BLE key,
   which nothing in this repo, the server or any log can recover. Use a fresh profile or clear app
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half

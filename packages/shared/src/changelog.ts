@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.33",
+    date: "2026-09-24",
+    changes: [
+      "Your collection now has a row in the More tab. It was only reachable through its Home card, and that card is off until you turn it on \u2014 so on a fresh install the screen existed with no way to open it. Home is unchanged: the card is still off by default.",
+    ],
+  },
+  {
     version: "1.465.32",
     date: "2026-09-24",
     changes: [
