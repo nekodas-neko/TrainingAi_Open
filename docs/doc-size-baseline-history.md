@@ -16561,11 +16561,21 @@ it is what has already been ruled out — the control run against `main`, the in
 absence of any console error — and the one thing that has NOT been checked, which is whether it
 reproduces outside the dev server. Writing that down is what stops the next session re-running the
 same four probes.
+## 2026-09-24 — `CLAUDE.md` 966 → 990, `docs/implementation-backlog.md` → 28090
+
+The owner's standing instruction that a question for him becomes a task rather than a chat message,
+plus BF-191 carrying the two decisions it split out of BF-190. The CLAUDE.md growth is one rule, and
+most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, so gating an owner
+question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
+asking. Stating the rule without stating that inversion would have produced exactly the failure the
+rule is for.
+
+---
 
 ### 2026-09-24 — `docs/implementation-backlog.md`
 
-28117 → 28212 (+95, on the base after merging `origin/main` twice; the earlier +81 on this
-branch was against the pre-merge 28052). Three owed checks re-laned
+28168 → 28263 (+95, after three merges of `origin/main`; the earlier +81 and +95-on-28117 on this
+branch were against earlier bases). Three owed checks re-laned
 to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the DV-13 concurrency hazard
 and the owner's authorisation for a production write — a bare lane change would not tell the device agent
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
