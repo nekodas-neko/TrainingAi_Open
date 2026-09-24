@@ -16534,3 +16534,9 @@ that would disprove it. Writing the ruled-out half down is what stops Lane A re-
 entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
 re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
 to run. Offset by removing RV-126, whose results all have homes (−30).
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
+28052 → 28110 (+58). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
+not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
+seven device gates are re-filed.
