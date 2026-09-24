@@ -778,8 +778,10 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
 
 ### [nutrition][app-shell] LB-140 — "Prefer the step-by-step setup?" does nothing; the sheet never mounts
 
-- **Lane:** B — `app/nutrition/nutrition-content.tsx`, `components/nutrition/meal-plan-sheets.tsx`.
-  **Added:** 2026-09-24 · Lane B, found while verifying LB-139's extraction.
+- **Lane: DV** — the next action is a reproduction on the phone with an objective pass/fail, and
+  nobody has run it. Back to `B` the moment it reproduces; **closed** if it does not, because
+  then the whole finding is a dev-server artefact. **Added:** 2026-09-24 · Lane B, found while
+  verifying LB-139's extraction · re-laned by Lane B 2026-09-24 after the sandbox probe ran out.
 - **Measured (web, `pnpm dev`, seeded e2e account with no meal plan, mobile-chromium 384 px).** Tap
   the stepper link under *Build a meal plan* and **nothing happens**: 0 elements with `role=dialog`
   and 0 `[data-slot="sheet-content"]` in the tree **20 seconds** after the tap, with no console
@@ -795,10 +797,17 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   ("`reviewOpen` goes true, the element is in the tree, and the component body never runs") and
   fixed by making it static. Its comment says reverting that reopens the bug; this may be the same
   bug still live on a sibling.
-- **NOT verified against a production build or the APK.** `next start` would not come up in this
-  container (`routesManifest.dataRoutes is not iterable`), so everything above is the dev server —
-  and `next/dynamic` behaves differently there. **First action is to reproduce on a real build**,
-  because if it is dev-only there is nothing to fix.
+- **The production-build probe was attempted and CANNOT be run in a container — do not retry it.**
+  The first failure (`routesManifest.dataRoutes is not iterable`) was a corrupted `.next`, and a
+  clean `pnpm build` fixed it. The real blocker is one layer down and is deliberate: `next start`
+  sets `NODE_ENV=production`, and `instrumentation-node.ts`'s `fatalOrLoud` **throws on boot** when
+  the model constants cannot be fetched — *"could not list the bucket: SignatureDoesNotMatch
+  (403)"*. That gate is `NODE_ENV`-keyed on purpose so a real deploy that lost its storage variables
+  fails loudly, and the file's own comment states that no session sandbox can authenticate to the
+  bucket. So a production-mode server is unreachable here by design, not by accident.
+- **Which leaves the phone, and that is why this is `Lane: DV` now.** Everything recorded here is the
+  dev server, where `next/dynamic` behaves differently, so the finding is unconfirmed on the runtime
+  that matters.
 - **Pass test:** on the S25, from `/nutrition` with no active plan, tap *Prefer the step-by-step
   setup?* — the New meal plan sheet opens on the first tap.
 
@@ -1348,25 +1357,6 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
 - Needs a `window.fetch` wrapper installed at app start; that is a harness change under
   `scripts/device/**`, which the role owns.
 
-### [app-shell] RV-144 — three inputs on `/more/details` sit under the 44 px touch floor
-
-- **Lane:** B — `/more/details`. **Added:** 2026-09-24 · filed out of `RV-127`, whose remaining work
-  was getting its findings to the lanes that own them. The letter stays `RV-` because Review's probe
-  found it; the lane says who builds it.
-- **📱 Measured twice on the S25, and the second pass is what settles it.** The first sweep recorded
-  three **318 × 21** inputs — display name, birth year, height — and said *"not judged; whether their
-  row or label widens the target is the next question"*. **Sweep 2 asked that question**: the real
-  vertical touch area is **~33 px**, against the repo's own 44 px floor. So the label does not rescue
-  it and this is a defect rather than an open measurement.
-- **Not the same as the session dots.** `RV-127` also found `tap-target-dot` at 24 × 44 on Workout,
-  which is **by design** in `globals.css` — 44 in the axis that matters. Do not "fix" those.
-- **Do not fix this with a bare `button`/`a` rule in `globals.css`.** CLAUDE.md's *No global
-  element-selector styling*: tap-target floors belong in the shared component, and any unavoidable
-  global rule ships its opt-outs in the same PR.
-- **Sibling sweep before closing**: the probe covered 13 routes and found these three, but it
-  measured what was on screen. Check the other text inputs in the same form family rather than only
-  the three named.
-
 ### [app-shell][platform] RV-146 — two fonts only the meal-label printer uses are preloaded on every page
 
 - **Lane:** B — `app/layout.tsx`.
@@ -1485,7 +1475,7 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
   phone on **three-button navigation**, where the inset is generous and a broken floored utility
   passes anyway. Until the owner switches to gesture nav, clearance is COULD NOT CHECK; the four
   claims above are unaffected and can run today.
-- **Sweep 4 — what is actually left.** The filing work this entry was held in `O` for is **done**: its one actionable finding is now `RV-144` (Lane B), the session
+- **Sweep 4 — what is actually left.** The filing work this entry was held in `O` for is **done**: its one actionable finding shipped as `RV-144`, the session
   dots are by design, the horizontal overflow was looked at and overlaps nothing, and `DV-4`/`DV-6`
   were already filed. **What remains is only the clearance half**, which needs the owner on gesture
   navigation — the same group as `RV-37`, deferred to sweep 4 for the same reason.

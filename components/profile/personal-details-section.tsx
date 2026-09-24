@@ -66,7 +66,7 @@ export function PersonalDetailsSection({
           value={values.displayName}
           onChange={e => onChange('displayName', e.target.value)}
           placeholder={namePlaceholder ?? 'Your name'}
-          className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
+          className="mt-0.5 border-0 bg-transparent px-0 py-0 h-auto min-h-[48px] text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
         />
       </div>
 
@@ -107,7 +107,7 @@ export function PersonalDetailsSection({
           min={1920}
           max={new Date().getFullYear() - 10}
           disabled={saving}
-          className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
+          className="mt-0.5 border-0 bg-transparent px-0 py-0 h-auto min-h-[48px] text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
         />
       </div>
 
@@ -122,7 +122,7 @@ export function PersonalDetailsSection({
           min={50}
           max={300}
           disabled={saving}
-          className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
+          className="mt-0.5 border-0 bg-transparent px-0 py-0 h-auto min-h-[48px] text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
         />
       </div>
 
