@@ -16587,3 +16587,14 @@ to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the D
 and the owner's authorisation for a production write — a bare lane change would not tell the device agent
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
 `laneFromLines` is first-match-wins.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/readiness-gates-nothing)
+
+28335 → 28434 (+99). Two entries. TN-64 records that readiness gates nothing — its only automatic
+protective action is excluded on the active `ai_dynamic` program and has never fired on any program —
+and carries the owner decision brief in the entry rather than a chat reply. TN-65 records that set RPE
+is a dense signal (864 of 1,286 sets) available to validate scoring, the load-controlled null it
+produced, and the n=10 correlations that must not be cited. Both are long because most of each is what
+has been ruled out and what must not be re-derived.
