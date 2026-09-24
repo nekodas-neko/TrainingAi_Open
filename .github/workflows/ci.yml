@@ -1,5 +1,12 @@
 name: CI
 
+# RV-198. Default the token to read-only for every job here. Nothing in this workflow writes to the
+# repository: the only token-bearing operation is `actions/upload-artifact`, which uses the Actions
+# runtime token rather than `GITHUB_TOKEN`. `android.yml` keeps `contents: write` because its publish
+# step genuinely needs it.
+permissions:
+  contents: read
+
 # Action versions are the MINIMUM that runs on Node 24, verified per action against each one's own
 # `action.yml` `runs.using` rather than bumped uniformly (LA-17). That distinction is load-bearing:
 # `upload-artifact@v5` is still `node20`, so a uniform "everything to v5" would have left it behind
@@ -51,7 +58,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -99,7 +106,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -118,7 +125,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
+      # DV-14: the heap cap lives in `package.json`'s build script, so Railway's builder and this
+      # job run the SAME number. It used to be set here and nowhere else, which is why CI passed at
+      # 4096 while Railway — which sets no NODE_OPTIONS at all — died on Node's own ~4 GB default.
+      # A value set here would be overridden by the script's inline one, so it is not set here.
       # Q-311. Everything below is a throwaway literal for this ephemeral job, not a redacted
       # secret. This repo is public, and a reader cannot tell a dummy from a leak by looking, so:
       # the database is a service container destroyed with the runner, and the Google/Gemini/Tasker
@@ -133,7 +143,7 @@ jobs:
       WEBHOOK_USER_ID: placeholder
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -572,7 +582,7 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -695,7 +705,7 @@ jobs:
           # an engine change still skips the browser and LA-63's saving is intact.
           CHANGED=$(printf '%s\n' "$FILES" | node scripts/e2e-ui-touched.js)
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         if: steps.ui.outputs.changed == 'true'
         with:
           version: 10.33.0

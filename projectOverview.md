@@ -2612,6 +2612,30 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ⚠️ Database errors were forwarding row values — including an email — to sentry.io (RV-194, 2026-09-24)
+
+`beforeSend` scrubbed the request and left the **exception message** untouched, and Drizzle puts the
+bound parameters into it: `` `Failed query: ${query}\nparams: ${params}` ``, where `params` is an
+array the template comma-joins. So every uncaught database error sent real row values to a third
+party; on the `users` path that included an email address. Console breadcrumbs (whatever the app
+last logged), navigation `from`/`to`, `extra` and `contexts` were passing through as well, and no
+`maxValueLength` was set on any runtime.
+
+**Fixed 2026-09-24** — the message is cut at `\nparams:` and capped, console breadcrumbs are dropped
+as a category, `from`/`to` join `url` in the URL scrubber, `extra` is deleted and `contexts` is
+allowlisted to the SDK's own runtime keys. The parameterised SQL above the params line is
+deliberately kept, because it carries `$1` placeholders rather than values and is what makes the
+error diagnosable.
+
+**What is NOT claimed:** nothing was sent to sentry.io to check this. The scrubber is a pure
+function, tested against a message built from the **pinned** `drizzle-orm` constructor. What is
+verified is that the shape Drizzle documents gets scrubbed — not that production throws only that
+shape. `enabled` is false outside production, so a local capture could not have shown it either.
+
+**Already-sent events are not recalled by this.** Anything forwarded before today is in sentry.io
+and stays there; clearing it is an account-side action, not a code one, and nobody has measured how
+many events are affected.
+
 ### [nutrition][platform] ⚠️ Supplement ticks lost their time and frozen dose on every sync — fixed, not yet seen on the phone (RV-172, 2026-09-24)
 
 `applyDelta` writes `col = excluded.col` unconditionally, so a column the sync delta omits is not
@@ -3011,7 +3035,7 @@ and nothing asks for a new value. No invalidation was added: all five keys were 
 and are now checked against `lib/cache-groups.ts` in the test. Owed: the device check, which is the
 Device Verification agent's — and **RV-124's device probe settles this class by measurement**,
 these three included. Detail:
-[`docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md`](docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md).
+[`2026-09-23-rv106-rv107-rv109-stale-surfaces`](docs/overview/history-2026-09-24-folded-2.md#2026-09-23-rv106-rv107-rv109-stale-surfaces).
 
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 

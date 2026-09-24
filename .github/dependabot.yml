@@ -26,3 +26,20 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
+
+  # RV-198. Without this ecosystem, nothing ever tells us a pinned action has a security fix — and
+  # SHA-pinning makes that worse, not better: a tag silently follows upstream, a SHA silently does
+  # not. The pin is what makes this entry mandatory rather than tidy.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 0 # matches npm above: version updates off, security updates unaffected
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"

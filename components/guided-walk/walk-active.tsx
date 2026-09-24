@@ -35,9 +35,23 @@ export interface WalkHrSample { at: number; bpm: number }
 
 const STALE_MS = 8_000
 
-export function WalkActive({ userProfile, onFinish }: {
+/**
+ * BF-191 — below this, ending a walk offers to discard it instead of saving it.
+ *
+ * The owner asked for "a mix of min floor duration + confirm on exit". `MIN_SESSION_SEC` (120s,
+ * `time-audit.ts`) is the repo's precedent for this shape but is a WORKOUT floor; two minutes of
+ * walking is a real walk, so this is its own number rather than a reused one.
+ */
+export const MIN_WALK_SEC = 60
+
+export function WalkActive({ userProfile, onFinish, onDiscard }: {
   userProfile: { age: number | null; restingHr: number; hrMax: number }
-  onFinish: (samples: WalkHrSample[], cadence: CadenceSummary | null) => void
+  // BF-190: the elapsed seconds travel WITH the callback. Both exits used to be the same two-arg
+  // call, so the summary could not tell a completed walk from one stopped 27 seconds in — and
+  // assumed the plan. Same shape as the mutation-callback rule in CLAUDE.md: the callback has to
+  // carry the fact that matters rather than let the receiver reconstruct it.
+  onFinish: (samples: WalkHrSample[], cadence: CadenceSummary | null, elapsedSec: number) => void
+  onDiscard: () => void
 }) {
   const config = useGuidedWalkStore(s => s.config)
   const startedAtMs = useGuidedWalkStore(s => s.startedAtMs)
@@ -54,6 +68,8 @@ export function WalkActive({ userProfile, onFinish }: {
   const finishedRef = useRef(false)
   const onFinishRef = useRef(onFinish)
   onFinishRef.current = onFinish
+  const onDiscardRef = useRef(onDiscard)
+  onDiscardRef.current = onDiscard
   const [elapsedSec, setElapsedSec] = useState(0)
   const [liveBpm, setLiveBpm] = useState<number | null>(null)
   const [lastBeatAt, setLastBeatAt] = useState<number | null>(null)
@@ -142,7 +158,7 @@ export function WalkActive({ userProfile, onFinish }: {
       if (e >= plan.totalSec && !finishedRef.current) {
         finishedRef.current = true
         hapticSuccess()
-        onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+        onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null, e)
       }
     }
     tick()
@@ -273,14 +289,24 @@ export function WalkActive({ userProfile, onFinish }: {
         End walk
       </Button>
 
+      {/* BF-191: one dialog, not two. Implemented literally — a floor, then a confirm — a mis-tap
+          would raise "End walk?" and then "Discard this short walk?", which is the two-prompt
+          objection the confirm-on-exit alternative lost on. Below the floor this dialog becomes
+          the confirm instead of being followed by one. */}
       <LeaveWalkDialog
         open={confirmEndOpen}
+        outcome={elapsedSec < MIN_WALK_SEC ? 'discard' : 'save'}
+        elapsedSec={elapsedSec}
         onStay={() => setConfirmEndOpen(false)}
         onLeave={() => {
           setConfirmEndOpen(false)
           if (finishedRef.current) return
           finishedRef.current = true
-          onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+          if (elapsedSec < MIN_WALK_SEC) {
+            onDiscardRef.current()
+            return
+          }
+          onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null, elapsedSec)
         }}
       />
     </div>
