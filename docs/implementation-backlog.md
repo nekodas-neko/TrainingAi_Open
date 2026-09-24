@@ -769,8 +769,14 @@ the Orchestrator's to do.
   Component names are minified, so **which** chart(s) and why is not established — the suspect is a
   responsive resize when a panel leaves `content-visibility: hidden`.
 
-- **Lane: B** · **Batch: tab-switch-speed** — **re-laned from `DV` on 2026-09-24, because the
-  measurement it was parked for HAS BEEN TAKEN.** The owner said tab-switch speed is his highest
+- **Gate:** device — the remaining question needs the phone.
+- **Lane: B** · **Batch: tab-switch-speed** — **re-laned from `DV` on 2026-09-24,
+  because the measurement it was parked for HAS BEEN TAKEN.**
+  **⚠ `Gate: device` added 2026-09-24 (LB-145) after this entry headed Lane B's READY list while
+  being unstartable.** The re-lane to `B` was right — the fix is Lane B's — but the remaining
+  question needs the phone, and that was said only in prose. Prose does not route: `next-item.js`
+  offered it as ready work, which is the same defect RV-166 had. The gate parks it and puts it in
+  `--sittings`, where it belongs, and it clears the moment a device sitting happens. The owner said tab-switch speed is his highest
   priority; this is the entry that holds the time, so it heads the lane.
   **The park was correct when it was written and is not now.** This entry's *"Not established"* line
   asked for a CPU profile of one tap to name what dominates the task — and sweep 3 ran exactly that
@@ -813,8 +819,11 @@ the Orchestrator's to do.
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
 
-- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 · Orchestrator, answering
-  `DV-12`'s open question without the phone.
+- **Gate:** device — the count that chooses between (a), (b) and (c) needs the phone.
+- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 ·
+  Orchestrator, answering `DV-12`'s open question without the phone. **Gated 2026-09-24 (LB-145)
+  for the same reason as `DV-12`** — its own choice between (a), (b) and (c) turns on a count that
+  the harness cannot take.
 - **`DV-12`'s "Not established" was *which component dominates the task*.** Its sweep-3 profile named
   the chain — chart.js `update → _tickSize → _computeLabelSizes → set font`, the canvas `font` setter
   at **7-48 ms** on every tap — and guessed the cause: *"the suspect is a responsive resize when a
@@ -836,7 +845,12 @@ the Orchestrator's to do.
 - **Ask why the update fires before optimising what it does.** A chart whose pixel size has not
   actually changed should not re-measure. Directions, cheapest first, none yet measured:
   **(a)** chart.js `resizeDelay` — currently set nowhere in the repo — debounces the observer, which
-  may be enough to coalesce the reveal into one update instead of per-chart;
+  may be enough to coalesce the reveal into one update instead of per-chart. **It reads like a
+  one-liner and the repo's shape makes it not one (LB-145):** **20 files call `ChartJS.register`
+  individually and there is no shared chart module.** `ChartJS.defaults.resizeDelay` would cover
+  all of them from one place, but that place does not exist yet and must be imported before the
+  first chart is constructed — so (a) is "create a shared defaults module and route 20 files
+  through it", not "add a prop";
   **(b)** hold the canvas size across the hidden state so the observed box does not change;
   **(c)** skip the update when the previous box was zero-size, which is the reveal case specifically.
 - **Pass test is `DV-12`'s, unchanged:** `perf.js longtasks`, every tab tap's longest task under
