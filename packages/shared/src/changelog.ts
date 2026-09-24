@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.29",
+    date: "2026-09-24",
+    changes: [
+      "Home no longer says \"Sleep: OK\" under your mood card. That was not something you told it — the check-in stopped asking about sleep quality back in June, and the app has been filling the blank with the same word ever since and showing it back to you as your own answer. It is gone rather than replaced; whether your morning sleep rating belongs there instead is a question for you.",
+      "The nutrition goal recommendations no longer feed that same made-up value to the model. It still gets your measured sleep hours and your real energy rating, which are both genuine.",
+    ],
+  },
+  {
     version: "1.465.28",
     date: "2026-09-24",
     changes: [
