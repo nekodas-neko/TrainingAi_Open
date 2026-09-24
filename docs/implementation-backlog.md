@@ -1256,6 +1256,59 @@ which is the right shape for something that can only be validated by living with
   `app/api/admin/backfill-derived-scores` (the pattern to copy).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
 
+### [workouts] TN-75 — the load prescription IS followed; what regressed is the field that lets anyone check, from 93% coverage in August to 72% in September
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, completing TN-64's question from the other
+  side: readiness gates no prescription, so does the prescription itself reach the bar?
+- **Lane: A** — `planned_*` is written on the set-log path, engine territory.
+- **The good news first, and it is a real non-finding worth recording.** Where both planned and actual
+  are present (432 sets): mean load deviation **−0.81 percentage points** (sd 3.45), with **214 of 432
+  (50%) inside half a point of plan**. Reps: **228 of 432 exact**, mean deviation **+0.45**, and only
+  **17 sets under** the prescribed reps. So the owner follows the prescribed load closely and overshoots
+  reps slightly rather than falling short. **The prescription path works.** What TN-64 found disconnected
+  is the readiness *input* to it, not the mechanism — worth separating, because "the app's advice is
+  ignored" would be the wrong conclusion to draw from TN-64 alone.
+- **The regression.** `planned_pct` coverage by month, over sets joined to their sessions:
+
+  | month | sets | with a plan | coverage |
+  |---|---:|---:|---:|
+  | 2026-05 | 332 | 0 | **0%** |
+  | 2026-06 | 165 | 0 | **0%** |
+  | 2026-07 | 372 | 147 | 40% |
+  | 2026-08 | 266 | 247 | **93%** |
+  | 2026-09 | 151 | 109 | **72%** |
+
+  The field arrives in July, reaches 93% in August, then **falls 21 points in September**. Coverage going
+  backwards is the finding; the 0% before July is just the field's age.
+- **Two distinct shapes inside the September gap.**
+  - **A five-session hole, 2026-09-07 → 09-12: 24 sets, ZERO with a plan.** Those five sessions also ran
+    **4–5 sets each against 10 in every session either side**, and all carry `intensity_mode` NULL where
+    the 2–6 September sessions carry `'deload'`. A different regime, not scattered loss.
+  - **A steady residue elsewhere**: sessions from 09-14 on sit at 8 of 10 with striking consistency.
+    Measured against set position, the loss is **even — 7 of 40 missing on set 1 and 7 of 40 on set 2** —
+    so it is **whole exercises lacking a plan, not late sets losing one.**
+- **⚠ THE OBVIOUS UNIFICATION WITH TN-74 IS FALSE, and I nearly filed it.** `planned_pct` derives from a
+  1RM, so a log with `estimated_1rm = 0` should have no prescribable percentage — which would have made
+  TN-74 and this one defect. Measured over sets since 2026-07-01: **16% of sets WITH a plan sit on a
+  zero-1RM log (81 of 503), against only 4% of sets WITHOUT one (11 of 286).** The association runs the
+  *opposite* way to the prediction. Missing `style_id` does not explain it either (13 of 286).
+  **They are two independent defects** and must be worked as such.
+- **Why this matters for tuning specifically.** `planned_pct` is the only column that makes
+  prescription-adherence measurable at all. The adherence figures at the top of this entry could only be
+  computed on **39% of sets** (503 of 1,286), and on the five-session hole they cannot be computed at
+  all. Every future claim about whether the app's advice was taken is limited by this coverage, so the
+  regression costs the analysis, not just the record.
+- **Acceptance criteria:** September-onward coverage returns to August's level or better; the five-session
+  window's cause is identified (whatever produced 4–5-set sessions with no plan and a null intensity
+  mode); and a set written with no available plan is distinguishable from one never asked, rather than
+  both reading NULL.
+- **What this does NOT establish.** Why those five sessions differ. Which exercises carry the steady
+  residue — the even split by set position says it is per-exercise, but the exercises were not named.
+  And whether the −0.81-point mean deviation is the owner rounding to available plates or genuinely
+  under-loading; a plate-rounding check would settle it and was not run.
+- **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
+  written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a

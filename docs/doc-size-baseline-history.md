@@ -16885,3 +16885,12 @@ and stops the next sweep undoing that.
 expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
 parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
 a stale citation or building a finished entry.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/planned-pct-coverage)
+
+29745 → 29843 (+98). TN-75: the load prescription is followed (50% of sets within half a percentage point, reps exact on 53%),
+but `planned_pct` coverage fell from 93% in August to 72% in September with a five-session hole. Includes
+the measurement that kills the tempting unification with TN-74 — a zero 1RM is more common among sets
+that DO carry a plan, not fewer.
