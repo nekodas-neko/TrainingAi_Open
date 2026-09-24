@@ -16775,3 +16775,12 @@ it wants, baseline zero. The six lines are the last six gates plus OR-145's corr
 gated entries rather than the 76 it was written against, and a twelve-entry admin sitting rather
 than ten. That count moved four times in a day, every rise from reading a gate that said only
 `owner` and finding a button press behind it, so the entry now says to recount rather than quote it.
+
+## 2026-09-24 — `projectOverview.md` → 12676
+
+12655 → 12676 (+21). DV-18's row. It earns a place for a reason the entry itself did not have: the
+defect was filed as one broken admin image and turned out to reach the workout screen, so it is
+something the owner saw and could not explain rather than an internal tidy-up. The row also records
+that the filed mechanism was wrong, which is the part worth carrying — a future reader finding the
+content-type fix in the diff would otherwise conclude that was the cause. Leaves the S25 check
+outstanding, so per the archive rule it stays open.

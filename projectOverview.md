@@ -2612,6 +2612,27 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] ⚠️ Broken exercise pictures — fixed, not yet seen on the phone (DV-18, 2026-09-24)
+
+The device agent reported one broken image in the admin tools. It was six places, and one of them
+is the workout screen you use.
+
+Pictures under `/exercise-media/` sit behind your sign-in. Next's image pipeline fetches a picture
+**on the server, without your cookie**, so it was redirected to the sign-in page, got a web page
+where an image should be, and gave up — which the browser draws as a broken-image icon. Measured
+rather than guessed: the direct address answers `307 /sign-in`, and the optimiser answers
+`400 isn't a valid image`. Animations were exempted years ago for an unrelated reason, so GIFs
+worked and everything else broke, which is why it looked arbitrary. An exercise the generator made
+only a still frame for showed a broken picture in the workout screen and the warm-up list.
+
+**The filed cause was wrong and the entry said so honestly** — it diagnosed a phone photo stored
+under a `.png` name and marked itself unproven, needing production storage nobody in a container
+can reach. The real cause needed no storage at all. That upload defect was real too and is fixed
+alongside, but it was not this.
+
+**Still owed: the look on the S25.** Admin → Exercises shows the style reference, and an exercise
+with only a still frame shows it rather than a broken icon. Nothing is blocked on that check.
+
 ### [readiness][body][heart-rate] ⚠️ The Body Battery is fixed on provisional numbers, and three things are still owed (TN-55, 2026-09-24)
 
 Your *"it's pretty much useless"* was a rate-balance defect, and it is fixed: replayed over 66 days

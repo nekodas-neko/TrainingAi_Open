@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.28",
+    date: "2026-09-24",
+    changes: [
+      "Exercise pictures no longer come up broken. An exercise the generator made only a still frame for — no animation — showed a broken-image icon in the workout screen and the warm-up list, because those pictures are behind your sign-in and the image pipeline was fetching them without it. Animated ones were unaffected, which is why it looked random.",
+      "Uploading a style reference in the admin tools now checks what the file actually is instead of trusting its name, and says so plainly if it is something that cannot be shown — a photo straight from the phone camera, for instance.",
+    ],
+  },
+  {
     version: "1.465.27",
     date: "2026-09-24",
     changes: [

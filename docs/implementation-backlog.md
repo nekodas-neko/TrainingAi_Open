@@ -1471,37 +1471,36 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **Pass test:** on the S25, from `/nutrition` with no active plan, tap *Prefer the step-by-step
   setup?* — the New meal plan sheet opens on the first tap.
 
-### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
+### [platform][app-shell] DV-18 — private media went through Next's image optimizer, which cannot authenticate
 
-- **Lane: A** — `app/api/admin/reference-figure/route.ts` (POST), `app/exercise-media/[...key]/route.ts`.
-  Re-laned from B after Lane B looked first, as the entry asked.
-- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147) · triaged by Lane B 2026-09-24.
-- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Admin → Exercises → **AI style reference** renders the WebView's broken-image
-  icon and the alt text *"Reference figure"*. This is the anchor the AI GIF generator styles from, so a
-  missing one may affect generations too.
-- **The entry's open question is settled: a URL IS stored.** `exercise-manager.tsx` renders
-  *"No reference — AI uses text prompts only"* when `referenceUrl` is null. The device saw the
-  broken-image icon and the alt text instead, so the GET returned a URL and the browser's fetch of
-  it failed. "Never set" is ruled out.
-- **Not a path mismatch, checked:** `REFERENCE_FIGURE_KEY` is `exercise-media/reference-figure.png`;
-  the admin GET strips that prefix to build `/exercise-media/reference-figure.png`, and the proxy
-  re-adds it. The two agree exactly.
-- **Mechanism — high confidence, NOT proven.** The POST writes **any** uploaded file to the `.png`
-  key with a hard-coded `'image/png'`, and the proxy sets Content-Type from the `.png` extension.
-  Neither inspects the bytes. The S25 shoots HEIC/JPEG, so a phone upload is stored and served as
-  PNG, which the WebView cannot decode — a broken image, while the GET's existence check (a real
-  `downloadMedia`) still succeeds. That is the observed symptom exactly.
-- **What would disprove it:** the stored object really being a valid PNG, in which case look at a
-  truncated upload or the proxy's response. Settling it needs production storage, which the sandbox
-  cannot reach — so this is a diagnosis to verify, not a conclusion to build on.
-- **Why Lane A:** the durable fix is server-side — sniff the real type on upload and store/serve it
-  under a matching key and Content-Type, or reject a non-PNG outright. `app/api/**` is Lane A by the
-  path rule.
-- **The Lane B half is deliberately not done.** Constraining the file input in
-  `components/admin/exercise-manager.tsx` is bypassable and cannot repair the already-stored object,
-  so shipping it alone would make the card look fixed while the AI generator still styles from a
-  file it cannot read. Worth adding *after* the server fix, not instead of it.
-- **Pass test:** the card shows the reference image on the S25.
+- **Lane:** A — shipped 2026-09-24. The S25 check below is the only thing left.
+- **Verify:** device
+- **Keep:** the pass test on the S25 — Admin → Exercises shows the AI style reference, and a workout
+  whose exercise has only a still frame (no GIF) shows that frame rather than a broken image.
+- **⚠ THE FILED MECHANISM WAS WRONG, and it is worth reading why before trusting the next one.** The
+  entry diagnosed a HEIC/JPEG stored and served under a `.png` key with a hard-coded `image/png`,
+  and called it *"high confidence, NOT proven"*, needing production storage to settle. The real
+  cause needed no storage at all and is measurable from a dev server:
+
+  ```
+  GET /exercise-media/reference-figure.png              -> 307 /sign-in
+  GET /_next/image?url=%2Fexercise-media%2F…&w=96&q=75  -> 400 "isn't a valid image"
+  ```
+
+  `middleware.ts` puts every non-`/api` path behind the session gate, and Next's image optimizer
+  fetches its source **server-side without the viewer's cookie** — so it is redirected, receives
+  HTML, and rejects it. It fails before storage is consulted, so what is stored under the key never
+  mattered. The device supplied the other half: the admin page itself rendered, so the session was
+  present in the browser and the image still failed.
+- **It was never one image.** Six `<Image>` call sites carried `unoptimized={src.endsWith('.gif')}`,
+  so GIFs worked by accident and every other private-media URL broke. `mediaKey` writes start/end
+  frames as `.png`, and `exercise-media-panel.tsx` falls back to that frame when an exercise has no
+  animation — so this was **user-facing in the workout screen**, not an admin-only cosmetic defect.
+  One predicate, `mustBypassImageOptimizer`, now answers it at every site.
+- **The content-type half shipped too, as a latent defect rather than this one.** The upload really
+  did store every file as `image/png` whatever the bytes were; it now sniffs the magic bytes,
+  rejects what it cannot serve, and the proxy serves the stored type rather than guessing from the
+  extension.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
 
