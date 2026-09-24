@@ -16634,7 +16634,6 @@ cover the gap because the write's own invalidation has emptied the key. Measured
 Writing the arithmetic down is what stops the next session reading the sweep result as "the
 reporting never worked" and rebuilding a channel that already exists.
 
----
 
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-autonomic-collinearity)
 
@@ -16674,6 +16673,9 @@ is the column's age rather than a missing input — plus the one cheap test that
 TN-71 adds the post-TN-60 contributor share table LA-122 2b was parked for: temperature holds 10% of the
 weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-of-movement contributor
 "never scored".
+
+---
+
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 57, `review/sweep-57-data-census`.**
 28809 → 28974 (+165; rebased on #1525). Eight new entries from a census of the owner's production data
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
@@ -16693,6 +16695,21 @@ Rebased: the number above is the merged figure. Review's sweeps 55–57 added RV
 RV-170 at the same queue head in the same hour — three more owner-question entries, no content
 overlap with OR-145. OR-145 gained a five-line cross-reference so all four are asked as one
 sitting; four separate interruptions for one sitting's answers was the failure worth five lines.
+
+---
+
+---
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → RV-111 shipped, device re-check kept
+
+29054 → 29065 (+11 on the merged base). RV-111's fix is two lines; the eleven are what was checked rather than assumed.
+The entry warned that one press closing both surfaces would leave the app blank, because the
+scanner's `body.scanner-active` rule hides every other body child until it unmounts — so the note
+records why that cannot happen (`handlePop` closes only surfaces deeper than the arriving entry,
+and popping the scanner's lands on the sheet's) and why the stack itself needed no change. Without
+it the next reader re-derives the same safety argument from scratch.
 
 ---
 

@@ -2995,8 +2995,19 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   (`barcode-scanner.tsx:73-76`) and removes it in `stopNative()` on unmount. **If one back press
   ever closed both surfaces in a single pop, the app would be left with every body child hidden.**
   The existing `pendingSelfPops` accounting is what prevents that.
-- **Not established:** whether the native barcode activity intercepts hardware back before the JS
-  listener runs — device-only, and it may already mask this.
+- **✅ Shipped 2026-09-24 (Lane B).** `useSheetBackDismiss` in both files, exactly as the entry
+  specified. Nothing in the stack needed changing: `sheet-back-stack.test.ts`'s LB-17 case already
+  proves three layers unwind one press at a time, and the depth accounting is why — popping the
+  scanner's entry lands on the sheet's, so `arrivedDepth` is 1 and only surfaces deeper than 1
+  close. **The ordering risk therefore cannot fire**, which is the half worth having checked, since
+  the scanner's global `body.scanner-active` rule hides every other body child until it unmounts.
+- **Keep:** the device re-check — on the S25, Log Food → Barcode → one hardware back returns to the
+  Log Food sheet with the scanner gone, the sheet intact, and nothing left hidden; a second back
+  then closes the sheet. The sandbox cannot drive the scanner (it wants a camera), so this is the
+  only way the fix is observed. **Lane: DV.**
+- **Still not established, and unchanged by this:** whether the native barcode activity intercepts
+  hardware back before the JS listener runs — device-only. Sweep 2's confirmation implies it does
+  not, since the JS path was reached; the device re-check above settles it either way.
 
 ### [platform] LB-133 — the guard for the post-push class cannot see the class
 

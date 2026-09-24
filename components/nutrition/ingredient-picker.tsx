@@ -12,6 +12,7 @@ import type { RecipeCandidate } from './recipe-candidates'
 import { runRecipeImport, offlineHint } from './recipe-import-run'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 import { BarcodeScanner } from './barcode-scanner'
+import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
 
 interface Props {
@@ -66,6 +67,11 @@ export function IngredientPicker({
   const [addFoodSaving, setAddFoodSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [lookingUp, setLookingUp] = useState(false)
+
+  // RV-111, same shape as `capture-actions.tsx`: the scanner replaces this picker's body, so
+  // without its own entry the back listener sees one surface and closes the picker. See that file
+  // for why the depth accounting makes one press step exactly one level.
+  useSheetBackDismiss(scanning, () => setScanning(false))
 
   // The database search runs on its own clock in `useFoodDatabaseSearch`, deliberately not chained
   // behind this one: they are independent queries, and chaining them meant a slow library fetch
