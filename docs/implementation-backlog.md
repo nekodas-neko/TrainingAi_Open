@@ -733,6 +733,106 @@ which is the right shape for something that can only be validated by living with
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
+### [sleep][app-shell] TN-66 — `sleep_quality` has been a hard-coded `'ok'` for 91 days, and two surfaces present it as the owner's own answer
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while looking for a second external signal
+  to validate scores against.
+- **Lane: A** — it straddles both halves (an `app/api` prompt and a Home component), so the path rule
+  sends it to Lane A, engine half first.
+- **This is the TN-57 class, at a second site TN-57 did not cover.** TN-57 fixed the *unanswered*
+  self-report by storing `null` for an untouched scale. This one stores a **value**, so nothing
+  downstream can tell it was never answered.
+- **Measured 2026-09-24.** `mood_logs` holds **108 rows across 108 distinct days** (2026-05-27 →
+  today), with `energy_level`, `sleep_quality` and `body_state` all **100% populated**. `energy_level`
+  carries real spread — drained 6, low 18, ok 50, good 34. `sleep_quality` carries **two values of its
+  five**: `ok` 93, `good` 15, and never `terrible`, `poor` or `great`.
+- **The date split is the proof, not the distribution.** Every `good` falls between **2026-05-27 and
+  2026-06-25**; every row since 2026-06-25 is `ok`. The field went constant 91 days ago.
+- **It is deliberate, documented, and not itself the defect.**
+  `packages/shared/src/validation/mood-log.ts:13` says so outright: *"the check-in no longer collects
+  it, so a queued mutation omits it and the write path defaults to `'ok'` — without that default the
+  `NOT NULL` column rejects the insert and the mutation strands in the outbox forever, which is how the
+  check-in came back on every app open (#47)."* The default is load-bearing. **Do not remove the
+  default** — that reintroduces #47.
+- **The defect is the two readers that cannot tell a default from an answer:**
+  - **`components/home/home-card-widget.tsx:220`** renders `Sleep: {SLEEP_LABEL[moodLog.sleepQuality]}`.
+    So Home has displayed **"Sleep: OK"** every day for 91 days, sourced from a constant, in the card
+    that otherwise shows what the owner reported. He is being told what he said about his sleep and he
+    never said it.
+  - **`app/api/nutrition-goals/recommend/route.ts:110`** puts `sleep quality=${m.sleepQuality}` into an
+    **LLM prompt** for nutrition-goal recommendations, beside genuinely measured `Xh sleep` and a real
+    `energy=`. The model receives 93 days of a constant presented as observation. The route's own
+    neighbouring comment (Q-76) exists because feeding the model an untrue sleep figure means it
+    *"learns nothing true"* — the same hazard, one field over.
+- **Fix, both halves:** stop rendering and stop prompting with a value that was not collected. The write
+  default stays; the readers must distinguish "defaulted" from "reported". The cheapest honest form is a
+  `sleep_quality_reported` boolean (or reusing TN-57's `*_touched` convention, which already exists for
+  exactly this) — the readers then omit the line rather than print or prompt a fabricated one.
+  **Backfill is decidable from the dates above:** rows on or before 2026-06-25 were collected, later
+  ones were not.
+- **Acceptance criteria:** Home shows no sleep line on a day the field was defaulted; the nutrition
+  prompt omits `sleep quality=` for those days; the 15 genuinely-collected rows still render and still
+  reach the prompt; #47 does not regress (a queued mutation with no `sleepQuality` still inserts).
+- **⚠ What this closes off for Tuning, which is why the entry exists at all.** I went looking for a
+  second daily self-report to validate readiness against, after TN-65 established that set RPE is the
+  only dense one. On its face `mood_logs` looked ideal — 108 days, 100% capture. **`energy_level` is
+  usable and `sleep_quality` is not**, and an analysis that had not checked the date split would have
+  read a 91-day constant as agreement between the sleep score and the owner's perception.
+- **Where the mechanism is:** `packages/shared/src/validation/mood-log.ts` (the documented default and
+  #47), `app/api/mood/route.ts:62` and `lib/data/postgres/adapter.ts:4715` (the two write paths that
+  apply it), `components/mood-checkin-sheet.tsx:256` (the client hard-codes it too).
+
+### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
+  conclusion I had already drawn in this session.
+- **Lane: O** — nothing to build; it sets what may and may not be claimed about the score, and names a
+  dated point at which the real measurement becomes possible.
+- **The measurement that looked like validation.** Reported `energy_level` against same-day
+  `readiness_score`, **n = 67, r = +0.619**, with group means monotonic across every level present —
+  drained **40.0** (n=6), low **52.1** (n=17), ok **67.8** (n=40), good **72.8** (n=4). Sleep score
+  against the same target: **r = +0.411**. On its face that is far stronger external agreement than
+  anything previously measured for this score, whose own day-to-day autocorrelation is +0.361.
+- **It does not survive a date split, and the split is a natural experiment.** TN-50 shipped
+  **2026-09-19** (#1320) and removed the check-in's `readinessToEnergy(readiness)` default:
+
+  | era | n | r(energy, readiness) |
+  |---|---:|---:|
+  | before 2026-09-19 — picker **seeded from readiness** | **62** | **+0.664** |
+  | after 2026-09-19 — picker **starts unset** | **5** | **0.000** |
+
+  So **62 of the 67 days come from the era when the app filled the answer in from the score.** TN-50's
+  own measurement is the mechanism: the saved level was exactly what the auto-fill would have picked on
+  **45 of 62 days (73%, against ~20–25% by chance)**. The correlation is largely the app agreeing with
+  itself.
+- **The clean window is five days, and five days is nothing.** The post-fix sample spans two energy
+  levels (ok ×4, low ×1), so its r = 0.000 is not evidence *against* agreement either. **Both readings
+  are unusable and it is the pre-fix one that is dangerous**, because it is large, monotonic and
+  points the way everyone hopes.
+- **⚠ So: no external validation of the readiness score exists today.** Every historical
+  energy-versus-score analysis over data before 2026-09-19 is contaminated, including the monotonic
+  table above. This **extends** the correction already recorded in
+  [`docs/reviews/2026-09-18-what-the-score-can-and-cannot-say.md`](reviews/2026-09-18-what-the-score-can-and-cannot-say.md)
+  (lines 70–74), which established that the `checkin` *contributor share* was not independent of
+  readiness. The same contamination disqualifies `energy_level` as a **validation target**, which that
+  review did not say and which is the use this entry was about to make of it.
+- **Falsifiable and dated.** At the observed cadence the post-fix sample reaches **n ≈ 30 around
+  2026-10-20**. Re-run the split then. **If r stays near +0.6 on clean data the score is externally
+  validated** and this entry closes as good news; if it collapses toward zero, the agreement was always
+  the loop. Either answer is worth having and neither is available now.
+- **One confound survives even the clean window, and it is by design.** The sheet still receives
+  `readiness` — *"Shown beside the picker for context. It must NEVER set the default again (TN-50)"*
+  (`components/mood-checkin-sheet.tsx:50`). So the number is visible while the owner chooses, and
+  **86 of 108 check-ins are filed between 05:00 and 09:00** Brisbane, all 108 on their own day, which
+  is exactly when Home renders the score. Removing the seeding closed the mechanical loop and left an
+  anchoring one that stored data cannot separate. Settling *that* needs the score hidden until the
+  check-in is saved — a product change, so it is the owner's call and not assumed here.
+- **What this makes of TN-65.** Set RPE becomes the **only** validator usable on historical data, since
+  it was never derived from a score. That raises TN-65 from a nice-to-have method to the one route to
+  an answer before late October.
+- **Two things not to do.** Do not quote the monotonic table as evidence of anything. Do not read the
+  post-fix r = 0.000 as the score failing — it is five days.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
