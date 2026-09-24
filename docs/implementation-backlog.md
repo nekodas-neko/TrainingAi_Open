@@ -741,46 +741,6 @@ below keep their gate — they really are blocked pending an answer — and this
   number of other days each change moves — a bare gate on a scoring constant is a question he
   cannot answer, and routing them here would just move the silence.
 
-### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
-- **✅ DECIDED BY THE OWNER, 2026-09-24 — add the More-tab row.** He took the recommendation: a screen worth building gets a permanent address, and `DEFAULT_CARD_WIDGETS` stays empty so Home is unchanged. **Now ordinary Lane B work, ungated** — one row in the More tab pointing at `/collection`.
-- **Lane:** B — `app/more/**`. Re-laned from `O` on the answer; there is no decision left in it.
-
-- **Superseded lane note (demoted from a field, OR-155):** this read `O` while the question was open — *a product question, ungated so the Orchestrator can put it*. Answered 2026-09-24; the field above is live. **Added:** 2026-09-22 ·
-  Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
-  shipped, leaving only the part that is the owner's.
-- **Recommendation: add a `Collection` row to the More tab, and leave `DEFAULT_CARD_WIDGETS` empty.**
-  A screen worth building is worth having a permanent address; a Home card is a *shortcut* to it, not
-  its only entrance.
-- **What is true.** `/collection` is navigated to from exactly one place in the app —
-  `home-card-widget.tsx:330`, inside `case 'card_collectionWidget'`, which returns `null` unless the
-  widget is enabled. `DEFAULT_CARD_WIDGETS` is `[]` (`lib/home/home-prefs.ts:110`), so on a fresh
-  install the route exists and nothing reaches it. **This is not a Collection-specific oversight** —
-  all ten card widgets are off by default and the card's own docstring says so deliberately. What is
-  specific to Collection is that it is the only one whose card is the sole route to a *whole screen*;
-  the other nine summarise data reachable elsewhere.
-- **Why, a year out.** The More tab is where every other secondary screen lives, so a row there costs
-  one line and makes the route independent of a Home preference nobody remembers setting. Turning the
-  widget on by default instead puts a card on Home permanently to solve a navigation problem, and
-  Home is the screen the owner reads daily.
-- **Alternatives.**
-  - *Turn `collectionWidget` on by default.* Better at discovery — he would see it without being
-    told. But it changes what Home shows on every install, which is the **owner-gated mockup** class,
-    and it still leaves the route with one door.
-  - *Leave it as is.* Better at nothing, unless the answer is that Collection is a spike he does not
-    want surfaced — which is a real possible answer and the reason this is his call, not Lane B's.
-- **Reversal cost: near zero either way.** A More row is one line to add or remove; a default-on
-  widget is one array literal. Nothing migrates and no data moves.
-- **Note his install is probably not fresh** — if the widget is already on for him, this is invisible
-  to him today and is about what a reinstall or a second user would get.
-- **✅ Shipped 2026-09-24 (Lane B), the other half of this entry:** the three affordances that select
-  the `moodWidget` card labelled it **"Readiness"**, colliding with `oura-score-chip-row.tsx`'s label
-  for the computed readiness score, while the card itself renders **"Exercise Readiness"**. All three
-  now name the card — the More-tab picker, Home's colour swatch, and the hidden-sections restore
-  panel. The entry named one site; there were three, which is why the test asserts the *agreement*
-  between the card's heading and its pickers rather than a string.
-- **Also noted, not filed separately:** three step readings can be on Home at once (`stepsWidget`,
-  the Steps metric tile, and the chip row's Activity score).
-
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 - **Ask:** owner — readiness currently changes NOTHING the app prescribes: its one automatic action has never fired in 117 sessions and cannot on the active program. What should a low readiness day actually do? Decision brief in the entry.
 
@@ -1096,11 +1056,35 @@ which is the right shape for something that can only be validated by living with
 - **Why it is first:** 39 of the last 40 deploys failed. Production serves **1.465.26** while `main` is
   at **1.465.31**, so tonight's merges are **not live**, and that includes RV-180's clock fix (#1554)
   and RV-164's goal-apply fix (#1546). Every merge until this lands is inert.
-- **Unblock: a structural call, reversible in one line, no owner needed.** Set the heap in the build
-  script, **not** as a Railway service variable (that route is a production config change and was
-  put to the owner): `"build": "node scripts/build-rollup-worker.mjs && NODE_OPTIONS=--max-old-space-size=6144 next build"`.
-  **Caveat:** if the Railway builder has under ~8 GB of RAM, the kernel may kill it instead. That
-  is no worse than today and would show in the build log.
+- **✅ UNBLOCK SHIPPED 2026-09-24 (Lane A).** `package.json`:
+  `NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=6144} next build`. The `:-` form means an
+  operator can still override it from the Railway service without a code change. Verified locally
+  with no `NODE_OPTIONS` set: node received **6192 MB**, the build exited **0**, 244/244 pages.
+  **Caveat unchanged:** if the Railway builder has under ~8 GB the kernel may kill it instead — no
+  worse than today, and it would show in the build log.
+- **⚠ AND THE CAP WAS ONLY EVER SET IN CI — this is why the split existed at all.**
+  `.github/workflows/ci.yml` set `NODE_OPTIONS: --max-old-space-size=4096` at the Build job, and
+  **nothing set it for Railway**, which therefore ran on Node's own default. That default is
+  **sized from container RAM, not a constant**: ~**4,051 MB** on Railway's builder (read off its own
+  OOM line) against **2,096 MB** in this sandbox. So CI was green and production was failing **on
+  the same commit**, ~45 MB apart. The job-level line is now removed and the number lives in
+  `package.json` alone, so the two can no longer disagree.
+- **❌ PART 2 ITEM 1 WAS TRIED AND DOES NOT WORK — do not repeat it.** Setting
+  `autoInstrumentServerFunctions` / `autoInstrumentMiddleware` / `autoInstrumentAppDirectory` to
+  `false` is **not** equivalent to removing `withSentryConfig`. Measured at the 3 GB repro cap:
+  control **exit 134** (4,906 MB summed), with the three flags off **still exit 134** (5,450 MB).
+  Whatever the wrapper does that costs the memory, it is not those three transforms — so the next
+  attempt needs to bisect the wrapper's webpack plugin itself, not its documented options.
+- **❌ PART 2 ITEM 2 DOES NOT ADDRESS THIS FAILURE.** Skipping Railway's lint and type-check was
+  implemented and reverted: **both builds die during COMPILATION**, before either pass runs
+  (`Creating an optimized production build ...` is the last line in each). Type-checking may well
+  need >3 GB of its own, but it is not what fails first, so turning it off on the deploy host buys
+  nothing and gives up a check.
+- **Keep:** two things. ① **Confirm a deploy actually succeeds** and `/api/version` advances past
+  1.465.31 — the unblock is verified locally and by CI, never yet by a green Railway deploy.
+  ② **Part 2 proper** — the compile still wants >4 GB, so this is headroom, not a cure, and the
+  6,144 figure stays provisional until something explains the appetite. The 3 GB local cap remains
+  the deterministic repro loop (control above confirms it still reproduces).
 - **Take it off the boundary, measured with the local 3 GB loop (DV-14's table):**
   1. **Trim the Sentry webpack wrapper**, the measured compile-phase driver. Removing it lets the
      compile pass at 3 GB. Try the `withSentryConfig` options that add build-time transforms first
@@ -1111,7 +1095,9 @@ which is the right shape for something that can only be validated by living with
      Railway (`eslint.ignoreDuringBuilds` / `typescript.ignoreBuildErrors` gated on a Railway
      env var), so CI stays the gate.
 - **Done when:** `pnpm build` passes locally under `NODE_OPTIONS=--max-old-space-size=3072`, and
-  Railway's next deploy is SUCCESS with `/api/version` matching `main`.
+  Railway's next deploy is SUCCESS with `/api/version` matching `main`. **Neither half is met yet:**
+  the 3 GB target needs part 2, which is still open, and the deploy is unconfirmed. The entry stays
+  queued.
 - **Not the changelog:** cutting it to 9.8 KB changed nothing. Bounding it is still reasonable
   hygiene, but it is not this fix.
 
@@ -1200,23 +1186,6 @@ which is the right shape for something that can only be validated by living with
   token is long-lived, can write to Google Calendar, and outlives sign-out.
 - **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
 
-### [platform] RV-194 — Sentry scrubbing misses the parts of an event that carry query values
-- **Lane: A** — `lib/sentry-scrub.ts`.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** `scrubEvent` scrubs request, cookie and auth fields, but not:
-  - `exception.values[].value`: Drizzle's `Failed query … params: …` message, which carries row values;
-  - console-breadcrumb messages;
-  - navigation breadcrumb `from` and `to`;
-  - `extra` and `contexts`.
-  It also sets no `maxValueLength`. A throwaway test confirmed the params pass through unchanged. Every
-  uncaught database error therefore ships ids, dates and values to sentry.io. On the `users` path that
-  includes email.
-- **Fix:**
-  1. Cut exception messages at `\nparams:`.
-  2. Scrub breadcrumb `from` and `to` with the existing URL scrubber.
-  3. Drop console breadcrumbs, `extra` and `contexts`, or allowlist them.
-  4. Add a test using a real Drizzle error string.
-
 ### [platform] RV-195 — three low-severity auth and social gaps, one PR
 - **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
 - **Added:** 2026-09-24 · Review sweep 60.
@@ -1262,8 +1231,10 @@ which is the right shape for something that can only be validated by living with
   `generativelanguage.googleapis.com` at the same time.
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
+
 - **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
-- **Added:** 2026-09-24 · Review sweep 60.
+- **Added:** 2026-09-24 · Review sweep 60. **Three of four shipped 2026-09-24 (Lane A); item 3 is
+  half done and the rest is the `Keep:`.**
 - **What:**
   - Every action is pinned to a major tag, not a SHA.
   - `dependabot.yml` has no `github-actions` ecosystem.
@@ -1273,12 +1244,35 @@ which is the right shape for something that can only be validated by living with
 - **Who:** a compromised upstream action tag would run with the keystore (the key the owner's
   installed APK is signed with) and a write token. Fork PRs get nothing, and collaborators already
   have write access.
-- **Fix:**
-  1. SHA-pin the third-party actions: `pnpm/action-setup`, `reactivecircus/android-emulator-runner`.
-  2. Add the `github-actions` ecosystem to dependabot.
-  3. Split `android.yml` so PR runs get `contents: read` and no keystore, and only the `push` job
-     restores the key.
-  4. Add a top-level `permissions: contents: read` to `ci.yml`.
+- **✅ 1. SHA-pinned**, **8 call sites across all three workflows** — `pnpm/action-setup@v5` ×7 →
+  `fc06bc12…`, `reactivecircus/android-emulator-runner@v2` ×1 → `a421e438…`, each with the version
+  kept as a trailing comment. Both are the **current** commit behind the moving major tag, resolved
+  with `git ls-remote` and **dereferenced through the annotated tag** (`v5^{}`) — pinning the tag
+  object rather than the commit it points at is the standard way to get this wrong, and Actions
+  would reject it. So this pins today's behaviour rather than upgrading anything.
+  **`actions/*` are deliberately NOT pinned:** they are GitHub's own, the entry does not ask for it,
+  and pinning 18 more call sites would bury the two that carry third-party risk.
+- **✅ 2. `github-actions` ecosystem added to dependabot**, matching npm's shape
+  (`open-pull-requests-limit: 0`, security updates grouped into one PR). **This is what makes the
+  pin safe rather than a liability**: a tag silently follows upstream security fixes and a SHA
+  silently does not, so pinning without this trades a supply-chain risk for a staleness one.
+- **⚠ 3. HALF DONE — the keystore is off PR runs; the job split is NOT done.** The credential half
+  is one line: `if: github.event_name == 'push'` on *Restore the stable debug signing key*. A PR run
+  now falls back to a per-runner key, which is the path already taken when the secret is unset, and
+  PR APKs are never published.
+  **The `contents: write` half needs the job split and was not attempted.** GitHub does not accept
+  an expression in `permissions:`, so making it per-event means duplicating the build into two jobs
+  — and a mistake there breaks **APK signing on `push`**, which only surfaces after merge and which
+  nothing in the sandbox can test (no Android SDK; Gradle is proxy-blocked). Weighed against a
+  residual risk the entry itself calls low — fork PRs get nothing, collaborators already have
+  write — that trade was not worth taking blind.
+- **✅ 4. `permissions: contents: read`** at the top of `ci.yml`. Nothing there writes: the only
+  token-bearing step is `actions/upload-artifact`, which uses the **Actions runtime token**, not
+  `GITHUB_TOKEN`. `android.yml` keeps `contents: write` for its publish step.
+- **Keep:** the `android.yml` job split (item 3's second half), so PR runs get `contents: read`.
+  **Whoever takes it verifies a signed APK still publishes on `push` after merging**, because CI on
+  the PR itself cannot prove that half.
+
 
 ### [readiness][devices] TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again
 
@@ -1460,55 +1454,70 @@ which is the right shape for something that can only be validated by living with
   `app/api/admin/backfill-derived-scores` (the pattern to copy).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
 
-### [workouts] TN-74 — `estimated_1rm` is stored as 0 on 42 loaded exercise logs, and it is not a function of the log's own sets
+### [workouts] TN-74 — the zero `estimated_1rm` is mostly BY DESIGN, and the rest is Q-298's already-fixed bug
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, pointing TN-73's validated instrument at the
-  thing that actually sets prescribed load.
-- **Lane: A** — the write path (`app/api/log-exercise`, the repository mapper), engine territory.
-- **Why tuning cares.** `target_80` is derived from `estimated_1rm`, and target80 is the prescribed
-  weight. A wrong 1RM does not just mislabel history; it sets what the owner is told to lift.
-- **Measured 2026-09-24 over 494 non-deleted exercise logs.** **42 store `estimated_1rm = 0`** (8.5%) and
-  **38 store `target_80 = 0`**. None are NULL — every row has a number, and for 42 of them that number
-  is zero.
-- **⚠ These are NOT bodyweight movements — that was my first hypothesis and it is wrong.** The zero logs
-  carry real load: Sumo Deadlift at **82.5 kg**, Barbell Shrug **87.5 kg**, Barbell Hip Thrust **85 kg**,
-  Bent-Over Row **45 kg**, at normal rep counts (mean 7–11). Only Pull-Up and Hanging Leg Raise among the
-  25 affected exercises have a max set weight of 0.
-- **The dominant mechanism, measured.** Logs with **no `use_for_1rm` set carrying weight**:
-  - among the 42 zero logs: **30 (71%)**
-  - among the 452 non-zero logs: **138 (31%)**
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. **⚠ Re-measured by Lane A the same day
+  against production and the code; the original framing does not survive, and the corrected version
+  is below. The measurements were sound; the conclusion drawn from them was not.**
+- **Lane: A** — what is left is small; see **Still open**.
+- **⛔ THE HEADLINE IS WRONG: 42 zeros is not the defect count. 32 of them are correct.**
+  Grouped in production by `exercise_deloaded` over 494 non-deleted logs:
 
-  Mean flagged sets per log is **0.76** on the zeros against **1.79** on the rest. So "no eligible set to
-  compute from" explains most of the zeros, and `calc1RM` returning `weight` when `weight <= 0`
-  (`packages/shared/src/1rm.ts:26`) is how that becomes a stored 0 rather than a NULL.
-- **⚠ But it does not explain all of it, and the leftover is the real finding.** **12 of the 42 zero logs
-  DO have a loaded flagged set** and still store zero. And **138 non-zero logs have NO loaded flagged
-  set** yet store a positive 1RM. The same input condition yields 0 in 30 cases and a positive number in
-  138 — so **`estimated_1rm` is not a function of the log's own sets.** Something else supplies it much
-  of the time (a carry-forward from a previous session, a program-configured value, or a second write
-  path), and when that something is absent the field falls to 0. **Identifying that supplier is the
-  first task**, not changing the formula.
-- **⚠ CORRECTION TO MY OWN FIRST READING — the high-rep guard is present and careful.** I measured the
-  stored 1RM-to-weight ratio rising monotonically with the rep count of the contributing set — **1.246
-  (1–6 reps) → 1.352 (7–10) → 1.467 (11–14) → 1.663 (15+, mean 17.4)** — and took it for an uncapped
-  formula, which would have been the historical "wrong high-rep guard → inflated PRs" bug.
-  `packages/shared/src/1rm.ts` shows otherwise: `repFactor` averages Epley with a **Brzycki term frozen
-  at its 20-rep value** (its own comment explains Brzycki blows up toward rep 36), and
-  `amrapScaleFactor` **de-rates high reps deliberately** — 1.0 / 0.97 / 0.93 / 0.88 by rep band.
-  **And my ratio measurement cannot test the guard anyway**: `estimated_1rm` is stored per exercise-log,
-  so dividing it by each contributing set's weight attributes one log's estimate to several sets. The
-  rising ratio is largely that join artefact. Recorded so nobody re-runs it and files the wrong defect.
-- **Acceptance criteria:** no exercise log stores `estimated_1rm = 0` while carrying a loaded set; a log
-  with genuinely no eligible set stores **NULL** rather than 0, so downstream can tell "no estimate" from
-  "an estimate of zero"; and `target_80` is never 0 where the 1RM is positive (four logs currently pair a
-  zero 1RM with a *positive* target80 — Overhead Press 15.8, Skull Crusher 12.5, Cable Pulldown 9.6,
-  Cable Preacher Curl 5.0 — which is the inverse inconsistency and needs the same answer).
-- **What this does NOT establish.** What supplies the positive 1RM on the 138 logs with no eligible set.
-  Why 12 loaded logs still read zero. Whether a zero ever reached a prescribed weight the owner actually
-  saw — that needs the surface, not the table, and is the one part a device pass could answer.
-- **Where the mechanism is:** `packages/shared/src/1rm.ts` (`calc1RM` at 25, `repFactor` at 18,
-  `amrapScaleFactor` at 32), `app/api/log-exercise/route.ts` (writes the estimate),
-  `claude_ro.exercise_logs.estimated_1rm` / `target_80`.
+  | `exercise_deloaded` | logs | `estimated_1rm = 0` | positive |
+  |---|---:|---:|---:|
+  | true | 32 | **32 (all)** | 0 |
+  | false | 462 | **10** | 452 |
+
+  `estimateOneRm` returns `{ estimated1rm: 0, target80: 0 }` when `deloaded`
+  (`packages/shared/src/1rm.ts:166`), and `lib/data/postgres/adapter.ts:1482` states the contract
+  outright: ***"`estimated_1rm > 0` IS the deload test, not a proxy for one."*** So zero is the
+  intended encoding for a deload, and **76% of the reported defect is the design working**.
+- **⛔ AND THE ACCEPTANCE CRITERION CONTRADICTS THAT CONTRACT.** The entry asked for NULL instead of
+  0 so downstream can tell "no estimate" from "an estimate of zero". Queries across the adapter use
+  `estimated_1rm > 0` **as** the deload test, so switching to NULL is not a storage tidy-up — it
+  changes what those queries mean. Anyone picking this up decides that deliberately or leaves it.
+- **The 10 genuine zeros are TWO SESSIONS, not a rate.** Both "Pull": **2026-08-09** and
+  **2026-08-16**, five logs each, four of five carrying loaded sets. Every exercise in both sessions
+  stored zero — including the bodyweight Pull-Up, which takes a different code path — so the zeroing
+  is **session-wide**, which is what `deloaded`'s early return does and what a per-set formula fault
+  cannot do.
+- **The mechanism is Q-298, and it is ALREADY FIXED — no code change is owed for it.**
+  `packages/shared/src/workout/log-exercise.ts:308-317` carries its own account: the estimate uses
+  `deloadedForEstimate = exerciseDeloaded === true || (isAnyDeload && !isBaseline)`, which includes a
+  **phase-level** deload, while the row *used to* store `exerciseDeloaded ?? false`. So a phase
+  deload zeroed the 1RM and stamped the row `false`. Line 317 now stores `deloadedForEstimate`. The
+  10 rows are **historical residue written before that fix**, and they were written that way at log
+  time — `updated_at - logged_at` is **2–7 minutes, same day**, so nothing modified them later.
+  Supporting but not proof: `session_periodization` for the Pull session records a phase transition
+  dated **2026-08-16**, consistent with a deload window covering both. That table keeps only current
+  state, so the phase on 08-09 cannot be read back.
+- **⛔ THERE IS NO MYSTERY SUPPLIER — the entry's central open question dissolves.** It asked what
+  supplies a positive 1RM to *"138 non-zero logs with NO loaded flagged set"*. Nothing does:
+  `amrapAverage1Rm` and `calculate1RM` filter sets with `!flagged || style![i]?.useFor1rm`, so when
+  **no** set is flagged, `!flagged` is true and **every** set is used. "No `use_for_1rm` set" means
+  "use them all", not "compute from nothing".
+- **⚠ A hypothesis worth recording as REFUTED, so it is not re-run.** That the style's flagged set
+  positions outran the sets actually performed. Measured: **08-16 Barbell Shrug** and **08-23
+  Barbell Shrug** both have a 4-set style with all four flagged and both logged **2** sets — 08-16
+  stored **0**, 08-23 stored **108.75**. Identical style shape, identical set count, opposite
+  results. The style is not the variable.
+- **Still open, and it is small:**
+  1. **The four zero-1RM/positive-`target_80` rows.** All four are the **same 2026-08-06 deload
+     session**, correctly flagged `deloaded = true`, so `estimateOneRm` gave them `target80: 0` —
+     and their `updated_at` is **6–7 hours later, on 08-07**. Some later write path set `target_80`
+     without touching `estimated_1rm`. **Which path is NOT established** and is the one thing here
+     still worth chasing.
+  2. **`target80` is an accepted input that silently does nothing.** `log-exercise.ts:48` takes
+     `target80: z.number().optional()`, and line 224 destructures `target80` from `estimateOneRm`,
+     **shadowing** it. A caller can send the field and it is discarded without a word. Either drop
+     it from the schema or honour it.
+- **Repairing the historical rows is the OWNER'S call, not this entry's.** Rewriting 10 (or 42)
+  stored estimates is a data rewrite; the code that produced them is fixed, and nothing here
+  establishes that a wrong prescribed weight ever reached a screen.
+- **Untouched and still correct:** the entry's own correction about the high-rep guard — `repFactor`
+  freezes Brzycki at its 20-rep value and `amrapScaleFactor` de-rates high reps — and its warning
+  that the stored-1RM-to-set-weight ratio is a join artefact. Both stand; do not re-measure them.
+
 
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
@@ -1776,6 +1785,11 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 - **First step:** Railway's deploy log for `main` from 18:16 — the first failing deploy names the
   cause. Not established: whether deploys fail, are stuck queued, or are disabled.
 - **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
+- **✅ CAUSE CLOSED 2026-09-24 (Lane A, RV-188):** the heap cap was set in `ci.yml`'s Build job and
+  **nowhere else**, so Railway ran on Node's RAM-scaled default — ~4,051 MB there against 2,096 MB
+  in the sandbox — and failed ~45 MB short on the same commit CI passed. The number now lives in
+  `package.json` alone. See RV-188 for what shipped, and for the two part-2 fixes that were tried
+  and did not work.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** production **caught up**: live 1.465.25 = `main` 1.465.25 (merged 11:26, live by 13:09). One read cannot show deploy latency, and the cause stays unread in Railway's log, so this is *stopped, not explained*.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** see the reproduction below and **RV-188**, which is now Lane A's first item. There is also a fourth version reading: live **1.465.26** against `main` **1.465.31** (21:30 AEST).
 - **🔬 REPRODUCED LOCALLY 2026-09-24 (Review sweep 59) — and the changelog is NOT the driver.**
@@ -2436,60 +2450,62 @@ drift.
   following 3 weeks and confirm the 66% moves. A session that still floors every exercise at 2 sets
   has not been fixed regardless of what the done screen says.
 
-### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
-- **✅ BOTH ANSWERED BY THE OWNER, 2026-09-24.**
-  **Decision 1 — he chose a MIX, not either alternative:** *"A mix of min floor duration + confirm on exit."* So a sub-minute walk is neither saved silently nor discarded silently.
-  **Decision 2 — he soft-deletes the phantom row himself** in the activity list, so it writes a `deleted_at` tombstone that propagates to the device. Row `b8083d04`, 2026-09-24.
-- **⚠ THE MIX NEEDS ONE DESIGN DECISION HE DID NOT MAKE, and the naive build gets it wrong.** Implemented literally — floor, then a confirm — the mis-tap path is **two dialogs**: *"End walk?"* then *"Discard this short walk?"*. That is the exact objection the confirm-on-exit alternative lost on, so a literal reading reintroduces it in the one case he cares about.
-  **Recommended implementation, and it is the Orchestrator's reading rather than his words:** when elapsed is under the floor, the EXISTING end-walk dialog becomes the confirm — *"End and discard this 27-second walk?"* with Discard / Keep — instead of a second prompt after it. One dialog, one tap, nothing silently dropped, and above the floor the flow is unchanged. **If he meant two separate prompts, say so and this is wrong.**
-  Reuse `MIN_SESSION_SEC`'s shape (`time-audit.ts:358`) for the floor rather than a new constant.
-- **Lane:** B — the remaining work is the walk UI's end-of-session path; there is no decision left in it beyond the note above.
+### [activity] BF-191 — the walk-end fix shipped; three phantom rows are still in the history
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Superseded lane note (OR-156):** this read `O` while both questions were open — *both are the
-  owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply*. Answered 2026-09-24; the field above is live.
-  **Split out of BF-190**, where they were buried in a `Lane: B` body and therefore invisible to the
-  Orchestrator; BF-190 keeps the half that needs no decision and can start immediately.
-- **Context, in one line.** Ending a guided walk early records it as a full session at the planned
-  duration — the owner hit it on 2026-09-24 (*"I started a walk; then closed it"*) and it wrote a
-  40-minute, 133 kcal row for a walk 27 seconds old. BF-190 fixes the duration. These two do not
-  follow from that fix.
+- **Lane: O** — what is left needs the owner's hand and a phone, not code. **Added:** 2026-09-24 ·
+  BugFix intake. **Code shipped 2026-09-24 (Lane B)** together with BF-190: the elapsed seconds now
+  travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and
+  below `MIN_WALK_SEC` (60s) the existing end-walk dialog becomes a discard confirm instead of being
+  followed by a second prompt.
+- **Keep ①, the owner's:** **three** phantom rows are already in `activity_logs` and nothing marks
+  them spurious. `b8083d04` (09-24, 40 min, 133 kcal) is the one he reported; Review sweep 57
+  measured **two more** — `ea77ce16` (07-30, 30-min interval walk, 0.037 km, pace 49,104 s/km) and
+  `a85568a4` (09-14, 22-min treadmill, 74 kcal, HR 65). He soft-deletes them from the activity list,
+  which writes a `deleted_at` tombstone that propagates; a direct database write would not. **Never
+  a corrective migration** for three rows.
+  **The signature to find any others is NOT `avg_hr`/`steps` both null** — that finds only 09-24,
+  because the older two carry HR from their first ~90 seconds. It is `created_at` falling more than
+  2 minutes before `end_time` on the same local day.
+- **Keep ②, the device check:** start a guided walk, end it inside a minute, and confirm the dialog
+  offers Discard and no row is written; then end one after a few minutes and confirm the row's
+  duration matches the clock; then complete a full walk and confirm it is unchanged. **Lane: DV.**
+  The sandbox cannot reach it — `getLocalStore` returns null there, so the branch that writes the
+  row is exactly the one a browser here cannot exercise.
+- **⚠ A third finding, from the same surface, that neither entry named:** the back gesture and the
+  tab bar raise the same dialog and call `reset()` — they keep **nothing**, at any duration, so
+  walking away from a 39-minute walk discards it. That is now stated honestly in the dialog rather
+  than fixed, because making those paths save is a behaviour change he has not been asked about.
+  Filed as LB-141.
 
-**Decision 1 — after the fix, should a sub-minute walk be saved at all?**
 
-- Passing the real elapsed time through turns the phantom into a truthful **27-second** row. Truthful
-  is not the same as wanted.
-- **⭐ Recommend a minimum-duration floor, discarded below it with a toast.** The repo already has
-  this shape — `MIN_SESSION_SEC` in `time-audit.ts:358` drops implausibly short workouts from the
-  decomposition — so it is reuse, and a floor needs no interaction at the moment the lifter is
-  walking away from a mis-tap.
-- **Alternative: keep every row.** Better if you ever want to see abandoned starts as data — which
-  is a real thing to want, and the reason this is not obvious. It loses because a 27-second row
-  still lands in activity history, the day audit and the totals, where it is noise in every reading
-  that matters.
-- **Alternative: confirm on exit** (*"discard this short walk?"*). Better in that nothing is ever
-  silently dropped. It loses on where it fires: mid-walk, one tap after a dialog that already asked
-  *"End walk?"*, which is two prompts for one intention.
-- **Reversal cost: near zero.** A constant and one branch.
+### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
 
-**Decision 2 — the phantom row already in the history.**
+- **Lane: O** — a product decision about what happens to a walk, not a defect with one right answer.
+  **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
+  written per call site, which is what surfaced it).
+- **Measured in source, three callers of `LeaveWalkDialog`:**
+  | Exit | What it does |
+  |---|---|
+  | **End walk** button (`walk-active.tsx`) | saves the walk at the elapsed time |
+  | **Back gesture** (`mobile-auth-handler.tsx:184`) | `reset()` — keeps nothing |
+  | **Tab bar** (`bottom-nav.tsx:159`) | `reset()` — keeps nothing |
+- **So walking away from a 39-minute walk by tapping another tab discards it**, with no row and
+  nothing in history. Until 2026-09-24 all three showed the same sentence — *"Ending now will stop
+  it early"* — which was false at every one of them.
+- **Shipped alongside: the copy is now honest**, each caller naming its outcome. That is the half
+  that needed no decision. Making the other two exits SAVE is the half that does.
+- **Recommended: make all three save**, on the reading that a walk the lifter actually did is data
+  they did not ask to throw away, and the app now knows the real elapsed time (BF-190) so saving is
+  no longer lossy or wrong.
+- **Alternative: keep discarding.** Better if leaving by the tab bar is meant to read as "I am not
+  doing this" rather than "I am done" — which is a real distinction, and the reason this is his
+  call rather than mine. It also avoids rows he never deliberately ended.
+- **Alternative: make the two paths ASK** (save or discard) rather than assume. Better at never
+  guessing wrong; worse in that it puts a two-option dialog in front of a tab tap, which is the
+  interruption BF-191 just finished removing from the other exit.
+- **Reversal cost: near zero.** Each path is one call — `reset()` or the same finish the End-walk
+  button uses.
 
-- `b8083d04`, 2026-09-24, 40 min, 133 kcal, no HR, no steps. The day reads 80 min / 266 kcal against
-  40 / 133 actually walked.
-- **⭐ Recommend the owner soft-deletes it from the activity list.** It is one row, the app's own
-  delete is the supported path, and it produces a `deleted_at` tombstone that propagates to the
-  device — which a direct database write would not.
-- **Alternative: leave it.** Better if you would rather the history show what the app actually did,
-  warts included. It loses because nothing marks the row as spurious, so every future reading of
-  that week is wrong in a way no one will remember.
-- **Never a migration.** A corrective migration for one bad row is blast radius with no upside, and
-  data-touching migrations are the carve-out that always needs the owner anyway.
-- **⚠ Whether OTHER phantom rows exist has not been measured.** Only 2026-09-24 was checked. Before
-  acting, sweep `activity_logs` for rows whose `duration_min` equals the plan while `avg_hr` and
-  `steps` are both null — that is the signature. Do not report a count without running it.
-
-- **Verification:** this entry closes when both answers are recorded here with the date, and BF-190
-  is updated to build the one that touches code.
-- **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **there are two more live phantom rows**, measured rather than assumed: `ea77ce16` (07-30, a 30-min interval walk, 0.037 km, pace 49,104 s/km) and `a85568a4` (09-14, a 22-min treadmill session, 74 kcal, HR 65). A third, from 07-29, the owner already deleted. **The signature proposed above (`avg_hr` and `steps` both null) finds only 09-24**, because the older two carry HR from their first ~90 s. The reliable signature is *the local time of `created_at` falls before `end_time` minus 2 min, on the same day*.
 
 ### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
 - **✅ THE CENTRAL CLAIM IS VERIFIED, and sharpened — Orchestrator, 2026-09-24.** Re-read from the API rather than taken from this entry: PR #1467 merged at **10:18:18Z**; its `Tests` job (`107136618616`) reported **failure at 10:18:29Z**, eleven seconds LATER. So what the merge went past was a **PENDING** check, not a reported failure — which falsifies CLAUDE.md's claim *"it cannot merge a genuinely pending check"* even more directly than the entry states. (`E2E` also failed, at 10:47.) The conclusion is unchanged and the wording is now exact.
@@ -2872,24 +2888,6 @@ drift.
   - The first set of dates comes from this sweep's TOO-EARLY list: TN-58 09-29 / 10-06, TN-55
     10-04, Q-507 10-16, TN-50 10-17, TN-25 10-18, LA-110's evidence expiring 10-06.
 - **Reversal cost:** delete the field and one print block.
-
-### [nutrition] RV-171 — opening the meal-plan setup with a failed request silently deletes every saved dietary restriction
-
-- **Lane: B** — `components/nutrition/meal-plan-setup-sheet.tsx`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Confirmed in code here.
-- **The path:**
-  1. The sheet loads restrictions with a bare `fetch` (`:82`). On failure it does
-     `if (!d) return` / `.catch(() => {})`, so `restrictions` stays at its initial `[]`.
-  2. `handleGenerate` always PUTs `{ entries: restrictions }` first (`:143`).
-  3. That lands in `replaceUserDietaryRestrictions` (`slices/meal-plans.ts:541`), which **deletes
-     every row for the user** before inserting.
-- **So one 429, 5xx or network blip while the sheet opens erases his allergies and intolerances.**
-  The plan is then generated without them, because the generate route reads them back
-  (`generate/route.ts:127,189`). The only visible hint is an empty restrictions step.
-- **Fix:**
-  - Show an error state when the load fails.
-  - Do not PUT until a load has succeeded.
-  - PUT only when the selection changed.
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
@@ -3315,8 +3313,10 @@ written entity.
 - **Verify:** device — no build half. Method: **P9**; `tour.js` already walks routes.
 - **The falsifiable claim:** every route in the build is reachable **by tapping only**, from a fresh
   install and from a warm one, and no picker or menu label names a different metric from what its
-  target screen shows. RV-121 says `/collection` fails the first half and one widget label fails the
-  second — confirm both and find the rest.
+  target screen shows. RV-121 found one of each and **both shipped 2026-09-24** — `/collection` now
+  has a More-tab row, and the `moodWidget` pickers name the card rather than the readiness score.
+  So neither is a live instance any more: re-walk to confirm the fixes hold on device, and the
+  value of this check is now finding the ones nobody has looked for.
 - **⚠ Never uninstall to get a fresh install** — an uninstall destroys the Oura ring's BLE key,
   which nothing in this repo, the server or any log can recover. Use a fresh profile or clear app
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
@@ -5400,96 +5400,6 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
-### [activity] BF-190 — reaching the walk summary saves a whole walk, at the PLANNED duration, 27 seconds in
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake, found while answering the owner's
-  question about a blank calories tile). **Lane: B** — `components/guided-walk/walk-summary.tsx`.
-- **⚑ MEASURED — two rows in production for one walk, both claiming 40 minutes and 133 kcal.**
-  `activity_logs` for 2026-09-24:
-
-  | id | created (Brisbane) | start–end | duration | steps | avg HR | cadence | kcal |
-  |---|---|---|---|---|---|---|---|
-  | `b8083d04` | **09:18:27** | 09:18 → 09:58 | **40** | — | — | no | **133** |
-  | `d0231b08` | 09:59:28 | 09:19 → 09:59 | 40 | 3190 | 92 | yes | 133 |
-
-  The second row is the real walk. **The first was written 27 seconds after its walk started** and
-  claims the whole session — a 40-minute end time that had not happened yet, and the calories to
-  match. The day now holds 80 minutes and 266 kcal of treadmill walking against 40 and 133 actually
-  done.
-- **⚑ OWNER CONFIRMED THE TRIGGER 2026-09-24, and it sharpens the root cause below.** *"I started a
-  walk; then closed it - I guess it didnt fully close it? that should be looked at too."* So the
-  09:18 row came from **End walk**, not a crash or a mis-tap — which makes this reproducible on
-  demand and moves the defect earlier than the mount-save.
-- **⚑ THE REAL ROOT CAUSE: the two exits are the SAME CALL, and neither carries how long the walk
-  ran.** In `walk-active.tsx`, finishing naturally —
-  ```ts
-  if (e >= plan.totalSec && !finishedRef.current) {   // :142
-    finishedRef.current = true
-    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
-  }
-  ```
-  and ending early —
-  ```ts
-  onLeave={() => {                                    // :279
-    if (finishedRef.current) return
-    finishedRef.current = true
-    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
-  }}
-  ```
-  are **byte-for-byte the same callback with the same two arguments**. `WalkSummary` then receives
-  only `config`, `samples`, `cadence` and `startedAtMs` — nothing that says whether the walk ran to
-  completion or was stopped after 27 seconds. **It cannot tell, so it assumes the plan.** The
-  elapsed time is right there in the same component (`elapsedSec`, `:140`) and is dropped at the
-  boundary.
-- **⚠ This is an instance of a bug class CLAUDE.md already names.** *"Mutation-callback contract:
-  completion callbacks must carry the written entity, not fire as a parameterless 'please
-  refetch'."* Same shape — the callback fires without the fact that matters and the receiver
-  reconstructs it wrongly. Worth citing in the fix so the rule earns another example rather than
-  being rediscovered.
-- **⚠ And the UI already promises the distinction it does not keep.** `leave-walk-dialog.tsx` reads
-  *"Ending now will stop it early."* The lifter is told the walk will be recorded as stopped early;
-  it is recorded as a full session at the planned duration. That is the sentence the fix has to make
-  true.
-- **So the fix has two halves, and the first is the one that matters.** Pass the elapsed seconds
-  through `onFinish` and have `WalkSummary` use it for `durationMin` and `endTime`. The plan stays
-  the right source for the *interval structure* (`buildIntervalPlan` drives the per-segment stats) —
-  only the wall-clock fields move to the clock.
-- **Secondary — the mount-save makes it unrecoverable.** `walk-summary.tsx:130` saves on **mount**,
-  guarded only by a ref that lives for one mount:
-  ```ts
-  useEffect(() => {
-    if (savedRef.current) return
-    savedRef.current = true
-    void saveWalk()
-  }, [])
-  ```
-  and what it saves is the **plan**, not what happened:
-  ```ts
-  const durationMin = Math.round(plan.totalSec / 60)              // :61 — the PLAN
-  const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000) // :140 — start + the PLAN
-  ```
-  So the row is written before the lifter can see what it says, let alone decline it. Even with the
-  duration fixed, there is no beat at which a 27-second walk could be discarded — which is why the
-  floor below is part of the fix and not a nicety.
-- **The calories follow the duration, which is why both rows read exactly 133.**
-  `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
-  type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
-  133 kcal, every time, and it is indistinguishable from a real one in the row.
-- **→ Whether a sub-minute walk should be saved at all is BF-191, and so is the phantom row.** Both
-  are the owner's and were split out on 2026-09-24 so the Orchestrator can put them to him; they
-  were buried in this body, where the lane field routed them to an implementer instead. **This entry
-  does not wait on that** — passing the real elapsed time through is correct under either answer.
-- **The phantom row is already in the history** and feeds `build-day-audit.ts:257`. That is BF-191's
-  second decision, not this entry's.
-- **Sibling sweep:** `done-activity-screen.tsx` takes the same write path but navigates away the
-  instant it saves (recorded under BF-107), so it has no mount-save. `walk-active.tsx` does not
-  write. This is the guided-walk summary alone.
-- **Verification:** start a guided walk, leave within a minute, and confirm either no row or a row
-  whose duration matches the seconds actually walked. Then complete a full walk and confirm the
-  duration still matches. **Device look owed** — the local-store branch is the one that runs on the
-  APK and `getLocalStore` returns null in the sandbox.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the natural finish is at `walk-active.tsx:143-145`, leave at `:279-283`, `elapsedSec` at `:57`; `walk-summary.tsx` mount-save is at `:131-133`. **Also `:160` `computeAvgPaceSecPerKm(…, plan.totalSec)`**, a third plan-derived field. Remove *"the floor below is part of the fix"*: the floor moved to BF-191.
-
 ### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake, found while resolving a real
@@ -5534,6 +5444,26 @@ why the count of affected entries always understated the harm.
   the fix should be read with that in mind: a unique filename per fold ends the collision, while a
   convention ("check `main` first") cannot, because both lanes checked and both were right at the
   time they looked.
+
+- **✅ THE COLLISION IS FIXED, 2026-09-24 (Lane B) — the cheaper of the two answers this entry
+  names.** `part` now starts past the highest `-N` already on disk for that date, so a second fold
+  writes `-2` and cannot overwrite a file it has never touched. Taken as a tooling call rather than
+  brought back here, because the measurement below rules out the alternative: a convention cannot
+  close a race whose window IS the check.
+  Verified by count, since the failure is silent and passes `check-doc-links`: the second fold of
+  2026-09-24 left `folded-1` at **26** anchors untouched and wrote **41** into `folded-2`; anchors
+  across all history files went 645 → 686, entries 69 → 29.
+- **Keep ①: the additive write is still the better long-term answer** and is not done. One file per
+  day is tidier than N, and it is what makes a same-day fold idempotent rather than merely safe. It
+  loses today only because it has to merge two documents correctly and corrupts the archive when it
+  does not — which is the failure this entry exists for.
+- **Keep ②: the recovery path, untouched.** Nothing reports which entries a past fold dropped, and
+  #1484's losses are only in git history. That half is unaffected by the fix above.
+- **📊 Second live instance, and the reason the fix could not wait:** it happened again on
+  2026-09-24. The 60-entry limit fails for EVERY lane at once, so two lanes started the same fold
+  within an hour — Lane A folded 25 (#1543, merged) and Lane B 40 (#1545, closed unmerged). Nothing
+  was destroyed that time by ordering rather than by any check. It then blocked a third PR the same
+  evening, which is what prompted this.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 

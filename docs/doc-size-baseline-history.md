@@ -16918,6 +16918,50 @@ owner chose a MIX of two options that were framed as alternatives, and the liter
 reintroduces the objection one of them lost on — two dialogs in the mis-tap path. The resolution is
 written as the Orchestrator's reading rather than his words, so he can correct it. RV-170 keeps a
 warning that its ✅ covers the policy and not its two unanswered riders.
+## 2026-09-24 — `docs/implementation-backlog.md` → 30035 (RV-188)
+
+Thirty-one lines on RV-188, and most of them are **negative results**, which is the part that
+justifies the length. Two of the entry's own prescribed part-2 fixes were implemented, measured and
+reverted: the three Sentry `autoInstrument*` flags are not equivalent to removing `withSentryConfig`
+(still exit 134 at the 3 GB repro cap), and skipping Railway's lint/type-check addresses the wrong
+phase entirely, since both builds die during compilation before either pass runs. Both look exactly
+like the prescribed answer, so an entry that recorded only what shipped would send the next session
+to spend a cycle rediscovering them.
+
+The rest is the cause itself, which is one sentence of finding and several of evidence: the heap cap
+was set in `ci.yml` and nowhere else, and Node's default is sized from container RAM rather than
+fixed — ~4,051 MB on Railway's builder against 2,096 MB in the sandbox. Without both numbers the
+claim reads as a guess, and the entry has already been wrong twice about this failure.
+
+## 2026-09-24 — `projectOverview.md` → 12771 (RV-194)
+
+Twenty-four lines for a privacy fix, and the length is two disclaimers rather than description.
+
+The first is what the fix does **not** establish: nothing was sent to sentry.io to check it. The
+scrubber is a pure function tested against a message built from the pinned `drizzle-orm`
+constructor, so what is verified is that the documented shape gets scrubbed — not that production
+throws only that shape. `enabled` is false outside production, so no local capture was possible
+either. A row reading "fixed" without that sentence would overstate it.
+
+The second is that **already-sent events are not recalled**. Anything forwarded before today sits in
+sentry.io and stays there; clearing it is an account-side action nobody has taken, and no one has
+measured how many events carry values. A reader who takes "fixed" to mean the leak is undone would
+be wrong about the part that matters.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30104 (RV-198)
+
+Twenty-five lines, and most of them are one refusal and its reasoning.
+
+Three of the entry's four items shipped and are one line each to record. The fourth — splitting
+`android.yml` so PR runs drop `contents: write` — was deliberately left half done, and that needs
+more space than doing it would have: GitHub rejects an expression in `permissions:`, so it means
+duplicating the build, a mistake breaks APK signing on `push`, that only surfaces after merge, and
+no sandbox can test it without an Android SDK. Without those four facts written down the `Keep:`
+reads as unfinished work rather than a weighed decision, and the next session either repeats the
+reasoning or does it blind.
+
+The SHA-pinning bullet also records that the tags were dereferenced (`v5^{}`) rather than pinned as
+tag objects. That is the standard way to get action pinning wrong, and it is invisible in the diff.
 
 ## 2026-09-24 — `CLAUDE.md` and the backlog (lb-134, unsound merge gate)
 

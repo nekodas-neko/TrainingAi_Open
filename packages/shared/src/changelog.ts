@@ -6,6 +6,37 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.35",
+    date: "2026-09-24",
+    changes: [
+      "Your dietary restrictions can no longer be wiped by opening the meal-plan setup. If the request that loads them failed, the screen started from a blank list and then saved that blank list over the top \u2014 erasing every allergy and intolerance, and building the plan without them. It now says the list could not load, leaves your saved ones alone, and only saves when you have actually changed something.",
+    ],
+  },
+  {
+    version: "1.465.34",
+    date: "2026-09-24",
+    changes: [
+      "Ending a guided walk early now records what you actually walked. It used to save the whole planned session \u2014 a walk you stopped 27 seconds in went into your history as 40 minutes and 133 calories, and the calories are worked out from the duration, so a made-up duration meant made-up calories every time.",
+      "Stopping in the first minute now offers to discard the walk instead, in the same dialog rather than a second one. And the three ways out of a walk no longer all claim the same thing: leaving by the back gesture or the tab bar keeps nothing, and now says so rather than telling you it will stop the walk early.",
+    ],
+  },
+  {
+    version: "1.465.33",
+    date: "2026-09-24",
+    changes: [
+      "Your collection now has a row in the More tab. It was only reachable through its Home card, and that card is off until you turn it on \u2014 so on a fresh install the screen existed with no way to open it. Home is unchanged: the card is still off by default.",
+    ],
+  },
+  {
+    version: "1.465.32",
+    date: "2026-09-24",
+    changes: [
+      "Your supplement doses keep the time you logged them and the strength you actually took. Every sync quietly wiped both off each tick, and because the app rebuilds a dose from whatever it has, history started re-doing the sums against whichever vial is current instead of the one you used at the time \u2014 which is exactly what the frozen dose is there to prevent. Most ticks will fill themselves back in on the next sync, because the server still had the real values and simply was not sending them. Any dose that got re-saved while the values were missing kept the wrong vial, and those cannot be recovered.",
+      "Your recent foods are in the right order again when you are offline. The list sorts by when each food was last updated, and the app was reading a field the server has never had \u2014 so it stored the word \"undefined\", which sorts above every real date and pinned a block of arbitrary foods to the top.",
+      "Deloaded sets stop being un-marked behind your back. A set logged as a deload was being reset to \"not a deload\" on the next sync, which has been happening for months.",
+    ],
+  },
+  {
     version: "1.465.31",
     date: "2026-09-24",
     changes: [

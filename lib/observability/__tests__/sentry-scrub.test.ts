@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scrubEvent, scrubUrl, scrubPath } from '../sentry-scrub'
+import { scrubEvent, scrubUrl, scrubPath, scrubExceptionValue } from '../sentry-scrub'
 import type { ErrorEvent } from '@sentry/nextjs'
 
 /**
@@ -102,5 +102,91 @@ describe('scrubEvent', () => {
   it('passes an event with nothing sensitive through unchanged', () => {
     const out = scrubEvent(evt({ request: { url: '/api/version' } }))!
     expect(out.request!.url).toBe('/api/version')
+  })
+})
+
+/**
+ * RV-194. The four gaps `beforeSend` had: it scrubbed the REQUEST and left untouched the thing that
+ * actually throws, what the app last logged, where it navigated, and two open bags.
+ */
+describe('RV-194 — the parts of an event that carry values', () => {
+  const evt = (over: Partial<ErrorEvent>): ErrorEvent => ({ ...over }) as ErrorEvent
+
+  // Built from drizzle-orm's own constructor, read out of the pinned package rather than written
+  // from memory: `super(`Failed query: ${query}\nparams: ${params}`)`. `params` is an ARRAY, so the
+  // template comma-joins the real bound values into `.message`.
+  const realDrizzleError = [
+    'Failed query: select "id", "email", "timezone" from "users" where "users"."email" = $1',
+    'params: dasa.delan@gmail.com',
+  ].join('\n')
+
+  it('cuts the bound parameters out of a real Drizzle message — this one carries an email', () => {
+    const out = scrubExceptionValue(realDrizzleError)
+    expect(out).not.toContain('dasa.delan@gmail.com')
+    expect(out).toContain('params: [scrubbed]')
+  })
+
+  it('KEEPS the SQL above the params line, which is the diagnosable half', () => {
+    // Drizzle parameterises, so the query carries `$1` rather than a value. Cutting the whole
+    // message would make the error useless and is the over-correction to avoid.
+    const out = scrubExceptionValue(realDrizzleError)
+    expect(out).toContain('from "users"')
+    expect(out).toContain('$1')
+  })
+
+  it('reaches the message through scrubEvent, not just the exported helper', () => {
+    const out = scrubEvent(evt({
+      exception: { values: [{ type: 'DrizzleQueryError', value: realDrizzleError }] },
+    }))!
+    expect(out.exception!.values![0].value).not.toContain('dasa.delan@gmail.com')
+  })
+
+  it('truncates a message with no params line at all, so a payload cannot ride in one', () => {
+    const out = scrubExceptionValue('x'.repeat(5000))
+    expect(out.length).toBeLessThan(1100)
+    expect(out.endsWith('… [truncated]')).toBe(true)
+  })
+
+  it('leaves an ordinary exception message alone', () => {
+    expect(scrubExceptionValue('Cannot read properties of undefined')).toBe('Cannot read properties of undefined')
+  })
+
+  it('drops console breadcrumbs — whatever the app last logged, verbatim', () => {
+    const out = scrubEvent(evt({
+      breadcrumbs: [
+        { category: 'console', message: 'saved weight 82.5kg for dasa.delan@gmail.com' },
+        { category: 'fetch', data: { url: '/api/version' } },
+      ],
+    }))!
+    expect(out.breadcrumbs).toHaveLength(1)
+    expect(JSON.stringify(out.breadcrumbs)).not.toContain('82.5')
+  })
+
+  it('scrubs navigation from/to, not only fetch url', () => {
+    const out = scrubEvent(evt({
+      breadcrumbs: [{
+        category: 'navigation',
+        data: { from: '/health/day/2026/08/19', to: '/api/x?userId=0db7ea82-57c1-4669-b07c-660fa15c9356' },
+      }],
+    }))!
+    const data = out.breadcrumbs![0].data as Record<string, string>
+    expect(data.from).toBe('/health/day/:date')
+    expect(data.to).toBe('/api/x?userId=[scrubbed]')
+  })
+
+  it('drops `extra` outright and allowlists `contexts`', () => {
+    const out = scrubEvent(evt({
+      extra: { weightKg: 82.5 },
+      // The real shape Sentry's state integration emits, not an invented one — `contexts.state`
+      // is typed as `StateContext`, and getting that wrong is what a spec-is-code check catches.
+      contexts: { os: { name: 'Android' }, state: { state: { type: 'redux', value: { user: { email: 'a@b.com' } } } } },
+    }))!
+    expect(out.extra).toBeUndefined()
+    expect(out.contexts!.os).toEqual({ name: 'Android' })
+    expect(out.contexts!.state).toBeUndefined()
+  })
+
+  it('does not throw on an event with none of these fields', () => {
+    expect(() => scrubEvent(evt({ request: { url: '/api/version' } }))).not.toThrow()
   })
 })
