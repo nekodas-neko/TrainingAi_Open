@@ -23,7 +23,7 @@ const src = () => readFileSync(path.join(ROOT, SHEET), 'utf8')
  */
 describe('RV-171 — sameRestrictions compares sets, not lists', () => {
   const peanut = { restrictionId: 'peanut', severity: 'allergy' as const }
-  const gluten = { restrictionId: 'gluten', severity: 'intolerance' as const }
+  const gluten = { restrictionId: 'gluten', severity: 'avoid' as const }
 
   it('is order-insensitive — the picker rebuilds the array on every toggle', () => {
     // Order equality would make almost every open look like an edit and re-run the delete-and-
@@ -32,7 +32,7 @@ describe('RV-171 — sameRestrictions compares sets, not lists', () => {
   })
 
   it('sees a severity change, which is the edit most easily missed', () => {
-    expect(sameRestrictions([peanut], [{ restrictionId: 'peanut', severity: 'intolerance' }])).toBe(false)
+    expect(sameRestrictions([peanut], [{ restrictionId: 'peanut', severity: 'avoid' }])).toBe(false)
   })
 
   it('sees an addition and a removal', () => {

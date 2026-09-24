@@ -47,8 +47,8 @@ Orchestrator's chat, being exported to `docs/design/`. Do not re-ask him, do not
 - **READ THE CODE BEFORE THE ENTRY.** Seven for seven — BF-190/191 missed that two of the three
   walk exits keep nothing.
 - **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a
-  gating vitest file. **A source-scanning test can pass locally and fail in CI on ITSELF**:
-  `git ls-files` skips it while untracked, and `ls-files A B -- '*.tsx'` UNIONS pathspecs, so
-  `__tests__` returns too — filter in JS.
+  gating vitest file. **A source-scanning test can fail in CI on ITSELF**: `git ls-files` skips it
+  while untracked, and `ls-files A B -- '*.tsx'` UNIONS pathspecs — filter in JS.
 - **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; and COMMIT before `git stash`/`checkout`.
-- **`pnpm build` compiles an auth-gated page and typechecks tests** — `tsc --noEmit` does neither.
+- **`tsc --noEmit` typechecks NEITHER an auth-gated page nor tests.** Before pushing a new spec run
+  `node scripts/check-test-typecheck.js` — shrink-only per file, and it caught an invented enum.
