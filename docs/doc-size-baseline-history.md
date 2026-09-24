@@ -17031,3 +17031,20 @@ pass/fail DV can act on without reading the journal.
 The seventh is a `Needs: RV-170` on RV-166. The entry was already blocked, but said so only in prose
 inside its `Lane:` line, so `next-item.js` offered it as Lane B's ready work twice in one session.
 One line in the field the runner actually reads is cheaper than the two pick-ups it cost.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30255, four owner decisions recorded (OR-159)
+
+Net growth from four answers arriving at once, and most of it is one entry. RV-199 grew because the
+owner's "all three" had to be separated from what it did **not** decide: its third item recommended
+*deciding* the ring-key question deliberately, so reading the approval as an answer would have put
+words in his mouth. That split costs two new entries (`OR-159`, `OR-160`) and a paragraph saying why.
+
+The clinical-baseline removal also costs lines it would be wrong to save. Two of them record what was
+deliberately NOT done — the derived figures stay, and there is no history rewrite, so **the data
+remains in public git history**. A removal that reads as a clean one would be the more dangerous
+document.
+
+TN-64's decision is long for the same reason: it names the three parts in order and then says
+explicitly not to re-tune the 45 / 1.2 thresholds in the same change, because a prompt firing would
+then be unattributable. `RV-113` was deleted outright (declined), which is where the offsetting
+shrink comes from.

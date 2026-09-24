@@ -733,29 +733,88 @@ the Orchestrator's to do.
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
-### [platform] RV-199 — three privacy questions about what is public and what gets backed up
-- **Ask:** owner — three privacy decisions from security sweep 60: the clinical baseline doc in the public repo, the personal email on 1,528 commits, and whether Android backup carries the ring key and health store.
+### [platform] RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here
+- **Keep:** two of the three are not the Orchestrator's to execute — item 2 is a GitHub account
+  setting only the owner can toggle, and item 3 is `android/**`, which is Lane A's. Item 1 shipped in
+  this PR.
 
-- **Lane: O** — each is the owner's, and the recommendation comes first. Filed as a task per #1508.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **1. The clinical baseline is in the public repo.** `docs/clinical-baseline-2026-08-27.md` holds a
-  full blood panel, a DEXA and RMR result, a scan ID and an instrument serial number. Its figures are
-  repeated in the backlog, a plan and a history archive.
-  **Recommended:** move the doc to the private archive repo, and replace the figures elsewhere with a
-  pointer, in a docs-only PR. **This does not remove them from git history.** A history rewrite of a
-  public repo is irreversible and breaks every open clone and PR. Only do that if the exposure matters
-  more than that cost; the recommendation is not to.
-- **2. 1,528 of 1,529 commits carry the owner's personal email.** **Recommended:** turn on GitHub's
-  *keep my email private* and *block pushes that expose it*. That is a setting, not a repo change,
-  and it does nothing for existing history, for the same reason as item 1.
-- **3. `android:allowBackup="true"` with no backup rules** (`AndroidManifest.xml:14`). The local
-  store is over the 25 MB quota today, so nothing is backed up. Once D4's pruning lands, Drive backup
-  would carry the health store, the ring key and the WebView session cookie.
-  **Recommended:** exclude the cookie store, and decide on the ring key deliberately. A backed-up key
-  is the only way to survive an uninstall, which is the upside, and the Google account then becomes
-  the key's guard, which is the cost. Lane A implements whichever is chosen.
-- **Reversal cost:** 1 and 2 are cheap and forward-only. 3 is one XML file plus an APK.
+- **Lane: O** · **Added:** 2026-09-24 · Review sweep 60
+  ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
+- **✅ THE OWNER ANSWERED ALL THREE: apply every recommendation** (2026-09-24, put to him with the
+  branch-protection re-ask, TN-64 and RV-113).
+- **① The clinical baseline document — ✅ DONE IN THIS PR.** It held a DEXA, an RMR, a 58-analyte
+  blood panel, the provider's scan reference and the instrument serial in one public file. Removed
+  from the tree, registered in `scripts/private-paths.json` under a new `personal-health` kind so the
+  CI gate refuses it back, and the nine links to it across the backlog, two plans, the body domain
+  index, the module map, BugFix's baton and `projectOverview.md` are repointed to plain text.
+  **The owner was sent the file before it was deleted** and holds the copy.
+  - **⚠ A FACT THE RECOMMENDATION DID NOT ACCOUNT FOR, found while reading the doc rather than the
+    entry.** It described itself as the DURABLE copy: `BF-2` (scale calibration), `BF-33` (measured
+    RMR) and `BF-1` (blood import) were each filed *waiting on exactly these values*, and BF-41's own
+    rule requires its schemas be written from the real report rather than a description. So this was
+    working data, not a stray file. It is recoverable from git history and from the owner's copy, but
+    **an entry that reaches for it will not find it** — hence the plain-text pointers rather than
+    silent deletion.
+  - **The derived figures were DELIBERATELY LEFT** — the 28.5 % vs 25.3 % scale pair, RMR 1325 vs
+    1549, the Cunningham comparison. **This is a judgement and the owner can reverse it:** they are
+    the reasoning several queued entries turn on, a single figure in engineering prose is a different
+    exposure from a 58-analyte panel with a scan reference, and they are in git history regardless.
+    Scrubbing them would gut the entries' context for no change to what is public.
+  - **No history rewrite.** Considered and declined in the recommendation he accepted: it is
+    irreversible and breaks every clone and open PR. **The data stays in public git history.**
+- **② The personal email on 1,528 of 1,529 commits — ⏳ OWNER ACTION, not shipped here.** It is a
+  GitHub account setting: *Settings → Emails → Keep my email addresses private*, plus *Block command
+  line pushes that expose my email*. Nothing in the repo changes and it does not touch existing
+  history, for the same reason as ①.
+- **③ `android:allowBackup="true"` with no backup rules** (`AndroidManifest.xml:14`) — **split in
+  two, because he approved one half and the other was never a recommendation.** The cookie exclusion
+  is `OR-159` (Lane A). **Whether Google Drive backup should carry the Oura ring key is `OR-160`,
+  still his** — the recommendation said *decide deliberately*, so "all three" approved the decision
+  being taken, not a particular answer.
+- **Not urgent today:** the local store is over the 25 MB quota, so nothing is backed up at all. This
+  becomes live the moment D4's pruning lands.
 
+### [devices][platform] OR-159 — Android backup carries the WebView session cookie; exclude it
+
+- **Lane: A** — `android/app/src/main/AndroidManifest.xml` and a backup-rules XML. **Added:**
+  2026-09-24 · split out of `RV-199` item ③, which the owner approved.
+- **The decision is made — this is implementation, not a question.** `android:allowBackup="true"`
+  with no rules (`AndroidManifest.xml:14`) means Google Drive backup takes whatever the app stores.
+  The owner approved excluding the **WebView session cookie**, which is a live credential: restored
+  onto another device it is a signed-in session.
+- **Scope it to the cookie.** The Oura ring key is the SAME manifest and a different decision, still
+  the owner's — see `OR-160`. Do not settle it by implication while editing this file; if `OR-160` is
+  still open when this is built, exclude the cookie and leave the key's handling exactly as it is.
+- **Not urgent, and say so rather than rushing it.** The local store is over Android Auto Backup's
+  25 MB quota today, so **nothing is backed up at all** — measured on-device 2026-08-18 at 31.2 MB.
+  This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
+  prioritise it.
+- **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+
+### [devices] OR-160 — should Google Drive backup carry the Oura ring's BLE key?
+- **Ask:** owner — should Android backup include the Oura ring's BLE key? Backing it up is the only thing that survives an uninstall, which today destroys the key permanently; the cost is that the Google account becomes the key's guard. Recommendation and both costs in the entry.
+
+- **Lane: O** · **Added:** 2026-09-24 · split out of `RV-199` item ③. **He approved *deciding*
+  this deliberately, which is not the same as approving an answer** — so it is still open, and
+  filing it as its own entry is what stops it being settled by whoever next edits the manifest.
+- **Why it is genuinely his.** It trades a real recovery path against a real exposure, and both
+  sides are serious.
+- **Recommendation: back it up, encrypted, and exclude everything else.** An uninstall destroys the
+  ring's BLE key **permanently** — `CLAUDE.md` is emphatic that it is not recoverable from this repo,
+  the server, or any log, and re-pairing means re-onboarding the official Oura app, which risks a
+  firmware update that breaks the reverse-engineered protocol. That is the worst outcome available
+  here, it is one mis-tap away, and a backup is the only thing standing between him and it.
+- **The cost, stated plainly:** the Google account becomes the key's guard. Anyone who compromises it
+  can restore a device that talks to his ring. Android backup is encrypted with the device PIN on
+  modern versions, so this is not a plaintext copy in Drive — but it is a copy, and it is outside his
+  phone.
+- **The alternative and what it is better at.** *Exclude the key with everything else* is better if
+  he would rather the key exist in exactly one place and accept that an uninstall is fatal to it. It
+  is the stronger position on paper and the weaker one in practice, because the failure it guards
+  against needs an attacker and the failure it invites needs a slip.
+- **Reversal cost: low both ways** — one XML file and an APK. But note the asymmetry: switching the
+  backup ON later does not recover a key already destroyed.
+- **`OR-159` ships regardless** and must not settle this by implication.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
@@ -824,11 +883,30 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
-- **Ask:** owner — readiness currently changes NOTHING the app prescribes: its one automatic action has never fired in 117 sessions and cannot on the active program. What should a low readiness day actually do? Decision brief in the entry.
+
+- **✅ ANSWERED BY THE OWNER 2026-09-24: extend the recommender to `ai_dynamic` and persist ACWR,
+  keeping the owner-confirmation step.** He took the recommendation as written, over *leave it off
+  and delete the gate* and over *lower the thresholds*.
+- **So this is now BUILDABLE and it is Lane A's.** Three parts, and the order matters:
+  **(a)** persist ACWR — nothing stores it today, which is why the second leg of this entry's finding
+  is inference rather than measurement, and no fix can be validated without it;
+  **(b)** widen the `phaseMode === 'automatic'` condition at `readiness-payload.ts:665` so an
+  `ai_dynamic` program reaches the recommender;
+  **(c)** leave `POST /api/confirm-early-deload` in the path — **the owner confirms, the app never
+  deloads him on its own.** That was explicit in what he accepted and it is the part that makes this
+  reversible in practice.
+- **Do NOT also move `EARLY_DELOAD_SCORE_MAX` (45) or `EARLY_DELOAD_ACWR_MIN` (1.2).** Re-tuning the
+  thresholds in the same change makes it impossible to tell whether a prompt fired because the gate
+  opened or because the bar moved. Ship the condition, watch what it proposes, tune after — and a
+  threshold change is Tuning's proposal anyway, not this entry's.
+- **What tells us it worked:** `is_early_deload` is false on all 117 sessions and
+  `early_deload_week_start` is NULL on all 5 programs. A prompt appearing on a genuinely low day is
+  the signal; prompts on ordinary days mean the thresholds are wrong, which is (a)'s data answering
+  the question this entry could not.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while testing whether the readiness score
   predicts anything about training.
-- **Lane: O** — this needs the owner's call on what the app should *do*, which is product behaviour
+- **Lane: A** — **re-laned 2026-09-24 the moment the owner answered.** It was `O` because it needed his call on what the app should DO; he has made it, so what is left is engine work: `lib/health/readiness-payload.ts`, a stored ACWR column and a migration. Was: *Lane: O — this needs the owner’s call on what the app should do.*
   rather than a structural choice, and the decision brief is below rather than in a chat reply.
 - **What the code says.** `earlyDeloadRecommended` (`lib/health/readiness-payload.ts:665`) is the only
   place a readiness score automatically changes what the app prescribes. It is wrapped in
@@ -4338,47 +4416,6 @@ written entity.
   Day sheet opens. If it now opens, the static import was the fix; if it still does not, the chunk
   boundary was never the cause and the dev-compiler reading above was a red herring — say so and
   reopen from the param-independent half.
-
-### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
-- **Ask:** owner — every tab switch shows 58–109 ms with neither panel painted, measured on the S25 over 10 of 10 switches. The fix is one line. Is a blink on the app's most frequent interaction worth changing it for?
-
-- **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
-  `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
-  goes `visibility: hidden` in the **same frame** the incoming one becomes active, and the incoming
-  panel then reads **opacity 0** for 3–5 frames spanning **58–109 ms** — the same frames as DV-12's
-  long task — before `ta-tab-enter` fades it in. So yes: every switch shows ~60–110 ms with neither
-  panel painted. **What shows in the gap:** the panel's parent, `main` and `body` are all
-  transparent; the first painted layer is `html` (`oklch(0.145 0.02 215)`) plus any fixed wallpaper
-  layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
-  toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
-
-- **Ungated 2026-09-24 (OR-143).** It IS the owner's call — a daily interaction he never asked to have changed — but nobody has put it to him, and `Gate:` parks the entry out of the Orchestrator's own READY list, so the gate was what stopped it being asked. Asking is the work; the work is `Lane: O`.
-- **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
-  and the file paths below are right; what is missing is permission to spend it. This entry ends by
-  saying its two open questions "decide whether this is worth doing at all", and both are
-  **looks** judgements on the app's most frequent interaction — is a 180 ms blink perceptible, and
-  does `bg-page` resolve transparent under the owner's wallpaper. CLAUDE.md routes a judgement about
-  whether something *feels* right to `O` and the owner, not to `DV`: the phone is where he will look
-  at it, but nobody is measuring anything. Building it first risks changing a daily interaction he
-  never asked to have changed.
-  Files when it returns: `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- The incoming panel gets `tab-panel-enter` and the outgoing one gets
-  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
-  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
-  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
-  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
-  content fading out first; **that half is not implemented.**
-- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
-  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
-  so there is nothing to hide and the blink cannot happen.
-- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
-  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
-  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
-  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
-- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
-  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
-  they decide whether this is worth doing at all.**
 
 ### [app-shell] RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed
 
@@ -14032,12 +14069,12 @@ brings it back.** It fits every part of the report:
 
 > **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
 > This entry is now the pipeline's own priority, not a note attached to three others. The reports
-> exist de-identified in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md),
+> exist de-identified in the owner’s clinical baseline (held privately since 2026-09-24, RV-199),
 > so every schema can be written from a real one today. **Storage is decided: keep every field**
 > (BF-43), which means the DEXA table carries all 11 regions and both index blocks, and the analyte
 > table carries the raw range string and the printed result text, not just what a screen renders.
 
-- **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
+- **⚑ The real reports have arrived and are recorded, de-identified, in the owner’s clinical baseline (held privately since 2026-09-24, RV-199)** — DEXA and RMR
   (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
   description. It already settles BF-1's hardest shape questions (one-sided and absent reference
   ranges, a `<0.2` non-numeric result, free-text flags with commentary, a month-precision date).
@@ -14103,7 +14140,7 @@ description will silently drop the field that turns out to matter. **The owner i
 - **✅ DEXA STORAGE SHIPPED, 2026-08-30 (Lane A).** `dexa_scans` + `dexa_scan_regions` (migration
   **240**, `claude_ro` views regenerated in **241**), `saveDexaScan`/`getLatestDexaScan`/`listDexaScans`
   on the repository, and `GET`/`POST /api/dexa-scans`. Written from the real Hologic printout in
-  [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md), every field kept per
+  the owner’s clinical baseline (held privately since 2026-09-24, RV-199), every field kept per
   BF-43, no source document stored. Upsert on `(user_id, scanned_on)` so a re-entry or a replayed
   extraction updates in place; regions are **replaced** on re-save, not merged. **This unblocks BF-2**
   — the DEXA half of its first calibration pair now has a table to live in.
@@ -16170,7 +16207,7 @@ P/C/F chips gone. Journal:
   the entry surface — the highest-value thing left in this entry. Do it before the 2×2 panel.
 
 - **⚑ The measurement exists (2026-08-27): 1325 kcal measured vs 1549 predicted, −14 %.** Full
-  numbers and both provider TDEE variants in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). Two findings that bear on the design: Cunningham
+  numbers and both provider TDEE variants in the owner’s clinical baseline (held privately since 2026-09-24, RV-199). Two findings that bear on the design: Cunningham
   on the owner's own **DEXA** lean+BMC gives 1481, still **156 kcal over** the measured value — so the
   over-estimate is not a body-composition error and a measured reading must override rather than be
   blended; and the app's learned maintenance (1,827) lands within **5 kcal** of the provider's Mild
@@ -18752,6 +18789,18 @@ without a queue entry is a dropped finding.*
   user's rows. The writer map is read from source and is complete; the counts are not.
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
+- **⏸ RE-ASKED AND PARKED AGAIN, 2026-09-24 (second time).** Put to him with the correctness
+  framing this time, not the throughput one — *the required checks are not enforced at merge, so no
+  merge in this repo is gated on its tests* — alongside the two-minute click path and a
+  no-required-checks middle option that would restore auto-merge alone. **He chose to keep it
+  parked.** The `Gate: owner` stays and is now correctly stating what it waits on.
+- **What this costs, recorded so the next session does not re-litigate it:** every merge stays
+  hand-caught against a base that moved roughly every 8 minutes on 2026-09-24, and **a green merge
+  remains no evidence the checks passed.** The mitigation is a habit rather than a mechanism — read
+  the job conclusions (`get_check_runs`; all six `completed` AND `success`) before every merge. That
+  held for the three merges of 2026-09-24 and it depends on whoever is merging doing it every time.
+- **Do not re-ask without a new fact.** Twice now. The next thing that would change the answer is a
+  red commit on `main` that actually costs something, or the owner raising it himself.
 
 - **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
   page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
