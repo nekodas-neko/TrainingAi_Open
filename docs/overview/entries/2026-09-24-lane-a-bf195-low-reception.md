@@ -78,3 +78,53 @@ airplane mode exercises the path that already worked.
 **The banner is still a false promise on a seedless screen.** `offline-indicator.tsx` says *"Offline
 — showing saved data"*. The engine now makes it appear at the right *times*; it cannot make that
 sentence true on a screen with nothing saved. That copy is Lane B's, and it is on the entry's Keep.
+
+## The abort was wrong, and CI is what said so
+
+Everything above describes the **first** version of this fix, which cancelled the request at the
+threshold with `AbortSignal.timeout(8000)`. It shipped to a PR, and **E2E failed** — 7 failures
+across 5 specs, the first E2E failure of the day on any branch.
+
+The diagnosis took a wrong turn worth recording. I first hypothesised that the E2E suite had rotted
+on `main` and my branch merely happened to be the one that ran it. That was checkable and I checked
+it the lazy way — a list of run conclusions — which showed several `success` results and no obvious
+pattern. It was misleading: most of those runs **skipped** the tests entirely, because a "does this
+change touch the UI?" gate short-circuits E2E on non-UI PRs, and a skipped job still reports
+`success`. Reading the per-step conclusion instead of the job conclusion settled it in one query:
+four branches genuinely ran the suite to completion that day and all four passed, including
+`fix/rv176-timezone-escapes` which started 21:29, *after* my failing run. The suite was healthy.
+The break was mine.
+
+**The mechanism.** CI runs E2E against `pnpm dev` deliberately (a production server cannot reach the
+local non-SSL Postgres), so first-compile responses legitimately take 9–19 seconds — I had measured
+exactly that locally earlier and talked myself out of it. The 8 s abort fired on real, working
+requests. `day-rollover-checkin.spec.ts` asserts *"a same-day resume must not refetch"* and saw
+**Expected: 1, Received: 2**: the abort killed the first request, and the screen went back for the
+data it never got.
+
+**Why the redesign is better than a bigger number.** The threshold was never the defect. Cancelling
+was. An abort on a slow-but-working connection destroys a request that was about to succeed and
+shows an error instead of the data — that is the *worse* outcome in exactly the state BF-195 exists
+to handle, and it silently changed the request semantics of every GET in the app. The watchdog now
+**observes**: a `setTimeout` reports the request as slow and the request itself runs to completion
+untouched. The user on a weak connection gets an honest "no throughput" indicator *and* their data
+when it lands. `fetch` is back to a single `{ cache: 'no-store' }` argument, so the exact-match
+guard in `cache-http-layer-bypass.test.ts` is restored to its strict form rather than relaxed.
+
+A second correctness gain came free: one slow response is no longer a diagnosis. A cold container, a
+heavy aggregate, or a dev server compiling on demand all produce a single long request on a good
+connection, so two in a row are now required before the app calls itself unreachable.
+
+**Verification of the redesign:** `tsc` clean · `typecheck:tests` clean (318 errors / 89 files, none
+above baseline) · lint clean · Custom Rules **78 of 78** · full suite **9,684 passed, 1,036 files,
+0 failures**. Mutation pass re-run: **5 mutants, 5 killed** — threshold 2→1, re-introducing the
+abort, `markSettled` not resetting the run, dropping the `clearTimeout`, and a hard network throw
+claiming low reception — plus **1 deliberately equivalent control** (`8000` → `8_000`) that
+survived correctly. Re-introducing the abort is now killed by **three** tests, so the exact break
+CI found is pinned at unit level and cannot return silently.
+
+**Process note, recorded against myself.** I had the evidence for this before I had the conclusion:
+I measured 9061/10190/18978 ms responses locally, called them "strong evidence" the timeout was
+firing, then walked that back when a local run showed no failures — without noticing that my local
+dev server was warm and CI's is not. The local run could not have reproduced it. Reaching for the
+cheap CI query (per-step conclusions) an hour earlier would have cost one minute.

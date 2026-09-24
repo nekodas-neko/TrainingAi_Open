@@ -17029,3 +17029,12 @@ screen with nothing saved, and that the 8 s figure is a starting value nobody ha
 The separately-observed month-stale sleep card is recorded as NOT diagnosed, with the reason: a
 screenshot cannot tell a stale cache entry from the card's own fallback. Writing it as part of BF-195
 would send the next session to fix the wrong thing.
+
+## 2026-09-24 — projectOverview.md 12796 → 12807 (BF-195 correction)
+
++11 lines on the BF-195 Known-Issues row, recording that the **first** version of that fix — an
+`AbortSignal.timeout` that cancelled the request — was wrong, and why. It is kept rather than
+quietly overwritten because the row's own caveat predicted the wrong failure: it said *"a finding
+about the number is not a finding about the approach"*, and the defect was the approach. A future
+session reaching for a cancelling timeout on a slow connection should find the reason it was
+already tried and reverted, not just the current code.

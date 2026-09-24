@@ -130,21 +130,35 @@ export function subscribeToInvalidation(listener: InvalidationListener): () => v
 // no throughput — and nothing in the client had a state for that, so the offline branch below
 // never ran and screens held their skeletons.
 //
-// This is the flag that distinguishes the two, and it is deliberately derived from ONE fact: a
-// request timed out. Not a new subsystem, not a heuristic over latency.
+// This is the flag that distinguishes the two, and it is deliberately derived from ONE fact:
+// responses stopped arriving. Not a new subsystem, not a heuristic over latency.
 //
 // A settled response marks us reachable **even when the server rejected it** — a 500 is proof the
 // connection carried a request and brought an answer back, which is exactly the question being
 // asked. A hard network throw (DNS, refused, server down) deliberately does NOT clear the flag:
 // that is a different failure, it is already handled correctly below, and treating it as "no
 // reception" would put an Offline banner in front of a working connection.
-const FETCH_TIMEOUT_MS = 8000;
+//
+// **The watchdog OBSERVES; it must never cancel the request.** The first version of this aborted
+// the fetch at the threshold, which destroys a slow-but-working request — the exact case a lifter
+// on a weak connection is in — and replaces arriving data with an error. It also made every GET in
+// the app retry-prone: CI ran the E2E suite against a dev server whose first-compile responses take
+// 9–19s, the aborts fired, and a spec asserting "a same-day resume must not refetch" saw two. A
+// slow response is information about the connection, not a reason to throw the answer away.
+const SLOW_RESPONSE_MS = 8000;
+
+// One slow response is not a diagnosis. A cold serverless container, a heavy aggregate or a dev
+// server compiling on demand all produce a single long request on a perfectly good connection;
+// low reception produces a run of them. Requiring two before showing the user anything is what
+// keeps this from crying offline at the first slow payload.
+const SLOW_RESPONSES_BEFORE_UNREACHABLE = 2;
 
 type ReachabilityListener = (reachable: boolean) => void;
 const reachabilityListeners = new Set<ReachabilityListener>();
 let requestsAreCompleting = true;
+let slowResponses = 0;
 
-/** True while requests are completing. False once one has timed out, until the next settles. */
+/** True while requests are completing. False after a run of slow ones, until the next settles. */
 export function requestsCompleting(): boolean {
   return requestsAreCompleting;
 }
@@ -164,9 +178,22 @@ function setReachable(reachable: boolean): void {
   }
 }
 
+/** A request passed the threshold without settling — only a run of them means low reception. */
+function markSlow(): void {
+  slowResponses += 1;
+  if (slowResponses >= SLOW_RESPONSES_BEFORE_UNREACHABLE) setReachable(false);
+}
+
+/** A response arrived, so the connection carries traffic — whatever the server said. */
+function markSettled(): void {
+  slowResponses = 0;
+  setReachable(true);
+}
+
 /** Test seam only — the module-level flag outlives a single test otherwise. */
 export function __resetReachabilityForTests(): void {
   requestsAreCompleting = true;
+  slowResponses = 0;
   reachabilityListeners.clear();
 }
 
@@ -395,18 +422,13 @@ async function cachedFetchCore<T>(
       // (`scripts/check-api-no-store.js` keeps them there), so this is now the second of two
       // independent guarantees rather than the only one. Keep it: it is free, and it is the half
       // that holds for any response — including one from a route that regains a header.
-      // BF-195. Without this the request on a dying connection hangs until the OS gives up, and
-      // there is no path from "hanging" to any rendered state — the caller's `refreshing` stays
-      // true and the screen holds its skeleton indefinitely. The timeout makes `fetch` THROW, which
-      // lands in the catch below: machinery that already keeps the cached value and reports through
-      // `onError`/`onRevalidateError`. So this converts an unhandled state into a handled one at one
-      // call site, for every screen, rather than adding a second failure path.
-      //
-      // 8s is a starting value, not a tuned one: long enough that a slow-but-working connection
-      // still succeeds, short enough that a lifter is not staring at a skeleton mid-session.
-      const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      // BF-195: the watchdog reports that this request is taking too long WITHOUT touching it.
+      // The request runs to completion either way — on a weak connection the answer still arrives,
+      // it is just reported as slow first, which is what the offline indicator needs to be honest.
+      const slowTimer = setTimeout(markSlow, SLOW_RESPONSE_MS);
+      const res = await fetch(url, { cache: 'no-store' }).finally(() => { clearTimeout(slowTimer); });
       // The response settled, so the connection carries traffic — even if the server rejected it.
-      setReachable(true);
+      markSettled();
       if (!res.ok) {
         // Got a response the server rejected (500/429/401/…) — the device is
         // online, so this is a real error. Only surface it when nothing was
@@ -446,11 +468,10 @@ async function cachedFetchCore<T>(
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
       //
-      // BF-195: a timeout is the low-reception case specifically — the radio is attached and
-      // `navigator.onLine` is true, so without this flag the app would keep believing it is online
-      // and keep skipping the offline branch. `AbortSignal.timeout` rejects with a `TimeoutError`,
-      // which is what separates it from an ordinary network failure.
-      if (err instanceof DOMException && err.name === 'TimeoutError') setReachable(false);
+      // BF-195: a hard throw does NOT clear the reachability flag — per the contract above it is a
+      // different failure from "attached but moving nothing", and it is already handled here. The
+      // watchdog is the only thing that clears it, and it has already fired if this request was
+      // slow enough to matter.
       const isOnline = typeof navigator !== 'undefined' && navigator.onLine && requestsAreCompleting;
       const online = cached === null && isOnline;
       if (online) { try { onError?.({ status: null }); } catch { /* caller's onError threw */ } }
