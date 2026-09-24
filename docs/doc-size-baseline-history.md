@@ -16487,7 +16487,23 @@ names a cause instead of a symptom.
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
-## 2026-09-24 — `docs/implementation-backlog.md` → BF-190 + BF-107 reopened
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+TN-62, filed on a status recheck, and it records a cost of my own 2026-09-22 proposal rather than a
+new defect. The single batched recompute was meant to stop the owner's readiness history shifting four
+times; measured today, the interim it creates is **worse than the defect being fixed** — 26 stored
+`hrvBalance` and 19 `sleepBalance` values still carry the pre-fix clip, so 2026-09-23 at z −3.24
+stores 4 while 2026-09-15 at z −1.63 stores 0 and the worse night reads better. Pre-fix the series was
+at least monotonic.
+
+Two blocks earn their lines. **DV-14's deploy stall was ruled out before the finding was written** —
+the tail shipped in 1.465.13 and production is live on 1.465.17 — because "production is ten hours
+behind" is the explanation a later session would reach for first. And **`computed_at` is recorded as
+misleading**: 57 of 71 rows carry a timestamp of 2026-09-23 or later and were not re-derived, so the
+one field that looks like the answer is the trap. The verification test is stated as a property of the
+model (it cannot emit 0 or 100 for any realistic z) rather than as a timestamp check.
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
 
 BF-190, found while answering why a calories tile was blank: the walk summary saves on mount with the
 planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minute session. The
@@ -16497,7 +16513,7 @@ the distinction is the whole value of the note, so it could not be shortened to 
 
 ---
 
-## 2026-09-24 — `docs/implementation-backlog.md` → DV-17 shipped, LB-139 filed
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
 
 Net +14 across two entries. DV-17 grew because its stated location was wrong and the correction is
 the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is the parent passing
@@ -16505,7 +16521,7 @@ the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is
 the six-line DV-17 fix put `nutrition-content.tsx` at exactly its 800-line ceiling, so the next edit
 to that file fails CI, and the extraction that fixes it is real work rather than a baseline raise.
 
-## 2026-09-24 — `docs/implementation-backlog.md` → DV-18 triaged and re-laned to A
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
 
 27821 → 27843 (+22). DV-18 asked Lane B to look first and hand over if the cause was server-side, so
 this is that handover rather than a new entry. The +22 is the triage: what was ruled out (the stored
