@@ -16809,3 +16809,15 @@ reads and then argues with: a sleep score of 42 where the night deserved about 7
 of 44 built on top of it. A row that only said "night selection unified" would not let him connect
 those two days to a cause, and the two days are still wrong — re-scoring them is a stored-data
 rewrite queued as RV-170, so the entry stays open until he authorises that.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 58, `review/sweep-58-rules-and-perf`.**
+29212 → 29518 (+306; rebased on #1540). Sixteen entries (RV-171 to RV-186): a census of the CLAUDE.md rules
+no CI step enforces, and a performance sweep with its device half as one baseline sitting. One dated
+note on DV-13 naming its probable cause (RV-180).
+## 2026-09-24 — `docs/implementation-backlog.md` → 29369 (BF-192 + BF-193)
+
+Account deletion, asked for as an app-store requirement. The length is the two measured tables the
+entry turns on — the reproduced foreign-key failure in the existing delete path, and the CASCADE /
+SET NULL / NO ACTION split across the 99-table schema — plus BF-193's three decision briefs. The
+schema table is the part that could not be summarised away: which keys cascade and which do not is
+the whole difference between a deletion that works and one that silently leaves rows behind.
