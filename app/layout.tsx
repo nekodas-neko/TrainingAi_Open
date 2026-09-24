@@ -82,10 +82,18 @@ const geistMono = Geist_Mono({
 // `display: "swap"` is deliberate — the renderer awaits `document.fonts.ready` before drawing, so
 // the label never paints in a fallback, and swap keeps these off the critical path for every screen
 // that is not the label.
+//
+// `preload: false` because swap kept them off the RENDER path and not off the NETWORK one (RV-146):
+// `next/font/google` preloads by default, so every cold start on every screen fetched two faces that
+// only the printable meal label uses, and the browser logged four "preloaded but not used" warnings
+// per visit. The renderer now asks for the face by name before it draws, which is what starts the
+// load — see `meal-label-render.ts`. Do not flip this back without removing that, or the other way
+// round: together they are the whole guarantee, and either alone is a silent fallback.
 const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],
   display: "swap",
+  preload: false,
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -93,6 +101,7 @@ const instrumentSerif = Instrument_Serif({
   weight: "400",
   subsets: ["latin"],
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
