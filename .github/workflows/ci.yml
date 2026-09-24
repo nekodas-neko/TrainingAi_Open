@@ -1,5 +1,12 @@
 name: CI
 
+# RV-198. Default the token to read-only for every job here. Nothing in this workflow writes to the
+# repository: the only token-bearing operation is `actions/upload-artifact`, which uses the Actions
+# runtime token rather than `GITHUB_TOKEN`. `android.yml` keeps `contents: write` because its publish
+# step genuinely needs it.
+permissions:
+  contents: read
+
 # Action versions are the MINIMUM that runs on Node 24, verified per action against each one's own
 # `action.yml` `runs.using` rather than bumped uniformly (LA-17). That distinction is load-bearing:
 # `upload-artifact@v5` is still `node20`, so a uniform "everything to v5" would have left it behind
@@ -51,7 +58,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -99,7 +106,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -136,7 +143,7 @@ jobs:
       WEBHOOK_USER_ID: placeholder
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -575,7 +582,7 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -698,7 +705,7 @@ jobs:
           # an engine change still skips the browser and LA-63's saving is intact.
           CHANGED=$(printf '%s\n' "$FILES" | node scripts/e2e-ui-touched.js)
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         if: steps.ui.outputs.changed == 'true'
         with:
           version: 10.33.0

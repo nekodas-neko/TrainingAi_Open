@@ -46,7 +46,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       # Node 22, not 20: the Capacitor CLI 8.x (`npx cap sync`) requires >=22.
@@ -78,6 +78,11 @@ jobs:
       # and is a script-injection surface. `secrets` is also unavailable in a step-level `if`,
       # so the absent case is handled in the script instead of as a condition.
       - name: Restore the stable debug signing key
+        # RV-198. `push` only. A PR run builds an APK that is never published, so decoding the
+        # signing key there put the credential the owner's installed APK is signed with into every
+        # run a workflow change could reach, for no gain. On a PR the step is skipped and the build
+        # falls back to a per-runner key — the same path already taken when the secret is unset.
+        if: github.event_name == 'push'
         env:
           KEY_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
         run: |
