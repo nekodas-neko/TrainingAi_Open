@@ -17031,3 +17031,11 @@ pass/fail DV can act on without reading the journal.
 The seventh is a `Needs: RV-170` on RV-166. The entry was already blocked, but said so only in prose
 inside its `Lane:` line, so `next-item.js` offered it as Lane B's ready work twice in one session.
 One line in the field the runner actually reads is cheaper than the two pick-ups it cost.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30362 (BF-196 + BF-189 amendment)
+
+The finish-time question, answered by measurement: 51 minutes is the working budget exactly, not a
+shortfall against 60. The length is the five-term table that derives it — session budget, measured
+warm-up, the clamp, the working budget, the stored prescription — because the whole answer is that
+two numbers are the same and one of them is labelled ambiguously. The BF-189 amendment rides along
+since the same measurement rules out one of its candidate explanations.

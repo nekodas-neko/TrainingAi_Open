@@ -2778,6 +2778,64 @@ drift.
 - **Verification:** this entry closes when all three answers are recorded here with the date, and
   BF-192 is updated with whichever ones change its diff.
 
+### [workouts] BF-196 — "~51 min" is WORKING minutes and reads as whole-session minutes, so a full session looks nine short
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"I see that for my
+  current day it says if I complete on time I will finish at 51 minutes which is less than the 60 -
+  does this sound right?? Ideally we can push that to the full duration?"*
+- **Lane: B** — `components/workout/ai-prescription-card.tsx:213`. One string. No engine change:
+  the number is correct and the plan behind it is correct.
+- **⚑ MEASURED — 51 IS THE BUDGET, EXACTLY. There is no nine-minute gap.** The estimate is not
+  measured against the 60-minute session budget; it is measured against the **working** budget, which
+  is the session budget minus a warm-up carve-out (`workingBudgetMin`, `duration-model.ts:76`):
+
+  | term | value | source |
+  |---|---|---|
+  | session budget | 60 min | `program_sessions.time_budget_minutes` |
+  | measured warm-up median | **9.3 min** | 20 completed sessions, last 30 days |
+  | carve-out after clamping to `[MIN_WARMUP_MIN 4, MAX_WARMUP_MIN 15]` | **9 min** | `warmupBudgetMin` |
+  | **working budget** | **51 min** | 60 − 9 |
+  | **his current Lower prescription** | **51 min** | `session_periodization.prescription` |
+
+  **51 against 51.** The session is not nine minutes short of full — it is exactly full, and adding
+  the warm-up back gives ~60. The comparison is what is wrong, not the plan.
+- **So the answer to the question as asked is: yes, it is right, and "push it to the full duration"
+  is already done.** Expanding further would overrun the hour rather than fill it.
+- **The defect is the label, and it invites precisely this reading.** The card renders
+  `` · ~${prescription.estimatedSessionDurationMin} min ``: a bare number, beside a session the
+  lifter has configured as 60 minutes. Nothing on screen says it excludes the warm-up, so the only
+  available reading is *"this will take 51 of my 60."* A number that is right and reads as wrong is
+  a UI defect, not a user error.
+- **⭐ Recommend: name the quantity — `~51 min working` (or `~51 min after warm-up`).** One word
+  carries the whole distinction and needs no second line. It is also durable: the carve-out is
+  *measured*, so it moves as his warm-up habits move, and a label that names the quantity stays true
+  while a fixed explanation would not.
+- **Alternatives, with what each is better at:**
+  - **Show both — `~9 + 51 min`.** Better at making the split visible without the lifter learning a
+    term. It loses on the card's width at 384 dp, which BF-96 and BF-139 have each already run out
+    of once.
+  - **Estimate the whole session instead** (add the carve-out back and show ~60). Better in matching
+    the number the lifter configured. It loses because the estimate would then no longer be the
+    thing the engine actually fits against, so the card and the planner would be quoting two
+    different numbers — the divergence class **One Formula, One Place** exists to prevent.
+  - **A tooltip or info dot.** Better if the full reasoning ever needs to be shown. It loses because
+    this needs to be read at a glance, mid-gym, and a tap is not a glance.
+- **Reversal cost: none.** It is one string.
+- **⚑ THE SAME MEASUREMENT SHARPENS BF-189 AND IS RECORDED THERE TOO.** BF-189 asked why every
+  exercise sits at the 2-set floor. **The budget is binding to the minute — 51 of 51 — so there is
+  zero headroom**, which rules out "the engine is leaving room unused" as an explanation and leaves
+  BF-189's three levers as the only ways to add volume. It also re-weights them: of those 51 working
+  minutes, **~14.9 are bar-loading and transitions** (BF-189's measurement) — a little under a third
+  of the working budget, and the largest single reclaimable block.
+- **⚠ Do NOT "fix" this by enabling `expandToBudget` on a standard session.** It exists
+  (`generate-prescription.ts:522`) and is gated on an explicit **long** request on purpose; the
+  code states why: *"The duration model is deliberately conservative and that under-fill IS the
+  finish-early margin — the owner's sessions land on time because of it. Expanding by default would
+  spend exactly that margin."* Here there is not even an under-fill to spend.
+- **Verification:** with the label changed, the card reads as working time on the S25 at 384 dp
+  without wrapping the row, and the number still matches
+  `prescription.estimatedSessionDurationMin`. **Device look owed** for the width.
+
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
 - **⚑ THE OWNER DECLINED THE THREE LEVERS AND RESTATED THE GOAL, 2026-09-24:** *"not sure what the best plan of attack is here. the goal was to be able to add more exercises/sets in when the time permitted. happy to go with fewer exercises and more sets if that's gonna be better results than more exercises. but ideally it was dynamic and could adjust itself."*
 - **So this is no longer a choice between three static levers.** What he wants is a prescription that FILLS the budget — more work when time permits, fewer exercises with more sets when it does not — rather than a fixed exercise count chosen once. The three levers were framed as alternatives and he is asking for the mechanism that makes the choice per session.
@@ -2804,6 +2862,12 @@ drift.
   **Setup exceeds work by half again.** Across the 14 most recent completed sessions the medians are
   wall **42.5**, warm-up **9.4**, setup **12.7**, work **8.6**, rest **8.4** — so **work is ~19% of
   session wall clock**, steady across sessions rather than a one-off.
+- **⚑ AMENDED 2026-09-24 — THE BUDGET IS BINDING TO THE MINUTE, which removes one explanation.**
+  The owner asked why a session estimates 51 minutes against his 60. It is not slack: the estimate is
+  against the **working** budget, `60 − 9` (his measured 9.3-min warm-up, clamped), so **51 of 51**.
+  Measured in BF-196. **So the engine is not leaving room unused** — there is none — and the three
+  levers below are the only ways to add volume. It also re-weights them: **~14.9 of those 51 working
+  minutes are bar-loading**, a little under a third, and the largest reclaimable block.
 - **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
   that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
   `is_early_deload = false`). The program's own stored styles prescribe **14 sets for Push**; **10**
