@@ -16615,6 +16615,8 @@ it actionable: the write default is load-bearing (#47) and must stay, so the fix
 TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
 energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
 
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → RV-103's sweep-2 failure explained
 
 28633 → 28645 (+12 on the merged base). RV-103 shipped and then failed its device check, and the twelve lines are the
@@ -16624,11 +16626,30 @@ cover the gap because the write's own invalidation has emptied the key. Measured
 Writing the arithmetic down is what stops the next session reading the sweep result as "the
 reporting never worked" and rebuilding a channel that already exists.
 
+<<<<<<< HEAD
 ## 2026-09-24 — `docs/implementation-backlog.md` → RV-111 shipped, device re-check kept
 
-28645 → 28656 (+11). RV-111's fix is two lines; the eleven are what was checked rather than assumed.
+28768 → 28779 (+11 on the merged base). RV-111's fix is two lines; the eleven are what was checked rather than assumed.
 The entry warned that one press closing both surfaces would leave the app blank, because the
 scanner's `body.scanner-active` rule hides every other body child until it unmounts — so the note
 records why that cannot happen (`handlePop` closes only surfaces deeper than the arriving entry,
 and popping the scanner's lands on the sheet's) and why the stack itself needed no change. Without
 it the next reader re-derives the same safety argument from scratch.
+=======
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-autonomic-collinearity)
+
+28645 → 28768 (+123, recounted on the merged base). TN-68: the sleep model's `hrv` and `hr` contributors correlate at +0.873 over 60 nights, so 28 of its
+110 weight is one effective axis, and both pin at 100 together on 17% of nights. Most of the entry is
+the distinction from TN-60 — that rail inverted stored ordering, this one only loses resolution — and
+the three alternatives with what each is better at, since any weight change here is the owner's.
+TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
+coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.
+## 2026-09-24 — CLAUDE.md → 1002 (chore/or-143-process-owner-gate-triage)
+
+Growth, +11 on the merged base (990 → 1002), recording the process the owner set out: the Orchestrator's primary job is the
+owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
+rather than run one. A role definition that lives only in a chat is one the next session does not
+have, so it costs twelve lines in the file every session reads.
+>>>>>>> origin/main

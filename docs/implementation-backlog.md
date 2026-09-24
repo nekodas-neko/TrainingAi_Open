@@ -833,6 +833,124 @@ which is the right shape for something that can only be validated by living with
 - **Two things not to do.** Do not quote the monotonic table as evidence of anything. Do not read the
   post-fix r = 0.000 as the score failing — it is five days.
 
+### [sleep] TN-68 — the sleep score's two autonomic contributors are one axis: r = +0.873, 25% of the model, and both pinned at 100 on 17% of nights
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, checking whether the sleep composite has
+  the rail TN-60 fixed in the readiness composite. It has a different one.
+- **Lane: O** — a weight change is the owner's per the standing scoring rule, and this needs a decision
+  about the model's shape before any constant moves.
+- **Measured 2026-09-24, n = 60 nights with both terms present.** `corr(hrv, hr) = +0.873`. For
+  contrast, in the same rows `corr(hrv, total_sleep) = 0.559`, `corr(hr, total_sleep) = 0.498`,
+  `corr(total_sleep, efficiency) = 0.681`. So the two autonomic terms track each other far more
+  tightly than any other pair in the model.
+- **What that means for the weights.** `SLEEP_WEIGHTS` gives `hrv` **14** and `hr` **14** out of a
+  total of **110**, and `sleep-score.ts:20` states the intent: *"Autonomic state (hrv + hr) is now 28
+  of 110 (25%) rather than 12 of 100 (12%)."* At r = 0.873 that is **one effective axis carrying 25%**,
+  not two axes carrying 12.7% each. The consequence is not that the share is wrong — the owner chose
+  25% — it is that **a single bad night's autonomic reading moves a quarter of the score**, where two
+  genuinely independent terms would have partly cancelled.
+- **And at the top they go flat together.** `hrv` reads exactly 100 on **12 of 60** nights (20%), `hr`
+  on **10 of 60** (17%), and **all 10 of the `hr` ceiling nights are also `hrv` ceiling nights**. On
+  those nights 28 of 110 weight is a constant and contributes no discrimination at all.
+- **The anchor tables say why, and the two ceilings are not symmetric.**
+  `HRV_RATIO` (`sleep-score.ts:76`) reaches 100 at a ratio of **1.35** — HRV 35% above the personal
+  baseline, genuinely rare. `HR_RATIO` (line 81) reaches 100 at **0.85** and that is its **first
+  anchor**, so *every* night with overnight HR at or below 85% of baseline scores exactly 100, with no
+  resolution beyond it. The HR ceiling is an open-ended plateau; the HRV one is a bound.
+- **⚠ This is not the TN-60 defect and must not be described as one.** TN-60's floor rail was
+  demonstrably wrong: stored history inverted its own ordering, a worse night reading better than a
+  milder one. Here the final score still discriminates — nights with one railed contributor average
+  **82.6** (range 36–94) and nights with two average **79.9** (range 42–92), so railing does not even
+  monotonically inflate the total. **The loss is resolution at the top of one axis, not a wrong
+  ordering**, and anyone quoting this entry as "the sleep score has TN-60's bug" would be wrong.
+- **Distribution for the record**, nights by count of contributors at exactly 100: 0 → 43 nights (mean
+  score 60.9) · 1 → 12 (82.6) · 2 → 8 (79.9) · 3 → 5 (91.4) · 4 → 3 (95.3) · 5 → 1 (95.0). So **29 of
+  72 nights (40%) have at least one contributor at the ceiling.**
+- **Recommendation: leave the weights alone and fix the HR ceiling's shape first.** Extending
+  `HR_RATIO` below 0.85 (say anchors at 0.80 and 0.75) costs one line, cannot reorder any night against
+  another, and is the only change here that adds information rather than redistributing it. Re-measure
+  the collinearity afterwards — part of the 0.873 is the shared plateau, and it is worth knowing how
+  much before touching a weight.
+- **Alternatives, and what each is better at.**
+  - *Merge the two terms into one autonomic contributor at 28.* Better at honesty — it would describe
+    what the model already does — and it discards the chance that they diverge on exactly the nights
+    that matter most, which is untested at n=60.
+  - *Cut one term to ~7 and keep the other at 14.* Better if the goal is to stop a single reading
+    moving 25% of the score. It re-scores every stored night, so it is a proposal needing the full
+    "how many other days does this move" treatment, not a constant tweak.
+  - *Do nothing.* Defensible: HRV and overnight HR both index parasympathetic tone, so r = 0.873 is
+    physiologically expected rather than a modelling error, and the owner picked 25% knowing it was
+    autonomic state.
+- **Reversal cost: low for the anchor change** (one array, re-derivable), **high for any weight
+  change** — it re-scores all stored nights and invites the same half-applied-history problem TN-62 is
+  still waiting on.
+- **What this does NOT establish.** Whether the collinearity is physiological or an artefact of both
+  terms being computed from the same night's BLE stream — a shared-input artefact and a shared-biology
+  signal look identical here. And the correlation is between two of **our own** derived numbers, so it
+  describes the model's internal geometry and is **not** a validation claim about either; per TN-67,
+  no external validation of any score currently exists.
+- **Where the mechanism is:** `packages/shared/src/health/sleep-score.ts` — `SLEEP_WEIGHTS` (line 22),
+  `HRV_RATIO` (76), `HR_RATIO` (81), `clamp100` (157) and the July recalibration's own rationale
+  (lines 15–21), which cites [`docs/reviews/2026-07-27-night-2026-07-25-case-study.md`](reviews/2026-07-27-night-2026-07-25-case-study.md).
+
+### [readiness][heart-rate] TN-69 — the daytime-stress scalar has no day-to-day structure, and the RPE residual cannot settle its sign either
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. This is the third failed attempt to
+  validate this metric, and the entry exists so a fourth session does not start from scratch.
+- **Lane: O** — it changes what may be claimed about the metric and it strengthens an existing
+  proposal; no code follows from it directly.
+- **Why it matters.** `daytime_stress_scaled` drives **61% of all Body Battery drain** (TN-55, measured
+  over 65 days). It is the single largest input to a number the owner reads daily, and TN-33 recorded
+  that its **sign** could not be settled from stored data.
+- **Attempt 1 — TN-65's RPE residual, which is the new tool and does not work here.** Per-set RPE
+  minus the mean for that exercise at that planned-intensity band, averaged per training day, against
+  the day's stress scalar: **38 training days, 426 sets**, same-day **r = +0.159**, previous-day stress
+  against today's residual **r = −0.161**. Two near-mirror magnitudes with opposite signs at n = 38 is
+  the shape of no relationship, and neither is significant. **The residual is still the right tool for
+  scoring work (TN-65 stands); it just has nothing to grip here.**
+- **Attempt 2 — persistence.** Lag-1 autocorrelation over 121 day-pairs:
+
+  | series | lag-1 |
+  |---|---:|
+  | `daytime_stress_scaled` | **−0.041** |
+  | `readiness_score` | +0.361 |
+  | `sleep_score` | +0.582 |
+
+  The scalar is **completely independent of its own previous day** while the two scores beside it carry
+  substantial persistence.
+- **Attempt 3 — coherence with the scores.** Over 62 days: against `readiness_score` **r = −0.023**,
+  against `sleep_score` **r = −0.003**. Both indistinguishable from zero.
+- **⚠ The one thing that DOES agree with it is tautological — do not cite it as validation.** Against
+  `stress_high_minutes` r = **−0.326** and `recovery_high_minutes` r = **+0.215**, and both signs are
+  correct given the convention (see below). But `daytime-stress-thresholds.ts` defines those minute
+  counts as **thresholds on this very series** (`STRESS_HIGH_LEVEL = -0.5`,
+  `RECOVERY_HIGH_LEVEL = 0.5`), so they are the same number counted differently. This is the
+  measure-a-score-against-itself trap that TN-67 caught in the energy check-in; it is recorded here
+  because the correlation looks like external agreement and is not.
+- **The sign convention is settled, from source, and it is NOT what needed settling.**
+  `lib/health/daytime-stress.ts:72`: *"scaled level in [−1, +1] (negative = below baseline =
+  stressed)"*. So negative is stressed, and the two internal correlations point the right way. TN-33's
+  open question is not the convention — that was always readable — but whether the **series tracks
+  real stress**. These three attempts say: no evidence that it does.
+- **⚠ The fair counter-argument, which keeps this from being a verdict.** A daytime stress *exposure*
+  has no obvious reason to persist across days — a hard Tuesday does not imply a hard Wednesday —
+  whereas readiness and sleep reflect slower physiology. So **−0.041 is not by itself damning**, and
+  this entry does not claim the metric is noise. What it claims is narrower and firmer: **after three
+  independent attempts there is still no measurement supporting it**, and the one apparent agreement is
+  circular.
+- **The consequence, and it is the useful part.** TN-55 cut `STRESS_DRAIN_RATE` from 0.20 to 0.020 and
+  justified it as *"a deliberate de-weighting of an untrusted input, not a calibration of a trusted
+  one"* — a decision taken on caution. **These measurements convert that caution into evidence.** The
+  plan's instruction not to raise it back until TN-33 validates the sign now has three failed
+  validations behind it rather than an absence of attempts.
+- **What would actually settle it**, so the next attempt is not a fourth repeat: a signal collected
+  independently of the ring on days that differ in known stress — the three-week `perceived_recovery`
+  log the owner declined on 2026-09-21 was exactly that, and nothing in stored data substitutes for it.
+  Anyone re-opening this should propose that, or accept the metric stays de-weighted indefinitely.
+- **Where the mechanism is:** `lib/health/daytime-stress.ts` (the scaled level and its convention),
+  `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
+  `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
@@ -23049,6 +23167,11 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   no file can be dated before it. That makes the 08-17 pass weak evidence, not proof; the instrument
   is what replaces it. **Do NOT merge with Q-507** — that is `STRESS_HIGH_DAY_THRESHOLD_MIN`, daytime
   stress minutes, a different mechanism sharing a word.
+- **⚠ MEASURED 2026-09-24 (Tuning), and it narrows what DV is looking for:** `chronic_stress_score` is
+  populated on **0 of 129 days**, and `chronic_stress_contributors` on **0 of 129**. So the value is not
+  wrong or stale — **it has never been produced, on any day, ever**. `resilience_level` beside it is
+  populated on 30 of 129. **Expect the console to show nothing rather than something suspicious**, and
+  read the question as *why has the producer never run* rather than *why is this number odd*.
 
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 
