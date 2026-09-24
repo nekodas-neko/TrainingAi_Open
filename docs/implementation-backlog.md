@@ -566,12 +566,34 @@ below threshold and left in place for next time.
 
 ### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
 
-- **Lane:** B to look first (`components/admin/exercise-manager.tsx`); A if the stored asset is gone.
-- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147).
+- **Lane: A** — `app/api/admin/reference-figure/route.ts` (POST), `app/exercise-media/[...key]/route.ts`.
+  Re-laned from B after Lane B looked first, as the entry asked.
+- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147) · triaged by Lane B 2026-09-24.
 - **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Admin → Exercises → **AI style reference** renders the WebView's broken-image
   icon and the alt text *"Reference figure"*. This is the anchor the AI GIF generator styles from, so a
-  missing one may affect generations too. **Not established:** whether the stored URL 404s or the
-  reference was never set.
+  missing one may affect generations too.
+- **The entry's open question is settled: a URL IS stored.** `exercise-manager.tsx` renders
+  *"No reference — AI uses text prompts only"* when `referenceUrl` is null. The device saw the
+  broken-image icon and the alt text instead, so the GET returned a URL and the browser's fetch of
+  it failed. "Never set" is ruled out.
+- **Not a path mismatch, checked:** `REFERENCE_FIGURE_KEY` is `exercise-media/reference-figure.png`;
+  the admin GET strips that prefix to build `/exercise-media/reference-figure.png`, and the proxy
+  re-adds it. The two agree exactly.
+- **Mechanism — high confidence, NOT proven.** The POST writes **any** uploaded file to the `.png`
+  key with a hard-coded `'image/png'`, and the proxy sets Content-Type from the `.png` extension.
+  Neither inspects the bytes. The S25 shoots HEIC/JPEG, so a phone upload is stored and served as
+  PNG, which the WebView cannot decode — a broken image, while the GET's existence check (a real
+  `downloadMedia`) still succeeds. That is the observed symptom exactly.
+- **What would disprove it:** the stored object really being a valid PNG, in which case look at a
+  truncated upload or the proxy's response. Settling it needs production storage, which the sandbox
+  cannot reach — so this is a diagnosis to verify, not a conclusion to build on.
+- **Why Lane A:** the durable fix is server-side — sniff the real type on upload and store/serve it
+  under a matching key and Content-Type, or reject a non-PNG outright. `app/api/**` is Lane A by the
+  path rule.
+- **The Lane B half is deliberately not done.** Constraining the file input in
+  `components/admin/exercise-manager.tsx` is bypassable and cannot repair the already-stored object,
+  so shipping it alone would make the card look fixed while the AI generator still styles from a
+  file it cannot read. Worth adding *after* the server fix, not instead of it.
 - **Pass test:** the card shows the reference image on the S25.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it

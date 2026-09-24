@@ -16504,3 +16504,11 @@ the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is
 `mealPlan === null` as "still loading" when null is the settled "no plan" answer. LB-139 is new —
 the six-line DV-17 fix put `nutrition-content.tsx` at exactly its 800-line ceiling, so the next edit
 to that file fails CI, and the extraction that fixes it is real work rather than a baseline raise.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → DV-18 triaged and re-laned to A
+
+27821 → 27843 (+22). DV-18 asked Lane B to look first and hand over if the cause was server-side, so
+this is that handover rather than a new entry. The +22 is the triage: what was ruled out (the stored
+URL exists — the component renders a "No reference" string when it is null, and the device saw a
+broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
+that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
