@@ -589,11 +589,13 @@ below keep their gate — they really are blocked pending an answer — and this
    nothing since about 2026-08-04. Either branch is a different feature and nothing in the repo
    decides it. **No recommendation offered** — this is a genuine product preference. Note the day
    timeline reads the same table, so retiring the card is not the whole blast radius.
-4. **The admin sitting — nine entries, one login.** `owner-admin-sitting` (3, including `LA-56`,
-   `LA-68`, `TN-1`) and `admin-console-sitting` (6) are two batch names for the same visit to
+4. **The admin sitting — ten entries, one login.** `owner-admin-sitting` (4, including `LA-56`,
+   `LA-68`, `TN-1` and `Q-525`, which OR-148 added on reading its gate) and `admin-console-sitting`
+   (6) are two batch names for the same visit to
    `/admin` → Devices on the phone: some need something *run* there, some need a *look*. They ship
-   as different PRs and must be ASKED as one sitting. Counted from the batch fields 2026-09-24;
-   `LA-56`'s own note says ten, which predates the count.
+   as different PRs and must be ASKED as one sitting. Recounted from the batch fields after OR-148;
+   `LA-56`'s own note said ten before the count said nine, and it is ten again for a different
+   reason — read the fields, not the prose.
 5. **`owner-branch-protection` (`LB-52` + `Q-297`'s second residue) — asked 2026-09-24**, parked by
    the owner for a few hours. E2E stays off the required-check list; that half is decided.
 
@@ -3739,7 +3741,7 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **The numbers he is moving to**, so nobody has to re-derive them: **1,359 kcal / 111 g protein /
   143 g carbs / 38 g fat** at the DEXA-corrected body fat — down **259 kcal** and **39 g protein**
   from the 1,660 / 150 he has been eating for three weeks. That is a real cut, not a correction.
-- **Gate:** owner
+- **Gate:** owner — the OUTCOME is decided (2026-09-23, computed numbers only); what is still owed is the WRITE, which is his one tap on a post-RV-66 recommendation. A decision recorded in a backlog entry is not a hand on his production data — do not run it for him.
 - **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
   only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
   141 g carbs / 55 g fat**, *exactly* the `goal_recommendations` row from **2026-08-31** — a row the
@@ -7840,7 +7842,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 - **Lane:** A — a sync-policy decision that lands in the Health Connect ingest path. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **Gate:** owner.
+- **Gate:** owner — a product decision with a recommendation already written below: an explicit, resumable "Import more history" action rather than a bigger automatic first-sync window. What "connect a data source" promises the user is his call, not a technical blocker.
 - **Added:** 2026-09-14 (one-off session; owner asked specifically whether a source "that can't have
   live data" — i.e. only reachable via a one-time or infrequent sync — "should be able to backfill
   the necessary activities etc." See
@@ -10102,7 +10104,7 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
-- **Gate:** owner
+- **Gate:** owner — LIVED FEEDBACK, not a decision. The recommendation below is to change nothing until he has trained several sessions under BF-128's five exercises; the safe-looking fix reintroduces the bug he reported. What is owed is whether five fits the hour in practice.
 - **Needs:** — nothing.
 - **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
   same day). What remains is one decision, which is why it is gated rather than closed.
@@ -23433,7 +23435,8 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   owner for exactly one thing: a hand-triggered `fullHistory` rollup pass**, which is the only path
   that reaches the model, and therefore the only path that will write a number. Until that runs the
   column is NULL everywhere and nothing more can be concluded here.
-- **Gate:** owner
+- **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-148). Like `LA-56`, `LA-68` and `TN-1`, the only thing this needs is a **fullHistory** pass fired by hand from an admin session. Same screen, same login; asking for it separately costs another sitting.
+- **Gate:** owner — ONE ACTION, not a decision: a hand-triggered `fullHistory` rollup pass. It is the only path that reaches the model, so until it runs the column is NULL everywhere and nothing more can be concluded.
 - **First action:** **instrument, do not relax.** Log the count of complete granular nights the pass
   actually assembled. Relaxing `CHRONIC_STRESS_MIN_DAYS` without that is Q-504's mistake — loosening a
   threshold whose input has not been checked.

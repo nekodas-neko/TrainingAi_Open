@@ -36,11 +36,11 @@ const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
 
 // Frozen 2026-09-24 at 23; 20 after OR-146 (Q-231, LA-56, BF-106), 17 after OR-147 (Q-4,
-// TN-16, Q-297).
+// TN-16, Q-297), 13 after OR-148 (LA-65, PS-43, Q-525, LA-126).
 // Shrink-only: remove an id when its gate states what is owed.
 const BASELINE = new Set([
-  'LA-126', 'PS-41', 'PS-43', 'LA-65', 'BF-77', 'LB-53',
-  'Q-515', 'Q-516', 'Q-525', 'Q-522', 'Q-523', 'Q-222', 'Q-71',
+  'PS-41', 'BF-77', 'LB-53',
+  'Q-515', 'Q-516', 'Q-522', 'Q-523', 'Q-222', 'Q-71',
   'Q-111', 'Q-44', 'Q-31', 'Q-11',
 ]);
 
