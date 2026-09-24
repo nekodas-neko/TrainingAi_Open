@@ -16893,3 +16893,11 @@ Q-71, Q-11) off his plate and onto DV — the gate had never been his judgement,
 admin session, and DV holds his login. He also corrected that DV cannot attach during his workouts
 at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
 would otherwise re-derive them.
+
+## 2026-09-24 — `docs/implementation-backlog.md` (or-156)
+
+Growth: BF-191's two answers and RV-170's policy answer. BF-191 costs the most lines because the
+owner chose a MIX of two options that were framed as alternatives, and the literal build of that mix
+reintroduces the objection one of them lost on — two dialogs in the mis-tap path. The resolution is
+written as the Orchestrator's reading rather than his words, so he can correct it. RV-170 keeps a
+warning that its ✅ covers the policy and not its two unanswered riders.
