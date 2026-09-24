@@ -2612,6 +2612,37 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][body][heart-rate] ⚠️ The Body Battery is fixed on provisional numbers, and three things are still owed (TN-55, 2026-09-24)
+
+Your *"it's pretty much useless"* was a rate-balance defect, and it is fixed: replayed over 66 days
+of your own history the battery went from a median **−48 points a day** ending at the floor on
+**67%** of days, to a median of **+0.2** ending at zero on **none** — with the spread intact
+(sd 25.1 → 25.2), which is what says it was calibrated rather than flattened to 50. Two things were
+wrong at once: drain ran 3× charge, and the charge ramp faded to nothing as heart rate approached
+the rest ceiling, so 220 minutes below that ceiling once stored zero charge. The ceiling itself —
+what TN-2 and TN-52 both went after — was never the problem and is unchanged.
+
+**The constants are provisional and that is deliberate.** Your dose stepped 0.5 mg → 1 mg on
+2026-09-13, so the earliest honest fit is **2026-10-04**; you chose on 2026-09-22 to ship now and
+re-sweep then rather than leave it a countdown for another fortnight. The re-sweep is a single gain
+dial and is queued as **LA-134** — without it these numbers quietly become permanent.
+
+**The stored history does not re-score, and the plan said it would.** `body_battery_daily` is
+written only for *today*, by the `GET` itself; no backfill path exists. Every earlier row stays
+stamped `v5`. Nothing you look at reads those rows, and the one field the route does take from them
+across days is an observed heart-rate peak that none of these constants touch — so this costs
+nothing today and is recorded because the plan claimed otherwise.
+
+**A workout day still barely separates from a rest day** — and it did not before either. Drain
+separates slightly better than it used to (Cohen *d* 0.31 → 0.37 across 48 workout days against 18
+rest days), but the number on the screen separates almost not at all in either model. That is
+**Q-521**: drain tracks how long you wore the ring (*r* = +0.518) rather than how hard you worked
+(*r* = −0.153). It is a different defect, it is queued, and it must not be "fixed" by putting the
+drain rate back — that would restore the countdown.
+
+**Not device-verified.** No S25 pass, and `app/api/body-battery`'s five route tests could not be run
+in-session; CI covers them and none of them assert a constant or a battery value.
+
 ### [nutrition][app-shell] ⚠️ The day review may still not open on the first tap of a session — fix NOT verified (LB-129, 2026-09-23)
 
 Home's "review your day" flips to `/nutrition?review=day`. On a Nutrition the shell has not mounted

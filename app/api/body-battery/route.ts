@@ -53,32 +53,48 @@ export interface BodyBatteryResponse {
 
 // ── Tuning constants ─────────────────────────────────────────────────────────
 // Battery is anchored at the morning readiness score and walked forward minute
-// by minute off the heart-rate series. Below REST_THRESHOLD of HR reserve the
-// tank charges; above it, it drains in proportion to intensity.
+// by minute off the heart-rate series. At or below REST_THRESHOLD of HR reserve
+// the tank charges at a flat rate; above it, it drains in proportion to intensity.
 // HR_REST_THRESHOLD (lib/health/hr-zones.ts) — the reserve fraction at/under which we recharge
 // (awake sitting HR sits ~0.05–0.10 of reserve, so only genuine low-HR rest charges;
 //  ordinary waking activity holds steady or drains gently). Shared with the Activity score's
 // "moved this hour" signal (lib/health/hourly-movement.ts) — one rest/active boundary, not two.
 const REST_THRESHOLD = HR_REST_THRESHOLD
-// Halved from 0.40 on 2026-08-04 (Q-57). At 0.40 a nominal eight hours of true resting HR charged
-// 192 points against a 100-point scale, and across 36 measured production days the battery ended
-// above 80 on 18 of them with 14 pinned at the ceiling — a tank that is always full carries no
-// information. Backtested over the same days with the corrected HRmax below: 0.20 is the highest
-// rate that pins no day at 100, and lands the end-of-day distribution around 50 rather than 72.
-const CHARGE_RATE    = 0.20   // battery points per minute at full rest
-const DRAIN_RATE     = 0.60   // battery points per minute per unit reserve over threshold
+// ⚠ PROVISIONAL, and deliberately so — TN-55, 2026-09-24. These are fitted numbers, but they were
+// fitted inside a window the calibration-period rule calls too early: the dose stepped
+// 0.5 mg → 1 mg on 2026-09-13, so the earliest honest fit is 2026-10-04. The owner chose on
+// 2026-09-22 to ship now and re-sweep then, accepting that the battery re-scores twice rather than
+// staying a countdown for another fortnight. Re-run `scripts/tuning/body-battery-replay.cjs` after
+// that date and adjust the gain — balance holds at zero across the range, so it is one dial.
+//
+// They come from a base fit (charge 0.30, drain 0.20, stress 0.05) scaled by a global gain of 0.40,
+// which sets day-to-day swing without disturbing balance. What was wrong before was the RATIO, not
+// the threshold TN-2 and TN-52 both went after: drain ran 3× charge on top of a charge ramp that
+// was near zero wherever this user actually sits, so the battery netted −48/day across 66 replayed
+// days and ended at the floor on 67% of them.
+const CHARGE_RATE    = 0.120  // battery points per minute at or below the rest threshold
+const DRAIN_RATE     = 0.080  // battery points per minute per unit reserve over threshold
 const GAP_HOLD_MIN   = 30     // gaps longer than this hold steady (ring not worn)
 const SAMPLE_CAP_MIN = 7      // clamp per-sample dt so sparse data can't spike a delta
 // Extra drain from daytime stress (dHRV below your daytime norm), added on top of the HR delta —
 // so stress depletes the tank even at rest. Scaled by how far below baseline the moment's dHRV is.
-const STRESS_DRAIN_RATE = 0.2 // battery points per minute at a full (100%) below-baseline deviation
+//
+// ⚠ Cut 10× as a DE-WEIGHTING OF AN UNTRUSTED INPUT, not a calibration of a trusted one. The stress
+// term was 61% of all drain and correlated −0.61 with the day's end value, so the battery was
+// mostly a rendering of daytime stress — whose SIGN is unvalidated (TN-33, TN-21, TN-22). Do not
+// raise it back on the argument that stress "should" matter more until TN-33 settles that sign.
+const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) below-baseline deviation
 
 // Stamped onto every daily snapshot so tuning analysis never mixes data from
 // different constant sets. Bump this whenever the constants above change.
 // v5 (2026-08-04, Q-57): charge rate halved and HRmax resolved from observed daily peaks rather
 // than 220 − age. `hrmax-observed` is in the string because the reserve now varies per user and
 // per window — two days on v5 are not comparable if one fell back to the age estimate.
-const MODEL_VERSION = `v5:rest${REST_THRESHOLD}:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule`
+// v6 (2026-09-24, TN-55): the charge ramp is flat at or below the threshold, and the rates are
+// rebalanced. The prefix has to move even though the interpolated constants already changed, because
+// they cannot express a change in the walk's SHAPE — a v5 row and a v6 row carrying identical
+// constants would still not be comparable.
+const MODEL_VERSION = `v6:rest${REST_THRESHOLD}:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule`
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))

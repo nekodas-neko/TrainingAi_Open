@@ -6,9 +6,11 @@
 // replay] table" — which is only possible once the shipped arithmetic is callable on its own. That
 // is what this file is for.
 //
-// **Behaviour is deliberately unchanged.** Every constant stays a parameter rather than being
-// re-declared here, so the route remains the single place they are chosen and this cannot silently
-// drift from them. `body-battery-walk.test.ts` pins the shape against hand-computed values.
+// Every constant stays a parameter rather than being re-declared here, so the route remains the
+// single place they are chosen and this cannot silently drift from them.
+// `body-battery-walk.test.ts` pins the shape against hand-computed values.
+//
+// The charge ramp was flattened by TN-55; the walk was otherwise lifted verbatim.
 
 /** One heart-rate sample. `tsMs` is epoch milliseconds. */
 export interface BatteryWalkSample {
@@ -37,7 +39,7 @@ export interface BatteryWalkParams {
    * immune to `hrMax` re-estimation. Nothing in this file needs to change for that.
    */
   restThreshold: number
-  /** Battery points per minute at full rest. */
+  /** Battery points per minute anywhere at or below `restThreshold`. */
   chargeRate: number
   /** Battery points per minute per unit reserve over the threshold. */
   drainRate: number
@@ -72,8 +74,8 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 /**
- * Walk the heart-rate series from wake forward, charging below the rest threshold and draining
- * above it, with daytime stress adding drain on top.
+ * Walk the heart-rate series from wake forward, charging at a flat rate at or below the rest
+ * threshold and draining above it, with daytime stress adding drain on top.
  *
  * `samples` must be ascending by `tsMs`; the caller already reads them ordered. Samples before
  * `wakeTime` are ignored, so the caller may pass the whole day.
@@ -103,7 +105,12 @@ export function walkBodyBattery(
     const hrr = clamp((s.bpm - p.restingHr) / p.reserve, 0, 1)
     let delta: number
     if (hrr <= p.restThreshold) {
-      delta = p.chargeRate * (1 - hrr / p.restThreshold) * dt
+      // Flat, not ramped. The ceiling has already decided the user is resting; the old
+      // `(1 − hrr/restThreshold)` factor then second-guessed it and reached full rate only at or
+      // below resting HR, which this user logs ~0 minutes of on almost every day. Measured over 66
+      // days it held the mean multiplier to 0.30–0.50 and produced 220 minutes under the ceiling
+      // for zero stored charge (TN-55).
+      delta = p.chargeRate * dt
       charged += delta
     } else {
       delta = -p.drainRate * (hrr - p.restThreshold) * dt
