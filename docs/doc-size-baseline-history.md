@@ -16888,6 +16888,29 @@ production read. An entry that said only "fixed" would leave a reader believing 
 Second, it records that the general guard the source entry asked for was built and **withdrawn** for
 false positives, and points at LA-137 where the four parsing traps are written down — without that,
 the next session re-attempts it from scratch and rediscovers them.
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` (or-154)
+
+Growth: three more entries carry `Ask: owner` (TN-64, RV-113, LA-129), and Q-551 carries a note
+saying it deliberately does not. A keyword sweep matched seven Lane-O entries as decision-shaped and
+only three were; Q-551 was the dangerous miss, because its own text says not to re-put it to the
+owner and the field would have surfaced it in the always-visible section. The note costs four lines
+and stops the next sweep undoing that.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 59, `review/sweep-59-queue-vs-code`.**
+29723 → 29790 (+67; rebased). 51 dated re-read notes on READY entries whose claims moved or
+expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
+parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
+a stale citation or building a finished entry.
+## 2026-09-24 — `docs/implementation-backlog.md` (or-155, owner answers)
+
+Growth: four owner answers recorded, and the largest is a correction rather than a decision. He said
+the device agent can run the admin sitting itself, which moved five entries (LA-56, LA-68, Q-525,
+Q-71, Q-11) off his plate and onto DV — the gate had never been his judgement, only the need for an
+admin session, and DV holds his login. He also corrected that DV cannot attach during his workouts
+at all. RV-157 keeps its length because those two premises were wrong in the entry and a reader
+would otherwise re-derive them.
 
 ---
 
