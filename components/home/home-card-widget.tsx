@@ -210,7 +210,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
         <div className="px-4 pb-3 relative">
           {sectionEditMode && (
             <div className="absolute top-4 right-12 z-20" onClick={e => e.stopPropagation()}>
-              <ColorSwatchPicker value={_mColor} label="Readiness card" onChange={hex => onColorChange('moodWidget', hex)} />
+              <ColorSwatchPicker value={_mColor} label="Exercise Readiness card" onChange={hex => onColorChange('moodWidget', hex)} />
             </div>
           )}
           <div role="button" tabIndex={0} onClick={() => { if (!sectionEditMode) setMoodSheetOpen(true); }} className={cn("w-full rounded-2xl p-4 text-left active:scale-95 transition cursor-pointer", sectionEditMode && "pointer-events-none")} style={accentCardStyle(_mColor)}>

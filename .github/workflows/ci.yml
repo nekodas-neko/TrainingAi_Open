@@ -454,6 +454,13 @@ jobs:
       - name: No entry is parked by prose alone
         run: node scripts/check-prose-parked-entries.js
 
+      # OR-146. `Gate: owner` parks an entry until the owner acts, without saying what he is asked
+      # FOR — a decision, a production write, or a reading. Measured 2026-09-24: 23 of 72 owner
+      # gates said nothing, so establishing what each owed meant reading up to 209 lines of body,
+      # and LA-89 sat correctly attributed and never asked for two weeks. 23 measured, 20 left.
+      - name: An owner gate says what is owed
+        run: node scripts/check-owner-gate-states-what-is-owed.js
+
       # LA-26. A repository method nothing calls is invisible to tsc (an unused export is not an
       # error), to lint, and to the tests. It has shipped three times (Q-301, Q-270, Q-231) and was
       # only ever caught by someone asking why a production table was empty.
