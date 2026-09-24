@@ -16859,6 +16859,8 @@ Body painting from seeds, the fetch-gated screens holding skeletons, the unseede
 table is the evidence that the offline-first architecture is sound and the layer above it is not,
 which is the whole argument for fixing one call site rather than three screens.
 
+---
+
 ## 2026-09-24 — `projectOverview.md` → 12747 (RV-172)
 
 One Known-Issues entry, 29 lines. It records a fix that is **not device-verified**, which is what
@@ -16900,6 +16902,22 @@ directly under RV-188. They cannot be shorter than this: each one names the surf
 it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
 deliberately.
 
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/estimated-1rm-zeros)
+
+29714 → 29745 (+31). TN-74: 42 of 494 exercise logs store `estimated_1rm = 0` while carrying loaded sets, and the same input
+condition (no eligible flagged set) yields a positive estimate on 138 other logs — so the field is not a
+function of the log's own sets. Much of the entry is what must NOT be concluded: they are not bodyweight
+movements, and the high-rep guard is present and careful, contrary to my first reading of a rising
+1RM-to-weight ratio that turned out to be a join artefact.
+## 2026-09-24 — `docs/implementation-backlog.md` (or-156)
+
+Growth: BF-191's two answers and RV-170's policy answer. BF-191 costs the most lines because the
+owner chose a MIX of two options that were framed as alternatives, and the literal build of that mix
+reintroduces the objection one of them lost on — two dialogs in the mis-tap path. The resolution is
+written as the Orchestrator's reading rather than his words, so he can correct it. RV-170 keeps a
+warning that its ✅ covers the policy and not its two unanswered riders.
 ## 2026-09-24 — `docs/implementation-backlog.md` → 30035 (RV-188)
 
 Thirty-one lines on RV-188, and most of them are **negative results**, which is the part that

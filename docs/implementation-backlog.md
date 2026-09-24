@@ -604,6 +604,11 @@ the Orchestrator's to do.
 
 
 ### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
+- **✅ THE POLICY IS ANSWERED, 2026-09-24 — he took the split-by-kind recommendation.**
+  **(a) Recompute-from-stored-inputs: YES.** Deterministic, repeatable at will, and it corrects history toward what the current code says.
+  **(b) Hand-edits of rows: NO**, per the `BF-81` precedent where he chose no recompute on 38 rows. Mark them visibly known-bad rather than rewriting them.
+  **This releases `LA-56`, `Q-71` and `LA-68`**, which carried `Needs:` on this entry for exactly that question. All three are recomputes, so they are authorised and are the device agent's to run.
+- **⚠ THIS ENTRY STAYS IN THE QUEUE — the policy is settled and its two riders are not.** `RV-164` (did he mean to apply the 09-14 recommendation of 1,618 kcal? the app still budgets 1,660) and `RV-166` (does a guided or treadmill walk on a prescribed day count as doing the run?) were asked in the same breath and are unanswered. **Do not read the ✅ above as this entry being done** — and do not re-ask the policy, which is.
 - **Ask:** owner — the history-row policy, unasked since 09-16: recompute-from-stored-inputs yes, hand-edits no, per the BF-81 precedent.
 
 - **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
@@ -1480,6 +1485,56 @@ which is the right shape for something that can only be validated by living with
   write at 385), `lib/data/postgres/slices/body-battery.ts:33` (the only upsert),
   `app/api/admin/backfill-derived-scores` (the pattern to copy).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
+
+### [workouts] TN-74 — `estimated_1rm` is stored as 0 on 42 loaded exercise logs, and it is not a function of the log's own sets
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, pointing TN-73's validated instrument at the
+  thing that actually sets prescribed load.
+- **Lane: A** — the write path (`app/api/log-exercise`, the repository mapper), engine territory.
+- **Why tuning cares.** `target_80` is derived from `estimated_1rm`, and target80 is the prescribed
+  weight. A wrong 1RM does not just mislabel history; it sets what the owner is told to lift.
+- **Measured 2026-09-24 over 494 non-deleted exercise logs.** **42 store `estimated_1rm = 0`** (8.5%) and
+  **38 store `target_80 = 0`**. None are NULL — every row has a number, and for 42 of them that number
+  is zero.
+- **⚠ These are NOT bodyweight movements — that was my first hypothesis and it is wrong.** The zero logs
+  carry real load: Sumo Deadlift at **82.5 kg**, Barbell Shrug **87.5 kg**, Barbell Hip Thrust **85 kg**,
+  Bent-Over Row **45 kg**, at normal rep counts (mean 7–11). Only Pull-Up and Hanging Leg Raise among the
+  25 affected exercises have a max set weight of 0.
+- **The dominant mechanism, measured.** Logs with **no `use_for_1rm` set carrying weight**:
+  - among the 42 zero logs: **30 (71%)**
+  - among the 452 non-zero logs: **138 (31%)**
+
+  Mean flagged sets per log is **0.76** on the zeros against **1.79** on the rest. So "no eligible set to
+  compute from" explains most of the zeros, and `calc1RM` returning `weight` when `weight <= 0`
+  (`packages/shared/src/1rm.ts:26`) is how that becomes a stored 0 rather than a NULL.
+- **⚠ But it does not explain all of it, and the leftover is the real finding.** **12 of the 42 zero logs
+  DO have a loaded flagged set** and still store zero. And **138 non-zero logs have NO loaded flagged
+  set** yet store a positive 1RM. The same input condition yields 0 in 30 cases and a positive number in
+  138 — so **`estimated_1rm` is not a function of the log's own sets.** Something else supplies it much
+  of the time (a carry-forward from a previous session, a program-configured value, or a second write
+  path), and when that something is absent the field falls to 0. **Identifying that supplier is the
+  first task**, not changing the formula.
+- **⚠ CORRECTION TO MY OWN FIRST READING — the high-rep guard is present and careful.** I measured the
+  stored 1RM-to-weight ratio rising monotonically with the rep count of the contributing set — **1.246
+  (1–6 reps) → 1.352 (7–10) → 1.467 (11–14) → 1.663 (15+, mean 17.4)** — and took it for an uncapped
+  formula, which would have been the historical "wrong high-rep guard → inflated PRs" bug.
+  `packages/shared/src/1rm.ts` shows otherwise: `repFactor` averages Epley with a **Brzycki term frozen
+  at its 20-rep value** (its own comment explains Brzycki blows up toward rep 36), and
+  `amrapScaleFactor` **de-rates high reps deliberately** — 1.0 / 0.97 / 0.93 / 0.88 by rep band.
+  **And my ratio measurement cannot test the guard anyway**: `estimated_1rm` is stored per exercise-log,
+  so dividing it by each contributing set's weight attributes one log's estimate to several sets. The
+  rising ratio is largely that join artefact. Recorded so nobody re-runs it and files the wrong defect.
+- **Acceptance criteria:** no exercise log stores `estimated_1rm = 0` while carrying a loaded set; a log
+  with genuinely no eligible set stores **NULL** rather than 0, so downstream can tell "no estimate" from
+  "an estimate of zero"; and `target_80` is never 0 where the 1RM is positive (four logs currently pair a
+  zero 1RM with a *positive* target80 — Overhead Press 15.8, Skull Crusher 12.5, Cable Pulldown 9.6,
+  Cable Preacher Curl 5.0 — which is the inverse inconsistency and needs the same answer).
+- **What this does NOT establish.** What supplies the positive 1RM on the 138 logs with no eligible set.
+  Why 12 loaded logs still read zero. Whether a zero ever reached a prescribed weight the owner actually
+  saw — that needs the surface, not the table, and is the one part a device pass could answer.
+- **Where the mechanism is:** `packages/shared/src/1rm.ts` (`calc1RM` at 25, `repFactor` at 18,
+  `amrapScaleFactor` at 32), `app/api/log-exercise/route.ts` (writes the estimate),
+  `claude_ro.exercise_logs.estimated_1rm` / `target_80`.
 
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
@@ -2413,10 +2468,16 @@ drift.
   has not been fixed regardless of what the done screen says.
 
 ### [activity] BF-191 — two decisions BF-190 cannot make: what a sub-minute walk should do, and what happens to the phantom row
-- **Ask:** owner — what a sub-minute walk should do, and what happens to the phantom activity row.
+- **✅ BOTH ANSWERED BY THE OWNER, 2026-09-24.**
+  **Decision 1 — he chose a MIX, not either alternative:** *"A mix of min floor duration + confirm on exit."* So a sub-minute walk is neither saved silently nor discarded silently.
+  **Decision 2 — he soft-deletes the phantom row himself** in the activity list, so it writes a `deleted_at` tombstone that propagates to the device. Row `b8083d04`, 2026-09-24.
+- **⚠ THE MIX NEEDS ONE DESIGN DECISION HE DID NOT MAKE, and the naive build gets it wrong.** Implemented literally — floor, then a confirm — the mis-tap path is **two dialogs**: *"End walk?"* then *"Discard this short walk?"*. That is the exact objection the confirm-on-exit alternative lost on, so a literal reading reintroduces it in the one case he cares about.
+  **Recommended implementation, and it is the Orchestrator's reading rather than his words:** when elapsed is under the floor, the EXISTING end-walk dialog becomes the confirm — *"End and discard this 27-second walk?"* with Discard / Keep — instead of a second prompt after it. One dialog, one tap, nothing silently dropped, and above the floor the flow is unchanged. **If he meant two separate prompts, say so and this is wrong.**
+  Reuse `MIN_SESSION_SEC`'s shape (`time-audit.ts:358`) for the floor rather than a new constant.
+- **Lane:** B — the remaining work is the walk UI's end-of-session path; there is no decision left in it beyond the note above.
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — both are the
-  owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply.
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Superseded lane note (OR-156):** this read `O` while both questions were open — *both are the
+  owner's, and per CLAUDE.md a question for him is a task here rather than a line in a chat reply*. Answered 2026-09-24; the field above is live.
   **Split out of BF-190**, where they were buried in a `Lane: B` body and therefore invisible to the
   Orchestrator; BF-190 keeps the half that needs no decision and can start immediately.
 - **Context, in one line.** Ending a guided walk early records it as a full session at the planned
@@ -11539,7 +11600,7 @@ July's early-deload consumed live ACWR while the card said "baselining".
 
 ### [devices][readiness] LA-68 — restore the 22 wear-time days PS-30 overwrote
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
-- **Needs:** RV-170 — it REWRITES stored history rather than filling a gap, which is exactly the split that entry puts to him (recompute-from-stored-inputs yes, hand-edits no). Authorising DV to press the button is not the same as deciding the rows may be rewritten, so this waits on that answer rather than on another sitting.
+- **✅ UNBLOCKED 2026-09-24.** It carried a `Needs:` on `RV-170` because it REWRITES stored history rather than filling a gap. He answered that policy the same day — recompute-from-stored-inputs YES, hand-edits NO — and this is a recompute, so it is authorised. Nothing further is owed by him; it is the device agent's to run.
 
 - **⚠ `owner-admin-sitting` and `admin-console-sitting` are the SAME VISIT** (noted 2026-09-16,
   OR-118). There is one device and one person: the entries that need a *look* at `/admin` → Devices
@@ -22967,7 +23028,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
-- **Needs:** RV-170 — it REWRITES stored history rather than filling a gap, which is exactly the split that entry puts to him (recompute-from-stored-inputs yes, hand-edits no). Authorising DV to press the button is not the same as deciding the rows may be rewritten, so this waits on that answer rather than on another sitting.
+- **✅ UNBLOCKED 2026-09-24.** It carried a `Needs:` on `RV-170` because it REWRITES stored history rather than filling a gap. He answered that policy the same day — recompute-from-stored-inputs YES, hand-edits NO — and this is a recompute, so it is authorised. Nothing further is owed by him; it is the device agent's to run.
 
 - **⚠ `owner-admin-sitting` and `admin-console-sitting` are the SAME VISIT** (noted 2026-09-16,
   OR-118). There is one device and one person: the entries that need a *look* at `/admin` → Devices
@@ -26118,7 +26179,7 @@ its own maintenance hazard. Recorded here as the shape to re-enumerate rather th
 
 ### [devices][platform][sleep] 🟡 Q-71 — the historical redecode that rewrites stored ring history has not been run
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
-- **Needs:** RV-170 — it REWRITES stored history rather than filling a gap, which is exactly the split that entry puts to him (recompute-from-stored-inputs yes, hand-edits no). Authorising DV to press the button is not the same as deciding the rows may be rewritten, so this waits on that answer rather than on another sitting.
+- **✅ UNBLOCKED 2026-09-24.** It carried a `Needs:` on `RV-170` because it REWRITES stored history rather than filling a gap. He answered that policy the same day — recompute-from-stored-inputs YES, hand-edits NO — and this is a recompute, so it is authorised. Nothing further is owed by him; it is the device agent's to run.
 
 - **Lane:** DV
 - **Keep:** the historical redecode. The 2026-08-12 code fix corrects **future** rollups only;
