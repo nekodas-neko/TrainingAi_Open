@@ -2612,6 +2612,29 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep][readiness] ⚠️ A long afternoon rest could be graded as last night — fixed, two days still wrong (RV-163, 2026-09-24)
+
+Any sleep window over four hours counts as a night wherever it falls on the clock, so one date can
+hold two. Five places in the app then picked between them by **four different rules** — longest,
+latest, latest-for-that-date, earliest — so one day could be a nap to one screen and a real night to
+the next.
+
+**2026-09-23 is the measured case.** Your overnight was 21:27–06:01 (7.92 h). A daytime rest ran
+10:42–17:25 (6.17 h). The app graded the afternoon one: **sleep score 42 instead of about 76**, and
+readiness took that 42 as the previous night and gave you **44**. Body Battery anchored its wake at
+17:25, so only **2** of the ring's 203 heart-rate samples fell inside the day it measured — which is
+why that day reads flat. **2026-08-27 has the same shape.**
+
+All five now use one rule: the longest window on a date is that date's night. The battery's guard
+was widened too — it refused a day that recorded *no* samples, and a 2-sample reading slipped past
+it; it now refuses any reading that recorded no movement at all.
+
+**⚠ The two damaged days are NOT re-scored.** That is a rewrite of stored scores, which is yours to
+authorise rather than a lane's — queued as **RV-170**. Until it runs, those two days keep the scores
+the old rule produced.
+
+**Not device-verified.**
+
 ### [workouts][platform] ⚠️ Broken exercise pictures — fixed, not yet seen on the phone (DV-18, 2026-09-24)
 
 The device agent reported one broken image in the admin tools. It was six places, and one of them

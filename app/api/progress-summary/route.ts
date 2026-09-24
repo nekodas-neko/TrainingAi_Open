@@ -4,7 +4,7 @@ import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ, todayInTz, startOfWeekInTz, aestMidnight, toAestDay, shiftDateStr } from "@trainingai/shared/date-utils";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
-import { nightSessions } from "@trainingai/shared/health/sleep-night";
+import { nightSessions, canonicalLatestNight } from "@trainingai/shared/health/sleep-night";
 
 export interface ProgressSummaryResponse {
   sleep: { lastNightHours: number | null; thisWeekHours: number };
@@ -54,7 +54,7 @@ export async function GET() {
   // last night. Naps drop out of the weekly total too — the card says "sleep", and a nights-only
   // total is the number that lines up with the nightly figure above it.
   const nights = nightSessions(sleepSessions, tz);
-  const lastNightHours = nights.at(-1)?.durationHours ?? null;
+  const lastNightHours = canonicalLatestNight(nights)?.durationHours ?? null;
   const thisWeekHours = nights
     .filter(ss => ss.date >= weekStartStr)
     .reduce((sum, ss) => sum + (ss.durationHours ?? 0), 0);

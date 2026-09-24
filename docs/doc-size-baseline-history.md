@@ -16802,6 +16802,14 @@ v4 → v5 (mean end 62.9 against 15.2), live since August. v6 is a fifth boundar
 census was re-run rather than copied from Tuning's, which is what surfaced the single v2 day theirs
 omitted — and the growth here is mostly that table, which is the evidence the entry was missing.
 
+## 2026-09-24 — `projectOverview.md` → 12718
+
+12695 → 12718 (+23). RV-163's row. It earns a place because the defect changed numbers the owner
+reads and then argues with: a sleep score of 42 where the night deserved about 76, and a readiness
+of 44 built on top of it. A row that only said "night selection unified" would not let him connect
+those two days to a cause, and the two days are still wrong — re-scoring them is a stored-data
+rewrite queued as RV-170, so the entry stays open until he authorises that.
+
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 58, `review/sweep-58-rules-and-perf`.**
 29212 → 29518 (+306; rebased on #1540). Sixteen entries (RV-171 to RV-186): a census of the CLAUDE.md rules
 no CI step enforces, and a performance sweep with its device half as one baseline sitting. One dated
@@ -16813,6 +16821,20 @@ entry turns on — the reproduced foreign-key failure in the existing delete pat
 SET NULL / NO ACTION split across the 99-table schema — plus BF-193's three decision briefs. The
 schema table is the part that could not be summarised away: which keys cascade and which do not is
 the whole difference between a deletion that works and one that silently leaves rows behind.
+## 2026-09-24 — `docs/implementation-backlog.md` → 29217 (chore/or-153-route-six-more-to-tuning)
+
+Growth, +5. Six more scoring entries moved from `Gate: owner` to `Needs: OR-150`, and OR-150 grew
+the paragraph that matters: `Q-279` was checked and deliberately left gated, because its gate
+already states the number a proposal owes. A sweep that assumed every scoring gate was premature
+would have moved a ready entry backwards, so the test is written down rather than the conclusion.
+
+## 2026-09-24 — `docs/implementation-backlog.md` (or-153, second raise)
+
+LB-52 gains the reason the auto-merge probe gave a false positive: run against a PR with checks
+still pending, `enable_pr_auto_merge` reports an unstable-status error and never reaches the branch
+protection question, so the absence of the usual refusal looks like the setting landing. Re-run on
+green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
+repeating the cycle.
 
 ## 2026-09-24 — `docs/implementation-backlog.md` → 29699 (BF-194)
 
