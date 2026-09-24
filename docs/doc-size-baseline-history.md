@@ -16465,3 +16465,18 @@ gate because the check is a deliberate throw in production that may page someone
 `Q-395` to owner gates because artboard parity is a judgement about whether a screen looks right,
 which the phone cannot settle — `RV-143` had already read both as mis-gated rather than
 device-blocked.
+
+---
+
+## 2026-09-23 — `docs/implementation-backlog.md` → LB-138 + a note on BF-188
+
+Two findings from gating PR #1489, then bisected in the same session. LB-138 was rewritten rather
+than extended and came out the same 24 lines: the bisect replaced two red tests with one commit,
+one of the failures turned out to be the spec keying itself to a renamed storage slot and is fixed
+in this PR rather than queued, and what remains is a single real regression carrying the value that
+proves it (`about:blank`) plus the two device reports that corroborate it. Same length, and it now
+names a cause instead of a symptom.
+
+The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
+that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
+dropping twelve entries of which two survived nowhere but git history.

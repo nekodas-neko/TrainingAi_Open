@@ -1921,6 +1921,29 @@ below threshold and left in place for next time.
 - **Whoever takes it decides**: keep the route as a debug surface and drop just the two
   invalidations, or retire route + key + tests together. An invalidation aimed at nothing is the fix.
 
+### [app-shell] LB-138 — back from a push off Home lands on `about:blank`; a tab flip loses the history entry
+
+- **Lane:** B — `ef95595c11d` (#1431, RV-110/RV-112), `lib/navigation` tab-flip path,
+  `e2e/la109-back-from-subroute.spec.ts:87`. **Added:** 2026-09-23 · found gating #1489, bisected
+  the same session. **This is Lane B's own regression** — #1431 is a Lane B change.
+- **⚑ BISECTED, not guessed.** `e2e` on both specs at `75805c1800a` (#1438) → **4 passed**; at
+  `ef95595c11d` (#1431) → **2 failed**. One commit turned both red.
+- **The failing assertion is the URL one, and the value is the finding:**
+  `expect(pathname).toBe('/')` received **`"blank"`** — i.e. `about:blank`. After `/health` → flip
+  to Home → in-app push to `/health?tab=training` → `goBack()`, **there is no history entry to go
+  back to**. In the WebView that is the back gesture leaving the app or landing on nothing, not a
+  wrong-tab landing.
+- **The spec is a guard doing its job, not drift.** Its own header says it pins "the reverse
+  direction — flip to Home, push off it, come back — the thing a naive version of that fix would
+  break". #1431 converted 15 destinations to `navigateToTab`; the flip no longer leaves a history
+  entry the push can return to.
+- **Corroborated on device, independently.** Device sweep 3 reports BF-49 still failing (*"back
+  from a timeline row lands on Health, not where you started"*) and RV-111 (*"one hardware back
+  from the barcode scanner closes the whole Log Food sheet"*). Same class, same surface. Whoever
+  takes this should read those two together with it rather than in isolation.
+- **Start from the history semantics of `navigateToTab`** — push vs replace vs neither — against the
+  three reports above. Do not start from the spec.
+
 ### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
 
 - **Lane:** B — `components/home/home-card-widget.tsx:325`, `components/more/home-widgets-section.tsx`.
@@ -3284,6 +3307,13 @@ why the count of affected entries always understated the harm.
   measured — the rule named the hazard without naming the line that causes it.
 - **Verification:** fold N entries, then fold M more into the same day without deleting the file,
   and confirm the result holds N+M anchors. Today it holds M.
+- **⚑ IT HAS ALSO LANDED ON `main`, which the above does not cover — this entry was filed from a
+  conflict caught before merge; the same defect shipped.** PR #1484's fold was a same-day second
+  fold: it archived 40 entries and removed the **12** another session had archived an hour earlier.
+  Ten came back as loose files when #1488 dropped its own fold; **two existed nowhere** and were
+  restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
+  priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
+  is only in git history, and nothing reports which entries went missing.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
