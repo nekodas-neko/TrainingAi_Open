@@ -1244,6 +1244,62 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 
 - **Verification:** this entry closes when both answers are recorded here with the date, and BF-190
   is updated to build the one that touches code.
+### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
+
+- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133 ·
+  **moved above the Orchestrator's print cut 2026-09-24** by Lane B, per CLAUDE.md's new rule that an
+  owner question is a task with a top queue position — it was at rank 12 against a `TOP_N` of 10, so it
+  was in the queue and in nobody's view. No content change; only its position moved.
+- **⚠ The test half of this entry was NOT fixed here — `#1472` fixed it concurrently on `main`,
+  and this entry originally claimed the fix as its own. Corrected before merge.** What this branch
+  carries is one added assertion on top of #1472's fix (below); the substantive finding is the
+  merge-gate one, which is untouched by #1472 and is why the entry stays open.
+- **What was red:** `app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6,
+  deterministically on `main` — reproduced in a clean worktree, confirmed byte-identical to
+  GitHub's copy so it was not a stale checkout, and unchanged with `DATABASE_URL` unset.
+- **Cause:** #1466 (RV-82) changed the route to read `recommendation.program` — `getNextSession`
+  hands back the program it already fetched — while the test still stubbed `getActiveProgram` and
+  its `getNextSession` mock had no `program`. So `program` was null and **every case fell into the
+  rest-day branch**, including the two still reporting green: the rest-day test passed trivially,
+  and *"never calls a prescription-mutating repo method"* passed **vacuously**, asserting nothing,
+  because that branch returns before any of them is reachable.
+- **This branch adds one line to #1472's fix:** `expect(getActiveProgram).not.toHaveBeenCalled()`,
+  which pins RV-82's actual point — the route must not fetch the program a second time — so the
+  stub cannot go stale in silence again. #1472 restored the mock but not the guard against a repeat.
+- **⚠ THE FINDING THAT MATTERS, and it is not about this test.** The failing `Tests` job did **not**
+  stop the merge. PR #1467 was squash-merged at 10:18 while `Tests` was failing on its head
+  (`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned
+  *"Pull Request successfully merged"*. **`main` took a red commit.**
+  **This falsifies a rule CLAUDE.md leans on heavily**, in the CI/CD section: *"attempting the merge
+  is the reliable green test … it cannot merge a genuinely pending check."* It can, and it did.
+  The likely reason is already recorded in the standing-agents section — `enable_pr_auto_merge`
+  fails here with *"Protected branch rules not configured for this branch"* — i.e. the required
+  checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
+  inference in this repo unsound. The same section's opening claim that branch protection *"requires
+  a PR with all CI checks passing"* is then also wrong.
+- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
+  change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
+  way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
+  unsound gate.
+- **Until it is settled, the workaround is cheap and every lane should use it:** before merging,
+  read the `Tests` job conclusion explicitly rather than trusting the merge call —
+  `get_job_logs` with `failed_only: true` returns only failed jobs, so an empty list is the green
+  signal, and it does not flood context the way `list_workflow_jobs` does (Custom Rules alone is 79
+  steps). Note the RUN stays `in_progress` for ~31 minutes because E2E is advisory; that is not a
+  failure.
+- **⚠ `main` went red a SECOND time the same day, from the same shape — found and fixed here too.**
+  `scripts/__tests__/keep-gate-set-off.test.ts` pins the queue's gate classification by id. Device
+  sweep 2 (#1471) closed Q-317's device check and removed its entry — legitimate — but did not
+  update the pinned list, so the snapshot read 16 where it expected 17 and `main` was red on every
+  branch. Fixed by dropping `Q-317:device` and naming the reason in place, which is exactly what
+  that test's own comment instructs (the Q-305 precedent, 2026-09-16).
+  **Two independent red-`main` events in one day, both snapshot-vs-change mismatches, neither
+  signalled anywhere** — that is the argument for enforcing the checks rather than for fixing two
+  tests.
+- **Blast radius was small only by luck:** `main` was already red from #1466 before #1467 went near
+  it, so nothing in #1467 caused it — but #1467 merged on top, and the next PR would have inherited
+  a red base with no signal. #1472 has since cleared it.
+
 ### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
 
 - **Lane:** O — `scripts/`, the queue tooling. **Added:** 2026-09-24 · orchestrator review of device
@@ -2161,59 +2217,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   The existing `pendingSelfPops` accounting is what prevents that.
 - **Not established:** whether the native barcode activity intercepts hardware back before the JS
   listener runs — device-only, and it may already mask this.
-
-### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
-
-- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133.
-- **⚠ The test half of this entry was NOT fixed here — `#1472` fixed it concurrently on `main`,
-  and this entry originally claimed the fix as its own. Corrected before merge.** What this branch
-  carries is one added assertion on top of #1472's fix (below); the substantive finding is the
-  merge-gate one, which is untouched by #1472 and is why the entry stays open.
-- **What was red:** `app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6,
-  deterministically on `main` — reproduced in a clean worktree, confirmed byte-identical to
-  GitHub's copy so it was not a stale checkout, and unchanged with `DATABASE_URL` unset.
-- **Cause:** #1466 (RV-82) changed the route to read `recommendation.program` — `getNextSession`
-  hands back the program it already fetched — while the test still stubbed `getActiveProgram` and
-  its `getNextSession` mock had no `program`. So `program` was null and **every case fell into the
-  rest-day branch**, including the two still reporting green: the rest-day test passed trivially,
-  and *"never calls a prescription-mutating repo method"* passed **vacuously**, asserting nothing,
-  because that branch returns before any of them is reachable.
-- **This branch adds one line to #1472's fix:** `expect(getActiveProgram).not.toHaveBeenCalled()`,
-  which pins RV-82's actual point — the route must not fetch the program a second time — so the
-  stub cannot go stale in silence again. #1472 restored the mock but not the guard against a repeat.
-- **⚠ THE FINDING THAT MATTERS, and it is not about this test.** The failing `Tests` job did **not**
-  stop the merge. PR #1467 was squash-merged at 10:18 while `Tests` was failing on its head
-  (`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned
-  *"Pull Request successfully merged"*. **`main` took a red commit.**
-  **This falsifies a rule CLAUDE.md leans on heavily**, in the CI/CD section: *"attempting the merge
-  is the reliable green test … it cannot merge a genuinely pending check."* It can, and it did.
-  The likely reason is already recorded in the standing-agents section — `enable_pr_auto_merge`
-  fails here with *"Protected branch rules not configured for this branch"* — i.e. the required
-  checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
-  inference in this repo unsound. The same section's opening claim that branch protection *"requires
-  a PR with all CI checks passing"* is then also wrong.
-- **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
-  change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
-  way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
-  unsound gate.
-- **Until it is settled, the workaround is cheap and every lane should use it:** before merging,
-  read the `Tests` job conclusion explicitly rather than trusting the merge call —
-  `get_job_logs` with `failed_only: true` returns only failed jobs, so an empty list is the green
-  signal, and it does not flood context the way `list_workflow_jobs` does (Custom Rules alone is 79
-  steps). Note the RUN stays `in_progress` for ~31 minutes because E2E is advisory; that is not a
-  failure.
-- **⚠ `main` went red a SECOND time the same day, from the same shape — found and fixed here too.**
-  `scripts/__tests__/keep-gate-set-off.test.ts` pins the queue's gate classification by id. Device
-  sweep 2 (#1471) closed Q-317's device check and removed its entry — legitimate — but did not
-  update the pinned list, so the snapshot read 16 where it expected 17 and `main` was red on every
-  branch. Fixed by dropping `Q-317:device` and naming the reason in place, which is exactly what
-  that test's own comment instructs (the Q-305 precedent, 2026-09-16).
-  **Two independent red-`main` events in one day, both snapshot-vs-change mismatches, neither
-  signalled anywhere** — that is the argument for enforcing the checks rather than for fixing two
-  tests.
-- **Blast radius was small only by luck:** `main` was already red from #1466 before #1467 went near
-  it, so nothing in #1467 caused it — but #1467 merged on top, and the next PR would have inherited
-  a red base with no signal. #1472 has since cleared it.
 
 ### [platform] LB-133 — the guard for the post-push class cannot see the class
 
