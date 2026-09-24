@@ -16480,3 +16480,19 @@ names a cause instead of a symptom.
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
+
+---
+
+## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
+
+Growth from the orchestrator's review of device sweep 3.
+
+**Backlog +66.** One new entry, `OR-139` — a device FAILURE does not clear the field that makes an
+entry read as finished, found after fixing five instances by hand (`BF-61`, `BF-139`, `BF-96`,
+`RV-103`, `TN-53`). The rest is the corrections themselves: each of the five needed its field
+removed, its title made true, and an acceptance criterion written, because a failed check is work
+and the old wording said otherwise.
+
+**CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
+contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
+available fix is telling agents to ignore it, with the reason.

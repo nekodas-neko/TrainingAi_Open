@@ -757,6 +757,32 @@ below threshold and left in place for next time.
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
+### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
+
+- **Lane:** O — `scripts/`, the queue tooling. **Added:** 2026-09-24 · orchestrator review of device
+  sweep 3, after fixing five instances by hand.
+- **The shape.** An entry ships a fix, carries `Keep:`/`Verify: device` meaning *shipped, a look is
+  owed*, the device runs that look and it **FAILS** — and nothing clears the field. The failure is
+  recorded faithfully in the entry's text while the entry keeps printing to its lane under
+  *"shipped; only the stated residue is owed. **Not new work**"*. CLAUDE.md already states the rule
+  (*a FAILED is work, not verification debt*); what is missing is anything that enforces it.
+- **Five found in one review, and one of them was blocking another entry.** `BF-61` (failed 2 of 2,
+  titled *"fixed; device check owed"*, with `BF-94` sitting on `Needs: BF-61`), `BF-139` and `BF-96`
+  (both shipped, both failed on the device the next day, nothing since, both still titled *"fixed"*),
+  `RV-103` and `TN-53` (sweep 2 ran the exact check their `Keep:` asked for and it failed). All five
+  are corrected; the class is not.
+- **The check:** an entry whose body records a device failure must not also carry `Keep:`/`Verify:`.
+  Match the failure the way the device agent writes it — `FAILS on the device`, `❌ FAILED`,
+  `STILL FAILS` — rather than inventing a vocabulary.
+- **⚠ Baseline it, do not fail on everything.** `BF-98` is a **legitimate** counter-example and the
+  reason this is not a one-liner: it failed on 2026-09-13, was fixed, and **sweep 2 passed it** on
+  2026-09-23, so a later `Verify:` is correct there. The text alone cannot order the events. So the
+  check is shrink-only with `BF-98` baselined, and anything new is a regression — the same shape as
+  `check-aest-midnight-timezone.js`.
+- **Also worth catching, and cheaper:** `BF-96` carried three bullets reading `- **Keep — …**` that
+  meant *keep this knowledge*, not the residue field, and the parser read the first as the field.
+  A prose sentence starting with the name of a field is the `TN-59` class again.
+
 ### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
 
 - **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
@@ -1400,7 +1426,11 @@ below threshold and left in place for next time.
   inert:** the unmount ref was set in a cleanup and never reset, so StrictMode's simulated unmount
   latched it `true` for the life of the screen and `isCancelled()` killed every retry. One aborted
   request was observed where four were due.
-- **Keep:** ① the device check — the failure line and its Retry at the S25 width, in the card that
+- **⚠ Filed as finished while FAILING — corrected 2026-09-24 (orchestrator review of sweep 3).**
+  CLAUDE.md: *a FAILED is work, not verification debt* — it goes back to the lane with what
+  reproduces it, never into a field that reads as done. This entry carried one, so it printed to its
+  own lane under *shipped, only the stated residue is owed*. **Sweep 2 ran that check and it FAILED.**
+- **Acceptance:** ① the device check — the failure line and its Retry at the S25 width, in the card that
   carries "kcal left". ② the reporting path was **wired but only observed firing once in five
   sandbox runs**, because the residue case had no channel; **LB-128 shipped that channel on
   2026-09-23 and this hook now takes it** (`onRevalidateError` beside `onExhausted`), so the
@@ -6816,7 +6846,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   read rather than built.
 - **Reversal cost:** none. It is queue metadata.
 
-### [app-shell] BF-139 — three header chips no longer fit beside the date (fixed; the device look is what is left)
+### [app-shell] BF-139 — three header chips no longer fit beside the date (the fix FAILED on device; open work)
 
 - **Batch:** `header-row-width` — ships with **BF-96**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
 
@@ -6827,8 +6857,19 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   and neither owns the date. **Batch them.**
 
 - **Lane:** B
-- **Verify:** device — on the S25, all three chips whole at the right edge, **and again during the
-  day with `· UV n` present**, which is the case the 07:20 screenshot could not show. The sandbox
+- **⚠ Filed as finished while FAILING — corrected 2026-09-24 (orchestrator review of sweep 3).**
+  CLAUDE.md: *a FAILED is work, not verification debt* — it goes back to the lane with what
+  reproduces it, never into a field that reads as done. This entry carried one, so it printed to its
+  own lane under *shipped, only the stated residue is owed*. The look it asked for **already happened and failed**
+  (2026-09-13), and nothing has shipped since.
+- **What the fix must do, from this entry's own diagnosis:** something in the header row must **own
+  the date**. Two fixes have each been shipped and each re-broken the row because they own different
+  elements in one width budget and neither defends the date — so a third fix that only shrinks a
+  chip will re-break it a third time. Ships batched with `BF-96` (`header-row-width`), because one
+  look at the longest real date with `· UV n` present settles both and fixing either alone
+  re-breaks the other.
+- **Acceptance:** on the S25, all three chips whole at the right edge, **and again during the day
+  with `· UV n` present** — the case the 07:20 screenshot could not show. The sandbox
   seeds no weather snapshot, so `WeatherChip` renders a skeleton and the real row can be neither
   reproduced nor disproved off the device (BF-96 records the same limitation).
 - **✅ SHIPPED 2026-09-12** (`fix/bf139-header-chip-width`).
@@ -11265,7 +11306,7 @@ two screens, and a user who sets one has no way to know the other exists.
 - **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
   a small button for each session to choose 'rest'."*
 
-### [app-shell] BF-96 — the temperature/UV pill wrapped (fixed; the device check is the whole of what is left)
+### [app-shell] BF-96 — the temperature/UV pill wrapped (the fix FAILED on device; open work)
 
 - **Batch:** `header-row-width` — ships with **BF-139**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
 
@@ -11282,16 +11323,22 @@ two screens, and a user who sets one has no way to know the other exists.
   wraps or moves. A fix that only makes today fit will fail again in the same way.
 
 - **Lane:** B
-- **Verify:** device — on the S25, the pill is one line on a **long** date. Today's is not the worst
+- **⚠ Filed as finished while FAILING — corrected 2026-09-24 (orchestrator review of sweep 3).**
+  CLAUDE.md: *a FAILED is work, not verification debt* — it goes back to the lane with what
+  reproduces it, never into a field that reads as done. This entry carried one, so it printed to its
+  own lane under *shipped, only the stated residue is owed*. The look already happened and failed
+  (2026-09-13, owner: *"Day is cut off"*), and nothing has shipped since. Ships batched with
+  `BF-139`; see that entry for why a chip-only fix re-breaks the row.
+- **Acceptance:** on the S25, the pill is one line on a **long** date. Today's is not the worst
   case: `EEEE d MMMM` runs 12–22 characters (measured 2026-09-01, correcting this entry's original
   "12 to 20"), so check *Wednesday 30 September* rather than whatever today gives.
-- **Keep — nothing to build.** The chip was never moved; it was wrapping, because the header row's
+- **Note — the chip itself needs no change.** It was never moved; it was wrapping, because the header row's
   other item (the date) carries `whitespace-nowrap shrink-0` and the chip carried neither, so it
   absorbed every shortfall. It has both now.
-- **Keep — the sandbox cannot show this.** There is no weather snapshot in the seeded DB, so
+- **Note — the sandbox cannot show this.** There is no weather snapshot in the seeded DB, so
   `WeatherChip` renders only its skeleton and the wrap can be neither reproduced nor disproved off
   the device. The classes are held by a mutation-checked source guard meanwhile.
-- **Keep — if a long date still overflows on device, shorten the DATE, not the chip.** `EEE d MMMM`
+- **Note — if a long date still overflows on device, shorten the DATE, not the chip.** `EEE d MMMM`
   saves four characters; the date is partly recoverable from the phone's own UI, the temperature and
   UV are not. Making the chip smaller is the wrong lever: this is `white-space`, not width.
 - **⚑ 2026-09-10 — that instruction is now SPENT, and BF-139 is where it goes.** It was written when
@@ -12899,7 +12946,7 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   no bottom-anchored action row to be flush against, it is another domain, and nothing was reported
   on it — re-judge it if one is.
 
-### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
+### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
 
 - **📱 Sweep 3 — the immediate tap FAILS (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** New harness call `rawSwipeThenTap` (one
   `adb shell "input swipe … && input tap …"`, so the tap lands the moment the swipe ends). From a
@@ -12945,10 +12992,23 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   tray uncovers from its right edge first. What works is a 36 px drag (rests open on distance,
   leaving the row short of its offset), a tap 52 px into the tray, and the transition stretched to
   6 s so the window is wider than a protocol round-trip. Mutation-proved both ways.
-- **Keep:** the **device check**, and only that. On the S25, swipe and tap Delete **immediately** —
-  the confirmation must appear on the first press, on **both** the meal list and the food rows, and
-  the slow tap must keep working. **BF-29's 2026-08-30 pass is not evidence**: it was the meal list,
-  tapped slowly.
+- **⚠ The `Keep:` was removed 2026-09-24 (orchestrator review of sweep 3) — this is OPEN WORK, not
+  verification debt.** It read *"the device check, and only that"*, and the title said *"fixed"*.
+  **Sweep 3 ran that check and it FAILED, 2 of 2.** With a `Keep:` the entry printed for Lane B under
+  *"shipped; only the stated residue is owed. Not new work"* — so a defect confirmed broken on the
+  device read as finished to the lane that owns the fix, **while `BF-94` sat blocked behind it**.
+  CLAUDE.md states the rule this violated: a FAILED is work, and goes back to the lane with what
+  reproduces it rather than into a `Keep:` that reads as finished.
+- **Acceptance, and the third clause is the one the old wording would have let through.** On the
+  S25, swipe and tap Delete **immediately**: ① the confirmation appears on the **first** press, on
+  **both** the meal list and the food rows; ② the slow tap keeps working; ③ **the next rightward
+  swipe closes the tray and leaves the day alone.** Sweep 3 found that after the swallowed tap the
+  next rightward swipe moved Nutrition to **Yesterday**, 2 of 2 — the row stops owning the gesture
+  and the page's day-swipe takes it. That is downstream of the same swallowed tap, so one fix may
+  clear both; **it is written as its own clause because the old acceptance text would pass with the
+  day still jumping**, which is the more alarming half for the user.
+- **Still not run: the meal-list half.** Sweep 3 covered the food rows. COULD NOT CHECK, not a pass.
+- **`BF-29`'s 2026-08-30 pass is not evidence**: it was the meal list, tapped slowly.
 
 
 ### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
@@ -15420,7 +15480,13 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   `/health/heart-rate`, plus that the header still fits a phone; **proven red against the pre-fix
   component** — *"the sparkline drew the gap without disclosing it"*, received
   `"Resting Heart Rate — 14 days"`.
-- **Keep: the device look, and the owner's pass test.** Two things a browser cannot settle. ① The
+- **⚠ Filed as finished while FAILING — corrected 2026-09-24 (orchestrator review of sweep 3).**
+  CLAUDE.md: *a FAILED is work, not verification debt* — it goes back to the lane with what
+  reproduces it, never into a field that reads as done. This entry carried one, so it printed to its
+  own lane under *shipped, only the stated residue is owed*. **Sweep 2 ran the look and it FAILED** — HR
+  recovery still plots 0-value points. The owner's pass test is genuinely still owed and is recorded
+  below; it is not what makes this entry finished.
+- **Acceptance — two things a browser cannot settle.** ① The
   S25 render — a stranded 3 px dot and a "N days missing" note at 412 px beside a delta chip; the
   spec measures that nothing overflows, which is not the same as it reading well. ② The pass test
   — *"the sparkline shows a gap across the period the strap was not worn"* — needs production
