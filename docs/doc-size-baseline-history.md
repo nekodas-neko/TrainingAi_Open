@@ -16588,8 +16588,18 @@ and the owner's authorisation for a production write — a bare lane change woul
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
 `laneFromLines` is first-match-wins.
 
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/readiness-gates-nothing)
+
+28338 → 28437 (+99, recounted on the merged base). Two entries. TN-64 records that readiness gates nothing — its only automatic
+protective action is excluded on the active `ai_dynamic` program and has never fired on any program —
+and carries the owner decision brief in the entry rather than a chat reply. TN-65 records that set RPE
+is a dense signal (864 of 1,286 sets) available to validate scoring, the load-controlled null it
+produced, and the n=10 correlations that must not be cited. Both are long because most of each is what
+has been ruled out and what must not be re-derived.
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 56, `review/sweep-56-owed-reads`.**
-28335 → 28424 (+89). Twenty-three dated reading notes on entries whose owed read was run
+28437 → 28533 (+96; rebased on #1514). Twenty-three dated reading notes on entries whose owed read was run
 today, and four new entries (RV-159 an unattributed rewrite, RV-160 closures, RV-161 owner decisions,
 RV-162 a `Due:` field). Reading notes are the point of this sweep: each replaces a claim with a
 measurement on the entry that made the claim.
