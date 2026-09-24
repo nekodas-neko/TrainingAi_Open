@@ -35,6 +35,17 @@ const TZ = 'Australia/Brisbane'
 // Shipped constants — mirrored from app/api/body-battery/route.ts. If they change there, change
 // them here in the same PR; this file deliberately does not import the route.
 const SHIPPED = {
+  restThreshold: 0.05, chargeRate: 0.120, drainRate: 0.080,
+  stressDrainRate: 0.020, gapHoldMin: 30, sampleCapMin: 7,
+}
+
+// ⚠ `--validate` can only reproduce rows that were computed under the constants AND the walk it is
+// replaying. TN-55 changed both on 2026-09-24, and nothing recomputes history — the route rewrites
+// today's row and no other path writes the table — so every row stamped `v5:` stays v5 forever.
+// Validating against one of those needs V5 below *and* a checkout from before that commit, because
+// `bundleShared()` bundles the live walk and the charge ramp is no longer the ramp those rows were
+// built with. From a few days of v6 rows onward, `--validate` works again against the default.
+const V5 = {
   restThreshold: 0.05, chargeRate: 0.20, drainRate: 0.60,
   stressDrainRate: 0.2, gapHoldMin: 30, sampleCapMin: 7,
 }
@@ -169,4 +180,4 @@ if (require.main === module) {
   else console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0])
 }
 
-module.exports = { load, buildDay, validate, SHIPPED }
+module.exports = { load, buildDay, validate, SHIPPED, V5 }

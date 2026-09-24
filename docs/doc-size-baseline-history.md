@@ -16528,6 +16528,14 @@ URL exists — the component renders a "No reference" string when it is null, an
 broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
 that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
 
+## 2026-09-24 — `projectOverview.md` → 12655
+
+12624 → 12655 (+31). TN-55's Known-Issues row. The battery fix itself would not have earned a row —
+it is a shipped bug fix and the journal entry carries the detail — but three things are still owed
+and each would otherwise be invisible: the constants are provisional until the 2026-10-04 re-sweep,
+the stored history does not re-score although the plan said it would, and a workout day still barely
+separates from a rest day. Per the archive rule an entry stays here while anything is outstanding,
+so this is the row that has to exist, and it is written to the owner rather than about the code.
 **2026-09-24 · `docs/implementation-backlog.md` · Review, `review/dv-results-and-new-probes`.**
 27947 → 28052 (+105; rebased on #1498). Nine new Review entries: three findings from device sweeps 1–3 that had no
 entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
@@ -16643,6 +16651,6 @@ owner-gated queue, BugFix owns the in-app feedback intake, and Review may commis
 rather than run one. A role definition that lives only in a chat is one the next session does not
 have, so it costs twelve lines in the file every session reads.
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 57, `review/sweep-57-data-census`.**
-28768 → 28956 (+188; rebased). Eight new entries from a census of the owner's production data
+28768 → 28874 (+106; rebased on #1521). Eight new entries from a census of the owner's production data
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
 was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
