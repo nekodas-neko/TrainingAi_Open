@@ -16488,7 +16488,7 @@ The BF-188 addition is six lines saying the defect it describes has already land
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
 
-## 2026-09-24 — `docs/implementation-backlog.md` → 27790
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
 
 TN-62, filed on a status recheck, and it records a cost of my own 2026-09-22 proposal rather than a
 new defect. The single batched recompute was meant to stop the owner's readiness history shifting four
@@ -16503,3 +16503,28 @@ behind" is the explanation a later session would reach for first. And **`compute
 misleading**: 57 of 71 rows carry a timestamp of 2026-09-23 or later and were not re-derived, so the
 one field that looks like the answer is the trap. The verification test is stated as a property of the
 model (it cannot emit 0 or 100 for any realistic z) rather than as a timestamp check.
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+BF-190, found while answering why a calories tile was blank: the walk summary saves on mount with the
+planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minute session. The
+length carries the two-row production table that is the evidence, and the reopening note on BF-107
+that distinguishes "the fix regressed" from "the screenshot was taken 30 seconds after the save" —
+the distinction is the whole value of the note, so it could not be shortened to a verdict.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+Net +14 across two entries. DV-17 grew because its stated location was wrong and the correction is
+the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is the parent passing
+`mealPlan === null` as "still loading" when null is the settled "no plan" answer. LB-139 is new —
+the six-line DV-17 fix put `nutrition-content.tsx` at exactly its 800-line ceiling, so the next edit
+to that file fails CI, and the extraction that fixes it is real work rather than a baseline raise.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+27821 → 27843 (+22). DV-18 asked Lane B to look first and hand over if the cause was server-side, so
+this is that handover rather than a new entry. The +22 is the triage: what was ruled out (the stored
+URL exists — the component renders a "No reference" string when it is null, and the device saw a
+broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
+that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
