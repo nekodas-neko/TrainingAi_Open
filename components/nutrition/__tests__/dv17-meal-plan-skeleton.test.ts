@@ -32,7 +32,7 @@ describe('DV-17 — a warm Nutrition visit does not repaint the meal-plan skelet
     // The seed is the only thing that runs before first paint; settling it later cannot prevent
     // a flash that has already happened.
     expect(parent).toMatch(/readCacheSync<MealPlansResponse>\('meal-plans'\)/);
-    expect(parent).toMatch(/if \(plans\) \{[^}]*setPlanLoaded\(true\)/s);
+    expect(parent).toMatch(/if \(plans\) \{[^}]*setPlanLoaded\(true\)/);
   });
 
   it('does not let a failed fetch settle the question', () => {
