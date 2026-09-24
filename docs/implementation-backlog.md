@@ -733,6 +733,130 @@ the Orchestrator's to do.
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
+### [app-shell] RV-113 — the tab switch blanks the panel for 58–109 ms; drop the opacity ramp
+
+- **Lane: B** · **Batch: tab-switch-speed** — **decided by the owner 2026-09-24, and re-laned from
+  `O` the same hour.** He was asked whether a blink on the app's most frequent interaction was worth
+  one line and first said leave it; told that **tab-switch speed is his highest priority**, he
+  reversed it: *"If this can fix speeds do it."*
+- **⚠ BUILD IT, BUT DO NOT SELL IT AS A SPEED FIX — it removes a BLANK, not a DELAY.** The 58–109 ms
+  gap is **the same frames** as `DV-12`'s long task, and that task is what costs the time. Dropping
+  the opacity ramp does not shorten it by a millisecond; it means the new panel's content is
+  **painted and visible** during the block instead of the user staring at the background. That is a
+  real perceived-latency win on every switch and it is not a throughput win, and the difference
+  matters because measuring this against `perf.js longtasks` will show **no improvement** and someone
+  will read that as the fix having failed.
+- **`DV-12` is the actual speed item and they ship together** — same interaction, same frames, one
+  device check. Do not ship this one alone: content painted promptly on top of a 68–118 ms blocked
+  main thread still reads as sluggish, and the pair is what the owner actually asked for.
+- **The fix, unchanged from below:** drop the opacity ramp, keep the settle
+  (`from { transform: scale(0.97) } to { transform: none }`). The content is already painted, so
+  there is nothing to hide and the gap cannot happen. **Do not build the true cross-dissolve** — it
+  holds a second full-screen tree composited ~90 ms and needs the pause-when-hidden behaviour off,
+  which a profile once blamed for 21.3 % of main-thread time.
+- **What the blank actually shows, which decides how visible this is today.** `bg-page` is
+  `var(--page-bg, var(--background))`, and `--page-bg: transparent` is set **only while
+  `DynamicBackground` is active** (`dynamic-background.tsx:75`). With it ON the gap shows the dynamic
+  background with no content over it; with it OFF `bg-page` resolves to the same colour `html`
+  paints, so the gap is invisible — content vanishes and returns against an unchanging backdrop.
+  Either way it is a CONTENT blink, not a colour flash; the earlier "ramp is over wallpaper" wording
+  overstated it.
+
+- **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
+  `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
+  goes `visibility: hidden` in the **same frame** the incoming one becomes active, and the incoming
+  panel then reads **opacity 0** for 3–5 frames spanning **58–109 ms** — the same frames as DV-12's
+  long task — before `ta-tab-enter` fades it in. So yes: every switch shows ~60–110 ms with neither
+  panel painted. **What shows in the gap:** the panel's parent, `main` and `body` are all
+  transparent; the first painted layer is `html` (`oklch(0.145 0.02 215)`) plus any fixed wallpaper
+  layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
+  toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
+
+- **Superseded lane field, demoted to prose (TN-63) so it cannot route this entry:** it read
+  it read *“Lane O — re-channelled from `B` by Lane B, 2026-09-23”*, and the permission it was
+  waiting for has been given. The fix is one line and the file paths below are right. This entry ends by
+  saying its two open questions "decide whether this is worth doing at all", and both are
+  **looks** judgements on the app's most frequent interaction — is a 180 ms blink perceptible, and
+  does `bg-page` resolve transparent under the owner's wallpaper. CLAUDE.md routes a judgement about
+  whether something *feels* right to `O` and the owner, not to `DV`: the phone is where he will look
+  at it, but nobody is measuring anything. Building it first risks changing a daily interaction he
+  never asked to have changed.
+  Files when it returns: `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- The incoming panel gets `tab-panel-enter` and the outgoing one gets
+  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
+  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
+  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
+  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
+  content fading out first; **that half is not implemented.**
+- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
+  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
+  so there is nothing to hide and the blink cannot happen.
+- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
+  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
+  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
+  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
+- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
+  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
+  they decide whether this is worth doing at all.**
+
+
+### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
+
+- **⚑ THE OWNER'S HIGHEST PRIORITY, stated 2026-09-24: *"speed/performance/efficiency when switching
+  pages tabs is my highest priority."*** Of everything in the queue touching the tab switch, **this is
+  the one that holds the time.** `RV-113` removes a blank during the block and is batched with it;
+  this removes the block. Half the tabs already exceed CLAUDE.md's 100 ms touch-feedback bar on the
+  tap alone.
+- **The lead is strong enough to start from:** the top self-time item on **every** tap is a canvas
+  `font` setter under chart.js axis-label measurement. A chart that is not visible should not be
+  re-measuring its axis on a tab switch, so the first thing to establish is **why the update fires at
+  all** — before optimising what it does.
+- **Pass test is unchanged and objective:** `perf.js longtasks`, every tab tap's longest task **under
+  50 ms**. Note `RV-113` will NOT move this number; it is not meant to.
+
+- **📱 The lead, from a CPU profile of single tab taps (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24; `Profiler`, 200 µs sampling, 10
+  taps).** The top self-time item on **every** tap is the canvas `font` setter, **7–48 ms**, and its caller
+  chain is chart.js `update → _tickSize → _computeLabelSizes → set font`. Every tab switch re-runs a
+  chart.js update that re-measures axis labels. Smaller: `localStorage.setItem` 1–15 ms per tap.
+  Component names are minified, so **which** chart(s) and why is not established — the suspect is a
+  responsive resize when a panel leaves `content-visibility: hidden`.
+
+- **Lane: B** · **Batch: tab-switch-speed** — **re-laned from `DV` on 2026-09-24, because the
+  measurement it was parked for HAS BEEN TAKEN.** The owner said tab-switch speed is his highest
+  priority; this is the entry that holds the time, so it heads the lane.
+  **The park was correct when it was written and is not now.** This entry's *"Not established"* line
+  asked for a CPU profile of one tap to name what dominates the task — and sweep 3 ran exactly that
+  (`Profiler`, 200 µs, 10 taps) and named it: the canvas `font` setter, **7–48 ms**, via chart.js
+  `update → _tickSize → _computeLabelSizes → set font`. **Every tab switch re-runs a chart.js update
+  that re-measures axis labels.** That is CLAUDE.md's trap (b) — *a probe that has already been run is
+  no longer DV's* — and the entry's own text already said to hand it back to `B` with the profile
+  attached.
+  **What is still unknown is answerable from SOURCE, not from the phone:** which chart(s), because
+  the profile's component names are minified. Finding which charts render inside a tab panel is a grep
+  in `components/shell/**` and the tab screens; the suspect is already named — a responsive resize
+  when a panel leaves `content-visibility: hidden`.
+  Superseded field, demoted to prose so it cannot route this entry: it read *“Lane DV —
+  re-channelled from `B` by Lane B, 2026-09-23. The fix will be Lane B's; the next ACTION is not.”* This entry's own "Not established" line says what it needs: a CPU profile of one
+  tap, to name the component that dominates the task. That is a measurement nobody has taken, with
+  an objective output, on hardware only the device agent has — which is exactly what
+  CLAUDE.md's lane rule assigns to `DV`. Left in `B` it sits at the head of the lane blocking on
+  something the lane cannot do, and each Lane B session pays to rediscover that. Hand it back to
+  `B` with the profile attached. The eventual fix path is still `components/shell/**`.
+- **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
+- **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
+  long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
+  (→ Home 78, → Health 108, → Workout 93, → Nutrition 68, → More 79; reverse direction 76–118), and the
+  frame attribution names **`#document.onclick`** — React's delegated click handler, so the switch's
+  own synchronous render. Scrolling Home and Health produced **none**; `animationiteration` no
+  longer appears at all.
+- **Why it is filed:** CLAUDE.md asks for touch feedback within 100 ms, and half the tabs exceed it
+  on the tap alone. It may be the same work RV-113 calls "hide-then-fade"; read that first.
+- **Not established:** which component dominates the task — the next measurement is a CPU profile of
+  one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
+- **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
+
+
 ### [platform] RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here
 - **Keep:** two of the three are not the Orchestrator's to execute — item 2 is a GitHub account
   setting only the owner can toggle, and item 3 is `android/**`, which is Lane A's. Item 1 shipped in
@@ -4007,36 +4131,6 @@ written entity.
 - **Keep:** the device pass — a screen reader on the S25 announcing each switch with its name. The
   sandbox can prove the attribute is present and cannot prove what TalkBack says.
 - **Verify: device**
-
-### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
-
-- **📱 The lead, from a CPU profile of single tab taps (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24; `Profiler`, 200 µs sampling, 10
-  taps).** The top self-time item on **every** tap is the canvas `font` setter, **7–48 ms**, and its caller
-  chain is chart.js `update → _tickSize → _computeLabelSizes → set font`. Every tab switch re-runs a
-  chart.js update that re-measures axis labels. Smaller: `localStorage.setItem` 1–15 ms per tap.
-  Component names are minified, so **which** chart(s) and why is not established — the suspect is a
-  responsive resize when a panel leaves `content-visibility: hidden`.
-
-- **Lane: DV** — re-channelled from `B` by Lane B, 2026-09-23. **The fix will be Lane B's; the next
-  ACTION is not.** This entry's own "Not established" line says what it needs: a CPU profile of one
-  tap, to name the component that dominates the task. That is a measurement nobody has taken, with
-  an objective output, on hardware only the device agent has — which is exactly what
-  CLAUDE.md's lane rule assigns to `DV`. Left in `B` it sits at the head of the lane blocking on
-  something the lane cannot do, and each Lane B session pays to rediscover that. Hand it back to
-  `B` with the profile attached. The eventual fix path is still `components/shell/**`.
-- **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
-- **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
-  long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
-  (→ Home 78, → Health 108, → Workout 93, → Nutrition 68, → More 79; reverse direction 76–118), and the
-  frame attribution names **`#document.onclick`** — React's delegated click handler, so the switch's
-  own synchronous render. Scrolling Home and Health produced **none**; `animationiteration` no
-  longer appears at all.
-- **Why it is filed:** CLAUDE.md asks for touch feedback within 100 ms, and half the tabs exceed it
-  on the tap alone. It may be the same work RV-113 calls "hide-then-fade"; read that first.
-- **Not established:** which component dominates the task — the next measurement is a CPU profile of
-  one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
-- **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
-
 
 ### [platform][app-shell] RV-155 — about 60 shipped changes owe a device look that no queue shows DV: run them as six stations
 

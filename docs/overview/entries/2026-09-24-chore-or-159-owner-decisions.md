@@ -45,9 +45,28 @@ app proposes, he confirms. The entry now says explicitly **not** to move the 45 
 the same change, because then nobody can tell whether a prompt fired from the gate opening or the bar
 moving.
 
-**RV-113 is removed.** He has used the app daily for months without reporting the blink; it was found
-by a per-frame sampler, not a person. A declined entry is deleted with the reason recorded here
-rather than left in the queue looking like pending work.
+**RV-113 was removed and then REINSTATED in the same PR, because the owner reversed it.** Asked
+whether a blink was worth one line, he first said leave it. Told the reasoning — and told that the
+blink's visibility had never actually been established — he answered: **"speed/performance/efficiency
+when switching pages tabs is my highest priority. If this can fix speeds do it."**
+
+**So it is built, and the entry now carries a warning against the claim he was sold it on: it removes
+a BLANK, not a DELAY.** The 58–109 ms gap is the same frames as `DV-12`'s long task, and that task is
+what costs the time. Dropping the opacity ramp shortens it by nothing; it paints the content during
+the block instead of leaving the user on the background. Real perceived-latency win, zero throughput
+win — and worth stating loudly, because the pass test (`perf.js longtasks`) will show **no
+improvement** and someone will read that as failure.
+
+**`DV-12` re-laned `DV → B` and moved to position 2, batched with RV-113.** That is the entry holding
+the 68–118 ms, and **it was parked on a measurement that has since been taken**: its own *"Not
+established"* asked for a CPU profile to name what dominates the task, and sweep 3 ran it — the canvas
+`font` setter, 7–48 ms, under chart.js `update → _tickSize → _computeLabelSizes → set font`. Every tab
+switch re-runs a chart.js update that re-measures axis labels. That is CLAUDE.md's trap (b) exactly,
+*a probe already run is no longer DV's*, and the entry's own text already said to hand it back to B
+with the profile attached. What is left — which chart — is a grep, not a phone.
+
+**The two ship together.** Content painted promptly on top of a blocked main thread still reads as
+sluggish; the pair is what he asked for.
 
 **Branch protection was asked twice and parked twice.** What it costs is written onto `LB-52` so the
 next session inherits the reasoning instead of re-deriving it: every merge stays hand-caught against
