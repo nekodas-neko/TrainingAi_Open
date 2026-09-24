@@ -91,3 +91,43 @@ no duplicates, no cycles.
 
 No product code changed. Items ② (a GitHub account setting) and ③ (`android/**`) are not the
 Orchestrator's to execute and are routed rather than done.
+
+
+## Amendment — the perceived-latency sweep (OR-161, OR-162, OR-163)
+
+The owner followed his RV-113 reversal with a wider instruction: *"Perceived latency is just as
+important. We need to do another check to make sure we apply the same logic everywhere."* Three
+entries, and the third is the honest one.
+
+**`OR-161` — the correct pattern is 50 lines above the broken one.** `app/globals.css` holds both
+transitions. The route push/pop (`ta-axis-y-in`/`-out`) fades the outgoing screen out by 40 % and
+holds the incoming at 0 until 25 %, a deliberate overlap whose own comment says *"the screen is never
+fully empty mid-transition."* The tab switch has no outgoing half at all. So RV-113's fix does not
+need inventing.
+
+**Two code comments assert the defect does not exist** — *"this animates content that is already
+painted"* in the CSS and *"content that is genuinely there"* in `tab-shell.tsx`. Both are false
+against RV-113's measurement, and they are why it survived a year of reading. They get fixed in the
+same PR: a comment denying a defect is worse than no comment.
+
+**`OR-162` — DV-12's mechanism, confirmed from source rather than the phone.** Its profile guessed
+*"a responsive resize when a panel leaves `content-visibility: hidden`"*, and the source bears it
+out: `tab-shell.tsx:205` un-lays-out every hidden panel, so on reveal every `<canvas>` inside goes
+from no box to a real one and chart.js re-measures its axis labels. All three charts sampled are
+configured the way that arms it (`responsive: true, maintainAspectRatio: false`); 20 files import
+`react-chartjs-2`. **The obvious fix is a regression** — removing `content-visibility` re-introduces
+the 21.3 % main-thread burn it was added to stop — so the entry says to ask why the update fires
+before optimising what it does.
+
+**`OR-163` — and this one exists because the first two are not the sweep.** They came from following
+two known defects outward, aimed at one interaction. Filing them as the answer would be the LB-108
+failure again: a result computed from the wrong starting set that looks complete. So OR-163 states
+the method instead — the two classes kept apart, a third (first paint, where CLAUDE.md already bans a
+repeat-visit skeleton flash), interaction-first rather than file-first, and a before-number required
+per finding, because perceived latency is exactly where an unmeasured improvement is
+indistinguishable from a preference.
+
+Two gaps recorded rather than worked around: **there is no `Lane:` value for Review**, whose work this
+is, so it sits in `O` alongside the same gap `OR-150` notes for Tuning; and **the device agent's
+session is archived** while its title still ends in 🟢, so the session list reads as though it is
+live. Class 2 needs it.

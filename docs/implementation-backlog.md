@@ -857,6 +857,105 @@ the Orchestrator's to do.
 - **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
 
 
+### [app-shell] OR-161 — the route transition already does what the tab switch is missing, 50 lines above it
+
+- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 · Orchestrator, sweeping for the
+  `RV-113` pattern elsewhere after the owner said perceived latency matters as much as real latency.
+- **The finding is a CONTRAST, not a new defect, and that is what makes it cheap.** `app/globals.css`
+  holds both transitions:
+  - **Route push/pop (`ta-axis-y-in`/`-out`, :752-755) is CORRECT.** The outgoing screen fades to
+    `opacity: 0` by **40%** and the incoming holds `opacity: 0` until **25%** — a deliberate ~15%
+    overlap, and the comment above it says exactly why: *"enough that the screen is never fully empty
+    mid-transition"*. **There is no blank window.**
+  - **Tab switch (`ta-tab-enter`, :800-805) has no outgoing half at all.** The outgoing panel is
+    hidden outright in the same commit, so the incoming ramp plays over nothing. That is `RV-113`.
+- **So the fix for `RV-113` need not be invented — the shape is already in the file.** Either drop the
+  opacity ramp (RV-113's one-liner, recommended, cheapest) or give the tab switch the same overlap the
+  route transition has. Do NOT do both.
+- **⚠ TWO CODE COMMENTS ASSERT THE BUG DOES NOT EXIST, and they are why it survived.**
+  `globals.css:790` — *"this animates content that is already painted, which is why it reads as polish
+  rather than as waiting"* — and `tab-shell.tsx:186` — *"this animates content that is genuinely
+  there, which is why it reads as smooth rather than as a stall."* Both are false: `RV-113` measured
+  58-109 ms with neither panel painted, 10 of 10 switches. **Fix the comments in the same PR.** A
+  wrong comment asserting the absence of a defect is worse than no comment, and the next reader
+  checking whether this needs work will believe it.
+
+### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
+
+- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 · Orchestrator, answering
+  `DV-12`'s open question without the phone.
+- **`DV-12`'s "Not established" was *which component dominates the task*.** Its sweep-3 profile named
+  the chain — chart.js `update → _tickSize → _computeLabelSizes → set font`, the canvas `font` setter
+  at **7-48 ms** on every tap — and guessed the cause: *"the suspect is a responsive resize when a
+  panel leaves `content-visibility: hidden`."* **The source confirms the suspect.**
+- **The mechanism, end to end.** `tab-shell.tsx:205` puts
+  `invisible [content-visibility:hidden]` on every non-active panel, which means its subtree is **not
+  laid out**. On switch that is removed, the subtree lays out, every `<canvas>` inside goes from no
+  box to a real one, and chart.js's responsive resize observer fires an `update()` — which
+  re-measures axis labels, which sets the canvas `font`. Sampled three charts and **all three** are
+  configured the way that arms it: `responsive: true, maintainAspectRatio: false`
+  (`health/trend-chart.tsx:36-37`, `ui/sparkline-chart.tsx:110-111`, `health/hr-day-chart.tsx:216-217`).
+  **20 files import `react-chartjs-2`**, and the Health tab alone holds trend, sleep-phase trend,
+  sleep-timing trend, week-metric, week-volume, hr-day, time-in-zone and trend-sparkline.
+- **⚠ The obvious fix is a REGRESSION and must not be taken.** Removing
+  `[content-visibility:hidden]` stops the re-measure and re-introduces what it was added for: a
+  device profile attributed **21.3 % of main-thread time** to `animationiteration` from loops running
+  in panels nobody can see (49 components use `animate-pulse`, 46 `animate-spin`, both infinite).
+  Trading a 68-118 ms tap cost for a permanent background burn is a bad trade.
+- **Ask why the update fires before optimising what it does.** A chart whose pixel size has not
+  actually changed should not re-measure. Directions, cheapest first, none yet measured:
+  **(a)** chart.js `resizeDelay` — currently set nowhere in the repo — debounces the observer, which
+  may be enough to coalesce the reveal into one update instead of per-chart;
+  **(b)** hold the canvas size across the hidden state so the observed box does not change;
+  **(c)** skip the update when the previous box was zero-size, which is the reveal case specifically.
+- **Pass test is `DV-12`'s, unchanged:** `perf.js longtasks`, every tab tap's longest task under
+  **50 ms**. This entry is where the time is; `RV-113` is where the blank is.
+- **Not established:** how many canvases are actually mounted across the five tabs at once. That is a
+  count somebody should take before choosing between (a), (b) and (c), because (a) only pays if the
+  cost is many charts rather than one expensive one.
+
+### [app-shell][platform] OR-163 — sweep the whole app for the two latency classes, with a stated method
+
+- **Lane: O** · **Added:** 2026-09-24 · commissioned by the owner: *"Perceived latency is just as
+  important. We need to do another check to make sure we apply the same logic everywhere to find areas
+  to increase latency or perceived latency."*
+- **⚠ WHAT HAS BEEN DONE IS NOT THE SWEEP.** `RV-113`, `OR-161` and `OR-162` came from following two
+  known defects outward, not from covering the app. They are three findings from roughly twenty
+  minutes aimed at the tab switch. **Treating them as the answer is the failure this entry exists to
+  prevent** — the same shape as LB-108, where a fix computed from the wrong starting set looked
+  complete.
+- **The two classes are different and want different searches.** Keeping them apart is the point;
+  conflating them is how a perceived-latency fix gets measured with a throughput test and read as a
+  failure (see `RV-113`).
+  - **Class 1 — content hidden that is already painted.** Costs nothing to fix, changes no work done.
+    Tell: an opacity/visibility transition on a container whose content is mounted. Search: the
+    keyframes in `app/globals.css` and every `invisible` / `[content-visibility:hidden]` /
+    `display:none` toggle on a mounted tree.
+  - **Class 2 — avoidable work on an interaction's critical path.** Tell: synchronous work in a click
+    or navigation handler that is not needed to paint. Search: the long-task profile per interaction,
+    then the source. `DV-12` also names `localStorage.setItem` at **1-15 ms per tap**, which nobody
+    has chased.
+- **A third class the owner's instruction covers and neither entry touches: the FIRST paint.**
+  CLAUDE.md is explicit that a skeleton flash on a repeat visit is a bug and that every fetch seeds
+  synchronously from `readCacheSync`. Measured counts, 2026-09-24, as a starting frame and **not as a
+  finding**: **54** files render `animate-pulse`, **56** call `readCacheSync`, **37** use
+  `useCachedValue`. Those sets overlap unknown amounts. **The question to answer per site is whether a
+  skeleton can appear on a REPEAT visit**, which neither a count nor a grep decides.
+- **Do it interaction-first, not file-first.** The interactions worth timing, in the owner's order of
+  use: tab switch (covered), open a workout, log a set, open Nutrition and add a food, open a day
+  detail, pull-to-sync. For each: does anything blank that was painted, and what runs synchronously
+  before the first frame.
+- **Deliverable:** one entry per finding with the class named and a measurement, filed as a single PR
+  per CLAUDE.md's filing-sweep rule. **A finding without a before number is not a finding here** —
+  perceived latency is exactly where an unmeasured improvement is indistinguishable from a preference.
+- **⚠ There is no `Lane:` value for Review, which is whose work this is.** The lanes are `A`, `B`, `O`
+  and `DV`, so a sweep that produces findings has no channel of its own and sits in `O` — the same gap
+  `OR-150` records for Tuning. Do not invent `Lane: R` for this one entry; if it recurs, that is the
+  evidence for a fifth value.
+- **Needs the device for class 2, and the device agent is ARCHIVED** (noted 2026-09-24: its session is
+  archived while its title still ends in 🟢, so the session list reads as though it is live). Class 1
+  and class 3 can be swept from source without it.
+
 ### [platform] RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here
 - **Keep:** two of the three are not the Orchestrator's to execute — item 2 is a GitHub account
   setting only the owner can toggle, and item 3 is `android/**`, which is Lane A's. Item 1 shipped in

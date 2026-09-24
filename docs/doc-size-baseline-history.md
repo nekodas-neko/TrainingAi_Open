@@ -17063,3 +17063,18 @@ that recorded only "owner approved, build it" would produce exactly that misread
 CPU profile that sweep 3 had already taken, so the lines added are the profile's result and the
 argument that what remains is a grep rather than a phone. Recording why a park was correct when
 written and is not now is what stops the next sweep re-parking it.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30540, the perceived-latency sweep (OR-161/162/163)
+
+Three entries from the owner's instruction that perceived latency counts as much as real latency.
+The growth is mostly two refusals to overclaim.
+
+`OR-162` spends its length on why the obvious fix is a regression: removing `content-visibility:
+hidden` stops the chart re-measure and restores the 21.3 % main-thread burn it was added to prevent.
+An entry naming the mechanism without that warning would read as a one-line fix and cost a cycle.
+
+`OR-163` is longer than the two findings it follows, on purpose. It exists to say that those findings
+are **not** the sweep — they came from following two known defects outward over twenty minutes, and
+recording them as the answer is the LB-108 shape, a result computed from the wrong starting set that
+looks complete. It also carries two structural gaps found while filing: no `Lane:` value for Review,
+and the device agent archived behind a 🟢 title.
