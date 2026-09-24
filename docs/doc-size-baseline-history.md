@@ -17079,6 +17079,31 @@ recording them as the answer is the LB-108 shape, a result computed from the wro
 looks complete. It also carries two structural gaps found while filing: no `Lane:` value for Review,
 and the device agent archived behind a 🟢 title.
 
+## 2026-09-24 — `docs/implementation-backlog.md` → 30362 (BF-196 + BF-189 amendment)
+
+The finish-time question, answered by measurement: 51 minutes is the working budget exactly, not a
+shortfall against 60. The length is the five-term table that derives it — session budget, measured
+warm-up, the clamp, the working budget, the stored prescription — because the whole answer is that
+two numbers are the same and one of them is labelled ambiguously. The BF-189 amendment rides along
+since the same measurement rules out one of its candidate explanations.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30461 (BF-197, LA-65 amendment, two corrections)
+
+The same session's follow-up, and it partly overturns the entry above. The estimate that lands on 51
+does so by charging a rest he skips 93.5% of the time and a transition after the last exercise — 14.2
+phantom minutes against a measured 39.9-min working median. The length is the two-column table (as
+shipped vs corrected, at 2 and 3 sets) plus the counter-argument from `expandToBudget`'s own comment,
+which is real and had to be answered rather than omitted. Two corrections in place are the rest: the
+withdrawn clause in the BF-189 amendment and the wrong second sentence in BF-196. Striking them where
+they were written costs lines and is the only way a reader of those entries sees the correction.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30624 (BF-196, second surface)
+
+The owner read `48:00` on a completed session and asked whether the warm-up was counted. It is — and
+the amendment costs lines because the answer is that the two numbers he compares are in different
+units: the card's estimate is working time, the summary's duration is wall clock. Recording it needs
+both the code anchors and the session's three timestamps, because "it is counting it" is not
+believable without them.
 ## 2026-09-24 — `projectOverview.md` 12771 → 12785 (LB-144, #…)
 
 Fourteen lines: the Known-Issues row CLAUDE.md requires for a change that shipped without a device
