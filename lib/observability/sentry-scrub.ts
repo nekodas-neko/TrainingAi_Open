@@ -78,6 +78,38 @@ export function scrubUrl(raw: string): string {
 }
 
 /**
+ * Sentry's own runtime context keys. Everything here is populated by the SDK and describes the
+ * MACHINE — os, node/browser version, the trace id — never the user or their readings.
+ *
+ * An allowlist rather than a denylist because `contexts` is open: any integration added later can
+ * put whatever it likes in there (a state dump is the classic one), and a denylist would not know
+ * about it. Nothing in this app calls `setContext`, so the allowlist costs no debugging value today
+ * and holds the line if that changes.
+ */
+const SAFE_CONTEXT_KEYS = ['os', 'runtime', 'device', 'browser', 'app', 'trace', 'culture']
+
+/** Longest exception message forwarded. A message past this is a payload, not a description. */
+const MAX_VALUE_LENGTH = 1000
+
+/**
+ * Drizzle puts the bound parameters INTO the exception message:
+ * `` super(`Failed query: ${query}\nparams: ${params}`) `` — verified in the pinned
+ * `drizzle-orm/errors.js`, not from memory. `params` is an array, so the template comma-joins the
+ * real values straight into `.message`.
+ *
+ * The SQL above that line is kept deliberately: Drizzle parameterises, so it carries `$1`/`$2`
+ * placeholders rather than values, and it is the part that makes the error diagnosable.
+ *
+ * Without this, every uncaught database error forwards row values to sentry.io — on the `users`
+ * path that is an email address.
+ */
+export function scrubExceptionValue(value: string): string {
+  const cut = value.indexOf('\nparams:')
+  const head = cut === -1 ? value : `${value.slice(0, cut)}\nparams: [scrubbed]`
+  return head.length > MAX_VALUE_LENGTH ? `${head.slice(0, MAX_VALUE_LENGTH)}… [truncated]` : head
+}
+
+/**
  * The `beforeSend` hook every runtime shares.
  *
  * Deliberately a **denylist of shapes rather than of routes.** A route allowlist goes stale the
@@ -99,13 +131,43 @@ export function scrubEvent(event: ErrorEvent, _hint?: EventHint): ErrorEvent | n
     }
   }
 
+  // The exception message itself carries row values — see `scrubExceptionValue`. This was the
+  // largest remaining hole: `beforeSend` scrubbed the request and left the thing that actually
+  // throws untouched.
+  if (event.exception?.values) {
+    for (const ex of event.exception.values) {
+      if (typeof ex.value === 'string') ex.value = scrubExceptionValue(ex.value)
+    }
+  }
+
   // Breadcrumbs are the quiet leak: every fetch the app made, with its URL, is in here by default.
   if (event.breadcrumbs) {
-    event.breadcrumbs = event.breadcrumbs.map(b => {
-      const data = b.data as Record<string, unknown> | undefined
-      if (data && typeof data.url === 'string') return { ...b, data: { ...data, url: scrubUrl(data.url) } }
-      return b
-    })
+    event.breadcrumbs = event.breadcrumbs
+      // Console breadcrumbs are whatever the app last logged, verbatim. There is no way to know in
+      // advance that a `console.log` somewhere did not print a food row or a weight, so the whole
+      // category goes rather than being pattern-matched.
+      .filter(b => b.category !== 'console')
+      .map(b => {
+        const data = b.data as Record<string, unknown> | undefined
+        if (!data) return b
+        const next = { ...data }
+        // `url` is the fetch breadcrumb; `from`/`to` are the navigation one, and they are URLs of
+        // the same app carrying the same dates and ids.
+        for (const k of ['url', 'from', 'to']) {
+          if (typeof next[k] === 'string') next[k] = scrubUrl(next[k] as string)
+        }
+        return { ...b, data: next }
+      })
+  }
+
+  // Nothing in this app writes `extra`, so anything here came from the SDK or an integration and
+  // has no established shape. Dropped outright rather than inspected.
+  delete event.extra
+
+  if (event.contexts) {
+    for (const key of Object.keys(event.contexts)) {
+      if (!SAFE_CONTEXT_KEYS.includes(key)) delete event.contexts[key]
+    }
   }
 
   // The user id is deliberately kept — it is how a fault is attributed, and it is meaningless to

@@ -16918,3 +16918,18 @@ owner chose a MIX of two options that were framed as alternatives, and the liter
 reintroduces the objection one of them lost on — two dialogs in the mis-tap path. The resolution is
 written as the Orchestrator's reading rather than his words, so he can correct it. RV-170 keeps a
 warning that its ✅ covers the policy and not its two unanswered riders.
+
+## 2026-09-24 — `projectOverview.md` → 12771 (RV-194)
+
+Twenty-four lines for a privacy fix, and the length is two disclaimers rather than description.
+
+The first is what the fix does **not** establish: nothing was sent to sentry.io to check it. The
+scrubber is a pure function tested against a message built from the pinned `drizzle-orm`
+constructor, so what is verified is that the documented shape gets scrubbed — not that production
+throws only that shape. `enabled` is false outside production, so no local capture was possible
+either. A row reading "fixed" without that sentence would overstate it.
+
+The second is that **already-sent events are not recalled**. Anything forwarded before today sits in
+sentry.io and stays there; clearing it is an account-side action nobody has taken, and no one has
+measured how many events carry values. A reader who takes "fixed" to mean the leak is undone would
+be wrong about the part that matters.
