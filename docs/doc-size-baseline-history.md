@@ -16559,8 +16559,16 @@ it is what has already been ruled out — the control run against `main`, the in
 absence of any console error — and the one thing that has NOT been checked, which is whether it
 reproduces outside the dev server. Writing that down is what stops the next session re-running the
 same four probes.
+## 2026-09-24 — `CLAUDE.md` 966 → 990, `docs/implementation-backlog.md` → 28090
+
+The owner's standing instruction that a question for him becomes a task rather than a chat message,
+plus BF-191 carrying the two decisions it split out of BF-190. The CLAUDE.md growth is one rule, and
+most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, so gating an owner
+question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
+asking. Stating the rule without stating that inversion would have produced exactly the failure the
+rule is for.
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
-28117 → 28189 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+28168 → 28240 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
 archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
 not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
 seven device gates are re-filed.
