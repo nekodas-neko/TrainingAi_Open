@@ -1122,6 +1122,62 @@ which is the right shape for something that can only be validated by living with
   no external validation of the composite, so this describes which inputs move the number, never which
   ones *should*.
 
+### [readiness][heart-rate] TN-72 — v6 will never re-score a single stored day, and TN-55's plan said it would. That claim was mine and is retracted here
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, verifying TN-55's own acceptance test after
+  the fix shipped. **This corrects my own plan**, not Lane A's implementation — the constants landed
+  exactly as specified.
+- **Lane: A** — the fix is a backfill path on `app/api/body-battery`, engine territory.
+- **What shipped, correctly.** `app/api/body-battery/route.ts` now carries `CHARGE_RATE` **0.120**,
+  `DRAIN_RATE` **0.080**, `STRESS_DRAIN_RATE` **0.020** and `MODEL_VERSION` **v6**. Production deployed
+  it (1.465.25 → **1.465.26**).
+- **What cannot happen.** The route's write-through persists **`date: todayIso` only** (line ~385), and
+  `upsertBodyBatteryDaily` has **exactly one caller** — that route. There is **no backfill, no wide pass,
+  no admin re-derive** for `body_battery_daily`. So v6 rows appear one day at a time as the owner opens
+  the app, and **every stored historical day keeps the model it was written under, permanently.**
+- **⚠ THE PLAN ASSERTED OTHERWISE AND WAS WRONG.**
+  [`docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md)
+  §5 says *"History recompute: the owner decided 2026-08-26 to recompute rather than freeze. That
+  decision stands and this change re-scores all 84 stored days."* **It does not and cannot.** I wrote
+  that from the `MODEL_VERSION` bump — which only *labels* which model wrote a row — and never checked
+  that a path existed to rewrite one. The owner's 2026-08-26 decision is therefore **unsatisfied**, not
+  implemented.
+- **Measured consequence, which the owner will see.** Stored days now read:
+  **v1** 16 days (mean end 66.3, 0 at zero) · **v2** 1 · **v4** 18 days (62.9, 0 at zero) · **v5** 52
+  days (**15.2**, **27 of 52 at zero**), running to 2026-09-24 · **v6** 0 days. So any battery trend
+  spanning today shows a **step from ~15 to ~60 that is a model change wearing the clothes of a
+  recovery.** A 30-day chart will look like the owner dramatically improved overnight.
+- **This is TN-62's shape on a second metric**, and the lesson generalises: a `MODEL_VERSION` bump plus a
+  write path that only touches today produces a history that silently mixes models. Worth checking for
+  wherever else a versioned score is persisted per-day.
+- **Recommendation: a bounded admin re-derive for `body_battery_daily`, same shape as
+  `backfill-derived-scores`.** It already exists as a pattern for exactly this problem — page-limited,
+  dry-run by default, recomputing through the live functions rather than restating the formula. The
+  battery's inputs (`oura_heartrate` + the raw tier) are still present for the whole span, so the days
+  are re-derivable.
+- **Alternatives, and what each is better at.**
+  - *Freeze history and label the discontinuity in the UI.* Better if re-deriving 84 days is judged not
+    worth the write; honest, cheap, and it reverses the owner's 2026-08-26 decision, so it is his call
+    rather than a lane's.
+  - *Delete the pre-v6 rows.* Better at removing the false step — and it destroys data to fix a
+    presentation problem, which is the wrong trade and needs confirmation besides.
+  - *Let it heal forward and say nothing.* Worst option, stated so it is on the record as rejected: the
+    chart misleads for as long as the window spans the boundary, and nothing marks why.
+- **Reversal cost: low.** A re-derive that recomputes from surviving inputs can be re-run; nothing is
+  destroyed. The recommendation is additive.
+- **⚠ THE ACCEPTANCE TEST HAS NOT RUN, and must not be reported as passed.** TN-55's pass test is
+  distributional — median daily net near 0, mean end ~61, sd ~25, ~0% of days at zero, ~9% railing at
+  100 — and **zero v6 rows exist**, so none of it is measured. The first v6 row appears when the route
+  is next read for a day; the earliest real check is after a few of those accumulate.
+- **Also still owed, from the plan's own §2 caveat:** `DRAIN_RATE` fell **7.5×**, and Q-521 measured that
+  drain tracks *wear time* rather than exertion (`corr(hr_sample_count, drained)` **+0.518** against
+  `corr(steps, drained)` **−0.153**). So confirm a workout day still separates from a rest day under v6.
+  **If it does not, that is a SEPARATE defect — drain keyed on the wrong input — and must NOT be patched
+  by raising `DRAIN_RATE` back**, which would restore the −30/day countdown.
+- **Where the mechanism is:** `app/api/body-battery/route.ts` (the constants at 75–97, the today-only
+  write at 385), `lib/data/postgres/slices/body-battery.ts:33` (the only upsert),
+  `app/api/admin/backfill-derived-scores` (the pattern to copy).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
