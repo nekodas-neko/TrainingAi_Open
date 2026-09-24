@@ -2571,26 +2571,6 @@ below threshold and left in place for next time.
   describes. That is a cost trend the owner should see, not a mandate to promote it back — the
   decision to take the cheap option was his and stands until he says otherwise.
 
-### [platform] RV-76 — two program routes make the model emit muscle arrays that the code provably discards
-
-- **Lane:** A — `app/api/generate-program/route.ts:85-86,183`, `app/api/builder-chat/route.ts:251`,
-  `packages/shared/src/validation/generated-program.ts:10`. **Added:** 2026-09-20 · Review sweep 51.
-- `generate-program`'s own comment says it outright — *"its mainMuscles/secondaryMuscles output is
-  never read — the library's assignments are written over it at resolution time below"* — and the
-  schema still demands them (up to 10 strings × 60 chars per exercise). In `builder-chat:251`,
-  `mainMuscles: libraryMuscles?.mainMuscles ?? ex.mainMuscles ?? []` has **both fallbacks dead**: the
-  `.filter()` immediately above drops every exercise not in `exerciseMuscleLookup`, so
-  `libraryMuscles` is always defined.
-- **Fix:** delete the two fields from `BuilderExerciseSchema` and `GeneratedExerciseSchema` and
-  attach the library's assignments after parse, which `resolveAgainstLibrary`/`exerciseMuscleLookup`
-  already do. No new helper.
-- **Why it is worth anything:** generation time scales with emitted JSON, and `generate-program` is
-  the slowest call in the app at **4,786 ms**. Two string arrays per exercise across ~30 exercises is
-  a real share of that. It also removes a field the model is known to get wrong (the comment cites
-  squats/glutes).
-- **Not established:** the token/latency delta of removing the fields was not measured — no token
-  counts are stored per call.
-
 ### [platform] RV-78 — `/api/next-session` serialises two independent queries, and one card fetches with no seed
 
 - **Lane:** A — `app/api/next-session/route.ts:14,18,30`; plus

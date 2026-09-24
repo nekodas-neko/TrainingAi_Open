@@ -78,12 +78,19 @@ const GOAL_PHASE_SET_MAP: Record<string, string> = {
   strength:               'Strength Progression',
 }
 
+// RV-76: no mainMuscles/secondaryMuscles. `resolveAgainstLibrary` below overwrites both with the
+// library's assignments for every exercise it keeps, and drops the ones it cannot resolve — so
+// asking the model for them bought two string arrays per exercise that were discarded a few lines
+// later, on the slowest call in the app. It was also a field the model is known to get wrong (the
+// comment at the prompt cites Glutes as main for squats).
+//
+// This is the MODEL-OUTPUT schema. The same two fields stay in the request-side
+// `GeneratedExerciseSchema` in packages/shared/src/validation/generated-program.ts, which is
+// `.strict()` and validates the program the builder client posts back — that state carries them.
 const GeneratedExerciseSchema = z.object({
   name: z.string(),
   exerciseRole: z.enum(['primary', 'secondary', 'accessory']),
   progressionStyleName: z.string(),
-  mainMuscles: z.array(z.string()),
-  secondaryMuscles: z.array(z.string()),
 })
 
 const GeneratedProgramSchema = z.object({
@@ -362,12 +369,17 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
     // exercise is kept — under the LIBRARY's name, because `personal_records` and
     // `exercise_estimates` are unique on `(user_id, exercise_name)`, so a paraphrase that survived
     // would start that lift's history from zero.
+    //
+    // RV-76: the resolved exercises are kept in their OWN array rather than written back over
+    // `sess.exercises`. The model no longer emits muscles, so the schema's type has none, and
+    // assigning back would have thrown the library's assignments away in the type system while
+    // keeping them at runtime — the sort of gap that compiles and then reads `undefined`.
     const unresolved: string[] = []
-    for (const sess of raw.sessions) {
+    const resolvedSessions = raw.sessions.map(sess => {
       const outcome = resolveAgainstLibrary(sess.exercises, nameResolver)
-      sess.exercises = outcome.resolved
       unresolved.push(...outcome.unresolved)
-    }
+      return { ...sess, exercises: outcome.resolved }
+    })
 
     if (unresolved.length > 0) {
       // Dropping is still the right call for a name the library genuinely does not hold — one lost
@@ -379,8 +391,8 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       )
     }
 
-    const emptySessions = raw.sessions.filter(s => s.exercises.length === 0).map(s => s.name)
-    if (emptySessions.length > 0 || raw.sessions.length === 0) {
+    const emptySessions = resolvedSessions.filter(s => s.exercises.length === 0).map(s => s.name)
+    if (emptySessions.length > 0 || resolvedSessions.length === 0) {
       // A session with no exercises is not a program the user can start — it is a broken artefact
       // they have to notice and repair by hand. Fail loudly instead of returning it.
       return NextResponse.json(
@@ -416,7 +428,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
 
     const programJson: GeneratedProgram = {
       name: raw.name,
-      sessions: raw.sessions.map(s => {
+      sessions: resolvedSessions.map(s => {
         const hasEmoji = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u.test(s.icon ?? '')
         const icon = hasEmoji
           ? s.icon
