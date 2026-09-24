@@ -3215,8 +3215,46 @@ why the count of affected entries always understated the harm.
   claims the whole session — a 40-minute end time that had not happened yet, and the calories to
   match. The day now holds 80 minutes and 266 kcal of treadmill walking against 40 and 133 actually
   done.
-- **Root cause, and it is three lines.** `walk-summary.tsx:130` saves on **mount**, guarded only by
-  a ref that lives for one mount:
+- **⚑ OWNER CONFIRMED THE TRIGGER 2026-09-24, and it sharpens the root cause below.** *"I started a
+  walk; then closed it - I guess it didnt fully close it? that should be looked at too."* So the
+  09:18 row came from **End walk**, not a crash or a mis-tap — which makes this reproducible on
+  demand and moves the defect earlier than the mount-save.
+- **⚑ THE REAL ROOT CAUSE: the two exits are the SAME CALL, and neither carries how long the walk
+  ran.** In `walk-active.tsx`, finishing naturally —
+  ```ts
+  if (e >= plan.totalSec && !finishedRef.current) {   // :142
+    finishedRef.current = true
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+  }
+  ```
+  and ending early —
+  ```ts
+  onLeave={() => {                                    // :279
+    if (finishedRef.current) return
+    finishedRef.current = true
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+  }}
+  ```
+  are **byte-for-byte the same callback with the same two arguments**. `WalkSummary` then receives
+  only `config`, `samples`, `cadence` and `startedAtMs` — nothing that says whether the walk ran to
+  completion or was stopped after 27 seconds. **It cannot tell, so it assumes the plan.** The
+  elapsed time is right there in the same component (`elapsedSec`, `:140`) and is dropped at the
+  boundary.
+- **⚠ This is an instance of a bug class CLAUDE.md already names.** *"Mutation-callback contract:
+  completion callbacks must carry the written entity, not fire as a parameterless 'please
+  refetch'."* Same shape — the callback fires without the fact that matters and the receiver
+  reconstructs it wrongly. Worth citing in the fix so the rule earns another example rather than
+  being rediscovered.
+- **⚠ And the UI already promises the distinction it does not keep.** `leave-walk-dialog.tsx` reads
+  *"Ending now will stop it early."* The lifter is told the walk will be recorded as stopped early;
+  it is recorded as a full session at the planned duration. That is the sentence the fix has to make
+  true.
+- **So the fix has two halves, and the first is the one that matters.** Pass the elapsed seconds
+  through `onFinish` and have `WalkSummary` use it for `durationMin` and `endTime`. The plan stays
+  the right source for the *interval structure* (`buildIntervalPlan` drives the per-segment stats) —
+  only the wall-clock fields move to the clock.
+- **Secondary — the mount-save makes it unrecoverable.** `walk-summary.tsx:130` saves on **mount**,
+  guarded only by a ref that lives for one mount:
   ```ts
   useEffect(() => {
     if (savedRef.current) return
@@ -3229,16 +3267,13 @@ why the count of affected entries always understated the harm.
   const durationMin = Math.round(plan.totalSec / 60)              // :61 — the PLAN
   const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000) // :140 — start + the PLAN
   ```
-  So the row's duration and end time are fixed the moment the screen renders, regardless of how much
-  of the walk was actually done. Whatever puts the lifter on this screen early — a stop, a back
-  gesture, a mis-tap — logs a finished session.
+  So the row is written before the lifter can see what it says, let alone decline it. Even with the
+  duration fixed, there is no beat at which a 27-second walk could be discarded — which is why the
+  floor below is part of the fix and not a nicety.
 - **The calories follow the duration, which is why both rows read exactly 133.**
   `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
   type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
   133 kcal, every time, and it is indistinguishable from a real one in the row.
-- **Fix: save what happened.** `durationMin` from `Date.now() - startedAtMs`, `endTime` likewise.
-  The plan stays the right source for the *interval structure* (`buildIntervalPlan` drives the
-  per-segment stats) — it is only the wall-clock fields that must come from the clock.
 - **⚠ Then decide whether a 27-second walk should be saved AT ALL, because the fix alone makes it a
   27-second row rather than no row.** Recommend a **minimum-duration floor, discarded below it with
   a toast** — the same shape `decomposeSessions` already uses for workouts (`MIN_SESSION_SEC`,

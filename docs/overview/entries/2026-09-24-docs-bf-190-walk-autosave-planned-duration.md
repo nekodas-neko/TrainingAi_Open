@@ -31,3 +31,27 @@ The day now holds 80 minutes and 266 kcal of treadmill walking against 40 and 13
 Filed Lane B with the three-line fix (read the clock, not the plan) and a flagged follow-on decision:
 whether a sub-minute walk should be saved at all. Recommended a minimum-duration floor matching the
 `MIN_SESSION_SEC` pattern `time-audit.ts` already uses for workouts, rather than a confirm dialog.
+
+## Amended after the owner confirmed the trigger
+
+*"I started a walk; then closed it - I guess it didnt fully close it? that should be looked at
+too."* So the phantom row came from **End walk**, not a crash — reproducible on demand, and the
+defect sits earlier than the mount-save the entry first blamed.
+
+In `walk-active.tsx` the two exits are the same call with the same two arguments. Finishing
+naturally at `e >= plan.totalSec` (:142) and confirming **End walk** (:279) both invoke
+`onFinishRef.current(samples, cadence)`. `WalkSummary` receives `config`, `samples`, `cadence` and
+`startedAtMs` — nothing that says whether the walk ran out or was stopped after 27 seconds. It
+cannot tell, so it assumes the plan. The elapsed seconds are in the same component and are dropped
+at the boundary.
+
+That makes this an instance of a class CLAUDE.md already names — *"completion callbacks must carry
+the written entity"* — and the fix earns that rule another example rather than rediscovering it.
+
+The dialog also already promises what the data does not keep: *"Ending now will stop it early."* The
+lifter is told the walk is recorded as stopped early and it is recorded as a full planned session.
+Making that sentence true is the acceptance criterion.
+
+The mount-save stays in the entry as the secondary half: with the duration fixed there is still no
+beat at which a 27-second walk could be declined, which is why the minimum-duration floor is part of
+the fix rather than a nicety.
