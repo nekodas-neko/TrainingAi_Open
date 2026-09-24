@@ -49,7 +49,7 @@ const CARD_WIDGET_DEFS: { key: CardWidgetKey; label: string; icon: LucideIcon }[
   { key: "nutritionDonut",     label: "Nutrition",     icon: Apple         },
   { key: "sleepWidget",        label: "Sleep",         icon: Moon          },
   { key: "stepsWidget",        label: "Steps",         icon: Footprints    },
-  { key: "moodWidget",         label: "Readiness",     icon: MessageCircle },
+  { key: "moodWidget",         label: "Exercise Readiness", icon: MessageCircle },
   { key: "acwrWidget",         label: "ACWR",          icon: BarChart2     },
   { key: "muscleStatusWidget", label: "Muscle Status", icon: Dumbbell      },
   { key: "hrChartWidget",      label: "HR Chart",      icon: Heart         },
