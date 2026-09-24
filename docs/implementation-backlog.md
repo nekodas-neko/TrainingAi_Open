@@ -628,6 +628,13 @@ the Orchestrator's to do.
 - **Known floor, unchanged and still stated in the file:** static `from '…'` imports only, so a
   dynamic `import()` built from a variable is not seen. A new client entry point named by convention
   must be added to `CONVENTION_CLIENT_ROOTS` by hand.
+- **What this PR proved in CI, and what it did NOT.** #1576 touches only `scripts/`, which no browser
+  reaches, and its **E2E job completed in 40 seconds** — so the SKIP branch is proven against the real
+  workflow, and the widening does not over-fire. **The RUN branch is still only verified locally**
+  (unit tests plus the detector run by hand against the #1569 file list). The CI-level proof of that
+  half is the next PR to touch a client `lib/` file: **its E2E job must take MINUTES, not 40
+  seconds.** Same observation LB-108 owed and nobody made for a day — so it is written here rather
+  than left as an intention.
 - **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
   new). `Ran 78 of 78` Custom Rules steps.
 
