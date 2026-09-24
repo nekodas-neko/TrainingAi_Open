@@ -16535,8 +16535,23 @@ entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four
 re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
 to run. Offset by removing RV-126, whose results all have homes (−30).
 
+---
+
+## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
+
+Growth from the orchestrator's review of device sweep 3.
+
+**Backlog +66.** One new entry, `OR-139` — a device FAILURE does not clear the field that makes an
+entry read as finished, found after fixing five instances by hand (`BF-61`, `BF-139`, `BF-96`,
+`RV-103`, `TN-53`). The rest is the corrections themselves: each of the five needed its field
+removed, its title made true, and an acceptance criterion written, because a failed check is work
+and the old wording said otherwise.
+
+**CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
+contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
+available fix is telling agents to ignore it, with the reason.
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
-28052 → 28110 (+58). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+28104 → 28176 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
 archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
 not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
 seven device gates are re-filed.
