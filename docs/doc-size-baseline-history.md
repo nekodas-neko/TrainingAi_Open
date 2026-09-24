@@ -16801,3 +16801,10 @@ reasoned from the diff: the table already held v1, v2, v4 and v5, and the violen
 v4 → v5 (mean end 62.9 against 15.2), live since August. v6 is a fifth boundary, not the cause. The
 census was re-run rather than copied from Tuning's, which is what surfaced the single v2 day theirs
 omitted — and the growth here is mostly that table, which is the evidence the entry was missing.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29217 (chore/or-153-route-six-more-to-tuning)
+
+Growth, +5. Six more scoring entries moved from `Gate: owner` to `Needs: OR-150`, and OR-150 grew
+the paragraph that matters: `Q-279` was checked and deliberately left gated, because its gate
+already states the number a proposal owes. A sweep that assumed every scoring gate was premature
+would have moved a ready entry backwards, so the test is written down rather than the conclusion.
