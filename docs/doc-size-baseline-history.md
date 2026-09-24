@@ -16620,7 +16620,9 @@ energy: 62 of its 67 days predate TN-50, when the app filled the answer in from 
 
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-autonomic-collinearity)
 
-28632 → 28692 (+60). TN-68: the sleep model's `hrv` and `hr` contributors correlate at +0.873 over 60 nights, so 28 of its
+28632 → 28755 (+123). TN-68: the sleep model's `hrv` and `hr` contributors correlate at +0.873 over 60 nights, so 28 of its
 110 weight is one effective axis, and both pin at 100 together on 17% of nights. Most of the entry is
 the distinction from TN-60 — that rail inverted stored ordering, this one only loses resolution — and
 the three alternatives with what each is better at, since any weight change here is the owner's.
+TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
+coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.

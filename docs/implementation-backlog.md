@@ -893,6 +893,64 @@ which is the right shape for something that can only be validated by living with
   `HRV_RATIO` (76), `HR_RATIO` (81), `clamp100` (157) and the July recalibration's own rationale
   (lines 15–21), which cites [`docs/reviews/2026-07-27-night-2026-07-25-case-study.md`](reviews/2026-07-27-night-2026-07-25-case-study.md).
 
+### [readiness][heart-rate] TN-69 — the daytime-stress scalar has no day-to-day structure, and the RPE residual cannot settle its sign either
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. This is the third failed attempt to
+  validate this metric, and the entry exists so a fourth session does not start from scratch.
+- **Lane: O** — it changes what may be claimed about the metric and it strengthens an existing
+  proposal; no code follows from it directly.
+- **Why it matters.** `daytime_stress_scaled` drives **61% of all Body Battery drain** (TN-55, measured
+  over 65 days). It is the single largest input to a number the owner reads daily, and TN-33 recorded
+  that its **sign** could not be settled from stored data.
+- **Attempt 1 — TN-65's RPE residual, which is the new tool and does not work here.** Per-set RPE
+  minus the mean for that exercise at that planned-intensity band, averaged per training day, against
+  the day's stress scalar: **38 training days, 426 sets**, same-day **r = +0.159**, previous-day stress
+  against today's residual **r = −0.161**. Two near-mirror magnitudes with opposite signs at n = 38 is
+  the shape of no relationship, and neither is significant. **The residual is still the right tool for
+  scoring work (TN-65 stands); it just has nothing to grip here.**
+- **Attempt 2 — persistence.** Lag-1 autocorrelation over 121 day-pairs:
+
+  | series | lag-1 |
+  |---|---:|
+  | `daytime_stress_scaled` | **−0.041** |
+  | `readiness_score` | +0.361 |
+  | `sleep_score` | +0.582 |
+
+  The scalar is **completely independent of its own previous day** while the two scores beside it carry
+  substantial persistence.
+- **Attempt 3 — coherence with the scores.** Over 62 days: against `readiness_score` **r = −0.023**,
+  against `sleep_score` **r = −0.003**. Both indistinguishable from zero.
+- **⚠ The one thing that DOES agree with it is tautological — do not cite it as validation.** Against
+  `stress_high_minutes` r = **−0.326** and `recovery_high_minutes` r = **+0.215**, and both signs are
+  correct given the convention (see below). But `daytime-stress-thresholds.ts` defines those minute
+  counts as **thresholds on this very series** (`STRESS_HIGH_LEVEL = -0.5`,
+  `RECOVERY_HIGH_LEVEL = 0.5`), so they are the same number counted differently. This is the
+  measure-a-score-against-itself trap that TN-67 caught in the energy check-in; it is recorded here
+  because the correlation looks like external agreement and is not.
+- **The sign convention is settled, from source, and it is NOT what needed settling.**
+  `lib/health/daytime-stress.ts:72`: *"scaled level in [−1, +1] (negative = below baseline =
+  stressed)"*. So negative is stressed, and the two internal correlations point the right way. TN-33's
+  open question is not the convention — that was always readable — but whether the **series tracks
+  real stress**. These three attempts say: no evidence that it does.
+- **⚠ The fair counter-argument, which keeps this from being a verdict.** A daytime stress *exposure*
+  has no obvious reason to persist across days — a hard Tuesday does not imply a hard Wednesday —
+  whereas readiness and sleep reflect slower physiology. So **−0.041 is not by itself damning**, and
+  this entry does not claim the metric is noise. What it claims is narrower and firmer: **after three
+  independent attempts there is still no measurement supporting it**, and the one apparent agreement is
+  circular.
+- **The consequence, and it is the useful part.** TN-55 cut `STRESS_DRAIN_RATE` from 0.20 to 0.020 and
+  justified it as *"a deliberate de-weighting of an untrusted input, not a calibration of a trusted
+  one"* — a decision taken on caution. **These measurements convert that caution into evidence.** The
+  plan's instruction not to raise it back until TN-33 validates the sign now has three failed
+  validations behind it rather than an absence of attempts.
+- **What would actually settle it**, so the next attempt is not a fourth repeat: a signal collected
+  independently of the ring on days that differ in known stress — the three-week `perceived_recovery`
+  log the owner declined on 2026-09-21 was exactly that, and nothing in stored data substitutes for it.
+  Anyone re-opening this should propose that, or accept the metric stays de-weighted indefinitely.
+- **Where the mechanism is:** `lib/health/daytime-stress.ts` (the scaled level and its convention),
+  `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
+  `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
@@ -23085,6 +23143,11 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   no file can be dated before it. That makes the 08-17 pass weak evidence, not proof; the instrument
   is what replaces it. **Do NOT merge with Q-507** — that is `STRESS_HIGH_DAY_THRESHOLD_MIN`, daytime
   stress minutes, a different mechanism sharing a word.
+- **⚠ MEASURED 2026-09-24 (Tuning), and it narrows what DV is looking for:** `chronic_stress_score` is
+  populated on **0 of 129 days**, and `chronic_stress_contributors` on **0 of 129**. So the value is not
+  wrong or stale — **it has never been produced, on any day, ever**. `resilience_level` beside it is
+  populated on 30 of 129. **Expect the console to show nothing rather than something suspicious**, and
+  read the question as *why has the producer never run* rather than *why is this number odd*.
 
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 

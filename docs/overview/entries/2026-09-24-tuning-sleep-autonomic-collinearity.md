@@ -44,6 +44,46 @@ another, and it adds information instead of redistributing it. Then re-measure t
 part of the 0.873 is the shared plateau. Weight changes re-score every stored night and would walk into
 the same half-applied-history state TN-62 is still waiting on.
 
+## TN-69 — the daytime-stress scalar, third failed validation
+
+Same pass, different metric. `daytime_stress_scaled` drives **61% of Body Battery drain** (TN-55) and
+TN-33 recorded that its sign could not be settled from stored data. Three attempts today, all negative:
+
+1. **TN-65's RPE residual** — the new tool. 38 training days, 426 sets: same-day **r = +0.159**,
+   previous-day stress against today's residual **r = −0.161**. Two near-mirror magnitudes with opposite
+   signs at n = 38 is the shape of nothing. The residual stays the right instrument for scoring work; it
+   has nothing to grip here.
+2. **Persistence.** Lag-1 over 121 day-pairs: stress **−0.041**, against readiness **+0.361** and sleep
+   score **+0.582**. The scalar is independent of its own previous day.
+3. **Coherence with the scores.** Over 62 days, readiness **−0.023**, sleep score **−0.003**.
+
+**The one agreement it does show is circular.** Against `stress_high_minutes` r = −0.326 and
+`recovery_high_minutes` r = +0.215, both correctly signed — but `daytime-stress-thresholds.ts` defines
+those counts as thresholds on *this very series* (`STRESS_HIGH_LEVEL = -0.5`, `RECOVERY_HIGH_LEVEL =
+0.5`). Same number, counted differently. That is the trap TN-67 caught in the energy check-in, one
+metric over, and it is written down because it looks like external agreement.
+
+The sign convention itself was never the open question — `daytime-stress.ts:72` states *"negative =
+below baseline = stressed"* plainly. What is open is whether the series tracks real stress.
+
+**The counter-argument that keeps this short of a verdict:** a stress *exposure* has no obvious reason
+to persist day to day, unlike readiness or sleep. So −0.041 alone is not damning, and TN-69 does not
+claim the metric is noise. It claims that after three independent attempts nothing supports it, and the
+apparent support is circular.
+
+**The useful consequence:** TN-55 cut `STRESS_DRAIN_RATE` 0.20 → 0.020 and called it *"a deliberate
+de-weighting of an untrusted input"* — a decision taken on caution. These measurements convert that
+caution into evidence. What would actually settle it is a signal collected independently of the ring,
+which is the three-week log declined on 2026-09-21; nothing in stored data substitutes.
+
+## TN-1 gains a number
+
+While checking the stress columns: **`chronic_stress_score` is populated on 0 of 129 days**, and
+`chronic_stress_contributors` on 0 of 129. TN-1 is in DV's lane awaiting a console read, so the
+measurement is written onto it — the value is not wrong or stale, it **has never been produced**, and
+the question to carry to the phone is *why has the producer never run* rather than *why is this number
+odd*. `resilience_level` beside it is populated on 30 of 129.
+
 ## Not exercised
 
 Nothing runs. Read-only `claude_ro` queries, **row-scoped to the owner**, plus source reading. **Not
@@ -51,4 +91,6 @@ established:** whether the collinearity is physiological (HRV and overnight HR b
 parasympathetic tone, so 0.873 is unsurprising) or an artefact of both terms being computed from the
 same BLE stream — the two look identical from here. And both numbers are **our own** derived outputs, so
 this measures internal geometry and is not a validation claim; per TN-67 no external validation of any
-score currently exists. `pnpm check:rules` result below.
+score currently exists. `pnpm check:rules` result below. For TN-69 specifically, **not established:** whether the stress
+scalar's lack of persistence is a property of stress itself or of the measurement — the two are
+indistinguishable from stored data, which is the whole reason three attempts have now failed.
