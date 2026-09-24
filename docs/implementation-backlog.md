@@ -592,18 +592,57 @@ require ≥28 days — see the calibration-period rule at the head of this file.
 more hours and makes the same countdown read better, which is worse than the current state because
 it is no longer visibly broken.
 
+### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
+  in the same session it was measured.
+- **Lane: O** — the queue's own routing correctness, plus a check in
+  `scripts/check-backlog-pointers.js`. No product code.
+- **What it is.** `laneFromLines` in `scripts/lib/lane.js` is **first-match-wins**, which the script
+  itself documents as the Q-529 failure. So when an entry is re-laned by adding a new field and the old
+  one is left standing lower down, the parser keeps whichever appears first — usually the stale one.
+  Nothing in `next-item.js` output says the entry was ambiguous.
+- **Measured 2026-09-24**, walking every heading in this file:
+  - **34 entries** contain more than one line matching the lane-field pattern.
+  - **8 of those 34 disagree** about the value: `LB-94`, `TN-32`, `OR-106`, `BF-111`, `Q-395`,
+    `TN-19`, `Q-420`, `PS-7`. Three of them put an implementer letter second, so they are currently
+    being served to the wrong bucket or to the unclassified one.
+  - The other 26 are duplicates that agree, which is harmless today and is how the 8 got made.
+- **⚠ Do not read "34" as "34 misrouted entries".** Only the 8 are wrong now; the 26 are the fuel, not
+  the fire. Each of the 8 needs a human-ish read of which value was meant — the later field is usually
+  the newer intent, but that is an inference and the entry text is the authority.
+- **Why a check and not just a sweep.** Fixing the 8 leaves the pattern intact: the next re-laning adds
+  a second field and the count starts again. It already happened twice to me in one session, once while
+  writing the note explaining the trap — the note contained the literal token and the parser matched it
+  inside the prose. So the check must count **field-shaped lines**, the same regex the parser uses, and
+  fail on two of them under one heading.
+- **The check has a known cost:** an entry that *explains* the trap cannot quote a field value inline
+  any more. That is the right trade — a prose example is worth less than a queue that routes.
+- **Pass test:** `pnpm check:rules` fails on a backlog with two lane fields under one heading, passes on
+  the swept file, and the count above reads **0** when re-run. Custom Rules goes 77 → 78.
+- **Reference:** `scripts/lib/lane.js` (the first-match-wins comment and its Q-529 note),
+  `scripts/next-item.js` (which prints the parsed lane and not the ambiguity).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
   consequence of my own 2026-09-22 proposal** (LA-122 item 2a, the single batched recompute), not a
   defect in TN-60's fix.
-- **Lane: A** — no code change is required; it is a decision about *when* to re-derive, plus one
-  correction to which endpoint does it.
-- **Gate: owner** — **the run itself is the owner's**, and not by convention: the route authenticates
-  through `auth()` + `requireAdmin`, so it needs a **logged-in admin session**. There is no
-  bearer-token path, so no sandboxed agent can fire it. (Its own bullet: written inline on the Lane
-  line, the field is silently ignored and the entry prints READY. `check-backlog-pointers.js` caught
-  exactly that on this entry.)
+- **Lane: DV** — re-laned 2026-09-24 on the owner's yes. No code change is required; the deliverable is
+  **running the re-derive and reporting what it changed**, which is a measurement with an objective
+  pass/fail. The route authenticates through `auth()` + `requireAdmin`, so it needs a **logged-in admin
+  session** and has no bearer-token path — which is exactly why no sandboxed agent can do it and the
+  device agent can: `session.evaluate()` runs in the page, and the page is signed in.
+- **⚠ THIS IS A PRODUCTION DATA WRITE, and that the device agent may fire it is a deliberate owner
+  decision (2026-09-24), not an inference.** BF-13's precedent says a run like this *"is the owner's to
+  fire"*; what changed is only who presses it, with the run itself already authorised. **Do not
+  generalise this to other production writes** — a data-dropping or non-reversible one is still
+  confirm-first. This one is a recompute from stored inputs, repeatable at will.
+- **⚠ HAZARD — this is DV-13's shape. Read that entry first.** Opening `/admin/oura-ble` in sweep 2
+  issued four requests that left production unresponsive for **~8 minutes**.
+  `backfill-derived-scores` runs **~370 queries per call** against a `max: 10` pool. It is sequential
+  by design and rate-limited to 4/min, so it is safer than that console — but the shape is the same.
+  **One page at a time, dry-run first, and never concurrent with another admin route or a sweep.**
 - **✅ OWNER DECIDED 2026-09-24 — re-derive NOW for the rail fix, and again after the batch.** Option 1
   below. He accepted two visible shifts because a series that inverts its own ordering is the least
   legible state there is.
@@ -676,6 +715,17 @@ model; test the value against what the model can produce, as above.
 `computed_at` on 57 rows without re-deriving them, which is the whole reason this entry exists. The
 check is the table above: after the recompute, **no stored `hrvBalance` or `sleepBalance` may read
 exactly 0 or 100**, because the live model cannot emit those values for any z this owner produces.
+
+**The verification is TUNING's, not the owner's and not DV's** — re-laned 2026-09-24. It is one
+`claude_ro` read and needs no session and no phone, and it had been sitting on the owner's list by
+mistake:
+```sql
+SELECT count(*) FILTER (WHERE (readiness_contributors->'hrvBalance'->>'score')::int IN (0,100))  AS hrv_stale,
+       count(*) FILTER (WHERE (readiness_contributors->'sleepBalance'->>'score')::int IN (0,100)) AS sleep_stale
+FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
+```
+**Both must read 0.** They read **26** and **19** on 2026-09-24, over 71 days. Do **not** read
+`computed_at` as the answer — that is the field that already lied.
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 
 - **Lane: DV** — the deliverable is an attribution only the running app can give.
@@ -2334,10 +2384,17 @@ exactly 0 or 100**, because the live model cannot emit those values for any z th
 
 - **Lane:** B — control shipped 2026-09-22 (`components/checkin/vs-yesterday-picker.tsx`,
   `components/morning-checkin-sheet.tsx`). Engine half was LB-124. **Added:** 2026-09-21 · Tuning.
-- **Keep:** the **pass test, which cannot be run for a fortnight.** After two weeks of the control
-  being on the sheet, `day_checkins.vs_yesterday` must show **≥3 distinct values and a touched-rate
-  materially above zero**. Query it with the `claude_ro` view; the absolute scale's baseline to beat
-  is 2 distinct values in 81 days at sd 0.29.
+- **Keep:** the **pass test, which cannot be run for a fortnight — and it is TUNING's to run, not the
+  owner's.** Stated 2026-09-24, because this sat on his list by mistake: it is one `claude_ro` read
+  needing no session and no phone. What *is* his is **answering the control**, which nobody else can do
+  without fabricating the label. After two weeks, `day_checkins.vs_yesterday` must show **≥3 distinct
+  values and a touched-rate materially above zero**; the absolute scale's baseline to beat is 2 distinct
+  values in 81 days at sd 0.29.
+  **⚠ EARLY READING, 2026-09-24 — `vs_yesterday` is NULL on every row since the control shipped
+  (2026-09-22), including that morning's.** Two days is not the fortnight and this is **not** a fail.
+  It is recorded because the failure mode to fear is the owner never seeing the control rather than
+  seeing it and declining: if it is still null at one week, ask whether it is findable on the sheet
+  before concluding anything about his willingness to answer.
 - **If it fails, that is the finding, not a defect:** self-report is not available from this owner
   at all, which settles TN-33/TN-16/TN-34/TN-55 by a different route. Do not quietly re-tune the
   control and restart the clock.
@@ -4974,7 +5031,11 @@ the owner recognises as unusually stressful.
 
 ### [readiness][devices] BF-13 — the baseline EMA seeds at ZERO: the line under TN-6 and Q-506, and it is shared by all six baselines
 
-- **Lane: A**
+- **Lane: DV** — re-laned 2026-09-24. This entry's code shipped, so its only remaining action is the
+  **run**, and `Lane:` names who acts next. ⚠ That makes it the one member of its batch in a different
+  lane: **TN-6 and Q-506 are still Lane A code**, and the batch below now means *"their PR, then this
+  run"* rather than one PR. Do not read the batch as putting the run in a code PR — the standing rules
+  forbid batching a production data write with code.
 - **Batch:** temperature-baseline — ships with **TN-6** and **Q-506**, which are the two
   *consumers* of the object this entry's line corrupts. Same PR or none: fixing the seed without
   re-deriving the stored baselines leaves both of them still reading wrong.
@@ -5120,9 +5181,20 @@ true mean on night 2 rather than converging for fifty.
     to read the size of the change, then commit with `?dryRun=false`. Fire the async full-history
     Redecode instead **only** if the illness re-stamp matters in the same pass — see Q-506's `Keep:`,
     which is the one thing this route deliberately does not do.
-- **Keep:** the run is owed and is the owner's to fire. It is a production data write, so it was
-  deliberately not executed from the sandbox. **TN-6's and Q-506's pass tests, and this entry's, stay
-  unmeasured until it runs.**
+- **Keep:** the run is owed. ⚠ *"the owner's to fire"*, which this line said until **2026-09-24**, is
+  superseded — the owner re-laned this class to the **device agent** that day, because the route needs
+  a signed-in admin session rather than a person, and `session.evaluate()` runs in the app's own page.
+  It remains a production data write and remains deliberately not executable from the sandbox; what
+  changed is only who presses it. See TN-62 for the same decision stated in full, including that it
+  does **not** generalise to data-dropping or non-reversible writes.
+  **⚠ Ordering matters and TN-62 corrected it:** `rederive-baselines` (this entry) rewrites the
+  **baselines**; `backfill-derived-scores` then rewrites the **scores** computed from them. Running the
+  second without the first re-derives from stale baselines.
+  **⚠ Same hazard as DV-13** — sequential, one range at a time, dry-run first, never concurrent with
+  another admin route.
+  **TN-6's and Q-506's pass tests, and this entry's, stay unmeasured until it runs — and those
+  re-measurements are TUNING's**, not the runner's: the run produces the data, reading it back against
+  the pass tests is a `claude_ro` query needing neither session nor phone.
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 - **Lane:** A — engine only: lib/health.
 
@@ -16067,6 +16139,14 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
   a rate balance that nets **−29.8 points/day**. Read TN-55 before doing anything here; what survives
   of this entry is the history-recompute policy and the owner's 2026-08-26 decision to recompute
   rather than freeze.
+- **⚠ THIS GATE WAS CALLED STALE ON 2026-09-24 AND IS NOT — the claim is withdrawn here.** Tuning
+  proposed striking it on the grounds that TN-55 supersedes this entry and the owner had signed TN-55.
+  Reading the gate rather than remembering it: it is owed **the `.constants.json` set**, which is a
+  real, unsatisfied dependency and nothing to do with TN-55's sign-off. It stays.
+  What *is* true is that **TN-55 supersedes the work this gate protects** — the rate-balance fit
+  reconstructs the stress term from the measured residual instead of executing it, so nothing anyone
+  currently wants to build is waiting on the constants. The gate is honest and inert, which is a
+  different thing from stale, and it should not be struck to make the queue look tidier.
 - **Gate: owner** — added 2026-09-22 (OR-122), expressing in a field what the ⛔ below has said in
   prose since 2026-08-24. What is owed is the `.constants.json` set: it is downloaded at boot into
   `OURA_CONSTANTS_DIR`, Q-49 removed it from the repository, and neither path exists in a session
@@ -22372,7 +22452,12 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   an admin session**, which is the owner's to run and nobody else's. Asking for them separately costs
   three sittings for one login. Whoever picks any of them up presents all three together.
 
-- **Branch:** `feat/chronic-stress-null-reason` · **Lane:** A
+- **Branch:** `feat/chronic-stress-null-reason` — ⚠ an A-lane field sat on this line until 2026-09-24
+  and is **removed, not edited**: `laneFromLines` is **first-match-wins**, so it beat the device-lane
+  field twelve lines below and the entry went on serving to Lane A. That is the Q-529 failure
+  `scripts/lib/lane.js` documents in its own header. **One lane field per entry** — and describing the
+  trap re-created it once here, because the parser matches the token inside the explanation too, so
+  this note deliberately spells neither value as a field.
 - **⚑ SHIPPED 2026-09-02** — migrations **258** (column) + **259** (regenerated `claude_ro` views,
   without which the number is invisible to the audit endpoint that motivates it), local SQLite
   **v36**. `usableGranularNights(summaryRows, signalsByDate)` counts nights in the model's own
@@ -22388,8 +22473,18 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   **The entry's `adapter.ts:5706` reference is stale** — the step moved to
   `lib/oura-ble/rollup/run.ts` with the rollup extraction.
   [journal](overview/history-2026-09-10-folded-6.md#2026-09-02-tn1-chronic-stress-count).
-- **Gate:** owner
-- **Keep:** the number itself, and only the owner can produce it. The instrumentation is live but
+- **Lane: DV** — re-laned 2026-09-24 (owner's yes), replacing a `Gate: owner` that had held since
+  2026-09-16. The count needs a **real session at the admin screen**, which is precisely what the
+  device agent reaches: `scripts/device/README.md` names *"what the admin consoles read"* and **all of
+  `admin-console-sitting`** as in scope. **The owner declined this trip on 2026-09-22**, so re-laning
+  it is what unblocks it rather than a reshuffle.
+  **⚠ Its `Batch: owner-admin-sitting` siblings (LA-68, LA-56) are the same one screen** — whoever
+  takes it should clear all three in the visit, and the batch's name is now wrong: it is a *device*
+  sitting, not an owner one. Renaming it is Orchestrator's, not a thing to do mid-entry.
+  **⚠ Do NOT open `/admin/oura-ble` while doing it** — DV-13, four requests, production
+  unresponsive ~8 minutes.
+- **Keep:** the number itself. ⚠ *"only the owner can produce it"*, which this line said until
+  2026-09-24, was **wrong** — it needs a signed-in session, not a person. The instrumentation is live but
   **nothing will write it until a `fullHistory` rollup pass is triggered by hand**, which is
   owner/device-gated and is the same gate Q-525 names. Until then the column stays NULL on every
   row, and that is the expected state rather than a defect. Once a number exists: **≥ 21 with the
