@@ -7,6 +7,7 @@ import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetween
 import { buildBatteryRecoveryCalibration } from '@trainingai/shared/health/battery-recovery-calibration'
 import { reportServerError } from '@/lib/observability'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
+import { generationCensus, modelGeneration } from '@trainingai/shared/health/model-generation'
 
 /**
  * Admin Body-Battery calibration: each day's end-of-day battery next to the recovery rating the
@@ -73,19 +74,54 @@ export async function GET(req: NextRequest) {
       repo.listDayCheckins(userId, start, end, 'morning'),
     ])
 
+    // TN-57: the touched flag, not the column. 78 of the owner's 97 morning rows carry a
+    // `perceived_recovery` and none of them was ever answered — so this route was calibrating
+    // against a neutral seed. The correlation is expected to EMPTY rather than shift, and
+    // that is the correct result, not something to rescue by relaxing the filter.
+    const recoveryByDate = new Map(checkins.map(c => [c.logDate, answeredMorningScales(c).perceivedRecovery]))
+    const batteryByDate = new Map(battery.map(b => [b.date, b.endValue]))
+
+    // LA-135. `model_version` has been written on every row since the table existed and read by
+    // nothing, so a window spanning a model change produced one correlation over two different
+    // models and said nothing about it. Measured 2026-09-24: four generations are stored, and the
+    // v4 → v5 boundary alone moves the mean end-of-day value 62.9 → 15.2.
+    //
+    // The window is NOT narrowed. Silently dropping days would answer a question nobody asked and
+    // hide that it had done so; a 90-day request would come back computed over a handful of rows
+    // with nothing saying why. Instead the census ships beside the figure, and when the window does
+    // span a boundary each generation also gets its own calibration — so there is always a number
+    // that means something, next to the evidence for whether the headline one does.
+    const models = generationCensus(battery.map(b => b.modelVersion))
+    const spansModelChange = models.length > 1
+    const byModel = spansModelChange
+      ? models.map(({ generation, days }) => ({
+          generation,
+          days,
+          calibration: buildBatteryRecoveryCalibration({
+            from: start,
+            to: end,
+            batteryByDate: new Map(
+              battery
+                .filter(b => modelGeneration(b.modelVersion) === generation)
+                .map(b => [b.date, b.endValue]),
+            ),
+            recoveryByDate,
+          }),
+        }))
+      : null
+
     return NextResponse.json(
       {
         timezone: tz,
         generatedAt: new Date().toISOString(),
+        models,
+        spansModelChange,
+        byModel,
         ...buildBatteryRecoveryCalibration({
           from: start,
           to: end,
-          batteryByDate: new Map(battery.map(b => [b.date, b.endValue])),
-          // TN-57: the touched flag, not the column. 78 of the owner's 97 morning rows carry a
-          // `perceived_recovery` and none of them was ever answered — so this route was calibrating
-          // against a neutral seed. The correlation is expected to EMPTY rather than shift, and
-          // that is the correct result, not something to rescue by relaxing the filter.
-          recoveryByDate: new Map(checkins.map(c => [c.logDate, answeredMorningScales(c).perceivedRecovery])),
+          batteryByDate,
+          recoveryByDate,
         }),
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
