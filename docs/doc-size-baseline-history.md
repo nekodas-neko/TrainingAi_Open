@@ -17039,3 +17039,13 @@ shortfall against 60. The length is the five-term table that derives it — sess
 warm-up, the clamp, the working budget, the stored prescription — because the whole answer is that
 two numbers are the same and one of them is labelled ambiguously. The BF-189 amendment rides along
 since the same measurement rules out one of its candidate explanations.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30461 (BF-197, LA-65 amendment, two corrections)
+
+The same session's follow-up, and it partly overturns the entry above. The estimate that lands on 51
+does so by charging a rest he skips 93.5% of the time and a transition after the last exercise — 14.2
+phantom minutes against a measured 39.9-min working median. The length is the two-column table (as
+shipped vs corrected, at 2 and 3 sets) plus the counter-argument from `expandToBudget`'s own comment,
+which is real and had to be answered rather than omitted. Two corrections in place are the rest: the
+withdrawn clause in the BF-189 amendment and the wrong second sentence in BF-196. Striking them where
+they were written costs lines and is the only way a reader of those entries sees the correction.

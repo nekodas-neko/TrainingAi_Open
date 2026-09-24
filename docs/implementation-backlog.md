@@ -2801,6 +2801,12 @@ drift.
   the warm-up back gives ~60. The comparison is what is wrong, not the plan.
 - **So the answer to the question as asked is: yes, it is right, and "push it to the full duration"
   is already done.** Expanding further would overrun the hour rather than fill it.
+  **⚠ CORRECTED SAME DAY BY BF-197 — the second sentence is wrong.** The 51 is the estimate's own
+  arithmetic, and that arithmetic over-charges by **14.2 min** (a rest after each exercise's last set
+  that he skips 93.5% of the time, and a transition after the last exercise, which does not exist).
+  His *measured* working median is **39.9 min**. So expanding to 3 sets per exercise corrects to
+  **49.6 min and fits the 51-minute budget** — it would not overrun. What stands here is the label
+  defect, which is this entry's actual subject and is unaffected.
 - **The defect is the label, and it invites precisely this reading.** The card renders
   `` · ~${prescription.estimatedSessionDurationMin} min ``: a bare number, beside a session the
   lifter has configured as 60 minutes. Nothing on screen says it excludes the warm-up, so the only
@@ -2836,6 +2842,82 @@ drift.
   without wrapping the row, and the number still matches
   `prescription.estimatedSessionDurationMin`. **Device look owed** for the width.
 
+### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
+- **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
+- **Added:** 2026-09-24 · BugFix, from the owner's *"bar load and rest time should be able to be analyzed from past and can determine how much time is needed so not sure if that can be adjusted."*
+- **Needs:** — nothing. Supersedes the "change nothing" recommendation in `LA-65`, amended below.
+
+- **His hypothesis was right, and the mechanism he asked for already exists.** The model does learn
+  both quantities from his own history: `resolveTransitionSec` (`time-audit.ts:338`) prefers his
+  measured per-exercise median over the constant, and `measuredRestSec` reaches
+  `estimateExerciseDurationSec` the same way. Nothing needs building to make the estimate personal.
+  It already is. **It spends each learned number once too often.**
+
+- **Two off-by-ones, both in one function** (`duration-model.ts:268`):
+  `sets × work + sets × rest + transition`, summed per exercise.
+  - **Rest is charged after the LAST set of every exercise.** He never takes it — the recorded
+    trailing rest is 0 on **93.5% of 309 exercises** (BF-128's own figure). At his 2 sets per
+    exercise that is a **50% over-charge on all rest**.
+  - **A transition is charged after the LAST exercise.** A session has N−1 gaps, not N.
+
+- **Measured, 32 completed sessions, last 45 days (production).** His medians: transition **319 s
+  per gap**, per-set rest **107 s**, set work **49 s**. Reconstructing the estimate for his live
+  5-exercise Lower plan:
+
+  | | as shipped | both off-by-ones fixed |
+  |---|---|---|
+  | 2 sets per exercise | **51.4 min** | 37.2 min |
+  | 3 sets per exercise | 63.8 min | **49.6 min** |
+
+  **51.4 is the 51 on his card**, to the tenth — so this arithmetic is the shipped path, not a model
+  of it. His **actual working time runs a median 39.9 min**, which the corrected figure matches to
+  2.7 min and the shipped figure misses by 11.5. **The phantom time is 14.2 min.**
+
+- **That is exactly the missing third set.** 3 sets across all five exercises corrects to **49.6 min
+  against the 51-minute working budget** — it fits, with 1.4 min spare, and no lever from BF-189 is
+  needed to make it fit. The reason every exercise sits on the 2-set floor is not that his hour is
+  full; it is that `fitToBudget` is trimming against a budget inflated by a rest he skips and a gap
+  that is not there.
+
+- **⚠ This corrects my own BF-189 amendment of the same day, in the direction that matters.** That
+  amendment read *"51 against 51 — zero headroom,"* and concluded the budget being binding to the
+  minute *"rules out 'the engine is leaving room unused'."* **The identity was real and the
+  conclusion drawn from it was wrong.** 51 = 51 says the estimate fills its budget; it says nothing
+  about whether the estimate is true, and it is not. Against his measured 39.9 min the engine is
+  leaving **~11 min unused** on a typical session. The amendment's re-weighting of BF-189's levers
+  stands on its measurements; its dismissal of the fourth possibility does not.
+
+- **The honest counter-argument, and why it does not settle it.** `expandToBudget`'s comment states
+  that the conservatism IS the finish-early margin — *"the owner's sessions land on time because of
+  it."* That is true and this entry does not dispute it: his working time has a **p90 of 53.9 min
+  and a max of 81.7**, so at the median he finishes early and at the tail he already overruns 51.
+  Removing 14.2 min of slack will put more sessions past the hour. **But a margin that exists
+  because two terms are double-counted is not a margin, it is an error that happens to be
+  protective** — it scales with exercise count and set count rather than with his variance, so it
+  over-protects the 5×2 session and would under-protect a 3×4 one. **Recommended:** fix both
+  off-by-ones, and if a margin is wanted, take it explicitly (a named buffer constant, or sizing to
+  a percentile of his measured working time rather than to the median). That is reversible in one
+  constant; leaving the double-charge in place is not visible anywhere.
+
+- **Why it is worth more than the third set alone.** **Transitions are 59% of his working time** —
+  median 23.4 min of a 39.9-min session, against 9 min of set work and 11 min of rest. A gap costs
+  **5.3 min** and a marginal set costs **~2.5 min**, so sets are the cheaper unit of volume by
+  roughly 2×, and fewer-exercises-more-sets is strictly better volume per minute (5×2 = 10 sets in
+  ~43 min; 4×3 = 12 sets in ~45; 3×4 = 12 sets in ~41). **This is the arithmetic behind the owner's
+  own instinct** — *"happy to go with fewer exercises and more sets if that's gonna be better
+  results"* — and it means BF-189's exercise-count lever and this fix compound rather than compete.
+
+- **Not diagnosed here.** Whether `styleWorkSec` (which LA-65 already corrected for the trailing
+  rest) and this function can be unified rather than fixed twice; and whether the p90 overrun is
+  driven by the transition tail (p90 **10.2 min** per gap, against a 5.3 median) rather than by set
+  or rest variance — if it is, the margin question is really a question about equipment waits, and a
+  buffer sized on transition variance alone would be tighter than one sized on the whole session.
+
+- **Verification:** `estimateExerciseDurationSec` charges `(sets − 1)` rests per exercise and
+  `(N − 1)` transitions per session; the stored estimate for his current 5-exercise Lower plan moves
+  from 51 to ~37 min at 2 sets; and a 3-set prescription survives `fitToBudget` against the 51-minute
+  working budget instead of being trimmed to 2.
+
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
 - **⚑ THE OWNER DECLINED THE THREE LEVERS AND RESTATED THE GOAL, 2026-09-24:** *"not sure what the best plan of attack is here. the goal was to be able to add more exercises/sets in when the time permitted. happy to go with fewer exercises and more sets if that's gonna be better results than more exercises. but ideally it was dynamic and could adjust itself."*
 - **So this is no longer a choice between three static levers.** What he wants is a prescription that FILLS the budget — more work when time permits, fewer exercises with more sets when it does not — rather than a fixed exercise count chosen once. The three levers were framed as alternatives and he is asking for the mechanism that makes the choice per session.
@@ -2865,8 +2947,12 @@ drift.
 - **⚑ AMENDED 2026-09-24 — THE BUDGET IS BINDING TO THE MINUTE, which removes one explanation.**
   The owner asked why a session estimates 51 minutes against his 60. It is not slack: the estimate is
   against the **working** budget, `60 − 9` (his measured 9.3-min warm-up, clamped), so **51 of 51**.
-  Measured in BF-196. **So the engine is not leaving room unused** — there is none — and the three
-  levers below are the only ways to add volume. It also re-weights them: **~14.9 of those 51 working
+  Measured in BF-196. ~~**So the engine is not leaving room unused** — there is none — and the three
+  levers below are the only ways to add volume.~~ **⚠ THAT CLAUSE IS WITHDRAWN — see BF-197, filed
+  the same day.** 51 = 51 shows the estimate fills its budget, not that the estimate is true, and it
+  is not: it over-charges by 14.2 min against his measured 39.9-min working median, so the engine
+  **is** leaving ~11 real minutes unused. A fourth lever exists — fixing the estimate — and it alone
+  fits 3 sets on every exercise. The re-weighting below stands on its own measurements. It also re-weights them: **~14.9 of those 51 working
   minutes are bar-loading**, a little under a third, and the largest reclaimable block.
 - **⚑ MEASURED — every exercise ran exactly 2 sets, which is the hard floor.** All five exercises of
   that session logged 2 sets under `AI · Accumulation`, none deloaded (`exercise_deloaded = false`,
@@ -11305,6 +11391,19 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   worst-case default for unknown equipment.
 - **Reversal cost:** low as code, high as behaviour — it moves every generated program's volume, at
   every budget except five exercises.
+- **⚠ THE CANCELLATION DOES NOT HOLD ON THE OWNER'S OWN SESSIONS — measured 2026-09-24 (BF-197).**
+  This entry's "change nothing" rests on `5 × 240 = 4 × 300`, which is arithmetic about the
+  **constant**. But `resolveTransitionSec` prefers his *measured* per-exercise median over the
+  constant, and that median is **319 s** across 106 transitions in 45 days. At 319 s the identity
+  becomes `5 × 319 = 1595` against a real `4 × 319 = 1276` — **319 s of phantom transition, every
+  session, at exactly the N where the errors were supposed to cancel.** The cancellation was never
+  protecting him; it protects a lifter still on the constant. The reconstruction that pins this is
+  in BF-197: the shipped formula reproduces the 51 min on his card to the tenth, and his measured
+  working time runs a median 39.9.
+- **So the "wait for lived feedback" gate is answered, and answered against waiting.** BF-128 asked
+  whether five exercises fit the hour. They do, with ~11 min to spare against his measured median —
+  which is the over-reservation itself, not headroom he could spend. The two corrections should be
+  made together as this entry says, and BF-197 carries the rest-term half of the same fix.
 ### [nutrition] BF-134 — the macro targets and the calorie budget on one card are anchored to different days, and disagree by 406 kcal before you move
 
 - **✅ THE OWNER SPECIFIED WHAT THEY WANT, 2026-09-13 — and it is a model change, not a display fix.**

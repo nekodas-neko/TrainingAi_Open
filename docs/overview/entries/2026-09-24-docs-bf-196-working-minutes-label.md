@@ -36,3 +36,45 @@ working minutes, ~14.9 are bar-loading — a little under a third, and the large
 The entry also warns against the tempting fix: `expandToBudget` exists and is gated on an explicit
 long request on purpose. Its own comment says the conservative under-fill *is* the finish-early
 margin. Here there is not even an under-fill to spend.
+
+## Follow-up the same session — BF-197, and a correction to the entry above
+
+The owner's next question was the useful one: *"bar load and rest time should be able to be analyzed
+from past and can determine how much time is needed so not sure if that can be adjusted."*
+
+**He was right, and the mechanism already exists.** `resolveTransitionSec` prefers his measured
+per-exercise median over the constant, and `measuredRestSec` reaches the duration model the same way.
+The estimate is already personalised. **It spends each learned number once too often:**
+`estimateExerciseDurationSec` charges rest after every exercise's last set — which he skips on 93.5%
+of 309 exercises — and charges a transition after the last exercise, where a session has N−1 gaps.
+
+Reconstructed from his own medians (32 sessions, 45 days: transition **319 s/gap**, rest **107 s/set**,
+set work **49 s**), for the live 5-exercise Lower plan:
+
+| | as shipped | both off-by-ones fixed |
+|---|---|---|
+| 2 sets per exercise | **51.4 min** | 37.2 min |
+| 3 sets per exercise | 63.8 min | **49.6 min** |
+
+51.4 reproduces the 51 on his card to the tenth, so this is the shipped path rather than a model of
+it. His measured working time runs a median **39.9 min** — the corrected figure matches it to 2.7 min,
+the shipped one misses by 11.5. **Three sets on all five exercises corrects to 49.6 against the
+51-minute budget: it fits, with no lever from BF-189 needed.**
+
+**This withdraws a clause written earlier the same session.** The BF-189 amendment above concluded
+that 51 = 51 *"rules out the engine leaving room unused."* The identity is real; the inference is not.
+51 = 51 says the estimate fills its budget, not that the estimate is true. Against his measured median
+the engine leaves ~11 real minutes unused. Both places that drew the wrong conclusion are struck in
+place rather than quietly edited, so a reader of either entry meets the correction.
+
+Filed **BF-197** (`Lane: A`) and amended **LA-65**, whose "change nothing" rested on `5 × 240 = 4 × 300`
+— arithmetic about the *constant*. At his measured 319 s the cancellation breaks in the wrong
+direction at exactly N = 5, so it never protected him.
+
+The counter-argument is recorded rather than dismissed: `expandToBudget`'s comment says the
+conservatism is the finish-early margin, and his working time has a p90 of 53.9 and a max of 81.7, so
+removing 14.2 min of slack will push more sessions past the hour. The entry's answer is that a margin
+arising from a double-count scales with exercise and set count rather than with his variance, so it
+should be taken explicitly if it is wanted.
+
+Nothing was run — docs-only, as above.
