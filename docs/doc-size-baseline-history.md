@@ -14941,7 +14941,6 @@ need a backfill that does not exist and is a production write, and the condition
 reads see nothing is still unidentified.
 
 
-
 ## 2026-09-21 — TN-35's overlay half, and how it came to be startable
 
 `docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
@@ -16535,7 +16534,6 @@ entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four
 re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
 to run. Offset by removing RV-126, whose results all have homes (−30).
 
----
 
 ## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
 
@@ -16550,8 +16548,19 @@ and the old wording said otherwise.
 **CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
 contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
 available fix is telling agents to ignore it, with the reason.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → LB-139 out, LB-140 in
+
+28104 → 28117 (+13 on the merged base). Net of a 13-line removal and a 26-line
+addition, landing under Review's sweep in the same hour. LB-139 shipped, so it left the
+queue. LB-140 is what verifying LB-139 turned up: the step-by-step meal-plan setup sheet does not
+open at all, on `main` as well as on the branch. The entry is longer than the defect because most of
+it is what has already been ruled out — the control run against `main`, the intact wiring, the
+absence of any console error — and the one thing that has NOT been checked, which is whether it
+reproduces outside the dev server. Writing that down is what stops the next session re-running the
+same four probes.
 **2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
-28104 → 28176 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+28117 → 28189 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
 archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
 not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
 seven device gates are re-filed.
