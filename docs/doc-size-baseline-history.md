@@ -16650,3 +16650,11 @@ Growth, +11 on the merged base (990 → 1002), recording the process the owner s
 owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
 rather than run one. A role definition that lives only in a chat is one the next session does not
 have, so it costs twelve lines in the file every session reads.
+
+## 2026-09-24 — `docs/agents/state/orchestrator.md` → 97 (chore/or-144-ungate-owner-questions)
+
+Growth, +19. The owner-gate triage's state: which of the seven self-parked `Lane: O` entries were
+ungated and why, which three keep their gate, and the two things deliberately left owed (the queue
+reordering, and 69 entries still triaged only as a shape). It is +19 because a baton that says
+"triage in progress" is worth nothing — the next session needs the three keep-the-gate decisions by
+name, or it re-asks the owner questions he has already parked.
