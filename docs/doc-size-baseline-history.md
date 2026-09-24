@@ -16512,3 +16512,13 @@ this is that handover rather than a new entry. The +22 is the triage: what was r
 URL exists — the component renders a "No reference" string when it is null, and the device saw a
 broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
 that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → LB-139 out, LB-140 in
+
+27843 → 27856 (+13). Net of a 13-line removal and a 26-line addition. LB-139 shipped, so it left the
+queue. LB-140 is what verifying LB-139 turned up: the step-by-step meal-plan setup sheet does not
+open at all, on `main` as well as on the branch. The entry is longer than the defect because most of
+it is what has already been ruled out — the control run against `main`, the intact wiring, the
+absence of any console error — and the one thing that has NOT been checked, which is whether it
+reproduces outside the dev server. Writing that down is what stops the next session re-running the
+same four probes.
