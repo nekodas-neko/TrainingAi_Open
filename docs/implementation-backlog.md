@@ -2497,13 +2497,26 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   CLAUDE.md: *a FAILED is work, not verification debt* — it goes back to the lane with what
   reproduces it, never into a field that reads as done. This entry carried one, so it printed to its
   own lane under *shipped, only the stated residue is owed*. **Sweep 2 ran that check and it FAILED.**
-- **Acceptance:** ① the device check — the failure line and its Retry at the S25 width, in the card that
+- **✅ The sweep-2 FAILURE is explained and addressed — 2026-09-24, Lane B.** It was not a missing
+  channel; every channel was wired and none could have fired in the seven seconds the device
+  watched. **Measured with fake timers rather than reasoned about:** `fetchWithRetry` makes four
+  attempts with 2.5 s + 5 s + 7.5 s of backoff, so `onExhausted` is **15 s** away — two attempts
+  have run at 7 s and nothing has been reported. `onRevalidateError` cannot cover the gap either: it
+  fires only when a cached value was painted, and the write's own `invalidateNutritionWrite()` has
+  just emptied the key, so on the post-write path it is silent by construction. For fifteen seconds
+  the card presented a pre-write number as current, which is exactly what sweep 2 saw.
+  The hook now exposes `refreshing` and the card renders *"Refreshing your budget…"* in the same
+  slot the failure line uses, so nothing reflows when one becomes the other.
+- **Acceptance:** ① **the device check, still owed and now covering both lines** — with the balance
+  route blocked at the network, the card says it is refreshing within a second or so, and the
+  failure line with its Retry replaces it at ~15 s, both legible at the S25 width in the card that
   carries "kcal left". ② the reporting path was **wired but only observed firing once in five
   sandbox runs**, because the residue case had no channel; **LB-128 shipped that channel on
   2026-09-23 and this hook now takes it** (`onRevalidateError` beside `onExhausted`), so the
   flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
+- **Keep:** ① above. **Lane: DV.**
 
 ### [platform] LB-132 — write paths that invalidate for this device but not after the push
 
