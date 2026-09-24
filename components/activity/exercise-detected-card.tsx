@@ -5,20 +5,15 @@ import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { invalidateOuraWorkoutReview } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
-
-function formatTime(ms: number): string {
-  const d = new Date(ms)
-  const h = d.getHours()
-  const m = String(d.getMinutes()).padStart(2, '0')
-  const ampm = h >= 12 ? 'pm' : 'am'
-  return `${h % 12 || 12}:${m}${ampm}`
-}
+import { formatTimeOfDay } from '@trainingai/shared/date-utils'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
 interface Props {
   onReview: (sessionId: string) => void
 }
 
 export function ExerciseDetectedCard({ onReview }: Props) {
+  const tz = useUserTimezone()
   const pendingSessions = useAutoDetectionStore(s => s.pendingSessions)
   const dismissSession = useAutoDetectionStore(s => s.dismissSession)
   const addOuraSession = useAutoDetectionStore(s => s.addOuraSession)
@@ -94,7 +89,7 @@ export function ExerciseDetectedCard({ onReview }: Props) {
             {session.activityType === 'run' ? 'Run' : 'Walk'} detected
           </p>
           <p className="text-xs text-muted-foreground">
-            {formatTime(session.startMs)} · {Math.round(session.durationMin)} min{session.distanceKm > 0 ? ` · ${session.distanceKm.toFixed(2)} km` : ''}
+            {formatTimeOfDay(session.startMs, tz)} · {Math.round(session.durationMin)} min{session.distanceKm > 0 ? ` · ${session.distanceKm.toFixed(2)} km` : ''}
             {extras > 0 && ` · +${extras} more`}
           </p>
         </div>

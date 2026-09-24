@@ -3412,27 +3412,6 @@ drift.
   leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
 - **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
 
-### [readiness][app-shell] RV-176 — timezone-rule escapes the CI checks do not see: one medium, several latent
-
-- **Lane: B**
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **MEDIUM: `components/health/health-score-detail.tsx:138` uses `todayInTz(DEFAULT_TZ)`.** The
-  readiness and activity detail screens key the AI insight date (`:279`) and the offline seed
-  (`:148`) to Brisbane's date, so a user in another zone asks for tomorrow's insight.
-  `app/health/heart-rate/page.tsx:26` records the same bug, already fixed on the sibling screen.
-- **LOW, and harmless for the owner in Brisbane:**
-  - Device-local clock text in `components/activity/exercise-detected-card.tsx:9-15`
-    (`getHours()`). Use `formatTimeOfDay(ms, tz)`.
-  - Window starts from tz-less `todayMidnightUtc()` + `toAestDay()`: `session-select-content.tsx`
-    `:357,456,742`, `log-value-sheet.tsx:120`, `health-content.tsx:226`, `sleep-content.tsx:49`
-    and `metric-log-sheet.tsx:114`.
-  - Device month for calendar cache keys: `session-select-content.tsx:266-276,385-389`,
-    `workout-screen.tsx:1501`, `calendar-widget.tsx:35` and `year-review-content.tsx:14`.
-  - Device hour for the meal bucket: `nutrition-content.tsx:592`, `food-logger-sheet.tsx:250`,
-    `saved-meals-sheet.tsx:449` and `assign-step.tsx:51,58`. assign-step also re-implements
-    `mealTypeForHour`, which breaks One Formula.
-- **The CI blind spots behind these are in RV-179.**
-
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
 - **Lane: B** (callers), Lane A for `lib/local-store/push-then-revalidate.ts` / `cache-groups.ts`.
@@ -3529,6 +3508,12 @@ written entity.
     `Intl.DateTimeFormat` (RV-176).
   - **`check-client-today-timezone`** misses `todayInTz(DEFAULT_TZ)` and bare
     `todayMidnightUtc()`/`toAestDay()` (RV-176).
+- **RV-176's instances all SHIPPED 2026-09-24 (LB-143) — the two blind spots above did not close,
+  and that is still this entry's work.** Nothing in Custom Rules would catch a reintroduction; what
+  holds them at zero today is `lib/__tests__/rv176-timezone-escapes.test.ts`, a vitest scan of every
+  client `.tsx`. Widening the two scripts should let that file shrink to the helper's unit tests.
+  Note the arity trap it documents: the tz is `todayMidnightUtc`'s FIRST argument and `toAestDay`'s
+  SECOND, and a naive `toAestDay\([^,)]+\)` flags the CORRECTED form by stopping at an inner paren.
   - **`check-memo-prop-stability`** misses a render-body function passed by name (RV-178).
   - **`prose-guards.test.ts`** uses a hand-written route list (RV-173).
 - **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11

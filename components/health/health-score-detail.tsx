@@ -4,7 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { cachedFetchToday, readTodayCacheSync } from "@/lib/sqlite/cache";
 import { HEALTH_TRENDS_SUMMARY_TTL, READINESS_SCORE_TTL } from '@trainingai/shared/cache-ttl';
-import { todayInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { todayInTz } from "@trainingai/shared/date-utils";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getLocalStore } from "@/lib/local-store";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 import { scoreGapText } from "@/components/health/score-gap-copy";
@@ -135,7 +136,11 @@ export function HealthScoreDetail({
   userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards,
   breakdown, contributorChart, averageContext, hideContributors,
 }: HealthScoreDetailProps) {
-  const today = todayInTz(DEFAULT_TZ);
+  // Was `todayInTz(DEFAULT_TZ)`, which keyed every user's readiness and activity detail to
+  // Brisbane's date — the AI insight below asks for that date, and the offline seed reads that
+  // day's row, so a user west of it asks for tomorrow. Same fix as the heart-rate sibling.
+  const tz = useUserTimezone();
+  const today = todayInTz(tz);
   const [data, setData] = useState<ReadinessScoreResponse | null>(null);
   const [trends, setTrends] = useState<HealthTrendsResponse | null>(null);
 
