@@ -16587,9 +16587,9 @@ to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the D
 and the owner's authorisation for a production write — a bare lane change would not tell the device agent
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
 `laneFromLines` is first-match-wins.
-## 2026-09-24 — CLAUDE.md → 1001 (chore/or-143-process-owner-gate-triage)
+## 2026-09-24 — CLAUDE.md → 1002 (chore/or-143-process-owner-gate-triage)
 
-Growth, +11 on the merged base (990 → 1001), recording the process the owner set out: the Orchestrator's primary job is the
+Growth, +11 on the merged base (990 → 1002), recording the process the owner set out: the Orchestrator's primary job is the
 owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
 rather than run one. A role definition that lives only in a chat is one the next session does not
 have, so it costs twelve lines in the file every session reads.
