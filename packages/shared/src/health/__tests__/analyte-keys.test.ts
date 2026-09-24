@@ -124,28 +124,30 @@ describe('analyte keys', () => {
   })
 
   /**
-   * **Read from the report rather than from a list retyped here.** A hand-copied list of labels
+   * **Read from a data file rather than from a list retyped here.** A hand-copied list of labels
    * moves whenever the table moves, so it can only ever agree with itself — the assertion has to
-   * anchor on something this module cannot edit. `docs/clinical-baseline-2026-08-27.md` is that
-   * anchor: it is the de-identified panel the schema was written from, and if a label is added to
-   * it without a key, `analyteKey` silently falls through to `slugAnalyte` and the coverage claim
-   * in the docs quietly stops being true. That is exactly how six haematology markers (MCHC, RDW,
+   * anchor on something this module cannot edit. If a label gains no key, `analyteKey` silently
+   * falls through to `slugAnalyte` and the coverage claim in the docs quietly stops being true.
+   *
+   * **The anchor MOVED on 2026-09-24 (OR-159) and the property is preserved, not dropped.** It was
+   * `docs/clinical-baseline-2026-08-27.md`, which left the public repo on the owner's privacy
+   * decision (RV-199) — it carried results, a DEXA, an RMR, a scan reference and an instrument
+   * serial. The 58 analyte LABELS were extracted to `fixtures/blood-panel-labels.txt`, which holds
+   * names only. A panel's list of tests is a standard lab menu; the record was the values.
+   * **Keep the anchor a separate file** — inlining the list here is what this comment has always
+   * warned against. That is exactly how six haematology markers (MCHC, RDW,
    * platelets, MPV, WBC, neutrophils) sat outside the table while their slugs happened to come out
    * right — accidental correctness, indistinguishable from the real thing until something slugged
    * badly.
    */
   it('covers every analyte the real panel prints, by name rather than by lucky slug', () => {
-    const doc = readFileSync(
-      new URL('../../../../../docs/clinical-baseline-2026-08-27.md', import.meta.url),
+    const labels = readFileSync(
+      new URL('./fixtures/blood-panel-labels.txt', import.meta.url),
       'utf8',
     )
-    const section = doc.split(/^## \d+\. Blood panel/m)[1]?.split(/^## /m)[0]
-    expect(section, 'the blood-panel section moved or was renamed').toBeTruthy()
-
-    const labels = section!
       .split('\n')
-      .filter(l => l.startsWith('| ') && !/^\|[ -]*-{3,}/.test(l) && !/^\| *Test *\|/.test(l))
-      .map(l => l.split('|')[1].trim())
+      .map(l => l.trim())
+      .filter(l => l.length > 0 && !l.startsWith('#'))
 
     expect(labels.length, 'the panel table did not parse').toBeGreaterThan(40)
 

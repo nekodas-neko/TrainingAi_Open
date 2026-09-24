@@ -9,7 +9,8 @@
   },
   "_archive": {
     "bucket": "Upload to the object-storage bucket (see scripts/upload-model-assets.js) before removing from the tree. Not recoverable from this repository once deleted and not regenerable here, so the upload is a prerequisite rather than a formality.",
-    "runtime-fetch": "Already served from object storage at runtime; the tree copy was a fallback and is gone."
+    "runtime-fetch": "Already served from object storage at runtime; the tree copy was a fallback and is gone.",
+    "owner": "The owner holds the only copy outside git history. Nothing in this repository or its object storage can restore it, so the file is sent to him BEFORE it is removed and that send is the archive step."
   },
   "paths": [
     {
