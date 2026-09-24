@@ -16678,3 +16678,16 @@ weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-
 28809 → 28974 (+165; rebased on #1525). Eight new entries from a census of the owner's production data
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
 was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29054 (chore/or-145-owner-questions-owed)
+
+Growth, +45 for OR-145. It is long for one entry because the entry IS the asks: each numbered item
+carries the question, the recommendation and the reversal cost, so the owner can answer from the
+queue instead of from a scrollback. A one-line "ask him about LA-89" would cost five lines and
+reproduce the failure it exists to fix — the gate already recorded that the decision was his, and
+nobody could act on that.
+
+Rebased: the number above is the merged figure. Review's sweeps 55–57 added RV-161, RV-157 and
+RV-170 at the same queue head in the same hour — three more owner-question entries, no content
+overlap with OR-145. OR-145 gained a five-line cross-reference so all four are asked as one
+sitting; four separate interruptions for one sitting's answers was the failure worth five lines.
