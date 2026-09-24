@@ -16751,3 +16751,11 @@ Growth, +3. Four more owner gates say what they want — and reading them is wha
 needs the same hand-fired `fullHistory` pass as `LA-56`, `LA-68` and `TN-1`, so it joined
 `owner-admin-sitting` and `OR-145`'s count of that sitting went from nine to ten. That is the
 argument for the gate text in three lines: the batching was invisible while the gate said `owner`.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29162 (chore/or-149-state-more-owner-gates)
+
+Growth, +10. Three more owner gates say what they want, and two of those turned into asks OR-145 now
+carries: BF-77's gate has MOVED (he declined the A/B/C sizing and asked for a session, so the
+question is whether that session is his or an agent's), and LB-53's is a production write that
+belongs inside RV-170's history-row policy rather than beside it. Both cost lines in OR-145 because
+a question he can answer in one sentence is worth more space than a gate he cannot act on at all.

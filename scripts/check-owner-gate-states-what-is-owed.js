@@ -39,9 +39,8 @@ const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
 // TN-16, Q-297), 13 after OR-148 (LA-65, PS-43, Q-525, LA-126).
 // Shrink-only: remove an id when its gate states what is owed.
 const BASELINE = new Set([
-  'PS-41', 'BF-77', 'LB-53',
-  'Q-515', 'Q-516', 'Q-522', 'Q-523', 'Q-222', 'Q-71',
-  'Q-111', 'Q-44', 'Q-31', 'Q-11',
+  'PS-41', 'Q-515', 'Q-516', 'Q-522', 'Q-523',
+  'Q-222', 'Q-71', 'Q-44', 'Q-31', 'Q-11',
 ]);
 
 let entries;
