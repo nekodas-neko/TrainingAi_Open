@@ -1,6 +1,6 @@
 # 2026-09-24 — Review sweep 58: the rules no check enforces, and where the time goes
 
-**Branch:** `review/sweep-58-rules-and-performance` · **Agent:** Review · **Docs only.**
+**Branch:** `review/sweep-58-rules-and-perf` · **Agent:** Review · **Docs only.**
 
 The owner asked for three things: send the decisions to the Orchestrator, do another sweep, and do
 a performance sweep with the device agent's help.
