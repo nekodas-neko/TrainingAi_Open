@@ -554,6 +554,44 @@ below threshold and left in place for next time.
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
+### [app-shell] RV-121 — `/collection` has exactly one door, and it is a Home card that is off by default
+
+- **Lane: O** — a product question, ungated so the Orchestrator can put it. **Added:** 2026-09-22 ·
+  Review sweep 53. **Re-scoped and re-laned 2026-09-24 (Lane B):** the label half of this entry
+  shipped, leaving only the part that is the owner's.
+- **Recommendation: add a `Collection` row to the More tab, and leave `DEFAULT_CARD_WIDGETS` empty.**
+  A screen worth building is worth having a permanent address; a Home card is a *shortcut* to it, not
+  its only entrance.
+- **What is true.** `/collection` is navigated to from exactly one place in the app —
+  `home-card-widget.tsx:330`, inside `case 'card_collectionWidget'`, which returns `null` unless the
+  widget is enabled. `DEFAULT_CARD_WIDGETS` is `[]` (`lib/home/home-prefs.ts:110`), so on a fresh
+  install the route exists and nothing reaches it. **This is not a Collection-specific oversight** —
+  all ten card widgets are off by default and the card's own docstring says so deliberately. What is
+  specific to Collection is that it is the only one whose card is the sole route to a *whole screen*;
+  the other nine summarise data reachable elsewhere.
+- **Why, a year out.** The More tab is where every other secondary screen lives, so a row there costs
+  one line and makes the route independent of a Home preference nobody remembers setting. Turning the
+  widget on by default instead puts a card on Home permanently to solve a navigation problem, and
+  Home is the screen the owner reads daily.
+- **Alternatives.**
+  - *Turn `collectionWidget` on by default.* Better at discovery — he would see it without being
+    told. But it changes what Home shows on every install, which is the **owner-gated mockup** class,
+    and it still leaves the route with one door.
+  - *Leave it as is.* Better at nothing, unless the answer is that Collection is a spike he does not
+    want surfaced — which is a real possible answer and the reason this is his call, not Lane B's.
+- **Reversal cost: near zero either way.** A More row is one line to add or remove; a default-on
+  widget is one array literal. Nothing migrates and no data moves.
+- **Note his install is probably not fresh** — if the widget is already on for him, this is invisible
+  to him today and is about what a reinstall or a second user would get.
+- **✅ Shipped 2026-09-24 (Lane B), the other half of this entry:** the three affordances that select
+  the `moodWidget` card labelled it **"Readiness"**, colliding with `oura-score-chip-row.tsx`'s label
+  for the computed readiness score, while the card itself renders **"Exercise Readiness"**. All three
+  now name the card — the More-tab picker, Home's colour swatch, and the hidden-sections restore
+  panel. The entry named one site; there were three, which is why the test asserts the *agreement*
+  between the card's heading and its pickers rather than a string.
+- **Also noted, not filed separately:** three step readings can be on Home at once (`stepsWidget`,
+  the Steps metric tile, and the chip row's Activity score).
+
 ### [platform] TN-63 — 34 entries carry two lane fields, the parser keeps the first, and 8 of them disagree about who should build the work
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, after this defect ate a re-laning of TN-1
@@ -3218,21 +3256,6 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 - **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
-
-### [app-shell] RV-121 — `/collection` is unreachable on a fresh install, and one widget's picker label names a different metric
-
-- **Lane:** B — `components/home/home-card-widget.tsx:325`, `components/more/home-widgets-section.tsx`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- `/collection` has **exactly one** in-app link, inside `case 'card_collectionWidget'`, which returns
-  null unless the widget is enabled — and `DEFAULT_CARD_WIDGETS` is `[]`
-  (`lib/home/home-prefs.ts:110`). So on a fresh install the route exists and nothing can reach it.
-  Not dead; hidden behind a preference. Decide whether that is intended.
-- Separately: the picker labels `moodWidget` **"Readiness"**, which collides with the chip row's
-  actual Readiness score, while the widget renders **"Exercise Readiness"** — the subjective
-  check-in. One word, and it stops two different numbers sharing a name in the place where the owner
-  chooses between them.
-- **Also noted, not filed separately:** three step readings can be on Home at once
-  (`stepsWidget`, the Steps metric tile, and the chip row's Activity score).
 
 ### [platform][app-shell] RV-122 — the sync-failure card cannot trigger the sync that clears it
 

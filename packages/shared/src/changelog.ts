@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.27",
+    date: "2026-09-24",
+    changes: [
+      "The morning check-in card is now called \"Exercise Readiness\" everywhere you choose it, not just on the card itself. The widget picker, its colour swatch and the restore list all said \"Readiness\", which is the name of the readiness score in the chip row above it \u2014 two different numbers sharing one name in the one place you pick between them.",
+    ],
+  },
+  {
     version: "1.465.26",
     date: "2026-09-24",
     changes: [

@@ -16678,3 +16678,19 @@ weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-
 28809 → 28974 (+165; rebased on #1525). Eight new entries from a census of the owner's production data
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
 was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29027 (fix/rv121-readiness-label-collision)
+
+28974 → 29027. This branch adds **23** lines; the remaining 30 are slack main was already carrying —
+main's recorded 28974 sat under its own 29004, so the next recount was always going to bank it.
+
+The 23 are RV-121 turning from a two-part Lane B entry into a one-part owner question. The label
+half shipped, so what is left is `/collection` having exactly one door, and that is a decision
+rather than a task: it needs the recommendation, the two alternatives with what each is genuinely
+better at, and the reversal cost, or the Orchestrator has to reconstruct all of it before it can put
+the question. Fifteen lines of brief is what stops the question being asked badly once and then
+re-asked. The other eight are the shipped-half record and the note that all ten card widgets are off
+by default — without which the next reader re-derives that this is not a Collection-specific
+oversight.

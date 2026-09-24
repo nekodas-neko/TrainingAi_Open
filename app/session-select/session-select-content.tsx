@@ -1326,7 +1326,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                 card_nutritionDonut:     'Nutrition',
                 card_sleepWidget:        'Sleep',
                 card_stepsWidget:        'Steps',
-                card_moodWidget:         'Readiness',
+                card_moodWidget:         'Exercise Readiness',
                 card_acwrWidget:         'ACWR',
                 card_muscleStatusWidget: 'Muscle Status',
                 card_hrChartWidget:      'Heart Rate Chart',
