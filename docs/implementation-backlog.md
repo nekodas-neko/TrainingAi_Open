@@ -1413,7 +1413,49 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
   query and both are needed, and this entry closes.
 
-### [platform] DV-14 — production has not deployed since 15:13: six merges are on `main` and not live
+### [platform] DV-14 — ROOT-CAUSED: the Railway build runs out of memory, so almost every deploy fails
+
+- **⛔ ANSWERED 2026-09-24 ~19:30 AEST (Lane A). It was never a stall.** Of the last **40**
+  deployments, **39 FAILED**; the one success was 04:24 UTC. Every failure is the same:
+
+  ```
+  FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+  [76:0x28c02000] 101405 ms: Mark-Compact 4072.1 (4176.3) -> 4071.7 (4188.3) MB
+  ... v8::internal::JsonStringifier::Stringify ...
+  ELIFECYCLE  Command failed with exit code 134
+  ```
+
+  `next build` hits Node's default ~4 GB old-space cap. **No `NODE_OPTIONS` is set anywhere** — not
+  in `package.json`, not in `nixpacks.toml`, not on the service.
+- **This retires the "it recovered on its own" reading, twice recorded above.** The build sits ON the
+  memory boundary, so it occasionally squeaks through — the 04:24 success is why production serves
+  `1.465.26` and why TN-55's battery fix is live at all. The earlier "recoveries" were lucky builds,
+  not recoveries, which is exactly why three measurement passes from outside found nothing.
+- **⚠ How to read this: the deploy log was reachable the whole time.** `RAILWAY_API_TOKEN` is in the
+  session environment and answers `https://backboard.railway.com/graphql/v2` with a
+  **`Project-Access-Token`** header (NOT `Authorization: Bearer`, which returns *Not Authorized* and
+  reads like a dead credential). Three sessions escalated this to the owner as unreachable. Query
+  `deployments(input:{projectId,environmentId})` for status and `buildLogs(deploymentId)` for the
+  reason; `projectToken { projectId environmentId }` returns both ids.
+- **CI's `Build` job passes**, so this is the Railway builder's memory rather than the code.
+- **⚠ `nixpacks.toml` may be dead config** — the build log shows `railpack-builder`, not nixpacks.
+  Worth confirming before anyone edits that file expecting it to take effect.
+- **Strong candidate for what grew, NOT proven:** `packages/shared/src/changelog.ts` is **661 KB,
+  1,257 entries, 9,883 lines** — the largest source file in the repo by a wide margin, imported into
+  **client** bundles by `about-panel.tsx` and `data-capture-console.tsx`, and appended to by **every
+  PR** under the standing version-bump rule (~7.5 KB/day at the current merge rate). The OOM frame
+  is `JsonStringify`. That fits a slow growth crossing a threshold, but 661 KB → 4 GB needs a
+  mechanism nobody has demonstrated. **The experiment that would settle it:** build twice with a
+  fixed heap cap, once with the changelog stubbed to a handful of entries, and compare peak RSS.
+- **Two fixes, and they are not alternatives — the first unblocks, the second is the actual repair.**
+  Raising the cap (`NODE_OPTIONS=--max-old-space-size=…`, in the build script or as a service
+  variable) gets 22 merges of shipped work deployed; if the container has under ~8 GB it trades a
+  clean exit-134 for a kernel OOM kill, so the value wants checking against the plan. Bounding the
+  changelog — a fragment file, or shipping only the last N entries to the client — is what stops it
+  recurring. **Owner asked 2026-09-24; the service-variable route is a production config change and
+  was not taken unilaterally.**
+
+**The history below is kept as filed — the measurements are sound, the conclusion drawn from them was not.**
 
 - **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
   `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
