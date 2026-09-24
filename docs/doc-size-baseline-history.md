@@ -16918,3 +16918,11 @@ owner chose a MIX of two options that were framed as alternatives, and the liter
 reintroduces the objection one of them lost on — two dialogs in the mis-tap path. The resolution is
 written as the Orchestrator's reading rather than his words, so he can correct it. RV-170 keeps a
 warning that its ✅ covers the policy and not its two unanswered riders.
+
+## 2026-09-24 — `CLAUDE.md` and the backlog (lb-134, unsound merge gate)
+
+Two CLAUDE.md passages told every agent that a successful merge proves the checks passed. Measured:
+PR #1467 merged eleven seconds before its Tests job reported failure, so it merged past a pending
+check — which is what one of those passages said was impossible. The corrections cost lines in the
+file every session reads because the wrong version is load-bearing: it is quoted as the reason not
+to poll the checks endpoint.
