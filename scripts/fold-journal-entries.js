@@ -72,9 +72,27 @@ const foldDate = new Date().toISOString().slice(0, 10);
 // worth doing has to roll rather than produce one 600 KB slab. Each entry is assigned its file up
 // front, because a citation has to be rewritten to the file its target actually lands in.
 const ROLL_BYTES = 250 * 1024;
+// BF-188: `part` used to start at 1 unconditionally, and line 177 writes with `fs.writeFileSync` —
+// so a SECOND fold on the same day rebuilt `history-<date>-folded-1.md` from only the entries it
+// was folding and silently dropped every section already there. That shipped: #1484 destroyed the
+// 12 another session had archived an hour earlier, and two of them existed nowhere afterwards.
+//
+// Starting past the highest suffix already on disk is the cheaper of the two fixes the entry names.
+// The other — making the write additive — is better in that it keeps one file per day, and loses
+// because it has to merge two documents correctly and silently corrupts the archive when it does
+// not. This cannot: a file it has never touched is a file it cannot overwrite.
+//
+// A convention was measured and rejected rather than assumed. On 2026-09-24 two lanes folded within
+// an hour because the 60-entry limit fails for EVERY lane at once; both checked `main` first and
+// both were right when they looked. "Check first" cannot close a race whose window is the check.
+const takenParts = fs.readdirSync(OVERVIEW)
+  .map((n) => new RegExp(`^history-${foldDate}-folded-(\\d+)\\.md$`).exec(n))
+  .filter(Boolean)
+  .map((m) => Number(m[1]));
+const firstPart = takenParts.length ? Math.max(...takenParts) + 1 : 1;
 const fileFor = new Map();
 {
-  let part = 1, used = 0;
+  let part = firstPart, used = 0;
   for (const f of batch) {
     const size = fs.statSync(path.join(ENTRIES, f)).size;
     if (used && used + size > ROLL_BYTES) { part++; used = 0; }

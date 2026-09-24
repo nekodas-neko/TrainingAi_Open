@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.34",
+    date: "2026-09-24",
+    changes: [
+      "Ending a guided walk early now records what you actually walked. It used to save the whole planned session \u2014 a walk you stopped 27 seconds in went into your history as 40 minutes and 133 calories, and the calories are worked out from the duration, so a made-up duration meant made-up calories every time.",
+      "Stopping in the first minute now offers to discard the walk instead, in the same dialog rather than a second one. And the three ways out of a walk no longer all claim the same thing: leaving by the back gesture or the tab bar keeps nothing, and now says so rather than telling you it will stop the walk early.",
+    ],
+  },
+  {
     version: "1.465.33",
     date: "2026-09-24",
     changes: [

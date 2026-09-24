@@ -158,6 +158,8 @@ export function BottomNav({
 
       <LeaveWalkDialog
         open={!!pendingWalkHref}
+        // This path calls reset(): nothing is saved, whatever was walked.
+        outcome="discard"
         onStay={() => setPendingWalkHref(null)}
         onLeave={() => {
           const href = pendingWalkHref!;

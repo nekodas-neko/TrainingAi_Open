@@ -42,8 +42,11 @@ const ActivityRouteMap = dynamic(
 const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
 function avg(nums: number[]) { return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null }
-export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onDone }: {
+export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs, userId, onDone }: {
   config: WalkConfig; samples: WalkHrSample[]; cadence?: CadenceSummary | null
+  // BF-190: the seconds actually walked. The plan stays the source for the INTERVAL STRUCTURE —
+  // `buildIntervalPlan` drives the per-segment stats — and only the wall-clock fields move to it.
+  elapsedSec: number
   startedAtMs: number; userId?: string; onDone: () => void
 }) {
   const tz = useUserTimezone();
@@ -58,7 +61,10 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   useEffect(() => { router.prefetch('/health') }, [router])
   const rawPoints = useGuidedWalkStore(s => s.rawPoints)
   const plan = buildIntervalPlan(config)
-  const durationMin = Math.round(plan.totalSec / 60)
+  // Never above the plan: a walk cannot run longer than it was told to, and the 1 Hz tick can land
+  // a second past `totalSec` before the finish fires.
+  const actualSec = Math.min(elapsedSec, plan.totalSec)
+  const durationMin = Math.round(actualSec / 60)
   const bpms = samples.map(s => s.bpm)
   const avgHr = avg(bpms)
   const maxHr = bpms.length ? Math.max(...bpms) : null
@@ -137,7 +143,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   async function saveWalk() {
     const date = todayInTz(tz)
     const startTime = msToHHMMInTz(startedAtMs)
-    const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000)
+    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000)
 
     // Treadmill walks save as the `treadmill` activity type (is_distance_based=false), so the
     // cardio aggregates that filter on a non-null distance/pace exclude them automatically —
@@ -157,7 +163,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
     const splits = hasRoute ? computeSplits(rawPoints) : null
     const bestEfforts = hasRoute ? computeBestEfforts(rawPoints) : null
     const paceSeries = hasRoute ? computePaceSeries(rawPoints) : null
-    const avgPaceSecPerKm = hasRoute ? computeAvgPaceSecPerKm(distanceKm!, plan.totalSec) ?? null : null
+    const avgPaceSecPerKm = hasRoute ? computeAvgPaceSecPerKm(distanceKm!, actualSec) ?? null : null
     const elevation = hasRoute ? computeElevationChange(rawPoints) : null
     const elevationGainM = elevation?.gainM ?? null
     const elevationLossM = elevation?.lossM ?? null
