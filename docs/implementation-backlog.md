@@ -735,71 +735,18 @@ the Orchestrator's to do.
 
 ### [app-shell] RV-113 — the tab switch blanks the panel for 58–109 ms; drop the opacity ramp
 
-- **Lane: B** · **Batch: tab-switch-speed** — **decided by the owner 2026-09-24, and re-laned from
-  `O` the same hour.** He was asked whether a blink on the app's most frequent interaction was worth
-  one line and first said leave it; told that **tab-switch speed is his highest priority**, he
-  reversed it: *"If this can fix speeds do it."*
-- **⚠ BUILD IT, BUT DO NOT SELL IT AS A SPEED FIX — it removes a BLANK, not a DELAY.** The 58–109 ms
-  gap is **the same frames** as `DV-12`'s long task, and that task is what costs the time. Dropping
-  the opacity ramp does not shorten it by a millisecond; it means the new panel's content is
-  **painted and visible** during the block instead of the user staring at the background. That is a
-  real perceived-latency win on every switch and it is not a throughput win, and the difference
-  matters because measuring this against `perf.js longtasks` will show **no improvement** and someone
-  will read that as the fix having failed.
-- **`DV-12` is the actual speed item and they ship together** — same interaction, same frames, one
-  device check. Do not ship this one alone: content painted promptly on top of a 68–118 ms blocked
-  main thread still reads as sluggish, and the pair is what the owner actually asked for.
-- **The fix, unchanged from below:** drop the opacity ramp, keep the settle
-  (`from { transform: scale(0.97) } to { transform: none }`). The content is already painted, so
-  there is nothing to hide and the gap cannot happen. **Do not build the true cross-dissolve** — it
-  holds a second full-screen tree composited ~90 ms and needs the pause-when-hidden behaviour off,
-  which a profile once blamed for 21.3 % of main-thread time.
-- **What the blank actually shows, which decides how visible this is today.** `bg-page` is
-  `var(--page-bg, var(--background))`, and `--page-bg: transparent` is set **only while
-  `DynamicBackground` is active** (`dynamic-background.tsx:75`). With it ON the gap shows the dynamic
-  background with no content over it; with it OFF `bg-page` resolves to the same colour `html`
-  paints, so the gap is invisible — content vanishes and returns against an unchanging backdrop.
-  Either way it is a CONTENT blink, not a colour flash; the earlier "ramp is over wallpaper" wording
-  overstated it.
-
-- **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
-  `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
-  goes `visibility: hidden` in the **same frame** the incoming one becomes active, and the incoming
-  panel then reads **opacity 0** for 3–5 frames spanning **58–109 ms** — the same frames as DV-12's
-  long task — before `ta-tab-enter` fades it in. So yes: every switch shows ~60–110 ms with neither
-  panel painted. **What shows in the gap:** the panel's parent, `main` and `body` are all
-  transparent; the first painted layer is `html` (`oklch(0.145 0.02 215)`) plus any fixed wallpaper
-  layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
-  toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
-
-- **Superseded lane field, demoted to prose (TN-63) so it cannot route this entry:** it read
-  it read *“Lane O — re-channelled from `B` by Lane B, 2026-09-23”*, and the permission it was
-  waiting for has been given. The fix is one line and the file paths below are right. This entry ends by
-  saying its two open questions "decide whether this is worth doing at all", and both are
-  **looks** judgements on the app's most frequent interaction — is a 180 ms blink perceptible, and
-  does `bg-page` resolve transparent under the owner's wallpaper. CLAUDE.md routes a judgement about
-  whether something *feels* right to `O` and the owner, not to `DV`: the phone is where he will look
-  at it, but nobody is measuring anything. Building it first risks changing a daily interaction he
-  never asked to have changed.
-  Files when it returns: `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- The incoming panel gets `tab-panel-enter` and the outgoing one gets
-  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
-  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
-  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
-  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
-  content fading out first; **that half is not implemented.**
-- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
-  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
-  so there is nothing to hide and the blink cannot happen.
-- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
-  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
-  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
-  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
-- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
-  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
-  they decide whether this is worth doing at all.**
-
+- **Lane: DV** · **Batch: tab-switch-speed** — shipped; only the device look is owed.
+- **✅ SHIPPED 2026-09-24** (LB-144, #…). The opacity ramp is gone from `ta-tab-enter`
+  (`app/globals.css`); the 0.96 scale settle stays, with the comment above it rewritten — it used
+  to assert this defect could not happen. OR-161's second false comment
+  (`tab-shell.tsx:186`) went in the same PR.
+  **Kept 0.96, not the 0.97 this entry and its relay both wrote:** the scale was never part of the
+  defect, and the comment beside it records why 0.96 was chosen over the spec's 92%.
+- **Keep:** DV — does the switch read better? This removes a BLANK, not a DELAY, so
+  `perf.js longtasks` will show no change and that is the expected result, not a failure. The
+  question is perceptual and the owner's: with the dynamic background ON, the 58–109 ms gap used
+  to show the wallpaper with no content over it. Pass/fail: switch tabs on the S25 and say whether
+  the blink is gone. `DV-12` still holds the 68–118 ms block underneath it.
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
 
@@ -855,30 +802,14 @@ the Orchestrator's to do.
 - **Not established:** which component dominates the task — the next measurement is a CPU profile of
   one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
 - **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
+- **Still open after LB-144 (2026-09-24), which shipped RV-113's half of the batch.** No chart
+  change was made: `OR-162`'s three directions are still unmeasured, and the count that was to
+  choose between them **cannot be taken off-device** — see the census recorded there. Shipping a
+  speculative chart.js change to the owner's highest-priority path, against a defect that does not
+  reproduce in the harness, is the "verified but broken" shape. **When the phone is next available,
+  take the per-panel canvas count in the SAME sitting as this long-task measurement** — one is
+  useless without the other.
 
-
-### [app-shell] OR-161 — the route transition already does what the tab switch is missing, 50 lines above it
-
-- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 · Orchestrator, sweeping for the
-  `RV-113` pattern elsewhere after the owner said perceived latency matters as much as real latency.
-- **The finding is a CONTRAST, not a new defect, and that is what makes it cheap.** `app/globals.css`
-  holds both transitions:
-  - **Route push/pop (`ta-axis-y-in`/`-out`, :752-755) is CORRECT.** The outgoing screen fades to
-    `opacity: 0` by **40%** and the incoming holds `opacity: 0` until **25%** — a deliberate ~15%
-    overlap, and the comment above it says exactly why: *"enough that the screen is never fully empty
-    mid-transition"*. **There is no blank window.**
-  - **Tab switch (`ta-tab-enter`, :800-805) has no outgoing half at all.** The outgoing panel is
-    hidden outright in the same commit, so the incoming ramp plays over nothing. That is `RV-113`.
-- **So the fix for `RV-113` need not be invented — the shape is already in the file.** Either drop the
-  opacity ramp (RV-113's one-liner, recommended, cheapest) or give the tab switch the same overlap the
-  route transition has. Do NOT do both.
-- **⚠ TWO CODE COMMENTS ASSERT THE BUG DOES NOT EXIST, and they are why it survived.**
-  `globals.css:790` — *"this animates content that is already painted, which is why it reads as polish
-  rather than as waiting"* — and `tab-shell.tsx:186` — *"this animates content that is genuinely
-  there, which is why it reads as smooth rather than as a stall."* Both are false: `RV-113` measured
-  58-109 ms with neither panel painted, 10 of 10 switches. **Fix the comments in the same PR.** A
-  wrong comment asserting the absence of a defect is worse than no comment, and the next reader
-  checking whether this needs work will believe it.
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
 
@@ -910,9 +841,27 @@ the Orchestrator's to do.
   **(c)** skip the update when the previous box was zero-size, which is the reveal case specifically.
 - **Pass test is `DV-12`'s, unchanged:** `perf.js longtasks`, every tab tap's longest task under
   **50 ms**. This entry is where the time is; `RV-113` is where the blank is.
-- **Not established:** how many canvases are actually mounted across the five tabs at once. That is a
-  count somebody should take before choosing between (a), (b) and (c), because (a) only pays if the
-  cost is many charts rather than one expensive one.
+- **⚠ THE COUNT WAS ATTEMPTED AND THE QUESTION IS WRONGLY POSED — LB-144, 2026-09-24, measured in
+  the Playwright harness at 384 px (`e2e/or162-canvas-census.spec.ts`).** With all reachable tabs
+  mounted, the census read **0 canvases across 4 panels** — none hidden, none active. So the harness
+  cannot answer it, and the reason is the useful part: **no chart is unconditional in a tab panel.**
+  Charts reach one only through the owner's configuration and data — Home via
+  `home-card-widget.tsx` → `HrDayChart`, Health via `health-sections.tsx` → `TimeInZoneCard`,
+  `trends-section.tsx` → `TrendChart` and two `TrendSparkline` cards, Nutrition via
+  `day-tools-section.tsx` → `WeeklyNutritionChart`. **`TrendSparkline` is `dynamic(ssr:false)`**, so
+  it is not even in the bundle until something renders it.
+  **Therefore there is no single number, and "many charts vs one expensive chart" cannot be settled
+  off-device** — it depends on which Home widgets the owner has enabled and which Health sections
+  have data. The next measurement is on the S25: count `document.querySelectorAll('canvas')` per
+  panel, then attribute. Only then choose between (a), (b) and (c).
+- **What the harness DID establish, and now guards:** all three hidden panels carry a computed
+  `content-visibility: hidden`, which is the precondition for the whole mechanism. The spec asserts
+  that and logs the census; it deliberately asserts no canvas count, which would pin the seed's
+  poverty or break when the seed gains data.
+- **One direction is cheaper than it looks, and one is not.** (b) "hold the canvas size across the
+  hidden state" cannot be done with `contain-intrinsic-size`: that sizes the CONTAINED element, not
+  the descendant canvases, which still have no box. So (b) means JS, not CSS — it is not the cheap
+  option it reads as.
 
 ### [app-shell][platform] OR-163 — sweep the whole app for the two latency classes, with a stated method
 
