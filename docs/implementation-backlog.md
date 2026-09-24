@@ -1465,20 +1465,19 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 
 ### [app-shell][platform] RV-146 — two fonts only the meal-label printer uses are preloaded on every page
 
-- **Lane:** B — `app/layout.tsx`.
-- **Added:** 2026-09-24 · Review, reading RV-130's walk half (S25 · web v1.465.4 · gesture nav):
-  **4 font files × 10 visits** logged *"preloaded using link preload but not used within a few
-  seconds"*. That finding has had no entry until now.
-- **The cause, read from source:** `app/layout.tsx` loads `Archivo` and `Instrument_Serif` for
-  Q-389's printable meal label only (`--font-archivo` and `--font-instrument-serif` each have one
-  user). `next/font/google` sets **`preload: true` by default**, so every cold start downloads both
-  faces before first paint. `display: "swap"` keeps them off the *render* path, as the code comment
-  says, but not off the *network* path. Cold-start FCP is **1020 ms** (sweep 1, P11).
-- **The fix:** `preload: false` on those two. The label renderer already awaits
-  `document.fonts.ready` before drawing, so the faces still load before the label needs them. Geist
-  and Geist Mono stay preloaded.
-- **The device check once it ships:** the four console warnings are gone on a cold start, the
-  printed label still renders in its own faces, and P11's FCP is re-read to see whether it moved.
+- **SHIPPED 2026-09-24 (Lane B).** `preload: false` on `Archivo` and `Instrument_Serif`, plus the
+  explicit `document.fonts.load` the renderer needed once nothing preloaded them.
+- **Keep:** the device check this entry specified — on a cold start on the S25, the four
+  *"preloaded but not used"* console warnings are gone, the printed label still renders in its own
+  faces, and P11's cold-start FCP (1020 ms, sweep 1) is re-read to see whether it moved. The sandbox
+  can measure the font set but not the S25's FCP. **Lane: DV.**
+- **⚠ The fix as this entry stated it would have shipped a silent fallback, and that is worth
+  keeping.** The entry reasoned that the renderer already awaits `document.fonts.ready`, so the
+  faces would still arrive. Measured in Chromium on 2026-09-24: `fonts.ready` settles *pending*
+  loads, it does not *start* one, and nothing on the page renders in these faces — so
+  `check('700 12px "Archivo"')` was **false** after `ready` and **true** only after an explicit
+  `fonts.load`. Canvas takes an unavailable face without complaint. The two halves are one
+  guarantee; `components/nutrition/__tests__/rv146-label-font-loading.test.ts` pins them together.
 
 ### [platform] RV-147 — `docs/data-layer-rules.md` still names `metric-log-sheet` as the save that overwrites every column
 
