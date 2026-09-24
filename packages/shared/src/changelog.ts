@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.36",
+    date: "2026-09-24",
+    changes: [
+      "A walk whose strap starts reporting your cadence late no longer records a fraction of your steps as though it were the whole walk. One treadmill walk logged 584 steps where a normal one logs around 3,000, because the strap only picked up the last eight minutes \u2014 and the pace looked completely normal, because it was averaged over just those eight minutes. When the cadence reading covers less than half the walk, the step count is now left out rather than quietly counted short.",
+    ],
+  },
+  {
     version: "1.465.35",
     date: "2026-09-24",
     changes: [
