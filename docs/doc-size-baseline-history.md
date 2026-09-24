@@ -16676,9 +16676,16 @@ weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-
 
 ---
 
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 57, `review/sweep-57-data-census`.**
+28809 → 28974 (+165; rebased on #1525). Eight new entries from a census of the owner's production data
+(RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
+was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
+
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` → RV-111 shipped, device re-check kept
 
-28809 → 28827 (+18 on the merged base). RV-111's fix is two lines; the eighteen are what was checked rather than assumed.
+28974 → 29015 on the merged base. The entry itself grows by **11** lines (+13/−2); the baseline moves 41 because main's recorded number carried 30 lines of tolerated slack, so recounting on this base banks that too. RV-111's fix is two lines; the eleven are what was checked rather than assumed.
 The entry warned that one press closing both surfaces would leave the app blank, because the
 scanner's `body.scanner-active` rule hides every other body child until it unmounts — so the note
 records why that cannot happen (`handlePop` closes only surfaces deeper than the arriving entry,
