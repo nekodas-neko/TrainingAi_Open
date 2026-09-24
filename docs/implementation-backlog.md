@@ -1675,6 +1675,46 @@ unverified"* is now answered: it persists.
   byte layouts and ported code come from the source, not from convenience. Only with a vector re-pin.
   **Whichever is chosen, split the overloaded label**: a null from a failed validator must not report
   as `insufficient_met`. That misreporting is what hid this for five weeks.
+- **✅ CONFIRMED BY THE REPO'S OWN TEST — the "not observed" caveat below is now discharged, without
+  running the route.** The loose end was whether any other caller passes a dense MET series and
+  therefore works. Answered, and it settles the diagnosis outright:
+
+  **(1) There is exactly ONE production caller.** `runTrainingStressScore` is called from
+  `packages/shared/src/health/training-stress.ts:76` and nowhere else in the app. Every other
+  reference is the test file. So there is no working contrast case in production — **the model has
+  never produced a value from real data in this app**, only from a fixture.
+
+  **(2) A passing test asserts precisely the failure.**
+  `lib/oura-models/inference/__tests__/ots.test.ts`:
+
+  ```js
+  it('rejects a NaN-containing MET series (validator error 2)', () => {
+    const bad = Float32Array.from(golden.mets)
+    bad[10] = NaN                      // ONE NaN, into an otherwise dense golden series
+    expect(runTrainingStressScore(inputFromGolden({ mets: bad }))).toBeNull()
+  })
+  ```
+
+  One NaN anywhere in 1,440 minutes returns null. The route supplies roughly **275** of them per day.
+  Note it is `it`, not the `itVendor` used by its neighbours — the file's own comment says *"Only the
+  validator-error case below is decided before any threshold is consulted, which is why it stays
+  unguarded"*, so it runs on every CI pass, with no vendor constants needed. **The behaviour breaking
+  production has been asserted, green, on every run.**
+
+  **(3) The golden vector is dense.** `bad[10] = NaN` is a *mutation* applied to make it invalid, so
+  `golden.mets` contains none — which is why parity passes while production gates. The fixture and the
+  live producer disagree about the one property that decides the outcome.
+
+  **What this changes.** The mechanism is no longer an inference: it is the documented, tested contract
+  of the model, violated by its only caller. The `validate(input)` log line is no longer needed to
+  establish *what* is wrong — keep it only as the check that a fix worked.
+  **And it adds a risk to Q-204 that its cost estimate does not carry:** direction B's "complete ported
+  model" has been exercised end to end against **a fixture and nothing else**. Parity with the
+  TorchScript reference is real and is not the same as having ever scored one of the owner's days. That
+  belongs in the proposal as a stated risk, not as a reason against B.
+  **A test worth adding with whichever fix lands:** one that feeds the *route's own* grid shape — a
+  realistic series with gaps — through `computeTrainingStress` and asserts a non-null result. Its
+  absence is why a green suite and a dead column coexisted for five weeks.
 - **What is established and what is not.** The mechanism is identified by **reading the code**, and the
   arithmetic and the 21-of-21 pattern both agree with it — but **the route was still not run**, so this
   is a very strong inference rather than an observation. The confirming step is unchanged and now
@@ -27058,6 +27098,10 @@ per-field merge where an AI write has no honest source rank to claim.
   deliberately fills non-wear gaps with NaN, so every real day fails and is misreported as
   `insufficient_met`. **So B is not a new derivation; it is one input-contract bug away from producing
   values.** Read TN-79 before scoping this entry — it changes the cost more than anything else on it.
+  **One risk comes with that, and it is not a reason against B:** the ported model has been exercised
+  end to end against **a golden fixture and nothing else**. There is exactly one production caller and
+  it has always gated, so parity with the TorchScript reference — which is real — is not the same as
+  having ever scored one of the owner's days. Scope B expecting the first real run to surface something.
 - **Sequencing:** independent of Q-184. If a load lane lands, the case for reviving
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
