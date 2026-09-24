@@ -16899,3 +16899,18 @@ would otherwise re-derive them.
 directly under RV-188. They cannot be shorter than this: each one names the surface, who can reach
 it, the fix shape and whether the owner confirms. The repo is public, so exploit steps are left out
 deliberately.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30035 (RV-188)
+
+Thirty-one lines on RV-188, and most of them are **negative results**, which is the part that
+justifies the length. Two of the entry's own prescribed part-2 fixes were implemented, measured and
+reverted: the three Sentry `autoInstrument*` flags are not equivalent to removing `withSentryConfig`
+(still exit 134 at the 3 GB repro cap), and skipping Railway's lint/type-check addresses the wrong
+phase entirely, since both builds die during compilation before either pass runs. Both look exactly
+like the prescribed answer, so an entry that recorded only what shipped would send the next session
+to spend a cycle rediscovering them.
+
+The rest is the cause itself, which is one sentence of finding and several of evidence: the heap cap
+was set in `ci.yml` and nowhere else, and Node's default is sized from container RAM rather than
+fixed — ~4,051 MB on Railway's builder against 2,096 MB in the sandbox. Without both numbers the
+claim reads as a guess, and the entry has already been wrong twice about this failure.
