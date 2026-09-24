@@ -609,8 +609,9 @@ async function weightedSetsByMuscle(db: Db, opts: {
  * Weighted sets per muscle for ONE programme over a span.
  *
  * Keyed on `ws.started_at` rather than `el.logged_at`, and that stays as it is: its unit is a
- * programme session, and its two callers — `/api/ai-periodization/weekly-volume` and
- * `signals.ts` — grade a week against that programme's own targets. Changing the date column here
+ * programme session, and its caller — `signals.ts` — grades a week against that programme's own
+ * targets. (It had a second caller, `/api/ai-periodization/weekly-volume`, until LB-137 retired
+ * that route: nothing had read it since RV-120 deleted the card it served.) Changing the date column here
  * would move numbers they already compare against, which is a behaviour change dressed as a
  * refactor. For a span that should cross programme changes, use `getSetsByMuscleInWindow`.
  */

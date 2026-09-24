@@ -15,6 +15,9 @@ export interface EnergyBalanceRefetch {
   /** Dismiss the failure and try again — the recovery the owner was performing by hand, twice, by
    *  switching tabs. */
   retry: () => void
+  /** A refetch is in flight and nothing has painted yet. Distinct from `failed`, and the gap
+   *  between them is fifteen seconds wide — see the note on `refreshing` below. */
+  refreshing: boolean
 }
 
 /**
@@ -63,6 +66,17 @@ export function useEnergyBalanceRefetch(
   setBalance: (b: EnergyBalanceResponse) => void,
 ): EnergyBalanceRefetch {
   const [failed, setFailed] = useState(false)
+  // **RV-103's device FAILURE was a timing gap, not a missing channel.** Sweep 2 blocked the balance
+  // route at the network and watched the card hold "320 kcal left" for 7 s with nothing said. Every
+  // channel below was wired correctly; none of them could have fired yet. `fetchWithRetry` makes
+  // four attempts with 2.5 s + 5 s + 7.5 s of backoff, so `onExhausted` is **15 s** away, and
+  // `onRevalidateError` fires only when a cached value was painted — which the write's own
+  // `invalidateNutritionWrite()` has just made sure there is not. So for fifteen seconds the screen
+  // showed a pre-write number as though it were current, which is the whole complaint.
+  //
+  // `refreshing` is the honest thing to say during those seconds. It is not a failure and must not
+  // read as one; it is "this number is being replaced".
+  const [refreshing, setRefreshing] = useState(false)
   // `refetch` is called from event handlers, not an effect, so there is no cleanup to cancel it —
   // this is what stops `onExhausted` setting state on a screen that has gone away.
   //
@@ -81,6 +95,7 @@ export function useEnergyBalanceRefetch(
   const refetch = useCallback((date: string) => {
     lastDateRef.current = date
     setFailed(false)
+    setRefreshing(true)
     // **Two channels, because one failure has two shapes and neither alone covers both.**
     //
     // `onExhausted` covers the post-write NORM: the write awaited `invalidateNutritionWrite()`, so
@@ -101,11 +116,14 @@ export function useEnergyBalanceRefetch(
     // `onRevalidateError` can fire on more than one attempt.
     fetchWithRetry<EnergyBalanceResponse>(
       `energy-balance:${date}`, `/api/nutrition/energy-balance?date=${date}`, ENERGY_BALANCE_TTL,
-      d => { if (d) setBalance(d) },
+      d => { if (d) { setBalance(d); setRefreshing(false) } },
       () => unmountedRef.current,
       0,
       cachedFetch,
-      { onExhausted: () => setFailed(true), onRevalidateError: () => setFailed(true) },
+      {
+        onExhausted: () => { setFailed(true); setRefreshing(false) },
+        onRevalidateError: () => { setFailed(true); setRefreshing(false) },
+      },
     )
   }, [setBalance])
 
@@ -113,5 +131,5 @@ export function useEnergyBalanceRefetch(
     if (lastDateRef.current) refetch(lastDateRef.current)
   }, [refetch])
 
-  return { refetch, failed, retry }
+  return { refetch, failed, retry, refreshing }
 }

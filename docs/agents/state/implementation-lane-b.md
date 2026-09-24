@@ -1,54 +1,54 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-23 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-138 (LB-137 filed 2026-09-23) — ⚠ the grep counts THIS LINE, so take what it returns, not +1.
+**Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
+**Next ID:** LB-141 (LB-140 filed 2026-09-24) — allocate by grep, and check the JOURNAL too: a
+shipped entry leaves the queue, so the backlog alone reads low.
 
 ## Now
 
-RV-120 shipped — deleted the `aiVolume` card, already superseded server-side. 7 PRs merged today.
+DV-16/17, the DV-18 handover, LB-139, RV-144 shipped. LB-140 → `DV`: no prod-mode boot in a container.
 
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; do
-not cut a branch until there is something to commit, or the stop-hook flags a scratch branch.
+not cut a branch until there is something to commit. The Orchestrator re-prioritises, so the top
+item changes between sessions — device findings jumped above LB-138 mid-run.
 
-**RV-117/118/119 are `Lane: O` — leave them.** Their owner gate IS satisfied; the mockup lives in
-the Orchestrator's chat and it is exporting it to `docs/design/`. Do not take them back, do not
-re-ask him, do not re-make the mockup.
+**RV-117/118/119 are `Lane: O` — leave them.** Their owner gate IS satisfied; the mockup is in the
+Orchestrator's chat and it is exporting it to `docs/design/`. Do not re-ask him, do not re-make it.
 
-**BF-177's plan (scratchpad) is AMENDED** — LB-128 shipped as #1456, so its premise that
-`cachedFetch` gates `onError` on `cached === null` may no longer hold. Re-read `lib/sqlite/cache.ts`.
+**BF-177's scratchpad plan is STALE** — LB-128 (#1456) may have voided its `cachedFetch`/`onError` premise.
 
 ## Blocked / owed
 
-- **LB-134 is the owner's** — branch protection. Until he rules, read the `Tests` job CONCLUSION
-  before every merge.
-- **LB-129 shipped an UNPROVEN fix** (`Gate: device`) — do not reopen here; the harness provably
-  cannot discriminate (dev compiles cold chunks; `next start` can't reach local PG). Entry has it.
+- **LB-134 is the owner's** — branch protection. Until he rules, read the five job CONCLUSIONS
+  before every merge, and expect the merge race below.
+- **LB-138** — `la109` is a REAL regression from #1431 (Lane B's own): back off Home reaches
+  `about:blank`. Start from `navigateToTab`'s history semantics, not the spec. Read with BF-49,
+  RV-111, RV-113 — same surface, device-reported.
 - Device checks are DV's to RUN, mine to RECORD. A FAILED check comes BACK as work.
 
 ## Claimed paths — none.
 
 ## Lessons that cost real time
 
-- **⚠ THE MERGE CALL IS NOT A GATE HERE.** #1467 squash-merged with `Tests` FAILING and returned
-  success. Confirm run completed+success, or `list_workflow_jobs` once for the five required jobs.
-  `get_job_logs failed_only:true` returning 0 only rules OUT failure. E2E is advisory (~31 min).
-- **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481's merge silently deleted RV-117
-  and RV-118; I checked only the three headings I had edited and shipped the loss. Every line of
-  `diff <(git show origin/main:docs/implementation-backlog.md|grep '^### '|sort) <(grep '^### '
-  docs/implementation-backlog.md|sort)` must be an add or remove you INTENDED.
-- **A `docs/overview/` conflict is TWO FOLDS on one `history-<date>-folded-N.md`, and the archive
-  PRE-EXISTS, so it conflicts as ordinary appended content.** Never splice: take origin/main's
-  `docs/overview/` whole, then re-run `fold-journal-entries.js` once over the merged tree.
-- **READ THE ENTRY BEFORE ACTING ON ITS TITLE, and the CODE before acting on the entry.** I told
-  the owner the IA batches needed mockups (they did not), and RV-120's own comment promised a merge
-  that `weekly-muscle-sets/route.ts` had already shipped. Both were one read away.
-- **A gate's exit code must be read DIRECTLY — not through a `tail` pipe, not via `$?` after a
-  pipe, not via `&&` into `git commit` (an intervening `echo` succeeds, so a RED gate still
-  commits).** All three shipped a red push today. Gates to a file, read the code, THEN commit.
-- **An auth-gated page never compiles from a dev-server GET** — `curl -L /health` follows to
-  `/sign-in`, so only that compiles. `pnpm build` is what exercises the change; say so honestly.
-- **A spec that passes with AND without the fix is worse than none** — delete it. Always control-run.
+- **⚠ THE MERGE CALL IS NOT A GATE HERE.** #1467 squash-merged with `Tests` FAILING. Confirm the
+  five jobs' conclusions via `list_workflow_jobs`; E2E is advisory (~31 min) and is red on `main`.
+- **THE MERGE RACE IS ARITHMETIC.** CI ~7 min vs a commit to `main` ~every 8, and every filing PR
+  touches the two doc-size files. Six cycles lost before I cut MY latency: check at 6 min, merge the
+  INSTANT the five are green. No run for your head = conflicted PR, never slow CI.
+- **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481 silently deleted RV-117/118;
+  counting only headings I had edited could not see a neighbour vanish. Every line of `diff <(git
+  show origin/main:docs/implementation-backlog.md|grep '^### '|sort) <(…)` must be one you INTENDED.
+- **READ THE CODE BEFORE THE ENTRY.** Three for three — RV-120, DV-16, DV-17 all mislocated their
+  own cause. An entry says where someone looked, not where the bug is.
+- **CONTROL-RUN every new test against `origin/main`** — a spec that passes either way is worse
+  than none. Revert via `git show origin/main:<file>`, not a `cp` snapshot.
+- **`grep` is case-sensitive**: `planLoaded` does not match `setPlanLoaded`. Use `-i` when counting
+  a camelCase symbol — I misread a complete file as half-applied.
+- **A gate's exit code must be read DIRECTLY** — not through a pipe, not via `&&` into `git commit`
+  (an intervening `echo` succeeds, so a RED gate still commits). Gates to a file, read the code.
+- **A `docs/overview/` fold conflict is TWO FOLDS on one pre-existing archive** — never splice; take
+  origin/main's whole and re-fold once. BF-188 already lost 12 entries on `main`; read it first.
+- **An auth-gated page never compiles from a dev-server GET** — `pnpm build` is what exercises it.
 - **`npx tsc --noEmit` DOES NOT typecheck test files** — Build runs `check-test-typecheck.js`.
-- **`total_count: 0` is a stale base or a conflicted PR, never slow CI.** Re-merge and push.

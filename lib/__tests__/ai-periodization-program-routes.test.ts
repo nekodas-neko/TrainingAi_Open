@@ -55,7 +55,6 @@ vi.mock('@/lib/data', () => {
 import { POST as baselineComplete } from '@/app/api/ai-periodization/baseline/complete/route'
 import { POST as transition } from '@/app/api/ai-periodization/session/[sessionId]/transition/route'
 import { GET as programOverview } from '@/app/api/ai-periodization/program-overview/route'
-import { GET as weeklyVolume } from '@/app/api/ai-periodization/weekly-volume/route'
 
 const SESSION_ID = '00000000-0000-4000-8000-0000000000aa'
 const OTHER_SESSION = '00000000-0000-4000-8000-0000000000bb'
@@ -103,10 +102,6 @@ const transitionPost = (body: unknown, id = SESSION_ID) =>
   post(transition as never, `/api/ai-periodization/session/${id}/transition`, body,
     { params: Promise.resolve({ sessionId: id }) })
 const overviewGet = () => programOverview()
-const volumeGet = (query = '') =>
-  weeklyVolume(Object.assign(new Request(`http://localhost/api/ai-periodization/weekly-volume${query}`), {
-    nextUrl: new URL(`http://localhost/api/ai-periodization/weekly-volume${query}`),
-  }) as never)
 
 let seq = 0
 const freshUser = (over: { timezone?: string } = {}) => {
@@ -356,55 +351,3 @@ describe('GET /api/ai-periodization/program-overview', () => {
   })
 })
 
-describe('GET /api/ai-periodization/weekly-volume', () => {
-  it('refuses without a session', async () => {
-    sessionUser = null
-    expect((await volumeGet()).status).toBe(401)
-  })
-
-  it('404s a programId the caller does not own, without reading its targets', async () => {
-    listPrograms.mockResolvedValue([program({ id: 'p-mine' })])
-    const res = await volumeGet('?programId=p-someone-elses')
-    expect(res.status).toBe(404)
-    expect(listVolumeTargets).not.toHaveBeenCalled()
-  })
-
-  it('falls back to the active program when none is named', async () => {
-    await volumeGet()
-    expect(listVolumeTargets.mock.calls[0][1]).toBe('p-1')
-    expect(listPrograms).not.toHaveBeenCalled()
-  })
-
-  it('404s when there is no program to fall back to', async () => {
-    getActiveProgram.mockResolvedValue(null)
-    expect((await volumeGet()).status).toBe(404)
-  })
-
-  // A target row edited by hand can carry a synonym of one the defaults already wrote, and the
-  // logged side is normalised too — so both must land on the same key, and collisions must SUM.
-  it('normalises muscle names and sums two rows that mean the same muscle', async () => {
-    listVolumeTargets.mockResolvedValue([
-      { muscleGroup: 'Quads', targetSetsPerWeek: 8 },
-      { muscleGroup: 'quadriceps', targetSetsPerWeek: 4 },
-      { muscleGroup: 'biceps', targetSetsPerWeek: 6 },
-    ])
-    const body = await (await volumeGet()).json()
-    expect(body.targets.quads).toBe(12)
-    expect(body.targets.biceps).toBe(6)
-    expect(Object.keys(body.targets).sort()).toEqual(['biceps', 'quads'])
-  })
-
-  it('asks for a Monday-to-Sunday week in the user timezone', async () => {
-    freshUser({ timezone: 'Etc/GMT-14' })
-    await volumeGet()
-    const [, , weekStart, weekEnd, tz] = getWeeklySetsByMuscleGroup.mock.calls[0]
-    expect(weekStart).toBe(startOfWeekInTz('Etc/GMT-14'))
-    expect(tz).toBe('Etc/GMT-14')
-    const span = (new Date(weekEnd + 'T00:00:00Z').getTime() - new Date(weekStart + 'T00:00:00Z').getTime()) / 86_400_000
-    expect(span).toBe(6)
-  })
-
-  it('answers no-store, because this app manages its own freshness', async () => {
-    expect((await volumeGet()).headers.get('Cache-Control')).toBe('private, no-store')
-  })
-})

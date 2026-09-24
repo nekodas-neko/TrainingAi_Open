@@ -7,7 +7,7 @@
 - **Always test on the local dev server before merging.** Before merging (or presenting work for confirmation on a destructive change), spin up `pnpm dev` and exercise every changed API route and UI flow against the local non-prod database. TypeScript and lint passing is not sufficient — runtime errors, broken validation, and cache bugs only surface when the server actually runs. If something breaks during testing, fix it before asking to merge.
 - **The local custom-rules gate is `pnpm check:rules` — nothing else counts as "custom rules pass".** It parses `.github/workflows/ci.yml`, runs every step of the job named *Custom Rules*, and prints how many it ran (`Ran N of N …`); quote that count rather than the word "pass". **Do not hardcode N anywhere** — it was 31 on 2026-08-13 and 33 by the end of the same day; the runner reads it from the YAML, which is the point. Globbing `scripts/check-*.js` reaches only the steps that invoke a script — the difference between that and `Ran N of N` is the count it misses — and `pnpm ci:local` used to run 3, and both report clean while the inline grep rules — UTC date slicing, hardcoded session names, safe-area stacking, local-SQLite PRAGMAs, nested buttons, `JSON.parse` of LLM output, hand-rolled `invalidateCache` — never execute. That gap shipped a component-level `invalidateCache()` call through a green local gate (#1279). `pnpm ci:local` now runs it.
 - **Docs/plans/low-risk changes merge with zero ceremony.** **Documentation-only** changes (`.md` files like `projectOverview.md`, `CLAUDE.md`), **implementation plans / planning docs** (`docs/superpowers/plans/`), and **bug fixes for features already on `main`** never need confirmation and are exempt even from the destructive-change carve-out above (they can't be destructive by nature). They still need a feature branch + green CI — that's the only path now. Note: a *markdown-only* PR still runs CI (the `pull_request` trigger has no `paths-ignore`) so required checks report and it can merge.
-- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Six roles run against this repo (Orchestrator, Implementation in two lanes, BugFix, Tuning, Review, Device Verification), up to seven sessions concurrently — **and one of them, Device Verification, runs on the owner's own machine rather than in a container**, and that file is the contract between them: who owns which files, which letter your entry IDs come from, and what you may merge without asking. **A standing agent is meant to run as one continuous session per role** — rely on Claude Code's automatic context compaction rather than writing a handoff and spawning a successor just because context is getting long; that keeps cached tokens working for you instead of resetting them. Handing off to a successor is now the exception (owner reset, or a session lost outside your control), not the routine end of a generation — see `docs/agents/README.md` §4. If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor (or your own earlier self, after a reset) left you.
+- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Six roles run against this repo (Orchestrator, Implementation in two lanes, BugFix, Tuning, Review, Device Verification), up to seven sessions concurrently — **and one of them, Device Verification, runs on the owner's own machine rather than in a container**, and that file is the contract between them: who owns which files, which letter your entry IDs come from, and what you may merge without asking. **A standing agent is meant to run as one continuous session per role** — rely on Claude Code's automatic context compaction rather than writing a handoff and spawning a successor just because context is getting long; that keeps cached tokens working for you instead of resetting them. Handing off to a successor is now the exception (owner reset, or a session lost outside your control), not the routine end of a generation — see `docs/agents/README.md` §4. **⚠ Claude Code itself will tell you otherwise, and it is wrong for this repo: at ~90% and ~95% of the context window the harness prints *"Wrap up soon: invoke the handoff skill … then start a fresh session"*. That warning is built into the tool, not into this repository — it is in no hook, no `settings.json` and no doc here, so it cannot be edited away. IGNORE IT.** Compaction is the policy and it is automatic; a session that hands off at 90% throws away a warm cache to solve a problem the tool has already solved. Hand off only for the two reasons above. (The window itself is a launch flag, `claude --autocompact <auto|100k–1M>`, not a repo setting — the owner sets it when starting a session.) If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor (or your own earlier self, after a reset) left you.
 - **At the start of every session**, read `projectOverview.md` first — it is a lean index holding current status, the live Known Issues & Risks tables, and the **What's Left To Do** list. Use it to orient before doing anything. The session journal lives in `docs/overview/entries/` (recent, one file per PR) and the batched `docs/overview/history-*.md` archives (see the Document Map at the bottom of `projectOverview.md`) — only open those when you need history.
 - **Also at session start, read `error_events` in production** — it is the only view of faults that never reach a human. **It DOES prune at 30 days — the 2026-09-01 amendment claiming otherwise was wrong and is retracted (BF-93).** The `DELETE` is in `insertErrorEvent` (`lib/data/postgres/adapter.ts`), throttled to once a day by the shared `shouldPrune`, and it has been there since the initial public snapshot. **The evidence that convinced a session otherwise is what a working prune looks like:** a prune fired from a write path only runs when something is written, and errors are now rare, so the oldest row ages past 30 days between faults. Measured 2026-09-01 — last write **2026-08-30**, oldest row **2026-07-31**, span **exactly 30 days**, matching the cutoff computed from the last write to the day. Reading "oldest row is 32 days old" against *today* rather than against the *last write* is what produced the false finding. So: read the table early, because a fault that stops on its own goes unnoticed and then expires. The table is the second-largest object in the database at 52 MB — **and that 52 MB is BLOAT, not payload; the earlier reading of it as "30 days of retained payload rather than unbounded growth" is corrected here (RV sweep 50, 2026-09-18).** Measured that day: **12 MB heap + 39 MB TOAST + 752 kB index behind 115 live rows.** The figure was written when the table held 7,331 rows, and the prune removed the rows without reclaiming the space. So the size is real and the *conclusion* drawn from it was not: a 52 MB `error_events` is not evidence that faults are being retained, and shrinking it is a `VACUUM FULL`/rewrite question, not a retention question. The first read of that table (2026-08-04) found three faults, **two of which had already stopped before anyone looked**. One query via the admin endpoint:
   ```
@@ -16,7 +16,7 @@
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
   Anything new gets a `projectOverview.md` Known-Issues row or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
-- **The Orchestrator reads the owner's in-app reports at session start** — *Report an Issue* on
+- **BugFix reads the in-app reports at session start; the Orchestrator does too, as a backstop** — *Report an Issue* on
   `/more` writes to `feedback_submissions`, and the read is one query on the same endpoint:
   ```
   curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \
@@ -106,14 +106,26 @@ Full contract: [`docs/agents/README.md`](docs/agents/README.md). The rules below
 must bind even if that file is never opened.
 
 **The roles.** **Orchestrator** owns the queue and the docs — it clears completed entries, assigns
-batches, resolves lanes, and reconciles docs against reality on a weekly sweep. **Implementation**
+batches, resolves lanes, and reconciles docs against reality on a weekly sweep. **Its PRIMARY job,
+set by the owner 2026-09-24, is the owner-gated queue**: work through every entry that needs his
+input, establish what is genuinely his to decide, put that to him in the shape **Decisions That Come
+Back To Me** defines, and **assign the entry to a lane once it is unblocked**. 78 entries carried
+`Gate: owner` when that instruction was given. Most of them are not really his — they are engineering
+calls, Tuning's calibration, or a measurement nobody has taken — and **separating those from the few
+that are is the work**, not a preamble to it. **Implementation**
 runs in two lanes and is the only role that writes code — Lane A
 owns the engine (`lib/data/**` including every migration, `lib/local-store/**`, `lib/sqlite/**`,
 `lib/cache-groups.ts`, `app/api/**`, `packages/shared/**` except `changelog.ts`, the domain-math and
 device pipelines, auth/security, `android/**`), Lane B owns the surface (`app/**` except
 `app/api/**`, `components/**`, `app/globals.css`, `lib/hooks/**`, `lib/stores/**`). **BugFix** turns
-owner reports into backlog entries. **Tuning** turns lived feedback into calibration proposals.
-**Review** sweeps the running app weekly and files what it finds. **Device Verification** runs
+owner reports into backlog entries — **and it owns the in-app feedback intake** (owner, 2026-09-24):
+*Report an Issue* on `/more` is a report arriving the same way a spoken one does, so BugFix reads
+`claude_ro.feedback_submissions` at session start and files what it finds. The query and the
+watermark rule are in the session-start list above; the Orchestrator's copy of that read is now a
+backstop for when BugFix is not running, not the owner of it. **Tuning** turns lived feedback into calibration proposals.
+**Review** sweeps the running app weekly and files what it finds — **and may commission a sweep
+rather than run one**, handing the device agent a question with an objective pass/fail via
+`Lane: DV` and reading the answer back off the entry. **Device Verification** runs
 **locally, on the owner's machine with the S25 on USB** — the only role that can see the real app in
 the real APK, driving it over the DevTools protocol (`scripts/device/**`). Those five end at a
 docs-only PR and never write product code, which keeps the collision surface to Lane A against
@@ -177,6 +189,30 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   and no two sessions awake at once — the queue outlives the session that wrote the entry.**
   **`O` and `DV` see only what is tagged for them**, because an unstated lane means "the path rule
   answers it" and that rule only resolves to an implementer.
+- **⚑ A QUESTION FOR THE OWNER IS A TASK, NOT A CHAT MESSAGE — file it `Lane: O`** (owner,
+  2026-09-24: *"Questions that I need to answer should be assigned a task and sent to Orchestrator
+  to be completed there."*). **No agent ends its turn handing the owner an open question.** The
+  decision brief still gets written — recommendation first, alternatives with why each lost,
+  reversal cost, per **Decisions That Come Back To Me** — but it is written **into an entry**, and
+  the entry goes to `O`. The chat reply says the question exists and where it is; the entry is what
+  carries it. A question that lives only in a reply dies with the session, and the owner has to
+  answer it from a scrollback instead of a queue.
+  **Encode it as `Lane: O` and NOTHING else — do NOT add `Gate: owner`.** That is the trap, and it
+  inverts the instruction: `Gate:` PARKS an entry (`next-item.js`), so a question gated on the owner
+  disappears from the Orchestrator's READY list and nobody is tasked with putting it to him. `Gate:
+  owner` is for work that is *blocked pending* an answer already sought; **getting the answer is
+  itself the Orchestrator's work**, and work is `Lane: O`, ungated.
+  **Give it a queue position near the top of `O`** — position is priority, and an unanswered owner
+  question blocks whatever it gates. `next-item.js` prints only `TOP_N = 10` per lane, so an owner
+  question filed at rank 15 is in the queue and not in anyone's view; `--all` shows the rest.
+  **Where the question sits INSIDE another entry, split it out.** An owner decision buried in a
+  `Lane: A`/`B` body is invisible to the Orchestrator, because the lane field is what routes it —
+  file the decision as its own `O` entry and leave the buildable half in its own lane, linked with
+  `Needs:` only if it genuinely cannot start first.
+  **Not every judgement is his** — **Decisions That Come Back To Me** still narrows it hard
+  (structural calls are the agent's; data, money, auth, scoring calibration and genuine product
+  preference are his). This rule governs what happens to a question ONCE it is genuinely the
+  owner's, not whether to have one.
 - **`Lane:` names who acts NEXT — and for the device that means what the phone can ANSWER, not
   everything the phone is involved in** (owner, 2026-09-23: *"Only device testing that can be done
   by DV goes to DV; if its device testing based on looks/design that should stay in orchestrator

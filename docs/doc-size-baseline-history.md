@@ -14941,7 +14941,6 @@ need a backfill that does not exist and is a production write, and the condition
 reads see nothing is still unidentified.
 
 
-
 ## 2026-09-21 — TN-35's overlay half, and how it came to be startable
 
 `docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
@@ -16487,3 +16486,175 @@ names a cause instead of a symptom.
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+TN-62, filed on a status recheck, and it records a cost of my own 2026-09-22 proposal rather than a
+new defect. The single batched recompute was meant to stop the owner's readiness history shifting four
+times; measured today, the interim it creates is **worse than the defect being fixed** — 26 stored
+`hrvBalance` and 19 `sleepBalance` values still carry the pre-fix clip, so 2026-09-23 at z −3.24
+stores 4 while 2026-09-15 at z −1.63 stores 0 and the worse night reads better. Pre-fix the series was
+at least monotonic.
+
+Two blocks earn their lines. **DV-14's deploy stall was ruled out before the finding was written** —
+the tail shipped in 1.465.13 and production is live on 1.465.17 — because "production is ten hours
+behind" is the explanation a later session would reach for first. And **`computed_at` is recorded as
+misleading**: 57 of 71 rows carry a timestamp of 2026-09-23 or later and were not re-derived, so the
+one field that looks like the answer is the trap. The verification test is stated as a property of the
+model (it cannot emit 0 or 100 for any realistic z) rather than as a timestamp check.
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+BF-190, found while answering why a calories tile was blank: the walk summary saves on mount with the
+planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minute session. The
+length carries the two-row production table that is the evidence, and the reopening note on BF-107
+that distinguishes "the fix regressed" from "the screenshot was taken 30 seconds after the save" —
+the distinction is the whole value of the note, so it could not be shortened to a verdict.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+Net +14 across two entries. DV-17 grew because its stated location was wrong and the correction is
+the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is the parent passing
+`mealPlan === null` as "still loading" when null is the settled "no plan" answer. LB-139 is new —
+the six-line DV-17 fix put `nutrition-content.tsx` at exactly its 800-line ceiling, so the next edit
+to that file fails CI, and the extraction that fixes it is real work rather than a baseline raise.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 27947
+
+27821 → 27843 (+22). DV-18 asked Lane B to look first and hand over if the cause was server-side, so
+this is that handover rather than a new entry. The +22 is the triage: what was ruled out (the stored
+URL exists — the component renders a "No reference" string when it is null, and the device saw a
+broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
+that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
+
+## 2026-09-24 — `projectOverview.md` → 12655
+
+12624 → 12655 (+31). TN-55's Known-Issues row. The battery fix itself would not have earned a row —
+it is a shipped bug fix and the journal entry carries the detail — but three things are still owed
+and each would otherwise be invisible: the constants are provisional until the 2026-10-04 re-sweep,
+the stored history does not re-score although the plan said it would, and a workout day still barely
+separates from a rest day. Per the archive rule an entry stays here while anything is outstanding,
+so this is the row that has to exist, and it is written to the owner rather than about the code.
+**2026-09-24 · `docs/implementation-backlog.md` · Review, `review/dv-results-and-new-probes`.**
+27947 → 28052 (+105; rebased on #1498). Nine new Review entries: three findings from device sweeps 1–3 that had no
+entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four parked probes were
+re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
+to run. Offset by removing RV-126, whose results all have homes (−30).
+
+
+## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
+
+Growth from the orchestrator's review of device sweep 3.
+
+**Backlog +66.** One new entry, `OR-139` — a device FAILURE does not clear the field that makes an
+entry read as finished, found after fixing five instances by hand (`BF-61`, `BF-139`, `BF-96`,
+`RV-103`, `TN-53`). The rest is the corrections themselves: each of the five needed its field
+removed, its title made true, and an acceptance criterion written, because a failed check is work
+and the old wording said otherwise.
+
+**CLAUDE.md +2.** The harness prints a handoff instruction at ~90% of the context window that
+contradicts this repo's compaction policy, and it lives in no hook or setting here — so the only
+available fix is telling agents to ignore it, with the reason.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → LB-139 out, LB-140 in
+
+28104 → 28117 (+13 on the merged base). Net of a 13-line removal and a 26-line
+addition, landing under Review's sweep in the same hour. LB-139 shipped, so it left the
+queue. LB-140 is what verifying LB-139 turned up: the step-by-step meal-plan setup sheet does not
+open at all, on `main` as well as on the branch. The entry is longer than the defect because most of
+it is what has already been ruled out — the control run against `main`, the intact wiring, the
+absence of any console error — and the one thing that has NOT been checked, which is whether it
+reproduces outside the dev server. Writing that down is what stops the next session re-running the
+same four probes.
+## 2026-09-24 — `CLAUDE.md` 966 → 990, `docs/implementation-backlog.md` → 28090
+
+The owner's standing instruction that a question for him becomes a task rather than a chat message,
+plus BF-191 carrying the two decisions it split out of BF-190. The CLAUDE.md growth is one rule, and
+most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, so gating an owner
+question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
+asking. Stating the rule without stating that inversion would have produced exactly the failure the
+rule is for.
+---
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
+28168 → 28240 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
+not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
+seven device gates are re-filed.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md`
+
+28240 → 28335 (+95, after four merges of `origin/main` — the earlier figures on this branch were
+against bases that had already moved). Three owed checks re-laned
+to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the DV-13 concurrency hazard
+and the owner's authorisation for a production write — a bare lane change would not tell the device agent
+any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
+`laneFromLines` is first-match-wins.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/readiness-gates-nothing)
+
+28338 → 28437 (+99, recounted on the merged base). Two entries. TN-64 records that readiness gates nothing — its only automatic
+protective action is excluded on the active `ai_dynamic` program and has never fired on any program —
+and carries the owner decision brief in the entry rather than a chat reply. TN-65 records that set RPE
+is a dense signal (864 of 1,286 sets) available to validate scoring, the load-controlled null it
+produced, and the n=10 correlations that must not be cited. Both are long because most of each is what
+has been ruled out and what must not be re-derived.
+---
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 56, `review/sweep-56-owed-reads`.**
+28437 → 28533 (+96; rebased on #1514). Twenty-three dated reading notes on entries whose owed read was run
+today, and four new entries (RV-159 an unattributed rewrite, RV-160 closures, RV-161 owner decisions,
+RV-162 a `Due:` field). Reading notes are the point of this sweep: each replaces a claim with a
+measurement on the entry that made the claim.
+
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-quality-is-a-default)
+
+28532 → 28632 (+100, recounted on the merged base). TN-66: `sleep_quality` has been a hard-coded `'ok'` since 2026-06-25, and two live readers present it as
+the owner's own answer — Home's card and an LLM prompt. Most of the entry is the distinction that makes
+it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.
+TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
+energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → RV-103's sweep-2 failure explained
+
+28633 → 28645 (+12 on the merged base). RV-103 shipped and then failed its device check, and the twelve lines are the
+explanation rather than a new entry: the failure line is fifteen seconds away because
+`fetchWithRetry` makes four attempts with 2.5 + 5 + 7.5 s of backoff, and `onRevalidateError` cannot
+cover the gap because the write's own invalidation has emptied the key. Measured with fake timers.
+Writing the arithmetic down is what stops the next session reading the sweep result as "the
+reporting never worked" and rebuilding a channel that already exists.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-autonomic-collinearity)
+
+28645 → 28768 (+123, recounted on the merged base). TN-68: the sleep model's `hrv` and `hr` contributors correlate at +0.873 over 60 nights, so 28 of its
+110 weight is one effective axis, and both pin at 100 together on 17% of nights. Most of the entry is
+the distinction from TN-60 — that rail inverted stored ordering, this one only loses resolution — and
+the three alternatives with what each is better at, since any weight change here is the owner's.
+TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
+coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.
+## 2026-09-24 — CLAUDE.md → 1002 (chore/or-143-process-owner-gate-triage)
+
+Growth, +11 on the merged base (990 → 1002), recording the process the owner set out: the Orchestrator's primary job is the
+owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
+rather than run one. A role definition that lives only in a chat is one the next session does not
+have, so it costs twelve lines in the file every session reads.
+
+## 2026-09-24 — `docs/agents/state/orchestrator.md` → 97 (chore/or-144-ungate-owner-questions)
+
+Growth, +19. The owner-gate triage's state: which of the seven self-parked `Lane: O` entries were
+ungated and why, which three keep their gate, and the two things deliberately left owed (the queue
+reordering, and 69 entries still triaged only as a shape). It is +19 because a baton that says
+"triage in progress" is worth nothing — the next session needs the three keep-the-gate decisions by
+name, or it re-asks the owner questions he has already parked.
