@@ -73,9 +73,13 @@ describe('BF-191 — a sub-minute walk is offered as a discard, in ONE dialog', 
   })
 
   it('every caller states what ending does, because the three genuinely differ', () => {
-    const callers = execFileSync('git', ['ls-files', 'app', 'components', '--', '*.tsx'], {
-      cwd: ROOT, encoding: 'utf8',
-    }).split('\n').filter(Boolean).filter(f => f !== DIALOG && src(f).includes('<LeaveWalkDialog'))
+    // `git ls-files app components -- '*.tsx'` UNIONS its pathspecs, so it also returns every
+    // `.test.ts` under those directories — including this file, whose own regex literal contains
+    // `<LeaveWalkDialog`. It passed locally only because the file was still untracked. Filter here.
+    const callers = execFileSync('git', ['ls-files', 'app', 'components'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter(Boolean)
+      .filter(f => f.endsWith('.tsx') && !f.includes('__tests__'))
+      .filter(f => f !== DIALOG && src(f).includes('<LeaveWalkDialog'))
     // Three today: the End-walk button, the back gesture, the tab bar.
     expect(callers.length).toBeGreaterThanOrEqual(3)
     for (const f of callers) {

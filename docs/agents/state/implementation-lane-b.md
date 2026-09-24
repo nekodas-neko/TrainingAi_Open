@@ -1,13 +1,13 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-141 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-142 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111, RV-121 both halves, RV-164 shipped. Now BF-190 + BF-191 together — one flow, one device
-check, and BF-191's floor is near-meaningless without BF-190's real elapsed time. Also fixed
-BF-188's fold collision (unique `-N` per fold) since it blocked a third PR.
+RV-111, RV-121 both halves, RV-164, BF-190 + BF-191 shipped. The last two went together: one flow,
+one device check, and BF-191's floor is near-meaningless without BF-190's elapsed time. LB-141 filed
+(two of three walk exits keep nothing). BF-188's fold collision fixed — it blocked a third PR.
 
 ## Next
 
@@ -33,22 +33,22 @@ Orchestrator's chat, being exported to `docs/design/`. Do not re-ask him, do not
 
 ## Lessons that cost real time
 
-- **⚠ THE MERGE CALL IS NOT A GATE HERE** — #1467 squash-merged with `Tests` FAILING. Read the five
-  conclusions via `list_workflow_jobs` (`resource_id`, not `run_id`); E2E is advisory.
-- **THE MERGE RACE IS ARITHMETIC AND I LOST IT SEVEN TIMES ON ONE PR.** CI ~7 min vs a commit to
-  `main` ~every 4. Merge the INSTANT the five are green; no run for your head = conflicted PR.
-- **THE FOLD IS SAFE AGAIN** — it writes `-2` when `-1` exists (BF-188, fixed 2026-09-24). Still
-  verify by anchor count: the loss is silent and `check-doc-links` passes over it.
-- **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS.** Two sweeps inserting different entries at one
-  point is two ADDITIONS — keep both. Read the headings on each side before choosing, every time.
+- **⚠ THE MERGE CALL IS NOT A GATE** — #1467 merged with `Tests` FAILING. Read the five conclusions
+  via `list_workflow_jobs` (`resource_id`, not `run_id`).
+- **THE MERGE RACE IS ARITHMETIC — seven lost cycles on one PR.** CI ~7 min vs a commit to `main`
+  every ~4. Merge the INSTANT the five are green; no run for your head = conflicted PR.
+- **THE FOLD IS SAFE AGAIN** — writes `-2` when `-1` exists (BF-188). Verify by anchor count: the
+  loss is silent and `check-doc-links` passes over it.
+- **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS** — two sweeps inserting at one point is two
+  ADDITIONS, keep both. Read the headings on each side, every time.
 - **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481 silently deleted RV-117/118.
-- **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — the conflict sits inside a `changes:`
-  array under a shared header, so a splice drops the other PR's entry. It conflicts on EVERY merge.
-- **READ THE CODE BEFORE THE ENTRY.** Six for six. RV-164 named three writes; the localStorage
-  seeds and the dismiss path were the same defect, unnamed.
-- **CONTROL-RUN every new test against `origin/main`**, and MEASURE what main does rather than
-  inferring it from a red assertion. E2E is ADVISORY, so pair any spec with a gating vitest file.
-- **A gate's exit code must be read DIRECTLY** — never via `&&`/`;` into `git commit`, where an
-  `echo` succeeds and a RED gate still commits. Same reflex: COMMIT before `git stash`/`checkout`.
-- **`pnpm build` is what compiles an auth-gated page and typechecks test files** — `tsc --noEmit`
-  does neither.
+- **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — a shared header means a splice drops
+  the other PR's entry. It conflicts on EVERY merge.
+- **READ THE CODE BEFORE THE ENTRY.** Seven for seven — BF-190/191 missed that two of the three
+  walk exits keep nothing.
+- **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a
+  gating vitest file. **A source-scanning test can pass locally and fail in CI on ITSELF**:
+  `git ls-files` skips it while untracked, and `ls-files A B -- '*.tsx'` UNIONS pathspecs, so
+  `__tests__` returns too — filter in JS.
+- **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; and COMMIT before `git stash`/`checkout`.
+- **`pnpm build` compiles an auth-gated page and typechecks tests** — `tsc --noEmit` does neither.

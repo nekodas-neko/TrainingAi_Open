@@ -24,9 +24,10 @@ describe('RV-121 — /collection is reachable without enabling a widget', () => 
   const WIDGET = 'components/home/home-card-widget.tsx'
 
   function navigators(): string[] {
-    const files = execFileSync('git', ['ls-files', 'app', 'components', '--', '*.tsx'], {
-      cwd: ROOT, encoding: 'utf8',
-    }).split('\n').filter(Boolean)
+    // The `-- '*.tsx'` form unions its pathspecs and pulls in `__tests__` too (BF-190's CI failure).
+    const files = execFileSync('git', ['ls-files', 'app', 'components'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter(Boolean)
+      .filter(f => f.endsWith('.tsx') && !f.includes('__tests__'))
     // A navigation, not a mere mention: `/collection` as the target of a push/navigate call.
     return files.filter(f => /(?:push|navigateWithTransition|navigateToTab|href=)[^\n]*['"`]\/collection['"`]/.test(src(f)))
   }
