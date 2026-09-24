@@ -22,7 +22,7 @@ describe('client reads bypass the browser HTTP cache', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   it('cachedFetch asks for no-store, so revalidation cannot be answered from the HTTP cache', async () => {
-    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ ok: 1 }) }))
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, json: async () => ({ ok: 1 }) }))
     vi.stubGlobal('fetch', fetchSpy)
 
     await cachedFetch('http-bypass-key', '/api/anything', 60, () => {})
@@ -31,19 +31,19 @@ describe('client reads bypass the browser HTTP cache', () => {
     // BF-195 added an `AbortSignal.timeout` to this call. The exact-match below was deliberate —
     // it catches anything unexpected being passed to `fetch` — so it is kept as an exact KEY check
     // rather than relaxed to a partial match, which would stop guarding that.
-    const init = fetchSpy.mock.calls[0][1] as RequestInit
+    const init = fetchSpy.mock.calls[0][1]!
     expect(Object.keys(init).sort()).toEqual(['cache', 'signal'])
     expect(init.cache).toBe('no-store')
     expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('the today-envelope variant goes through the same path, so it inherits the bypass', async () => {
-    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ ok: 1 }) }))
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, json: async () => ({ ok: 1 }) }))
     vi.stubGlobal('fetch', fetchSpy)
 
     await cachedFetchToday('http-bypass-key-today', '/api/anything-today', 60, () => {})
 
-    const init = fetchSpy.mock.calls[0][1] as RequestInit
+    const init = fetchSpy.mock.calls[0][1]!
     expect(Object.keys(init).sort()).toEqual(['cache', 'signal'])
     expect(init.cache).toBe('no-store')
   })
