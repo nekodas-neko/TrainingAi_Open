@@ -1096,11 +1096,35 @@ which is the right shape for something that can only be validated by living with
 - **Why it is first:** 39 of the last 40 deploys failed. Production serves **1.465.26** while `main` is
   at **1.465.31**, so tonight's merges are **not live**, and that includes RV-180's clock fix (#1554)
   and RV-164's goal-apply fix (#1546). Every merge until this lands is inert.
-- **Unblock: a structural call, reversible in one line, no owner needed.** Set the heap in the build
-  script, **not** as a Railway service variable (that route is a production config change and was
-  put to the owner): `"build": "node scripts/build-rollup-worker.mjs && NODE_OPTIONS=--max-old-space-size=6144 next build"`.
-  **Caveat:** if the Railway builder has under ~8 GB of RAM, the kernel may kill it instead. That
-  is no worse than today and would show in the build log.
+- **✅ UNBLOCK SHIPPED 2026-09-24 (Lane A).** `package.json`:
+  `NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=6144} next build`. The `:-` form means an
+  operator can still override it from the Railway service without a code change. Verified locally
+  with no `NODE_OPTIONS` set: node received **6192 MB**, the build exited **0**, 244/244 pages.
+  **Caveat unchanged:** if the Railway builder has under ~8 GB the kernel may kill it instead — no
+  worse than today, and it would show in the build log.
+- **⚠ AND THE CAP WAS ONLY EVER SET IN CI — this is why the split existed at all.**
+  `.github/workflows/ci.yml` set `NODE_OPTIONS: --max-old-space-size=4096` at the Build job, and
+  **nothing set it for Railway**, which therefore ran on Node's own default. That default is
+  **sized from container RAM, not a constant**: ~**4,051 MB** on Railway's builder (read off its own
+  OOM line) against **2,096 MB** in this sandbox. So CI was green and production was failing **on
+  the same commit**, ~45 MB apart. The job-level line is now removed and the number lives in
+  `package.json` alone, so the two can no longer disagree.
+- **❌ PART 2 ITEM 1 WAS TRIED AND DOES NOT WORK — do not repeat it.** Setting
+  `autoInstrumentServerFunctions` / `autoInstrumentMiddleware` / `autoInstrumentAppDirectory` to
+  `false` is **not** equivalent to removing `withSentryConfig`. Measured at the 3 GB repro cap:
+  control **exit 134** (4,906 MB summed), with the three flags off **still exit 134** (5,450 MB).
+  Whatever the wrapper does that costs the memory, it is not those three transforms — so the next
+  attempt needs to bisect the wrapper's webpack plugin itself, not its documented options.
+- **❌ PART 2 ITEM 2 DOES NOT ADDRESS THIS FAILURE.** Skipping Railway's lint and type-check was
+  implemented and reverted: **both builds die during COMPILATION**, before either pass runs
+  (`Creating an optimized production build ...` is the last line in each). Type-checking may well
+  need >3 GB of its own, but it is not what fails first, so turning it off on the deploy host buys
+  nothing and gives up a check.
+- **Keep:** two things. ① **Confirm a deploy actually succeeds** and `/api/version` advances past
+  1.465.31 — the unblock is verified locally and by CI, never yet by a green Railway deploy.
+  ② **Part 2 proper** — the compile still wants >4 GB, so this is headroom, not a cure, and the
+  6,144 figure stays provisional until something explains the appetite. The 3 GB local cap remains
+  the deterministic repro loop (control above confirms it still reproduces).
 - **Take it off the boundary, measured with the local 3 GB loop (DV-14's table):**
   1. **Trim the Sentry webpack wrapper**, the measured compile-phase driver. Removing it lets the
      compile pass at 3 GB. Try the `withSentryConfig` options that add build-time transforms first
@@ -1111,7 +1135,9 @@ which is the right shape for something that can only be validated by living with
      Railway (`eslint.ignoreDuringBuilds` / `typescript.ignoreBuildErrors` gated on a Railway
      env var), so CI stays the gate.
 - **Done when:** `pnpm build` passes locally under `NODE_OPTIONS=--max-old-space-size=3072`, and
-  Railway's next deploy is SUCCESS with `/api/version` matching `main`.
+  Railway's next deploy is SUCCESS with `/api/version` matching `main`. **Neither half is met yet:**
+  the 3 GB target needs part 2, which is still open, and the deploy is unconfirmed. The entry stays
+  queued.
 - **Not the changelog:** cutting it to 9.8 KB changed nothing. Bounding it is still reasonable
   hygiene, but it is not this fix.
 
@@ -1759,6 +1785,11 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 - **First step:** Railway's deploy log for `main` from 18:16 — the first failing deploy names the
   cause. Not established: whether deploys fail, are stuck queued, or are disabled.
 - **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
+- **✅ CAUSE CLOSED 2026-09-24 (Lane A, RV-188):** the heap cap was set in `ci.yml`'s Build job and
+  **nowhere else**, so Railway ran on Node's RAM-scaled default — ~4,051 MB there against 2,096 MB
+  in the sandbox — and failed ~45 MB short on the same commit CI passed. The number now lives in
+  `package.json` alone. See RV-188 for what shipped, and for the two part-2 fixes that were tried
+  and did not work.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** production **caught up**: live 1.465.25 = `main` 1.465.25 (merged 11:26, live by 13:09). One read cannot show deploy latency, and the cause stays unread in Railway's log, so this is *stopped, not explained*.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** see the reproduction below and **RV-188**, which is now Lane A's first item. There is also a fourth version reading: live **1.465.26** against `main` **1.465.31** (21:30 AEST).
 - **🔬 REPRODUCED LOCALLY 2026-09-24 (Review sweep 59) — and the changelog is NOT the driver.**
