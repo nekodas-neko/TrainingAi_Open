@@ -16767,3 +16767,12 @@ gate their own text called premature since 2026-09-16, and why a correct diagnos
 itself: removing the gate would have released a scoring change with no proposal into Lane A, and
 there is no `Lane:` value for Tuning, so nothing else could hold them. The entry is long because the
 next session needs the reason the obvious fix (a fifth lane) was rejected, or it will add one.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/rpe-residual-validated)
+
+29149 → 29259 (+110). TN-73: the RPE residual passes a positive control (set 1 → set 3 moves it +0.248, r = +0.156 over 782
+sets, beating raw RPE), which calibrates its sensitivity at ~0.25 points and turns the sleep/readiness
+nulls into a measured ceiling — neither moves perceived effort by a fifth of that. Filed as a Reference
+because future proposals read it for their acceptance bar rather than building from it.
