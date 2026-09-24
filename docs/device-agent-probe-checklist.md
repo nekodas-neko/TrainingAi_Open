@@ -327,3 +327,64 @@ Take P11's per-tab time-to-interactive numbers **at app open, after the P2 walk,
 minutes idle**. Report the three sets side by side. RV-133 measures heap and listener counts over the
 same window; **this is the timing half of the same question**, and the two together decide whether
 the accumulation RV-133 finds is inert or is what BF-22 is feeling.
+
+# Part C — what sweeps 1–3 made possible (P17–P22)
+
+Added 2026-09-24 after reading sweeps 1–3. Each probe below is **read-only** unless it says
+otherwise, and each uses a CDP domain the harness can already reach through `pw.js`. The reporting
+contract above still applies: VERIFIED / FAILED / COULD NOT CHECK, with screen, orientation and
+navigation mode on every result.
+
+## P17 — the timezone census (every screen, two clocks that disagree)
+
+`Emulation.setTimezoneOverride('America/New_York')` with the **profile left on Brisbane**, then walk
+every route and snapshot the visible text of each. Repeat with the override cleared. **Every clock
+time, date label and "today"/"yesterday" word must be identical in both snapshots**: the app is
+meant to render in the user's zone, never the device's. A difference is the `toLocale*String`
+-without-`timeZone` class that CLAUDE.md names, found mechanically across the whole app rather than
+one screen at a time. DV-7 ran this on the Sleep screen only. Report the diff, per route.
+Second pass: a fixed-offset zone (`Etc/GMT±N`) whose local time is currently **00:00–02:00**, which
+is where a device-day and a user-day disagree about the date itself.
+
+## P18 — fault injection, one endpoint at a time
+
+`Fetch.enable` with a pattern for **one** `GET /api/*` endpoint, answered with a 500 (then, a second
+pass, never answered for 20 s). Visit every screen that reads it. For each card: does it show an
+**error state**, keep a **stale value with no sign that it is stale**, or **vanish**? The last two are
+the Q-499 rule (a self-fetching card needs an explicit failure state) and RV-103 found one by hand.
+**Never fail a write** (`POST`/`PUT`/`PATCH`/`DELETE`, or `/api/sync/*`); this probe is about reads.
+Report a table: endpoint × card × {error shown, stale shown silently, vanished, unaffected}.
+
+## P19 — how long the phone runs old code after a deploy
+
+The sweep-2 runbook says *"restart the app after a deploy before re-checking a fix"*, which means the
+running WebView does **not** pick up a Railway deploy on its own. Measure it: after a merge deploys
+(watch `/api/version` flip), read the version the **running bundle** reports, then check again after
+(a) staying in the foreground 10 min, (b) background → resume, (c) a force-stop → cold start. Report
+the time or step at which each reached the new build, and what the service worker's cache holds for
+the old one. **This decides the lag for every `Verify: device` in the queue**, and it is also how long
+the owner runs a fix's predecessor.
+
+## P20 — accessibility tree and broken-image census
+
+`Accessibility.getFullAXTree` on every route: **interactive nodes with no accessible name**, images
+with no alt text, and `img` elements with `complete && naturalWidth === 0` (a broken image). DV-11
+(switches with no name) and DV-18 (a broken admin image) were each found by eye on one screen; this
+finds the rest in one pass. Report counts per route and each offender's role and nearest text.
+
+## P21 — what a tab tap writes to localStorage
+
+DV-12's profile puts `localStorage.setItem` at **1–15 ms on every tab tap**. The suspect is
+`lib/sqlite/cache.ts:82`, which stores `JSON.stringify(entry)` of the **whole payload** synchronously
+on every cache write, and every visit revalidates. Wrap `Storage.prototype.setItem` with
+`Runtime.evaluate` so it logs **key, value length and duration**, then tap through each tab. Report
+the keys written per tap, their sizes, and the total size of `localStorage` against its quota. A
+quota near full turns this from a cost into a failure, because `setItem` throws when it is full.
+
+## P22 — the app left open across local midnight
+
+The "today's data served after midnight" class (session 52) has only ever been checked by reading
+code. With the app in the foreground at **23:55 Brisbane**, record which today-keyed values change at
+00:00 and which do not until a tab switch or a restart: Home's day, Nutrition's diary date, the
+readiness card, the timeline. **Needs an overnight sitting the owner agrees to**, so it is the one
+probe here that cannot run whenever the phone is plugged in.
