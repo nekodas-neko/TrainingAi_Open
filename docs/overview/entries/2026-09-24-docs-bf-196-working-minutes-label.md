@@ -78,3 +78,20 @@ arising from a double-count scales with exercise and set count rather than with 
 should be taken explicitly if it is wanted.
 
 Nothing was run — docs-only, as above.
+
+## Second surface, same session — the summary's `DURATION` is wall clock
+
+Owner, on a completed Lower session showing `48:00`: *"Like this workout says 48 thats way under 60?
+Is it not counting warmup?"*
+
+**It is.** `done-screen.tsx` renders `workoutEndMs − workoutStartMs`, and `workoutStartMs` is stamped
+at the start of the warm-up. Measured on that session: wall **47.9 min**, warm-up **12.5**, working
+**35.4**.
+
+The two numbers he sees are in different units and neither says so — the card's `~51 min` is working
+time, the summary's `48:00` is the whole session. Compared directly they read as *"3 minutes under"*;
+the real comparison is **51 planned working against 35.4 actual — 15.6 under**, on a session whose
+warm-up also overran its 9-minute carve-out by 3.5.
+
+That is BF-197 caught live and larger than the median case: it predicts 14.2 phantom minutes and this
+session gave back 15.6. BF-196 now owns both strings rather than just the card's.

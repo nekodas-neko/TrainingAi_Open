@@ -17049,3 +17049,11 @@ shipped vs corrected, at 2 and 3 sets) plus the counter-argument from `expandToB
 which is real and had to be answered rather than omitted. Two corrections in place are the rest: the
 withdrawn clause in the BF-189 amendment and the wrong second sentence in BF-196. Striking them where
 they were written costs lines and is the only way a reader of those entries sees the correction.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30624 (BF-196, second surface)
+
+The owner read `48:00` on a completed session and asked whether the warm-up was counted. It is — and
+the amendment costs lines because the answer is that the two numbers he compares are in different
+units: the card's estimate is working time, the summary's duration is wall clock. Recording it needs
+both the code anchors and the session's three timestamps, because "it is counting it" is not
+believable without them.

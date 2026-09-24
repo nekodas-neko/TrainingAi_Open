@@ -2973,9 +2973,27 @@ drift.
   code states why: *"The duration model is deliberately conservative and that under-fill IS the
   finish-early margin — the owner's sessions land on time because of it. Expanding by default would
   spend exactly that margin."* Here there is not even an under-fill to spend.
+- **⚑ SECOND SURFACE, SAME CLASS — the summary's `DURATION` is WHOLE-SESSION while the card's
+  estimate is WORKING-ONLY, and the two are naturally compared.** Owner, 2026-09-24, on a completed
+  Lower session reading `48:00`: *"Like this workout says 48 thats way under 60? Is it not counting
+  warmup?"* **It is counting it.** `done-screen.tsx` renders `durationMinutes`, computed in
+  `workout-screen.tsx:1746` as `workoutEndMs − workoutStartMs`, and `workoutStartMs` is stamped at
+  the *start of the warm-up* (it is the same anchor the warm-up chip counts from,
+  `workout-screen.tsx:694`). Measured on that session (`workout_sessions`, 2026-09-24 21:46:11 →
+  22:34:02): wall **47.9 min**, warm-up **12.5**, working **35.4**.
+  **So the two numbers he sees are in different units and neither says so:** the card's `~51 min` is
+  working time, the summary's `48:00` is wall clock. Comparing them reads as *"3 minutes under"*.
+  The true comparison is **51 planned working against 35.4 actual working — 15.6 minutes under**, on
+  a session whose warm-up also **overran** the 9-min carve-out by 3.5. Fixing one label and not the
+  other leaves the mismatch intact, so this entry now owns both strings: name the quantity on the
+  card (`~51 min working`) and on the summary (`48:00 total` / `incl. warm-up`).
+- **It is also the BF-197 over-reservation caught live, at a larger magnitude than the median.**
+  BF-197 predicts 14.2 phantom minutes; this session gave back **15.6**. The lifter finished
+  **12 minutes inside the hour** after a warm-up that ran long — which is the shape BF-197 describes,
+  not a session that was too short.
 - **Verification:** with the label changed, the card reads as working time on the S25 at 384 dp
   without wrapping the row, and the number still matches
-  `prescription.estimatedSessionDurationMin`. **Device look owed** for the width.
+  `prescription.estimatedSessionDurationMin`. **Device look owed** for the width. Both strings, not just the card's.
 
 ### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
