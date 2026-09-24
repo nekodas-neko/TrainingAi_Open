@@ -478,7 +478,7 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] OR-150 — thirteen scoring entries owe a Tuning proposal, not the owner's signature
+### [platform] OR-150 — fifteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
 - **Added:** 2026-09-24 · OR-150, the last slice of the `Gate: owner` triage.
@@ -510,16 +510,22 @@ brake in reach. **There is no `Lane:` value for Tuning** — the lanes are `A`, 
 entry that owes a Tuning proposal has no field that says so. That is the gap, and it is why a
 correct triage could not act on itself.
 
-**What this entry does about it:** each of the thirteen now carries `Needs: OR-150` in place of the
+**⚑ FIFTEEN as of 2026-09-24, not thirteen.** RV-189 added two more on the same test: **`TN-11`**
+(*"moved this hour"* redefines what counts as an active hour) and **`OR-155`** (the `activityBalance`
+half, split out of `TN-9` because a question buried inside another entry does not get routed). Both
+arrived by the independent route the six of 09-24 did — a scoring change with no proposal and no
+days-moved figure — which is now three separate sweeps reaching the same conclusion.
+
+**What this entry does about it:** each of the fifteen now carries `Needs: OR-150` in place of the
 owner gate. They stay parked, for the true reason, and they stop counting as owner debt. When the
 proposals exist this entry leaves the queue and all thirteen unpark together.
 
-**The deliverable is thirteen Tuning proposals**, each stating **how many other days the change moves**
+**The deliverable is fifteen Tuning proposals**, each stating **how many other days the change moves**
 — which is what `CLAUDE.md` already requires of a proposal and what none of these has. Tuning reads
 the backlog, so an `O` entry naming them is the channel; writing into another agent's baton is not
 the Orchestrator's to do.
 
-- **Done when** every one of the thirteen has a proposal, or has been withdrawn with a reason. Not when
+- **Done when** every one of the fifteen has a proposal, or has been withdrawn with a reason. Not when
   this has been read.
 - **Deliberately NOT done here: inventing a `Lane: T`.** Tuning picks its work from its own sweeps
   rather than a lane queue, so a fifth lane value would be a channel nobody reads, and it would need
@@ -527,34 +533,67 @@ the Orchestrator's to do.
   that a standing channel is needed rather than one entry.
 
 
-### [platform] RV-189 — the implementer queue re-read against code: 5 entries to remove, 5 to park or reroute
+### [readiness] OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call
 
-- **Lane: O** — removing and parking entries is the Orchestrator's job. Every entry below carries a
-  dated `🔎 Re-read … (Review sweep 59)` note with its evidence.
-- **Added:** 2026-09-24 · Review sweep 59 ([`docs/reviews/2026-09-24-sweep-59-queue-against-code.md`](reviews/2026-09-24-sweep-59-queue-against-code.md)). The sweep re-read 59 READY entries in Lanes A and
-  B; the ones filed today were left out.
-- **Remove (already shipped or nothing left):**
-  - **LB-123** (#1394). This also clears RV-79's `Needs:`.
-  - **LB-114** (#1345).
-  - **Q-272** (#1521 via TN-55; its residue is LA-134).
-  - **Q-3b** (both halves closed).
-  - **Q-112** (every child shipped).
-- **Remove or reword and park:** **RV-77**. Its own re-verification says the calls are not
-  duplicates, and the path has never run.
-- **Park (READY, but not startable as written):**
-  - **LA-134:** its calibration window opens 2026-10-04.
-  - **OR-137:** its own verdict is don't build; 0 feedback rows.
-  - **Q-28:** its own verdict is don't build; the tripwire is already enforced. Consider `Reference:`.
-  - **TN-37:** step 3 needs a plan that does not exist.
-- **Reroute:**
-  - **TN-11** and **TN-9's activityBalance half**: scoring choices without a sign-off, so Tuning or
-    the owner.
-  - **TN-53**: remaining cause undiagnosed and probably engine-side, so not Lane B yet.
-  - **Q-48**: docs and planning, so Lane O.
-- **Already done in this PR:** `Needs: TN-5` on TN-10, and `Needs: TN-33` on Q-507, so neither shows
-  READY ahead of what it depends on.
-- **The rest are buildable.** 17 have corrected line numbers or a missing step in their note, which
-  saves the implementer the re-derivation. 19 are VALID as written.
+- **Lane: A** · **Added:** 2026-09-24 · split out of `TN-9` by RV-189, on Review sweep 59's reading.
+- **Needs: OR-150**
+- **Why it is its own entry.** `TN-9` is two halves under one owner sign-off. The check-in half has a
+  chosen mechanism (drop `checkin` from the composite and renormalise over the remaining eight) and is
+  buildable. **This half has no chosen mechanism** — the entry offers *"point `activityBalance` at a
+  completed day, or drop it"* and picks neither. A question buried inside another entry is invisible
+  to whoever routes the queue, which is why it is split rather than annotated.
+- **The finding, from TN-9 and unchanged.** `READINESS_WEIGHTS.activityBalance = 0.06`
+  (`packages/shared/src/health/readiness-composite.ts:29-30`) reads the CURRENT day, so it moves as
+  the day accumulates — the same "the number must be settled at first load" violation the owner ruled
+  out, and worse than the check-in half because nothing the owner does settles it.
+- **Why `Needs: OR-150` rather than a gate.** Both options change the score, and neither states **how
+  many other days it moves** — the thing CLAUDE.md requires of a Tuning proposal. Releasing it into
+  Lane A's READY list would hand an implementer a scoring change with no proposal; gating it on the
+  owner would ask him to sign a blank page. `OR-150` is the standing hold for that class.
+- **Done when** a proposal picks one option and states the days moved. Then this unparks with the
+  other fourteen.
+
+### [readiness][platform] OR-156 — TN-37 step 3 has no plan, and its own text forbids starting without one
+
+- **Lane: O** · **Added:** 2026-09-24 · filed by RV-189 so `TN-37` has a real `Needs:` target instead
+  of a prose block nothing enforces.
+- **The deliverable is a plan document** in `docs/superpowers/plans/`, not the change itself.
+- **Why it cannot be skipped.** `TN-37` step 3 says *"do not start without its own plan"*, and Review
+  sweep 59 found no plan exists — so the entry has been printing READY for Lane A while being
+  unstartable by its own instruction. **And the obvious shortcut is a trap the sweep caught:**
+  skimming step 2 as *"drop the reads"* would **disable wear filtering on the HRV and RHR baselines**
+  (`lib/health/readiness-payload.ts:329-334`, filter at `:376`/`:388`). A plan that does not say what
+  replaces the wear filter is not a plan.
+- **What the plan must settle:** which of the four device-specific stores readiness may read, what
+  preserves wear filtering once they are removed, and whether the connector guide's invariant or the
+  code is the thing that changes. **If it moves scores, it is Tuning's first** — say so in the plan
+  rather than leaving Lane A to discover it.
+- **Done when** the plan is written and `TN-37`'s `Needs:` is cleared by this entry leaving the queue.
+
+### [platform] OR-157 — an entry blocked until a DATE has no field to say so, so it prints as READY
+
+- **Lane: O** · **Added:** 2026-09-24 · found by RV-189 while trying to park `LA-134` and finding
+  nothing to park it with.
+- **The gap.** `next-item.js` parks on exactly three things (`scripts/lib/backlog-entries.js:139-141`):
+  an unmet `Needs:` naming another entry, a `Gate:` of `owner` or `device`, and the legacy prose
+  marker (the no-entry glyph followed by the word the parser looks for — not written out here,
+  because writing it out parks this entry). **None expresses "not before a date"**, so an entry whose blocker is the calendar has three
+  bad options: print as READY and waste an implementer's pick-up, take a `Gate:` that names the wrong
+  blocker, or carry a `Needs:` pointed at an entry that is not really its dependency. All three are
+  worse than the field.
+- **The live case.** `LA-134` — the Body Battery constants cannot be fitted before **2026-10-04**,
+  because the window needs days the clock has not produced yet. It is left READY deliberately rather
+  than parked with a false reason, and its date is stated in the entry. It is the only current case,
+  which is the honest argument against building this immediately.
+- **Recommendation: `Until: YYYY-MM-DD`**, pushing a park reason while the date is in the future, and
+  clearing itself with no edit when it passes. That last property is the point — every other park in
+  this file needs someone to come back and remove it, and a date does not.
+- **Cost to reverse: low.** It is a parse in `backlog-entries.js`, a reason line, and a validator case
+  in `check-backlog-pointers.js`, matching the shape of `Ask:` and `Reference:`. Deleting it later is
+  deleting one branch.
+- **Deliberately not built inside RV-189**, which is queue hygiene against verified evidence; a new
+  field is tooling and wants its own tests. **Build it when a second dated case appears**, or sooner
+  if `LA-134` gets picked up and dropped once — that pick-up is the cost this prevents.
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
@@ -2880,6 +2919,15 @@ drift.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
 
+- **⏳ NOT STARTABLE BEFORE 2026-10-04, and it is NOT parked — read this before picking it up.**
+  RV-189 tried to park it and found nothing to park it with: `next-item.js` parks only on a `Needs:`
+  naming another entry, a `Gate:` of owner or device, or the legacy prose marker, and none of those is
+  true here. The blocker is the calendar. Rather than borrow a field that names the wrong reason, the
+  gap is filed as **`OR-157`** (an `Until:` field) and this entry stays READY with the date stated
+  here. **The fit needs days the clock has not produced yet** — picking it up earlier produces a
+  calibration fitted to a window that is still filling, which is the exact error BF-55 spent three
+  weeks on.
+
 - **Lane:** A — `app/api/body-battery/route.ts` (the constants only). **Added:** 2026-09-24 · Lane A,
   as the stated residue of TN-55.
 - **⚠ CARRIED FORWARD FROM TN-55, and it is a precondition on the fit rather than a note.** Review
@@ -5139,32 +5187,6 @@ written entity.
   after; `grep -rn REST_DAY_CARB_REDUCTION app/` returns one definition.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** `generate/route.ts` declares at `:98` and uses at `:357-360`, **plus a third use at `:306`** (`restDayCarbLine(dailyCarbs * REST_DAY_CARB_REDUCTION)`). The helper should cover the prompt line too. `structure/route.ts` is unchanged at `:47,129-131`.
 
-### [platform] LB-123 — `cachedFetch` caches any 2xx body, so a route that can answer `null` cannot use it
-
-- **Lane: A** — `lib/sqlite/cache.ts:366`. **Added:** 2026-09-21 · found by Lane B while taking
-  RV-79. The `LB-` letter records who found it, not who ships it.
-- `cachedFetchCore` ends a successful fetch with `await setCached(key, toStored(data), ttlSeconds)`
-  — **unconditional**, outside every null check. `onData` runs before it and cannot veto it, and
-  the only opts are `freshWithinTtl` and `onError`. So a caller cannot say *"paint this, but do not
-  persist it"*.
-- **Why that matters beyond style.** `setCached` writes sessionStorage, localStorage **and**
-  SQLite, and `readCacheSync` parses a stored `"null"` back to `null` rather than treating it as a
-  miss. A route that legitimately answers `null` therefore **overwrites a good cached value with an
-  absence**, and every `readCacheSync` seed downstream reads that absence as fact.
-- **Measured 2026-09-21, not read off the source.** Seed `mood:<date>` with a log, run `cachedFetch`
-  against a stubbed 200 returning `null`: `onData` fires twice (`[{…}, null]`) and
-  `readCacheSync` then reads `null`. That is the session-167 mood re-prompt bug, reachable through
-  the helper the standing cache rule tells every client GET to use.
-- **Fix:** `opts.shouldCache?: (data: T) => boolean`, defaulting to always, threaded into
-  `cachedFetchCore` to guard that one `setCached` call. Additive — every existing caller is
-  unaffected — and it lands for **any** nullable-payload key, not just mood. A narrower `skipNull`
-  boolean also works; the predicate is preferred because the next case will not be `null` (an empty
-  array reads the same way to a seed).
-- **Unblocks RV-79**, which is currently a rule violation that cannot be fixed without it.
-- **Not established:** how many other GET routes can answer `null` or `[]` was not swept — this was
-  found from one call site. A sweep is worth doing when the option lands, and is not a blocker for it.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **ALREADY SHIPPED — do not build.** #1394 (0fc1581e) added `shouldCache?: (data: T) => boolean` (`lib/sqlite/cache.ts:279`), used at `:386`, threaded through `:443/449`, tested at `cache-fetch.test.ts:331`, used at `done-screen.tsx:125`. Removal is in RV-189. **RV-79's `Needs: LB-123` then clears**, and its *"no shouldCache option"* text is stale.
-
 ### [workouts][platform] RV-79 — Home reads today's mood with a bare `fetch`, against the standing rule
 
 - **Lane:** B — `app/session-select/session-select-content.tsx:613`. **Added:** 2026-09-20 ·
@@ -5181,8 +5203,9 @@ written entity.
   Lane B.** `onData` has no power over the write:
   `cachedFetchCore` (`lib/sqlite/cache.ts:366`) calls `await setCached(key, toStored(data),
   ttlSeconds)` **unconditionally** after any 2xx, outside every null check, and `toStored` is
-  identity for `cachedFetch`. There is no `shouldCache`/`skipNull` option — the only opts are
-  `freshWithinTtl` and `onError`.
+  identity for `cachedFetch`. There was no `shouldCache`/`skipNull` option when this was
+  measured — the only opts were `freshWithinTtl` and `onError`. **That is no longer true; see the
+  unblocked note below.**
 - **Proven, not read off the source.** A probe seeded `mood:<date>` with an optimistic log, then
   ran `cachedFetch` against a stubbed 200 returning `null`:
   - `onData` fired **twice** — `[{logDate…, energyLevel:'high'}, null]`, so React state is clobbered
@@ -5192,10 +5215,16 @@ written entity.
     than treating it as a miss — so the seeds at `session-select-content.tsx:211` and `:319` call
     `setMoodLog(null)` on the next visit and **the check-in card re-prompts**. That is the
     session-167 bug exactly.
-- **Needs: LB-123** — the enabling change is in `lib/sqlite/**`, which is Lane A's. Converting
-  `loadTodayMood` is one line once that option exists, and **this entry stays Lane B**.
-- **Do NOT convert this call site before then.** The bare `fetch` is the rule violation; caching
-  the null is a live bug. Trading the first for the second is a loss.
+- **✅ UNBLOCKED 2026-09-24 (RV-189) — the enabling option SHIPPED and this entry is now buildable
+  as one line.** `LB-123` asked for it; #1394 landed it and `LB-123` is removed, so the `Needs:` is
+  gone. `cachedFetch` takes **`shouldCache?: (data: T) => boolean`** (`lib/sqlite/cache.ts:279`,
+  guarding the `setCached` at `:386`, threaded at `:443`/`:449`); `done-screen.tsx:125` is a live
+  caller. **The two bullets above are now stale where they say the option does not exist** — struck
+  rather than deleted, because the measurement under them is what justifies passing the predicate
+  and is still true.
+- **So the fix is:** `cachedFetch('mood:'+today, …, MOOD_TTL, …, { shouldCache: (d) => d != null })`.
+  Without that option the conversion trades a rule violation for a live bug; with it, neither.
+  **Still Lane B** — the engine half is done.
 - **Not established:** on the APK the local-store branch short-circuits before this fetch, so how
   often it fires on device is unmeasured. Filed for the rule as much as the cost.
 
@@ -5517,6 +5546,14 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the five sites are now `readiness-payload.ts:628, 657, 661, 675, 817` (plus the `ouraScore` passthrough at `:847`); `computeBlendedScore` is at `:249`. **Strike step (1) of "What to do, in order": the owner answered it on 2026-09-22**, and the entry contradicts itself.
 
 ### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
+
+- **Reference:** don't build **yet**, and the reason is a count rather than a judgement — converted
+  2026-09-24 by RV-189 on the entry's own verdict. `feedback_submissions` holds **zero** rows, so a
+  route to serve the withheld `screenshot_data` would be built against no traffic and verified
+  against nothing. **This is the known gap `CLAUDE.md` names** — a UI bug arrives with
+  `screenshot_bytes` (a size) and not the image — so the finding must not be lost, which is why this
+  is `Reference:` and not a removal. **Revisit the moment the table is non-empty**: the first real
+  report is both the reason to build it and the fixture to test it with.
 
 - **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
   decision the same day.- **✅ RE-MEASURED 2026-09-24 (Lane A) — the deferral below still holds, so this was NOT built.**
@@ -6638,6 +6675,18 @@ existing 65 days moves by less than 5 points on every one of them.
   three are 1 point out, and 25 of 65 are stamped.
 
 ### [nutrition][platform] RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
+
+- **Reference:** re-verified and NOT buildable as written — kept so the next sweep recognises it in a
+  minute instead of re-deriving it. Converted 2026-09-24 by RV-189, on Review sweep 59's reading and
+  Lane A's 2026-09-23 re-verification below. Three findings, all still true: the `Promise.all`
+  structure is real, the two calls are **not** duplicates (the rest variant subtracts
+  `REST_DAY_CARB_REDUCTION`, so the variants scale toward different targets and reach different
+  shortfalls), and the path has **never executed** — zero `meal-plan-top-up` rows, and
+  `meal-plan-generate` has fired twice ever, last 2026-09-01. The proposed key would collapse the two
+  calls only when the shortfalls happen to round together, so a fix built to this description is a
+  near-no-op that reads as done. **If the path ever runs, build the entry's SECOND option instead**
+  (one top-up on the training variant, re-scaled for rest) — it changes plan output, so it needs a
+  sign-off.
 
 - **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts:355-380`,
   `lib/nutrition/meal-top-up.ts:88`. **Added:** 2026-09-20 · Review sweep 51.
@@ -8303,105 +8352,6 @@ composite reports which of its inputs were inferred.
 - **Do NOT fix this by raising `retries`.** That hides it, and the run-1 `la109` case shows why the
   hiding is expensive: the failures it produces are indistinguishable from real ones until re-run.
 
-### [readiness][platform] LB-114 — a zero-data account reads `sufficient: true`, so RV-38's badge is gone and its spec is red for TWO hours a day
-
-- **Lane:** A — `packages/shared/src/health/body-battery-inputs.ts:125`. Filed by Lane B on
-  2026-09-16 after `e2e/rv38-body-battery-no-data-badge.spec.ts` failed CI on an unrelated PR.
-- **⚠ RED ON `main`, and it fires on a CLOCK — TWO separate hours: 00:00–01:00 AND 07:00–08:00
-  Brisbane (14:00–15:00 and 21:00–22:00 UTC), every day, on every branch.** That is why it reads as
-  a flake and is not one. It is the hour-dependence class CLAUDE.md documents at length, in its
-  nastiest form: the test is CORRECT and the payload is wrong.
-- **✏️ CORRECTED 2026-09-17 by Lane B, and the correction is the point: this entry said ONE hour and
-  named the wrong mechanism for half of it.** It was filed from a single 07:55 observation and the
-  clause was then read backwards from that one data point — which is the "an entry's numbers are
-  prose until something checks them" trap, committed by the entry's own author. There is a SECOND
-  window with a SECOND cause, in `app/api/body-battery/route.ts:172` rather than the clause:
-  ```ts
-  const rawWakeTime = todaySleep?.sleepEnd?.getTime() ?? firstHrTime
-    ?? (todayMid.getTime() + 7 * 3_600_000)   // default 07:00
-  const wakeTime = rawWakeTime > now.getTime() ? (firstHrTime ?? todayMid.getTime()) : rawWakeTime
-  ```
-  Before 07:00 local the 07:00 default is **in the future**, so the future-wake guard fires and
-  `wakeTime` falls back to `firstHrTime ?? todayMid` — and a zero-data account has no HR rows, so it
-  lands on **local midnight**. `wakingMinutes` is then minutes-since-midnight, which is under 60 for
-  the first hour of the day. So the grace clause short-circuits at 00:00–01:00 for that reason and
-  again at 07:00–08:00 for the reason already filed. Between 01:00 and 07:00 it is over 60 and the
-  spec passes.
-- **Measured, not inferred.** `GET /api/body-battery` for the `zero@local.dev` fixture, captured
-  2026-09-17 07:55 Brisbane:
-  ```json
-  { "current": 50, "label": "Good", "hasData": false, "anchorSource": "default",
-    "confidence": { "sampleCount": 0, "wakingMinutes": 55, "samplesPerHour": 0, "sufficient": true } }
-  ```
-  **Zero samples, zero per hour, `sufficient: true`.**
-- **The clause that does it:**
-  ```ts
-  sufficient: mins < MIN_WAKING_MINUTES_TO_JUDGE || samplesPerHour >= MIN_SAMPLES_PER_WAKING_HOUR
-  ```
-  `MIN_WAKING_MINUTES_TO_JUDGE` is 60, and `mins` is `Math.max(0, wakingMinutes)`. The fixture's wake
-  anchor is **07:00 local** after 07:00 and **local midnight** before it (see the correction above),
-  so `wakingMinutes` is under 60 in each of the two windows and the grace clause short-circuits to
-  true. Outside them it goes false, the badge returns, and the spec passes again.
-  **The recommended one-condition fix below closes BOTH windows**, because it keys on
-  `sampleCount === 0` rather than on the window — which is why the correction changes the entry's
-  scope and urgency without changing its fix.
-- **✅ CONFIRMED BY NATURAL EXPERIMENT, not just by reading the clause.** The same commit
-  (`1bc4332afa`, PR #1264) ran E2E twice: the run starting **21:15 UTC failed** on this spec, and the
-  run starting **22:00 UTC passed**. Identical code, identical fixture, different side of 22:00 UTC —
-  which is 08:00 Brisbane, the minute `wakingMinutes` crosses 60. That forecloses the "it is just
-  flaky" reading, which is the reading this defect otherwise invites.
-- **Cause: #1256** (*"Stop counting sleep as daytime stress"*, LA-112) narrowed the route's waking
-  window. Before it, the window was effectively the whole calendar day, so `mins` cleared 60 at any
-  hour and zero samples always read as insufficient. Nothing is wrong with that change; it exposed a
-  clause that was only ever correct by accident of a wide window.
-- **The grace clause is right for a day that is young and wrong for an account that has never had
-  data**, and the two are not the same state — `hasData: false` and `anchorSource: "default"` both say
-  so in the same payload. **Recommended:** `sufficient` is false when `sampleCount === 0`, whatever
-  the window; keep the grace for a genuinely young day that has *some* readings. One condition.
-- **⚠ Do NOT fix this by loosening the spec.** RV-38's assertion is the correct one — an account with
-  nothing must qualify the 50 it prints — and it is the whole point of the entry. The card
-  (`components/body-battery-card.tsx`) is also correct and unchanged since #1214: its guard is
-  `conf != null && !conf.sufficient`, which is right; it is being told `true`.
-- **Secondary observation from the same CI run**, recorded so it is not lost rather than diagnosed:
-  three specs went flaky-but-passed (`bf5-week-in-review-page.spec.ts:106`,
-  `nutrition-day-navigation.spec.ts:92`, `one-calorie-budget.spec.ts:135`) and the log carries a
-  `chrome-headless-shell` crash stack. One runner, three retries and a browser crash reads as runner
-  instability rather than three spec defects.
-- **⚠ IT REPEATED — twice on 2026-09-17, on PR #1280's two E2E runs, so it is no longer "worth a
-  second look".** Both runs carry a `chrome-headless-shell` **SIGSEGV** (`Received signal 11
-  SEGV_MAPERR`, faulting address `0x1b0` both times, identical stack). Run 1 lost two specs to
-  `browser.newContext: Target page, context or browser has been closed` — no test body ran —
-  including `diary-nested-meal.spec.ts:231`; run 2 lost three more to retries. **Every one of them
-  passed on the other run or on retry**, and `la109-back-from-subroute.spec.ts:87`, which failed run
-  1 on a real 30 s timeout, passed run 2 and passed four times locally. So the pattern is a browser
-  that dies mid-suite and takes whatever was on that worker with it. **Filed as its own item is the
-  right next step rather than more notes here** — the practical cost today is that an E2E result has
-  to be read twice before it means anything, which is exactly the "flake is not a root cause" reading
-  this repo forbids relying on.
-- **Verification:** run `e2e/rv38-body-battery-no-data-badge.spec.ts` inside EITHER red window —
-  **00:00–01:00 or 07:00–08:00 Brisbane** — and it must pass. Outside both it passes regardless and
-  proves nothing. **Verify in both**, not one: they have different causes (the clause, and the
-  future-wake fallback to midnight), and the recommended one-condition fix is what makes passing in
-  one predict passing in the other. A fix verified only at 07:30 has not been shown to close the
-  midnight window at all.
-- **✅ THE MIDNIGHT WINDOW IS CONFIRMED BY NATURAL EXPERIMENT TOO, not only by reading the guard**
-  (2026-09-17, PR #1280, one checkout, no code change between runs):
-
-  | Brisbane local | result |
-  |---|---|
-  | 00:41 · 00:46 · 00:50 | **failed**, three for three |
-  | 01:06 | **passed** |
-
-  Opposite sides of 01:00, so the boundary is where the guard says it is. The CI runs bracket it
-  from the other side: #1280's first E2E run (23:36–00:01) passed this spec and its re-run
-  (00:06–00:40) failed it on the identical commit. Same shape as the 21:15/22:00 experiment above,
-  at the other window.
-- **The control that establishes a red run here is NOT the PR's, for whoever hits it next:** check
-  the wall clock in Brisbane first. A local repro at 00:41 on a checkout differing from `main` only
-  in four nutrition files is what settled ownership on #1280; it took minutes, where reading the
-  spec's assertion would have suggested a real regression.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **ALREADY SHIPPED — do not build.** #1345 (99994349) set `sufficient: sampleCount > 0 && (…)` at `body-battery-inputs.ts:139`, the single condition this entry recommends, and it closes both the 00:00 and 07:00 windows. The SIGSEGV side-note is LB-119. Removal is in RV-189.
-
 ### [platform][devices] LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
 
 - **Verify:** device — Health Connect only runs natively (`syncHealthConnect` returns immediately off
@@ -8630,6 +8580,11 @@ task A settles.
 supply; and a rendered score can say what it was computed without.
 
 ### [platform][readiness] TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
+
+- **Needs: OR-156** — added 2026-09-24 by RV-189. **Step 1 shipped** (#1259, guide §5.4/§5.5) and
+  step 2 was withdrawn inside this entry, so step 3 is all that is left — and step 3's own text says
+  *"do not start without its own plan"*, which no plan satisfies. `OR-156` is that plan. This entry
+  was printing READY for Lane A while being unstartable by its own instruction.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-15 · owner: *"we get data from Oura; then we normalise/calculate it into usable fields… then we use those fields to calculate our pillars. Can we make sure we are doing this correctly?"*
 - **Lane: A** for steps 2–3 (`lib/health/readiness-payload.ts:278-291`); **step 1 is docs-only and should not wait.**
@@ -17197,6 +17152,13 @@ test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again
 - **Needs:** TN-5 — added 2026-09-24 by Review sweep 59: its own sequencing note says build after TN-5, which sat below it.
 
 ### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
+
+- **Needs: OR-150** — added 2026-09-24 by RV-189, on Review sweep 59's reading. This changes what
+  counts as an active hour, so it is a **scoring change**, and CLAUDE.md is explicit that Tuning
+  proposes, the owner signs and Lane A implements. No proposal exists and none of the three options
+  states **how many other days it moves**, which is what a proposal owes. `OR-150` is the hold for
+  exactly this class; this makes it fourteen rather than thirteen. **There is no `Lane:` value for
+  Tuning**, which is why the hold is a `Needs:` and not a lane change.
 - **Lane:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_
@@ -17836,11 +17798,22 @@ behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) i
   nothing was observed in production.
 ### [heart-rate][workouts] TN-53 — the HR-recovery trend has no density gate
 
+- **⚠ NOT STARTABLE AS LANE B — rerouted 2026-09-24 by RV-189** (Review sweep 59). The lane field
+  above reads `B` for *"what is left"*, but what is left is an **undiagnosed cause** rather than a
+  surface change: the engine half shipped and the trend is still wrong, so the next action is a
+  diagnosis, and the evidence points engine-side. Handing a surface lane a defect whose cause is
+  unknown produces a guess at the render layer. **Re-lane it once the cause is named** — to `A` if it
+  is engine-side as expected, back to `B` if the diagnosis lands in `components/health/**` after all.
+
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** HR recovery still plots **0-value points** (Thu,
   Fri, Wed), and there is **no gap** over 09-15…09-20 even though data is present 15–17. Breaks do
   render for a real gap elsewhere, so the break logic works; the zeros are the fault.
 
-- **Lane:** B for what is left — `components/health/**`, by the path rule. The engine half was
+- **Lane: A** — **re-laned 2026-09-24 by RV-189** from `B`. The field below reads `B` for *"what is
+  left"*, and what is left is a DIAGNOSIS whose evidence points engine-side, not a surface change;
+  the path rule sends an item spanning both to `A`. **Re-lane back to `B` if the cause lands in
+  `components/health/**` after all.** Superseded, kept for the reasoning: Lane B for what is left —
+  `components/health/**`, by the path rule. The engine half was
   Lane A's and is done; this entry carried no `Lane:` field at all, so it printed as UNCLASSIFIED
   while its remaining work sat named in the body.
 - **Branch:** `lane-a/tn53-hrr-density-gate` (engine) · `feat/tn53-sparkline-gaps` (render) ·
@@ -22695,69 +22668,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
   (Q-500 was on this list and is retired — shipped 2026-08-18, follow-up answered 2026-08-26.)
 
-### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
-
-- **✅ THE PROPOSAL EXISTS NOW, AND THE OWNER HAS SIGNED IT (2026-09-22).** This entry waited from
-  2026-08-15 for a Tuning proposal. It is
-  [`2026-09-21-body-battery-rate-balance.md`](superpowers/plans/2026-09-21-body-battery-rate-balance.md),
-  filed as **TN-55**, fitted offline against 64 days with a committed harness
-  (`scripts/tuning/body-battery-replay.cjs`). **Q-272 and TN-55 are one line of work — build from the
-  plan, and read §6a first.** Gate lifted.
-- **⚠ THIS ENTRY'S OWN ACCEPTANCE TEST DOES NOT REPLICATE — do not use it.** The *"v5 end-of-day
-  battery → next-day readiness is r = +0.67 (n = 11)"* below, and the instruction to re-run it after
-  the change, were re-measured 2026-09-23 over **70 days**: **r = +0.252**, against readiness's own
-  day-to-day autocorrelation of **+0.361**. The battery's end value predicts tomorrow's readiness
-  *worse than yesterday's readiness does*. So the conclusion drawn from it — *"v5's level carries real
-  signal; its shape within the day is wrong"* — keeps its second half (the four defects are measured
-  independently) and **loses its first**. Use the plan's distributional pass test instead; a change
-  cannot be validated against a relationship that is not there.
-- **⚠ Direction 1 below is refuted twice over and direction 2 is the survivor.** Q-502 refuted raising
-  `CHARGE_RATE` alone; TN-55 additionally found that overnight charging must **not** be added, because
-  this entry is right that the wake anchor already accounts for the night — re-fitting without it is
-  strictly better (0% of days ending at zero, against 5% with it). Direction 2 (feed daytime HRV into
-  the charge term, from `rr_intervals`) remains open and unmeasured.
-
-- **Branch:** `fix/body-battery-daytime-recovery`
-- **Plan:** none yet · tuning notes live in [`docs/body-battery-tuning.md`](body-battery-tuning.md)
-- **Added:** 2026-08-15 · from the comprehensive review §1.5
-- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: the Body Battery walk is `packages/shared/src/health/body-battery-walk.ts` with its constants in `app/api/body-battery`.
-- **Measured, grouped by `model_version` over 40 production days:**
-
-  | model_version | n | charge/day | drain/day | ratio | hit 0 | ended at daily min |
-  |---|---|---|---|---|---|---|
-  | `v1:…chg0.4:drn0.6` | 9 | 34.2 | 22.1 | 0.6× | 0 | 1 |
-  | `v4:…chg0.4:drn0.6:str0.2` | 18 | 34.9 | 30.3 | 0.9× | 0 | 7 |
-  | **`v5:…chg0.2:drn0.6:hrmax-observed`** | **12** | **10.5** | **52.4** | **5.0×** | **3** | **10** |
-
-  Across all 40 days: `end_value == day_min` on **19**, and `day_max == anchor` on **13** — on a
-  third of days the battery never rises above where it woke up.
-- **Cause is known and was deliberate.** Q-57 halved `CHARGE_RATE` 0.40 → 0.20 to stop days pinning
-  at the 100 ceiling. It fixed that (ceiling days 14 → 0) and overshot into the opposite failure.
-- **The deferred validation says tune, not abandon.** The same review re-ran the check the
-  Known-Issues row asked for: **v5 end-of-day battery → next-day readiness is r = +0.67 (n = 11)**.
-  v5's *level* carries real signal; its *shape* within the day is wrong.
-- **What "wrong shape" means concretely.** Garmin's Body Battery — the model this is built against —
-  recovers during waking rest; that is the feature's headline behaviour, and Firstbeat drives it
-  from beat-to-beat HRV rather than heart rate alone. Overnight recharge here is handled by the
-  morning anchor reset rather than accumulated charge, which is a defensible difference. Near-zero
-  *daytime* recovery is not.
-- **Directions, in preference order:**
-  1. Raise `CHARGE_RATE` back toward v4 **and** keep v5's `hrmax-observed` reserve — the ceiling
-     problem v5 solved was mostly the reserve, not the charge rate. Backtest both changes
-     independently against the stored HR series before picking.
-  2. Feed daytime HRV into the charge term. `rr_intervals` holds ~49,900 rows and
-     `daytime_stress_scaled` exists on 22 of 40 days; neither reaches the battery model today.
-- **Re-measure:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
-  the before/after comparison is not interpretable.
-- **⚠️ Read [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md)
-  (Q-502) before starting. It re-measured this entry (still true — 5.6× on 14 v5 days now) and found
-  two things that change how to work it:** (a) **direction #1 above is refuted** — the charge window
-  is reachable on a median 6.7% of waking samples (0.8% on 2026-08-14), so raising `CHARGE_RATE`
-  scales a term that is barely active; `REST_THRESHOLD`/the reserve is the lever. (b) The stored
-  snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
-  is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **ALREADY SHIPPED — do not build.** #1521 (266f5178) shipped v6 via TN-55: net −48 → +0.2/day, days ending at zero 67% → 0%. The only residue is LA-134, the constants re-sweep after 2026-10-04. Direction 2 (daytime HRV in the charge term) is unmeasured and waits on TN-33's stress sign; re-file it as a Tuning idea if it is still wanted. Removal is in RV-189.
-
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
 
 - **Needs:** Q-523
@@ -27212,17 +27122,6 @@ per-field merge where an AI write has no honest source rank to claim.
   visual duration — shortening it trades away retry margin for slower-than-typical connections, so
   reconcile + shorten carefully and re-verify on-device, not just visually.
 
-### [nutrition][app-shell] Q-112 — the unified day review: the read-through already exists, so this is a flow
-
-- **Branch:** _umbrella_ · **Lane: B** · **Plan:** [`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)
-- **Needs: Q-112e**
-- **Added:** 2026-08-06 · **re-planned 2026-08-25 — Task 27 is now stale in its central premise.** It
-  asked for a new merged day screen; `/health/day` shipped two days later and already draws body
-  composition, energy in/out, per-session volume, steps, scores, sleep and a day HR trace from
-  reusable components. What is missing is one entry point instead of two, three stats, a 7-day
-  comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **UMBRELLA WITH EVERY CHILD SHIPPED — do not build.** Q-112a #587, Q-112b #592, Q-112c #868, Q-112d #951 (+#953), Q-112e #1129. Removal is in RV-189.
-
 ### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 
 - **✅ THE OWNER QUESTION IS ANSWERED, 2026-09-14 — build the scale chip.** *"I would like the scale
@@ -27791,7 +27690,7 @@ describing a safety net that no longer exists.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
-- **Lane:** A — migrations and `scripts/check-push-mutations.js`. (Assigned 2026-09-15, OR-116 lane sweep.)
+- **Lane: O** — **re-laned 2026-09-24 by RV-189** (Review sweep 59) from `A`. What is left in this entry is roadmap reconciliation and planning, not migrations: the OR-116 sweep assigned `A` from the paths its oldest bullets name, and those halves have since shipped. Planning is the Orchestrator's per the lane rule. Re-lane to `A` if a concrete migration falls out of the planning.
 
 - **The `Gate: owner` was removed 2026-09-01 — nothing here is the owner's any more.** F1, F2, F3
   and F7 are all answered (dates and quotes in the table below); F8 was fixed in this entry's own
@@ -28626,38 +28525,6 @@ means no public server deploy: their asset files move to `.gitignore` and stay o
 private build machine. Implement in the new public repo once it exists, per owner preference — this
 repo's production path is unaffected until then.
 
-### [readiness] 🟡 Q-3b — awakenings-calibrated restfulness + the chronic-stress two-scale column
-
-- **Lane:** A
-> **⚑ The data gate is CLEARED (2026-08-04).** This entry says *"No code without that data. ⛔
-> owner/data-gated"* — the data exists: **32 rated nights** in `day_checkins.sleep_quality_feel`,
-> collected automatically by the morning check-in since 2026-07-03. See **Q-72** for the analysis of
-> what those ratings say, which is stronger than expected and reframes this item.
-
-Two independent findings, both low-urgency:
-
-- **(a) Awakenings-calibrated restfulness term — TRIED 2026-08-06, REJECTED, superseded by a
-  different mechanism.** `restlessPeriods` (the ring's 0–5 wake-event count) was tested as the
-  driving signal for exactly this: production data showed the SAME value (4) on both a real
-  disrupted night (2026-08-06) and the single best-rated night of the prior month (2026-07-17) —
-  it carries no separating information for this ring, confirmed empirically, not assumed. Do not
-  revisit this specific approach without new evidence it's more informative than that. What
-  shipped instead: an awake-TIME-fraction fragmentation cap (not an awakenings-count term) — see
-  [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
-  Closed.
-- **(b) `chronic-stress-assembly.ts:65`'s `gotUps` two-scale concern — RE-INVESTIGATED
-  2026-07-30, does not reproduce on current `main`.** Traced the full input chain:
-  `oura_daily_summary` (migration 116, "Oura BLE Phase 5 addendum A3") is written only
-  by two paths — the server-side `aggregateOuraRawSamples` rollup (`nightInputsByDate`
-  in `lib/data/postgres/adapter.ts`, built exclusively from `oura_raw_samples`, i.e.
-  BLE-only, post-2026-07-07-re-key) and the on-device push path
-  (`pushMutations`'s `oura_daily_summary` branch, same device-computed
-  `model.awakenings` scale). No code path ever writes Oura Cloud's
-  `sleep_sessions.restless_periods` (138–330 scale) into `oura_daily_summary` — the
-  table didn't exist before the BLE era, so there's nothing pre-cutover for a 31-night
-  window to straddle. Downgrading — no action needed unless new evidence surfaces.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **NOTHING LEFT TO BUILD.** Half (a) was closed and rejected (`AWAKE_FRAGMENTATION_CAP` shipped instead). Half (b) is recorded here as *"does not reproduce, no action needed"*. Removal is in RV-189.
-
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
 - **Lane:** A
@@ -29276,6 +29143,12 @@ and the whole dataset's **maximum `bpm_at_end` is 128**, which is what makes Q-1
 degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
+
+- **Reference:** don't build — the entry's own verdict, made a field 2026-09-24 by RV-189 so it stops
+  printing as READY. The measured win did not justify the change, and the tripwire that guards the
+  regression **is already enforced** in the Custom Rules job (*"applyDelta's domain list is frozen
+  (Q-28 tripwire)"*, step 76 of 78). It is kept because the measurement is the answer to *"should we
+  batch the bridge crossing?"* and re-deriving it costs a session.
 
 - **✅ RELEASED BY THE OWNER, 2026-09-22 (OR-125).** This entry carried no `Gate:` and was held
   instead by an exclusion list inside the Lane A scheduled prompt — a convention living where no
