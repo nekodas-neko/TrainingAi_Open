@@ -602,7 +602,9 @@ the Orchestrator's to do.
   - Reversal cost: (a) is repeatable, (b) is avoided.
 - **Two more owner answers the census needs, same sitting:**
   - **RV-164:** did he mean to apply the 09-14 recommendation (1,618 kcal)? The app still budgets
-    1,660.
+    1,660. **Still his to answer — RV-164 itself shipped 2026-09-24 and left the queue, but that
+    fixed the cause going forward and not the 09-14 row, which is the divergence he is being asked
+    about.**
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
@@ -2568,26 +2570,6 @@ drift.
   - Show an error state when the load fails.
   - Do not PUT until a load has succeeded.
   - PUT only when the selection changed.
-
-### [nutrition][app-shell] RV-164 — applying a goal recommendation marks it "applied" and toasts success without checking any of its writes
-
-- **Lane: B** — `components/profile/goal-recommendation-sheet.tsx`.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **In production:** the 2026-09-14 recommendation (1,618 kcal / 150 P / 131 C / 55 F) is
-  `status='applied'` (21:07:19). But `nutrition_targets` still holds **1,660 / 150 / 141 / 55**, with
-  `updated_at` **2026-08-31**, and `users.calorie_goal` is 1,660. The 08-31 apply did write: targets
-  were updated 200 ms before that apply was recorded.
-- **Why nobody could tell:**
-  - The sheet ticks every row by default (`:86-91`).
-  - It `await`s the `PUT /api/nutrition/targets` and `/api/user/goals` calls **without reading the
-    response**. Only the profile PATCH checks `res.ok`.
-  - It then PATCHes the recommendation to `applied` and toasts *"Goals updated"*. Only a thrown
-    network error reaches the failure toast; a 4xx or 5xx passes as success.
-  - `app/api/nutrition-goals/recommend/route.ts:36-37` describes the 09-14 values as
-    *"stored-and-applied"*, and the database contradicts that.
-- **Fix:** check each write's response. Mark the recommendation applied only when every ticked field
-  landed, and say which one failed otherwise.
-- **The owner's half, whether he meant to apply 1,618, is in RV-170.**
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
@@ -5207,6 +5189,16 @@ why the count of affected entries always understated the harm.
   restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
   priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
   is only in git history, and nothing reports which entries went missing.
+- **⚑ SECOND LIVE INSTANCE, 2026-09-24 — and it shows the trigger is the GATE, not carelessness.**
+  `docs/overview/entries/` crossed its 60-file limit, which fails `check-doc-index-size` for **every
+  lane at once**, so two lanes independently started the fold within an hour. Both wrote
+  `history-2026-09-24-folded-1.md`: Lane A folded 25 (#1543, merged), Lane B folded 40 (#1545,
+  closed unmerged because merging it meant hand-merging two archives — exactly the resolution this
+  entry says looks correct and loses nothing visible). Nothing was destroyed this time, by luck of
+  ordering rather than by any check. **So the chore this gate demands is a race, not a task**, and
+  the fix should be read with that in mind: a unique filename per fold ends the collision, while a
+  convention ("check `main` first") cannot, because both lanes checked and both were right at the
+  time they looked.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 

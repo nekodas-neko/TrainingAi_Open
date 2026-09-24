@@ -77,6 +77,31 @@ function formatActivityLevel(level: ActivityLevel | null): string {
   return level ? level.replaceAll('_', ' ') : 'unset'
 }
 
+/**
+ * A mutation that reports whether it landed, and never throws.
+ *
+ * RV-164: a network error must not abort the remaining writes — the point of checking is to name
+ * every field that failed, and an early throw would report only the first. `null` means the write
+ * did not land, whether the server refused it or the request never arrived.
+ */
+async function writeJson(url: string, method: 'PATCH' | 'PUT', body: unknown): Promise<Response | null> {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return res.ok ? res : null
+  } catch {
+    return null
+  }
+}
+
+function joinLabels(labels: string[]): string {
+  if (labels.length < 2) return labels.join('')
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+}
+
 export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved, onGoalsApplied, onApplied }: GoalRecommendationSheetProps) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [applying, setApplying] = useState(false)
@@ -106,6 +131,10 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
 
   async function handleApply() {
     setApplying(true)
+    // Every field the user ticked whose write did not land. The recommendation is marked applied
+    // only when this is empty: the route takes 'applied' or 'dismissed' and nothing between, so a
+    // partial apply must stay pending and retryable rather than record a state the data contradicts.
+    const failed: string[] = []
     try {
       const goalsPatch: Record<string, number> = {}
       const stepsRow = rows.find(r => r.key === 'steps')!
@@ -115,20 +144,21 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
       if (checked.calories) goalsPatch.calorieGoal = Math.round(caloriesRow.suggested)
       if (checked.water) goalsPatch.waterGoalMl = Math.round(waterRow.suggested)
       if (Object.keys(goalsPatch).length > 0) {
-        await fetch('/api/user/goals', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(goalsPatch),
-        })
-        // Update the first-paint seed so the home widgets, which still read it synchronously,
-        // reflect the applied suggestion without waiting for a refetch. Since Q-241 this is a
-        // cache of the server value rather than a second source of truth — the PATCH above is what
-        // actually stores the goal, and `invalidateGoalRecommendations()` below drops the
-        // `user-goals` entry so the next read comes from the server.
-        if (goalsPatch.stepsGoal != null) localStorage.setItem(STEPS_GOAL_KEY, String(goalsPatch.stepsGoal))
-        if (goalsPatch.calorieGoal != null) localStorage.setItem(CALORIE_GOAL_KEY, String(goalsPatch.calorieGoal))
-        if (goalsPatch.waterGoalMl != null) localStorage.setItem(WATER_GOAL_KEY, String(goalsPatch.waterGoalMl))
-        onGoalsApplied?.(goalsPatch)
+        if (await writeJson('/api/user/goals', 'PATCH', goalsPatch)) {
+          // Seeds are written only once the PATCH has landed. Writing them regardless would leave
+          // the home widgets — which read this synchronously — showing a goal the server rejected.
+          // Since Q-241 this is a cache of the server value rather than a second source of truth;
+          // `invalidateGoalRecommendations()` below drops the `user-goals` entry so the next read
+          // comes from the server.
+          if (goalsPatch.stepsGoal != null) localStorage.setItem(STEPS_GOAL_KEY, String(goalsPatch.stepsGoal))
+          if (goalsPatch.calorieGoal != null) localStorage.setItem(CALORIE_GOAL_KEY, String(goalsPatch.calorieGoal))
+          if (goalsPatch.waterGoalMl != null) localStorage.setItem(WATER_GOAL_KEY, String(goalsPatch.waterGoalMl))
+          onGoalsApplied?.(goalsPatch)
+        } else {
+          if (checked.steps) failed.push('Steps Goal')
+          if (checked.calories) failed.push('Calories')
+          if (checked.water) failed.push('Water')
+        }
       }
 
       const targetsPatch: Record<string, number> = {}
@@ -137,34 +167,41 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
       if (checked.carbs) targetsPatch.carbsG = rec.recommended.carbsG
       if (checked.fat) targetsPatch.fatG = rec.recommended.fatG
       if (Object.keys(targetsPatch).length > 0) {
-        await fetch('/api/nutrition/targets', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(targetsPatch),
-        })
-      }
-
-      if (showActivityRow && checked.activityLevel) {
-        const res = await fetch('/api/user/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activityLevel: rec.recommended.activityLevel }),
-        })
-        if (res.ok) {
-          const d = await res.json()
-          onUserSaved(d.user)
+        if (!await writeJson('/api/nutrition/targets', 'PUT', targetsPatch)) {
+          // Calories can already be here from the goals PATCH — it is one metric to the reader even
+          // though two routes store it, so name it once.
+          if (checked.calories && !failed.includes('Calories')) failed.push('Calories')
+          if (checked.protein) failed.push('Protein')
+          if (checked.carbs) failed.push('Carbs')
+          if (checked.fat) failed.push('Fat')
         }
       }
 
-      await fetch(`/api/nutrition-goals/${rec.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'applied' }),
-      })
+      if (showActivityRow && checked.activityLevel) {
+        const res = await writeJson('/api/user/profile', 'PATCH', { activityLevel: rec.recommended.activityLevel })
+        if (res) {
+          const d = await res.json()
+          onUserSaved(d.user)
+        } else {
+          failed.push('Activity Level')
+        }
+      }
+
+      if (failed.length === 0) {
+        await writeJson(`/api/nutrition-goals/${rec.id}`, 'PATCH', { status: 'applied' })
+      }
+      // Runs either way: whatever did land has to be visible, and a partial apply is exactly the
+      // case where a stale read would hide half the change.
       await invalidateGoalRecommendations()
       onApplied?.()
-      toast.success('Goals updated')
-      onOpenChange(false)
+
+      if (failed.length === 0) {
+        toast.success('Goals updated')
+        onOpenChange(false)
+      } else {
+        // The sheet stays open with the toggles as they were, so retrying is one tap.
+        toast.error(`Couldn't save ${joinLabels(failed)} — nothing was marked applied, try again`)
+      }
     } catch {
       toast.error('Failed to apply changes')
     } finally {
@@ -175,14 +212,13 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
   async function handleDismiss() {
     setDismissing(true)
     try {
-      await fetch(`/api/nutrition-goals/${rec.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'dismissed' }),
-      })
-      onOpenChange(false)
-    } catch {
-      toast.error('Failed to dismiss')
+      // Same defect as apply had: closing on an unread response means a refused dismiss leaves the
+      // recommendation pending and the sheet gone, so it returns on the next read looking untouched.
+      if (await writeJson(`/api/nutrition-goals/${rec.id}`, 'PATCH', { status: 'dismissed' })) {
+        onOpenChange(false)
+      } else {
+        toast.error('Failed to dismiss')
+      }
     } finally {
       setDismissing(false)
     }
