@@ -473,6 +473,43 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-150 — seven scoring entries have carried a gate their own text calls premature since 2026-09-16
+
+- **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
+- **Added:** 2026-09-24 · OR-150, the last slice of the `Gate: owner` triage.
+
+**What was found.** `OR-117` triaged these on 2026-09-16 and wrote the same paragraph into all seven:
+*"NOT OWNER-READY — `Gate: owner` is premature here … putting this in front of the owner asks them to
+sign a blank page — and it has been counting as owner debt in every sweep meanwhile. The next action
+is Tuning's, not theirs."* **The paragraph went in and the field did not come out.** Eight days
+later all seven still carried the gate, and every sweep since has counted them as the owner's.
+
+**The seven:** `Q-275` · `Q-508` · `Q-515` · `Q-516` · `Q-522` · `Q-523` · `Q-149`.
+
+**Why the field survived a correct diagnosis — and this is the part worth keeping.** Removing the
+gate would have released them into Lane A's READY list, and a scoring change with no proposal is
+exactly what Lane A must not pick up. So the gate was wrong *and* load-bearing: it was the only
+brake in reach. **There is no `Lane:` value for Tuning** — the lanes are `A`, `B`, `O`, `DV` — so an
+entry that owes a Tuning proposal has no field that says so. That is the gap, and it is why a
+correct triage could not act on itself.
+
+**What this entry does about it:** each of the seven now carries `Needs: OR-150` in place of the
+owner gate. They stay parked, for the true reason, and they stop counting as owner debt. When the
+proposals exist this entry leaves the queue and all seven unpark together.
+
+**The deliverable is seven Tuning proposals**, each stating **how many other days the change moves**
+— which is what `CLAUDE.md` already requires of a proposal and what none of these has. Tuning reads
+the backlog, so an `O` entry naming them is the channel; writing into another agent's baton is not
+the Orchestrator's to do.
+
+- **Done when** every one of the seven has a proposal, or has been withdrawn with a reason. Not when
+  this has been read.
+- **Deliberately NOT done here: inventing a `Lane: T`.** Tuning picks its work from its own sweeps
+  rather than a lane queue, so a fifth lane value would be a channel nobody reads, and it would need
+  `next-item.js`, `lane.js` and `entry-id.js` changed to carry it. Revisit only if these seven prove
+  that a standing channel is needed rather than one entry.
+
+
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
@@ -21584,8 +21621,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   putting this in front of the owner asks them to sign a blank page — and it has been counting as
   owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
-- **Gate:** owner — adding an input to the readiness composite re-scores every day, so it is a
-  scoring change: the owner signs off before Lane A implements. No proposal is written yet.
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 
 - **Branch:** `feat/readiness-training-load-input`
 - **Plan:** none yet — this is a modelling change and wants a written plan before code
@@ -22084,9 +22120,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   putting this in front of the owner asks them to sign a blank page — and it has been counting as
   owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
-- **Gate:** owner — the first action needs a decision *"this repo cannot settle"*: whether the
-  vendor sum is faithful. The vendor source is in the private archive, and that answer gates
-  everything else in the entry.
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 
 - **Branch:** `fix/resilience-longterm-sleep-recovery`
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** Blocked on a question this repo
@@ -22747,7 +22781,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   constant with a date, so the boundary is unchanged on the switchover day and cannot drift after
   it. Its cost, stated plainly: a frozen constant goes stale silently, and there is **no cron layer**
   (`module-map.md` §0), so "re-derived quarterly" means a person remembers.
-- **Gate:** owner
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 - **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
@@ -22846,7 +22880,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   line is struck and the lane is a field now.
 - **Keep:** the owner's question, and only that — whether the feature is targeted correctly at all,
   given the range it wants lives in cardio rather than strength sets. Nothing to build for it.
-- **Gate:** owner.
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
 - **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for
@@ -23635,7 +23669,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 - **Branch:** `fix/move-hours-rest-boundary`
 - **Needs:** Q-515
-- **Gate:** owner
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 - **⚠ BLOCKED IN PROSE ONLY UNTIL 2026-09-02, WHICH IS WHY IT KEPT PRESENTING AS READY.** The
   plan line has said *"Do Q-515 first — same boundary, same root cause"* since it was filed, and
   `next-item.js` reads fields, not sentences. Verified against the code: both consumers compute
@@ -23697,7 +23731,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
 - **Branch:** `fix/zone-minutes-floor-and-gap-cap`
-- **Gate:** owner
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 - **⚠ ITS Q-516 PREMISE IS WRONG — CHECKED 2026-09-02, AND Q-516 HAS NOW SHIPPED.** This entry
   says the Zone 2 floor is *"Q-516 in a second consumer of the same banding — resolve them
   together or the two will drift apart"*. **They are not the same banding.** Q-516 is
@@ -28023,11 +28057,7 @@ indefinitely.
   wear the chest strap while training. Let's have it specific to the user."* So the bar is
   **personalised, not re-picked as another constant**, and the measured `hrr1` requirement stays.
 - **Lane:** A to implement — but **Tuning proposes the fit and the owner signs the number first.**
-- **Gate:** owner — **and this is a DIFFERENT gate from the one cleared above, not a re-park.** The
-  owner settled the *direction* on 2026-09-01 (fit it to the user). What is still owed is a
-  signature on **the fitted number itself**, which cannot be asked for until Tuning has produced
-  one. Per CLAUDE.md, Tuning never ships a scoring change and this one **re-scores months of
-  history**, so Lane A must not take it straight off the READY list. The gate is what stops that.
+- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
 - **⚠ TWO PREMISES IN THIS ENTRY WERE WRONG, and production says so. Re-measured 2026-09-01 against
   `claude_ro.set_hr_stats`.**
   - **"The ring power-gates, so end-of-set HR is never chest-strap-grade" — the strap is in fact the

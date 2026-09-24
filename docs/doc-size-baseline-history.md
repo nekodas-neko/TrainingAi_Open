@@ -16759,3 +16759,11 @@ carries: BF-77's gate has MOVED (he declined the A/B/C sizing and asked for a se
 question is whether that session is his or an agent's), and LB-53's is a production write that
 belongs inside RV-170's history-row policy rather than beside it. Both cost lines in OR-145 because
 a question he can answer in one sentence is worth more space than a gate he cannot act on at all.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29192 (chore/or-150-last-bare-owner-gates)
+
+Growth, +30, and it is mostly one new entry. OR-150 records that seven entries have carried an owner
+gate their own text called premature since 2026-09-16, and why a correct diagnosis could not act on
+itself: removing the gate would have released a scoring change with no proposal into Lane A, and
+there is no `Lane:` value for Tuning, so nothing else could hold them. The entry is long because the
+next session needs the reason the obvious fix (a fifth lane) was rejected, or it will add one.
