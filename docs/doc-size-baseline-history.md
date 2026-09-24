@@ -16835,3 +16835,10 @@ still pending, `enable_pr_auto_merge` reports an unstable-status error and never
 protection question, so the absence of the usual refusal looks like the setting landing. Re-run on
 green, it refused exactly as always. Eleven lines so the next session re-probes on green instead of
 repeating the cycle.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29699 (BF-194)
+
+The owner-question visibility rule, measured failing the day it was written: three questions at
+ranks 15–17 of a 57-entry lane that prints 10. The length is the rank table plus three alternatives
+with the reason each lost — the table is the evidence that position cannot hold, which is the whole
+argument for replacing it with a section.
