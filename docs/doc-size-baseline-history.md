@@ -16636,6 +16636,14 @@ the distinction from TN-60 — that rail inverted stored ordering, this one only
 the three alternatives with what each is better at, since any weight change here is the owner's.
 TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
 coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.
+---
+
+## 2026-09-24 — CLAUDE.md → 1002 (chore/or-143-process-owner-gate-triage)
+
+Growth, +11 on the merged base (990 → 1002), recording the process the owner set out: the Orchestrator's primary job is the
+owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
+rather than run one. A role definition that lives only in a chat is one the next session does not
+have, so it costs twelve lines in the file every session reads.
 
 ---
 
