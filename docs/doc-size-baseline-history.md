@@ -16598,3 +16598,11 @@ and carries the owner decision brief in the entry rather than a chat reply. TN-6
 is a dense signal (864 of 1,286 sets) available to validate scoring, the load-controlled null it
 produced, and the n=10 correlations that must not be cited. Both are long because most of each is what
 has been ruled out and what must not be re-derived.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-quality-is-a-default)
+
+28437 → 28486 (+49). TN-66: `sleep_quality` has been a hard-coded `'ok'` since 2026-06-25, and two live readers present it as
+the owner's own answer — Home's card and an LLM prompt. Most of the entry is the distinction that makes
+it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.

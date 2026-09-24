@@ -732,6 +732,55 @@ which is the right shape for something that can only be validated by living with
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
+### [sleep][app-shell] TN-66 — `sleep_quality` has been a hard-coded `'ok'` for 91 days, and two surfaces present it as the owner's own answer
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while looking for a second external signal
+  to validate scores against.
+- **Lane: A** — it straddles both halves (an `app/api` prompt and a Home component), so the path rule
+  sends it to Lane A, engine half first.
+- **This is the TN-57 class, at a second site TN-57 did not cover.** TN-57 fixed the *unanswered*
+  self-report by storing `null` for an untouched scale. This one stores a **value**, so nothing
+  downstream can tell it was never answered.
+- **Measured 2026-09-24.** `mood_logs` holds **108 rows across 108 distinct days** (2026-05-27 →
+  today), with `energy_level`, `sleep_quality` and `body_state` all **100% populated**. `energy_level`
+  carries real spread — drained 6, low 18, ok 50, good 34. `sleep_quality` carries **two values of its
+  five**: `ok` 93, `good` 15, and never `terrible`, `poor` or `great`.
+- **The date split is the proof, not the distribution.** Every `good` falls between **2026-05-27 and
+  2026-06-25**; every row since 2026-06-25 is `ok`. The field went constant 91 days ago.
+- **It is deliberate, documented, and not itself the defect.**
+  `packages/shared/src/validation/mood-log.ts:13` says so outright: *"the check-in no longer collects
+  it, so a queued mutation omits it and the write path defaults to `'ok'` — without that default the
+  `NOT NULL` column rejects the insert and the mutation strands in the outbox forever, which is how the
+  check-in came back on every app open (#47)."* The default is load-bearing. **Do not remove the
+  default** — that reintroduces #47.
+- **The defect is the two readers that cannot tell a default from an answer:**
+  - **`components/home/home-card-widget.tsx:220`** renders `Sleep: {SLEEP_LABEL[moodLog.sleepQuality]}`.
+    So Home has displayed **"Sleep: OK"** every day for 91 days, sourced from a constant, in the card
+    that otherwise shows what the owner reported. He is being told what he said about his sleep and he
+    never said it.
+  - **`app/api/nutrition-goals/recommend/route.ts:110`** puts `sleep quality=${m.sleepQuality}` into an
+    **LLM prompt** for nutrition-goal recommendations, beside genuinely measured `Xh sleep` and a real
+    `energy=`. The model receives 93 days of a constant presented as observation. The route's own
+    neighbouring comment (Q-76) exists because feeding the model an untrue sleep figure means it
+    *"learns nothing true"* — the same hazard, one field over.
+- **Fix, both halves:** stop rendering and stop prompting with a value that was not collected. The write
+  default stays; the readers must distinguish "defaulted" from "reported". The cheapest honest form is a
+  `sleep_quality_reported` boolean (or reusing TN-57's `*_touched` convention, which already exists for
+  exactly this) — the readers then omit the line rather than print or prompt a fabricated one.
+  **Backfill is decidable from the dates above:** rows on or before 2026-06-25 were collected, later
+  ones were not.
+- **Acceptance criteria:** Home shows no sleep line on a day the field was defaulted; the nutrition
+  prompt omits `sleep quality=` for those days; the 15 genuinely-collected rows still render and still
+  reach the prompt; #47 does not regress (a queued mutation with no `sleepQuality` still inserts).
+- **⚠ What this closes off for Tuning, which is why the entry exists at all.** I went looking for a
+  second daily self-report to validate readiness against, after TN-65 established that set RPE is the
+  only dense one. On its face `mood_logs` looked ideal — 108 days, 100% capture. **`energy_level` is
+  usable and `sleep_quality` is not**, and an analysis that had not checked the date split would have
+  read a 91-day constant as agreement between the sleep score and the owner's perception.
+- **Where the mechanism is:** `packages/shared/src/validation/mood-log.ts` (the documented default and
+  #47), `app/api/mood/route.ts:62` and `lib/data/postgres/adapter.ts:4715` (the two write paths that
+  apply it), `components/mood-checkin-sheet.tsx:256` (the client hard-codes it too).
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
