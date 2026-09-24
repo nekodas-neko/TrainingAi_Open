@@ -1990,13 +1990,28 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   snapshot; `getBodyBatteryHistory` passes it through, and **nothing branches on it**. Grepped for a
   `v5`/`v6` literal, a `startsWith`, an equality — there are none. The column exists to stop exactly
   the mistake below and does not currently stop it.
-- **The live consequence, as of TN-55 shipping today.** The calibration route reads
-  `getBodyBatteryHistory(userId, start, end)` and builds `batteryByDate` from `b.endValue`, then
-  correlates it against the morning `perceived_recovery` answers. Rows before today are `v5:` — the
-  countdown, which ended at the floor on about two thirds of days — and rows from today are `v6:`,
-  centred near 59. **Any range spanning today correlates across a model change**, which the repo's
-  own rule names as not evidence. The window cap is 180 days, so this is reachable rather than
-  theoretical.
+- **⚠ CORRECTED 2026-09-24, same day this was filed — the first version blamed TN-55 and was wrong
+  about when this starts.** It read *"rows before today are `v5:` and rows from today are `v6:`"*,
+  as though the shipping of v6 created the problem. Measured in production instead of reasoned from
+  the diff:
+
+  | model | days | mean end | days at 0 | last |
+  |---|---:|---:|---:|---|
+  | v1 | 16 | 66.3 | 0 | 2026-07-15 |
+  | v2 | 1 | 21.0 | 0 | 2026-07-16 |
+  | v4 | 18 | 62.9 | 0 | 2026-08-03 |
+  | v5 | 52 | 15.2 | **27** | 2026-09-24 |
+
+  **Four model generations are already in the table, and the v4 → v5 boundary is the violent one**
+  — mean end 62.9 against 15.2. A 180-day window has spanned it since early August. v6 adds a fifth
+  boundary to a defect that has been live since June; it is not the cause. (Tuning's census of the
+  same table on the same day omitted the single v2 day, which is why this one was re-run rather than
+  copied.)
+- **The live consequence.** The calibration route reads `getBodyBatteryHistory(userId, start, end)`
+  and builds `batteryByDate` from `b.endValue`, then correlates it against the morning
+  `perceived_recovery` answers. **Any range spanning a model boundary correlates across a model
+  change**, which the repo's own rule names as not evidence. The window cap is 180 days, so this is
+  reachable rather than theoretical — and has been reachable for longer than the entry first said.
 - **⚠ Do NOT "fix" it by filtering to the current version and stopping there.** That silently
   shortens the window instead of saying it did, which is the same failure one level quieter: a
   caller asking for 90 days would get a handful of rows and a correlation computed on them, with
