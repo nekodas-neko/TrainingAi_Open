@@ -18,6 +18,13 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
+
+Growth, and it is the cheap kind: the device agent re-reported DV-15 from a sitting on v1.465.17,
+which cannot contain the v1.465.23 fix, and asked after three DV-13 sibling routes that were checked
+and need no fix. Both answers went onto the entries rather than into a reply, so the next session
+does not re-fix a shipped guard or burn a device sitting on a build that predates it.
+
 ## 2026-09-24 — backlog → 27294 (DV-15 reproduced and fixed), projectOverview → 12638
 
 DV-15 stays queued for its device pass test, and grew because the entry now carries the
@@ -16480,6 +16487,31 @@ names a cause instead of a symptom.
 The BF-188 addition is six lines saying the defect it describes has already landed on `main` —
 that entry was filed from a conflict caught before merge, and #1484 shipped the same fault,
 dropping twelve entries of which two survived nowhere but git history.
+## 2026-09-24 — `docs/implementation-backlog.md` → BF-190 + BF-107 reopened
+
+BF-190, found while answering why a calories tile was blank: the walk summary saves on mount with the
+planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minute session. The
+length carries the two-row production table that is the evidence, and the reopening note on BF-107
+that distinguishes "the fix regressed" from "the screenshot was taken 30 seconds after the save" —
+the distinction is the whole value of the note, so it could not be shortened to a verdict.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → DV-17 shipped, LB-139 filed
+
+Net +14 across two entries. DV-17 grew because its stated location was wrong and the correction is
+the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is the parent passing
+`mealPlan === null` as "still loading" when null is the settled "no plan" answer. LB-139 is new —
+the six-line DV-17 fix put `nutrition-content.tsx` at exactly its 800-line ceiling, so the next edit
+to that file fails CI, and the extraction that fixes it is real work rather than a baseline raise.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → DV-18 triaged and re-laned to A
+
+27821 → 27843 (+22). DV-18 asked Lane B to look first and hand over if the cause was server-side, so
+this is that handover rather than a new entry. The +22 is the triage: what was ruled out (the stored
+URL exists — the component renders a "No reference" string when it is null, and the device saw a
+broken image instead; the two key strings agree exactly), and the mechanism proposed with the test
+that would disprove it. Writing the ruled-out half down is what stops Lane A re-walking it.
 
 ---
 

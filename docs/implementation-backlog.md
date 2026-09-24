@@ -517,48 +517,83 @@ below threshold and left in place for next time.
 - **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
 
 
-### [workouts][app-shell] DV-16 — "Leave workout? Your workout is in progress" after the day's workout is already done
+### [workouts][app-shell] DV-16 — "Leave workout? Your workout is already done" — shipped, device pass owed
 
-- **Lane:** B — `components/shell/bottom-nav.tsx` (`handleNavClick`), `lib/stores/workout-store.ts`.
-- **Added:** 2026-09-24 · Device Verification, sweep 3.
-- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** The owner finished **Push** that morning: persisted `ta_workout_state` read
-  `mode: "done"`, `workoutStartMs` and `workoutEndMs` set, `storedDate 2026-09-24`, and the Workout
-  tab showed the card stamped **COMPLETED** with *Start Again*. After an app restart, tapping another
-  tab from `/workout` raised **"Leave workout? Your workout is in progress. Leaving now will end the
-  session and unsaved sets will be lost."** — **2 of 2**. *Stay* was pressed both times; nothing was
-  reset.
-- **Why it is odd:** `isWorkoutActive` is `!!workoutStartMs && mode !== 'done'`, which is **false**
-  for the persisted state. So either the in-memory `mode` differs from what is persisted after a
-  restart, or a different guard raised the same dialog. **Not established which.**
-- **Cost to the owner:** after every workout, leaving the Workout tab asks to "end" a session that
-  is over, and *Leave* calls `resetSession` on the completed day.
-- **Pass test (device):** with a completed workout today, restart the app, open Workout, tap another
-  tab — it switches with no dialog.
+- **Lane:** B · **Branch:** `fix/dv16-completed-workout-leave-prompt` · v1.465.24.
+- **Found:** Device Verification sweep 3, 2026-09-24 (S25, three-button nav, 2 of 2).
+- **Cause** (the entry left this "not established", and neither guess was right as framed):
+  `applyRehydrateFixups` rewrites a persisted `done` to `pre` on reopen so `DoneScreen` cannot
+  replay its confetti, and that was the only term telling `isWorkoutActive` the workout had ended —
+  `workoutStartMs` survives anything under four hours. The card read COMPLETED off `workoutEndMs`
+  while the guard read active. Full write-up in the journal entry.
+- **Fix:** `isWorkoutActive` also requires `!workoutEndMs`, a stamp written once at completion and
+  nulled by `startWorkout`/`resetSession`, so it re-arms on Start Again. A third term, not a change
+  to either existing one — `pre` is the mid-workout hub and stays included. Four tests, control-run:
+  exactly one goes red against the pre-fix predicate.
+- **Keep:** the device pass test this entry specified. With a completed workout today, restart the
+  app, open Workout, tap another tab — it should switch with no dialog. Not runnable here: the
+  path needs the APK and a real completed day.
 
-### [nutrition][app-shell] DV-17 — Nutrition paints a meal-plan skeleton on every warm visit when there is no plan
+### [nutrition][app-shell] DV-17 — Nutrition's meal-plan skeleton on every warm visit — shipped, device pass owed
 
-- **Lane:** B — `components/nutrition/meal-plan-section.tsx:99`.
-- **Added:** 2026-09-24 · Device Verification, sweep 3 — RV-129's answer (RV-129 closed with this filed).
-- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame scan of the active panel for `.animate-pulse`/`[aria-busy]` over
-  3 warm rounds of Health, Nutrition, More, Home: Health, More and Home **never** painted a skeleton
-  (9 of 9). **Nutrition painted one on every visit (3 of 3)** — a 338×108 card at y=512, from
-  ~85 ms to 392–543 ms after the tap. It is `MealPlanSection`'s
-  `if (loading && plan == null) return <div className="h-28 … animate-pulse" aria-label="Loading meal plan" />`.
-  The owner has **no meal plan**, so `null` is the settled answer, and every visit repaints the pulse
-  until the refetch lands — the instant-paint rule's "skeleton flash on a repeat visit is a bug".
-- **Fix direction:** tell "no plan (cached)" apart from "not loaded yet" — seed from the cache and
-  only pulse when there is no cached answer at all.
-- **Pass test (device):** three warm Nutrition visits on an account with no plan paint zero skeleton
-  frames.
+- **Lane:** B · **Branch:** `fix/dv17-meal-plan-skeleton-on-warm-visit` · v1.465.25.
+- **Found:** Device Verification sweep 3, 2026-09-24 — 3 of 3 warm Nutrition visits, against 9 of 9
+  clean on Health/More/Home.
+- **The entry located it at `meal-plan-section.tsx:99`, and the defect is one level up.** That
+  component's `if (loading && plan == null)` is correct given its props. The parent passed
+  `loading={loading && mealPlan === null}` — and for an account with no plan, `null` is the
+  **settled answer the cache already gave**, indistinguishable from "no answer yet". So every warm
+  visit re-pulsed while the refetch ran.
+- **Fix:** `app/nutrition/nutrition-content.tsx` tracks `planLoaded` — set by the synchronous cache
+  seed (the only thing that runs before first paint) and by the fetch, but not by an `undefined`
+  payload, since `cachedFetch` swallows `!res.ok`. The presentational guard is unchanged and pinned.
+- **Verified:** 4 tests, control-run against `origin/main` — 3 of 4 go red without the change.
+- **Keep:** the device pass test — three warm Nutrition visits on an account with no plan, zero
+  skeleton frames. Needs the APK and a per-frame scan, so it stays owed.
+
+### [app-shell] LB-139 — `nutrition-content.tsx` is at 800 of 800 lines, so the next edit to it fails CI
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-24 · found shipping DV-17.
+- DV-17's six-line fix took the file from 795 to exactly the 800-line ceiling
+  `check-component-size` enforces. It passes, and **the next line anyone adds does not** — including
+  a one-line bug fix, which is the worst moment to be forced into an extraction.
+- Not extracted as part of DV-17: pulling a section out of a 795-line screen to make room for six
+  lines is a change with more risk than the fix it carries, and it would have shipped unreviewed
+  inside a device-reported defect.
+- **The extraction is the work here**, not a baseline raise. The file is a tab screen that already
+  delegates to `components/nutrition/*`; the candidates are the sheet/dialog wiring near the bottom
+  and the plan-related state cluster.
 
 ### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
 
-- **Lane:** B to look first (`components/admin/exercise-manager.tsx`); A if the stored asset is gone.
-- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147).
+- **Lane: A** — `app/api/admin/reference-figure/route.ts` (POST), `app/exercise-media/[...key]/route.ts`.
+  Re-laned from B after Lane B looked first, as the entry asked.
+- **Added:** 2026-09-24 · Device Verification, sweep 3 (seen while checking BF-147) · triaged by Lane B 2026-09-24.
 - **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Admin → Exercises → **AI style reference** renders the WebView's broken-image
   icon and the alt text *"Reference figure"*. This is the anchor the AI GIF generator styles from, so a
-  missing one may affect generations too. **Not established:** whether the stored URL 404s or the
-  reference was never set.
+  missing one may affect generations too.
+- **The entry's open question is settled: a URL IS stored.** `exercise-manager.tsx` renders
+  *"No reference — AI uses text prompts only"* when `referenceUrl` is null. The device saw the
+  broken-image icon and the alt text instead, so the GET returned a URL and the browser's fetch of
+  it failed. "Never set" is ruled out.
+- **Not a path mismatch, checked:** `REFERENCE_FIGURE_KEY` is `exercise-media/reference-figure.png`;
+  the admin GET strips that prefix to build `/exercise-media/reference-figure.png`, and the proxy
+  re-adds it. The two agree exactly.
+- **Mechanism — high confidence, NOT proven.** The POST writes **any** uploaded file to the `.png`
+  key with a hard-coded `'image/png'`, and the proxy sets Content-Type from the `.png` extension.
+  Neither inspects the bytes. The S25 shoots HEIC/JPEG, so a phone upload is stored and served as
+  PNG, which the WebView cannot decode — a broken image, while the GET's existence check (a real
+  `downloadMedia`) still succeeds. That is the observed symptom exactly.
+- **What would disprove it:** the stored object really being a valid PNG, in which case look at a
+  truncated upload or the proxy's response. Settling it needs production storage, which the sandbox
+  cannot reach — so this is a diagnosis to verify, not a conclusion to build on.
+- **Why Lane A:** the durable fix is server-side — sniff the real type on upload and store/serve it
+  under a matching key and Content-Type, or reject a non-PNG outright. `app/api/**` is Lane A by the
+  path rule.
+- **The Lane B half is deliberately not done.** Constraining the file input in
+  `components/admin/exercise-manager.tsx` is bypassable and cannot repair the already-stored object,
+  so shipping it alone would make the card look fixed while the AI generator still styles from a
+  file it cannot read. Worth adding *after* the server fix, not instead of it.
 - **Pass test:** the card shows the reference image on the S25.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
@@ -613,8 +648,29 @@ below threshold and left in place for next time.
   from `sqlite-backend.ts` at test time and run against `node:sqlite`, so it cannot drift from the
   implementation or pass against a stale copy. It also pins the two cases the guard must not buy:
   an ordinary pull still updates a live row, and a `pending` local edit is still protected.
-- **Keep:** the device pass test below. The race needs a real pull/push overlap on the S25, which no
-  container can stage — the reproduction is of the SQL, not of the timing.
+- **⚠ DEVICE SWEEP 3 RE-REPORTED THIS (#1491) — ON A BUILD THAT CANNOT CONTAIN THE FIX. Read this
+  before re-fixing anything.** The fix shipped in **v1.465.23** (#1485); production was serving
+  **v1.465.17** when the sweep ran and still is (DV-14). So a reproduction from that sitting is
+  expected and is **not** evidence the guard failed.
+- **The sweep's traced path is the SAME upsert the guard protects**, checked rather than assumed.
+  Its trace: local row DEL/pending at +118 ms, `GET /api/nutrition/food-logs` at +184 ms,
+  `POST /api/sync/push` at +194 ms confirming at +476 ms, row DEL/synced at +555 ms — with the
+  mechanism given as *"if the GET resolves after the push confirms, BF-47's queued-delete guard no
+  longer sees a pending delete, and hydration writes the pre-delete copy back as live+synced"*.
+  **That mechanism is exactly right**, and `use-food-logs-loader.ts:100` performs that write through
+  `store.applyDelta` — the guarded statement. Every other local food-log writer was enumerated:
+  `quick-edit-log-sheet.tsx` (a user edit, not hydration) and the sync-engine confirm arm, which for
+  a delete calls `markFoodLogSynced` and for a non-delete reads `getFoodLogs`, which filters
+  `deleted_at IS NULL` and so cannot find a tombstoned row. **`applyDelta` is the only hydration
+  writer**, so BF-47's screen-level guard is now the second line of defence rather than the only one.
+- **One datum from the sweep is genuinely new and does not change the fix:** it reproduced with a
+  delete **1.5 minutes after the log**, so the window is not only the quick log→delete. The guard
+  does not depend on the window — it depends on the tombstone being present, which every one of the
+  sweep's traces shows (DEL/pending → DEL/synced).
+- **Keep:** the device pass test below, **run against v1.465.23 or later** — which needs DV-14
+  resolved first, since production has not advanced past 1.465.17. The race needs a real pull/push
+  overlap on the S25, which no container can stage: the reproduction is of the SQL, not of the
+  timing.
 - **⚠ One window remains open and is NOT fixed here.** The guard protects a tombstone the device
   still holds. If a server tombstone delta has already hard-DELETEd the local row (the
   `if (r.deletedAt)` branch) and a stale pull arrives *after* that, the INSERT re-creates it with
@@ -692,6 +748,13 @@ below threshold and left in place for next time.
   now keyed by minute — exact for every timezone, since no UTC offset is finer than a minute — and
   pinned by `dv13-minute-keyed-day-bucketing.test.ts`, whose zone set includes Kathmandu and Chatham
   because an hour-keyed memo passes every whole-hour zone and is silently wrong in those two.
+- **The three sibling routes were checked and need no fix — that is why there is no recorded one.**
+  Device sweep 3 asked after `samples/summary`, `rollup-state` and `samples/pack`. None of them
+  carries a per-row `toAestDay`/`formatInTimeZone` loop; that was verified by reading all four
+  routes before #1473, and it is the reason a single-row `rollup-state` appearing to hang is the
+  signature of an occupied process rather than of that route being slow. If the console still hangs
+  after v1.465.23 reaches the device, the remaining suspect is the row CAP that `device-metrics`
+  still lacks (the `Keep:` below), not the siblings.
 - **Still NOT established, and this entry stays queued for it:** that `device-metrics` caused the
   **outage**. 656 ms — or even 3 s — does not account for a 90-second abort, and the deploy
   correlation above is the better explanation for that window. Do not close this by pointing at the
@@ -782,30 +845,6 @@ below threshold and left in place for next time.
 - **Also worth catching, and cheaper:** `BF-96` carried three bullets reading `- **Keep — …**` that
   meant *keep this knowledge*, not the residue field, and the parser read the first as the field.
   A prose sentence starting with the name of a field is the `TN-59` class again.
-
-### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
-
-- **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
-  decision the same day.
-- **The gap.** *Report an Issue* (`/more`) accepts a screenshot up to 500 KB and stores it in
-  `feedback_submissions.screenshot_data`. `claude_ro.feedback_submissions` **withholds that column
-  on purpose** and exposes `octet_length(...) AS screenshot_bytes` instead. So the Orchestrator's
-  session-start read of the owner's reports sees *"screenshot, 240 KB"* and nothing else — and for
-  a layout or rendering bug the picture is most of the signal, which is exactly the class the owner
-  is most likely to report from a phone.
-- **The owner asked for this (2026-09-23)** when the triage loop was set up, choosing it over
-  leaving the column withheld and describing screenshots by hand.
-- **Do NOT add `screenshot_data` to the `claude_ro` view.** It is a base-64 data URI up to 500 KB;
-  putting it in the view drags it into every `SELECT *` on that table and makes the db-query
-  endpoint unusable for ordinary report triage. **A dedicated route that returns ONE screenshot by
-  id is the shape** — the size belongs in the view, the bytes do not.
-- **Fetch by id, and scope it the way the view does.** The same owner scoping
-  (`current_setting('app.claude_ro_owner', …)`, never a hard-coded uuid — Q-456) has to hold on the
-  route, or it becomes a way to read another user's attachment. Match the auth and rate-limit shape
-  of its sibling admin routes rather than inventing one.
-- **Not urgent, and say so honestly:** the feature has **one submission in its lifetime** and none
-  of the owner's (measured 2026-09-23, view 0 rows against `n_tup_ins` 1). This is worth building
-  when reports start arriving, not before — it sits here so the gap is not rediscovered.
 
 ### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
 
@@ -2601,26 +2640,6 @@ below threshold and left in place for next time.
   describes. That is a cost trend the owner should see, not a mandate to promote it back — the
   decision to take the cheap option was his and stands until he says otherwise.
 
-### [platform] RV-76 — two program routes make the model emit muscle arrays that the code provably discards
-
-- **Lane:** A — `app/api/generate-program/route.ts:85-86,183`, `app/api/builder-chat/route.ts:251`,
-  `packages/shared/src/validation/generated-program.ts:10`. **Added:** 2026-09-20 · Review sweep 51.
-- `generate-program`'s own comment says it outright — *"its mainMuscles/secondaryMuscles output is
-  never read — the library's assignments are written over it at resolution time below"* — and the
-  schema still demands them (up to 10 strings × 60 chars per exercise). In `builder-chat:251`,
-  `mainMuscles: libraryMuscles?.mainMuscles ?? ex.mainMuscles ?? []` has **both fallbacks dead**: the
-  `.filter()` immediately above drops every exercise not in `exerciseMuscleLookup`, so
-  `libraryMuscles` is always defined.
-- **Fix:** delete the two fields from `BuilderExerciseSchema` and `GeneratedExerciseSchema` and
-  attach the library's assignments after parse, which `resolveAgainstLibrary`/`exerciseMuscleLookup`
-  already do. No new helper.
-- **Why it is worth anything:** generation time scales with emitted JSON, and `generate-program` is
-  the slowest call in the app at **4,786 ms**. Two string arrays per exercise across ~30 exercises is
-  a real share of that. It also removes a field the model is known to get wrong (the comment cites
-  squats/glutes).
-- **Not established:** the token/latency delta of removing the fields was not measured — no token
-  counts are stored per call.
-
 ### [platform] RV-78 — `/api/next-session` serialises two independent queries, and one card fetches with no seed
 
 - **Lane:** A — `app/api/next-session/route.ts:14,18,30`; plus
@@ -3141,6 +3160,42 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 - **Do NOT delete `temp-penalty-suspension.test.ts` as part of any cleanup.** It is the only record
   of what the ladder did, and answering (1) needs it.
 
+### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
+
+- **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
+  decision the same day.- **✅ RE-MEASURED 2026-09-24 (Lane A) — the deferral below still holds, so this was NOT built.**
+  `pg_stat_user_tables` reads `n_tup_ins` **1** and `n_live_tup` **1** for `feedback_submissions`;
+  `claude_ro.feedback_submissions` answers **0** of the owner's reports and **0** with a screenshot.
+  Unchanged from the filing a day earlier. Building a route to fetch an attachment that does not
+  exist would be guessing at the shape it should have.
+- **Moved down the queue accordingly**, below the startable defects. It reached position 3 only
+  because everything above it shipped — the queue working correctly, not a signal to start.
+- **When it IS built, two things from above are the whole design**, and they are easy to lose:
+  the bytes must NOT enter the `claude_ro` view (they would drag 500 KB into every `SELECT *` on
+  that table and make ordinary triage unusable), and the route must scope on
+  `current_setting('app.claude_ro_owner', …)` exactly as the view does, or it becomes a way to read
+  another user's attachment. **Check OR-138 first** — it shipped the ability to pivot that setting
+  per request, which changes what "scope it the way the view does" has to mean here.
+- **The gap.** *Report an Issue* (`/more`) accepts a screenshot up to 500 KB and stores it in
+  `feedback_submissions.screenshot_data`. `claude_ro.feedback_submissions` **withholds that column
+  on purpose** and exposes `octet_length(...) AS screenshot_bytes` instead. So the Orchestrator's
+  session-start read of the owner's reports sees *"screenshot, 240 KB"* and nothing else — and for
+  a layout or rendering bug the picture is most of the signal, which is exactly the class the owner
+  is most likely to report from a phone.
+- **The owner asked for this (2026-09-23)** when the triage loop was set up, choosing it over
+  leaving the column withheld and describing screenshots by hand.
+- **Do NOT add `screenshot_data` to the `claude_ro` view.** It is a base-64 data URI up to 500 KB;
+  putting it in the view drags it into every `SELECT *` on that table and makes the db-query
+  endpoint unusable for ordinary report triage. **A dedicated route that returns ONE screenshot by
+  id is the shape** — the size belongs in the view, the bytes do not.
+- **Fetch by id, and scope it the way the view does.** The same owner scoping
+  (`current_setting('app.claude_ro_owner', …)`, never a hard-coded uuid — Q-456) has to hold on the
+  route, or it becomes a way to read another user's attachment. Match the auth and rate-limit shape
+  of its sibling admin routes rather than inventing one.
+- **Not urgent, and say so honestly:** the feature has **one submission in its lifetime** and none
+  of the owner's (measured 2026-09-23, view 0 rows against `n_tup_ins` 1). This is worth building
+  when reports start arriving, not before — it sits here so the gap is not rediscovered.
+
 ### [platform] LB-121 — Reference: the queue parser's "blocked" marker, filed three times before it was fixed
 
 - **✅ FIXED 2026-09-22 (#1390, OR-122). `Reference:` — kept for the pattern, not for the fix.**
@@ -3229,6 +3284,98 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [activity] BF-190 — reaching the walk summary saves a whole walk, at the PLANNED duration, 27 seconds in
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake, found while answering the owner's
+  question about a blank calories tile). **Lane: B** — `components/guided-walk/walk-summary.tsx`.
+- **⚑ MEASURED — two rows in production for one walk, both claiming 40 minutes and 133 kcal.**
+  `activity_logs` for 2026-09-24:
+
+  | id | created (Brisbane) | start–end | duration | steps | avg HR | cadence | kcal |
+  |---|---|---|---|---|---|---|---|
+  | `b8083d04` | **09:18:27** | 09:18 → 09:58 | **40** | — | — | no | **133** |
+  | `d0231b08` | 09:59:28 | 09:19 → 09:59 | 40 | 3190 | 92 | yes | 133 |
+
+  The second row is the real walk. **The first was written 27 seconds after its walk started** and
+  claims the whole session — a 40-minute end time that had not happened yet, and the calories to
+  match. The day now holds 80 minutes and 266 kcal of treadmill walking against 40 and 133 actually
+  done.
+- **⚑ OWNER CONFIRMED THE TRIGGER 2026-09-24, and it sharpens the root cause below.** *"I started a
+  walk; then closed it - I guess it didnt fully close it? that should be looked at too."* So the
+  09:18 row came from **End walk**, not a crash or a mis-tap — which makes this reproducible on
+  demand and moves the defect earlier than the mount-save.
+- **⚑ THE REAL ROOT CAUSE: the two exits are the SAME CALL, and neither carries how long the walk
+  ran.** In `walk-active.tsx`, finishing naturally —
+  ```ts
+  if (e >= plan.totalSec && !finishedRef.current) {   // :142
+    finishedRef.current = true
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+  }
+  ```
+  and ending early —
+  ```ts
+  onLeave={() => {                                    // :279
+    if (finishedRef.current) return
+    finishedRef.current = true
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+  }}
+  ```
+  are **byte-for-byte the same callback with the same two arguments**. `WalkSummary` then receives
+  only `config`, `samples`, `cadence` and `startedAtMs` — nothing that says whether the walk ran to
+  completion or was stopped after 27 seconds. **It cannot tell, so it assumes the plan.** The
+  elapsed time is right there in the same component (`elapsedSec`, `:140`) and is dropped at the
+  boundary.
+- **⚠ This is an instance of a bug class CLAUDE.md already names.** *"Mutation-callback contract:
+  completion callbacks must carry the written entity, not fire as a parameterless 'please
+  refetch'."* Same shape — the callback fires without the fact that matters and the receiver
+  reconstructs it wrongly. Worth citing in the fix so the rule earns another example rather than
+  being rediscovered.
+- **⚠ And the UI already promises the distinction it does not keep.** `leave-walk-dialog.tsx` reads
+  *"Ending now will stop it early."* The lifter is told the walk will be recorded as stopped early;
+  it is recorded as a full session at the planned duration. That is the sentence the fix has to make
+  true.
+- **So the fix has two halves, and the first is the one that matters.** Pass the elapsed seconds
+  through `onFinish` and have `WalkSummary` use it for `durationMin` and `endTime`. The plan stays
+  the right source for the *interval structure* (`buildIntervalPlan` drives the per-segment stats) —
+  only the wall-clock fields move to the clock.
+- **Secondary — the mount-save makes it unrecoverable.** `walk-summary.tsx:130` saves on **mount**,
+  guarded only by a ref that lives for one mount:
+  ```ts
+  useEffect(() => {
+    if (savedRef.current) return
+    savedRef.current = true
+    void saveWalk()
+  }, [])
+  ```
+  and what it saves is the **plan**, not what happened:
+  ```ts
+  const durationMin = Math.round(plan.totalSec / 60)              // :61 — the PLAN
+  const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000) // :140 — start + the PLAN
+  ```
+  So the row is written before the lifter can see what it says, let alone decline it. Even with the
+  duration fixed, there is no beat at which a 27-second walk could be discarded — which is why the
+  floor below is part of the fix and not a nicety.
+- **The calories follow the duration, which is why both rows read exactly 133.**
+  `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
+  type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
+  133 kcal, every time, and it is indistinguishable from a real one in the row.
+- **⚠ Then decide whether a 27-second walk should be saved AT ALL, because the fix alone makes it a
+  27-second row rather than no row.** Recommend a **minimum-duration floor, discarded below it with
+  a toast** — the same shape `decomposeSessions` already uses for workouts (`MIN_SESSION_SEC`,
+  `time-audit.ts:358`), so the pattern exists rather than being invented here. A floor is better
+  than a confirm prompt: the lifter who backed out by accident does not want a dialog, and a
+  30-second walk is not data anyone wants in a trend.
+- **⚠ The two existing rows need a decision too — the phantom one is already in the history**, and
+  it feeds `build-day-audit.ts:257`. Deleting a production row is the owner's call and is not part of
+  the code fix; the app's own soft-delete from the activity list is the path, not a migration.
+- **Sibling sweep:** `done-activity-screen.tsx` takes the same write path but navigates away the
+  instant it saves (recorded under BF-107), so it has no mount-save. `walk-active.tsx` does not
+  write. This is the guided-walk summary alone.
+- **Verification:** start a guided walk, leave within a minute, and confirm either no row or a row
+  whose duration matches the seconds actually walked. Then complete a full walk and confirm the
+  duration still matches. **Device look owed** — the local-store branch is the one that runs on the
+  APK and `getLocalStore` returns null in the sandbox.
+
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
@@ -9935,7 +10082,25 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   save time. That changes what is *stored* across every food surface, which is a different decision
   from one warning banner, and nothing here presumes it.
 
-### [activity] BF-107 — the walk summary shows its calories (shipped; device owed)
+### [activity] BF-107 — the walk summary shows its calories (REOPENED 2026-09-24 — reported blank again)
+
+- **⚑ REOPENED, exactly as this entry said to.** It stated: *"If the calories tile is reported blank
+  again, that is a regression against an unverified fix."* The owner reported it blank on
+  2026-09-24: *"Why is the no calories burned in the top?"*
+- **⚠ BUT THE EVIDENCE DOES NOT YET SEPARATE THE TWO CASES, and saying so matters more than
+  reopening it.** The stored row has the number — `d0231b08`, **133 kcal**, derived server-side at
+  insert — so the server half works. The row was created at **09:59:28** Brisbane and the phone
+  clock in the screenshot reads **9:59**, i.e. the shot was taken within about half a minute of the
+  save. The tile is *designed* to start as a dash and fill when the forced pull returns, so a dash
+  at +30 s may be the documented pre-arrival state rather than the bug.
+- **The check that separates them, in five seconds and no code:** open that walk from the activity
+  list. The detail sheet reads `log.caloriesBurned` straight off the row
+  (`activity-detail-sheet.tsx:195`), so it will read **133**. If the summary tile ALSO fills when
+  re-opened, the fix works and the complaint is latency — which is a different entry about telling
+  the lifter the number is coming. If the tile stays a dash on a re-open, the forced
+  `pullDelta` inside `pushThenRevalidate`'s callback is not running and that is the regression.
+- **Start from** `fix/bf-107-walk-calories` and that callback either way.
+
 
 - **⚠ CLOSED CONDITIONALLY 2026-09-14, and nothing verified it.** Owner: *"Will have to see if this
   works after a walk; we can treat this as complete for now and if I re-raise it we know its not."*
