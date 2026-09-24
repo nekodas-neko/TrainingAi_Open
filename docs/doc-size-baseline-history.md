@@ -16678,3 +16678,12 @@ weight and moves 1.1% of the score, and the model file’s header calls a 14.4%-
 28809 → 28974 (+165; rebased on #1525). Eight new entries from a census of the owner's production data
 (RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
 was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/battery-v6-has-no-backfill)
+
+29008 → 29060 (+52). TN-72: the battery's v6 constants shipped and deployed, but the route persists today's row only and has
+one caller, so no stored day will ever be re-scored — retracting my own plan's claim that the change
+re-scores all 84 days. Most of the entry is the consequence (a v5→v6 step that reads as a recovery), the
+three options with what each is better at, and the acceptance test stated as NOT run.
