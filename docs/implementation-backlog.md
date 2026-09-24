@@ -5102,6 +5102,16 @@ why the count of affected entries always understated the harm.
   restored by hand in #1489 (`rv91-shared-date-and-energy-label`, `rv97-acwr-band-colour`). So the
   priority is not hypothetical, and a recovery path is needed as well as a fix: the dropped content
   is only in git history, and nothing reports which entries went missing.
+- **⚑ SECOND LIVE INSTANCE, 2026-09-24 — and it shows the trigger is the GATE, not carelessness.**
+  `docs/overview/entries/` crossed its 60-file limit, which fails `check-doc-index-size` for **every
+  lane at once**, so two lanes independently started the fold within an hour. Both wrote
+  `history-2026-09-24-folded-1.md`: Lane A folded 25 (#1543, merged), Lane B folded 40 (#1545,
+  closed unmerged because merging it meant hand-merging two archives — exactly the resolution this
+  entry says looks correct and loses nothing visible). Nothing was destroyed this time, by luck of
+  ordering rather than by any check. **So the chore this gate demands is a race, not a task**, and
+  the fix should be read with that in mind: a unique filename per fold ends the collision, while a
+  convention ("check `main` first") cannot, because both lanes checked and both were right at the
+  time they looked.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
