@@ -1572,6 +1572,73 @@ which is the right shape for something that can only be validated by living with
 - **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
   written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
 
+### [readiness][sleep][workouts] TN-73 — the RPE residual PASSES a positive control, which turns the scores' null into a measured ceiling: they move perceived effort ~5× less than doing one more set
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. **This is the first thing all session to
+  pass a validation rather than fail one**, and it upgrades TN-65 from a proposal to a calibrated
+  instrument.
+- **Lane: O** — it settles what the scoring work may claim and sets the acceptance bar for future
+  calibration; no code follows directly.
+- **Reference:** every future scoring proposal reads this for its acceptance bar; nothing is built FROM
+  it. **This is the field used correctly**, in contrast to TN-56, TN-59, TN-63 and TN-64, where I wrote
+  `Reference:` meaning "background reading" and so filed buildable work as read-only. The distinction:
+  those entries had work in them, this one has a standard in it.
+- **The positive control, which TN-65 never ran.** A residual is worthless unless it detects something
+  known. Within-session fatigue is the obvious candidate: later sets of the same exercise at the same
+  load should feel harder. Residual = RPE minus the mean for that exercise at that planned-intensity
+  band, by set number:
+
+  | set | n | mean residual |
+  |---:|---:|---:|
+  | 1 | 303 | **−0.094** |
+  | 2 | 253 | −0.021 |
+  | 3 | 145 | **+0.154** |
+  | 4 | 80 | +0.129 |
+
+  `corr(set_number, residual)` = **+0.156 over 782 sets** (p ≈ 1×10⁻⁵). **And the residual beats raw
+  RPE at this**: raw gives +0.148, so removing the load effect *strengthens* the fatigue signal rather
+  than washing it out — which is exactly what a sound residual does, and is the evidence that the
+  correction is doing real work.
+- **⚠ The raw comparison alone would have been a false positive.** Mean RPE rises 7.30 → 7.84 across
+  sets 1→4, but mean planned intensity rises too (73.0% → 77.8%), so the raw rise is partly just
+  heavier sets. Only the residual separates the two.
+- **So the instrument's sensitivity is now known: it resolves an effect of about 0.25 RPE points**
+  (set 1 → set 3) at this sample size. That number is what makes every null below meaningful instead of
+  merely absent.
+- **The scores, measured against it — at matched exercise, load band AND set number (527 sets):**
+
+  | | correlation with residual | poor days | good days | difference |
+  |---|---:|---:|---:|---:|
+  | `sleep_score` | **+0.001** | −0.113 (<50, n=98) | −0.068 (≥70, n=342) | **0.045**, wrong sign |
+  | `readiness_score` | −0.053 | — | — | ~0.04 (TN-69's figure) |
+
+- **The finding, stated as a ceiling rather than an absence.** The instrument demonstrably sees
+  **0.25**; neither score moves perceived effort by even **a fifth** of that, and the sleep-score
+  difference points the wrong way (a night the app scores under 50 feels marginally *easier*). **Doing
+  one more set of the same exercise at the same load changes how hard training feels roughly five times
+  more than the difference between the app's best and worst sleep nights.**
+- **⚠ What this does NOT license, and the distinction matters.** It is a statement about **perceived
+  effort during training**, which is one narrow outcome. The scores may well predict things this cannot
+  see — injury risk, long-run adaptation, mood, illness onset — and RPE is self-reported with an sd of
+  0.94, so it is a blunt instrument even when working. **Do not write "the readiness score is
+  meaningless" anywhere on the strength of this.** Write: *it does not predict how a session will feel,
+  by a measured margin.*
+- **What it changes for calibration work.** Any future scoring proposal now has a real acceptance test
+  with a known floor: **a change that claims to make a score better reflect the owner's state should
+  move the residual, and the bar to beat is 0.25.** A calibration that shifts the residual by 0.04 has
+  not been validated by this instrument — it has been shown to be below its resolution. That is a far
+  more useful standard than the distributional tests the scoring work has been using, which only ever
+  compare a score to itself.
+- **Assumptions worth checking before leaning harder on this.** `oura_daily_derived.day` is taken to key
+  the sleep score to the night *ending* that morning, so "poor sleep" means the night before the
+  session — not verified against the sleep-session boundary. And the 527 sets come from the same ~40
+  training days, so sets within a day are correlated; the set-level n overstates independent
+  observations, which inflates confidence in the *correlations* while leaving the *group means*
+  (the 0.045) sound.
+- **Where the mechanism is:** `claude_ro.set_logs.rpe` / `intensity_pct` / `set_number`, joined through
+  `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`; the residual partitions on
+  `(exercise_name, width_bucket(intensity_pct, 60, 100, 4), set_number)`.
+
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
