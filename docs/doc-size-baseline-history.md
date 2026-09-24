@@ -16615,3 +16615,8 @@ the owner's own answer — Home's card and an LLM prompt. Most of the entry is t
 it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.
 TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
 energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 57, `review/sweep-57-data-census`.**
+28632 → 28820 (+188). Eight new entries from a census of the owner's production data
+(RV-163 to RV-169, plus RV-170, which turns the history-row policy into the owner question it never
+was). Seven dated notes on existing entries. RV-161 and RV-157 moved to the head of Lane O, per #1508.
