@@ -1562,6 +1562,88 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
+### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
+
+- **Branch:** `tuning/training-load-gate-diagnosis`
+- **Lane:** A — `app/api/training-stress/route.ts`, `lib/data/postgres/adapter.ts`
+  (`getOuraDaytimeSignals`), `packages/shared/src/health/training-stress.ts`. Engine by the path rule.
+- **Added:** 2026-09-24 · Tuning agent, while checking whether `Q-204` was startable.
+- **Why this matters beyond itself:** `Q-204` (Q-137 direction B) carries `Needs: Q-270`, and Q-204 is
+  what would retire **TN-76**'s lane-balance finding and **TN-78**'s threshold question by replacing
+  `zoneMinutes` and the dead `activeEnergy` with one contributor. So Q-270 is the gate on three open
+  entries, and it has sat 🔴 and unexplained for five weeks.
+
+**⚑ Q-270's own framing is out of date and this is the correction.** Its title says
+*"`training_load_ots` is still 0 of 104 days, and the route is neither failing nor succeeding"*.
+Measured 2026-09-24: **`training_load_ots` is still NULL on all 110 days, but `training_load_gate` is
+now populated on 21** — every day from **2026-09-05 to 2026-09-25**, every one reading
+**`insufficient_met`**. So the route runs, reaches its gate, and persists the result. **The
+2026-08-15 warm-once-per-launch fix DID take**, and Q-204's caveat that *"the persist is
+unverified"* is now answered: it persists.
+
+**And the gate is firing on days whose data satisfies it.** `computeTrainingStress` gates on
+`metsPerMinute.length < 720 || validMin < 360`. Measured from the stored frames for tag `0x50`
+(`activity_information`, the MET stream), per Brisbane day:
+
+  | day | frames | MET values (from hex) | span (min) | needs ≥720 | needs ≥360 |
+  |---|---:|---:|---:|---|---|
+  | 2026-09-17 | 19 | 219 | 263 | fail | fail |
+  | 2026-09-18 | 84 | 981 | 1378 | **ok** | **ok** |
+  | 2026-09-19 | 93 | 1109 | 1417 | **ok** | **ok** |
+  | 2026-09-20 | 82 | 879 | 1342 | **ok** | **ok** |
+  | 2026-09-21 | 99 | 1137 | 1400 | **ok** | **ok** |
+  | 2026-09-22 | 117 | 1188 | 1364 | **ok** | **ok** |
+  | 2026-09-23 | 88 | 1086 | 1389 | **ok** | **ok** |
+  | 2026-09-24 | 116 | 1172 | 1375 | **ok** | **ok** |
+  | 2026-09-25 | 21 | 273 | 384 | fail | fail |
+
+  Seven of nine clear **both** floors with room. The two that do not are the partial days at the edges
+  of the 7-day hot window, which is expected. **So the input exists and the gate still fires**, which
+  places the loss between `oura_raw_samples` and `computeTrainingStress` — in
+  `getOuraDaytimeSignals` / `readRawFrames` / the ds conversion — and **not** in data availability.
+  That is the narrowing this entry contributes: Q-270 can stop asking whether the producer runs.
+- **Gate ordering rules out three causes for free.** `no_readiness`, `readiness_learning` and
+  `no_profile` are all checked **before** `insufficient_met`, so readiness is present and
+  `ble-derived`, the baseline is past `BASELINE_MIN_NIGHTS`, and age/sex/RHR are all set. Whatever is
+  wrong is downstream of those.
+- **⛔ TWO CAUSES CHECKED AND RULED OUT — do not re-spend a session on either.**
+  **(a) A missing decoder.** `decodeEventBody` handles `0x50` via `decodeActivityInfo`, which returns
+  `{state, met}` with the documented `b < 128 → b×0.1` scale. It is present and looks correct.
+  **(b) The clock-anchor window missing the frames.** It does not. Using the newest anchor
+  (`id 12544`, ds 70460518 ↔ 2026-09-24T21:04:19.802Z), the computed ds window **overlaps the real
+  frame range on all 9 days**.
+- **BUT (b) surfaced a separate inconsistency worth its own look.** The anchor set is **not
+  self-consistent**, and which anchor is chosen shifts the day window materially. Five anchors written
+  within **8 seconds** of wall-clock time carry `anchor_ds` values spanning **15,285 ds ≈ 25 minutes**
+  of ring time — so at most one of them is a true `(ds ↔ utc)` correspondence and the rest pair a ring
+  timestamp with its *ingest* instant. `getOuraClockAnchor` takes **newest by `created_at`**, and with
+  that one the computed window sits **~48 to ~97 minutes later** than the day's actual frame range
+  (2026-09-18: real 64129365–64963642 against computed 64157919–65021919). It still overlaps, so it is
+  not obviously the gate's cause — but a day window off by up to 1.6 hours is wrong on its own terms
+  and would silently mis-bucket any per-day aggregate built this way. **Not filed as its own entry
+  pending a Lane A read**, because the correct anchor-selection rule is a judgement about the ingest
+  contract rather than a measurement.
+- **Incidental, and cosmetic unless a decoder changes:** `decoded` is **NULL on all 719** tag-`0x50`
+  rows in the hot window, and `decoded` is **not** a withheld column in `claude_ro` (checked against
+  `_meta_withheld_columns`, which lists 8 entries, none of them this). So nothing persisted a decode
+  and every read re-decodes from `body_hex` via the adapter's `r.decoded ?? decodeEventBody(...)`
+  fallback. Correct today; it does mean a decoder edit retroactively changes historical reads with
+  nothing recording that it did.
+- **What to do next, in order.** (1) Run the route for 2026-09-22 and log
+  `grid.metsPerMinute.length` and the `validMin` count — that single log line separates "the frames
+  never arrive" from "they arrive and the grid collapses". (2) If the frames never arrive, instrument
+  `readRawFrames` for tag `0x50` across the hot/packed boundary. (3) Only then touch the thresholds —
+  **do not lower 720/360 to make the gate pass**, which would fabricate a load score from a series
+  nobody has shown is complete.
+- **What this does NOT establish.** I did not run the route, so I have **not** identified the cause —
+  this narrows it and rules two candidates out, nothing more. The MET value counts are estimated as
+  `(length(body_hex)/2) − 1` per frame (the decoder emits one value per body byte after the state
+  byte), not by running `decodeActivityInfo`, so they are close rather than exact; the margin over the
+  360 floor is wide enough that the conclusion holds either way. The span is `max(measured_at) −
+  min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
+  one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
+  not measured, so the 21-day gate run is only partly explained by this table.
+
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
 - **Branch:** `tuning/activity-contributor-behaviour`
