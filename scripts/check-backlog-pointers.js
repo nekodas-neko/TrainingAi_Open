@@ -39,6 +39,9 @@ const { laneFieldProblem, LANE_LOOSE_RE } = require('./lib/lane');
 
 /** A lane FIELD line: a list bullet whose first content is `Lane:`. Prose mentions never match. */
 const LANE_FIELD_LINE_RE = /^\s*[-*]\s*\*{0,2}Lane:/;
+
+/** An `Ask:` field line (BF-194). Only `owner` is a value — the field exists to surface HIS questions. */
+const ASK_FIELD_LINE_RE = /^\s*[-*]\s*\*{0,2}Ask\*{0,2}(?::\*{0,2}|\s*[—–-])\s*(.*)$/i;
 const { keepFromLines } = require('./lib/keep');
 const { keepKind, keepIsSettled } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
@@ -149,6 +152,18 @@ for (let i = 0; i < queue.length; i++) {
       // uses, is what makes this checkable: a prose mention of the token does not match, which matters
       // because the note explaining this trap has to quote it.
       if (LANE_FIELD_LINE_RE.test(line)) meta.get(currentId).laneFields += 1;
+
+      // BF-194. `Ask:` promotes an entry into its own always-visible section, so a typo in the
+      // value must not silently drop it back into the 10-row cut — which is the failure the field
+      // was added to end.
+      const ask = line.match(ASK_FIELD_LINE_RE);
+      if (ask && !/^owner\b/i.test(ask[1].trim())) {
+        failures.push(
+          `${currentId} declares \`Ask: ${ask[1].trim().slice(0, 40) || '(empty)'}\`. The only value is ` +
+            `\`owner\` — the field marks an entry whose deliverable is HIS answer, and it is what puts ` +
+            `it in the always-visible section. Write \`- **Ask:** owner — <the question>\`.`,
+        );
+      }
 
       const laneProblem = laneFieldProblem(line);
       if (laneProblem) {

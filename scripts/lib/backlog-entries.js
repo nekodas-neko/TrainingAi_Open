@@ -15,6 +15,7 @@ const { laneFromLines } = require('./lane');
 const { keepFromLines } = require('./keep');
 const { referenceFromLines } = require('./reference');
 const { verifyFromLines } = require('./verify');
+const { askFromLines } = require('./ask');
 const { idPattern } = require('./entry-id');
 
 /**
@@ -33,6 +34,7 @@ const { idPattern } = require('./entry-id');
  * @property {object|null} keep
  * @property {string|null} [reference]
  * @property {object|null} [verify]
+ * @property {string|null} [ask]
  */
 
 /** The backlog has no `## Queue` heading — it has been restructured. */
@@ -125,6 +127,7 @@ function parseEntries(lines) {
   e.keep = keepFromLines(e.laneLines);
   e.reference = referenceFromLines(e.laneLines);
   e.verify = verifyFromLines(e.laneLines);
+  e.ask = askFromLines(e.laneLines);
   }
 
   return entries;
