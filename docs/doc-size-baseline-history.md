@@ -17032,6 +17032,7 @@ The seventh is a `Needs: RV-170` on RV-166. The entry was already blocked, but s
 inside its `Lane:` line, so `next-item.js` offered it as Lane B's ready work twice in one session.
 One line in the field the runner actually reads is cheaper than the two pick-ups it cost.
 
+<<<<<<< HEAD
 ## 2026-09-24 — `docs/implementation-backlog.md` → 30362 (BF-196 + BF-189 amendment)
 
 The finish-time question, answered by measurement: 51 minutes is the working budget exactly, not a
@@ -17057,3 +17058,51 @@ the amendment costs lines because the answer is that the two numbers he compares
 units: the card's estimate is working time, the summary's duration is wall clock. Recording it needs
 both the code anchors and the session's three timestamps, because "it is counting it" is not
 believable without them.
+=======
+## 2026-09-24 — `docs/implementation-backlog.md` → 30349, four owner decisions recorded (OR-159)
+
+Net growth from four answers arriving at once, and most of it is one entry. RV-199 grew because the
+owner's "all three" had to be separated from what it did **not** decide: its third item recommended
+*deciding* the ring-key question deliberately, so reading the approval as an answer would have put
+words in his mouth. That split costs two new entries (`OR-159`, `OR-160`) and a paragraph saying why.
+
+The clinical-baseline removal also costs lines it would be wrong to save. Two of them record what was
+deliberately NOT done — the derived figures stay, and there is no history rewrite, so **the data
+remains in public git history**. A removal that reads as a clean one would be the more dangerous
+document.
+
+TN-64's decision is long for the same reason: it names the three parts in order and then says
+explicitly not to re-tune the 45 / 1.2 thresholds in the same change, because a prompt firing would
+then be unattributable. `RV-113` was deleted outright (declined), which is where the offsetting
+shrink comes from.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30349, the tab-switch reversal (OR-159, amended)
+
+`RV-113` was deleted as declined and then reinstated in the same PR, because the owner reversed
+himself once he heard the reasoning — tab-switch speed is his stated highest priority. The entry
+comes back longer than it left, and every added line is a guard against the thing he was sold:
+
+**It removes a blank, not a delay.** Its 58–109 ms gap is the same frames as `DV-12`'s long task, so
+the pass test will show no improvement and someone will read that as the fix having failed. An entry
+that recorded only "owner approved, build it" would produce exactly that misreading.
+
+`DV-12` grew for the opposite reason — it SHRANK in obligation. It was parked on `Lane: DV` awaiting a
+CPU profile that sweep 3 had already taken, so the lines added are the profile's result and the
+argument that what remains is a grep rather than a phone. Recording why a park was correct when
+written and is not now is what stops the next sweep re-parking it.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30540, the perceived-latency sweep (OR-161/162/163)
+
+Three entries from the owner's instruction that perceived latency counts as much as real latency.
+The growth is mostly two refusals to overclaim.
+
+`OR-162` spends its length on why the obvious fix is a regression: removing `content-visibility:
+hidden` stops the chart re-measure and restores the 21.3 % main-thread burn it was added to prevent.
+An entry naming the mechanism without that warning would read as a one-line fix and cost a cycle.
+
+`OR-163` is longer than the two findings it follows, on purpose. It exists to say that those findings
+are **not** the sweep — they came from following two known defects outward over twenty minutes, and
+recording them as the answer is the LB-108 shape, a result computed from the wrong starting set that
+looks complete. It also carries two structural gaps found while filing: no `Lane:` value for Review,
+and the device agent archived behind a 🟢 title.
+>>>>>>> origin/main

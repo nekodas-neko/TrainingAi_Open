@@ -4,13 +4,22 @@
     "vendor-binary": "A third party's compiled or serialised artefacts. Not regenerable from this repository.",
     "vendor-source": "A third party's own code, in any recovered form.",
     "vendor-notes": "Our written analysis of the above. Publishing the analysis publishes the substance even when the payload itself is gone.",
+    "personal-health": "The owner's own medical records. Not a third party's property like the kinds above, and listed here because the mechanism is the same: a CI gate that refuses the commit. Judge a new file by whether it concentrates clinical values, an instrument serial or a provider's scan reference in one place \u2014 a derived figure quoted in engineering prose is not this.",
     "vendor-procedure": "Provenance notes. The most sensitive category and the one to be strictest about, because it is of use to a reader who holds none of the rest. Never quote or paraphrase its contents anywhere."
   },
   "_archive": {
     "bucket": "Upload to the object-storage bucket (see scripts/upload-model-assets.js) before removing from the tree. Not recoverable from this repository once deleted and not regenerable here, so the upload is a prerequisite rather than a formality.",
-    "runtime-fetch": "Already served from object storage at runtime; the tree copy was a fallback and is gone."
+    "runtime-fetch": "Already served from object storage at runtime; the tree copy was a fallback and is gone.",
+    "owner": "The owner holds the only copy outside git history. Nothing in this repository or its object storage can restore it, so the file is sent to him BEFORE it is removed and that send is the archive step."
   },
   "paths": [
+    {
+      "path": "docs/clinical-baseline-2026-08-27.md",
+      "kind": "personal-health",
+      "importedByCode": false,
+      "archive": "owner",
+      "reason": "The owner's DEXA, RMR and a 58-analyte blood panel in one public file, with the provider's scan reference and the instrument serial. Removed 2026-09-24 on his decision (RV-199). It was already de-identified \u2014 no name, date of birth or patient reference \u2014 and that is not the point: the concentration is. Removing it from the tree does NOT remove it from git history, which stays public; a history rewrite was considered and declined, because it is irreversible and breaks every clone. He holds the copy."
+    },
     {
       "path": "lib/oura-models/weights/",
       "kind": "vendor-binary",

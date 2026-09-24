@@ -733,29 +733,311 @@ the Orchestrator's to do.
   - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
     Recommended: yes. It is how he trains (TN-24).
 
-### [platform] RV-199 — three privacy questions about what is public and what gets backed up
-- **Ask:** owner — three privacy decisions from security sweep 60: the clinical baseline doc in the public repo, the personal email on 1,528 commits, and whether Android backup carries the ring key and health store.
+### [app-shell] RV-113 — the tab switch blanks the panel for 58–109 ms; drop the opacity ramp
 
-- **Lane: O** — each is the owner's, and the recommendation comes first. Filed as a task per #1508.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **1. The clinical baseline is in the public repo.** `docs/clinical-baseline-2026-08-27.md` holds a
-  full blood panel, a DEXA and RMR result, a scan ID and an instrument serial number. Its figures are
-  repeated in the backlog, a plan and a history archive.
-  **Recommended:** move the doc to the private archive repo, and replace the figures elsewhere with a
-  pointer, in a docs-only PR. **This does not remove them from git history.** A history rewrite of a
-  public repo is irreversible and breaks every open clone and PR. Only do that if the exposure matters
-  more than that cost; the recommendation is not to.
-- **2. 1,528 of 1,529 commits carry the owner's personal email.** **Recommended:** turn on GitHub's
-  *keep my email private* and *block pushes that expose it*. That is a setting, not a repo change,
-  and it does nothing for existing history, for the same reason as item 1.
-- **3. `android:allowBackup="true"` with no backup rules** (`AndroidManifest.xml:14`). The local
-  store is over the 25 MB quota today, so nothing is backed up. Once D4's pruning lands, Drive backup
-  would carry the health store, the ring key and the WebView session cookie.
-  **Recommended:** exclude the cookie store, and decide on the ring key deliberately. A backed-up key
-  is the only way to survive an uninstall, which is the upside, and the Google account then becomes
-  the key's guard, which is the cost. Lane A implements whichever is chosen.
-- **Reversal cost:** 1 and 2 are cheap and forward-only. 3 is one XML file plus an APK.
+- **Lane: B** · **Batch: tab-switch-speed** — **decided by the owner 2026-09-24, and re-laned from
+  `O` the same hour.** He was asked whether a blink on the app's most frequent interaction was worth
+  one line and first said leave it; told that **tab-switch speed is his highest priority**, he
+  reversed it: *"If this can fix speeds do it."*
+- **⚠ BUILD IT, BUT DO NOT SELL IT AS A SPEED FIX — it removes a BLANK, not a DELAY.** The 58–109 ms
+  gap is **the same frames** as `DV-12`'s long task, and that task is what costs the time. Dropping
+  the opacity ramp does not shorten it by a millisecond; it means the new panel's content is
+  **painted and visible** during the block instead of the user staring at the background. That is a
+  real perceived-latency win on every switch and it is not a throughput win, and the difference
+  matters because measuring this against `perf.js longtasks` will show **no improvement** and someone
+  will read that as the fix having failed.
+- **`DV-12` is the actual speed item and they ship together** — same interaction, same frames, one
+  device check. Do not ship this one alone: content painted promptly on top of a 68–118 ms blocked
+  main thread still reads as sluggish, and the pair is what the owner actually asked for.
+- **The fix, unchanged from below:** drop the opacity ramp, keep the settle
+  (`from { transform: scale(0.97) } to { transform: none }`). The content is already painted, so
+  there is nothing to hide and the gap cannot happen. **Do not build the true cross-dissolve** — it
+  holds a second full-screen tree composited ~90 ms and needs the pause-when-hidden behaviour off,
+  which a profile once blamed for 21.3 % of main-thread time.
+- **What the blank actually shows, which decides how visible this is today.** `bg-page` is
+  `var(--page-bg, var(--background))`, and `--page-bg: transparent` is set **only while
+  `DynamicBackground` is active** (`dynamic-background.tsx:75`). With it ON the gap shows the dynamic
+  background with no content over it; with it OFF `bg-page` resolves to the same colour `html`
+  paints, so the gap is invisible — content vanishes and returns against an unchanging backdrop.
+  Either way it is a CONTENT blink, not a colour flash; the earlier "ramp is over wallpaper" wording
+  overstated it.
 
+- **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
+  `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
+  goes `visibility: hidden` in the **same frame** the incoming one becomes active, and the incoming
+  panel then reads **opacity 0** for 3–5 frames spanning **58–109 ms** — the same frames as DV-12's
+  long task — before `ta-tab-enter` fades it in. So yes: every switch shows ~60–110 ms with neither
+  panel painted. **What shows in the gap:** the panel's parent, `main` and `body` are all
+  transparent; the first painted layer is `html` (`oklch(0.145 0.02 215)`) plus any fixed wallpaper
+  layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
+  toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
+
+- **Superseded lane field, demoted to prose (TN-63) so it cannot route this entry:** it read
+  it read *“Lane O — re-channelled from `B` by Lane B, 2026-09-23”*, and the permission it was
+  waiting for has been given. The fix is one line and the file paths below are right. This entry ends by
+  saying its two open questions "decide whether this is worth doing at all", and both are
+  **looks** judgements on the app's most frequent interaction — is a 180 ms blink perceptible, and
+  does `bg-page` resolve transparent under the owner's wallpaper. CLAUDE.md routes a judgement about
+  whether something *feels* right to `O` and the owner, not to `DV`: the phone is where he will look
+  at it, but nobody is measuring anything. Building it first risks changing a daily interaction he
+  never asked to have changed.
+  Files when it returns: `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- The incoming panel gets `tab-panel-enter` and the outgoing one gets
+  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
+  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
+  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
+  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
+  content fading out first; **that half is not implemented.**
+- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
+  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
+  so there is nothing to hide and the blink cannot happen.
+- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
+  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
+  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
+  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
+- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
+  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
+  they decide whether this is worth doing at all.**
+
+
+### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
+
+- **⚑ THE OWNER'S HIGHEST PRIORITY, stated 2026-09-24: *"speed/performance/efficiency when switching
+  pages tabs is my highest priority."*** Of everything in the queue touching the tab switch, **this is
+  the one that holds the time.** `RV-113` removes a blank during the block and is batched with it;
+  this removes the block. Half the tabs already exceed CLAUDE.md's 100 ms touch-feedback bar on the
+  tap alone.
+- **The lead is strong enough to start from:** the top self-time item on **every** tap is a canvas
+  `font` setter under chart.js axis-label measurement. A chart that is not visible should not be
+  re-measuring its axis on a tab switch, so the first thing to establish is **why the update fires at
+  all** — before optimising what it does.
+- **Pass test is unchanged and objective:** `perf.js longtasks`, every tab tap's longest task **under
+  50 ms**. Note `RV-113` will NOT move this number; it is not meant to.
+
+- **📱 The lead, from a CPU profile of single tab taps (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24; `Profiler`, 200 µs sampling, 10
+  taps).** The top self-time item on **every** tap is the canvas `font` setter, **7–48 ms**, and its caller
+  chain is chart.js `update → _tickSize → _computeLabelSizes → set font`. Every tab switch re-runs a
+  chart.js update that re-measures axis labels. Smaller: `localStorage.setItem` 1–15 ms per tap.
+  Component names are minified, so **which** chart(s) and why is not established — the suspect is a
+  responsive resize when a panel leaves `content-visibility: hidden`.
+
+- **Lane: B** · **Batch: tab-switch-speed** — **re-laned from `DV` on 2026-09-24, because the
+  measurement it was parked for HAS BEEN TAKEN.** The owner said tab-switch speed is his highest
+  priority; this is the entry that holds the time, so it heads the lane.
+  **The park was correct when it was written and is not now.** This entry's *"Not established"* line
+  asked for a CPU profile of one tap to name what dominates the task — and sweep 3 ran exactly that
+  (`Profiler`, 200 µs, 10 taps) and named it: the canvas `font` setter, **7–48 ms**, via chart.js
+  `update → _tickSize → _computeLabelSizes → set font`. **Every tab switch re-runs a chart.js update
+  that re-measures axis labels.** That is CLAUDE.md's trap (b) — *a probe that has already been run is
+  no longer DV's* — and the entry's own text already said to hand it back to `B` with the profile
+  attached.
+  **What is still unknown is answerable from SOURCE, not from the phone:** which chart(s), because
+  the profile's component names are minified. Finding which charts render inside a tab panel is a grep
+  in `components/shell/**` and the tab screens; the suspect is already named — a responsive resize
+  when a panel leaves `content-visibility: hidden`.
+  Superseded field, demoted to prose so it cannot route this entry: it read *“Lane DV —
+  re-channelled from `B` by Lane B, 2026-09-23. The fix will be Lane B's; the next ACTION is not.”* This entry's own "Not established" line says what it needs: a CPU profile of one
+  tap, to name the component that dominates the task. That is a measurement nobody has taken, with
+  an objective output, on hardware only the device agent has — which is exactly what
+  CLAUDE.md's lane rule assigns to `DV`. Left in `B` it sits at the head of the lane blocking on
+  something the lane cannot do, and each Lane B session pays to rediscover that. Hand it back to
+  `B` with the profile attached. The eventual fix path is still `components/shell/**`.
+- **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
+- **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
+  long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
+  (→ Home 78, → Health 108, → Workout 93, → Nutrition 68, → More 79; reverse direction 76–118), and the
+  frame attribution names **`#document.onclick`** — React's delegated click handler, so the switch's
+  own synchronous render. Scrolling Home and Health produced **none**; `animationiteration` no
+  longer appears at all.
+- **Why it is filed:** CLAUDE.md asks for touch feedback within 100 ms, and half the tabs exceed it
+  on the tap alone. It may be the same work RV-113 calls "hide-then-fade"; read that first.
+- **Not established:** which component dominates the task — the next measurement is a CPU profile of
+  one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
+- **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
+
+
+### [app-shell] OR-161 — the route transition already does what the tab switch is missing, 50 lines above it
+
+- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 · Orchestrator, sweeping for the
+  `RV-113` pattern elsewhere after the owner said perceived latency matters as much as real latency.
+- **The finding is a CONTRAST, not a new defect, and that is what makes it cheap.** `app/globals.css`
+  holds both transitions:
+  - **Route push/pop (`ta-axis-y-in`/`-out`, :752-755) is CORRECT.** The outgoing screen fades to
+    `opacity: 0` by **40%** and the incoming holds `opacity: 0` until **25%** — a deliberate ~15%
+    overlap, and the comment above it says exactly why: *"enough that the screen is never fully empty
+    mid-transition"*. **There is no blank window.**
+  - **Tab switch (`ta-tab-enter`, :800-805) has no outgoing half at all.** The outgoing panel is
+    hidden outright in the same commit, so the incoming ramp plays over nothing. That is `RV-113`.
+- **So the fix for `RV-113` need not be invented — the shape is already in the file.** Either drop the
+  opacity ramp (RV-113's one-liner, recommended, cheapest) or give the tab switch the same overlap the
+  route transition has. Do NOT do both.
+- **⚠ TWO CODE COMMENTS ASSERT THE BUG DOES NOT EXIST, and they are why it survived.**
+  `globals.css:790` — *"this animates content that is already painted, which is why it reads as polish
+  rather than as waiting"* — and `tab-shell.tsx:186` — *"this animates content that is genuinely
+  there, which is why it reads as smooth rather than as a stall."* Both are false: `RV-113` measured
+  58-109 ms with neither panel painted, 10 of 10 switches. **Fix the comments in the same PR.** A
+  wrong comment asserting the absence of a defect is worse than no comment, and the next reader
+  checking whether this needs work will believe it.
+
+### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
+
+- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 · Orchestrator, answering
+  `DV-12`'s open question without the phone.
+- **`DV-12`'s "Not established" was *which component dominates the task*.** Its sweep-3 profile named
+  the chain — chart.js `update → _tickSize → _computeLabelSizes → set font`, the canvas `font` setter
+  at **7-48 ms** on every tap — and guessed the cause: *"the suspect is a responsive resize when a
+  panel leaves `content-visibility: hidden`."* **The source confirms the suspect.**
+- **The mechanism, end to end.** `tab-shell.tsx:205` puts
+  `invisible [content-visibility:hidden]` on every non-active panel, which means its subtree is **not
+  laid out**. On switch that is removed, the subtree lays out, every `<canvas>` inside goes from no
+  box to a real one, and chart.js's responsive resize observer fires an `update()` — which
+  re-measures axis labels, which sets the canvas `font`. Sampled three charts and **all three** are
+  configured the way that arms it: `responsive: true, maintainAspectRatio: false`
+  (`health/trend-chart.tsx:36-37`, `ui/sparkline-chart.tsx:110-111`, `health/hr-day-chart.tsx:216-217`).
+  **20 files import `react-chartjs-2`**, and the Health tab alone holds trend, sleep-phase trend,
+  sleep-timing trend, week-metric, week-volume, hr-day, time-in-zone and trend-sparkline.
+- **⚠ The obvious fix is a REGRESSION and must not be taken.** Removing
+  `[content-visibility:hidden]` stops the re-measure and re-introduces what it was added for: a
+  device profile attributed **21.3 % of main-thread time** to `animationiteration` from loops running
+  in panels nobody can see (49 components use `animate-pulse`, 46 `animate-spin`, both infinite).
+  Trading a 68-118 ms tap cost for a permanent background burn is a bad trade.
+- **Ask why the update fires before optimising what it does.** A chart whose pixel size has not
+  actually changed should not re-measure. Directions, cheapest first, none yet measured:
+  **(a)** chart.js `resizeDelay` — currently set nowhere in the repo — debounces the observer, which
+  may be enough to coalesce the reveal into one update instead of per-chart;
+  **(b)** hold the canvas size across the hidden state so the observed box does not change;
+  **(c)** skip the update when the previous box was zero-size, which is the reveal case specifically.
+- **Pass test is `DV-12`'s, unchanged:** `perf.js longtasks`, every tab tap's longest task under
+  **50 ms**. This entry is where the time is; `RV-113` is where the blank is.
+- **Not established:** how many canvases are actually mounted across the five tabs at once. That is a
+  count somebody should take before choosing between (a), (b) and (c), because (a) only pays if the
+  cost is many charts rather than one expensive one.
+
+### [app-shell][platform] OR-163 — sweep the whole app for the two latency classes, with a stated method
+
+- **Lane: O** · **Added:** 2026-09-24 · commissioned by the owner: *"Perceived latency is just as
+  important. We need to do another check to make sure we apply the same logic everywhere to find areas
+  to increase latency or perceived latency."*
+- **⚠ WHAT HAS BEEN DONE IS NOT THE SWEEP.** `RV-113`, `OR-161` and `OR-162` came from following two
+  known defects outward, not from covering the app. They are three findings from roughly twenty
+  minutes aimed at the tab switch. **Treating them as the answer is the failure this entry exists to
+  prevent** — the same shape as LB-108, where a fix computed from the wrong starting set looked
+  complete.
+- **The two classes are different and want different searches.** Keeping them apart is the point;
+  conflating them is how a perceived-latency fix gets measured with a throughput test and read as a
+  failure (see `RV-113`).
+  - **Class 1 — content hidden that is already painted.** Costs nothing to fix, changes no work done.
+    Tell: an opacity/visibility transition on a container whose content is mounted. Search: the
+    keyframes in `app/globals.css` and every `invisible` / `[content-visibility:hidden]` /
+    `display:none` toggle on a mounted tree.
+  - **Class 2 — avoidable work on an interaction's critical path.** Tell: synchronous work in a click
+    or navigation handler that is not needed to paint. Search: the long-task profile per interaction,
+    then the source. `DV-12` also names `localStorage.setItem` at **1-15 ms per tap**, which nobody
+    has chased.
+- **A third class the owner's instruction covers and neither entry touches: the FIRST paint.**
+  CLAUDE.md is explicit that a skeleton flash on a repeat visit is a bug and that every fetch seeds
+  synchronously from `readCacheSync`. Measured counts, 2026-09-24, as a starting frame and **not as a
+  finding**: **54** files render `animate-pulse`, **56** call `readCacheSync`, **37** use
+  `useCachedValue`. Those sets overlap unknown amounts. **The question to answer per site is whether a
+  skeleton can appear on a REPEAT visit**, which neither a count nor a grep decides.
+- **Do it interaction-first, not file-first.** The interactions worth timing, in the owner's order of
+  use: tab switch (covered), open a workout, log a set, open Nutrition and add a food, open a day
+  detail, pull-to-sync. For each: does anything blank that was painted, and what runs synchronously
+  before the first frame.
+- **Deliverable:** one entry per finding with the class named and a measurement, filed as a single PR
+  per CLAUDE.md's filing-sweep rule. **A finding without a before number is not a finding here** —
+  perceived latency is exactly where an unmeasured improvement is indistinguishable from a preference.
+- **⚠ There is no `Lane:` value for Review, which is whose work this is.** The lanes are `A`, `B`, `O`
+  and `DV`, so a sweep that produces findings has no channel of its own and sits in `O` — the same gap
+  `OR-150` records for Tuning. Do not invent `Lane: R` for this one entry; if it recurs, that is the
+  evidence for a fifth value.
+- **Needs the device for class 2, and the device agent is ARCHIVED** (noted 2026-09-24: its session is
+  archived while its title still ends in 🟢, so the session list reads as though it is live). Class 1
+  and class 3 can be swept from source without it.
+
+### [platform] RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here
+- **Keep:** two of the three are not the Orchestrator's to execute — item 2 is a GitHub account
+  setting only the owner can toggle, and item 3 is `android/**`, which is Lane A's. Item 1 shipped in
+  this PR.
+
+- **Lane: O** · **Added:** 2026-09-24 · Review sweep 60
+  ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
+- **✅ THE OWNER ANSWERED ALL THREE: apply every recommendation** (2026-09-24, put to him with the
+  branch-protection re-ask, TN-64 and RV-113).
+- **① The clinical baseline document — ✅ DONE IN THIS PR.** It held a DEXA, an RMR, a 58-analyte
+  blood panel, the provider's scan reference and the instrument serial in one public file. Removed
+  from the tree, registered in `scripts/private-paths.json` under a new `personal-health` kind so the
+  CI gate refuses it back, and the nine links to it across the backlog, two plans, the body domain
+  index, the module map, BugFix's baton and `projectOverview.md` are repointed to plain text.
+  **The owner was sent the file before it was deleted** and holds the copy.
+  - **⚠ A FACT THE RECOMMENDATION DID NOT ACCOUNT FOR, found while reading the doc rather than the
+    entry.** It described itself as the DURABLE copy: `BF-2` (scale calibration), `BF-33` (measured
+    RMR) and `BF-1` (blood import) were each filed *waiting on exactly these values*, and BF-41's own
+    rule requires its schemas be written from the real report rather than a description. So this was
+    working data, not a stray file. It is recoverable from git history and from the owner's copy, but
+    **an entry that reaches for it will not find it** — hence the plain-text pointers rather than
+    silent deletion.
+  - **The derived figures were DELIBERATELY LEFT** — the 28.5 % vs 25.3 % scale pair, RMR 1325 vs
+    1549, the Cunningham comparison. **This is a judgement and the owner can reverse it:** they are
+    the reasoning several queued entries turn on, a single figure in engineering prose is a different
+    exposure from a 58-analyte panel with a scan reference, and they are in git history regardless.
+    Scrubbing them would gut the entries' context for no change to what is public.
+  - **No history rewrite.** Considered and declined in the recommendation he accepted: it is
+    irreversible and breaks every clone and open PR. **The data stays in public git history.**
+- **② The personal email on 1,528 of 1,529 commits — ⏳ OWNER ACTION, not shipped here.** It is a
+  GitHub account setting: *Settings → Emails → Keep my email addresses private*, plus *Block command
+  line pushes that expose my email*. Nothing in the repo changes and it does not touch existing
+  history, for the same reason as ①.
+- **③ `android:allowBackup="true"` with no backup rules** (`AndroidManifest.xml:14`) — **split in
+  two, because he approved one half and the other was never a recommendation.** The cookie exclusion
+  is `OR-159` (Lane A). **Whether Google Drive backup should carry the Oura ring key is `OR-160`,
+  still his** — the recommendation said *decide deliberately*, so "all three" approved the decision
+  being taken, not a particular answer.
+- **Not urgent today:** the local store is over the 25 MB quota, so nothing is backed up at all. This
+  becomes live the moment D4's pruning lands.
+
+### [devices][platform] OR-159 — Android backup carries the WebView session cookie; exclude it
+
+- **Lane: A** — `android/app/src/main/AndroidManifest.xml` and a backup-rules XML. **Added:**
+  2026-09-24 · split out of `RV-199` item ③, which the owner approved.
+- **The decision is made — this is implementation, not a question.** `android:allowBackup="true"`
+  with no rules (`AndroidManifest.xml:14`) means Google Drive backup takes whatever the app stores.
+  The owner approved excluding the **WebView session cookie**, which is a live credential: restored
+  onto another device it is a signed-in session.
+- **Scope it to the cookie.** The Oura ring key is the SAME manifest and a different decision, still
+  the owner's — see `OR-160`. Do not settle it by implication while editing this file; if `OR-160` is
+  still open when this is built, exclude the cookie and leave the key's handling exactly as it is.
+- **Not urgent, and say so rather than rushing it.** The local store is over Android Auto Backup's
+  25 MB quota today, so **nothing is backed up at all** — measured on-device 2026-08-18 at 31.2 MB.
+  This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
+  prioritise it.
+- **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+
+### [devices] OR-160 — should Google Drive backup carry the Oura ring's BLE key?
+- **Ask:** owner — should Android backup include the Oura ring's BLE key? Backing it up is the only thing that survives an uninstall, which today destroys the key permanently; the cost is that the Google account becomes the key's guard. Recommendation and both costs in the entry.
+
+- **Lane: O** · **Added:** 2026-09-24 · split out of `RV-199` item ③. **He approved *deciding*
+  this deliberately, which is not the same as approving an answer** — so it is still open, and
+  filing it as its own entry is what stops it being settled by whoever next edits the manifest.
+- **Why it is genuinely his.** It trades a real recovery path against a real exposure, and both
+  sides are serious.
+- **Recommendation: back it up, encrypted, and exclude everything else.** An uninstall destroys the
+  ring's BLE key **permanently** — `CLAUDE.md` is emphatic that it is not recoverable from this repo,
+  the server, or any log, and re-pairing means re-onboarding the official Oura app, which risks a
+  firmware update that breaks the reverse-engineered protocol. That is the worst outcome available
+  here, it is one mis-tap away, and a backup is the only thing standing between him and it.
+- **The cost, stated plainly:** the Google account becomes the key's guard. Anyone who compromises it
+  can restore a device that talks to his ring. Android backup is encrypted with the device PIN on
+  modern versions, so this is not a plaintext copy in Drive — but it is a copy, and it is outside his
+  phone.
+- **The alternative and what it is better at.** *Exclude the key with everything else* is better if
+  he would rather the key exist in exactly one place and accept that an uninstall is fatal to it. It
+  is the stronger position on paper and the weaker one in practice, because the failure it guards
+  against needs an attacker and the failure it invites needs a slip.
+- **Reversal cost: low both ways** — one XML file and an APK. But note the asymmetry: switching the
+  backup ON later does not recover a key already destroyed.
+- **`OR-159` ships regardless** and must not settle this by implication.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
@@ -824,11 +1106,30 @@ below keep their gate — they really are blocked pending an answer — and this
   cannot answer, and routing them here would just move the silence.
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
-- **Ask:** owner — readiness currently changes NOTHING the app prescribes: its one automatic action has never fired in 117 sessions and cannot on the active program. What should a low readiness day actually do? Decision brief in the entry.
+
+- **✅ ANSWERED BY THE OWNER 2026-09-24: extend the recommender to `ai_dynamic` and persist ACWR,
+  keeping the owner-confirmation step.** He took the recommendation as written, over *leave it off
+  and delete the gate* and over *lower the thresholds*.
+- **So this is now BUILDABLE and it is Lane A's.** Three parts, and the order matters:
+  **(a)** persist ACWR — nothing stores it today, which is why the second leg of this entry's finding
+  is inference rather than measurement, and no fix can be validated without it;
+  **(b)** widen the `phaseMode === 'automatic'` condition at `readiness-payload.ts:665` so an
+  `ai_dynamic` program reaches the recommender;
+  **(c)** leave `POST /api/confirm-early-deload` in the path — **the owner confirms, the app never
+  deloads him on its own.** That was explicit in what he accepted and it is the part that makes this
+  reversible in practice.
+- **Do NOT also move `EARLY_DELOAD_SCORE_MAX` (45) or `EARLY_DELOAD_ACWR_MIN` (1.2).** Re-tuning the
+  thresholds in the same change makes it impossible to tell whether a prompt fired because the gate
+  opened or because the bar moved. Ship the condition, watch what it proposes, tune after — and a
+  threshold change is Tuning's proposal anyway, not this entry's.
+- **What tells us it worked:** `is_early_deload` is false on all 117 sessions and
+  `early_deload_week_start` is NULL on all 5 programs. A prompt appearing on a genuinely low day is
+  the signal; prompts on ordinary days mean the thresholds are wrong, which is (a)'s data answering
+  the question this entry could not.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while testing whether the readiness score
   predicts anything about training.
-- **Lane: O** — this needs the owner's call on what the app should *do*, which is product behaviour
+- **Lane: A** — **re-laned 2026-09-24 the moment the owner answered.** It was `O` because it needed his call on what the app should DO; he has made it, so what is left is engine work: `lib/health/readiness-payload.ts`, a stored ACWR column and a migration. Was: *Lane: O — this needs the owner’s call on what the app should do.*
   rather than a structural choice, and the decision brief is below rather than in a chat reply.
 - **What the code says.** `earlyDeloadRecommended` (`lib/health/readiness-payload.ts:665`) is the only
   place a readiness score automatically changes what the app prescribes. It is wrapped in
@@ -4348,36 +4649,6 @@ written entity.
   sandbox can prove the attribute is present and cannot prove what TalkBack says.
 - **Verify: device**
 
-### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
-
-- **📱 The lead, from a CPU profile of single tab taps (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24; `Profiler`, 200 µs sampling, 10
-  taps).** The top self-time item on **every** tap is the canvas `font` setter, **7–48 ms**, and its caller
-  chain is chart.js `update → _tickSize → _computeLabelSizes → set font`. Every tab switch re-runs a
-  chart.js update that re-measures axis labels. Smaller: `localStorage.setItem` 1–15 ms per tap.
-  Component names are minified, so **which** chart(s) and why is not established — the suspect is a
-  responsive resize when a panel leaves `content-visibility: hidden`.
-
-- **Lane: DV** — re-channelled from `B` by Lane B, 2026-09-23. **The fix will be Lane B's; the next
-  ACTION is not.** This entry's own "Not established" line says what it needs: a CPU profile of one
-  tap, to name the component that dominates the task. That is a measurement nobody has taken, with
-  an objective output, on hardware only the device agent has — which is exactly what
-  CLAUDE.md's lane rule assigns to `DV`. Left in `B` it sits at the head of the lane blocking on
-  something the lane cannot do, and each Lane B session pays to rediscover that. Hand it back to
-  `B` with the profile attached. The eventual fix path is still `components/shell/**`.
-- **Added:** 2026-09-23 · Device Verification, from sweep 1's P14 (RV-140, closed with this entry filed).
-- **Measured on the S25** (web v1.465.10, gesture nav; `perf.js longtasks`, long-task observer plus
-  long-animation-frame attribution): every tab switch produces **exactly one long task of 68–118 ms**
-  (→ Home 78, → Health 108, → Workout 93, → Nutrition 68, → More 79; reverse direction 76–118), and the
-  frame attribution names **`#document.onclick`** — React's delegated click handler, so the switch's
-  own synchronous render. Scrolling Home and Health produced **none**; `animationiteration` no
-  longer appears at all.
-- **Why it is filed:** CLAUDE.md asks for touch feedback within 100 ms, and half the tabs exceed it
-  on the tap alone. It may be the same work RV-113 calls "hide-then-fade"; read that first.
-- **Not established:** which component dominates the task — the next measurement is a CPU profile of
-  one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
-- **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
-
-
 ### [platform][app-shell] RV-155 — about 60 shipped changes owe a device look that no queue shows DV: run them as six stations
 
 - **Lane: DV**
@@ -4756,47 +5027,6 @@ written entity.
   Day sheet opens. If it now opens, the static import was the fix; if it still does not, the chunk
   boundary was never the cause and the dev-compiler reading above was a red herring — say so and
   reopen from the param-independent half.
-
-### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
-- **Ask:** owner — every tab switch shows 58–109 ms with neither panel painted, measured on the S25 over 10 of 10 switches. The fix is one line. Is a blink on the app's most frequent interaction worth changing it for?
-
-- **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
-  `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
-  goes `visibility: hidden` in the **same frame** the incoming one becomes active, and the incoming
-  panel then reads **opacity 0** for 3–5 frames spanning **58–109 ms** — the same frames as DV-12's
-  long task — before `ta-tab-enter` fades it in. So yes: every switch shows ~60–110 ms with neither
-  panel painted. **What shows in the gap:** the panel's parent, `main` and `body` are all
-  transparent; the first painted layer is `html` (`oklch(0.145 0.02 215)`) plus any fixed wallpaper
-  layer — the page colour/wallpaper, not a panel's `bg-page`. Not measured: the reduce-motion
-  toggle (OS setting), and RV-114 / RV-115, which keep their own entries.
-
-- **Ungated 2026-09-24 (OR-143).** It IS the owner's call — a daily interaction he never asked to have changed — but nobody has put it to him, and `Gate:` parks the entry out of the Orchestrator's own READY list, so the gate was what stopped it being asked. Asking is the work; the work is `Lane: O`.
-- **Lane: O** — re-channelled from `B` by Lane B, 2026-09-23. The fix is one line
-  and the file paths below are right; what is missing is permission to spend it. This entry ends by
-  saying its two open questions "decide whether this is worth doing at all", and both are
-  **looks** judgements on the app's most frequent interaction — is a 180 ms blink perceptible, and
-  does `bg-page` resolve transparent under the owner's wallpaper. CLAUDE.md routes a judgement about
-  whether something *feels* right to `O` and the owner, not to `DV`: the phone is where he will look
-  at it, but nobody is measuring anything. Building it first risks changing a daily interaction he
-  never asked to have changed.
-  Files when it returns: `components/shell/tab-shell.tsx:193,205`, `app/globals.css:800-805`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- The incoming panel gets `tab-panel-enter` and the outgoing one gets
-  `invisible [content-visibility:hidden]` **in the same React commit**, while `ta-tab-enter` ramps
-  `opacity: 0 → 1`, reaching 1 only at the 60% stop (~108ms of 180ms). Nothing paints the old panel
-  during that ramp, and panels are `bg-page`, transparent under the dynamic background — so the ramp
-  is over wallpaper. The file's comment calls this M3 fade-through, which specifies the outgoing
-  content fading out first; **that half is not implemented.**
-- **Fix, one line, and try this before the elaborate version:** drop the opacity ramp and keep the
-  settle — `from { transform: scale(0.97) } to { transform: none }`. The content is already painted,
-  so there is nothing to hide and the blink cannot happen.
-- **⚠ The true cross-dissolve costs more than it looks.** It keeps a second full-screen tree
-  composited for ~90ms and needs `tab-panel-idle`/`content-visibility` held **off** the outgoing
-  panel for that time — which is exactly the pause-when-hidden behaviour `globals.css:811-839`
-  protects, added after a device profile attributed 21.3% of main-thread time to `animationiteration`.
-- **Not established:** whether the blink is perceptible at 180ms on-device, and whether `bg-page`
-  resolves transparent under the owner's current wallpaper setting. **Both are device questions and
-  they decide whether this is worth doing at all.**
 
 ### [app-shell] RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed
 
@@ -14463,12 +14693,12 @@ brings it back.** It fits every part of the report:
 
 > **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
 > This entry is now the pipeline's own priority, not a note attached to three others. The reports
-> exist de-identified in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md),
+> exist de-identified in the owner’s clinical baseline (held privately since 2026-09-24, RV-199),
 > so every schema can be written from a real one today. **Storage is decided: keep every field**
 > (BF-43), which means the DEXA table carries all 11 regions and both index blocks, and the analyte
 > table carries the raw range string and the printed result text, not just what a screen renders.
 
-- **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
+- **⚑ The real reports have arrived and are recorded, de-identified, in the owner’s clinical baseline (held privately since 2026-09-24, RV-199)** — DEXA and RMR
   (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
   description. It already settles BF-1's hardest shape questions (one-sided and absent reference
   ranges, a `<0.2` non-numeric result, free-text flags with commentary, a month-precision date).
@@ -14534,7 +14764,7 @@ description will silently drop the field that turns out to matter. **The owner i
 - **✅ DEXA STORAGE SHIPPED, 2026-08-30 (Lane A).** `dexa_scans` + `dexa_scan_regions` (migration
   **240**, `claude_ro` views regenerated in **241**), `saveDexaScan`/`getLatestDexaScan`/`listDexaScans`
   on the repository, and `GET`/`POST /api/dexa-scans`. Written from the real Hologic printout in
-  [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md), every field kept per
+  the owner’s clinical baseline (held privately since 2026-09-24, RV-199), every field kept per
   BF-43, no source document stored. Upsert on `(user_id, scanned_on)` so a re-entry or a replayed
   extraction updates in place; regions are **replaced** on re-save, not merged. **This unblocks BF-2**
   — the DEXA half of its first calibration pair now has a table to live in.
@@ -16601,7 +16831,7 @@ P/C/F chips gone. Journal:
   the entry surface — the highest-value thing left in this entry. Do it before the 2×2 panel.
 
 - **⚑ The measurement exists (2026-08-27): 1325 kcal measured vs 1549 predicted, −14 %.** Full
-  numbers and both provider TDEE variants in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). Two findings that bear on the design: Cunningham
+  numbers and both provider TDEE variants in the owner’s clinical baseline (held privately since 2026-09-24, RV-199). Two findings that bear on the design: Cunningham
   on the owner's own **DEXA** lean+BMC gives 1481, still **156 kcal over** the measured value — so the
   over-estimate is not a body-composition error and a measured reading must override rather than be
   blended; and the app's learned maintenance (1,827) lands within **5 kcal** of the provider's Mild
@@ -19183,6 +19413,18 @@ without a queue entry is a dropped finding.*
   user's rows. The writer map is read from source and is complete; the counts are not.
 
 ### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
+- **⏸ RE-ASKED AND PARKED AGAIN, 2026-09-24 (second time).** Put to him with the correctness
+  framing this time, not the throughput one — *the required checks are not enforced at merge, so no
+  merge in this repo is gated on its tests* — alongside the two-minute click path and a
+  no-required-checks middle option that would restore auto-merge alone. **He chose to keep it
+  parked.** The `Gate: owner` stays and is now correctly stating what it waits on.
+- **What this costs, recorded so the next session does not re-litigate it:** every merge stays
+  hand-caught against a base that moved roughly every 8 minutes on 2026-09-24, and **a green merge
+  remains no evidence the checks passed.** The mitigation is a habit rather than a mechanism — read
+  the job conclusions (`get_check_runs`; all six `completed` AND `success`) before every merge. That
+  held for the three merges of 2026-09-24 and it depends on whoever is merging doing it every time.
+- **Do not re-ask without a new fact.** Twice now. The next thing that would change the answer is a
+  red commit on `main` that actually costs something, or the owner raising it himself.
 
 - **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
   page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
