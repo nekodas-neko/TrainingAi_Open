@@ -342,7 +342,12 @@ export interface ResilienceDayInput {
   sleepScore: number | null         // 0-100 (computeSleepScore)
   hrvBalance: number | null         // 0-100 readiness-composite contributor; null → the model's
                                     // hrv-absent path (NOT a fabricated 50), matching design 4a
-  recoveryIndex: number | null      // 0-100 contributor; provisional/null → today contributes no index
+  // 0-100 contributor; null → today contributes no index. **NOT gated on `provisional`**, unlike
+  // its two neighbours: `score-audit/readiness.ts` flags recoveryIndex "Approximation — always
+  // flagged provisional", so it is provisional on every day that has ever been derived. Nulling it
+  // on that flag would disable the contributor permanently. The caller (`rollup/run.ts`) gates it
+  // on whether the underlying recovery-index hours exist, which is the real availability test.
+  recoveryIndex: number | null
   restingHeartRate: number | null   // 0-100 contributor score (NOT raw bpm); null → no index
   stressSeries: { tMs: number; level: number }[]  // buildDaytimeStressSeries (level ∈ [−1,1])
   nightHrvBaselineMs: number | null                // scales the daytime-stress quantization

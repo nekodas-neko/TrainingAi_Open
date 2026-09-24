@@ -1408,6 +1408,39 @@ which is the right shape for something that can only be validated by living with
   only mean "what the vendor model yields on sound inputs".
 - **Where the mechanism is:** `lib/health/stress-resilience.ts` (the port, `confidence` at 310, the
   coverage gate at 144), `lib/oura-ble/rollup/run.ts:1179` (the write and its Q-510 comment).
+- **⚙ VERIFIED against `main` + production 2026-09-24 (Lane A), and NARROWED.** The entry's two-regime
+  table reproduces exactly (16 days / levels `{5}` / conf 0.464; 14 days / levels `{1,2,3,4}` / conf
+  0.434), and its ⚠ about `daytime_stress_coverage_min` is confirmed — 0 rows early against 14 late is
+  precisely the column's age. Do not re-derive either.
+  - **The switch is carried by ONE stored index: `resilience_daily_sleep_recovery`**, ~10–56 in July
+    against 0–17.6 (mostly exactly **0**) from September. A stored 0.0 means `polyval` went negative
+    and hit the clamp, so those days are saturated at the floor rather than measured.
+  - **Why that one index dominates.** `runStressResilience` builds its two recovery terms
+    differently (`stress-resilience.ts:303-306`, replicating a documented `.pt` broadcast):
+    restorative time is a weighted **mean**, sleep recovery is a **sum** that works out to
+    ≈ `windowLength × mean(sleeprec)` — ~14×, independent of valid-day count. July's window mean of
+    ~36 becomes ~511 where September's ~3 becomes ~42, which swamps stress and restorative time and
+    pins the label at the top band. **This is the mechanism of the switch, not a claim the ×14 is
+    wrong** — it is commented as faithful to the `.pt`.
+  - **It explains the shape the entry found odd:** the level-5 run carries the series' *highest*
+    stress (71–82) and *lowest* restorative time (15–26). The top band went to the worst-looking days
+    because the sleep-recovery term outweighed both.
+  - **Three of the four inputs behind it fell together** — sleepScore ~90→~48, hrvBalance ~80→~10,
+    RHR ~70→~25 — while recoveryIndex moved the *other* way (~20→~40). A whole-composite decline
+    makes a single upstream producer fault (the PS-30 hypothesis) less likely than the entry assumes.
+  - **⚠ TRAP, and it would have broken the model.** `recoveryIndex.provisional` is `true` on all 23
+    days, and `run.ts:1166-1168` gates its two neighbours on `provisional` but gates recoveryIndex on
+    `recoveryIndexHours != null`. That reads as a missed check, and the doc comment then at
+    `stress-resilience.ts:345` said `provisional/null → today contributes no index`, appearing to
+    confirm it. **Both were wrong.** `score-audit/readiness.ts:158` states recoveryIndex is
+    *"Approximation — always flagged provisional"* — for this contributor the flag is a permanent
+    property of the method, not the learning-period meaning its neighbours carry. Gating it on
+    `provisional` would null it on every day forever. The **comment** was the defect and is corrected
+    in this PR; `run.ts` is right as written.
+  - **The decisive re-run is still NOT done, deliberately.** Re-running the rollup against production
+    would rewrite `oura_daily_derived` rows — a production write, which is the owner's call rather
+    than Lane A's. The non-destructive form is a local run against an injected `io` (`runOuraRollup`
+    takes one); that is the next step and is what remains of this entry.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
