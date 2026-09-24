@@ -798,30 +798,6 @@ below threshold and left in place for next time.
   fix to make in this same PR rather than a reason to hurry the feature.
 - **Independent of OR-137** — either can be built first. (Written as prose on purpose: a `Needs:` here is a FIELD and would park this entry behind OR-137, which is the opposite of what the sentence says.)
 
-### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
-
-- **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
-  decision the same day.
-- **The gap.** *Report an Issue* (`/more`) accepts a screenshot up to 500 KB and stores it in
-  `feedback_submissions.screenshot_data`. `claude_ro.feedback_submissions` **withholds that column
-  on purpose** and exposes `octet_length(...) AS screenshot_bytes` instead. So the Orchestrator's
-  session-start read of the owner's reports sees *"screenshot, 240 KB"* and nothing else — and for
-  a layout or rendering bug the picture is most of the signal, which is exactly the class the owner
-  is most likely to report from a phone.
-- **The owner asked for this (2026-09-23)** when the triage loop was set up, choosing it over
-  leaving the column withheld and describing screenshots by hand.
-- **Do NOT add `screenshot_data` to the `claude_ro` view.** It is a base-64 data URI up to 500 KB;
-  putting it in the view drags it into every `SELECT *` on that table and makes the db-query
-  endpoint unusable for ordinary report triage. **A dedicated route that returns ONE screenshot by
-  id is the shape** — the size belongs in the view, the bytes do not.
-- **Fetch by id, and scope it the way the view does.** The same owner scoping
-  (`current_setting('app.claude_ro_owner', …)`, never a hard-coded uuid — Q-456) has to hold on the
-  route, or it becomes a way to read another user's attachment. Match the auth and rate-limit shape
-  of its sibling admin routes rather than inventing one.
-- **Not urgent, and say so honestly:** the feature has **one submission in its lifetime** and none
-  of the owner's (measured 2026-09-23, view 0 rows against `n_tup_ins` 1). This is worth building
-  when reports start arriving, not before — it sits here so the gap is not rediscovered.
-
 ### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
 
 - **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
@@ -3131,6 +3107,42 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
   silently re-score every stored day, and it buys nothing until (1) is answered.
 - **Do NOT delete `temp-penalty-suspension.test.ts` as part of any cleanup.** It is the only record
   of what the ladder did, and answering (1) needs it.
+
+### [platform] OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report
+
+- **Lane:** A — a new route under `app/api/admin/**`. **Added:** 2026-09-23 · orchestrator, owner
+  decision the same day.- **✅ RE-MEASURED 2026-09-24 (Lane A) — the deferral below still holds, so this was NOT built.**
+  `pg_stat_user_tables` reads `n_tup_ins` **1** and `n_live_tup` **1** for `feedback_submissions`;
+  `claude_ro.feedback_submissions` answers **0** of the owner's reports and **0** with a screenshot.
+  Unchanged from the filing a day earlier. Building a route to fetch an attachment that does not
+  exist would be guessing at the shape it should have.
+- **Moved down the queue accordingly**, below the startable defects. It reached position 3 only
+  because everything above it shipped — the queue working correctly, not a signal to start.
+- **When it IS built, two things from above are the whole design**, and they are easy to lose:
+  the bytes must NOT enter the `claude_ro` view (they would drag 500 KB into every `SELECT *` on
+  that table and make ordinary triage unusable), and the route must scope on
+  `current_setting('app.claude_ro_owner', …)` exactly as the view does, or it becomes a way to read
+  another user's attachment. **Check OR-138 first** — it shipped the ability to pivot that setting
+  per request, which changes what "scope it the way the view does" has to mean here.
+- **The gap.** *Report an Issue* (`/more`) accepts a screenshot up to 500 KB and stores it in
+  `feedback_submissions.screenshot_data`. `claude_ro.feedback_submissions` **withholds that column
+  on purpose** and exposes `octet_length(...) AS screenshot_bytes` instead. So the Orchestrator's
+  session-start read of the owner's reports sees *"screenshot, 240 KB"* and nothing else — and for
+  a layout or rendering bug the picture is most of the signal, which is exactly the class the owner
+  is most likely to report from a phone.
+- **The owner asked for this (2026-09-23)** when the triage loop was set up, choosing it over
+  leaving the column withheld and describing screenshots by hand.
+- **Do NOT add `screenshot_data` to the `claude_ro` view.** It is a base-64 data URI up to 500 KB;
+  putting it in the view drags it into every `SELECT *` on that table and makes the db-query
+  endpoint unusable for ordinary report triage. **A dedicated route that returns ONE screenshot by
+  id is the shape** — the size belongs in the view, the bytes do not.
+- **Fetch by id, and scope it the way the view does.** The same owner scoping
+  (`current_setting('app.claude_ro_owner', …)`, never a hard-coded uuid — Q-456) has to hold on the
+  route, or it becomes a way to read another user's attachment. Match the auth and rate-limit shape
+  of its sibling admin routes rather than inventing one.
+- **Not urgent, and say so honestly:** the feature has **one submission in its lifetime** and none
+  of the owner's (measured 2026-09-23, view 0 rows against `n_tup_ins` 1). This is worth building
+  when reports start arriving, not before — it sits here so the gap is not rediscovered.
 
 ### [platform] LB-121 — Reference: the queue parser's "blocked" marker, filed three times before it was fixed
 
