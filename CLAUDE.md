@@ -189,6 +189,30 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   and no two sessions awake at once — the queue outlives the session that wrote the entry.**
   **`O` and `DV` see only what is tagged for them**, because an unstated lane means "the path rule
   answers it" and that rule only resolves to an implementer.
+- **⚑ A QUESTION FOR THE OWNER IS A TASK, NOT A CHAT MESSAGE — file it `Lane: O`** (owner,
+  2026-09-24: *"Questions that I need to answer should be assigned a task and sent to Orchestrator
+  to be completed there."*). **No agent ends its turn handing the owner an open question.** The
+  decision brief still gets written — recommendation first, alternatives with why each lost,
+  reversal cost, per **Decisions That Come Back To Me** — but it is written **into an entry**, and
+  the entry goes to `O`. The chat reply says the question exists and where it is; the entry is what
+  carries it. A question that lives only in a reply dies with the session, and the owner has to
+  answer it from a scrollback instead of a queue.
+  **Encode it as `Lane: O` and NOTHING else — do NOT add `Gate: owner`.** That is the trap, and it
+  inverts the instruction: `Gate:` PARKS an entry (`next-item.js`), so a question gated on the owner
+  disappears from the Orchestrator's READY list and nobody is tasked with putting it to him. `Gate:
+  owner` is for work that is *blocked pending* an answer already sought; **getting the answer is
+  itself the Orchestrator's work**, and work is `Lane: O`, ungated.
+  **Give it a queue position near the top of `O`** — position is priority, and an unanswered owner
+  question blocks whatever it gates. `next-item.js` prints only `TOP_N = 10` per lane, so an owner
+  question filed at rank 15 is in the queue and not in anyone's view; `--all` shows the rest.
+  **Where the question sits INSIDE another entry, split it out.** An owner decision buried in a
+  `Lane: A`/`B` body is invisible to the Orchestrator, because the lane field is what routes it —
+  file the decision as its own `O` entry and leave the buildable half in its own lane, linked with
+  `Needs:` only if it genuinely cannot start first.
+  **Not every judgement is his** — **Decisions That Come Back To Me** still narrows it hard
+  (structural calls are the agent's; data, money, auth, scoring calibration and genuine product
+  preference are his). This rule governs what happens to a question ONCE it is genuinely the
+  owner's, not whether to have one.
 - **`Lane:` names who acts NEXT — and for the device that means what the phone can ANSWER, not
   everything the phone is involved in** (owner, 2026-09-23: *"Only device testing that can be done
   by DV goes to DV; if its device testing based on looks/design that should stay in orchestrator

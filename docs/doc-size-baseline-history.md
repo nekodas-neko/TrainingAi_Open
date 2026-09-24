@@ -14941,7 +14941,6 @@ need a backfill that does not exist and is a production write, and the condition
 reads see nothing is still unidentified.
 
 
-
 ## 2026-09-21 — TN-35's overlay half, and how it came to be startable
 
 `docs/implementation-backlog.md` **+37** · `projectOverview.md` **12093 → 12109** (+16)
@@ -16535,7 +16534,6 @@ entry (RV-145, RV-146, RV-147) and six new device probes (RV-149…RV-154). Four
 re-laned `O` → `DV`, each saying what is still owed, since a bare lane change would not tell DV what
 to run. Offset by removing RV-126, whose results all have homes (−30).
 
----
 
 ## 2026-09-24 — backlog → 27744, CLAUDE.md → 968 (chore/or-142-review-sweep-3)
 
@@ -16553,9 +16551,45 @@ available fix is telling agents to ignore it, with the reason.
 
 ---
 
-## 2026-09-24 — CLAUDE.md → 978 (chore/or-143-process-owner-gate-triage)
+## 2026-09-24 — `docs/implementation-backlog.md` → LB-139 out, LB-140 in
 
-Growth, +12, recording the process the owner set out: the Orchestrator's primary job is the
+28104 → 28117 (+13 on the merged base). Net of a 13-line removal and a 26-line
+addition, landing under Review's sweep in the same hour. LB-139 shipped, so it left the
+queue. LB-140 is what verifying LB-139 turned up: the step-by-step meal-plan setup sheet does not
+open at all, on `main` as well as on the branch. The entry is longer than the defect because most of
+it is what has already been ruled out — the control run against `main`, the intact wiring, the
+absence of any console error — and the one thing that has NOT been checked, which is whether it
+reproduces outside the dev server. Writing that down is what stops the next session re-running the
+same four probes.
+## 2026-09-24 — `CLAUDE.md` 966 → 990, `docs/implementation-backlog.md` → 28090
+
+The owner's standing instruction that a question for him becomes a task rather than a chat message,
+plus BF-191 carrying the two decisions it split out of BF-190. The CLAUDE.md growth is one rule, and
+most of its length is the trap it exists to stop: `Gate: owner` PARKS an entry, so gating an owner
+question on the owner is what removes it from the Orchestrator's list and leaves nobody tasked with
+asking. Stating the rule without stating that inversion would have produced exactly the failure the
+rule is for.
+---
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 55, `review/dv-verification-debt`.**
+28168 → 28240 (+72; rebased). Four entries route 155 unqueued device checks (RV-155 DV stations, RV-156
+archive, RV-157 owner sittings, RV-158 CI guard). The stations themselves live in the review doc,
+not the backlog, which is why this is +58 and not +600. Q-270 gains its owed production read;
+seven device gates are re-filed.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md`
+
+28240 → 28335 (+95, after four merges of `origin/main` — the earlier figures on this branch were
+against bases that had already moved). Three owed checks re-laned
+to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the DV-13 concurrency hazard
+and the owner's authorisation for a production write — a bare lane change would not tell the device agent
+any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
+`laneFromLines` is first-match-wins.
+## 2026-09-24 — CLAUDE.md → 1001 (chore/or-143-process-owner-gate-triage)
+
+Growth, +11 on the merged base (990 → 1001), recording the process the owner set out: the Orchestrator's primary job is the
 owner-gated queue, BugFix owns the in-app feedback intake, and Review may commission a device sweep
 rather than run one. A role definition that lives only in a chat is one the next session does not
 have, so it costs twelve lines in the file every session reads.

@@ -33,7 +33,10 @@ import { settleRouteBoundary, suppressMorningCheckin } from './fixtures'
  * that trade deliberately.
  */
 
-const SCREENS = ['/', '/health', '/workout', '/nutrition', '/more'] as const
+// The five tabs, plus the pushed routes a sweep has actually found something on. RV-144 is why
+// `/more/details` is here: three inputs sat at ~21 px tall for as long as this list was
+// tab-roots-only, because nothing measured a route you have to navigate to.
+const SCREENS = ['/', '/health', '/workout', '/nutrition', '/more', '/more/details'] as const
 
 /**
  * Known undersized controls, shrink-only: an entry may be REMOVED when it is fixed, never added
