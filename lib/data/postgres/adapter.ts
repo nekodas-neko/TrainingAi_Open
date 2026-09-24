@@ -4251,6 +4251,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         amount: s.supplementLogs.amount, unit: s.supplementLogs.unit,
         doseText: s.supplementLogs.doseText,
         source: s.supplementLogs.source, sourceRef: s.supplementLogs.sourceRef,
+        // RV-172. `applyDelta` writes `taken_at=excluded.taken_at` and the three `vial_*` columns
+        // unconditionally, so omitting them here does not leave the local value alone — it writes
+        // NULL over it on every pull. The vial triple is the FROZEN dose snapshot: without all
+        // three, `frozenReconstitution` returns null and history re-renders against the current
+        // vial, which is the retroactive rewrite the freeze exists to prevent.
+        takenAt: s.supplementLogs.takenAt,
+        vialStrengthMg: s.supplementLogs.vialStrengthMg,
+        vialWaterMl: s.supplementLogs.vialWaterMl,
+        vialUnitsPerMl: s.supplementLogs.vialUnitsPerMl,
         updatedAt: s.supplementLogs.updatedAt,
         deletedAt: s.supplementLogs.deletedAt,
       }).from(s.supplementLogs)
@@ -4280,6 +4289,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         muscleGroups:         s.exerciseLogs.muscleGroups,
         loggedAt:             s.exerciseLogs.loggedAt,
         interExerciseRestSec: s.exerciseLogs.interExerciseRestSec,
+        // RV-172. Omitted, `Boolean(undefined)` wrote `exercise_deloaded = 0` over every synced
+        // row. Q-131 added the mapper for this and left the SELECT alone, so the field it was
+        // added to carry never arrived — the entry's "half fixed", confirmed.
+        //
+        // `prepTimeSec` is NOT added alongside it, though the entry pairs them: it exists only
+        // server-side. Nothing in `lib/local-store/` names it, so there is no local value to
+        // overwrite and sending it would be payload for no reader.
+        exerciseDeloaded:     s.exerciseLogs.exerciseDeloaded,
         updatedAt:            s.exerciseLogs.updatedAt,
         deletedAt:            s.exerciseLogs.deletedAt,
       }).from(s.exerciseLogs)
