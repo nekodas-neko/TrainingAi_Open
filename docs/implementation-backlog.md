@@ -3207,6 +3207,98 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+### [activity] BF-190 — reaching the walk summary saves a whole walk, at the PLANNED duration, 27 seconds in
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake, found while answering the owner's
+  question about a blank calories tile). **Lane: B** — `components/guided-walk/walk-summary.tsx`.
+- **⚑ MEASURED — two rows in production for one walk, both claiming 40 minutes and 133 kcal.**
+  `activity_logs` for 2026-09-24:
+
+  | id | created (Brisbane) | start–end | duration | steps | avg HR | cadence | kcal |
+  |---|---|---|---|---|---|---|---|
+  | `b8083d04` | **09:18:27** | 09:18 → 09:58 | **40** | — | — | no | **133** |
+  | `d0231b08` | 09:59:28 | 09:19 → 09:59 | 40 | 3190 | 92 | yes | 133 |
+
+  The second row is the real walk. **The first was written 27 seconds after its walk started** and
+  claims the whole session — a 40-minute end time that had not happened yet, and the calories to
+  match. The day now holds 80 minutes and 266 kcal of treadmill walking against 40 and 133 actually
+  done.
+- **⚑ OWNER CONFIRMED THE TRIGGER 2026-09-24, and it sharpens the root cause below.** *"I started a
+  walk; then closed it - I guess it didnt fully close it? that should be looked at too."* So the
+  09:18 row came from **End walk**, not a crash or a mis-tap — which makes this reproducible on
+  demand and moves the defect earlier than the mount-save.
+- **⚑ THE REAL ROOT CAUSE: the two exits are the SAME CALL, and neither carries how long the walk
+  ran.** In `walk-active.tsx`, finishing naturally —
+  ```ts
+  if (e >= plan.totalSec && !finishedRef.current) {   // :142
+    finishedRef.current = true
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+  }
+  ```
+  and ending early —
+  ```ts
+  onLeave={() => {                                    // :279
+    if (finishedRef.current) return
+    finishedRef.current = true
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null)
+  }}
+  ```
+  are **byte-for-byte the same callback with the same two arguments**. `WalkSummary` then receives
+  only `config`, `samples`, `cadence` and `startedAtMs` — nothing that says whether the walk ran to
+  completion or was stopped after 27 seconds. **It cannot tell, so it assumes the plan.** The
+  elapsed time is right there in the same component (`elapsedSec`, `:140`) and is dropped at the
+  boundary.
+- **⚠ This is an instance of a bug class CLAUDE.md already names.** *"Mutation-callback contract:
+  completion callbacks must carry the written entity, not fire as a parameterless 'please
+  refetch'."* Same shape — the callback fires without the fact that matters and the receiver
+  reconstructs it wrongly. Worth citing in the fix so the rule earns another example rather than
+  being rediscovered.
+- **⚠ And the UI already promises the distinction it does not keep.** `leave-walk-dialog.tsx` reads
+  *"Ending now will stop it early."* The lifter is told the walk will be recorded as stopped early;
+  it is recorded as a full session at the planned duration. That is the sentence the fix has to make
+  true.
+- **So the fix has two halves, and the first is the one that matters.** Pass the elapsed seconds
+  through `onFinish` and have `WalkSummary` use it for `durationMin` and `endTime`. The plan stays
+  the right source for the *interval structure* (`buildIntervalPlan` drives the per-segment stats) —
+  only the wall-clock fields move to the clock.
+- **Secondary — the mount-save makes it unrecoverable.** `walk-summary.tsx:130` saves on **mount**,
+  guarded only by a ref that lives for one mount:
+  ```ts
+  useEffect(() => {
+    if (savedRef.current) return
+    savedRef.current = true
+    void saveWalk()
+  }, [])
+  ```
+  and what it saves is the **plan**, not what happened:
+  ```ts
+  const durationMin = Math.round(plan.totalSec / 60)              // :61 — the PLAN
+  const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000) // :140 — start + the PLAN
+  ```
+  So the row is written before the lifter can see what it says, let alone decline it. Even with the
+  duration fixed, there is no beat at which a 27-second walk could be discarded — which is why the
+  floor below is part of the fix and not a nicety.
+- **The calories follow the duration, which is why both rows read exactly 133.**
+  `deriveActivityKcal(userId, activityType, durationMin)` (`adapter.ts:2317`) estimates from activity
+  type and **duration alone** — no HR, no steps. A phantom 40 minutes is therefore a phantom
+  133 kcal, every time, and it is indistinguishable from a real one in the row.
+- **⚠ Then decide whether a 27-second walk should be saved AT ALL, because the fix alone makes it a
+  27-second row rather than no row.** Recommend a **minimum-duration floor, discarded below it with
+  a toast** — the same shape `decomposeSessions` already uses for workouts (`MIN_SESSION_SEC`,
+  `time-audit.ts:358`), so the pattern exists rather than being invented here. A floor is better
+  than a confirm prompt: the lifter who backed out by accident does not want a dialog, and a
+  30-second walk is not data anyone wants in a trend.
+- **⚠ The two existing rows need a decision too — the phantom one is already in the history**, and
+  it feeds `build-day-audit.ts:257`. Deleting a production row is the owner's call and is not part of
+  the code fix; the app's own soft-delete from the activity list is the path, not a migration.
+- **Sibling sweep:** `done-activity-screen.tsx` takes the same write path but navigates away the
+  instant it saves (recorded under BF-107), so it has no mount-save. `walk-active.tsx` does not
+  write. This is the guided-walk summary alone.
+- **Verification:** start a guided walk, leave within a minute, and confirm either no row or a row
+  whose duration matches the seconds actually walked. Then complete a full walk and confirm the
+  duration still matches. **Device look owed** — the local-store branch is the one that runs on the
+  APK and `getLocalStore` returns null in the sandbox.
+
 ### [workouts] BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Id like to know if
@@ -9902,7 +9994,25 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   save time. That changes what is *stored* across every food surface, which is a different decision
   from one warning banner, and nothing here presumes it.
 
-### [activity] BF-107 — the walk summary shows its calories (shipped; device owed)
+### [activity] BF-107 — the walk summary shows its calories (REOPENED 2026-09-24 — reported blank again)
+
+- **⚑ REOPENED, exactly as this entry said to.** It stated: *"If the calories tile is reported blank
+  again, that is a regression against an unverified fix."* The owner reported it blank on
+  2026-09-24: *"Why is the no calories burned in the top?"*
+- **⚠ BUT THE EVIDENCE DOES NOT YET SEPARATE THE TWO CASES, and saying so matters more than
+  reopening it.** The stored row has the number — `d0231b08`, **133 kcal**, derived server-side at
+  insert — so the server half works. The row was created at **09:59:28** Brisbane and the phone
+  clock in the screenshot reads **9:59**, i.e. the shot was taken within about half a minute of the
+  save. The tile is *designed* to start as a dash and fill when the forced pull returns, so a dash
+  at +30 s may be the documented pre-arrival state rather than the bug.
+- **The check that separates them, in five seconds and no code:** open that walk from the activity
+  list. The detail sheet reads `log.caloriesBurned` straight off the row
+  (`activity-detail-sheet.tsx:195`), so it will read **133**. If the summary tile ALSO fills when
+  re-opened, the fix works and the complaint is latency — which is a different entry about telling
+  the lifter the number is coming. If the tile stays a dash on a re-open, the forced
+  `pullDelta` inside `pushThenRevalidate`'s callback is not running and that is the regression.
+- **Start from** `fix/bf-107-walk-calories` and that callback either way.
+
 
 - **⚠ CLOSED CONDITIONALLY 2026-09-14, and nothing verified it.** Owner: *"Will have to see if this
   works after a walk; we can treat this as complete for now and if I re-raise it we know its not."*
