@@ -16887,6 +16887,8 @@ and stops the next sweep undoing that.
 expired, a local reproduction table on DV-14, RV-188 (unblock the deploy) and RV-189 (removals and
 parkings for the Orchestrator). The notes are the sweep: each saves an implementer from re-deriving
 a stale citation or building a finished entry.
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-155, owner answers)
 
 Growth: four owner answers recorded, and the largest is a correction rather than a decision. He said
@@ -16904,6 +16906,8 @@ deliberately.
 
 ---
 
+---
+
 ### 2026-09-24 — `docs/implementation-backlog.md` (tuning/estimated-1rm-zeros)
 
 29714 → 29745 (+31). TN-74: 42 of 494 exercise logs store `estimated_1rm = 0` while carrying loaded sets, and the same input
@@ -16911,6 +16915,8 @@ condition (no eligible flagged set) yields a positive estimate on 138 other logs
 function of the log's own sets. Much of the entry is what must NOT be concluded: they are not bodyweight
 movements, and the high-rep guard is present and careful, contrary to my first reading of a rising
 1RM-to-weight ratio that turned out to be a join artefact.
+---
+
 ## 2026-09-24 — `docs/implementation-backlog.md` (or-156)
 
 Growth: BF-191's two answers and RV-170's policy answer. BF-191 costs the most lines because the
@@ -16962,3 +16968,12 @@ reasoning or does it blind.
 
 The SHA-pinning bullet also records that the tags were dereferenced (`v5^{}`) rather than pinned as
 tag objects. That is the standard way to get action pinning wrong, and it is invisible in the diff.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/planned-pct-coverage)
+
+29745 → 29843 (+98). TN-75: the load prescription is followed (50% of sets within half a percentage point, reps exact on 53%),
+but `planned_pct` coverage fell from 93% in August to 72% in September with a five-session hole. Includes
+the measurement that kills the tempting unification with TN-74 — a zero 1RM is more common among sets
+that DO carry a plan, not fewer.
