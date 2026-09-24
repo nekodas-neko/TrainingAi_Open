@@ -7,6 +7,7 @@ import { getDb } from './client'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
+import { recomputeStoredBodyFatPctAtHeight } from '@/lib/scale-ble/composition'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
 import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
@@ -4026,13 +4027,57 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         date: s.bodyMetrics.date,
         bodyFatPct: s.bodyMetrics.bodyFatPct,
         sourceMap: s.bodyMetrics.sourceMap,
+        // RV-165 — the two columns that make a stale reading re-derivable. See below.
+        weightKg: s.bodyMetrics.weightKg,
+        bmrKcal: s.bodyMetrics.bmrKcal,
       })
       .from(s.bodyMetrics)
       .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
 
+    // RV-165. **Composition is computed once, at ingest, from the profile of that moment — so the
+    // stored value is only comparable to a DEXA scan if the profile has not moved since.** The
+    // owner's height was corrected from 160 to 158 to match a DEXA printout, and the 08-27 pair
+    // that sets the whole offset is still a 160 cm number. Fitted against it the offset came out
+    // +3.2 where the corrected reading gives +2.3, so every body-fat value the app has shown since
+    // has been about a point high.
+    //
+    // Re-deriving needs nothing that is not already stored: `bmr_kcal` has no impedance term and is
+    // linear in height, so it gives back the height used; impedance then follows from the stored
+    // body-fat value.
+    //
+    // **A reading that cannot be re-derived is KEPT AS STORED, not dropped.** Without a BMR there is
+    // no evidence the reading is stale — only an inability to check — and dropping it throws away a
+    // pair over a question that was never answered. Keeping it is exactly today's behaviour, so this
+    // can substitute a better value but never produce a worse calibration than the one it replaces.
+    // Dropping was tried first and collapsed the calibration to null for every reading without a
+    // stored BMR, which `body-fat-correction-consumers` caught.
+    const [profile] = await this.db
+      .select({ heightCm: s.users.heightCm, dateOfBirth: s.users.dateOfBirth, sex: s.users.sex })
+      .from(s.users).where(eq(s.users.id, userId)).limit(1)
+
+    const restated = readings.flatMap(r => {
+      const stored = r.bodyFatPct as number
+      // Without a profile there is nothing to restate to; the readings stand as stored, which is
+      // exactly today's behaviour.
+      if (profile?.heightCm == null || !profile.sex) return [{ ...r, bodyFatPct: stored }]
+      // Age AT THE READING, not today — a birthday between the weigh-in and now would otherwise
+      // shift the recovered height by 5/6.25 = 0.8 cm and quietly poison the inversion.
+      const ageYears = ageFromDob(profile.dateOfBirth ?? null, new Date(`${r.date}T12:00:00Z`))
+      if (ageYears == null) return [{ ...r, bodyFatPct: stored }]
+      const atCurrent = recomputeStoredBodyFatPctAtHeight({
+        storedBodyFatPct: stored,
+        storedBmrKcal: r.bmrKcal,
+        weightKg: r.weightKg as number,
+        ageYears,
+        sex: profile.sex,
+        heightCm: profile.heightCm,
+      })
+      return [{ ...r, bodyFatPct: atCurrent ?? stored }]
+    })
+
     const pairs = pairScansWithReadings(
       scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
-      readings.map(r => ({
+      restated.map(r => ({
         date: r.date,
         bodyFatPct: r.bodyFatPct as number,
         source: r.sourceMap?.body_fat_pct ?? null,

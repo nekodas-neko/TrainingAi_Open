@@ -174,3 +174,95 @@ export function computeBodyComposition(input: ScaleCompositionInput): ScaleCompo
     metabolicAge,
   }
 }
+
+// ── Re-deriving a stored reading at a different profile (RV-165) ─────────────
+//
+// **Composition is computed ONCE, at ingest, from the profile of that moment — so correcting the
+// profile afterwards does not reach the stored rows.** The owner corrected their height from 160 to
+// 158 to match a DEXA printout, and every reading before that is still a 160 cm number. That would
+// be a history question and nothing more, except that the DEXA calibration offset is fitted live
+// against those stored values (`body-fat-calibration.ts`), so one stale pair biases every corrected
+// body-fat reading the app shows today.
+//
+// **Nothing extra needs storing to undo it, which is the useful part.** Two properties of the
+// formula above make the original inputs recoverable from columns already written:
+//
+//  1. `bmrKcal` is Mifflin-St Jeor — `10w + 6.25h − 5a + sexTerm` — with **no impedance term** and
+//     linear in height. So the height used at ingest falls straight out of the stored BMR.
+//  2. Impedance enters the whole model through **`bodyFatPct` alone**; every other output is a
+//     function of body fat, weight, height, age and sex. So once the height is known, the
+//     impedance index follows from the stored body-fat value.
+//
+// Verified against production on 2026-09-24: 08-27 and 09-01 carry the SAME weight (71.7 kg) and
+// BMRs of 1557 and 1545. The 12 kcal gap is 12/6.25 = 1.92 cm, and solving each gives exactly
+// h = 160 and h = 158 at age 33 — the documented correction, recovered from the table alone.
+
+/** Rounded BMR loses ±0.5 kcal, which is ±0.08 cm of height — far inside the tolerance below. */
+const HEIGHT_RECOVERY_TOLERANCE_CM = 0.25
+
+/** Outside this, the "height" is not a height and the reconstruction is refused rather than used. */
+const PLAUSIBLE_HEIGHT_CM: readonly [number, number] = [120, 230]
+
+/** The file's own documented band for an adult reading; a recovery outside it is not trustworthy. */
+const PLAUSIBLE_IMPEDANCE_OHMS: readonly [number, number] = [200, 1500]
+
+/**
+ * The height that produced a stored `bmr_kcal`, or null when it cannot be recovered.
+ *
+ * `bmrKcal` is the only stored output with no impedance term, which is what makes this solvable.
+ */
+export function heightUsedForStoredBmr(
+  bmrKcal: number | null | undefined,
+  weightKg: number,
+  ageYears: number,
+  sex: string | null | undefined,
+): number | null {
+  if (bmrKcal == null || !Number.isFinite(bmrKcal)) return null
+  const sexTerm = sex === 'male' ? 5 : -161
+  const heightCm = (bmrKcal - 10 * weightKg + 5 * ageYears - sexTerm) / 6.25
+  if (!Number.isFinite(heightCm)) return null
+  return heightCm >= PLAUSIBLE_HEIGHT_CM[0] && heightCm <= PLAUSIBLE_HEIGHT_CM[1] ? heightCm : null
+}
+
+/**
+ * What a stored scale reading would have said at `heightCm`, or null when it cannot be re-derived.
+ *
+ * Returns the stored value unchanged when the height it was computed at already matches — "no
+ * correction needed" and "could not correct" are different answers, and a caller that cannot tell
+ * them apart would silently drop readings.
+ *
+ * The forward half deliberately calls `computeBodyComposition` rather than re-implementing the
+ * formula: only the INVERSE lives here, so the two cannot drift.
+ */
+export function recomputeStoredBodyFatPctAtHeight(args: {
+  storedBodyFatPct: number
+  storedBmrKcal: number | null | undefined
+  weightKg: number
+  ageYears: number
+  sex: string | null | undefined
+  heightCm: number
+}): number | null {
+  const { storedBodyFatPct, storedBmrKcal, weightKg, ageYears, sex, heightCm } = args
+  if (!Number.isFinite(storedBodyFatPct) || !Number.isFinite(weightKg) || weightKg <= 0) return null
+
+  // A stored value sitting on `computeBodyComposition`'s clamp carries no information about what
+  // the formula actually produced, so it cannot be inverted — refuse rather than invent one.
+  if (storedBodyFatPct <= 3 || storedBodyFatPct >= 60) return null
+
+  const originalHeightCm = heightUsedForStoredBmr(storedBmrKcal, weightKg, ageYears, sex)
+  if (originalHeightCm == null) return null
+  if (Math.abs(originalHeightCm - heightCm) < HEIGHT_RECOVERY_TOLERANCE_CM) return storedBodyFatPct
+
+  // Invert the body-fat line for the impedance term, then the index for the impedance itself.
+  const originalHeightM = originalHeightCm / 100
+  const originalBmi = weightKg / (originalHeightM * originalHeightM)
+  const isMale = sex === 'male'
+  const withoutImpedance = 1.2 * originalBmi + 0.23 * ageYears - 10.8 * (isMale ? 1 : 0) - 5.4
+  const impedanceIndex = REFERENCE_IMPEDANCE_INDEX - (storedBodyFatPct - withoutImpedance) / 0.05
+  if (!Number.isFinite(impedanceIndex) || impedanceIndex <= 0) return null
+
+  const impedanceOhms = (originalHeightCm * originalHeightCm) / impedanceIndex
+  if (impedanceOhms < PLAUSIBLE_IMPEDANCE_OHMS[0] || impedanceOhms > PLAUSIBLE_IMPEDANCE_OHMS[1]) return null
+
+  return computeBodyComposition({ weightKg, impedanceOhms, heightCm, ageYears, sex }).bodyFatPct
+}

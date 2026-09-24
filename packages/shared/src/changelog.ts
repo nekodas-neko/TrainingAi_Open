@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.37",
+    date: "2026-09-24",
+    changes: [
+      "Your body fat percentage will drop by about a point, and the old number was the wrong one. The scale works out your composition once, when you step on it, using your height at that moment \u2014 so when you corrected your height from 160 to 158cm to match your DEXA printout, every earlier reading kept the old figure. The app then calibrates against your DEXA scan using one of those earlier readings, which made the correction it applies about a point too big. It now re-works those readings at your current height before comparing them, so the number you see lines up with the scan.",
+      "Your stored weigh-in history is unchanged for now \u2014 the older rows still hold the figures worked out at 160cm. Rewriting them is a separate decision, since it edits records you have already seen.",
+    ],
+  },
+  {
     version: "1.465.36",
     date: "2026-09-24",
     changes: [

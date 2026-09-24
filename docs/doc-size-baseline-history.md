@@ -17031,3 +17031,21 @@ pass/fail DV can act on without reading the journal.
 The seventh is a `Needs: RV-170` on RV-166. The entry was already blocked, but said so only in prose
 inside its `Lane:` line, so `next-item.js` offered it as Lane B's ready work twice in one session.
 One line in the field the runner actually reads is cheaper than the two pick-ups it cost.
+
+## 2026-09-24 — `projectOverview.md` → 12793 (RV-165)
+
+Twenty-two lines, and the sentence that earns most of them is "expect the displayed number to DROP
+about a point."
+
+This changes a figure the owner reads daily. A row that said only "calibration fixed" would leave him
+to notice a one-point fall in his body fat and wonder which of the two numbers to believe. So the row
+states the direction, the size, and that it is the correction rather than a new fault.
+
+The rest is the split that keeps the entry open: the LIVE value is fixed because it is derived at
+read time, and the STORED rows still hold 160 cm composition — that is RV-170 and the owner's call.
+Without both halves written down, "fixed" reads as though the history was repaired too.
+
+The last paragraph says the +2.3 rests on a single DEXA pair. The calibration's own comment already
+warns that n = 1 supports an offset and not a ratio; repeating it here stops the new number being
+read as more authoritative than the old one. What improved is that the pair is compared like for
+like, not that the offset is now known to be right.

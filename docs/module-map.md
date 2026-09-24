@@ -551,6 +551,7 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 | Weather | `lib/weather/use-weather.ts` |
 | PiP mode / actions | `hooks/use-pip-mode.ts`, `hooks/use-pip-actions.ts` |
 | Health calcs | `app/health/hooks/use-health-calcs.ts` |
+| Re-derive a stored scale reading at a different profile | **`recomputeStoredBodyFatPctAtHeight()`** / **`heightUsedForStoredBmr()`** (`lib/scale-ble/composition.ts`) — composition is computed once at ingest, so a later height/DOB/sex correction never reaches stored rows. `bmr_kcal` has no impedance term and is linear in height, so it gives the height back; impedance then follows from the stored body fat. Only the INVERSE lives there — the forward half calls `computeBodyComposition` (RV-165) |
 | Online/offline status | `lib/use-online-status.ts` — `navigator.onLine` + DOM events + Capacitor Network |
 
 | Cross-cutting UI | File |
