@@ -714,6 +714,7 @@ below keep their gate — they really are blocked pending an answer — and this
   the Steps metric tile, and the chip row's Activity score).
 
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
+- **Ask:** owner — readiness currently changes NOTHING the app prescribes: its one automatic action has never fired in 117 sessions and cannot on the active program. What should a low readiness day actually do? Decision brief in the entry.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, while testing whether the readiness score
   predicts anything about training.
@@ -3656,6 +3657,7 @@ written entity.
   reopen from the param-independent half.
 
 ### [app-shell] RV-113 — the tab switch is a hide-then-fade, so the app's most frequent interaction can blink
+- **Ask:** owner — every tab switch shows 58–109 ms with neither panel painted, measured on the S25 over 10 of 10 switches. The fix is one line. Is a blink on the app's most frequent interaction worth changing it for?
 
 - **📱 RV-128 answered this entry's first open question (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame sampler of the
   `[data-tab-active]` panels over **10 of 10** switches (Home/Health/Nutrition/More): the outgoing panel
@@ -4439,6 +4441,7 @@ written entity.
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
+- **Ask:** owner — generate the doc-size baselines in CI instead of committing them? RV-134 already did the cheap half and rejected this one with a reason; re-measure the tax before deciding.
 
 - **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
   REJECTED this one with a reason.** The two were filed hours apart by different sessions and
@@ -19654,6 +19657,7 @@ Measured against `lib/walk/segment-stats.ts`:
   matters. Start from Profile → **Auto-detect timezone**, the button that triggers the whole class.
   `Gate: device`.
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+- **⚠ Deliberately carries NO `Ask:` field (OR-154).** It reads like an owner question and a keyword sweep picks it up, but the entry's own text says *"do not re-put this to the owner"* until Q-545 lands. Surfacing it in the always-visible section would do exactly that. Add the field when Q-545 clears it, not before.
 
 - **Lane:** O — an owner decision about hosting with no code in either lane's paths. (Assigned 2026-09-15, OR-116 lane sweep.)
 
