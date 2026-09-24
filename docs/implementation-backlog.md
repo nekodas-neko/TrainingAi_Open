@@ -534,21 +534,35 @@ below threshold and left in place for next time.
   app, open Workout, tap another tab — it should switch with no dialog. Not runnable here: the
   path needs the APK and a real completed day.
 
-### [nutrition][app-shell] DV-17 — Nutrition paints a meal-plan skeleton on every warm visit when there is no plan
+### [nutrition][app-shell] DV-17 — Nutrition's meal-plan skeleton on every warm visit — shipped, device pass owed
 
-- **Lane:** B — `components/nutrition/meal-plan-section.tsx:99`.
-- **Added:** 2026-09-24 · Device Verification, sweep 3 — RV-129's answer (RV-129 closed with this filed).
-- **Measured (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** A per-frame scan of the active panel for `.animate-pulse`/`[aria-busy]` over
-  3 warm rounds of Health, Nutrition, More, Home: Health, More and Home **never** painted a skeleton
-  (9 of 9). **Nutrition painted one on every visit (3 of 3)** — a 338×108 card at y=512, from
-  ~85 ms to 392–543 ms after the tap. It is `MealPlanSection`'s
-  `if (loading && plan == null) return <div className="h-28 … animate-pulse" aria-label="Loading meal plan" />`.
-  The owner has **no meal plan**, so `null` is the settled answer, and every visit repaints the pulse
-  until the refetch lands — the instant-paint rule's "skeleton flash on a repeat visit is a bug".
-- **Fix direction:** tell "no plan (cached)" apart from "not loaded yet" — seed from the cache and
-  only pulse when there is no cached answer at all.
-- **Pass test (device):** three warm Nutrition visits on an account with no plan paint zero skeleton
-  frames.
+- **Lane:** B · **Branch:** `fix/dv17-meal-plan-skeleton-on-warm-visit` · v1.465.25.
+- **Found:** Device Verification sweep 3, 2026-09-24 — 3 of 3 warm Nutrition visits, against 9 of 9
+  clean on Health/More/Home.
+- **The entry located it at `meal-plan-section.tsx:99`, and the defect is one level up.** That
+  component's `if (loading && plan == null)` is correct given its props. The parent passed
+  `loading={loading && mealPlan === null}` — and for an account with no plan, `null` is the
+  **settled answer the cache already gave**, indistinguishable from "no answer yet". So every warm
+  visit re-pulsed while the refetch ran.
+- **Fix:** `app/nutrition/nutrition-content.tsx` tracks `planLoaded` — set by the synchronous cache
+  seed (the only thing that runs before first paint) and by the fetch, but not by an `undefined`
+  payload, since `cachedFetch` swallows `!res.ok`. The presentational guard is unchanged and pinned.
+- **Verified:** 4 tests, control-run against `origin/main` — 3 of 4 go red without the change.
+- **Keep:** the device pass test — three warm Nutrition visits on an account with no plan, zero
+  skeleton frames. Needs the APK and a per-frame scan, so it stays owed.
+
+### [app-shell] LB-139 — `nutrition-content.tsx` is at 800 of 800 lines, so the next edit to it fails CI
+
+- **Lane:** B — `app/nutrition/nutrition-content.tsx`. **Added:** 2026-09-24 · found shipping DV-17.
+- DV-17's six-line fix took the file from 795 to exactly the 800-line ceiling
+  `check-component-size` enforces. It passes, and **the next line anyone adds does not** — including
+  a one-line bug fix, which is the worst moment to be forced into an extraction.
+- Not extracted as part of DV-17: pulling a section out of a 795-line screen to make room for six
+  lines is a change with more risk than the fix it carries, and it would have shipped unreviewed
+  inside a device-reported defect.
+- **The extraction is the work here**, not a baseline raise. The file is a tab screen that already
+  delegates to `components/nutrition/*`; the candidates are the sheet/dialog wiring near the bottom
+  and the plan-related state cluster.
 
 ### [platform][app-shell] DV-18 — the admin "AI style reference" image is broken
 

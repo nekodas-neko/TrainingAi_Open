@@ -16494,3 +16494,13 @@ planned duration, so a walk abandoned 27 seconds in logged as a complete 40-minu
 length carries the two-row production table that is the evidence, and the reopening note on BF-107
 that distinguishes "the fix regressed" from "the screenshot was taken 30 seconds after the save" —
 the distinction is the whole value of the note, so it could not be shortened to a verdict.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → DV-17 shipped, LB-139 filed
+
+Net +14 across two entries. DV-17 grew because its stated location was wrong and the correction is
+the useful part: the pulse renders in `meal-plan-section.tsx`, but the defect is the parent passing
+`mealPlan === null` as "still loading" when null is the settled "no plan" answer. LB-139 is new —
+the six-line DV-17 fix put `nutrition-content.tsx` at exactly its 800-line ceiling, so the next edit
+to that file fails CI, and the extraction that fixes it is real work rather than a baseline raise.
