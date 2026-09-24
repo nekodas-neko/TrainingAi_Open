@@ -16706,3 +16706,11 @@ scanner's `body.scanner-active` rule hides every other body child until it unmou
 records why that cannot happen (`handlePop` closes only surfaces deeper than the arriving entry,
 and popping the scanner's lands on the sheet's) and why the stack itself needed no change. Without
 it the next reader re-derives the same safety argument from scratch.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 29071 (chore/or-147-state-more-owner-gates)
+
+Growth, +6. Three owner gates now say what they are waiting for instead of saying `owner`, and
+`LB-52` records the half of its question the owner answered the same evening (E2E stays off the
+required-check list) plus the fact a session got wrong when re-asking it (*Allow auto-merge* is
+already on). Six lines against a read of up to 209 lines per entry, paid by every session that
+looks at the gate and cannot tell what it wants.

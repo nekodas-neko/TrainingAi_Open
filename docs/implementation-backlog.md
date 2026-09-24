@@ -11783,6 +11783,12 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
+- **✅ HALF-ANSWERED 2026-09-24: E2E stays OFF the required-check list.** Put to him with `Q-297`
+  as this batch; he chose to leave E2E advisory until `LB-56` establishes whether it gates anything
+  real. **What is still owed is the classic branch-protection rule itself**, which he parked for a
+  few hours the same evening. **Correct a fact before re-asking: *Allow auto-merge* is already ON**
+  (confirmed 2026-09-03, restated 2026-09-24 after a session told him to tick it) — the rule is the
+  only thing to add.
 - **⏸ ACKNOWLEDGED AND DEFERRED BY THE OWNER, 2026-09-15:** *"Keep this as a task to complete
   later."* The `Gate: owner` stays — `VACUUM FULL` cannot be run from the app.
 - **Re-measured 2026-09-14 before it was put to them, and the finding is unchanged:**
@@ -16587,7 +16593,7 @@ the bar to beat, not to assume).
 
 ### [readiness] TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign
 
-- **Gate:** owner
+- **Gate:** owner — and it is NOT SIGNABLE yet, so do not offer it in a tuning batch. The metric runs the wrong way (n = 33), so the warning would fire on his best days. `Needs: Q-507` to settle the sign; then it becomes an ordinary proposal.
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
 - **Lane: B**
 - **Needs: Q-507** — deliberately. Read the next paragraph before starting.
@@ -24153,7 +24159,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
      E2E is NOT required today** — PR #776 merged while its E2E job was still `in_progress`. LA-22
      has since made the job always-run and always-report specifically so it is safe to require, so
      the remaining question is only whether to.
-- **Gate:** owner
+- **Gate:** owner — ANSWERED 2026-09-24: **E2E stays OFF the required-check list.** He was asked it with `LB-52` as the `owner-branch-protection` batch and chose to leave it advisory until `LB-56` establishes whether it gates anything real. The gate stays only for residue 1 below, the warmed-server instant-paint budget, which is a judgement about spending CI flakiness.
 - **✅ Everything buildable in this entry has shipped**, four of the five under other numbers —
   `workout-set-loop.spec.ts` (Q-461), `food-logging-complete.spec.ts` (Q-387),
   `water-log-write-path.spec.ts`, `goal-round-trip.spec.ts` + `goal-invalidation.spec.ts` (which
@@ -27483,7 +27489,7 @@ Two independent findings, both low-urgency:
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
 - **Lane:** A
-- **Gate:** owner
+- **Gate:** owner — SCHEDULING, not consent. He said yes on 2026-08-04 and chose it off a list of four on 2026-09-01; what is owed is one night wearing the Polar H10, and nothing else can start until that data exists.
 
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
