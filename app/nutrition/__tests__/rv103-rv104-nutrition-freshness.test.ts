@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -45,7 +45,9 @@ describe('RV-103 — the balance refetch can report its own failure', () => {
     // `balanceForDate` is gated on `energyBalance?.date === selectedDate`, so a null makes the
     // budget and the macro targets DISAPPEAR rather than go stale — worse than what it replaced.
     expect(hook).not.toMatch(/setBalance\(d \?\? null\)/);
-    expect(hook).toMatch(/if \(d\) setBalance\(d\)/);
+    // The guard, not its exact spelling: sweep 2's fix added `setRefreshing(false)` beside the
+    // write, and a regex pinned to one statement fails on a change that keeps the invariant.
+    expect(hook).toMatch(/if \(d\) \{? ?setBalance\(d\)/);
   });
 
   it('exposes the failure and a retry to the card that renders the figure', () => {
@@ -89,5 +91,65 @@ describe('RV-104 — the weekly chart and adherence are subscribed, not remember
       expect(fetched, `nothing fetches ${key} — has the hook moved?`).toContain(owner);
       expect(fetched.filter(f => f !== owner), `${key} is fetched outside ${owner}`).toEqual([]);
     }
+  });
+});
+
+/**
+ * RV-103 sweep 2 — the entry shipped, and the device check FAILED anyway.
+ *
+ * With `energy-balance` blocked at the network the card held "320 kcal left" for **7 s** with no
+ * failure line and no Retry. Every channel the fix added was wired correctly; none of them could
+ * have fired yet, and that is the finding:
+ *
+ *   - `onRevalidateError` fires only when a cached value was painted, and the write's own
+ *     `invalidateNutritionWrite()` has just emptied the key. So on the post-write path it is silent
+ *     by construction.
+ *   - `onExhausted` fires after `fetchWithRetry` runs out of attempts — four of them, with
+ *     2.5 s + 5 s + 7.5 s of backoff between. Fifteen seconds.
+ *
+ * So for fifteen seconds the screen presented a pre-write number as current. The gap is real and
+ * measured below rather than reasoned about, because the whole entry turns on it.
+ */
+describe('RV-103 sweep 2 — the fifteen seconds before the failure line', () => {
+  const hook = src('app/nutrition/use-energy-balance-refetch.ts');
+  const card = src('components/nutrition/energy-card.tsx');
+
+  it('exhaustion really is ~15s away, so a 7s observation sees nothing', async () => {
+    vi.useFakeTimers();
+    try {
+      const { fetchWithRetry } = await import('@trainingai/shared/fetch-with-retry');
+      let exhausted = false;
+      let attempts = 0;
+      // Stands in for `cachedFetch` with the route blocked: never paints, never rejects.
+      const deadFetch = async () => { attempts += 1; return false };
+
+      fetchWithRetry<unknown>('k', '/u', 60, () => {}, () => false, 0, deadFetch, {
+        onExhausted: () => { exhausted = true },
+      });
+
+      await vi.advanceTimersByTimeAsync(7_000);
+      expect(attempts, 'two attempts have run by 7s').toBe(2);
+      expect(exhausted, 'the device watched for 7s and this is why it saw nothing').toBe(false);
+
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(attempts, 'four attempts in total').toBe(4);
+      expect(exhausted, 'the honest report arrives at 15s, not before').toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the hook says a refetch is in flight, which is what covers those seconds', () => {
+    expect(hook).toMatch(/refreshing: boolean/);
+    expect(hook, 'the in-flight flag must be raised when the refetch starts')
+      .toMatch(/setRefreshing\(true\)/);
+    // Cleared on every exit: a painted value, exhaustion, and a failed revalidation.
+    expect(hook.match(/setRefreshing\(false\)/g) ?? [], 'cleared on all three exits').toHaveLength(3);
+  });
+
+  it('the card shows it, and never beside the failure line', () => {
+    expect(card).toMatch(/balanceRefreshing/);
+    expect(card, 'a failure and an in-flight state in the same slot would both render')
+      .toMatch(/balanceRefreshing && !balanceStale/);
   });
 });

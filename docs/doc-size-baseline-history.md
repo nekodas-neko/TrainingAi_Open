@@ -16595,3 +16595,52 @@ to DV (TN-62, TN-1, BF-13), each carrying what it must run and, for TN-62, the D
 and the owner's authorisation for a production write — a bare lane change would not tell the device agent
 any of that. Plus TN-63, filing the 34 entries with two lane fields of which 8 disagree, since
 `laneFromLines` is first-match-wins.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/readiness-gates-nothing)
+
+28338 → 28437 (+99, recounted on the merged base). Two entries. TN-64 records that readiness gates nothing — its only automatic
+protective action is excluded on the active `ai_dynamic` program and has never fired on any program —
+and carries the owner decision brief in the entry rather than a chat reply. TN-65 records that set RPE
+is a dense signal (864 of 1,286 sets) available to validate scoring, the load-controlled null it
+produced, and the n=10 correlations that must not be cited. Both are long because most of each is what
+has been ruled out and what must not be re-derived.
+---
+
+**2026-09-24 · `docs/implementation-backlog.md` · Review sweep 56, `review/sweep-56-owed-reads`.**
+28437 → 28533 (+96; rebased on #1514). Twenty-three dated reading notes on entries whose owed read was run
+today, and four new entries (RV-159 an unattributed rewrite, RV-160 closures, RV-161 owner decisions,
+RV-162 a `Due:` field). Reading notes are the point of this sweep: each replaces a claim with a
+measurement on the entry that made the claim.
+
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-quality-is-a-default)
+
+28532 → 28632 (+100, recounted on the merged base). TN-66: `sleep_quality` has been a hard-coded `'ok'` since 2026-06-25, and two live readers present it as
+the owner's own answer — Home's card and an LLM prompt. Most of the entry is the distinction that makes
+it actionable: the write default is load-bearing (#47) and must stay, so the fix belongs in the readers.
+TN-67 retracts, in the same pass that produced it, an r = +0.62 agreement between readiness and reported
+energy: 62 of its 67 days predate TN-50, when the app filled the answer in from the score.
+
+---
+
+## 2026-09-24 — `docs/implementation-backlog.md` → RV-103's sweep-2 failure explained
+
+28633 → 28645 (+12 on the merged base). RV-103 shipped and then failed its device check, and the twelve lines are the
+explanation rather than a new entry: the failure line is fifteen seconds away because
+`fetchWithRetry` makes four attempts with 2.5 + 5 + 7.5 s of backoff, and `onRevalidateError` cannot
+cover the gap because the write's own invalidation has emptied the key. Measured with fake timers.
+Writing the arithmetic down is what stops the next session reading the sweep result as "the
+reporting never worked" and rebuilding a channel that already exists.
+
+---
+
+### 2026-09-24 — `docs/implementation-backlog.md` (tuning/sleep-autonomic-collinearity)
+
+28645 → 28768 (+123, recounted on the merged base). TN-68: the sleep model's `hrv` and `hr` contributors correlate at +0.873 over 60 nights, so 28 of its
+110 weight is one effective axis, and both pin at 100 together on 17% of nights. Most of the entry is
+the distinction from TN-60 — that rail inverted stored ordering, this one only loses resolution — and
+the three alternatives with what each is better at, since any weight change here is the owner's.
+TN-69 records three failed validations of the daytime-stress scalar (RPE residual, persistence,
+coherence) plus the circular agreement that looks like a fourth, and adds a 0-of-129 measurement to TN-1.

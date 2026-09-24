@@ -28,6 +28,9 @@ interface Props {
    *  budget on screen predates the entry just logged. The card says so rather than presenting a
    *  stale subtraction as current — which is the report that came back twice. */
   balanceStale?: boolean
+  /** A refetch is in flight. Mutually exclusive with `balanceStale` at the hook, and the two share
+   *  one slot so the card's height does not change when one becomes the other. */
+  balanceRefreshing?: boolean
   onRetryBalance?: () => void
   /** The **effective** targets: the caller has already substituted the burn-aware calorie budget and
    *  Q-323's earned-scaled macro grams. Passing the raw stored targets would report fat over on a
@@ -64,7 +67,7 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  */
 export const EnergyCard = memo(function EnergyCard({
   data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
-  targets, balanceStale, onRetryBalance,
+  targets, balanceStale, balanceRefreshing, onRetryBalance,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -169,6 +172,19 @@ export const EnergyCard = memo(function EnergyCard({
       {/* RV-103. The figure above is the one fetched before the last entry, and nothing else on the
           screen would say so — the owner's recovery, both times he reported it, was to leave the
           page and come back, which is this refetch happening by accident. */}
+      {/* RV-103 sweep 2 — the failure line below is fifteen seconds away, because that is how long
+          `fetchWithRetry`'s four attempts take to exhaust. The device watched the card hold a
+          pre-write number for seven of those with nothing said, which is the defect: not a missing
+          failure state, a missing in-flight one. Same slot, so nothing reflows when this becomes
+          that. */}
+      {balanceRefreshing && !balanceStale && (
+        <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
+          <p className="min-w-0 flex-1 text-[11px] leading-snug text-muted-foreground">
+            Refreshing your budget…
+          </p>
+        </div>
+      )}
+
       {balanceStale && (
         <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
           <p className="min-w-0 flex-1 text-[11px] leading-snug text-muted-foreground">
