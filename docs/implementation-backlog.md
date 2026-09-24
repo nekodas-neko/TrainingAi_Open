@@ -1271,8 +1271,10 @@ which is the right shape for something that can only be validated by living with
   `generativelanguage.googleapis.com` at the same time.
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
+
 - **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
-- **Added:** 2026-09-24 · Review sweep 60.
+- **Added:** 2026-09-24 · Review sweep 60. **Three of four shipped 2026-09-24 (Lane A); item 3 is
+  half done and the rest is the `Keep:`.**
 - **What:**
   - Every action is pinned to a major tag, not a SHA.
   - `dependabot.yml` has no `github-actions` ecosystem.
@@ -1282,12 +1284,35 @@ which is the right shape for something that can only be validated by living with
 - **Who:** a compromised upstream action tag would run with the keystore (the key the owner's
   installed APK is signed with) and a write token. Fork PRs get nothing, and collaborators already
   have write access.
-- **Fix:**
-  1. SHA-pin the third-party actions: `pnpm/action-setup`, `reactivecircus/android-emulator-runner`.
-  2. Add the `github-actions` ecosystem to dependabot.
-  3. Split `android.yml` so PR runs get `contents: read` and no keystore, and only the `push` job
-     restores the key.
-  4. Add a top-level `permissions: contents: read` to `ci.yml`.
+- **✅ 1. SHA-pinned**, **8 call sites across all three workflows** — `pnpm/action-setup@v5` ×7 →
+  `fc06bc12…`, `reactivecircus/android-emulator-runner@v2` ×1 → `a421e438…`, each with the version
+  kept as a trailing comment. Both are the **current** commit behind the moving major tag, resolved
+  with `git ls-remote` and **dereferenced through the annotated tag** (`v5^{}`) — pinning the tag
+  object rather than the commit it points at is the standard way to get this wrong, and Actions
+  would reject it. So this pins today's behaviour rather than upgrading anything.
+  **`actions/*` are deliberately NOT pinned:** they are GitHub's own, the entry does not ask for it,
+  and pinning 18 more call sites would bury the two that carry third-party risk.
+- **✅ 2. `github-actions` ecosystem added to dependabot**, matching npm's shape
+  (`open-pull-requests-limit: 0`, security updates grouped into one PR). **This is what makes the
+  pin safe rather than a liability**: a tag silently follows upstream security fixes and a SHA
+  silently does not, so pinning without this trades a supply-chain risk for a staleness one.
+- **⚠ 3. HALF DONE — the keystore is off PR runs; the job split is NOT done.** The credential half
+  is one line: `if: github.event_name == 'push'` on *Restore the stable debug signing key*. A PR run
+  now falls back to a per-runner key, which is the path already taken when the secret is unset, and
+  PR APKs are never published.
+  **The `contents: write` half needs the job split and was not attempted.** GitHub does not accept
+  an expression in `permissions:`, so making it per-event means duplicating the build into two jobs
+  — and a mistake there breaks **APK signing on `push`**, which only surfaces after merge and which
+  nothing in the sandbox can test (no Android SDK; Gradle is proxy-blocked). Weighed against a
+  residual risk the entry itself calls low — fork PRs get nothing, collaborators already have
+  write — that trade was not worth taking blind.
+- **✅ 4. `permissions: contents: read`** at the top of `ci.yml`. Nothing there writes: the only
+  token-bearing step is `actions/upload-artifact`, which uses the **Actions runtime token**, not
+  `GITHUB_TOKEN`. `android.yml` keeps `contents: write` for its publish step.
+- **Keep:** the `android.yml` job split (item 3's second half), so PR runs get `contents: read`.
+  **Whoever takes it verifies a signed APK still publishes on `push` after merging**, because CI on
+  the PR itself cannot prove that half.
+
 
 ### [readiness][devices] TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again
 

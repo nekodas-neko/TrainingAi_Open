@@ -16947,3 +16947,18 @@ The second is that **already-sent events are not recalled**. Anything forwarded 
 sentry.io and stays there; clearing it is an account-side action nobody has taken, and no one has
 measured how many events carry values. A reader who takes "fixed" to mean the leak is undone would
 be wrong about the part that matters.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30104 (RV-198)
+
+Twenty-five lines, and most of them are one refusal and its reasoning.
+
+Three of the entry's four items shipped and are one line each to record. The fourth — splitting
+`android.yml` so PR runs drop `contents: write` — was deliberately left half done, and that needs
+more space than doing it would have: GitHub rejects an expression in `permissions:`, so it means
+duplicating the build, a mistake breaks APK signing on `push`, that only surfaces after merge, and
+no sandbox can test it without an Android SDK. Without those four facts written down the `Keep:`
+reads as unfinished work rather than a weighed decision, and the next session either repeats the
+reasoning or does it blind.
+
+The SHA-pinning bullet also records that the tags were dereferenced (`v5^{}`) rather than pinned as
+tag objects. That is the standard way to get action pinning wrong, and it is invisible in the diff.
