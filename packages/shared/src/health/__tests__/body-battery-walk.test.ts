@@ -25,20 +25,37 @@ const MIN = 60_000
 
 describe('walkBodyBattery — charge and drain', () => {
   it('charges at the full rate when HR sits exactly at resting', () => {
-    // hrr = 0 → delta = 0.2 × (1 − 0/0.05) × 5 min = 1.0
+    // hrr = 0 → delta = 0.2 × 5 min = 1.0
     const r = walkBodyBattery([{ tsMs: 5 * MIN, bpm: 50 }], P)
     expect(r.battery).toBeCloseTo(51, 6)
     expect(r.charged).toBeCloseTo(1, 6)
     expect(r.drained).toBe(0)
   })
 
-  it('charges nothing exactly at the ceiling — the boundary is charge-neutral, not a step', () => {
-    // 55 bpm → hrr = 0.05 = threshold → delta = 0.2 × (1 − 1) × dt = 0. It takes the charge branch
-    // (`<=`), so this pins that the two branches meet at zero rather than jumping.
-    const r = walkBodyBattery([{ tsMs: 5 * MIN, bpm: 55 }], P)
-    expect(r.battery).toBeCloseTo(50, 6)
-    expect(r.charged).toBeCloseTo(0, 6)
-    expect(r.drained).toBe(0)
+  it('charges at the SAME full rate anywhere under the ceiling — the ramp is flat (TN-55)', () => {
+    // This is the case the old and new models disagree about most, and the one the whole entry is
+    // about. Under the ramp, 54 bpm (hrr = 0.04, i.e. 80% of the way to the ceiling) charged
+    // 0.2 × (1 − 0.8) × 5 = 0.2 — a fifth of the rate, at a heart rate that is plainly rest. The
+    // ceiling has already decided the user is resting; nothing should then re-litigate it.
+    for (const bpm of [50, 51, 53, 54]) {
+      const r = walkBodyBattery([{ tsMs: 5 * MIN, bpm }], P)
+      expect(r.charged, `${bpm} bpm charges at the full rate`).toBeCloseTo(1, 6)
+    }
+  })
+
+  it('steps at the ceiling rather than fading to it — 55 charges, 56 drains', () => {
+    // 55 bpm → hrr = 0.05 = threshold, which takes the charge branch (`<=`) and now charges a full
+    // 0.2 × 5 = 1.0. The two branches no longer meet at zero: the boundary is a step, and that is
+    // deliberate. Pinned so a later "smooth it out" change has to argue with this test.
+    const at = walkBodyBattery([{ tsMs: 5 * MIN, bpm: 55 }], P)
+    expect(at.battery).toBeCloseTo(51, 6)
+    expect(at.charged).toBeCloseTo(1, 6)
+    expect(at.drained).toBe(0)
+
+    // One bpm over: hrr = 0.06 → delta = −0.6 × 0.01 × 5 = −0.03.
+    const over = walkBodyBattery([{ tsMs: 5 * MIN, bpm: 56 }], P)
+    expect(over.charged).toBe(0)
+    expect(over.drained).toBeCloseTo(0.03, 6)
   })
 
   it('drains in proportion to reserve above the threshold', () => {
@@ -137,10 +154,12 @@ describe('the threshold is expressible as a bpm offset — what TN-2 needs', () 
   it('puts the charge ceiling at restingHr + offset, whatever the reserve', () => {
     for (const reserve of [80, 100, 137]) {
       const p = { ...P, reserve, restThreshold: OFFSET_BPM / reserve }
-      // Exactly at the ceiling: charge-neutral.
-      expect(walkBodyBattery([{ tsMs: 5 * MIN, bpm: 60 }], p).battery).toBeCloseTo(50, 6)
-      // One bpm under: charging.
-      expect(walkBodyBattery([{ tsMs: 5 * MIN, bpm: 59 }], p).battery).toBeGreaterThan(50)
+      const at = walkBodyBattery([{ tsMs: 5 * MIN, bpm: 60 }], p).battery
+      // At the ceiling it still takes the charge branch, and since TN-55 flattened the ramp that
+      // means a full-rate charge rather than the old zero.
+      expect(at).toBeGreaterThan(50)
+      // One bpm under charges by exactly as much — flat, so the offset form gains no tilt either.
+      expect(walkBodyBattery([{ tsMs: 5 * MIN, bpm: 59 }], p).battery).toBeCloseTo(at, 6)
       // One bpm over: draining.
       expect(walkBodyBattery([{ tsMs: 5 * MIN, bpm: 61 }], p).battery).toBeLessThan(50)
     }
