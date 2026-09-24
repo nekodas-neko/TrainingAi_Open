@@ -64,3 +64,37 @@ Nothing runs; this is documentation. The measurements are read-only queries thro
 `/api/admin/db-query`, **row-scoped to the owner**, plus the shipped composite driven locally through
 esbuild. **Not established:** why `computed_at` moved on 57 rows without the scores changing — I
 measured that it did, not what did it. `pnpm check:rules` **Ran 77 of 77**, all passed.
+
+---
+
+## Owner decisions, 2026-09-24 — and one correction they exposed
+
+Both as recommended: **re-derive now for the rail fix and again after the batch**, and **move TN-55 to
+the top of Lane A**. TN-55 is now Lane A's READY #1.
+
+**The correction is the more important half. TN-62 and LA-122 item 2a both named the wrong endpoint.**
+They said `POST /api/admin/rederive-baselines`, which re-derives the stored **personal baselines** —
+the EMA means and deviations, BF-13/TN-6's mechanism. It does not touch
+`oura_daily_derived.readiness_contributors`, which is what holds the stale clipped scores. Firing it
+for the rail fix would have reported success and changed none of the 45 stale values.
+
+The endpoint that does the job is **`POST /api/admin/backfill-derived-scores`** — it recomputes each
+day through `buildDayAudit`, *"the same compute functions the live route serves from, no formula
+restated"*. So the re-derive is **two calls in order**, because baselines feed the z-scores the
+contributors are built from: `rederive-baselines` once TN-6 and BF-13 land, **then**
+`backfill-derived-scores`.
+
+**Neither can be fired from here.** Both authenticate through `auth()` + `requireAdmin` with no
+bearer-token path, so they need a logged-in admin session. `backfill-derived-scores` caps at **31 days
+per request** and is dry-run unless `dryRun=false`, so the 71-day history is three pages.
+
+I nearly fired the wrong one on the strength of my own entry. The reason I didn't is that the route's
+name says *baselines* and the thing needing rewriting is *scores* — worth stating because the entry
+read as authoritative and was wrong.
+
+## Also re-measured today
+
+TN-55's own headline is now understated: the battery's last 40 days run charge **1.6**/day against
+drain **56.4** — net **−54.8**, **63% of days ending at zero**, mean end **12.1**. The entry's −30/day
+came from 84 days. That measurement is recorded on the entry with an instruction not to quote the
+plan's before-figures without re-running the harness.
