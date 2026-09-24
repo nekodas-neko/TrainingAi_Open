@@ -16603,3 +16603,12 @@ has been ruled out and what must not be re-derived.
 today, and four new entries (RV-159 an unattributed rewrite, RV-160 closures, RV-161 owner decisions,
 RV-162 a `Due:` field). Reading notes are the point of this sweep: each replaces a claim with a
 measurement on the entry that made the claim.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → RV-103's sweep-2 failure explained
+
+28533 → 28545 (+12). RV-103 shipped and then failed its device check, and the twelve lines are the
+explanation rather than a new entry: the failure line is fifteen seconds away because
+`fetchWithRetry` makes four attempts with 2.5 + 5 + 7.5 s of backoff, and `onRevalidateError` cannot
+cover the gap because the write's own invalidation has emptied the key. Measured with fake timers.
+Writing the arithmetic down is what stops the next session reading the sweep result as "the
+reporting never worked" and rebuilding a channel that already exists.
