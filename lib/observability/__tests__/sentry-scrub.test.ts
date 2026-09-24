@@ -177,7 +177,9 @@ describe('RV-194 — the parts of an event that carry values', () => {
   it('drops `extra` outright and allowlists `contexts`', () => {
     const out = scrubEvent(evt({
       extra: { weightKg: 82.5 },
-      contexts: { os: { name: 'Android' }, state: { redux: { user: { email: 'a@b.com' } } } },
+      // The real shape Sentry's state integration emits, not an invented one — `contexts.state`
+      // is typed as `StateContext`, and getting that wrong is what a spec-is-code check catches.
+      contexts: { os: { name: 'Android' }, state: { state: { type: 'redux', value: { user: { email: 'a@b.com' } } } } },
     }))!
     expect(out.extra).toBeUndefined()
     expect(out.contexts!.os).toEqual({ name: 'Android' })
