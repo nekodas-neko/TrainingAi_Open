@@ -3939,6 +3939,55 @@ drift.
   them under *"done; a look is owed, nothing is blocked"* — which is worse than the current silence,
   because a reader in either place stops looking. The selector is the defect, not the entries.
 
+### [readiness][body] LA-144 — the Body Battery's wake anchor discards the whole day when the main sleep is a daytime block
+
+- **Lane: A** — `app/api/body-battery/route.ts` (the wake-anchor block, ~line 172-188).
+- **Added:** 2026-09-25, Lane A. This is the *"09-23 no HR seen"* investigation Review sweep 59 asked
+  to be split out of LA-134 as startable now; LA-134 keeps only the constants re-sweep, which is
+  still date-blocked to 2026-10-04.
+- **Measured in production 2026-09-25, and the numbers are exact.** `body_battery_daily` for
+  **2026-09-23**: `total_charged 0`, `total_drained 0`, `end_value 41`, `day_min 41`, `day_max 41`,
+  **`hr_sample_count` 2**. `oura_heartrate` holds **203** rows for that Brisbane day, continuously
+  from hour 00 to hour 17.
+- **Not a write-once-early-and-never-update bug — that was checked and is false.** The route's
+  snapshot updates on every read, and 09-23's row *was* updated at **10:41 UTC = 20:41 Brisbane**,
+  the last read of the day. It still saw 2 waking rows at 8:41 pm.
+- **The cause.** `sleep_sessions` holds a **6.17 h session dated 09-23 running 10:42 → 17:25
+  Brisbane**. `canonicalNightForDate` returns it (it is the only session for that date and it is far
+  too long to be filtered as a nap), so `rawWakeTime` = **17:25**. Everything before 17:25 is
+  discarded. Hours 18-19 are a ring gap and hour 20 has 2 rows — hence `hr_sample_count = 2` and a
+  flat line at the anchor.
+- **The existing guard cannot catch it.** `rawWakeTime > now` only rejects a wake time in the
+  *future*. 17:25 against a 20:41 read is in the past, so it passes.
+- **This is Q-17 recurring, and the route's own comment describes the shape** — an evening nap moved
+  the anchor to the end of that nap, "the entire day's HR fell before `wakeTime` and was discarded",
+  producing a flat 29 with `hr_sample_count = 0` and 164 samples unused on 2026-07-26. The fix then
+  covered the future-wake case only.
+- **⚠ Do NOT file this as "the sleep session is bad data" — that was considered and is NOT
+  established.** The block is `source_map` **`oura_ble`** throughout (efficiency 91, avg HR 73,
+  lowest 59), so the ring staged it as sleep. Hours 10-17 do carry **61-93 bpm**, which reads high
+  for sleep, but 09-22 and 09-24 each hold a genuine daytime block too (1.58 h and 1.33 h), so
+  daytime sleep is normal for this owner and a 09-23 day sleep cannot be ruled out from the data.
+  **The defect below holds either way**, which is why it is filed on the anchor and not on the
+  session.
+- **What is actually wrong, under both readings.** Even if the 10:42-17:25 sleep is real, hours
+  00-10 were waking time with real HR, and the battery threw them away. A single "wake anchor"
+  assumes one sleep at the start of the day; a day whose main sleep sits in the middle has **two**
+  waking stretches and the model has no way to say so.
+- **⚠ The obvious narrow fix is WRONG — measured before proposing it.** "If the waking window is
+  near-empty while the day has many rows, fall back to the first HR reading" would set wake to
+  ~00:00 on 09-23 and then model the 10:42-17:25 *sleep* as waking, draining the battery through it.
+  The real answer is that the walk takes waking time as the day **minus the sleep intervals**,
+  rather than everything after one anchor — that is a model change, not a guard, which is why this
+  entry does not carry a one-line patch.
+- **Scope note:** this changes a number the owner reads daily, but it is not a calibration — the
+  constants are LA-134's and must not be touched here. On a normal day (one overnight sleep) the
+  waking window is unchanged, so the fix should move only the degenerate days. **Prove that**: replay
+  and report how many stored days move, per the Tuning rule about a fit that silently re-scores
+  history.
+- **The stored 09-23 row stays wrong** unless it is recomputed, which is a production write and the
+  owner's call — same footing as LA-143.
+
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
 
 - **⏳ NOT STARTABLE BEFORE 2026-10-04, and it is NOT parked — read this before picking it up.**
@@ -3985,7 +4034,7 @@ drift.
 - **Do not raise `STRESS_DRAIN_RATE` back** on the argument that stress "should" matter more. It was
   cut 10× as a de-weighting of an input whose sign is unvalidated (TN-33, TN-21, TN-22), not as a
   calibration of a trusted one. TN-33 settling that sign is what reopens it.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **NOT STARTABLE BEFORE 2026-10-04**, per its own calibration-window rule, yet `next-item` lists it READY. Fitting now fits the dose ramp-up, and the session is wasted. The 09-23 *"no HR seen"* investigation (RV-163 answered part of it) could be split out as startable work now. RV-189 asks the Orchestrator to park the rest.
+- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **NOT STARTABLE BEFORE 2026-10-04**, per its own calibration-window rule, yet `next-item` lists it READY. Fitting now fits the dose ramp-up, and the session is wasted. The 09-23 *"no HR seen"* investigation **has now been split out as `LA-144`** (root-caused 2026-09-25: the wake anchor takes a 6.17 h daytime sleep session as the night and discards the day). RV-189 asks the Orchestrator to park the rest.
 
 ### [platform] OR-132 — five PRs are dead from the shallow-fetch defect and need closing
 
