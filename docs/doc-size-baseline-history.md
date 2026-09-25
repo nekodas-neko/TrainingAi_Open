@@ -17749,6 +17749,18 @@ The truncation itself is deliberate and stays — the queue carries real section
 batches of entries, and six of the seven mid-entry `## ` headings are those. Only the seventh was
 wrong, and `check-backlog-pointers.js` now tells them apart by whether a FIELD bullet follows.
 
+## 2026-09-25 — `docs/implementation-backlog.md` 31655 → 31656 (RV-177 date group)
+
+One line net. RV-177's date bullet group was replaced with what shipped, and a `Keep:` added so the
+entry cannot read as finished while six of its nine gaps are still open — the rewrite and the
+addition very nearly cancel.
+
+The lines that stayed are the corrections, which are the part worth the space: the entry's
+`activity-logs:38`/`fitness-tests:38` line numbers pointed inside `POST` and neither route has a
+`date` query param at all, and its framing of health-insight's slash handling as a validation gap is
+backwards — the schema permits slashes on purpose and the right fix accepts and converts them. The
+`Keep:` also records which of the remaining groups have been re-verified (two) and which have not
+(four), so the next session does not re-derive that.
 ## 2026-09-25 — `docs/implementation-backlog.md` 31655 → 31684 (+29, BF-61)
 
 The shipped note, and one paragraph that is the whole reason this entry came back twice: **the

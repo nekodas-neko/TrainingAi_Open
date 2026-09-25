@@ -4626,6 +4626,11 @@ drift.
 ### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
 
 - **Lane: A**
+- **Keep:** the date group shipped 2026-09-25; **six groups remain** and each wants its own
+  verification before code — the two missing rate limits, the two unbounded written weight
+  dates, Zod on the three phase-set writes, `calendar-data`'s NaN year and validate-before-auth
+  ordering, the two unguarded body ids, and the unscoped/dead pair above. Of those, only the
+  dead-code pair and `createFoodItem`'s unscoped read-back have been re-verified so far.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
 gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
 - **No rate limit:**
@@ -4635,12 +4640,23 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **No clock bound on a written weight date (Q-494's missed siblings):**
   - `sync-health/route.ts:108-111`, where an invalid date also poisons the whole batch.
   - `body-metadata/route.ts:288-292`.
-- **Date params skip `normalizeDateParam`, so `2026-02-31` becomes a bodiless 500:**
-  - `ai/health-insight/route.ts:60`, which also never converts slashes, so `new Date` goes Invalid
-    at `:144,152,158`;
-  - `food-logging-complete/route.ts:49`;
-  - `activity-logs/route.ts:38`;
-  - `fitness-tests/route.ts:38`.
+- **✅ SHIPPED 2026-09-25 — the date group, all four**
+  ([entry](overview/entries/2026-09-25-rv177-date-validity-group.md)). `ai/health-insight` and
+  `food-logging-complete` take `normalizeDateParamIso` in the handler; `activity-logs` and
+  `fitness-tests` get `.refine(isCalendarDate)` in their **shared** validators, which also closes the
+  `pushMutations` path they share.
+  - **⚠ The entry framed health-insight's slash half as a validation gap and it is the opposite.**
+    The schema allows `2026/09/10` deliberately — that is what the client's `localDateString()`
+    emits — and the handler then built `new Date('2026/09/10T00:00:00.000Z')`, Invalid for a real
+    day. So the fix ACCEPTS and converts it rather than rejecting it. A test asserting 400 there was
+    written, failed against the fixed route, and was corrected.
+  - The line numbers in the original were stale: `activity-logs:38` and `fitness-tests:38` are
+    inside `POST`, and neither route has a `date` query param at all — their dates arrive through the
+    shared body validators.
+- **🔎 The general form is bigger than these four, and is NOT filed yet.** The
+  `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex is repeated in **20+ files**, while `isCalendarDate` —
+  which exists for exactly this (Q-496) — guards only about five of them. Worth its own sweep entry
+  rather than being smuggled into this one.
 - **No Zod on phase-set writes:** `phase-sets/[id]/route.ts:30`, `phase-sets/route.ts:34` and
   `phase-sets/clone/route.ts:21`. `durationCycles` is unchecked, and a bad body gives a bodiless 500.
 - **`calendar-data/route.ts:8-9`:** a NaN year slips past the range check, and params are validated
@@ -4649,8 +4665,12 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `nutrition/food-logs/route.ts:44` and `oura/hr-sync/route.ts:29`.
 - **Unscoped and dead code:**
   - `createFoodItem`'s read-back is not user-scoped (`slices/nutrition.ts:300`; latent).
-  - `logExerciseWithId` (`adapter.ts:947`) and `logSets` (`:968`) write with no user parameter and
-    have no callers. Delete them.
+  - `logExerciseWithId` (`adapter.ts:948`) and `logSets` (`:969`) write with no user parameter and
+    have no PRODUCTION callers. **Re-verified 2026-09-25: neither is on the `WorkoutRepository`
+    interface**, so deleting them is contained. Two nuances the original missed — `logSets` IS
+    called by `batch-upsert-duplicate-collapse.test.ts`, which goes with it; and that is safe
+    because `collapseOnConflict` has its own dedicated test and the LIVE set-logging path at
+    `adapter.ts:1087` uses it too, so no real coverage is lost.
 
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 

@@ -6,6 +6,7 @@ import {
 } from './plausibility'
 import { MAX_PLAUSIBLE_SPM } from '@trainingai/shared/health/cadence'
 import { z } from 'zod'
+import { isCalendarDate } from '../date-utils'
 
 // Shared by the web route (app/api/activity-logs/route.ts) and pushMutations
 // so an outbox payload can never write through unvalidated, and endTime
@@ -56,7 +57,7 @@ const WalkSegmentStatSchema = z.object({
 export const ActivityLogBody = z.object({
   // Both separators: the client fills date params from localDateString(), which emits
   // slashes — a dash-only regex rejects every real request before the handler runs (Q-130).
-  date:            z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
+  date:            z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
   activityType:    z.string().min(1),
   title:           z.string().min(1).max(120),
   startTime:       z.string().regex(/^\d{2}:\d{2}$/).optional(),

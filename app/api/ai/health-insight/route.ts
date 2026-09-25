@@ -7,7 +7,7 @@ import { degradedFromFacts } from '@/lib/ai/degrade'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { rateLimit } from '@/lib/rate-limit'
-import { DEFAULT_TZ, todayInTz, ageFromDob } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, ageFromDob, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { z } from 'zod'
@@ -57,7 +57,11 @@ export async function POST(req: Request) {
   }
 
   const tz = session.user.timezone ?? DEFAULT_TZ
-  const date = body.date ?? todayInTz(tz)
+  // The schema bounds the SHAPE and nothing else, so `2026-02-31` reaches here, and it accepts the
+  // slash form the client's `localDateString()` emits. Both then go Invalid at the three
+  // `new Date(\`${date}T00:00:00.000Z\`)` sites below and surface as a bodiless 500 (RV-177).
+  const date = body.date ? normalizeDateParamIso(body.date) : todayInTz(tz)
+  if (date === null) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
   const { section, force } = body
 
   const repo = await getRepository()
