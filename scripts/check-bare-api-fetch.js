@@ -64,7 +64,6 @@ const BASELINE = {
   'components/config-screen.tsx': 4,                              // phase-sets x2 + workout-templates x2
   'lib/day-review-reminders.ts': 1,                               // bedtime-estimate (1 of 2)
   'lib/meal-reminders.ts': 1,                                     // bedtime-estimate (2 of 2)
-  'components/nutrition/food-logger-sheet.tsx': 2,                // saved-meals + meal-types (LB-154)
 
   // SINGLE-SITE candidates.
   'app/nutrition/use-food-logs-loader.ts': 1,                     // food-logs?date=
