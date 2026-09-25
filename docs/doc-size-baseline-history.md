@@ -17224,3 +17224,21 @@ The remaining twelve amend RV-183, including a retraction: the previous amendmen
 half saying the reconciler needed a join. It does not. It takes `Pick<FoodLog, 'mealTypeId'>[]` and
 six fields the local rows already carry; what blocked it was an over-wide parameter type. Leaving
 the wrong reason in place would have kept the next reader from trying.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31013 → 31052 (+39)
+
+Twenty of the thirty-nine are `LB-150`: `unwrapToday` stamps and compares the "today" cache envelope
+against the bare Brisbane default, so the envelope rolls over at Brisbane midnight for every user
+while every server route computes "today" in the user's own zone. The entry is long for two
+reasons. It has to name the ~24 keys that write or read the envelope, because the blast radius is
+what makes it worth doing rather than a curiosity. And it has to state that **both sides must change
+together** — changing one leaves the writer and reader disagreeing, which makes a cached entry
+unreadable the moment it lands, a failure the sync-provider's recent fix was written to undo. A
+reader who takes only the headline is likely to fix exactly one side.
+
+The other nineteen correct RV-183, which said its remaining fetch half was Lane B's. It is not.
+All four reads are `cachedFetchToday`, which passes `undefined` for `freshWithinTtl`, so the flag is
+unreachable from every today-envelope key and the fix is one line in Lane A's `cache.ts`. The
+amendment records the two Lane-B-only shapes that were tried and rejected, with the reason each
+fails, because both look workable and one of them would have duplicated the LB-150 defect across
+three call sites to keep the item in this lane.
