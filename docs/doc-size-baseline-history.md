@@ -17877,3 +17877,16 @@ mounted, an A/B of `resizeDelay: 200` across all twenty charts showing **no effe
 noise**, and the fact that `pnpm start` cannot boot in this sandbox (the instrumentation hook needs
 object-storage credentials), which closes the obvious route around the dev-mode confound. Together they
 say the first task on this entry is a measurement that can tell a fix from a no-op — not the fix.
+
+## 2026-09-25 — `docs/implementation-backlog.md` (RV-177 rate limits)
+
+RV-177's rate-limit bullet replaced with what shipped, and the `Keep:` narrowed from three open
+groups to two.
+
+The lines record that both claims held on re-verification — the meal PATCH really does reach
+`generateObject` through `scaleWithTopUp`, and `log-calendar-event` had neither a limit nor a schema
+— and that the meal limit sits **inside** the scale branch rather than at the top of the handler,
+because the same route serves a rename that costs nothing. That placement is the kind of thing a
+later reader would otherwise "tidy" into a handler-level guard.
+
+32044 → 32049 (+5; rebased twice as main moved under this branch).
