@@ -21,9 +21,14 @@ break the screen, which is why the guard test asserts the predicate rather than 
 ## Counting the rest of the class
 
 RV-79 and `LB-154` (which I filed hours earlier, for the food-logger sheet reading meal types the
-same way) both read as one-off violations. They are not: **69 bare `fetch()` calls of an `/api/` GET
+same way) both read as one-off violations. They are not: **68 bare `fetch()` calls of an `/api/` GET
 exist in client code**, measured with a brace-balanced scan that drops any call with an explicit
 `method:`, ternaries included.
+
+> **Corrected 2026-09-25 (LB-155):** this said **69**. The scan dropped `method:` but not the
+> SHORTHAND `{ method, headers }`, which has no colon, so one POST in `supplements-section.tsx` was
+> counted as a GET. 68 was the figure at the time; it is 67 now, because this PR's own fix removed
+> one. The scan is unit-tested from LB-155 onward.
 
 By area: `components/oura-ble` **18**, admin consoles **15**, `components/nutrition` **10**, then a
 long tail. So roughly half sit in BLE and admin debug surfaces where a cached read is *actively
