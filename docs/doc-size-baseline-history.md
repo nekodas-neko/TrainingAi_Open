@@ -17599,6 +17599,16 @@ session shipping it.
 
 LA-134 keeps only the constants re-sweep, still date-blocked to 2026-10-04, and its sweep-59 line
 now points at LA-144 instead of describing the split as hypothetical.
+## 2026-09-25 — `docs/implementation-backlog.md` 31390 → 31393 (+3)
+
+`RV-68` shipped and keeps its entry, because the device look it always named as its verification is
+genuinely owed — the contention this fixes cannot be staged off the APK, so the fix rests on source
+ordering plus the repo's own recorded measurement of the identical shape in `mood-checkin-sheet.tsx`.
+
+Three lines, for the two things a later reader would otherwise redo: the entry asks for a haptic to
+be moved above the `try` and there is no haptic in that file (none was added — new device behaviour
+on a daily surface, unverifiable here), and the in-flight guard is deliberately NOT released with
+the paint, since moving the writes off the await path would otherwise re-open the double-tap window.
 
 ## 2026-09-25 — `docs/implementation-backlog.md` 31390 → 31408 (RV-169)
 
