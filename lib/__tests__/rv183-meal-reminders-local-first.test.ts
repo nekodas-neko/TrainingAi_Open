@@ -3,6 +3,12 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { computeMealReminderActions, type MealTypeForReminders } from '../meal-reminders'
 import type { LocalMealType } from '@/lib/local-store/types'
+import { fromZonedTime } from 'date-fns-tz'
+// Fixtures are wall-clock times in the USER's zone, not the device's. A bare
+// `new Date('2026-06-17T09:00:00')` is parsed device-local, which is how these tests used to agree
+// with a `setHours` implementation that had the same bug (LB-148).
+const TZ = 'Australia/Brisbane'
+const bne = (iso: string) => fromZonedTime(iso, TZ)
 
 const ROOT = path.resolve(__dirname, '../..')
 const code = (rel: string) =>
@@ -32,17 +38,17 @@ describe('RV-183 — the local meal-type row satisfies the reminder logic direct
   })
 
   it('cancels the reminder for a meal that has been logged', () => {
-    const [action] = computeMealReminderActions([localType()], [{ mealTypeId: 'm1' }], new Date('2026-09-25T12:00:00'))
+    const [action] = computeMealReminderActions([localType()], [{ mealTypeId: 'm1' }], bne('2026-09-25T12:00:00'))
     expect(action).toEqual({ mealTypeId: 'm1', type: 'cancel' })
   })
 
   it('still schedules one for a meal that has not', () => {
-    const [action] = computeMealReminderActions([localType()], [], new Date('2026-09-25T12:00:00'))
+    const [action] = computeMealReminderActions([localType()], [], bne('2026-09-25T12:00:00'))
     expect(action.type).toBe('scheduled')
   })
 
   it('cancels when reminders are off for that meal, logged or not', () => {
-    const [action] = computeMealReminderActions([localType({ remindersEnabled: false })], [], new Date('2026-09-25T12:00:00'))
+    const [action] = computeMealReminderActions([localType({ remindersEnabled: false })], [], bne('2026-09-25T12:00:00'))
     expect(action).toEqual({ mealTypeId: 'm1', type: 'cancel' })
   })
 })

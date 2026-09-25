@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.45",
+    date: "2026-09-25",
+    changes: [
+      "Reminders are now timed by the timezone on your profile. Meal, supplement and workout reminders were working out both \"has today's one already gone out\" and \"what moment is 8am\" from two different clocks \u2014 one fixed to Brisbane, one following whatever zone the phone was set to. In Brisbane with a Brisbane phone the two agree and everything was correct; anywhere else they did not, so a reminder could fire at the wrong hour, repeat, or be skipped for the day.",
+    ],
+  },
+  {
     version: "1.465.44",
     date: "2026-09-25",
     changes: [

@@ -194,7 +194,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     setMealRemindersEnabled(val);
     savePreference('mealReminders', val);
     if (val) {
-      reconcileMealReminders(mealTypes, logs);
+      reconcileMealReminders(mealTypes, logs, new Date(), tz);
     } else {
       cancelAllMealReminders(mealTypes.map(mt => mt.id));
     }

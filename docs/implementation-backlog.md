@@ -4241,33 +4241,9 @@ drift.
   zero food logs deliberately does NOT, because that is the case the reminder exists for.
 - **Still open:** the three fetches duplicating Home's, `next-session`, and the Lane A halves
   (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
-- **Found on the way out, filed as `LB-148`:** the three reminder modules time every notification in
-  Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`.
-
-### [platform][nutrition] LB-148 — every notification the app schedules is timed in Brisbane or in the phone's zone, never the user's
-
-- **Lane: B** — `lib/meal-reminders.ts`, `lib/supplement-reminders.ts`, `lib/workout-reminders.ts`.
-- **Added:** 2026-09-25 · found while shipping RV-183's meal half (LB-147's sibling sweep).
-- **RV-176 fixed this class in `app/**` and `components/**` and MISSED `lib/*.ts` entirely**, because
-  that sweep scanned `.tsx`. The reminder modules are the biggest remaining pocket: **8 sites across
-  3 files**, in the code that decides *when a notification fires*.
-  - **Bare `todayInTz()` — the Brisbane default nobody overrides:** `meal-reminders.ts:90,152`,
-    `supplement-reminders.ts:75`, `workout-reminders.ts:69`. Each is the "have I already notified
-    today" key, so on a user outside Brisbane the day rolls at the wrong hour and a reminder either
-    repeats or is suppressed.
-  - **Device-local `setHours` — the scheduled instant:** `meal-reminders.ts:42,168`,
-    `supplement-reminders.ts:40`, `workout-reminders.ts:30`. `new Date(now).setHours(h, m)` sets the
-    hour in the DEVICE's zone, so a reminder configured for 08:00 fires at 08:00 wherever the phone
-    is, not at the user's 08:00.
-- **Why it is filed rather than fixed in LB-147's PR:** it changes *when notifications fire*, which
-  is user-visible behaviour on a daily surface, and it needs the user's timezone threaded into three
-  modules that currently take none. That is its own change with its own verification, not a rider on
-  a local-first read.
-- **Invisible for the owner today** — his phone and his profile are both Brisbane, so every one of
-  these is correct for him right now and wrong for anyone else, which is exactly why the class keeps
-  surviving.
-- **`scripts/check-client-today-timezone.js` does not catch these** (RV-179 owns widening it). A fix
-  here without widening that check leaves the next instance free to land.
+- **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
+  Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
+  across the 3 modules now take the user's zone.
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
@@ -4356,6 +4332,11 @@ written entity.
 - **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11
   across 9 files"*. The script now reports **23 across 18**, because RV-105 widened what it counts,
   and the "can-bite is EMPTY" claim has not been re-verified against the wider population.
+- **LB-148 cleared the biggest pocket this check cannot see (2026-09-25).** The three reminder
+  modules held 8 of them — bare `todayInTz()` beside device-local `setHours`, in the code deciding
+  when a notification fires — and are now clean, guarded by a scanner test local to them
+  (`lib/reminders/__tests__/lb148-reminders-use-the-users-zone.test.ts`). So the widening no longer
+  has to fix and detect at once: it baselines against a `lib/` that is already correct here.
 
 ### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
 

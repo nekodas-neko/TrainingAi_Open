@@ -283,8 +283,8 @@ export function SyncProvider({ userId }: SyncProviderProps) {
           }
 
           if (mealTypeList != null && foodLogList != null) {
-            await reconcileMealReminders(mealTypeList, foodLogList)
-            await scheduleEndOfDayReminder(mealTypeList, foodLogList)
+            await reconcileMealReminders(mealTypeList, foodLogList, new Date(), tz)
+            await scheduleEndOfDayReminder(mealTypeList, foodLogList, tz)
           }
         } catch {
           // Network unavailable — skip, will retry on next open/resume
@@ -325,6 +325,8 @@ export function SyncProvider({ userId }: SyncProviderProps) {
           box.rec.session?.name,
           box.rec.reminderEnabled ?? false,
           box.rec.reminderTime ?? null,
+          new Date(),
+          tz,
         );
       } catch {
         // Network unavailable — skip
@@ -340,7 +342,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
     })();
 
     return () => { handle?.remove(); };
-  }, [userId]);
+  }, [userId, tz]);
 
   // Reconcile supplement reminder notifications on app open and on resume
   useEffect(() => {
@@ -374,7 +376,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
           await cachedFetchToday('supplements', '/api/supplements', TTL_MEDIUM, d => { fetched = d; });
           supplements = Array.isArray(fetched) ? fetched as SupplementWithStatus[] : [];
         }
-        await reconcileSupplementReminders(supplements, new Date());
+        await reconcileSupplementReminders(supplements, new Date(), tz);
       } catch {
         // Network unavailable — skip
       }

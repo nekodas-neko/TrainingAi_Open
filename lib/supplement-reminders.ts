@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import type { SupplementWithStatus } from '@trainingai/shared/types/supplement'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { instantAtLocalTime, localDayInTz } from '@/lib/reminders/local-instant'
 
 export const SUPPLEMENT_REMINDERS_CHANNEL = 'supplement-reminders'
 export const SUPPLEMENT_REMINDER_ROUTE = '/nutrition'
@@ -27,6 +28,7 @@ export function computeSupplementReminderActions(
   supplements: SupplementWithStatus[],
   now: Date = new Date(),
   notifiedToday: Set<string> = new Set(),
+  tz: string = DEFAULT_TZ,
 ): SupplementReminderAction[] {
   return supplements.map((s): SupplementReminderAction => {
     const supplementId = s.id
@@ -36,8 +38,8 @@ export function computeSupplementReminderActions(
     }
 
     const [hours, minutes] = s.reminderTime.split(':').map(Number)
-    const reminderAt = new Date(now)
-    reminderAt.setHours(hours, minutes, 0, 0)
+    // The user's wall clock, not the phone's (LB-148).
+    const reminderAt = instantAtLocalTime(localDayInTz(now, tz), hours, minutes, tz)
 
     if (now >= reminderAt) {
       if (notifiedToday.has(supplementId)) {
@@ -68,16 +70,17 @@ function writeNotifiedToday(map: Record<string, string>): void {
 export async function reconcileSupplementReminders(
   supplements: SupplementWithStatus[],
   now: Date = new Date(),
+  tz: string = DEFAULT_TZ,
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
-    const today = todayInTz()
+    const today = localDayInTz(now, tz)
     const notifiedMap = readNotifiedToday()
     const notifiedToday = new Set(
       Object.entries(notifiedMap).filter(([, date]) => date === today).map(([id]) => id),
     )
-    const actions = computeSupplementReminderActions(supplements, now, notifiedToday)
+    const actions = computeSupplementReminderActions(supplements, now, notifiedToday, tz)
 
     for (const action of actions) {
       const id = supplementReminderNotificationId(action.supplementId)
