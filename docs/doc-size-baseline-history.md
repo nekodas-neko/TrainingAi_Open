@@ -17495,3 +17495,18 @@ this branch was in the gate, so the baseline moved under it; the +9 is unchanged
 The entry stays open deliberately: `ci.yml` now dumps `dmesg` on an E2E failure, and the cause is
 established by the next red run rather than by this PR. Narrative in
 `docs/overview/entries/2026-09-25-lb149-e2e-browser-death.md`.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31321 → 31326 (RV-182 ③)
+
+Five lines net, and they are a **retraction**, which is why they sit in the queue.
+
+RV-182's third item proposed "upsert with IS DISTINCT FROM". That was already shipped, and had been
+since review B1/R1 — `upsertOuraHeartrate` carries the guard, with a comment explaining it. What the
+entry did not see is that a blanket delete ran immediately in front of it, removing the rows the
+guard existed to match, so the guard had never once applied. An implementer taking the item as
+written would have gone looking for an upsert to add, found one already there, and reasonably
+concluded the item was stale.
+
+The rest of the delta is the measurement (628,197 inserts and 574,974 deletes against 140,181 live
+rows, 95 updates) and one line keeping `oura_heartrate_pkey` — 7 MB, 0 scans — on the record, since
+dropping a primary key is a migration and ships alone.

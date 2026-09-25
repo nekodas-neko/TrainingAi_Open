@@ -4389,9 +4389,19 @@ drift.
   series because a single newest anchor was the wrong offset. **And the obvious aggregate is a
   REGRESSION** — `row_number() OVER (PARTITION BY epoch …)` measured **53–67 ms**, worse than the
   read it replaces, because it sorts all 12,591 rows. Only the count-then-top-N shape wins.
-- **STILL OPEN ③ — the rollup deletes and reinserts ~880 HR rows per pass even when nothing changed**
-  (`run.ts:877-878`): 535k deletes against 137k live rows. `oura_heartrate_pkey` (6.8 MB) has
-  **0 scans**. **Fix:** upsert with `IS DISTINCT FROM`, and delete only the timestamps that disappeared.
+- **SHIPPED ③ 2026-09-25** ([entry](overview/entries/2026-09-25-rv182-hr-rollup-churn.md)): the
+  rollup upserts the HR window first, then deletes only the timestamps that left it. Re-measured
+  before the change — **628,197 inserts and 574,974 deletes against 140,181 live rows, 95 updates**
+  (the entry's 535k/137k, grown).
+- **⚠ The entry's fix for ③ — "upsert with `IS DISTINCT FROM`" — was ALREADY DONE**, and had been
+  since review B1/R1: `upsertOuraHeartrate` carries `ON CONFLICT … DO UPDATE … WHERE bpm IS DISTINCT
+  FROM excluded.bpm`, written so an idempotent re-roll does not bump `updated_at` and re-send the
+  point over the Track-B sync. The defect was the blanket `DELETE … WHERE source = 'ble' AND
+  timestamp >= cutoff` running immediately **in front of it**, which removed exactly the rows about
+  to be written — so the conflict target never matched, every row was a fresh insert, and the guard
+  never applied. Reordering restores behaviour the upsert already had.
+- **`oura_heartrate_pkey` is still 7 MB with 0 scans** against the unique key's 792,453. Dropping a
+  primary key is a migration and ships alone; not done here.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
