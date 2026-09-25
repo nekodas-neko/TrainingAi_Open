@@ -17242,3 +17242,16 @@ unreachable from every today-envelope key and the fix is one line in Lane A's `c
 amendment records the two Lane-B-only shapes that were tried and rejected, with the reason each
 fails, because both look workable and one of them would have duplicated the LB-150 defect across
 three call sites to keep the item in this lane.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31052 → 31057 (+5)
+
+Queue hygiene, not new material. Two entries headed Lane B's READY list while unstartable, both
+because the thing blocking them was written as prose where the tooling reads a field.
+
+`RV-183`'s lane became `A`: its caller half shipped, and the remainder needs `lib/sqlite/cache.ts`.
+Three of the five lines are the reason, kept in the entry so the next B session does not re-derive
+it — the analysis took a PR of its own.
+
+`RV-185` gained `Needs: RV-186`. Its own text already said it was "worth doing only if RV-186 shows
+script evaluation matters at cold start", and RV-186 is the unrun device baseline, so it was
+self-describing as blocked while printing as ready.

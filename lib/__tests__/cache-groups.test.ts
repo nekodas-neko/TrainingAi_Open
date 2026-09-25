@@ -68,6 +68,9 @@ describe('cache group helpers', () => {
       'oura-stats', 'oura-hr-day:', 'home-day-timeline',
       'training-load', 'progress-summary', 'weekly-stats', 'health-trends:',
       'health-trends-summary', 'sleep-performance-correlation',
+      // RV-178 — a drain moves lastMeasuredAt, which is the whole content of the "Ring synced …"
+      // line the More card now seeds from this key.
+      'oura-ble-freshness',
     ]))
   })
 
@@ -143,9 +146,11 @@ describe('cache group helpers', () => {
     expect(invalidated).toEqual(expect.arrayContaining(['nutrition-meal-types', 'nutrition-adherence']))
   })
 
-  it('invalidateUserProfile clears the sole /api/user/profile key', async () => {
+  it('invalidateUserProfile clears the profile key and the public-profile prefix', async () => {
     await invalidateUserProfile()
-    expect(invalidated).toEqual(['more-user-profile'])
+    // RV-178: `/profile/[userId]` renders the same name, avatar and title. Prefix, because there is
+    // one entry per viewed user and editing yours can only invalidate your own by name.
+    expect(invalidated.sort()).toEqual(['more-user-profile', 'public-profile:'])
   })
 
   it('invalidateAiPeriodization clears the overview', async () => {

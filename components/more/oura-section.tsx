@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Activity, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, TriangleAlert, Wifi, KeyRound } from "lucide-react"
 import { invalidateRingBattery } from "@/lib/cache-groups"
 import { isBleDataFresh } from "@/lib/oura/ble-freshness"
-import { cachedFetchToday } from "@/lib/sqlite/cache"
+import { cachedFetch, cachedFetchToday, readCacheSync } from "@/lib/sqlite/cache"
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl"
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility"
 
@@ -17,6 +17,8 @@ type LiveBattery = { percent: number; charging: boolean | null; ageMinutes: numb
 const BLE_BATTERY_STALE_AFTER_MIN = 180
 
 const STALE_SYNC_THRESHOLD_MS = 24 * 60 * 60 * 1000
+
+const FRESHNESS_KEY = 'oura-ble-freshness'
 
 function formatSyncAge(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -57,6 +59,11 @@ export function OuraConnectionSection() {
   const [hasKey, setHasKey] = useState<boolean | null>(null)
 
   useEffect(() => {
+    // Seed synchronously before the fetches so a repeat open paints "Ring synced …" on the first
+    // frame instead of the skeleton below. In the effect, not a useState initializer — the standing
+    // instant-paint rule.
+    const seed = readCacheSync<{ lastMeasuredAt: string | null }>(FRESHNESS_KEY)
+    if (seed) setLastMeasuredAt(seed.lastMeasuredAt ?? null)
     void loadBattery()
     void loadFreshness()
     void loadKeyState()
@@ -84,13 +91,18 @@ export function OuraConnectionSection() {
     ).catch(() => {}).finally(() => setLoading(false))
   }
 
+  // RV-178: this was a bare `fetch`, so "Ring synced …" was blank on every open until the network
+  // answered — on a card whose whole job is telling you when the ring last synced. `cachedFetch`
+  // paints the last-known value first and revalidates, and the key is in `invalidateOuraSync()` so
+  // a drain evicts it.
+  // No `onError`: a failed read leaves the last-known "Ring synced …" on screen, which is the right
+  // outcome for this line — and a handler in the `.catch` would never run anyway, because
+  // `cachedFetch` swallows `!res.ok` (RV-84). The bare catch is for a rejected promise only.
   async function loadFreshness() {
-    try {
-      const res = await fetch('/api/oura-ble/freshness')
-      if (!res.ok) return
-      const { lastMeasuredAt: at } = await res.json() as { lastMeasuredAt: string | null }
-      setLastMeasuredAt(at)
-    } catch { /* leave the last-known value in place */ }
+    await cachedFetch<{ lastMeasuredAt: string | null }>(
+      FRESHNESS_KEY, '/api/oura-ble/freshness', TTL_MEDIUM,
+      d => { setLastMeasuredAt(d?.lastMeasuredAt ?? null) },
+    ).catch(() => {})
   }
 
   const bleBatteryFresh = liveBattery != null && liveBattery.ageMinutes <= BLE_BATTERY_STALE_AFTER_MIN

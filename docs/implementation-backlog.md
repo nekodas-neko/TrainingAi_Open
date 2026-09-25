@@ -4194,7 +4194,9 @@ drift.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
-- **Lane: B** (callers), Lane A for `lib/local-store/push-then-revalidate.ts` / `cache-groups.ts`.
+- **Lane: A** — was `B (callers)`, corrected 2026-09-25 once the caller half was done and the
+  remainder proved to need `lib/sqlite/cache.ts`. Nothing here is Lane B's any more; the lane field
+  is changed so the next B session does not re-derive that from scratch.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Counted from code; RV-186 counts them on the phone.
 - **Every launch and every resume sends 6 reminder-reconcile GETs** (`sync-provider.tsx:253-383`):
   meal-types, today's food logs, next-session, supplements, readiness-score and body-battery.
@@ -4286,7 +4288,10 @@ drift.
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
-- **Lane: B** — measure first (RV-186), then trim.
+- **Lane: B** — measure first, then trim.
+- **Needs: RV-186** — the entry's own bar is *"worth doing only if RV-186 shows script evaluation
+  matters at cold start"*, and RV-186 row 1 is what records it. That was prose, so this headed
+  Lane B's READY list while unstartable; it is a field now.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
 - **`next build` on `main` (e5a5b9e7), First Load JS:**
   - Home, Health, Nutrition and More: **457 kB** each.
@@ -4332,22 +4337,6 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   - `logExerciseWithId` (`adapter.ts:947`) and `logSets` (`:968`) write with no user parameter and
     have no callers. Delete them.
 
-### [app-shell] RV-178 — client-side gaps from the rules census: one card, two guards, three small fetches
-
-- **Lane: B**
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **CLEAN:** bottom action rows use floored safe-area utilities, and write callbacks carry the
-written entity.
-- **`components/home-day-timeline.tsx:251-252`:** a failure and an empty day both render nothing,
-  with no `onError`, so Home's timeline vanishes on a failed cold load.
-- **No in-flight guard:**
-  - `config-screen.tsx:309` `clonePhaseSet`: a double tap makes two copies, and it has no
-    try/catch.
-  - `ai-insight-card.tsx:93` Refresh: repeated taps spend the 10-per-hour AI limit.
-- **`React.memo` defeated by a render-body function passed by name:** `mood-checkin-sheet.tsx:394`
-  and `saved-meals-sheet.tsx:545`.
-- **Bare GETs with no seed:** `components/more/oura-section.tsx:89` (the "last synced" line is blank
-  until the network answers) and `app/profile/[userId]/page.tsx:26`.
-
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 
 - **Lane: O** — decide which to widen. Each is a small script change, and each one has a live
@@ -4371,6 +4360,12 @@ written entity.
 - **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11
   across 9 files"*. The script now reports **23 across 18**, because RV-105 widened what it counts,
   and the "can-bite is EMPTY" claim has not been re-verified against the wider population.
+- **RV-178 confirmed the `memo()` check's blind spot, with two live instances (2026-09-25).**
+  `check-memo-stable-props.js` catches an inline arrow or object at the call site and **not a
+  render-body function passed by name** — `onToggle={toggleSoreMuscle}`. Both were real: the
+  children are `memo()`-wrapped and the handlers were re-created every render, so the memo was
+  doing nothing while the code read as optimised. Both are now `useCallback`, so widening the check
+  starts from two fewer.
 - **LB-148 cleared the biggest pocket this check cannot see (2026-09-25).** The three reminder
   modules held 8 of them — bare `todayInTz()` beside device-local `setHours`, in the code deciding
   when a notification fires — and are now clean, guarded by a scanner test local to them
