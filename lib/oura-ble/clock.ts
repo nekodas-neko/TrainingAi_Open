@@ -142,7 +142,9 @@ function lagMs(a: ClockAnchor): number {
  * production frames (2026-08-07, n=99): p0→p10 spans 1.4 min against a 56.2 min full spread,
  * so the lower edge is sharp and the tail is pure receive latency.
  */
-const LAG_PERCENTILE = 0.1
+/** Exported so the SQL that computes this same order statistic cannot drift from the JS
+ *  (RV-182 ②) — one constant, two languages. */
+export const LAG_PERCENTILE = 0.1
 
 function robustOffsetMs(anchors: ClockAnchor[]): number {
   const lags = anchors.map(lagMs).sort((a, b) => a - b)
@@ -221,6 +223,57 @@ function offsetForEpoch(anchors: ClockAnchor[], ep: number): number | null {
     memo.offsets.set(ep, offset)
   }
   return offset
+}
+
+/**
+ * The resolved clock for a user: the current epoch, and each epoch's robust offset.
+ *
+ * **This, not the anchor rows, is all either direction actually needs** — which is the point.
+ * `robustOffsetMs` reduces an epoch's anchors to one scalar, so a caller that only converts
+ * timestamps can have that scalar computed in the database instead of dragging the whole
+ * observation log into Node (RV-182 ②: 12,591 rows, 2,190 times, 9.4% of all database time).
+ * Callers that need the observations themselves — the rollup reads `anchorDs` for its watermark —
+ * keep taking `ClockAnchor[]`.
+ */
+export interface ClockOffsets {
+  /** Max epoch present, or null when there are no anchors at all. */
+  epoch: number | null
+  /** Per-epoch offset in ms. A null VALUE means that epoch has no anchors; an absent key means
+   *  it was never asked about. */
+  offsets: Map<number, number | null>
+}
+
+/**
+ * Reduce anchors to the same shape the database returns, for callers that already hold them.
+ *
+ * **Eagerly, one entry per epoch present** — deliberately, and not `memoFor` directly. That memo
+ * fills lazily as `offsetForEpoch` is asked, so handing it out as a `ClockOffsets` gives a map that
+ * is empty until something asks the anchor-based resolvers first, and the offset-based ones read
+ * `undefined` and answer null. The database returns a row per epoch, so this does too.
+ */
+export function offsetsFromAnchors(anchors: ClockAnchor[]): ClockOffsets {
+  const offsets = new Map<number, number | null>()
+  for (const ep of new Set(anchors.map(a => a.epoch))) offsets.set(ep, offsetForEpoch(anchors, ep))
+  return { epoch: currentEpoch(anchors), offsets }
+}
+
+/** `ds` → wall clock, from a resolved clock. See `resolveDsToMs` for the model and why it is
+ *  a fixed slope with one offset rather than an interpolation. */
+export function dsToMs(ds: number, clock: ClockOffsets, epoch?: number): number | null {
+  const ep = epoch ?? clock.epoch
+  if (ep == null) return null
+  const offset = clock.offsets.get(ep)
+  if (offset == null) return null
+  return ds * MS_PER_DS + offset
+}
+
+/** Wall clock → `ds`, from a resolved clock. The exact inverse of `dsToMs` (LA-141). */
+export function msToDs(utcMs: number, clock: ClockOffsets, epoch?: number): number | null {
+  const ep = epoch ?? clock.epoch
+  if (ep == null) return null
+  const offset = clock.offsets.get(ep)
+  if (offset == null) return null
+  return (utcMs - offset) / MS_PER_DS
 }
 
 export function resolveDsToMs(ds: number, anchors: ClockAnchor[], epoch?: number): number | null {

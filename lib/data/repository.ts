@@ -1127,6 +1127,9 @@ export interface WorkoutRepository {
    *  the observation nearest *it*, which bounds the lag to one drain interval instead of
    *  "time since the last sync" — see `resolveDsToMs` in lib/oura-ble/clock.ts. */
   getOuraClockAnchors(userId: string): Promise<import('@/lib/oura-ble/clock').ClockAnchor[]>
+  /** Each epoch's robust clock offset, aggregated in the database — what a caller needs when it
+   *  only converts timestamps, rather than the whole anchor log (RV-182 ②). */
+  getOuraClockOffsets(userId: string): Promise<import('@/lib/oura-ble/clock').ClockOffsets>
   /** How far in wall-clock time the BLE rollup's derivation has reached — the rollup watermark
    *  resolved through the clock anchors, or null when no watermark applies to the current epoch.
    *  A night ending within `PROVISIONAL_COVERAGE_MARGIN_MS` of this can still grow (BF-83); see

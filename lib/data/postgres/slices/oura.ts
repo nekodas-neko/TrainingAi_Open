@@ -11,7 +11,7 @@ import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
-import { resolveDsToMs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
@@ -838,6 +838,57 @@ export async function getHrForWindow(db: Db, userId: string, from: Date, to: Dat
  * rest of the win is that 133,041 rows stop crossing the wire and stop being materialised in Node
  * on every resolve.
  */
+/**
+ * Each epoch's robust clock offset, computed in the database — one row per epoch instead of the
+ * whole anchor log.
+ *
+ * RV-182 ②. `getOuraClockAnchors` was **2,190 calls returning 9,736 rows each, 106 s, 9.4% of all
+ * database time**, and every one of those callers reduced the rows to a single scalar per epoch and
+ * threw the rest away. `robustOffsetMs` takes the 10th-percentile *lag* — an order statistic, so it
+ * is `ORDER BY … OFFSET floor(n * 0.1) LIMIT 1`, matching `Math.floor(lags.length * 0.1)` exactly.
+ * **Not `percentile_disc`**, which uses a different rank rule and disagrees at small n; the same
+ * trap RV-181 documented.
+ *
+ * **The formulation matters more than it looks, and the obvious one is slower than what it
+ * replaces.** Measured against production on 2026-09-25: the series read is ~48 ms; expressing this
+ * with `row_number() OVER (PARTITION BY epoch …)` costs **53–67 ms**, because the window sorts all
+ * 12,591 rows — a regression. Counting first and taking a top-N with `OFFSET` is **19–27 ms** warm.
+ * Both return the identical offset; only one is worth shipping.
+ *
+ * `floor(extract(epoch FROM anchor_utc) * 1000)` truncates to whole milliseconds because the JS
+ * path reads `new Date(anchor_utc).getTime()`, which does the same — without it a stored
+ * microsecond would put the two paths a fraction apart.
+ */
+export async function getOuraClockOffsets(db: Db, userId: string): Promise<ClockOffsets> {
+  const res = await db.execute<{ epoch: number; offset_ms: string | null }>(sql`
+    WITH lags AS (
+      SELECT epoch,
+             floor(extract(epoch FROM anchor_utc) * 1000) - anchor_ds * 100 AS lag_ms
+      FROM oura_ble_clock_anchors
+      WHERE user_id = ${userId}
+    ),
+    per_epoch AS (
+      -- The ::float8 cast is load-bearing. Bound beside a bigint count(*) the parameter is
+      -- inferred as bigint and 0.1 is rejected outright; the cast also makes this the same IEEE
+      -- double multiply as the JS lags.length * LAG_PERCENTILE, so the two floors cannot part.
+      SELECT epoch, floor(count(*) * ${LAG_PERCENTILE}::float8)::int AS idx FROM lags GROUP BY epoch
+    )
+    SELECT p.epoch,
+           (SELECT l.lag_ms::bigint FROM lags l WHERE l.epoch = p.epoch
+              ORDER BY l.lag_ms OFFSET p.idx LIMIT 1) AS offset_ms
+    FROM per_epoch p
+  `)
+  const rows = (res as unknown as { rows: { epoch: number; offset_ms: string | null }[] }).rows
+  const offsets = new Map<number, number | null>()
+  let epoch: number | null = null
+  for (const r of rows) {
+    const ep = Number(r.epoch)
+    offsets.set(ep, r.offset_ms == null ? null : Number(r.offset_ms))
+    if (epoch == null || ep > epoch) epoch = ep
+  }
+  return { epoch, offsets }
+}
+
 export async function getObservedHrProfile(
   db: Db, userId: string, from: Date, to: Date,
 ): Promise<ObservedHrProfile> {
