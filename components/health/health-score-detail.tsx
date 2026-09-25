@@ -53,7 +53,7 @@ function ScoreDisplay({ score, label }: { score: number | null; label: string })
     <div className="relative w-32 h-32">
       <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 120 120">
         <circle cx="60" cy="60" r={r} fill="none" strokeWidth="8" stroke={trackColor} />
-        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="8"
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="8" className="score-ring"
           style={{ stroke: color, strokeDasharray: circumference, strokeDashoffset: offset, strokeLinecap: "round" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">

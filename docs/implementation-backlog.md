@@ -6275,31 +6275,32 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   at all** are NOT converted. Both are separate files with separate risk and were left rather than
   swept blind; the primitive they would use now exists.
 
-### [readiness][app-shell] RV-74 — the health hero's number counts up while its ring snaps
+### [readiness][app-shell] RV-74 — the health hero's ring is eased now; the device look is owed
 
-- **Lane:** B — `components/health/health-score-detail.tsx:49-57`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- **Batch:** `motion-polish`
-- **Verification:** device — see the compositor risk below. The risk is in the *fix*, which is a
-  reason to look at the S25 after it lands, not a reason to forbid writing it; this carried
-  `Gate: device` from 2026-09-20 until OR-122. It ships with the rest of `motion-polish`, which is
-  already a device sitting.
-- `:49` is `const displayScore = useCountUp(score)`, easing the digits over 600 ms. Eight lines
-  below, the `<circle>` sets `strokeDashoffset` inline with **no transition**, so the arc is already
-  at its final position before the number finishes. That is an inconsistency inside a single
-  component, on the app's most prominent element.
-- **Fix:** `transition: stroke-dashoffset 600ms cubic-bezier(0.05,0.7,0.1,1)` on that circle, gated
-  on the same `useReducedMotion()` the count-up already reads — or add `.score-ring` to the existing
-  reduced-motion block in `globals.css`, exactly as `.border-run` is handled. Match 600 ms so ring
-  and number are one gesture.
-- **⚠ `docs/mobile-ui-and-performance.md` warns that SVGs in card grids can wipe sibling cards'
-  gradient backgrounds on Samsung's WebView compositor** and prefers conic-gradient over stroke-dash
-  donuts. This ring is in a hero rather than a card grid, so it is probably outside that failure
-  mode — but it is the exact path the warning names, which is why this one is device-gated.
-- **⛔ Do not extend this to the conic-gradient rings** (`home-nutrition-card.tsx:96`,
-  `energy-card.tsx:94-102`) — gradient-stop interpolation is unreliable and would repaint a masked
-  gradient every frame.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the count-up animates only on a score change (initial state = target), so the mismatch shows on change, not on first mount.
+- **Lane:** B. **Added:** 2026-09-20 · Review sweep 51. **Shipped 2026-09-25** — `app/globals.css`,
+  `components/health/health-score-detail.tsx`.
+- **Verify: device**
+- **Keep:** the device look, which this entry always named as its verification rather than a gate.
+  On the S25, open Health and let the readiness score CHANGE (the count-up only runs on a change, not
+  on mount — per the 2026-09-24 re-read): ring and number should finish together as one gesture. The
+  compositor risk the entry flags is in the *fix*, so this is also the look that would catch it.
+- **⛔ The prescribed curve was wrong, and this is the substantive correction.** The entry says
+  `cubic-bezier(0.05,0.7,0.1,1)` and "match 600 ms so ring and number are one gesture". Matching the
+  duration is not enough: `useCountUp` eases with `1 - (1-t)³`, and at the halfway mark that curve is
+  at **0.875** where the entry's is at **0.762** — the ring would trail the digits by eleven points of
+  progress and still read as two gestures. The exact CSS form of the hook's easing is
+  **`cubic-bezier(0.333, 1, 0.667, 1)`** (x(t) = t, y(t) = 1−(1−t)³, verified to 1e-16), which is what
+  shipped. Its test re-derives that rather than asserting the literal.
+- **✅ Done via the CSS class, not an inline transition**, because the component cannot gate on
+  `useReducedMotion()` — `useCountUp` reads that hook *internally*, so the boolean never reaches the
+  caller. `.score-ring` sits beside `.border-run` in the reduced-motion block, which is the precedent
+  the entry itself pointed at and the only route that needs no new hook call.
+- **⛔ Still do not extend this to the conic-gradient rings** (`home-nutrition-card.tsx`,
+  `energy-card.tsx`) — gradient-stop interpolation is unreliable and would repaint a masked gradient
+  every frame. Unchanged by this.
+- **Not established:** the Samsung WebView compositor risk `docs/mobile-ui-and-performance.md` warns
+  about for stroke-dash donuts in card grids. This ring is in a hero, not a grid, so it is probably
+  outside that failure mode — "probably" is why the look is owed.
 
 ### [app-shell] RV-75 — sheets take 500 ms to open; the app's own tuned target elsewhere is 180–200 ms
 

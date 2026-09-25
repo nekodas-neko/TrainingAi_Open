@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.56",
+    date: "2026-09-25",
+    changes: [
+      "On the Health screen, the ring around your readiness score now sweeps to its new position as the number counts up, instead of jumping there first.",
+    ],
+  },
+  {
     version: "1.465.55",
     date: "2026-09-25",
     changes: [
