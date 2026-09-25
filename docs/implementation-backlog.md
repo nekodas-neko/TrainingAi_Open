@@ -9387,6 +9387,39 @@ helper the call site calls.
 - **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
   (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the line *"Start from the device console, not from these files"* is stale.** The root cause is in the body (`log-activity-sheet.tsx:27-31` closes, then pushes, with no superseded signal in `sheet-back-stack.ts`). Build that, with DV-2. Do not redo the harness work or the timing/wait-for-pop fix this entry already measured as failing.
+- **Verify: device**
+- **✅ FIXED 2026-09-25 (v1.465.61), with DV-2, one mechanism.** `releaseTopSurfaceEntry()` in
+  `lib/hooks/sheet-back-stack.ts`: the call site hands the top surface's history entry to the
+  navigation **synchronously, before it starts**, so the surface's close pops nothing and there is no
+  window left to mistime. Tied to the surface OBJECT, not a module flag — the distinction BF-34
+  established.
+- **It is TWO halves and the second is not optional.** Suppressing the pop alone strands the sheet's
+  entry underneath `/activity` at `/cardio`'s own URL, so backing out takes two presses with the first
+  visibly doing nothing. `selectType` therefore uses **`router.replace`** when the entry was the
+  sheet's — overwriting it — and `push` when it was not (a surface that opened during one of our own
+  pops skips its push, so the `false` branch is real, not padding).
+- **✅ REPRODUCED AND CONTROL-RUN IN THE HARNESS**, with the two conditions this entry spent three
+  rounds establishing: warm both destinations with a direct `goto`, and hit-test the tap.
+  `e2e/bf165-dv2-navigation-survives-surface-close.spec.ts`. Against the unfixed source: *Other
+  activity → Treadmill* **fails** ("the navigation was undone after it landed"), one-back **fails**,
+  and *Guided walk* — the discriminator, no sheet involved — **passes**. Exactly the split this entry
+  predicted.
+- **`tapHitTested` is now in `e2e/fixtures.ts`**, because the coordinate artifact that produced this
+  entry's fabricated second defect is a trap for any spec below the fold: `touchscreen.tap` dispatches
+  at a coordinate with no scrolling and no actionability check, and `tapInView` filters on **x** only.
+  It scrolls `block: 'center'` and asserts `elementFromPoint` resolves to the control, naming what it
+  would have hit instead.
+- **Sibling swept:** `components/cardio/time-picker-sheet.tsx` `start()`, the identical shape. Its
+  `onLogActivity` arm deliberately does **not** release — it opens another sheet rather than
+  navigating, so the entry stays useful for the surface that replaces this one. **Still COULD NOT
+  CHECK on device:** its trigger renders only `!hasRunningPlan` and the owner has one.
+- **The residue question is answered by the fix, not separately:** `startActivity` still runs before
+  the navigation, and the navigation now lands, so the selection it leaves in
+  `localStorage.ta_activity_state` is correct rather than orphaned.
+- **Keep: the device pass.** On the S25: Cardio → *Other activity* → *Treadmill* lands on the
+  activity screen and stays; one back returns to the Cardio hub. The harness cannot fire the Android
+  back gesture, and the device undoes the navigation **60× faster** than the harness (7 ms vs 415 ms),
+  so the canonical runtime is where the timing claim is actually tested.
 
 ### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
 
@@ -9423,6 +9456,32 @@ helper the call site calls.
   `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
   for 2026-09-23 returned `sessions: []` afterwards.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** cite `mobile-auth-handler.tsx:178/187/196`; ships as one fix with BF-165.
+- **Verify: device**
+- **✅ FIXED 2026-09-25 (v1.465.61), same mechanism as BF-165.** All three `onLeave` handlers now call
+  a shared `leaveScreen()`: release the dialog's entry, then **one** `history.go(-2)`. One call and
+  not two `back()`s, because the surface's pop is not reliably pending when this runs — 7 ms on the
+  device against 415 ms in the harness, which is the trap this entry warned about. Releasing first is
+  what makes the single call cross both entries.
+- **⚠ `go(-2)` was WRONG on a reachable path, found by re-reading the diff rather than by a test, and
+  corrected before merge.** The back handler checks the three session guards **before**
+  `hasOpenSurface()` — deliberately, so a mid-workout back press answers this prompt rather than
+  closing whatever is open — so with a sheet already up (the 1RM calculator, an exercise-stats sheet)
+  the dialog opens **on top of it**. History is then `[…, /workout, sheet, dialog]`, and `go(-2)` from
+  the dialog lands on `/workout`: the screen *Leave* exists to leave. **Releasing an entry does not
+  remove it** — it only stops the surface popping it — so the travel distance is
+  `1 + releaseAllSurfaceEntries()`, counted rather than assumed.
+- **The count, not the stack depth.** `openSurface` skips its push while one of our own pops is in
+  flight, so a surface genuinely can have no entry and going one too far would leave a screen the user
+  never asked to leave. Both mutations of that — returning `stack.length`, and taking only the top —
+  fail a different assertion.
+- **NOT covered by the e2e spec, deliberately and unavoidably.** Reaching this dialog needs the
+  Android system back gesture over a Capacitor channel Playwright cannot fire. What IS covered is the
+  mechanism: `lib/hooks/__tests__/sheet-back-stack.test.ts` drives both releases directly and was
+  mutation-tested five ways (leaking a self-pop, releasing the bottom surface, always returning true,
+  counting the stack depth, counting only the top) — each fails a different assertion. **That is the
+  whole safety net for this half**, which is why the nested case above was worth a pre-merge fix
+  rather than a follow-up entry.
+- **Keep: the device pass test above, unchanged.** It is the only thing that can confirm this half.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 

@@ -419,6 +419,38 @@ export async function tapInView(page: Page, target: Locator): Promise<void> {
 }
 
 /**
+ * Scroll a control into view, prove the tap will land on it, and only then dispatch.
+ *
+ * **`tapCentre` and `tapInView` both manufacture false results below the fold, and BF-165 is the
+ * proof.** `page.touchscreen.tap()` is a raw CDP coordinate dispatch: no actionability check, no
+ * scrolling, and no complaint when the coordinate is outside the viewport. On `/cardio` at 412×915
+ * the three modality controls sit at y=852, 924 and 997 — so *Run* is on screen and the two below it
+ * are not, and their taps hit nothing at all. That read as *"both `/activity*` destinations are dead
+ * and `/running` works"*, a perfect differential pointing at the href, and it produced three rounds
+ * of confident wrong conclusions including one fabricated second defect. It was a coordinate
+ * artifact. `tapInView` does not save you: it filters on **x** only.
+ *
+ * So this scrolls with `block: 'center'` and then asserts `document.elementFromPoint` actually
+ * resolves to the control (or a descendant) before tapping. A tap that would have missed fails here,
+ * naming what it hit, instead of silently doing nothing and being read as a defect.
+ */
+export async function tapHitTested(page: Page, target: Locator): Promise<void> {
+  await expect(target).toBeVisible({ timeout: 30_000 })
+  await target.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }))
+  const box = await stableBox(target)
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  const hit = await target.evaluate((el, [px, py]) => {
+    const at = document.elementFromPoint(px as number, py as number)
+    return { inside: !!at && (at === el || el.contains(at)), tag: at ? `${at.tagName}.${at.className}` : 'null' }
+  }, [x, y])
+  if (!hit.inside) {
+    throw new Error(`the tap at (${Math.round(x)}, ${Math.round(y)}) would land on ${hit.tag}, not the target`)
+  }
+  await page.touchscreen.tap(x, y)
+}
+
+/**
  * Suppress Home's first-open-of-day Morning Check-in prompt (OR-1).
  *
  * It is a **modal** Radix sheet, so while it is open Radix sets `aria-hidden="true"` on `<main>` and

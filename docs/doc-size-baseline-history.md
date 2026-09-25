@@ -17691,3 +17691,26 @@ save* does not.
 
 The three authoritative reads are recorded in the scanner rather than here, with their reasons, which
 is where a future mechanical sweep will actually look.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31515 → 31563 (+48) and `projectOverview.md` 12867 → 12885 (+18), BF-165 / DV-2
+
+Two shipped fixes and one Known-Issues row, and the lines are mostly **negative results being kept**.
+BF-165 had three cheaper fixes built and measured as failing — waiting for the self-pop to drain (the
+counter is 0 when the navigation is issued), reordering the call site (the view transition holds the
+close behind the navigation), and lengthening the navigation cap (a slow dead tap). Recording which
+attempts are already spent is the difference between the next session reading the entry and the next
+session re-spending them; this one nearly re-spent the first.
+
+The `projectOverview.md` row is Canonical-Runtime material by definition: a shipped change that is
+**not** device verified, where the device is the surface that breaks it 60× faster than the harness.
+It carries both pass tests so the sitting is actionable without opening the backlog.
+
+Also kept: why the second half of the fix (`replace` rather than `push`) is not optional, and why the
+`tapHitTested` fixture exists — the coordinate artifact it prevents manufactured a second "dead
+button" that had to be retracted.
+
+**Raised again the same day, for a hole found in the fix before it merged.** `go(-2)` was wrong on a
+reachable path — the back handler raises the leave prompt ON TOP of an already-open sheet, so the
+distance is `1 + <pushed surfaces>`. The correction is worth its lines because the mistake under it is
+easy to repeat: **releasing an entry does not remove it**, so it still has to be travelled. Recorded in
+the entry, the journal and two new unit cases, since no test in this repo can reach that path.
