@@ -17838,3 +17838,13 @@ have 400ed the owner re-saving his own phase set. The entry records that, and re
 possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
 cites the computed code the model currently rewords, which is what makes it buildable without
 re-deriving it.
+
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → 31822 (BF-200, the deload that skipped one exercise)
+
+The owner noticed one deloaded exercise carrying his normal working weight. The four-row table is the
+entry: three exercises land exactly on the round-up of 52% of their last real 1RM and the fourth does
+not, which is what turns "the deload is broken" into "the deload works and this one exercise took a
+different basis". Two mechanisms both produce 30 and the entry refuses to pick between them, so it
+carries both plus the existing `source` field that settles it.
