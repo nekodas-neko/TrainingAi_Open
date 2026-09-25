@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-25 — backlog → BF-92's consent recorded as a runnable device check
+
+The owner approved throwing one deliberate client-side error in production to prove Sentry receives
+it, which was BF-92's entire remaining gate. The growth is the pass test rather than the answer: a
+consent is one word, but "throw an error and see if it arrives" is ambiguous in a way that wastes a
+device sitting, so the entry now states what VERIFIED, FAILED and COULD NOT CHECK each mean here —
+and in particular that **absence of a Sentry event is not evidence of anything, because absence is
+the symptom under investigation**.
+
+Also records that the probe must be labelled recognisably. It creates a real event in a real project,
+and the reason nobody had just done it was the note that it might page someone.
+
 ## 2026-09-25 — backlog → 32046 (OR-145's gate triage reduced from seven questions to four)
 
 Net +2 lines, and the reason it is only +2 is the point: three of the seven items were **removed**
