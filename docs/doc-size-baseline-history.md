@@ -17796,3 +17796,9 @@ different conflict target with no direct test of its own — so the coverage was
 path instead of deleted. The `Keep:` also now states plainly that **none** of the four remaining
 groups has been re-verified, since three of this entry's claims have already turned out stale or
 backwards and the next session should not assume otherwise.
+
+**2026-09-25 · `docs/implementation-backlog.md` · Review sweep 61, `review/sweep-61-ai-to-logic`.**
+31760 → 31840 (+80). Five entries (RV-200 to RV-204) at the owner's request to move AI calls to logic where
+possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
+cites the computed code the model currently rewords, which is what makes it buildable without
+re-deriving it.
