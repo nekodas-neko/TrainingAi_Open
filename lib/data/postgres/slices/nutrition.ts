@@ -297,7 +297,13 @@ export async function createFoodItem(
       .onConflictDoNothing({ target: s.foodItems.id })
       .returning()
     if (inserted) return rowToFoodItem(inserted)
-    const [existing] = await db.select().from(s.foodItems).where(eq(s.foodItems.id, id))
+    // The id comes from the CLIENT, so a conflict means either this caller's own row — the
+    // idempotent outbox retry this branch exists for — or somebody else's. Scoped on `userId`
+    // because the unscoped read handed the second case back to the caller: another user's food
+    // item, name and macros included, for the cost of guessing a uuid (RV-177).
+    const [existing] = await db.select().from(s.foodItems)
+      .where(and(eq(s.foodItems.id, id), eq(s.foodItems.userId, userId)))
+    if (!existing) throw new UserFacingError('That food item id is already taken.', 409)
     return rowToFoodItem(existing)
   }
   if (opts.reuseExisting) {
