@@ -435,6 +435,16 @@ body {
   }
 }
 
+/* RV-74: the health hero's ring, eased to match its own number. `useCountUp` animates the digits
+   over 600 ms with `1 - (1-t)^3`; the arc set `strokeDashoffset` inline with no transition, so it
+   was already parked at its final position while the number was still counting — an inconsistency
+   inside one component, on the app's most prominent element.
+   `cubic-bezier(0.333, 1, 0.667, 1)` is not a taste call: it is the EXACT CSS form of that cubic
+   ease-out (x(t) = t, y(t) = 1-(1-t)^3, verified to 1e-16), so ring and number share one curve as
+   well as one duration. Matching only the duration leaves the ring 11 points of progress behind the
+   digits at the halfway mark, which still reads as two gestures. */
+.score-ring { transition: stroke-dashoffset 600ms cubic-bezier(0.333, 1, 0.667, 1); }
+
 /* W2: border-run animation for active set indicator (uses pathLength=1000 normalisation) */
 @keyframes border-run {
   from { stroke-dashoffset: 1000; }
@@ -530,6 +540,7 @@ body {
   .pr-pulse-badge,
   .shimmer-sweep::after { animation: none !important; }
   .border-run { animation: none !important; stroke-dashoffset: 0 !important; }
+  .score-ring { transition: none !important; }
   .content-fade-in { animation: none !important; }
 }
 .shimmer-sweep::after {
