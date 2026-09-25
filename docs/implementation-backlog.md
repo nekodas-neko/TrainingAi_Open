@@ -904,6 +904,27 @@ the Orchestrator's to do.
   the profile's component names are minified. Finding which charts render inside a tab panel is a grep
   in `components/shell/**` and the tab screens; the suspect is already named — a responsive resize
   when a panel leaves `content-visibility: hidden`.
+- **✅ THE SOURCE HALF IS ANSWERED (Lane B, 2026-09-25), so the `Gate: device` is now the thing to argue
+  about rather than the mechanism.** The suspect is confirmed from source: **20 chart components set
+  `responsive: true` and NONE sets `resizeDelay`** (`grep -rn 'responsive: true' components/`), and
+  `tab-shell.tsx:209` puts `[content-visibility:hidden]` on the outgoing panel and takes it off the
+  incoming one — so **both** panels' canvases change size on every tap and each `responsive` chart gets a
+  ResizeObserver callback → `update → _tickSize → _computeLabelSizes → set font`. That is the profiled
+  chain, and it explains why it fires on *every* tap rather than only on the Health tab.
+- **⚠ AND A MEASUREMENT THAT CUTS AGAINST A CHART-ONLY FIX — take this before building one.** Driving tab
+  taps in the Playwright harness with a `PerformanceObserver('longtask')`: **216, 228, 465, 91, 235 ms**
+  on successive switches with **zero `<canvas>` elements on the page at all** (`canvasTotal: 0` — the
+  seeded e2e user has no chart data). So a large main-thread cost on tab switch exists **independently of
+  chart.js**, and a fix aimed only at the charts may not move the owner's number.
+  **What that measurement is NOT:** it is `next dev` (unminified, React dev mode, on-demand compilation)
+  against an unseeded user, so the absolute figures do not transfer to the APK and it cannot test the
+  chart hypothesis at all — there are no charts to resize. It is evidence about the *residual*, not about
+  the lead. **Reproducing the chart half here needs a seeded user with chart data**, which is the next
+  concrete step and is a fixture change, not a device sitting.
+- **So the fix has no obvious home yet, and that is a real finding:** there is no shared chart-options
+  module (`packages/shared/src/chart-colors.ts` is colours only), so `resizeDelay` is either 20 call sites
+  or a new shared helper — and a helper under `components/` is Lane B's while one under `packages/shared/`
+  is Lane A's. Decide that in the implementing PR, with the measurement above in hand.
   Superseded field, demoted to prose so it cannot route this entry: it read *“Lane DV —
   re-channelled from `B` by Lane B, 2026-09-23. The fix will be Lane B's; the next ACTION is not.”* This entry's own "Not established" line says what it needs: a CPU profile of one
   tap, to name the component that dominates the task. That is a measurement nobody has taken, with
@@ -3571,6 +3592,82 @@ drift.
   " of work" spends width ahead of the segments after it (`Phase transition suggested`,
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
+
+### [workouts] BF-199 — the prescription barely uses the model it is named after: sets are always clamped, reps/pct follow a table, and rest is the only free output and it is noise
+- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`, `app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`.
+- **Added:** 2026-09-26 · BugFix intake. Owner: *"Prescription uses ai right? Do we NEED ai for this? Can we do this through logic so its easy to prescribe and represcribe"*
+- **Needs:** — nothing. **Wants a plan doc before implementation** (`docs/superpowers/plans/`), per the backlog-driven protocol; this entry is the measurement, not the design.
+
+- **Short answer: no, and most of it is already logic.** There is exactly **one** model call in the
+  whole pipeline (`generateObject`, `generate-prescription.ts:304`). Everything around it —
+  `reconcilePrescription`, `applyRoleSetPlausibility`, `fitToBudget`/`dropToBudget`/`expandToBudget`,
+  the role floors — is deterministic TypeScript, and **the deload path makes a complete, valid
+  prescription with no model call at all.** The app already contains a working non-AI prescriber; it
+  runs whenever a deload is recommended.
+
+- **Measured: what the model actually contributes.** All 33 distinct `(sets, reps, pct, rest)` tuples
+  across every stored prescription (`session_periodization`):
+
+  | output | what production shows | whose number is it |
+  |---|---|---|
+  | **sets** | **2 in all 33 tuples, without exception** | **not the model's.** `fitToBudget` clamps to its floor of 2 because the budget is binding (BF-197). The model's set count never survives. |
+  | **reps + pct** | a tight curve: 12→66, 11→68, 10→70.5, 9→72.5, 8→75, 7→76–77.5, 6→80, 4→88, 3→88 — about **+2.25 % per rep fewer** | **a lookup table.** `progression_styles`/`style_sets` already stores `pct`, `reps` and `rest_sec` per set, which is the same four fields the prescription emits. |
+  | **rest** | **23 distinct values from 68 s to 300 s** — 76, 97, 101, 109, 128, 139, 143, 161, 187, 189 | **the model's, and the only genuinely free one.** The styles say 60 / 90 / 120 / 130 / 180. A coach does not prescribe 143 seconds. |
+
+  So the one quantity the model controls end-to-end is the one that looks wrong, and the two that
+  look right are reproducible from a table the database already holds.
+
+- **⚠ The honest counter-argument, which this entry does NOT overstate.** Reliability is **not**
+  currently a problem: `ai_call_log` shows **35 prescription calls, 35 `ok`, zero failures**, averaging
+  **2.1 s** and **3,645 tokens**. The structural risk is real — the route has **no fallback**, so a
+  failure returns `502 'AI generation failed'` and the lifter gets no plan at all (`:311`) — but it has
+  not bitten yet, and *"the AI keeps failing"* is not an argument available here. The case rests on
+  what the model adds, not on it breaking.
+
+- **⭐ Recommend: move the numbers to deterministic rules, keep the model for the prose.** The
+  `reasoning` string is genuinely generative and is the part worth an LLM; the four numbers are not.
+  Concretely: a rep→%1RM table (the curve above, already implicit in the output), the existing
+  style/role values, and the budget fitter that is already authoritative for set count.
+- **What that buys, in the owner's own terms — *"easy to prescribe and represcribe"*:**
+  - **Represcribing becomes instant, offline and free** — no 2.1 s round trip, no token spend, no rate
+    limit, no 502 path, and it works in the low-reception case BF-195 is about.
+  - **`Full` stops being a dead toggle outright.** BF-198 exists because the override needs numbers the
+    session-level deload never recorded; under a rules engine the full prescription is a **pure
+    function of the same inputs**, so "give me today at full intensity" is a re-evaluation rather than
+    a stored-state problem. **BF-198's fix and this change are the same idea at two sizes.**
+  - **It becomes testable and diffable.** A scoring or sizing change could be replayed over months of
+    history to state how many sessions it moves — which is exactly the evidence **BF-189** needs and
+    cannot get today, because the current generator is non-deterministic by construction.
+- **Alternatives, with what each is better at:**
+  - **Keep the model and constrain it harder** (enumerate rest to 60/90/120/180 in the schema). Better
+    at preserving whatever adaptive judgement it brings, and it is a one-schema change. It loses on the
+    owner's actual ask — it is still a network round trip, so representcribing stays slow, online-only
+    and fallible.
+  - **Rules engine with the model as an advisory second opinion** (numbers from logic; the model may
+    flag *"this looks too hard given readiness"*). Better if his trust in adaptation is the point. It
+    loses on complexity: two sources for one number is the shape **One Formula, One Place** exists to
+    prevent, and it keeps the network dependency.
+  - **Leave it.** Cheapest today. It loses because BF-198, BF-189 and the represcribe cost are all
+    downstream of the same non-determinism.
+- **Reversal cost: moderate, and one-way in practice.** The rules path can sit behind the existing
+  route and be compared against stored prescriptions before anything switches — but once the lifter is
+  used to instant represcribing, going back to a 2 s round trip will read as a regression.
+
+- **⚑ ONE PART IS NOT AN ENGINEERING CALL AND MUST NOT BE DECIDED BY A LANE: the rep→%1RM table
+  values.** Those are the loads he trains at, so they are calibration — **Tuning proposes, the owner
+  signs**, per the standing rule that Tuning never ships a scoring change. The *architecture* is the
+  lane's; the *numbers in the table* are not. A proposal is incomplete until it states how many of his
+  past sessions the table would have changed.
+- **Not diagnosed here.** What the model contributes to **phase** decisions
+  (`accumulation`/`intensification`/`deload`, `phaseAction`) as opposed to the four per-exercise
+  numbers — `reconcilePrescription` already resolves a "stay" response and the phase is largely
+  schedule- and volume-driven, but nobody has measured how often the model's phase survives
+  reconciliation. That measurement belongs in the plan doc, because a phase engine is the one part
+  that might genuinely want judgement.
+- **Verification:** a rules-generated prescription reproduces the stored `sets`/`reps`/`pct` of past
+  prescriptions within a stated tolerance across his history; rest lands on the style's own values
+  rather than arbitrary seconds; representcribing makes no network call and works offline; and the
+  `reasoning` prose still renders.
 
 ### [workouts] BF-198 — `Full` cannot override a WHOLE-SESSION deload, and the card's stated remedy does not exist
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts` (the session-level deload builder).
