@@ -17341,3 +17341,38 @@ The remaining length is two things a future session would otherwise undo: **`str
 purpose** (main moves faster than CI completes, so requiring a current base can livelock — seven
 re-merges on one PR the day before), and **the empty bypass list means a broken CI cannot be fixed**
 without temporarily adding one, which is stated rather than pre-configured.
+
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31159 (+7 after two rebases, net of RV-122 leaving)
+
+`LB-151` arrived and `RV-122` left in the same PR, so the file grew by four lines rather than by the
+entry's full length.
+
+The entry is the length it is because of one paragraph that is not a finding: **what it does not
+establish.** `pushMutations` having no in-flight guard is measured and certain; whether two
+overlapping drains actually double-*write* is not, because the per-domain handlers may be upserts.
+Those are a correctness bug and a bandwidth annoyance respectively, and the entry has to be readable
+by someone who picks it up cold without collapsing the second into the first. Cutting that paragraph
+would leave a confident-sounding entry that overstates what was measured, which is the failure mode
+this queue has been correcting all week.
+
+One pass of tightening was done first and bought a single line; the rest is load-bearing.
+
+The number moved twice more while this PR waited: #1609 and then #1611 each raised the same
+baseline, so the `.size` file conflicted on a value neither branch was wrong about. Recomputed from
+the merged file each time rather than picking a side — two PRs raising the same document is the one
+conflict in this file that is a genuine disagreement rather than two independent additions.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31159 → 31173 (+14)
+
+`LB-152` — the RV-99 migration turned out to be a visible app-wide restyle rather than a refactor
+(green moves 67 in sRGB on screens the owner reads daily), so it is his call rather than Lane B's.
+
+Long for its size because an owner question is only answerable if the entry carries the numbers: a
+three-row table of what each colour is today and becomes, and three answers that each unblock it —
+including retuning the token to today's hex first, which gets the same single-source benefit with no
+visual change. Without those he would have to re-derive the measurement to answer, which is the
+thing the entry exists to spare him.
+
+RV-99 itself also gained the measurement (116 occurrences across 48 files, and which of the four
+must-not-touch files are even in Lane B's paths) so the next session does not repeat it.

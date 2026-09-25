@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useGuardedAction } from '@/lib/hooks/use-guarded-action';
 import { getLocalStore } from '@/lib/local-store';
 import { pushMutations } from '@/lib/local-store/sync-engine';
 import { setDeadLetterCount } from '@/lib/local-store/dead-letter-signal';
@@ -9,6 +10,9 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility";
+
+/** Sentinel for `busyId` while the batch retry runs, so every button on the card disables. */
+const RETRY_ALL = '__all__';
 
 const DOMAIN_LABELS: Record<PendingMutation['domain'], string> = {
   body_metrics:    'Body metrics',
@@ -73,6 +77,32 @@ export function SyncHealthCard({ userId }: { userId?: string }) {
     }
   }, [userId, refresh]);
 
+  // RV-122. The entry asked for the `/more/data` "Sync now" button to be promoted onto this card,
+  // on the reading that it is what clears these. It is not: that button calls `pullDelta`, which
+  // never pushes. Even a push is not enough on its own — a dead-lettered row stays dead until
+  // `retryFailedMutation` resets it — so the per-item Retry was genuinely the only thing that could
+  // clear this card, which is the complaint. This is that, for all of them, in one tap.
+  //
+  // One `pushMutations` for the whole batch, not one per row: N taps of Retry sends N pushes.
+  const handleRetryAll = useGuardedAction(async () => {
+    const store = userId ? getLocalStore(userId) : null;
+    if (!store) return;
+    setBusyId(RETRY_ALL);
+    try {
+      const rows = await store.getFailedMutations(userId!);
+      for (const m of rows) await store.retryFailedMutation(m.id);
+      await pushMutations(userId!);
+      await refresh();
+      const stillFailed = await store.getFailedMutations(userId!);
+      if (stillFailed.length === 0) toast.success('Synced');
+      else if (stillFailed.length < rows.length) {
+        toast.warning(`${rows.length - stillFailed.length} synced, ${stillFailed.length} still failing`);
+      } else toast.error('Still failing — see the errors below');
+    } finally {
+      setBusyId(null);
+    }
+  }, () => { setBusyId(null); toast.error('Retry failed'); });
+
   const handleDiscard = useCallback(async (id: string) => {
     const store = userId ? getLocalStore(userId) : null;
     if (!store) return;
@@ -118,17 +148,24 @@ export function SyncHealthCard({ userId }: { userId?: string }) {
             </div>
             <div className="mt-1.5 flex gap-2">
               <Button size="sm" variant="secondary" className="h-8 flex-1"
-                      disabled={busyId === m.id} onClick={() => handleRetry(m.id)}>
+                      disabled={busyId !== null} onClick={() => handleRetry(m.id)}>
                 Retry
               </Button>
               <Button size="sm" variant="ghost" className="h-8 flex-1 text-destructive"
-                      onClick={() => handleDiscard(m.id)}>
+                      disabled={busyId !== null} onClick={() => handleDiscard(m.id)}>
                 Discard
               </Button>
             </div>
           </li>
         ))}
       </ul>
+      {failed.length > 1 && (
+        <Button size="sm" className="mt-2 h-9 w-full" disabled={busyId !== null}
+                onClick={() => void handleRetryAll()}>
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${busyId === RETRY_ALL ? 'animate-spin' : ''}`} aria-hidden />
+          Retry all {failed.length}
+        </Button>
+      )}
     </div>
   );
 }

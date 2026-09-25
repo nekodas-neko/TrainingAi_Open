@@ -478,6 +478,45 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-166 — `googleapis` is 203 MB for one `google.calendar()` call
+
+- **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency
+  audit, prompted by an external contributor's view that CI is too slow.
+- **Measured 2026-09-25:** `googleapis@172` installs **203 MB** and is imported by exactly **one**
+  file — `import { google } from "googleapis"` — plus a `vi.mock` of it in one test. It is the second
+  heaviest package in the tree after `onnxruntime-node`.
+- **Why it costs more than disk.** Next traces the import graph for the server bundle, so the whole
+  package is walked on every build even though one client is used. Build is the second-longest job
+  and becomes the critical path once `OR-165`'s test sharding lands.
+- **Fix:** swap to the scoped `@googleapis/calendar`, which is the same generated client for one API.
+  The call site changes from `google.calendar({ version: 'v3', auth })` to that package's equivalent,
+  and the test's `vi.mock('googleapis', …)` moves with it.
+- **⚠ Not a drive-by, which is why this is an entry and not a commit.** The route creates calendar
+  events with the owner's OAuth refresh token — a working integration with a credential path, and
+  `docs/environment-variables.md` names its vars. **Verify an event is actually created end to end**,
+  not that the route returns 200.
+- **Not established:** how much build time this actually returns. The 203 MB is measured; the saving
+  is not, and it should be stated as a before/after rather than assumed.
+
+### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
+
+- **Lane: B** · **Added:** 2026-09-25 · OR-165's dependency audit.
+- **Gate: owner** — it changes icons on screens he uses during a run, so the look is his call and
+  not a lane's.
+- **Measured 2026-09-25:** `lucide-react` (**43 MB**) is imported by **270** files;
+  `@phosphor-icons/react` (**41 MB**) by **six**, for five icons — `HeartIcon`, `PauseIcon`,
+  `PlayIcon`, `StopIcon`, `FootprintsIcon` — all in the activity and run screens
+  (`components/activity/**`).
+- **Proposal:** move those five onto lucide (`Heart`, `Pause`, `Play`, `Square`, `Footprints`) and
+  drop the dependency. Two icon sets in one app is also a consistency problem independent of size.
+- **⚠ THE OWNER SEES THESE ICONS DURING A RUN, so this is a look change, not a cleanup.** Phosphor
+  and lucide draw the same concepts differently — weight, corner radius, the foot shape. **Show a
+  before/after at 384 px dark before building it**, per CLAUDE.md's mockup rule.
+- **Do not fold this into an unrelated PR.** A silent icon swap on a daily screen is exactly the
+  change that gets noticed and resented afterwards.
+- **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
+  `Footprints`, unchecked against the current glyph.
+
 ### [platform] OR-150 — fifteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
@@ -5426,19 +5465,23 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
 
-### [platform][app-shell] RV-122 — the sync-failure card cannot trigger the sync that clears it
+### [platform] LB-151 — `pushMutations` has no in-flight guard, and several surfaces can call it at once
 
-- **Lane:** B — `components/more/sync-health-card.tsx:85`,
-  `components/more/data-sync-panel.tsx`. **Added:** 2026-09-22 · Review sweep 53.
-- The More tab's nav dot points at the sync-failure card, which lists pending and dead-lettered
-  mutations with a per-item retry. The global **"Sync now"** that usually clears them is one tap
-  deeper at `/more/data`. One task, two screens.
-- **Fix:** render "Sync now" on the failure card (or `DataSyncPanel` beneath it) when it is non-null.
-- **Keep it scoped — this is promoting one button, not merging a screen.** Restore and Export stay at
-  `/more/data`: they are rare and destructive-adjacent and do not belong on a card that appears
-  unprompted.
-- **Watch:** do not double-fire against `PullToSync`'s `handlePullSync` on the same screen.
-
+- **Lane: A** — `lib/local-store/sync-engine.ts` (Lane B found it while shipping RV-122).
+- **Added:** 2026-09-25 · from RV-122's *"do not double-fire against `handlePullSync`"* note, which
+  turned out to describe a gap in the engine rather than in the card.
+- **Measured:** `pushMutations` (`sync-engine.ts:839`) holds **no concurrency guard** — the only
+  gate is `push5xxUntil`, a server-error backoff — so two overlapping calls both drain the outbox.
+  Eleven call sites reach it (`more-content.tsx:118`, `sync-provider.tsx:165`/`:220`,
+  `push-then-revalidate.ts:33`, `sync-health-card.tsx`, per-domain writes); the More tab alone has
+  two on one screen, the pull gesture and the card.
+- **⚠ NOT established, and must be before this is sized:** whether a double drain actually
+  double-WRITES. The push endpoint shows no dedup on a mutation id, but the per-domain handlers may
+  be upserts, which makes it wasteful rather than wrong. **Read a couple of the domain writers
+  first** — that decides whether this is a correctness bug or a bandwidth one.
+- **RV-122 slightly improves it:** "Retry all" sends one push for N failures where N taps sent N.
+- **Fix if real:** a module-level in-flight promise later callers await, the shape `cachedFetch`'s
+  in-flight map already uses for reads.
 
 ### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
 
