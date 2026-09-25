@@ -17571,3 +17571,16 @@ replaces because it carries its exact `UPDATE` and a `Gate: owner`, which is the
 writes production rows, so it has to be startable by whoever picks it up without re-deriving the
 statement. Trimmed from 21 lines to 16 before raising the number rather than banking the whole of
 the first draft.
+
+## 2026-09-25 — `docs/implementation-backlog.md` shrinks (LA-141 queue entry removed)
+
+LA-141 shipped in #1625 and its queue entry was never removed — it was filed and built in the same
+PR, and only the removal was missed. It carried no `Keep:` and no `STILL OPEN`, so
+`node scripts/next-item.js --lane A` kept offering finished work as READY at position 23. Its
+content is not lost: the Q-139 history, the 16,144 ds round-trip error, the nine adapter call sites
+and the fixture-that-could-not-fail lesson are all in
+`docs/overview/entries/2026-09-25-la141-clock-inverse.md`, checked line by line before deleting.
+
+Its two queue neighbours, RV-181 and RV-182, were checked at the same time and **stay** — each
+carries inline unfinished work (RV-181's memo and `/api/health/trends`; RV-182's
+`oura_heartrate_pkey` drop), which is what the retention rule is for.
