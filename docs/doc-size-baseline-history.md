@@ -17527,3 +17527,20 @@ concluded the item was stale.
 The rest of the delta is the measurement (628,197 inserts and 574,974 deletes against 140,181 live
 rows, 95 updates) and one line keeping `oura_heartrate_pkey` — 7 MB, 0 scans — on the record, since
 dropping a primary key is a migration and ships alone.
+
+## 2026-09-25 — `docs/implementation-backlog.md` → 31340 (LA-142 correction)
+
+Five lines, and every one is the retraction.
+
+LA-142 was filed an hour earlier claiming six derived columns had no writer, two of them read by
+live surfaces. Four is the right number: `app/api/training-stress/route.ts:89` writes
+`training_load_ots` and `training_load_high` on its success branch, and the repo-wide grep behind
+the original claim truncated per column and never surfaced that file.
+
+The five lines buy the thing a silent edit would lose: that the user-visible symptom is real —
+the weekly digest's `otsHigh` is permanently false, the AI chat tool permanently empty — but its
+cause is the route's gate never reaching `ok`, which **TN-79 is already open for**. Without that
+sentence the next reader adds a writer to a column that has one, and TN-79 keeps looking unrelated.
+
+An entry filed to describe "measured the wrong thing" made that mistake within the hour, so the
+correction is worth more than the original finding.

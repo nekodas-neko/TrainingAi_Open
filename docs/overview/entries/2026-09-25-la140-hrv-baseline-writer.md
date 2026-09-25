@@ -43,14 +43,26 @@ implying the fix unblocked it.
 Rather than assume this column was alone, I asked production how many `oura_daily_derived` columns
 are NULL on every row: **eleven**. All-NULL is not proof of a missing writer — `chronic_stress_*` is
 gated on 21 complete nights by its own model, `recovery_index_hours` writes from `run.ts:561` — so
-each was checked against the code. **Six have no writer at all**, and two of those six are **read by
-live surfaces**: `weekly-digest` computes `otsHigh` from `trainingLoadHigh` (permanently false) and
-the AI chat `trainingStress` tool filters on `trainingLoadOts != null` (always an empty array).
-Neither fails; both quietly report nothing to say.
+each was checked against the code. **Four have no writer at all**: `active_calories_est`, `pwv`,
+`worn_hours_ble`, and the derived `vascular_age` (distinct from `oura_daily.vascular_age`, a
+different table that is written). None has a reader either, so deleting them and their plumbing is
+probably right — a migration plus a local SQLite version bump, so it ships alone. Filed as
+**LA-142**.
 
-That is LA-140's trap with consumers attached, and it is filed as **LA-142** rather than folded in
-here — the work is a per-column judgement (persist or delete) exactly as this one was, and six of
-them in one diff would be a sweep that decided nothing.
+> **⚠ Corrected 2026-09-25, after this entry was first written.** It said **six** columns had no
+> writer, and that two of them — `training_load_ots` and `training_load_high` — were read by live
+> surfaces, making them LA-140's trap with consumers attached.
+> **`app/api/training-stress/route.ts:89` writes both**, on its success branch. The repo-wide grep
+> behind that claim truncated its output per column and never surfaced the file.
+>
+> The symptom I described is real: both columns are all-NULL, so `weekly-digest`'s `otsHigh` is
+> permanently false and the AI chat's `trainingStress` tool always returns an empty array. But the
+> cause is that the route's gate never reaches `ok` and persists a reason instead — **TN-79's
+> subject, already open** — not a missing writer. Fixing the gate fills the columns.
+>
+> Recorded here rather than quietly edited, because the original claim shipped in this PR's body and
+> the wrong half is the interesting half: an entry filed to describe "measured the wrong thing"
+> made that exact mistake within the hour.
 
 ## Verification
 
