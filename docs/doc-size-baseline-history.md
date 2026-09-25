@@ -17146,3 +17146,19 @@ Not a deliberate raise: two branches added Known-Issues rows to the same documen
 `.size` conflicted on a single number. Recomputed with `--fix` on the merged file rather than taking
 either side — picking one would have encoded a count that matches neither branch's reality, and the
 check would then fail on `main` for whoever merged second.
+
+## 2026-09-24 — `docs/implementation-backlog.md` 30487 → 30520 (TN-70 verification)
+
+Thirty-three lines on TN-70, and the reason they are worth it is that most of them stop work rather
+than describe it.
+
+The entry asked for a rollup re-run. The verification narrowed that to a single stored index and
+showed why it dominates (a `.pt`-faithful broadcast makes sleep recovery ~14× the other recovery
+term), which turns an open-ended re-run into a specific question about one input. It also records
+that the level-5 run carries the series' *worst* stress and restorative time — the fact that makes
+the regime look like an error rather than a change.
+
+The largest block is a trap. Three contributors are gated inconsistently on `provisional`, and the
+doc comment appeared to confirm the odd one out was a bug. It is not: recoveryIndex is flagged
+provisional on every day by design, so "fixing" the asymmetry would disable the contributor
+permanently. Writing that down is cheaper than the next session rediscovering it by shipping it.
