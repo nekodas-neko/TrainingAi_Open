@@ -13,7 +13,7 @@
 // and says the things it has to. An eleventh route added without either constant is what this
 // catches.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { PROSE_GUARDS, PROSE_FIELD_GUARDS, METRIC_UNITS_RULE, NO_SUPERLATIVE_RULE, QUOTE_NUMBERS_RULE } from '../prompt-guards'
 
@@ -91,5 +91,63 @@ describe('the two guard sets differ only where they have to', () => {
     // once, silently, in a way only a model run would show.
     expect(PROSE_GUARDS).toContain(QUOTE_NUMBERS_RULE)
     expect(PROSE_FIELD_GUARDS).not.toContain(QUOTE_NUMBERS_RULE)
+  })
+})
+
+// RV-173 — the list above is hand-written, and Coach was not on it for as long as Coach existed.
+// It streams free prose about the owner's own numbers and carried none of the guards, while its
+// docstring still claimed "no user-facing entry point yet" — `app/coach/coach-content.tsx` has
+// driven it the whole time. A list cannot notice a route nobody adds to it, so this block DISCOVERS
+// them instead: anything that calls a prose generator must be able to reach the guards.
+//
+// `generateObject` is deliberately not a prose generator here. It returns structured data against a
+// schema, and its routes carry PROSE_FIELD_GUARDS only where a user-facing text field is in the
+// object — which the explicit list above already covers.
+const PROSE_CALL = /\b(loggedStreamText|streamText|generateText)\s*\(/
+
+/** Comments discuss these very identifiers, so a raw scan matches its own prose. */
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+function routeFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${e.name}`
+    if (e.isDirectory()) { if (e.name !== '__tests__') out.push(...routeFiles(rel)) }
+    else if (e.name === 'route.ts') out.push(rel)
+  }
+  return out
+}
+
+/** The guards may live in a sibling the route imports — health-insight builds its prompt in ./prompt. */
+/** The INTERPOLATION, not the identifier: an import that is never spliced into a prompt is a
+ *  route with no guards and a tidy import list. Matching the bare name let that pass. */
+const interpolates = (src: string) =>
+  src.includes('${PROSE_GUARDS}') || src.includes('${PROSE_FIELD_GUARDS}')
+
+function reachesGuards(rel: string): boolean {
+  const src = stripComments(read(rel))
+  if (interpolates(src)) return true
+  const dir = rel.slice(0, rel.lastIndexOf('/'))
+  for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
+    for (const ext of ['.ts', '.tsx', '/index.ts']) {
+      const cand = join(root, dir, m[1] + ext)
+      if (existsSync(cand)) {
+        if (interpolates(stripComments(readFileSync(cand, 'utf8')))) return true
+      }
+    }
+  }
+  return false
+}
+
+describe('every route that writes prose can reach the guards (RV-173)', () => {
+  const prose = routeFiles('app/api').filter(f => PROSE_CALL.test(stripComments(read(f))))
+
+  it('finds the prose routes at all — a scan that matches nothing would pass silently', () => {
+    expect(prose.length).toBeGreaterThanOrEqual(7)
+  })
+
+  it.each(prose)('%s reaches PROSE_GUARDS or PROSE_FIELD_GUARDS', rel => {
+    expect(reachesGuards(rel), `${rel} streams prose about the owner's data with no guards`).toBe(true)
   })
 })

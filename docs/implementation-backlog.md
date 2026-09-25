@@ -2370,6 +2370,22 @@ volume7dKg,                             // likewise
 - **This is TN-62's shape on a second metric**, and the lesson generalises: a `MODEL_VERSION` bump plus a
   write path that only touches today produces a history that silently mixes models. Worth checking for
   wherever else a versioned score is persisted per-day.
+- **⚙ SCOPED 2026-09-25 (Lane A) — the recommendation is right and it is NOT the small job the
+  comparison implies. Read this before picking it up.**
+  - **`backfill-derived-scores` is a poor template for effort.** Its scores were already computed by
+    a function it could call. Body Battery's are not: `walkBodyBattery` is importable, but its
+    inputs — `anchor`, `wakeTime`, `restingHr`, `reserve`, `stressAt` — are produced across ~200
+    lines of `app/api/body-battery/route.ts` with repo calls interleaved
+    (`getOuraDailyDerived`, `getDaytimeHrvModel`, the HR fetch). **The prerequisite is extracting
+    the route's per-day computation into something callable for an arbitrary date.** Duplicating it
+    in the backfill is not an option — One Formula, One Place.
+  - **Verified while scoping:** `upsertBodyBatteryDaily` does have exactly one caller
+    (`route.ts:385`) and it does hardcode `date: todayIso`. The entry is right about the mechanism.
+  - **⚠ But "zero v6 rows exist" is now STALE — the heal-forward has started.** Measured
+    2026-09-25: **v1** 16 days (mean end 66.3) · **v2** 1 · **v4** 18 (62.9) · **v5** 51 (**15.5**,
+    **26 at zero**, to 09-23) · **v6** **2 days** (40.0, 0 at zero, 09-24→09-25). So the step is no
+    longer hypothetical: it sits between 09-23 and 09-24 in the stored data, and TN-55's
+    distributional acceptance test now has two v6 days to start measuring against rather than none.
 - **Recommendation: a bounded admin re-derive for `body_battery_daily`, same shape as
   `backfill-derived-scores`.** It already exists as a pattern for exactly this problem — page-limited,
   dry-run by default, recomputing through the live functions rather than restating the formula. The
@@ -4172,19 +4188,6 @@ drift.
   - The day-strip changes shape at 09-17.
 - **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
   recompute from stored inputs (RV-170).
-
-### [app-shell][platform] RV-173 — the Coach streams prose about the owner's data without PROSE_GUARDS, and the test that enforces it misses it
-
-- **Lane: A** — `app/api/coach/route.ts`, `lib/ai/__tests__/prose-guards.test.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **The gap:** Coach streams free prose through `loggedStreamText` (`:218`), and its SYSTEM prompt
-  (`:44`) carries none of the guards: quote the given numbers, no superlatives, metric units only.
-  Q-292's failures (Fahrenheit, *"perfect"*) can come back there.
-- **Why no test caught it:** `prose-guards.test.ts:25-40` is a hand-written list of 10 routes, and
-  Coach is not on it. The route's own docstring (`:181`) still says *"no user-facing entry point
-  yet"*, but `app/coach/coach-content.tsx:51` drives it.
-- **Fix:** add the guards and the route. Better, make the test discover prose routes by their
-  `loggedStreamText`/`generateText` import rather than by list.
 
 ### [heart-rate][platform] RV-181 — the HR profile pulls 90 days of raw heart rate to compute three numbers: 51% of all database time
 

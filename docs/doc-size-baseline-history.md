@@ -17311,7 +17311,21 @@ it — the analysis took a PR of its own.
 script evaluation matters at cold start", and RV-186 is the unrun device baseline, so it was
 self-describing as blocked while printing as ready.
 
-## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31156 (+4, net of RV-122 leaving)
+## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31155 (RV-173 + TN-72 scoping)
+
+Three lines, and the interesting part is why this needed a second round.
+
+RV-173's entry was REMOVED (it shipped in full), and TN-72 gained a scoping note explaining that its
+"bounded admin re-derive" needs the body-battery route's per-day computation extracted first — that
+precedent could call an existing function, this one cannot. Net +3.
+
+The baseline moved twice because CI builds a PR against **live `main`**, not the base the branch
+merged. Two other PRs grew the backlog between the local run and the CI run, so a locally-clean
+ratchet failed on a number neither branch was wrong about. Recomputed against the newest main rather
+than argued with.
+
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31159 (+7 after two rebases, net of RV-122 leaving)
 
 `LB-151` arrived and `RV-122` left in the same PR, so the file grew by four lines rather than by the
 entry's full length.
@@ -17325,3 +17339,8 @@ would leave a confident-sounding entry that overstates what was measured, which 
 this queue has been correcting all week.
 
 One pass of tightening was done first and bought a single line; the rest is load-bearing.
+
+The number moved twice more while this PR waited: #1609 and then #1611 each raised the same
+baseline, so the `.size` file conflicted on a value neither branch was wrong about. Recomputed from
+the merged file each time rather than picking a side — two PRs raising the same document is the one
+conflict in this file that is a genuine disagreement rather than two independent additions.
