@@ -17269,3 +17269,18 @@ LA-140 is the dead `night_hrv_baseline_ms` column. Its value is not the null its
 nothing, but the inference the null invites: the resilience model gates on that exact field being
 non-null. The entry records that trap explicitly, and that both closing moves — persist it, or
 delete the plumbing — are real options rather than one obvious fix.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31082 → 31102 (LA-138 corrected)
+
+Twenty lines, and they buy a retraction that is worth more than the entry was.
+
+LA-138 was filed yesterday claiming `program_phases` was empty for every program. It is not — 46
+rows across 8 phase sets, 8 of them deload phases. The zero came from joining on `program_id`, a
+legacy column that is NULL on all 46 rows since phases moved under `phase_set_id`, so the query
+returned a confident zero with no error.
+
+The rewrite quotes the wrong claim before the right one rather than replacing it silently, because
+the trap is the reusable part: the obvious join shape still returns a false zero for the next person
+who tries it. The narrower real finding survives — an `ai_dynamic` program has no in-deload
+suppression — but the fix it pointed at (populate the table) would have been work against the
+design.
