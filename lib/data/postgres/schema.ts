@@ -1,7 +1,7 @@
 import {
   pgTable, text, boolean, timestamp, uuid,
   integer, doublePrecision, date, time, primaryKey, unique, uniqueIndex, jsonb, bigint, bigserial, smallint,
-  customType,
+  customType, check, index,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
@@ -1901,3 +1901,28 @@ export const colmiSleepSegments = pgTable('colmi_sleep_segments', {
   minutes:   integer('minutes').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('colmi_sleep_segments_unique').on(t.userId, t.startedAt, t.stage)])
+
+export const appleHealthSamples = pgTable('apple_health_samples', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sampleId: uuid('sample_id').notNull(),
+  sampleType: text('sample_type').notNull(),
+  startAt: timestamp('start_at', { withTimezone: true }),
+  endAt: timestamp('end_at', { withTimezone: true }),
+  quantityValue: doublePrecision('quantity_value'),
+  quantityUnit: text('quantity_unit'),
+  categoryValue: integer('category_value'),
+  sourceBundleId: text('source_bundle_id'),
+  sourceName: text('source_name'),
+  deviceName: text('device_name'),
+  deviceModel: text('device_model'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.sampleId] }),
+  check('apple_health_samples_type', sql`length(trim(${t.sampleType})) > 0`),
+  check('apple_health_samples_interval', sql`(${t.startAt} IS NULL OR isfinite(${t.startAt})) AND (${t.endAt} IS NULL OR isfinite(${t.endAt})) AND (${t.startAt} IS NULL OR ${t.endAt} IS NULL OR ${t.endAt} >= ${t.startAt})`),
+  check('apple_health_samples_value', sql`${t.quantityValue} IS NULL OR (${t.quantityValue} > '-Infinity'::double precision AND ${t.quantityValue} < 'Infinity'::double precision)`),
+  check('apple_health_samples_payload', sql`${t.deletedAt} IS NOT NULL OR (${t.startAt} IS NOT NULL AND ${t.endAt} IS NOT NULL AND ${t.sourceBundleId} IS NOT NULL AND length(trim(${t.sourceBundleId})) > 0 AND ((${t.quantityValue} IS NOT NULL AND ${t.quantityUnit} IS NOT NULL AND length(trim(${t.quantityUnit})) > 0 AND ${t.categoryValue} IS NULL) OR (${t.categoryValue} IS NOT NULL AND ${t.quantityValue} IS NULL AND ${t.quantityUnit} IS NULL)))`),
+  index('apple_health_samples_history_idx').on(t.userId, t.sampleType, t.startAt).where(sql`${t.deletedAt} IS NULL`),
+])
