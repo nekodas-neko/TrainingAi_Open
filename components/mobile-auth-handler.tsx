@@ -13,8 +13,28 @@ import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
 import { backActionForPath } from "@/components/shell/tabs";
-import { hasOpenSurface } from "@/lib/hooks/sheet-back-stack";
+import { hasOpenSurface, releaseTopSurfaceEntry } from "@/lib/hooks/sheet-back-stack";
 import { navigateToTab } from "@/lib/shell-nav";
+
+/**
+ * DV-2 — *Leave* on "Leave workout?" did not leave.
+ *
+ * The dialog pushed its own history entry when it opened, and closing it pops that entry — so the one
+ * `history.back()` meant to leave the SCREEN was spent on the dialog instead. Measured on the S25:
+ * `pushState()` when the prompt appeared, then a single `back()` on the Leave tap, `popstate` back to
+ * `/workout?session=…`. The store reset, the dialog closed, and the screen stayed on the session that
+ * had just been abandoned.
+ *
+ * One `history.go(-2)` rather than two `back()`s: the surface's pop is not reliably pending when this
+ * runs (7 ms on the device against 415 ms in the harness), which is the timing trap BF-165 measured.
+ * Releasing the entry first means the dialog's close pops nothing, so this single call crosses both.
+ *
+ * The `-1` branch is not defensive padding: a surface opened while one of our own pops is in flight
+ * deliberately skips its push (`openSurface`), so "the dialog has an entry" is genuinely conditional.
+ */
+function leaveScreen(): void {
+  window.history.go(releaseTopSurfaceEntry() ? -2 : -1);
+}
 
 export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
@@ -178,7 +198,7 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
         onLeave={() => {
           setConfirmLeaveOpen(false);
           useWorkoutStore.getState().resetSession();
-          window.history.back();
+          leaveScreen();
         }}
       />
       <LeaveWalkDialog
@@ -189,7 +209,7 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
         onLeave={() => {
           setConfirmLeaveWalkOpen(false);
           useGuidedWalkStore.getState().reset();
-          window.history.back();
+          leaveScreen();
         }}
       />
       <LeaveActivityDialog
@@ -198,7 +218,7 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
         onLeave={() => {
           setConfirmLeaveActivityOpen(false);
           useActivityStore.getState().resetSession();
-          window.history.back();
+          leaveScreen();
         }}
       />
     </>

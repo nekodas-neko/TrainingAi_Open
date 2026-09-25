@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.61",
+    date: "2026-09-25",
+    changes: [
+      "Fixed: picking a type under \"Other activity\" on the Cardio hub did nothing — it now opens the activity screen, and one back returns to the hub.",
+      "Fixed: \"Leave\" on the \"Leave workout?\" prompt now actually leaves the workout screen instead of closing the prompt and staying put. Same for leaving a guided walk or an activity.",
+    ],
+  },
+  {
     version: "1.465.60",
     date: "2026-09-25",
     changes: [
