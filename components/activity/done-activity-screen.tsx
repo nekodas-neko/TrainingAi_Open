@@ -1,6 +1,6 @@
 'use client'
 
-import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
+import { HR_PROFILE_TTL, HR_WINDOW_TTL } from '@trainingai/shared/cache-ttl'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -18,7 +18,17 @@ import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import { calculateSteps } from '@/lib/activity/treadmill-utils'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
-import { cachedFetch } from '@/lib/sqlite/cache'
+
+type HrWindow = { readings?: { timestamp: string; bpm: number }[]; avgHr?: number | null; maxHr?: number | null }
+
+/** One place builds the query, so the two readers of this window share one cache key (LB-155). */
+function hrWindowParams(startMs: number, endMs: number): URLSearchParams {
+  return new URLSearchParams({
+    start: new Date(startMs).toISOString(),
+    end: new Date(endMs).toISOString(),
+  })
+}
+import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { formatPace } from '@trainingai/shared/health/vdot'
 import { formatMinutes } from '@trainingai/shared/format/units'
@@ -95,17 +105,20 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
   // distance); when both exist the treadmill one wins, since it is what the user just saw.
   useEffect(() => {
     if (!startMs || !endMs) return
-    const params = new URLSearchParams({
-      start: new Date(startMs).toISOString(),
-      end: new Date(endMs).toISOString(),
-    })
-    fetch(`/api/oura/hr-window?${params}`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { readings?: { timestamp: string; bpm: number }[]; avgHr?: number | null; maxHr?: number | null } | null) => {
-        if (data?.readings) setHrReadings(data.readings)
-        if (data) setWindowHr({ avgHr: data.avgHr ?? null, maxHr: data.maxHr ?? null })
-      })
-      .catch(() => {})
+    const params = hrWindowParams(startMs, endMs)
+    // `hr-window:<query>` and `HR_WINDOW_TTL` — the key shape `activity-detail-sheet.tsx` and
+    // `exercise-review-sheet.tsx` already use for this route (LB-155). The window is in the key, so
+    // editing the times misses rather than painting the previous trace, and `invalidateOuraSync()`
+    // clears the whole prefix the moment new HR rows land. The seed matters on a remount of this
+    // screen: re-deriving an empty trace and nulling the route colouring is the instant-paint rule's
+    // worse outcome.
+    const key = `hr-window:${params}`
+    const apply = (data: HrWindow | null) => {
+      if (data?.readings) setHrReadings(data.readings)
+      if (data) setWindowHr({ avgHr: data.avgHr ?? null, maxHr: data.maxHr ?? null })
+    }
+    apply(readCacheSync<HrWindow>(key))
+    cachedFetch<HrWindow>(key, `/api/oura/hr-window?${params}`, HR_WINDOW_TTL, apply).catch(() => {})
     cachedFetch<{ maxHr: number; restingHr: number }>(
       'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
       p => { if (p) setHrProfile(p) },
@@ -148,17 +161,19 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
     let maxHr: number | null = null
     if (!hrFetchedRef.current && startMs && endMs) {
       setLoadingMetrics(true)
-      try {
-        const res = await fetch(
-          `/api/oura/hr-window?start=${encodeURIComponent(new Date(startMs).toISOString())}&end=${encodeURIComponent(new Date(endMs).toISOString())}`
-        )
-        if (res.ok) {
-          const data = await res.json()
-          avgHr = data.avgHr
-          maxHr = data.maxHr
+      // The SAME key the effect above fetches, built through the same helper — so entering a
+      // distance now reads the trace that screen already has instead of requesting the window a
+      // second time (LB-155). Hand-rolling the query string here was what made them two keys.
+      const params = hrWindowParams(startMs, endMs)
+      await cachedFetch<HrWindow>(
+        `hr-window:${params}`, `/api/oura/hr-window?${params}`, HR_WINDOW_TTL,
+        data => {
+          if (!data) return
+          avgHr = data.avgHr ?? null
+          maxHr = data.maxHr ?? null
           hrFetchedRef.current = true
-        }
-      } catch {}
+        },
+      ).catch(() => {})
       setLoadingMetrics(false)
     } else {
       avgHr = treadmillMetrics.avgHr

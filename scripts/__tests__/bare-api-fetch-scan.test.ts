@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { bareApiGets } = require('../check-bare-api-fetch.js') as {
@@ -43,6 +44,28 @@ describe('LB-155 — the bare-/api/-GET scan counts what it claims to', () => {
     // Guards the vacuous case: a scan that stopped matching would report a clean rule. The script
     // also refuses to pass if it finds no /api/ fetch at all, for the same reason.
     const out = execFileSync('node', ['scripts/check-bare-api-fetch.js'], { cwd: ROOT, encoding: 'utf8' })
-    expect(out).toMatch(/\d+ bare \/api\/ GET\(s\) — \d+ in debug consoles, \d+ on exempt endpoints, \d+ tracked/)
+    expect(out).toMatch(
+      /\d+ bare \/api\/ GET\(s\) — \d+ in debug consoles, \d+ on exempt endpoints, \d+ authoritative reads, \d+ tracked/,
+    )
+  })
+
+  /**
+   * The AUTHORITATIVE_READS population is the one whose value is entirely in its REASONS: the three
+   * calls in it would each break if converted, and the only thing standing between them and a future
+   * mechanical sweep is the sentence saying why. An unreasoned row is worse than no row — it reads as
+   * settled while explaining nothing.
+   */
+  it('every authoritative read carries a reason, and the population is not empty', () => {
+    const src = readFileSync(path.join(ROOT, 'scripts/check-bare-api-fetch.js'), 'utf8')
+    const block = src.slice(src.indexOf('const AUTHORITATIVE_READS = ['))
+    const rows = block.slice(0, block.indexOf('\n];')).matchAll(/\['([^']+)',\s*'([^']+)',\s*\n?\s*'([^']*)'/g)
+    const parsed = [...rows].map(m => ({ file: m[1], url: m[2], reason: m[3] }))
+    expect(parsed.length, 'the row shape changed and this test is now reading nothing').toBeGreaterThan(0)
+    for (const r of parsed) {
+      expect(r.url, `${r.file} exempts a non-/api/ route`).toContain('/api/')
+      // Long enough to be an argument rather than a label. The shortest real one is 118 characters.
+      expect(r.reason.length, `${r.file} — "${r.reason}" does not explain why a cache breaks it`)
+        .toBeGreaterThan(60)
+    }
   })
 })

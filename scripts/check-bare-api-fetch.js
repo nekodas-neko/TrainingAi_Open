@@ -39,6 +39,24 @@ const EXEMPT_ENDPOINTS = new Map([
   ['/api/ai-periodization/session/', 'conditionally no-store right after a write, which is the case the cache cannot serve'],
 ]);
 
+// AUTHORITATIVE reads — the third population, and the one a conversion would BREAK rather than
+// merely churn (LB-155, triaged 2026-09-25). These are not debt and are not waiting for anyone:
+// each one's contract is "see what the server has, or nothing", so painting a cached value first is
+// a correctness bug. Keyed by file AND endpoint, because one file can hold an authoritative read
+// and a convertible one — `workout-screen.tsx` holds exactly that pair.
+//
+// The ratchet still applies, and each row covers exactly ONE call: a second bare GET of the same
+// route in the same file falls through to BASELINE and fails there. So this is a carve-out for the
+// call that exists rather than a licence for the file or the route.
+const AUTHORITATIVE_READS = [
+  ['components/nutrition/meal-plan-edit-sheet.tsx', '/api/nutrition/meal-plans/',
+   'read-after-write: re-reads the plan immediately after PATCHing its meals, to hand the updated object to onChanged. A cached paint here is the pre-edit plan.'],
+  ['app/nutrition/use-food-logs-loader.ts', '/api/nutrition/food-logs',
+   'offline-first hydration: the file already caches this key on the no-store path. THIS call is the authoritative server copy that feeds applyDelta and hydrates the local store, and its own comment turns a failure into "keep the local render". A cached value would be applied as authoritative and re-insert rows the outbox has already deleted (BF-47).'],
+  ['components/workout-screen.tsx', '/api/achievements',
+   'the XP delta baseline: recordXpEarned subtracts the pre-workout XP from this response. A cached pre-workout value makes the gain read 0. It already writes the answer back with setCached, which is the caching half done correctly.'],
+];
+
 const DEBUG_DIRS = [
   ['components/oura-ble/', 'BLE debug console — live is the useful reading while holding the device (CLAUDE.md sets this same carve-out for the timezone rule)'],
   ['components/admin/', 'admin console — same reasoning'],
@@ -66,12 +84,8 @@ const BASELINE = {
   'lib/meal-reminders.ts': 1,                                     // bedtime-estimate (2 of 2)
 
   // SINGLE-SITE candidates.
-  'app/nutrition/use-food-logs-loader.ts': 1,                     // food-logs?date=
   'app/nutrition/use-plan-meal-logging.ts': 1,                    // plan-meal-answers?date=
-  'components/activity/done-activity-screen.tsx': 2,              // oura/hr-window x2
-  'components/nutrition/meal-plan-edit-sheet.tsx': 1,             // meal-plans/:id
-  'components/nutrition/meal-plan-setup-sheet.tsx': 1,            // dietary-restrictions
-  'components/workout-screen.tsx': 2,                             // achievements + exercise-history?name=
+  'components/workout-screen.tsx': 1,                             // exercise-history?name= (achievements is an authoritative read)
 };
 
 function bareApiGets(src) {
@@ -106,6 +120,8 @@ const files = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
     && !f.startsWith('scripts/'));
 
 const counts = {};
+const authCounts = {};
+const authSeen = new Set();
 let exemptCount = 0, debugCount = 0, total = 0;
 for (const f of files) {
   let src;
@@ -116,6 +132,9 @@ for (const f of files) {
     const debug = DEBUG_DIRS.find(([d]) => f.startsWith(d));
     if (debug) { debugCount++; continue; }
     if ([...EXEMPT_ENDPOINTS.keys()].some((e) => hit.url.includes(e))) { exemptCount++; continue; }
+    const auth = AUTHORITATIVE_READS.find(([file, url]) => f === file && hit.url.includes(url));
+    // `!authSeen.has(auth)` is what holds each row to the one call it describes.
+    if (auth && !authSeen.has(auth)) { authSeen.add(auth); authCounts[f] = (authCounts[f] || 0) + 1; continue; }
     counts[f] = (counts[f] || 0) + 1;
   }
 }
@@ -133,8 +152,12 @@ for (const [f, n] of Object.entries(counts)) {
   if (n > allowed) failures.push({ f, n, allowed });
 }
 const stale = Object.keys(BASELINE).filter((f) => (counts[f] ?? 0) < BASELINE[f]);
+// An AUTHORITATIVE_READS row whose call has gone is a row asserting a reason for nothing — the same
+// staleness the baseline refuses, and the reason is the part worth keeping true. Reported on its own
+// line rather than pushed into `stale`, whose message is about a NUMBER and reads as nonsense here.
+const orphanedAuth = AUTHORITATIVE_READS.filter((row) => !authSeen.has(row));
 
-if (failures.length || stale.length) {
+if (failures.length || stale.length || orphanedAuth.length) {
   if (failures.length) {
     console.error('Bare fetch() of an /api/ GET in client code (CLAUDE.md: use cachedFetch with a readCacheSync seed).');
     console.error('If the route genuinely must not be cached, add its ENDPOINT to EXEMPT_ENDPOINTS here WITH the reason.');
@@ -151,9 +174,16 @@ if (failures.length || stale.length) {
     console.error('Baseline row(s) to lower or delete — these files now carry fewer than recorded:');
     for (const s of stale) console.error(`  ${s}: ${counts[s] ?? 0} now, baseline ${BASELINE[s]}`);
   }
+  if (orphanedAuth.length) {
+    console.error('AUTHORITATIVE_READS row(s) matching nothing — the call was converted, moved or renamed.');
+    console.error('Delete the row if the read is gone; fix the file or endpoint if it only moved.');
+    for (const [file, url] of orphanedAuth) console.error(`  ${file} — no bare GET of ${url}`);
+  }
   process.exit(1);
 }
 
 const tracked = Object.values(counts).reduce((a, b) => a + b, 0);
+const authTotal = Object.values(authCounts).reduce((a, b) => a + b, 0);
 console.log(`check-bare-api-fetch: ${total} bare /api/ GET(s) — ${debugCount} in debug consoles, `
-  + `${exemptCount} on exempt endpoints, ${tracked} tracked across ${Object.keys(BASELINE).length} baselined file(s).`);
+  + `${exemptCount} on exempt endpoints, ${authTotal} authoritative reads, `
+  + `${tracked} tracked across ${Object.keys(BASELINE).length} baselined file(s).`);

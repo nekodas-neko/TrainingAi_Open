@@ -6065,10 +6065,11 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   from scratch. They were not hard questions — they were questions nobody had been asked, because
   each lived in a session transcript that ended. **Writing them in one place was the whole of the
   work.** That is the argument for this ledger continuing to exist after these six clear.
-### [platform] LB-155 — the bare-`fetch` rule is ENFORCED now and its exemptions are written down; ~20 conversions remain
+### [platform] LB-155 — the bare-`fetch` rule is ENFORCED; 3 sites converted, 10 blocked on a Lane A group entry
 
-- **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79. **Enforcement shipped
-  2026-09-25** — `scripts/check-bare-api-fetch.js`, wired into Custom Rules.
+- **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79.
+  **Enforcement shipped 2026-09-25** — `scripts/check-bare-api-fetch.js`, wired into Custom Rules.
+- **Needs: LB-156**
 - **⛔ The count in the first version of this entry was wrong twice over. It is 67 today.** Filed as
   **69**; that included a false positive, because the scan dropped `method:` but not the SHORTHAND
   `{ method, headers }`, which has no colon — so a POST in `supplements-section.tsx` counted as a
@@ -6085,10 +6086,38 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `sync/pull`, `oura-ble/rollup-state`, `exercise-library`, `ai-periodization/session` — several
   already pass `cache: 'no-store'`, which is the tell); and **26 tracked across 19 files**,
   shrink-only.
-- **Now 65 / 24 tracked across 18 files**, after `LB-154` cleared `food-logger-sheet.tsx`'s two on
-  2026-09-25. The baseline row was **deleted rather than lowered**, which is what makes the ratchet
-  the regression guard: a re-introduced bare GET in that file now fails the check outright instead of
-  fitting under a remaining allowance.
+- **Now 62 / 18 tracked across 14 files**, after `LB-154` cleared `food-logger-sheet.tsx`'s two and
+  this entry's own 2026-09-25 pass cleared three more. A cleared row is **deleted rather than
+  lowered**, which is what makes the ratchet the regression guard: a re-introduced bare GET in that
+  file fails the check outright instead of fitting under a remaining allowance.
+- **⛔ TRIAGED SITE BY SITE 2026-09-25, and "~20 conversions remain" is the wrong shape. THREE of the
+  24 were Lane B's to convert.** The rest split three ways, and the split is the reason this entry has
+  sat:
+  - **✅ CONVERTED (3).** `dietary-restrictions` in `meal-plan-setup-sheet.tsx`, and **both**
+    `hr-window` reads in `done-activity-screen.tsx` onto **one** key — the second was hand-building
+    its own query string, which is what made them two keys and cost a second request for a window the
+    screen had already fetched. All three keys were **already in an invalidation group**, which is
+    what made them Lane B's alone.
+  - **⛔ 3 are AUTHORITATIVE READS a conversion would BREAK, not debt.** Now a third population in
+    `check-bare-api-fetch.js`, keyed by file AND endpoint (one file holds both kinds), each with the
+    reason: `meal-plan-edit-sheet.tsx` re-reads the plan straight after PATCHing its meals, so a
+    cached paint is the pre-edit plan; `use-food-logs-loader.ts`'s second call is the authoritative
+    server copy that feeds `applyDelta`, where a cached value would re-insert rows the outbox has
+    already deleted (BF-47); `workout-screen.tsx`'s `/api/achievements` is the **XP delta baseline**,
+    so a cached pre-workout value makes the gain read **0**. Each row covers exactly one call — a
+    second bare GET of the same route in the same file falls through to the baseline and fails.
+  - **⛔ 10 need a `lib/cache-groups.ts` ENTRY FIRST, which is Lane A's file — filed as `LB-156`.**
+    `day-checkin` ×3, `phase-sets` ×2 + `workout-templates` ×2 (`config-screen.tsx`),
+    `bedtime-estimate` ×2, `plan-meal-answers` ×1. Introducing a key obliges registering it in every
+    write group that affects it, and none of these keys is in one — so converting them from here would
+    either breach the cache rule or the lane split. **`day-checkin:` is the sharp case: the group
+    `invalidateNutritionWrite` has cleared it since it was written, for a key nobody ever created**,
+    while `invalidateCheckinAffectsPrescription` — which the check-in writes themselves call — does
+    not clear it at all.
+  - **8 remain deliberately deferred**: the six per-query reads this entry already listed, plus
+    `exercise-history?name=` in `workout-screen.tsx`. Unchanged reasoning.
+  **So the remaining Lane B work is 0 until `LB-156` lands**, which is why this entry now carries
+  `Needs: LB-156` rather than a count.
 - **Remaining work — the ~20 conversions, triaged in the BASELINE itself so nobody re-derives it.**
   Weakest first: six are **per-query** (`?q=`, `?code=`, `?threadId=`, `?sessionId=`) where a key
   must carry the query, and a search-as-you-type key churns the cache for nothing. Strongest are the
@@ -6101,6 +6130,36 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **Guard:** `scripts/__tests__/bare-api-fetch-scan.test.ts` pins the SCAN rather than the count —
   the multi-line URL, and all three ways a method can be declared, including the shorthand that
   produced the wrong figure.
+
+### [platform] LB-156 — ten bare-`fetch` conversions are blocked on five cache keys no group clears
+
+- **Lane: A** — `lib/cache-groups.ts` only. **Added:** 2026-09-25 · Lane B, triaging `LB-155`'s
+  remaining conversions and finding it could not do them.
+- **What is owed: register five keys in the groups whose writes change them.** Nothing else — no
+  call site moves in this entry, and the ten conversions are `LB-155`'s to make afterwards.
+  | key | written by | which group needs it |
+  |---|---|---|
+  | `day-checkin:` | the morning and evening check-in POSTs | `invalidateCheckinAffectsPrescription` (`invalidateNutritionWrite` already has it) |
+  | `phase-sets` | `config-screen`'s POST + `DELETE /api/phase-sets/:id` | a group; `invalidateProgramStructure` is the closest fit |
+  | `workout-templates` | `config-screen`'s four template writes | same group |
+  | `bedtime-estimate` | derived from sleep rows | `invalidateBiometrics` / `invalidateOuraSync` |
+  | `plan-meal-answers:` | `POST /api/nutrition/plan-meal-answers` | `invalidateNutritionWrite`, or a narrower one |
+- **⚠ `day-checkin:` shows why this is a real gap and not a formality.** `invalidateNutritionWrite`
+  has cleared that prefix since it was written — **for a key nobody ever created**, because all three
+  readers are bare `fetch`. Meanwhile `invalidateCheckinAffectsPrescription`, which the check-in
+  writes themselves call, does not clear it. So a conversion done without this entry would cache a
+  check-in that a *food log* evicts and a *check-in save* does not: fresh by accident, stale by the
+  write that actually changed it.
+- **Why Lane A and not Lane B.** The standing cache rule obliges registering a new key in the
+  invalidation group of every write that affects it, in the same commit, and forbids an ad-hoc
+  `invalidateCache()` at the call site. `lib/cache-groups.ts` is Lane A's under the path rule, so the
+  engine half goes first — exactly the split §3 describes.
+- **The reverse order also works and may be better**, and it is Lane A's call: ship the group entries
+  as one small PR (this entry), then `LB-155` converts the ten call sites. A group clearing a key that
+  does not exist yet is a no-op, so there is no window where anything is wrong.
+- **Not established:** whether `phase-sets` and `workout-templates` belong in
+  `invalidateProgramStructure` or want their own group. Both are program configuration, which argues
+  for reuse; neither is read outside `config-screen` today, which argues it does not matter yet.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
 
