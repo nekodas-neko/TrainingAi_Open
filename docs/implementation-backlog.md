@@ -6059,32 +6059,38 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **⛔ This is 1 of 69, not a one-off — measured 2026-09-25 while shipping RV-79.** See `LB-155`:
   the rule has 69 live violations, so fixing them one filed entry at a time is not a plan.
 
-### [platform] LB-155 — "client GETs use cachedFetch, never bare fetch" has 69 live violations, and most are probably fine
+### [platform] LB-155 — the bare-`fetch` rule is ENFORCED now and its exemptions are written down; ~20 conversions remain
 
-- **Lane: B**
-- **Added:** 2026-09-25 · measured while shipping RV-79, which fixed one of them.
-- **The count:** 69 bare `fetch()` calls of an `/api/` GET in client code (excluding `app/api/**`,
-  tests, e2e and scripts; any call with an explicit `method:` dropped, ternaries included). Scan at
-  `/tmp/claude-0/barefetch.mjs` — rerun it rather than trusting this number.
-- **Where they are:** `components/oura-ble` **18**, admin consoles **15**, `components/nutrition`
-  **10**, then a long tail of ones and twos across `config-screen`, `workout-screen`, reminders and
-  settings.
-- **Why this is a triage and not a sweep.** Roughly half are BLE and admin debug consoles, where a
-  cached read is actively wrong — you want a live value when you are holding the device, and
-  CLAUDE.md already exempts those consoles from the sibling timezone rule for the same reason.
-  Others are per-query by nature (`food-items?q=`, `barcode?code=`) and would need the query inside
-  the key; `/api/version` is the one route deliberately exempt from the no-store rule and is read by
-  the update check, which must not be cached at all.
-- **So the work is to decide which of the ~36 product-surface sites genuinely want a cache key**,
-  convert those, and — the part that stops this recurring — **write the exemptions down**, either
-  as a checked list in a script or as a stated carve-out in the rule. A rule with 69 violations and
-  no exemption list cannot be enforced, and every future entry citing it will single out one site
-  as if it were exceptional, which is how RV-79 and LB-154 were both filed.
-- **⚠ A conversion is not mechanical** — RV-79 proved that. `cachedFetchCore` writes the response
-  after any 2xx, so a route that can return `null` needs `shouldCache`, or the conversion trades a
-  rule violation for the session-167 re-prompt bug.
-- **Not established:** no judgement has been made on any individual site beyond the two already
-  filed; the 18/15 split is by directory, not by a read of each call.
+- **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79. **Enforcement shipped
+  2026-09-25** — `scripts/check-bare-api-fetch.js`, wired into Custom Rules.
+- **⛔ The count in the first version of this entry was wrong twice over. It is 67 today.** Filed as
+  **69**; that included a false positive, because the scan dropped `method:` but not the SHORTHAND
+  `{ method, headers }`, which has no colon — so a POST in `supplements-section.tsx` counted as a
+  GET. The real figure then was **68**, and it is **67** now because RV-79's own fix removed one.
+  Each number was right when measured; the lesson is that **a figure from an unpinned scanner is a
+  guess with a number attached**, which is why the scan is now unit-tested rather than trusted.
+- **✅ What shipped is the enforcement and the carve-out, which is what this entry was for.** A rule
+  with 67 violations and no written exemption list cannot be enforced, and that — not any one call —
+  was the defect. The script separates three populations and ratchets only the third:
+  **33 in BLE/admin debug consoles** (exempt wholesale, on the precedent CLAUDE.md already sets for
+  those directories under the timezone rule — live is the useful reading while holding the device);
+  **8 on exempt ENDPOINTS**, keyed by route rather than `file:line` because the reason belongs to the
+  route and lines drift (`/api/version`, `colmi/status`, `scale-ble/pending`, `scale-ble/today`,
+  `sync/pull`, `oura-ble/rollup-state`, `exercise-library`, `ai-periodization/session` — several
+  already pass `cache: 'no-store'`, which is the tell); and **26 tracked across 19 files**,
+  shrink-only.
+- **Remaining work — the ~20 conversions, triaged in the BASELINE itself so nobody re-derives it.**
+  Weakest first: six are **per-query** (`?q=`, `?code=`, `?threadId=`, `?sessionId=`) where a key
+  must carry the query, and a search-as-you-type key churns the cache for nothing. Strongest are the
+  **duplicated endpoints**, where one key would serve several sites: `day-checkin` at **three** call
+  sites, `phase-sets` ×2 and `workout-templates` ×2 (both `config-screen`), `bedtime-estimate` ×2,
+  and `saved-meals`/`meal-types` in `food-logger-sheet` (the latter is `LB-154`).
+- **⚠ A conversion is NOT mechanical, and the script says so on failure.** `cachedFetchCore` stores
+  the response after any 2xx, so a route that can return `null` needs `shouldCache` — RV-79 proved
+  that the "proper" conversion without it trades a rule breach for the session-167 re-prompt bug.
+- **Guard:** `scripts/__tests__/bare-api-fetch-scan.test.ts` pins the SCAN rather than the count —
+  the multi-line URL, and all three ways a method can be declared, including the shorthand that
+  produced the wrong figure.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
 

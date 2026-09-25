@@ -488,6 +488,9 @@ jobs:
       - name: Hex colour literals do not increase
         run: node scripts/check-hex-literals.js
 
+      - name: Bare fetch of an /api/ GET does not increase
+        run: node scripts/check-bare-api-fetch.js
+
       - name: No two DB test files share a TEST_USER_ID
         run: node scripts/check-test-user-ids.js
 
