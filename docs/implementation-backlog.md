@@ -5360,11 +5360,10 @@ written entity.
 
 - **Lane: B**
 - **Added:** 2026-09-25 · found reading CI after merging #1598 on the five required checks.
-- **Measured on run 3031** (`fix/rv183-meal-reminders-local-first`): two specs failed in **1.0s
-  each** with `Error: browser.newContext: Target page, context or browser has been closed` —
-  `day-detail-sheets.spec.ts:99` and `diary-nested-meal.spec.ts:132`. A 1-second failure before any
-  test body runs is the browser process going away, not an assertion. The same suite passes locally:
-  124 specs, exit 0, checked 2026-09-25.
+- **Measured on run 3031:** `day-detail-sheets.spec.ts:99` and `diary-nested-meal.spec.ts:132` each
+  failed in **1.0s** with `browser.newContext: Target page, context or browser has been closed`. A
+  1-second failure before any test body runs is the browser process going away, not an assertion.
+  The same suite passes locally: 124 specs, exit 0, 2026-09-25.
 - **Why this is worth an entry rather than a shrug.** E2E is advisory, so the standing merge
   procedure reads the five required conclusions and goes — correct, but it makes a red E2E
   invisible by policy, and the only end-to-end signal the repo has then degrades silently. Two
