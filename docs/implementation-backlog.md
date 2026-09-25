@@ -1062,8 +1062,10 @@ below keep their gate — they really are blocked pending an answer — and this
    (ten in prose → nine counted → ten → twelve) and every rise came from reading a gate that said
    only `owner` and finding a button press behind it. **Read the batch fields, never the prose**, and
    recount before asking rather than quoting this line.
-5. **`owner-branch-protection` (`LB-52` + `Q-297`'s second residue) — asked 2026-09-24**, parked by
-   the owner for a few hours. E2E stays off the required-check list; that half is decided.
+5. ~~**`owner-branch-protection`**~~ — **DONE 2026-09-25 (OR-164).** The `ProtectMain` ruleset was
+   sitting at Enforcement `Disabled`, which is why nothing it listed was enforced; the owner set it
+   **Active**, dropped E2E from the required list and restricted merges to **squash**. `LB-52` is
+   removed, `Q-297`'s second residue is closed, and the batch is gone.
 6. **`BF-77` — is the "session to look into this" one he attends, or one an agent runs?** He asked
    for it on 2026-09-20 instead of picking from the A/B/C sizing he was offered. If an agent runs it,
    the docs-only planning PR is startable today and that gate comes off; if he wants to be in it, it
@@ -3680,6 +3682,21 @@ drift.
 
 
 ### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
+
+- **✅ CLOSED 2026-09-25 (OR-164) — and the MECHANISM recorded here was WRONG.** This entry, and the
+  CLAUDE.md passages it corrected, both blamed *"a Ruleset with no classic branch-protection rule
+  beside it"*. The real cause was one field nobody read: **the `ProtectMain` ruleset's Enforcement
+  status was `Disabled`**. It was created 2026-08-17 with all six checks already configured and sat
+  switched off for five and a half weeks, so the rules existed and did nothing. The owner set it to
+  **Active** on 2026-09-25; five checks are now genuinely required and this entry's defect cannot
+  recur.
+- **The observation was right and the explanation was a guess that read like a finding.** Worth
+  keeping, because the guess was plausible, was written down with confidence, and sent two sessions
+  looking for a classic branch-protection rule that was never the answer. **Nobody opened the ruleset
+  and read its enforcement field** — the cheapest possible check, skipped because the API error
+  (*"Protected branch rules not configured for this branch"*) was read as a statement about Rulesets
+  rather than as literally true.
+- **Its sibling `LB-52` is removed** in the same PR: auto-merge's refusal had the same single cause.
 - **✅ THE CENTRAL CLAIM IS VERIFIED, and sharpened — Orchestrator, 2026-09-24.** Re-read from the API rather than taken from this entry: PR #1467 merged at **10:18:18Z**; its `Tests` job (`107136618616`) reported **failure at 10:18:29Z**, eleven seconds LATER. So what the merge went past was a **PENDING** check, not a reported failure — which falsifies CLAUDE.md's claim *"it cannot merge a genuinely pending check"* even more directly than the entry states. (`E2E` also failed, at 10:47.) The conclusion is unchanged and the wording is now exact.
 - **✅ BOTH CLAUDE.md PASSAGES ARE CORRECTED** in this PR — the Standing Instruction that claimed branch protection *"requires a PR with all CI checks passing"*, and the CI/CD line that called the merge *"the reliable green check"*. Both now say the checks are not enforced at merge and point at `get_job_logs --failed_only` as the real read.
 - **The mechanism is confirmed and is the same one `LB-52` records.** `enable_pr_auto_merge` was re-probed on a GREEN PR at 09:15 UTC 2026-09-24 and still answers *"Protected branch rules not configured for this branch"*. `main` is protected by a Ruleset with no classic rule beside it, which is why the merge API neither enforces the checks nor offers auto-merge. **One setting causes both**, so this entry's remaining half and `LB-52` are the same fix.
@@ -13774,6 +13791,12 @@ on a production measurement.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 
+- **✅ THE BRANCH-PROTECTION MATERIAL BELOW IS SUPERSEDED, 2026-09-25 (OR-164).** It accumulated here
+  because `BF-106` shared the `owner-branch-protection` settings trip; none of it bears on this
+  entry's actual subject, which is the `VACUUM FULL`. The cause of every auto-merge refusal recorded
+  below was the **`ProtectMain` ruleset sitting at Enforcement `Disabled`**, not a missing classic
+  rule. The owner set it Active on 2026-09-25. **This entry's own gate is unaffected and still
+  stands:** `VACUUM FULL` cannot be run from the app, so it remains his.
 - **⚠ THE PROBE IS ONLY VALID ON A GREEN PR — measured 2026-09-24, after it produced a false
   positive.** Run against `#1544` while four checks were still `in_progress`,
   `enable_pr_auto_merge` answered *"The pull request is in unstable status (required checks are
@@ -19632,105 +19655,6 @@ without a queue entry is a dropped finding.*
   revises it. The backfill route is the remedy for that too.
 - **Caveats on the measurement:** `claude_ro` is row-scoped to the owner, so every count above is one
   user's rows. The writer map is read from source and is complete; the counts are not.
-
-### [platform] LB-52 — GitHub's auto-merge API does not see a Ruleset, so every PR is a hand-caught race
-- **⏸ RE-ASKED AND PARKED AGAIN, 2026-09-24 (second time).** Put to him with the correctness
-  framing this time, not the throughput one — *the required checks are not enforced at merge, so no
-  merge in this repo is gated on its tests* — alongside the two-minute click path and a
-  no-required-checks middle option that would restore auto-merge alone. **He chose to keep it
-  parked.** The `Gate: owner` stays and is now correctly stating what it waits on.
-- **What this costs, recorded so the next session does not re-litigate it:** every merge stays
-  hand-caught against a base that moved roughly every 8 minutes on 2026-09-24, and **a green merge
-  remains no evidence the checks passed.** The mitigation is a habit rather than a mechanism — read
-  the job conclusions (`get_check_runs`; all six `completed` AND `success`) before every merge. That
-  held for the three merges of 2026-09-24 and it depends on whoever is merging doing it every time.
-- **Do not re-ask without a new fact.** Twice now. The next thing that would change the answer is a
-  red commit on `main` that actually costs something, or the owner raising it himself.
-
-- **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
-  page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
-  Ruleset so auto-merge works; Q-297 asks whether **E2E becomes a required check**. One trip, two
-  toggles. Do not put them to the owner separately.
-
-- **⏸ ACKNOWLEDGED AND DEFERRED BY THE OWNER, 2026-09-15:** *"Keep this as a task to complete
-  later."* So the remedy is accepted and the timing is theirs. **The `Gate: owner` stays** — nothing
-  here is buildable by any agent; it is a repository setting.
-- **⚠ The cost keeps being paid in the meantime and is worth restating: 2026-09-14 alone, one PR
-  needed three base re-merges** (#1168 and #1170 landing under it, then again under the next one).
-  That is the tax this entry measures, and it scales with how many agents are running.
-
-- **Lane:** O — the Orchestrator's. The fix is a repository *setting*, not code in either lane's paths.
-- **Gate:** owner — the remedy is a repo setting only the owner can make.
-- **⚠️ THIS ENTRY'S ORIGINAL DIAGNOSIS WAS WRONG, and the correction is the point (2026-09-03).** It
-  said *"turn on Allow auto-merge and add a branch protection rule"*. **Both were already on.** The
-  owner showed the settings: *Allow auto-merge* ticked, and `main` protected by a **Ruleset** with
-  six required checks (Lint, Tests, Build, Migration Check, Custom Rules, **E2E**). The entry was
-  written from a single error string, never tested, and asked the owner twice for work already done.
-- **What is actually happening, reproduced on a second PR.** `enable_pr_auto_merge` returns
-  *"Pull request Protected branch rules not configured for this branch"* — on PR #818 (2026-09-02)
-  and again on **PR #853 (2026-09-03)**, a fresh PR with checks in flight, against that same repo.
-  **GitHub's auto-merge API is looking for CLASSIC branch protection and does not recognise a
-  Ruleset.** That is a gap on GitHub's side, not a misconfiguration.
-- **Measured cost, 2026-09-08.** One PR (#943) needed **four** base re-merges in ninety minutes,
-  each one a full CI cycle. Every single conflict was the same file —
-  `docs/doc-size/docs/implementation-backlog.md.size` — and never anything in the diff. That is
-  structural rather than bad luck: every merged PR removes a backlog entry, so every merge changes
-  that file's line count, so any two concurrent PRs conflict there by construction. LA-33's per-file
-  split of the doc-size map fixed the cross-*document* case and cannot fix this one. Worth weighing
-  when this entry is decided: auto-merge would not remove the conflict, but it would stop a human
-  paying for each round.
-  - **A sharper instance the same day: #954, whose entire diff is one `className`.** It needed
-    **four** base re-merges and **five** CI cycles across roughly two hours, every conflict on that
-    one `.size` file, while Lane A landed #955–#957 underneath it. Two of the four also hit
-    *"refusing to merge unrelated histories"* — the shallow-clone graft, fixed by
-    `git fetch origin --deepen=500`, which adds a step to a loop that is already pure overhead. The
-    cost of this entry does not scale with the size of the change, which is the argument for fixing
-    it rather than absorbing it.
-- **The six-check list above includes E2E, and that is not what the Ruleset enforces.** Four PRs
-  merged on 2026-09-07/08 (#930, #934, #941, #943) with the E2E job still `in_progress` —
-  `merge_pull_request` validates against real branch-protection state and would have refused a
-  genuinely required check. So E2E is advisory today. Recheck the Ruleset before quoting the list.
-- **Recommendation: add a classic branch-protection rule on `main` alongside the ruleset**, naming
-  the same six checks. The two coexist and GitHub takes the most restrictive, so enforcement does not
-  weaken — the classic rule exists only to give the auto-merge API the object it looks for. Reversal
-  cost is near zero: delete it and the repo is exactly where it is today.
-- **The alternative, if that is unwanted: reduce the conflict surface instead.** Move the version
-  bump and the doc-size baselines out of feature PRs — a changelog *fragment* per PR folded by the
-  compaction sweep, which CLAUDE.md already anticipates (*"a future changelog-fragment change could
-  remove that too"*). More work, and it only shrinks the race rather than ending it.
-- **⚠️ A rate limit is not a result.** Two attempts on 2026-09-03 returned *"API rate limit already
-  exceeded for user ID …"* — a different error that settles nothing. The polling this race forces is
-  itself what exhausted the budget, so the race now costs API quota as well as cycles.
-- **Related correction, same root:** *"E2E is not a required check"* was true until 2026-08-26 and is
-  now **false** — the owner added it per LA-22, whose `Keep:` is therefore satisfied. Sessions
-  carrying the old fact wait for five checks and merge into a sixth. Wait for **six**.
-- **Measured across 2026-09-02/03: fourteen merge attempts over seven PRs, every one green on its own merits.** BF-108 (#818) took five rounds and Q-516 (#839) took four.
-- **The original measurement, which still holds:**
-  `main` moved roughly every ten minutes with six agents running; a CI cycle takes five to seven. So
-  a PR opens green-in-waiting, `main` lands somebody else's merge, and the PR reads
-  `mergeable_state: dirty` before its own checks finish. Merge, resolve, push, and the next cycle can
-  lose again.
-- **It is every PR, not unlucky ones.** The conflicting files are the ones the process itself
-  requires: `package.json` and `packages/shared/src/changelog.ts` (the version bump), the two
-  `docs/doc-size/*.size` baselines, `docs/doc-size-baseline-history.md` and `projectOverview.md`.
-  Every feature PR touches all six by construction, so the collision surface is not the diff.
-- **The correct tool is unavailable.** `enable_pr_auto_merge` answers *"Protected branch rules not
-  configured for this branch."* GitHub gates auto-merge on the repo's *Allow auto-merge* setting plus
-  a branch-protection rule; `main` blocks direct pushes and requires five checks, but through a
-  mechanism this API does not see as a protection rule. Until it is available, an agent's only lever
-  is to poll and merge the instant checks go green, which is what CLAUDE.md's 2–3 minute check-in is
-  already for — and it does not close the window, it only narrows it.
-- **⛔ The old "what to change" list is struck — see the correction at the top of this entry.** It
-  read: (1) turn on *Allow auto-merge* and add a branch-protection rule; (2) failing that, take the
-  version bump and the doc-size baselines out of the feature PR —
-  a changelog *fragment* per PR, folded by the compaction sweep, removes the two files that conflict
-  most, and CLAUDE.md already anticipates this (*"a future changelog-fragment change could remove that
-  too"*). Either one alone would have made BF-108 a single round.
-- **The cost is not correctness, it is throughput and risk.** Nothing unsound merged — the merges were
-  resolved by hand each time and the gate re-run. But each round is a full re-resolution of six files,
-  and `package.json`/`changelog.ts` are exactly the pair CLAUDE.md warns must be rebuilt whole rather
-  than spliced, because a spliced hunk silently drops the other side's entry. That has corrupted the
-  changelog before. Repeating that resolution N times per PR is where the real hazard sits.
 
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
@@ -26211,6 +26135,10 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
      E2E is NOT required today** — PR #776 merged while its E2E job was still `in_progress`. LA-22
      has since made the job always-run and always-report specifically so it is safe to require, so
      the remaining question is only whether to.
+- **✅ THE BRANCH-PROTECTION HALF IS DONE, 2026-09-25 (OR-164).** The ruleset is **Active** and its
+  required list is `Lint, Tests, Build, Migration Check, Custom Rules` — **E2E is not on it**, which
+  is the owner's 2026-09-24 answer now actually in force rather than merely decided. The
+  `owner-branch-protection` batch is closed and `LB-52` is removed.
 - **Gate:** owner — ANSWERED 2026-09-24: **E2E stays OFF the required-check list.** He was asked it with `LB-52` as the `owner-branch-protection` batch and chose to leave it advisory until `LB-56` establishes whether it gates anything real. The gate stays only for residue 1 below, the warmed-server instant-paint budget, which is a judgement about spending CI flakiness.
 - **✅ Everything buildable in this entry has shipped**, four of the five under other numbers —
   `workout-set-loop.spec.ts` (Q-461), `food-logging-complete.spec.ts` (Q-387),

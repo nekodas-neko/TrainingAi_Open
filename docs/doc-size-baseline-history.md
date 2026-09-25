@@ -17324,6 +17324,24 @@ merged. Two other PRs grew the backlog between the local run and the CI run, so 
 ratchet failed on a number neither branch was wrong about. Recomputed against the newest main rather
 than argued with.
 
+## 2026-09-25 — `CLAUDE.md` → 1006 and `projectOverview.md` → 12851, the ruleset was Disabled (OR-164)
+
+Both orientation docs grow for the same reason, and it is not the good news. `main` is genuinely
+protected now, which could be recorded in a line. What costs the lines is that **the mechanism on
+file was wrong twice**: CLAUDE.md first said the checks were enforced, then that they were not, and
+both versions blamed the wrong thing. The real cause was the ruleset's Enforcement field sitting at
+`Disabled` since 2026-08-17 — configured and inert.
+
+The correction has to say more than "now fixed", because anything a session reads about the
+2026-08-17 → 2026-09-25 window is unreliable: a merge in that period proves nothing about its checks,
+and the force-push and deletion guarantees the file asserted were false too, since those rules sat in
+the same disabled ruleset.
+
+The remaining length is two things a future session would otherwise undo: **`strict` is off on
+purpose** (main moves faster than CI completes, so requiring a current base can livelock — seven
+re-merges on one PR the day before), and **the empty bypass list means a broken CI cannot be fixed**
+without temporarily adding one, which is stated rather than pre-configured.
+
 
 ## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31159 (+7 after two rebases, net of RV-122 leaving)
 
