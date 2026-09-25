@@ -17761,3 +17761,16 @@ The lines that stayed are the corrections, which are the part worth the space: t
 backwards — the schema permits slashes on purpose and the right fix accepts and converts them. The
 `Keep:` also records which of the remaining groups have been re-verified (two) and which have not
 (four), so the next session does not re-derive that.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31656 → 31660 (RV-177 ownership + dead code)
+
+Four lines. RV-177's unscoped/dead bullet was replaced with what shipped, and the `Keep:` narrowed
+from six open groups to four.
+
+The lines that stayed are a **correction to my own note from earlier the same day**, which is the
+part worth keeping: that note said deleting `logSets`'s tests lost no coverage. It did. `logSets`
+collapsed duplicates on `set_number` while the live `logExerciseAndSets` collapses on `set.id` — a
+different conflict target with no direct test of its own — so the coverage was moved onto the live
+path instead of deleted. The `Keep:` also now states plainly that **none** of the four remaining
+groups has been re-verified, since three of this entry's claims have already turned out stale or
+backwards and the next session should not assume otherwise.

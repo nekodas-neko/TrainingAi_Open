@@ -153,51 +153,52 @@ describe.skipIf(!canRun)('batch upserts collapse duplicates on the conflict targ
     expect(rows[0].steps).toBe(9000) // the field the second row did not carry
   })
 
-  it('logSets keeps the exercise when a payload repeats a set_number', async () => {
-    const { logExerciseFromPayload } = await import('@trainingai/shared/workout/log-exercise')
-    await logExerciseFromPayload(
+  /**
+   * RV-177 deleted `logSets` and `logExerciseWithId` — adapter methods with no production caller
+   * and no place on the repository interface. Two cases here drove `logSets`, so they went with it.
+   *
+   * They are replaced rather than dropped, because they were not redundant: `logSets` collapsed on
+   * `set_number`, while the LIVE write path — `logExerciseAndSets`, which is what a completed
+   * workout actually calls — collapses on `set.id`. A different conflict target, and it had no
+   * direct test of its own. So this moves the coverage off dead code and onto the live key.
+   */
+  it('logExerciseAndSets collapses a repeated set id and keeps the rest of the batch', async () => {
+    const dupId = crypto.randomUUID()
+    const { setLogs } = await repo.logExerciseAndSets(
       USER,
-      { sessionName: 'Batch Collapse', exercise: 'Collapse Bench', weights: [100], sets: 1, reps: [5] } as never,
-      'Australia/Brisbane',
+      {
+        workoutSessionId: (await (async () => {
+          const { rows: [ws] } = await pool.query(
+            `INSERT INTO workout_sessions (user_id, session_name, started_at)
+             VALUES ($1, 'Collapse Live', now()) RETURNING id`, [USER])
+          return ws.id as string
+        })()),
+        exerciseName: 'Collapse Live Bench',
+        muscleGroups: ['chest'],
+        loggedAt: new Date(),
+      } as never,
+      [
+        { id: dupId, setNumber: 1, weightKg: 100, reps: 5, useFor1rm: true },
+        { id: crypto.randomUUID(), setNumber: 2, weightKg: 105, reps: 5, useFor1rm: true },
+        { id: dupId, setNumber: 1, weightKg: 102, reps: 4, useFor1rm: true },
+      ] as never,
     )
-    const { rows: [log] } = await pool.query(
-      `SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
-        WHERE ws.user_id = $1 AND el.exercise_name = 'Collapse Bench'`, [USER])
-    await repo.logSets(log.id, [
-      { setNumber: 2, weightKg: 100, reps: 5, useFor1rm: true },
-      { setNumber: 3, weightKg: 105, reps: 5, useFor1rm: true }, // would be lost with the batch
-      { setNumber: 2, weightKg: 102, reps: 4, useFor1rm: true },
-    ] as never)
-    const { rows } = await pool.query(
-      `SELECT set_number, weight_kg FROM set_logs WHERE exercise_log_id = $1 AND set_number >= 2
-        ORDER BY set_number`, [log.id])
-    expect(rows.map(r => Number(r.weight_kg))).toEqual([102, 105])
-  })
 
-  // `logSets` zips `.returning()` against its input by index, so the array it inserts and the array
-  // it zips have to be the SAME array. Collapsing inline shifts every set after the first duplicate
-  // onto the wrong id — a quieter bug than the 21000 it was fixing.
-  it('logSets returns ids that belong to the sets it actually wrote', async () => {
-    const { logExerciseFromPayload } = await import('@trainingai/shared/workout/log-exercise')
-    await logExerciseFromPayload(
-      USER,
-      { sessionName: 'Batch Collapse', exercise: 'Collapse Row', weights: [60], sets: 1, reps: [5] } as never,
-      'Australia/Brisbane',
-    )
-    const { rows: [log] } = await pool.query(
-      `SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
-        WHERE ws.user_id = $1 AND el.exercise_name = 'Collapse Row'`, [USER])
-    const returned = await repo.logSets(log.id, [
-      { setNumber: 4, weightKg: 60, reps: 5, useFor1rm: true },
-      { setNumber: 4, weightKg: 62, reps: 5, useFor1rm: true },
-      { setNumber: 5, weightKg: 65, reps: 5, useFor1rm: true },
-    ] as never)
-    expect(returned).toHaveLength(2)
-    for (const set of returned) {
-      const { rows: [stored] } = await pool.query(
-        `SELECT set_number, weight_kg FROM set_logs WHERE id = $1`, [set.id])
-      expect(stored.set_number).toBe(set.setNumber)
-      expect(Number(stored.weight_kg)).toBe(set.weightKg)
+    // The whole batch survives — the 21000 this file exists for would have lost all three.
+    expect(setLogs).toHaveLength(2)
+
+    // Last write wins on the repeated id, and the untouched set is unchanged.
+    const { rows } = await pool.query(
+      `SELECT id, set_number, weight_kg FROM set_logs WHERE id = ANY($1::uuid[]) ORDER BY set_number`,
+      [setLogs.map(sl => sl.id)])
+    expect(rows.map(r => Number(r.weight_kg))).toEqual([102, 105])
+
+    // And the returned ids line up with what was stored — `.returning()` is zipped by index, so a
+    // collapse done inline would shift every set after the duplicate onto the wrong row.
+    for (const sl of setLogs) {
+      const stored = rows.find(r => r.id === sl.id)
+      expect(stored, `returned an id that is not in set_logs: ${sl.id}`).toBeDefined()
+      expect(stored!.set_number).toBe(sl.setNumber)
     }
   })
 })
