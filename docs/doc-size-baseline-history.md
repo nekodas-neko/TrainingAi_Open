@@ -17833,6 +17833,21 @@ The lines are there for one reason: the bound. `generated-program.ts` already bo
 editor floors at 0 and **production holds 8 phases at `duration_cycles = 0`**, so `min(1)` would
 have 400ed the owner re-saving his own phase set. The entry records that, and records that whether
 0 should be reachable is a product question left open rather than settled by a validator.
+**2026-09-25 · `docs/implementation-backlog.md` · Review sweep 61, `review/sweep-61-ai-to-logic`.**
+31865 → 31945 (+80; rebased). Five entries (RV-200 to RV-204) at the owner's request to move AI calls to logic where
+possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
+cites the computed code the model currently rewords, which is what makes it buildable without
+re-deriving it.
+
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → 31822 (BF-200, the deload that skipped one exercise)
+
+The owner noticed one deloaded exercise carrying his normal working weight. The four-row table is the
+entry: three exercises land exactly on the round-up of 52% of their last real 1RM and the fourth does
+not, which is what turns "the deload is broken" into "the deload works and this one exercise took a
+different basis". Two mechanisms both produce 30 and the entry refuses to pick between them, so it
+carries both plus the existing `source` field that settles it.
 
 ## 2026-09-25 — `docs/implementation-backlog.md` (RV-177 rate limits)
 
@@ -17844,3 +17859,5 @@ The lines record that both claims held on re-verification — the meal PATCH rea
 — and that the meal limit sits **inside** the scale branch rather than at the top of the handler,
 because the same route serves a rename that costs nothing. That placement is the kind of thing a
 later reader would otherwise "tidy" into a handler-level guard.
+
+32007 → 32012 (+5; rebased onto main's 31945 and 31822 entries above).

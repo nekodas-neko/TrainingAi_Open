@@ -1764,6 +1764,85 @@ which is the right shape for something that can only be validated by living with
 - **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
   `generativelanguage.googleapis.com` at the same time.
 
+### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
+- **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
+- **Added:** 2026-09-25 · Review sweep 61 ([`docs/reviews/2026-09-25-sweep-61-ai-to-logic.md`](reviews/2026-09-25-sweep-61-ai-to-logic.md)). **Owner request, 2026-09-25:** *"we use AI more than we need to … use logic instead to save on tokens and offline compatibility."* That request is the product decision, so **no further owner gate is needed**. The only cost is the AI's phrasing.
+- **The four, each measured at source:**
+  1. **daily-digest** runs automatically when the End-of-Day review opens (`day-digest-card.tsx:37-47`).
+     - Every fact line is already built in `app/api/daily-digest/route.ts:59-142`.
+     - The model is also fed the day's earlier AI insights, so it summarises other model output.
+     - **Replace:** render the fact lines as a short list, using a pure shared builder.
+  2. **session-explain insight** runs automatically on every page open (`app/api/session-explain/insight/route.ts:41-57`).
+     - `groupSignals`/`trendPhrase` (`group-signals.ts:42-83`) already turn the same signals into words on the same page.
+     - **Replace:** a template that names the heaviest-weighted signal.
+     - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
+  3. **running-plan explain** runs automatically, once per day per run (`prescribed-run-card.tsx:61-85`).
+     - The route's own header says it only rewords the deterministic `rationale` and is "never load-bearing".
+     - **Delete the route and the fetch;** the rationale is already on the card.
+  4. **nutrition-goals-recommend**: since RV-66, every number comes from `calculateBaseline`.
+     - The model now only picks an activity level, using a threshold its own prompt spells out (`route.ts:316`), and writes prose.
+     - A model failure still returns **500 and a "Failed to get recommendation" toast, discarding numbers already computed** (`:373-377`).
+     - **Replace:** the threshold becomes a function and the "built from…" sentence becomes a template.
+     - Correct the stale "AI adjusts this baseline" header in `components/profile/goal-baseline.ts`.
+- **Where it can, the text is built on the device, so it works offline:** daily-digest and session-explain read local-first data.
+- **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
+
+### [platform][app-shell] RV-201 — health-insight and weekly-digest: show computed text first, and let the week page work offline
+- **Lane: A**, then **B**. One PR. **Supersedes PS-31(a) and (b) for these two routes**; update PS-31 when this lands.
+- **Added:** 2026-09-25 · Review sweep 61.
+- **health-insight** has 26 calls in 30 days, the most of any prose route. It runs automatically on every Health detail screen (`ai-insight-card.tsx:72-77`).
+  - Every data line is computed in `app/api/ai/health-insight/route.ts:100-181`, and the numbers-only fallback already exists (`:195-198`).
+  - The cache key hashes the prompt, and the prompt includes a "Past week scores" line (`:116`) that changes daily. So it **regenerates every day**, and again on any back-fill.
+  - It is also where Q-292's false "perfect" and the imperial units came from: 16% of 117 insights audited.
+  - **Fix:** a template per section (band, weakest contributor, today against the 7-day values), rendered immediately and offline.
+  - Keep the model only if the owner later wants the prose back. The recommendation is to drop it.
+- **weekly-digest** runs automatically on **every Home visit** until the week's result is cached (`weekly-recap-banner.tsx:53`), and when `/health/week` opens.
+  - **The week page's charts ride on the AI POST**, so offline the whole page shows its error state.
+  - The rate-limit exit (`route.ts:277-279`) returns 429 **without** the metrics it has already computed.
+  - **Fix:** serve `WeeklyDigestMetrics` from a GET through `cachedFetch`, so the charts paint offline, and template the bullets from the week-over-week deltas.
+- **Done when:** both surfaces render with the network off, and neither shows a superlative or an imperial unit.
+
+### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
+- **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
+- **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
+- **What:**
+  1. **Model failure → 502** (`generate-prescription.ts:316`).
+     - The client ignores the non-ok response and polls `PRESCRIPTION_POLL_MAX = 10` times at 3 s.
+     - The user watches "Preparing your AI workout…" for about 30 s, then gets the base program.
+     - **The deterministic path already exists:** the whole-session deload builds a full prescription with no model (`:59`), and `fitToBudget`/autoregulation run after the model anyway.
+     - **Fix:** on failure, return the deterministic prescription flagged `source: 'rules'` instead of 502.
+  2. **A duration preset change re-runs the whole model call** (`use-duration-preset.ts:52`, `mood-checkin-sheet.tsx:148`), although the budget fit is pure code.
+     - **Fix:** re-fit the stored prescription with `fitToBudget`, with no model call. That also works offline.
+  3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
+     - The pending flag only comes from a server response (`workout-screen.tsx:446`).
+     - **Fix (B):** label the source ("Base program" or "From {date}").
+- **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
+
+### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
+- **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
+- **Added:** 2026-09-25 · Review sweep 61. nutrition-scan is the second-largest AI user, with 29 calls in 30 days.
+- **Photo and recipe-link scans stay on the model;** they genuinely need it. Everything below is logic-first, with the model kept as the fallback:
+  1. **Describe goes straight to the model** (`capture-actions.tsx:219-223`) and never searches the user's own foods. `store.searchFoodItems` already powers `ingredient-picker.tsx:87` and `food-list.tsx:105`.
+     - **Fix:** search saved foods (including earlier AI estimates) and saved meals first, and offer the model only when nothing matches.
+  2. **Barcode always calls Open Food Facts** (`capture-actions.tsx:250`), so a product scanned before still fails offline.
+     - **Fix:** look up the user's saved foods by barcode first.
+  3. **"Refine" with a portion correction** ("it was 300 g") calls the model again (`review-step.tsx:129`).
+     - **Fix:** parse a plain weight or serving count and rescale with the existing weight editor. Anything else still goes to the model.
+  4. **Meal plans default to inventing every meal:** `useLibrary` starts `false` (`meal-plan-setup-sheet.tsx:81`).
+     - **Fix:** default it on when the user has saved meals, so the model fills only the gaps. The route already skips the model when every slot is filled (`generate/route.ts:297-307`).
+- **Done when:** a repeat Describe or barcode for a known food works offline with no `nutrition-scan` row logged.
+
+### [workouts] RV-204 — workout-review and the recap have code that already does their job; neither ran in 30 days
+- **Lane: A.** Low priority: zero calls in 30 days.
+- **Added:** 2026-09-25 · Review sweep 61.
+- **workout-review** (runs automatically when its sheet opens from Config):
+  - `reconcileReview` already clamps every adjustment, refuses unsafe drops, back-fills what the model omitted, and recomputes duration and weekly volume (`reconcile.ts:104-220`).
+  - `dropToBudget`/`fitToBudget` already fit a session to its budget.
+  - **Fix:** run those directly, losing only the free-text drop reasons (a fallback string already exists, `:177`). Size M.
+- **Recap:**
+  - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
+  - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
+
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
 - **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
@@ -3592,6 +3671,68 @@ drift.
   " of work" spends width ahead of the segments after it (`Phase transition suggested`,
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
+
+### [workouts] BF-200 — the deload applied to four exercises and not the fifth: Skull Crusher was loaded at 30 kg where 52% of its 1RM is 19
+- **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
+- **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
+- **Needs:** — nothing.
+
+- **He is right, and it is one exercise out of five.** Measured against production for the deloaded
+  Upper session (prescription stored 2026-09-25 21:24, all five exercises `pct: 52`,
+  `deloaded: true`):
+
+  | exercise | last real 1RM | 52% of it | rounded to a loadable load | **app showed** | |
+  |---|---|---|---|---|---|
+  | Incline Bench Press | 56.25 | 29.25 | 30 | **30** | ✅ |
+  | Chest-Supported DB Row | 15.5 | 8.06 | 8.75 | **8.75** | ✅ |
+  | Dumbbell Lateral Raise | 11.25 | 5.85 | 6.25 | **6.25** | ✅ |
+  | **Barbell Skull Crusher** | **36.5** | **18.98** | **20 (empty bar)** | **30** | ❌ |
+
+  So the deload machinery works — three of four land exactly on the round-up of 52% × the last real
+  1RM. **Skull Crusher was loaded at 30 kg, which is his ordinary working weight**: his 2026-09-20
+  session was 30×8, 30×8, 30×8. A deload that prescribes last week's weight is not a deload, and it
+  is the only exercise where that happened.
+
+- **Two candidate mechanisms, both landing on exactly 30, and this entry does NOT pick between them.**
+  - **(a) the pct was applied to the ALL-TIME PR instead of the last real 1RM.** `personal_records`
+    holds **57.75 kg** for this exercise (achieved 2026-08-13) against a last-real of 36.5.
+    **52% × 57.75 = 30.03 → 30**, an exact match needing no rounding. This is the leading candidate
+    on precision alone.
+  - **(b) the deload pct was not applied at all and the normal target-80 was used.** The 2026-09-19
+    log stores `target_80 = 29.25`, which is not loadable on a 20 kg bar with paired plates and
+    would snap to **30**.
+  Both reproduce the number, so the arithmetic cannot separate them.
+
+- **⭐ The check that settles it, and it already exists.** `resolveWorkingBasisWithSource`
+  (`packages/shared/src/1rm.ts:500`) returns **`source: 'last_real' | 'seed' | 'pr'`** precisely so a
+  caller can say which input won. Log or assert that `source` for `Barbell Skull Crusher` on this
+  session: **`pr` proves (a)**, `last_real` proves (b) and moves the hunt to where the pct is applied.
+  No new instrumentation is needed — the field was built for this question.
+
+- **Why (a) would be possible at all, which is the part worth understanding.** The documented
+  precedence is `lastNonDeload1rm` → then `max(seed, pr)`, and the comment at `1rm.ts:469` says the
+  PR is *"reached only when there is no real logged session at all."* A usable 36.5 exists, so under
+  (a) the last-real value did **not** reach the resolver — which points at
+  `getLastRealOneRmBatch`'s exclusion of deload rows rather than at the resolver itself.
+  **`estimated_1rm` is stored as 0 on deload rows** (2026-09-04 and 2026-08-06 both read 0), so a
+  query that filters on that column can return nothing for an exercise whose recent history is
+  deload-heavy, and the fallback to a months-old PR is then silent.
+- **⚠ The PR itself looks inflated, which is what makes the failure land on exactly his working
+  weight rather than somewhere obviously wrong.** 57.75 kg against a current 36.5 is a 58% gap, and
+  30×8 implies roughly 36–38 by any standard formula. CLAUDE.md already records an inflated-PR class
+  from divergent 1RM copies with a wrong high-rep guard. **Whether this PR row is a survivor of that
+  is not established here** — it is flagged because a wrong basis and an inflated basis compound:
+  either alone would have been visible, together they produce a plausible-looking number.
+
+- **Reversal cost: low** for the fix itself; the risk is in the direction of the error, since a
+  deload that silently prescribes full weight is the failure mode that does not announce itself.
+- **Not diagnosed here.** Whether other sessions are affected — `Pull` is also a whole-session deload
+  (5 of 5) and was not checked exercise-by-exercise, and the same condition would hit any exercise
+  whose recent logs are mostly deloads.
+- **Verification:** for the deloaded Upper session, `resolveWorkingBasisWithSource('Barbell Skull
+  Crusher')` reports `last_real` with 36.5; the prescribed load reads ~20 kg (floored at the empty
+  bar) rather than 30; and the other four exercises are unchanged at 30 / 8.75 / 6.25 and their
+  bodyweight equivalent. **Device look owed** — the load is only visible on the exercise screen.
 
 ### [workouts] BF-199 — the prescription barely uses the model it is named after: sets are always clamped, reps/pct follow a table, and rest is the only free output and it is noise
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`, `app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`.
@@ -13401,6 +13542,7 @@ neighbours. Until then `excludeLowWearDays` drops all 22 from the HRV/RHR baseli
 nulling the column is data-dropping, and a Redecode restores real numbers.
 
 ### [platform] PS-31 — AI calls with no data gate, a missing maxRetries, and a blind fingerprint
+- **🔎 2026-09-25 (Review sweep 61):** (a) and (b) are still open. For `health-insight` and `weekly-digest`, **RV-201 supersedes them**: it replaces the prose with computed templates, so the gate and the fingerprint stop mattering there. (c), `running-plan/explain`'s retries, becomes moot under **RV-200**, which deletes that route.
 
 - **Lane:** A — `app/api/ai/health-insight/route.ts`, `app/api/weekly-digest/route.ts`,
   `app/api/running-plan/explain/route.ts`, `app/api/nutrition/scan/route.ts:184`.
