@@ -1,7 +1,7 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-144 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-147 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
@@ -11,43 +11,43 @@ exits keep nothing — his call). Four of eight named one surface and had a seco
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; two
-Review sweeps reordered the head in one day. It last offered **RV-183**, then RV-185, RV-178, RV-122.
-**RV-166 is parked properly now** — blocked on RV-170's unanswered rider but saying so in prose only,
-so the runner offered it twice; it carries `Needs: RV-170`. If an entry looks blocked but reads
-READY, check for that shape.
-**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is in the Orchestrator's chat;
-do not re-ask or re-make). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
+Review sweeps reordered the head in one day. **The owner's stated highest priority is tab/page
+switch speed**, so `DV-12` heads the lane the moment the phone is available. Otherwise RV-183, then
+RV-185, RV-178, RV-122.
+**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate:
+device`) both headed READY while unstartable. The field must LEAD its own bullet; inline after
+`Lane:` parses as nothing.
+**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
 ## Blocked / owed
 
 - **LB-134 is the owner's** (branch protection). Until he rules, read the five job CONCLUSIONS before every merge and expect the merge race below.
-- **A QUESTION FILED `Lane: O` COMES BACK** — RV-121's owner half returned as Lane B work within
-  hours, so write the brief properly (he takes the recommendation), then build it. Device checks are
-  DV's to RUN and mine to RECORD; a FAILED one comes back as work too.
+- **A QUESTION FILED `Lane: O` COMES BACK** — write the brief properly, then build it. Device checks are DV's to RUN, mine to RECORD.
 
 ## Claimed paths
 
-- `lib/calendar-month.ts` (LB-143) — a bare `lib/*.ts` module is the rule's ambiguous case; nothing
-  under `app/api/**` reaches it, so B. Release on merge.
+- None. (`lib/calendar-month.ts`, LB-143, released — #1578 merged.)
 
 ## Lessons that cost real time
 
-- **⚠ THE MERGE CALL IS NOT A GATE** — #1467 merged with `Tests` FAILING. Read the five conclusions
-  via `list_workflow_jobs` (`resource_id`, not `run_id`).
-- **THE MERGE RACE IS ARITHMETIC — seven lost cycles on one PR.** CI ~7 min vs a commit to `main`
-  every ~4. Merge the INSTANT the five are green; no run for your head = conflicted PR.
+- **⚠ THE MERGE CALL IS NOT A GATE** (#1467 merged past a PENDING `Tests`, which then failed). Read
+  the five conclusions — `get_job_logs failed_only` is cheap but "0 failed" on a RUNNING run is not
+  green. **The merge race is arithmetic:** CI ~7 min vs a commit to `main` every ~4, so merge the
+  instant the five are green; no run for your head = conflicted PR.
 - **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
   entry when the floor is a judgement rather than a fit.
-- **⚠ RE-RUN THE GATES AFTER MERGING THE BASE, NOT BEFORE.** The doc-size ratchet is BASE-RELATIVE:
-  `check:rules` passed, the merge of `main` consumed the slack, CI went red on #1574. Another lane
-  hit the same thing within four minutes, so it is the ordering, not a slip.
+- **GREP THE FIELD, NOT THE FILES THE ENTRY NAMES** — five in a row named one surface and had more. BF-196 said "one string"; a third had already solved it, so the fix was to MATCH its phrasing, not ship the entry's nicer one.
+- **A BATCH CAN SHIP HALF** — ship the measurable half, sharpen the rest, and SAY which half in the PR and the entry.
+- **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
+  lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
+  #1587 red; `no-console` allows info/warn/error) · `pnpm test` · `pnpm build` · `tsc`. The doc-size
+  ratchet is BASE-RELATIVE, so a clean run before merging `main` proves nothing — that put #1574
+  red, and another lane hit it four minutes later.
 - **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS** — two sweeps inserting at one point is two
-  ADDITIONS, keep both; read the headings on each side, then DIFF THE FULL HEADING SET after the
-  merge, every time (#1481 silently deleted RV-117/118).
-- **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — a shared header means a splice drops
-  the other PR's entry. It conflicts on EVERY merge.
-- **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a
-  gating vitest file. **Writing a source scanner has four traps, all of which have bitten:** it
+  ADDITIONS; read the headings each side, then DIFF THE FULL HEADING SET after every merge (#1481
+  silently deleted RV-117/118).
+- **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — a shared header means a splice drops the other PR's entry; it conflicts on EVERY merge.
+- **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a gating vitest file. **A source scanner has four traps, all of which have bitten:** it
   matches ITSELF (`git ls-files` hides it only while untracked, and `ls-files A B -- '*.tsx'` UNIONS
   pathspecs — filter in JS); it matches the COMMENTS explaining the fix (strip them); a regex cannot
   balance parens (`f\([^,)]+\)` flags the corrected `f(g(x), tz)`); arity is per-function.

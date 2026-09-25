@@ -10,7 +10,7 @@ protocol puts planning and building in separate PRs. This is PR 1.
 
 ## 1. The schema is written from a real report, not from a description
 
-The de-identified panel in [`docs/clinical-baseline-2026-08-27.md`](../../clinical-baseline-2026-08-27.md)
+The de-identified panel in the clinical baseline (held privately by the owner since 2026-09-24, RV-199)
 is 58 analytes from April 2026, and every awkward shape the schema must survive is already in it.
 Reading it rather than imagining it is the difference between a table that holds this report and one
 that holds a description of one:

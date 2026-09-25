@@ -221,7 +221,11 @@ export function DoneScreen({
 
   const STATS = [
     { label: "Exercises",  value: `${doneExercises.length}/${exercises.length}` },
-    { label: "Duration",   value: workoutDurationSec != null ? formatTime(workoutDurationSec) : "—" },
+    // "Total time", not "Duration" (BF-196). This is wall clock from the START OF THE WARM-UP, and
+    // the prescription card quotes WORKING minutes — so a 48:00 here next to a "~51 min" there read
+    // as three minutes under when the real comparison was 35.4 working against 51 planned. Naming
+    // it on the label rather than the value keeps the tile's number clean and its width unchanged.
+    { label: "Total time", value: workoutDurationSec != null ? formatTime(workoutDurationSec) : "—" },
     { label: "Sets",       value: String(displaySets) },
   ];
 

@@ -22,17 +22,21 @@ describe('client reads bypass the browser HTTP cache', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   it('cachedFetch asks for no-store, so revalidation cannot be answered from the HTTP cache', async () => {
-    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ ok: 1 }) }))
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, json: async () => ({ ok: 1 }) }))
     vi.stubGlobal('fetch', fetchSpy)
 
     await cachedFetch('http-bypass-key', '/api/anything', 60, () => {})
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+    // Exact match on purpose: it catches anything unexpected reaching `fetch`. BF-195 briefly
+    // added an `AbortSignal.timeout` here and that abort is what broke the E2E suite — the
+    // watchdog that replaced it observes the request instead of cancelling it, so `init` is
+    // back to exactly one key and this guard is worth keeping strict.
     expect(fetchSpy.mock.calls[0][1]).toEqual({ cache: 'no-store' })
   })
 
   it('the today-envelope variant goes through the same path, so it inherits the bypass', async () => {
-    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ ok: 1 }) }))
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, json: async () => ({ ok: 1 }) }))
     vi.stubGlobal('fetch', fetchSpy)
 
     await cachedFetchToday('http-bypass-key-today', '/api/anything-today', 60, () => {})

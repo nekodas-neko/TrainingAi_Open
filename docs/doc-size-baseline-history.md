@@ -17032,6 +17032,121 @@ The seventh is a `Needs: RV-170` on RV-166. The entry was already blocked, but s
 inside its `Lane:` line, so `next-item.js` offered it as Lane B's ready work twice in one session.
 One line in the field the runner actually reads is cheaper than the two pick-ups it cost.
 
+## 2026-09-24 — `docs/implementation-backlog.md` → 30349, four owner decisions recorded (OR-159)
+
+Net growth from four answers arriving at once, and most of it is one entry. RV-199 grew because the
+owner's "all three" had to be separated from what it did **not** decide: its third item recommended
+*deciding* the ring-key question deliberately, so reading the approval as an answer would have put
+words in his mouth. That split costs two new entries (`OR-159`, `OR-160`) and a paragraph saying why.
+
+The clinical-baseline removal also costs lines it would be wrong to save. Two of them record what was
+deliberately NOT done — the derived figures stay, and there is no history rewrite, so **the data
+remains in public git history**. A removal that reads as a clean one would be the more dangerous
+document.
+
+TN-64's decision is long for the same reason: it names the three parts in order and then says
+explicitly not to re-tune the 45 / 1.2 thresholds in the same change, because a prompt firing would
+then be unattributable. `RV-113` was deleted outright (declined), which is where the offsetting
+shrink comes from.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30349, the tab-switch reversal (OR-159, amended)
+
+`RV-113` was deleted as declined and then reinstated in the same PR, because the owner reversed
+himself once he heard the reasoning — tab-switch speed is his stated highest priority. The entry
+comes back longer than it left, and every added line is a guard against the thing he was sold:
+
+**It removes a blank, not a delay.** Its 58–109 ms gap is the same frames as `DV-12`'s long task, so
+the pass test will show no improvement and someone will read that as the fix having failed. An entry
+that recorded only "owner approved, build it" would produce exactly that misreading.
+
+`DV-12` grew for the opposite reason — it SHRANK in obligation. It was parked on `Lane: DV` awaiting a
+CPU profile that sweep 3 had already taken, so the lines added are the profile's result and the
+argument that what remains is a grep rather than a phone. Recording why a park was correct when
+written and is not now is what stops the next sweep re-parking it.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30540, the perceived-latency sweep (OR-161/162/163)
+
+Three entries from the owner's instruction that perceived latency counts as much as real latency.
+The growth is mostly two refusals to overclaim.
+
+`OR-162` spends its length on why the obvious fix is a regression: removing `content-visibility:
+hidden` stops the chart re-measure and restores the 21.3 % main-thread burn it was added to prevent.
+An entry naming the mechanism without that warning would read as a one-line fix and cost a cycle.
+
+`OR-163` is longer than the two findings it follows, on purpose. It exists to say that those findings
+are **not** the sweep — they came from following two known defects outward over twenty minutes, and
+recording them as the answer is the LB-108 shape, a result computed from the wrong starting set that
+looks complete. It also carries two structural gaps found while filing: no `Lane:` value for Review,
+and the device agent archived behind a 🟢 title.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30362 (BF-196 + BF-189 amendment)
+
+The finish-time question, answered by measurement: 51 minutes is the working budget exactly, not a
+shortfall against 60. The length is the five-term table that derives it — session budget, measured
+warm-up, the clamp, the working budget, the stored prescription — because the whole answer is that
+two numbers are the same and one of them is labelled ambiguously. The BF-189 amendment rides along
+since the same measurement rules out one of its candidate explanations.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30461 (BF-197, LA-65 amendment, two corrections)
+
+The same session's follow-up, and it partly overturns the entry above. The estimate that lands on 51
+does so by charging a rest he skips 93.5% of the time and a transition after the last exercise — 14.2
+phantom minutes against a measured 39.9-min working median. The length is the two-column table (as
+shipped vs corrected, at 2 and 3 sets) plus the counter-argument from `expandToBudget`'s own comment,
+which is real and had to be answered rather than omitted. Two corrections in place are the rest: the
+withdrawn clause in the BF-189 amendment and the wrong second sentence in BF-196. Striking them where
+they were written costs lines and is the only way a reader of those entries sees the correction.
+
+## 2026-09-24 — `docs/implementation-backlog.md` → 30624 (BF-196, second surface)
+
+The owner read `48:00` on a completed session and asked whether the warm-up was counted. It is — and
+the amendment costs lines because the answer is that the two numbers he compares are in different
+units: the card's estimate is working time, the summary's duration is wall clock. Recording it needs
+both the code anchors and the session's three timestamps, because "it is counting it" is not
+believable without them.
+## 2026-09-24 — `projectOverview.md` 12771 → 12785 (LB-144, #…)
+
+Fourteen lines: the Known-Issues row CLAUDE.md requires for a change that shipped without a device
+pass. The tab switch no longer blanks (RV-113), and the check owed is a *look*, not a measurement —
+the Device Verification session is archived.
+
+Most of the row is there to stop a specific wrong conclusion. RV-113 removes a blank, not a delay,
+so the obvious verification (`perf.js longtasks`) will show no improvement; without the row saying
+so, the next reader measures it, sees nothing, and records a working fix as a failed one. The 68–118
+ms long task under it is DV-12, still open. A row that only said "not verified on device" would have
+cost more than the lines it saved.
+
+
+## 2026-09-24 — `projectOverview.md` → 12796 (BF-195)
+
+Twenty-five lines for the owner's own report, and three of them are the reason it cannot be struck.
+
+The fix is one sentence: connectivity was a boolean, the fetch had no timeout, so a request on a
+dying connection never settled and the screen held its skeleton. What needs the space is the list of
+what is still owed — the device look (and that the honest reproduction is throttling, **not** airplane
+mode, which exercises the path that already worked), the banner copy that still over-promises on a
+screen with nothing saved, and that the 8 s figure is a starting value nobody has measured.
+
+The separately-observed month-stale sleep card is recorded as NOT diagnosed, with the reason: a
+screenshot cannot tell a stale cache entry from the card's own fallback. Writing it as part of BF-195
+would send the next session to fix the wrong thing.
+
+## 2026-09-24 — projectOverview.md 12796 → 12807 (BF-195 correction)
+
++11 lines on the BF-195 Known-Issues row, recording that the **first** version of that fix — an
+`AbortSignal.timeout` that cancelled the request — was wrong, and why. It is kept rather than
+quietly overwritten because the row's own caveat predicted the wrong failure: it said *"a finding
+about the number is not a finding about the approach"*, and the defect was the approach. A future
+session reaching for a cancelling timeout on a slow connection should find the reason it was
+already tried and reverted, not just the current code.
+
+## 2026-09-25 — `projectOverview.md` → 12821 (BF-195 merge recompute)
+
+Not a deliberate raise: two branches added Known-Issues rows to the same document in parallel, so the
+`.size` conflicted on a single number. Recomputed with `--fix` on the merged file rather than taking
+either side — picking one would have encoded a count that matches neither branch's reality, and the
+check would then fail on `main` for whoever merged second.
+
 ## 2026-09-24 — `docs/implementation-backlog.md` 30487 → 30520 (TN-70 verification)
 
 Thirty-three lines on TN-70, and the reason they are worth it is that most of them stop work rather
