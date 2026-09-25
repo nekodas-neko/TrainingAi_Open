@@ -17761,3 +17761,12 @@ The lines that stayed are the corrections, which are the part worth the space: t
 backwards — the schema permits slashes on purpose and the right fix accepts and converts them. The
 `Keep:` also records which of the remaining groups have been re-verified (two) and which have not
 (four), so the next session does not re-derive that.
+
+## 2026-09-26 — `docs/implementation-backlog.md` → 31727 (BF-198, the dead `Full` toggle)
+
+The owner asked how to select a full workout when the prescription is a deload. The answer is that he
+cannot, so the entry has to carry why: the four-row production table showing both deload shapes in his
+own data (whole-session always dead, per-exercise always working), the `.strict()` schema proving the
+card's stated remedy has no route behind it, and the 1RM gate that makes lifting heavy anyway earn
+nothing. Each is a claim he would otherwise have to take on trust, and the third is invisible from the
+app entirely.
