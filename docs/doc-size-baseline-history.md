@@ -17311,6 +17311,19 @@ it — the analysis took a PR of its own.
 script evaluation matters at cold start", and RV-186 is the unrun device baseline, so it was
 self-describing as blocked while printing as ready.
 
+## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31155 (RV-173 + TN-72 scoping)
+
+Three lines, and the interesting part is why this needed a second round.
+
+RV-173's entry was REMOVED (it shipped in full), and TN-72 gained a scoping note explaining that its
+"bounded admin re-derive" needs the body-battery route's per-day computation extracted first — that
+precedent could call an existing function, this one cannot. Net +3.
+
+The baseline moved twice because CI builds a PR against **live `main`**, not the base the branch
+merged. Two other PRs grew the backlog between the local run and the CI run, so a locally-clean
+ratchet failed on a number neither branch was wrong about. Recomputed against the newest main rather
+than argued with.
+
 ## 2026-09-25 — `CLAUDE.md` → 1006 and `projectOverview.md` → 12851, the ruleset was Disabled (OR-164)
 
 Both orientation docs grow for the same reason, and it is not the good news. `main` is genuinely
