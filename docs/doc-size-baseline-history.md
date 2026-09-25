@@ -17673,3 +17673,21 @@ for the owner than the one the entry was posing.
 Also folded in: why `RV-99` is now `Lane: A` (its Lane B half is entirely the owner's), the second
 workout-clocks-class defect and why no same-screen scan could have found it, and one
 checked-and-dismissed One-Formula suspicion so nobody re-opens it.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31468 → 31515 (+47, LB-155 / LB-156)
+
+A triage and the entry it produced. `LB-155` said "~20 conversions remain" and the number was never
+the useful thing: read site by site, **3** were Lane B's to convert, **3** are authoritative reads a
+conversion would BREAK, **10** need a `lib/cache-groups.ts` entry that is Lane A's to make, and 8 stay
+deliberately deferred. The remaining Lane B work was therefore **zero**, and the entry has been
+sitting at the top of the lane for it.
+
+Most of the addition is `LB-156`, the Lane A entry that unblocks the ten — a five-row table of key →
+writer → group, plus the case that makes it more than bookkeeping: `invalidateNutritionWrite` has
+cleared `day-checkin:` since it was written, **for a key nobody ever created**, while
+`invalidateCheckinAffectsPrescription` — which the check-in writes themselves call — does not clear it.
+A conversion done without that entry would cache a check-in that a *food log* evicts and a *check-in
+save* does not.
+
+The three authoritative reads are recorded in the scanner rather than here, with their reasons, which
+is where a future mechanical sweep will actually look.

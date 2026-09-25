@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.60",
+    date: "2026-09-25",
+    changes: [
+      "The heart-rate trace on the just-finished-activity screen is kept, so it reappears instantly instead of being re-fetched, and entering a treadmill distance no longer requests it a second time.",
+      "Your dietary restrictions are remembered between meal-plan setups rather than re-downloaded each time.",
+    ],
+  },
+  {
     version: "1.465.59",
     date: "2026-09-25",
     changes: [
