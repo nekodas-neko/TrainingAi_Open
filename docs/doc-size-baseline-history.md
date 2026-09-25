@@ -17571,3 +17571,14 @@ replaces because it carries its exact `UPDATE` and a `Gate: owner`, which is the
 writes production rows, so it has to be startable by whoever picks it up without re-deriving the
 statement. Trimmed from 21 lines to 16 before raising the number rather than banking the whole of
 the first draft.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31365 → 31368 (+3)
+
+`RV-68` shipped and keeps its entry, because the device look it always named as its verification is
+genuinely owed — the contention this fixes cannot be staged off the APK, so the fix rests on source
+ordering plus the repo's own recorded measurement of the identical shape in `mood-checkin-sheet.tsx`.
+
+Three lines, for the two things a later reader would otherwise redo: the entry asks for a haptic to
+be moved above the `try` and there is no haptic in that file (none was added — new device behaviour
+on a daily surface, unverifiable here), and the in-flight guard is deliberately NOT released with
+the paint, since moving the writes off the await path would otherwise re-open the double-tap window.

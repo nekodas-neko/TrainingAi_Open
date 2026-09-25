@@ -6103,32 +6103,35 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **Verification:** after the owner applies a post-RV-66 recommendation, `nutrition_targets` matches
   `calculateBaseline` for his profile, clamp floors included.
 
-### [nutrition][app-shell] RV-68 — the supplement tick paints only after three awaited local writes and a native call
+### [nutrition][app-shell] RV-68 — the supplement tick now paints before the writes; the device look is owed
 
-- **Lane:** B — `components/nutrition/supplements-section.tsx:66-106`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- **Verification:** device. The contention this is about cannot be staged off the APK, so the fix
-  ships and is then looked at on the S25 — **it is not gated**. `Gate: device` was written here on
-  2026-09-20 and parked buildable work for two days (OR-122): the fix below is three statements
-  moved above a `try`, needs nothing from the phone to write, and a gate that cannot be lifted until
-  someone starts the work it forbids starting is circular. Unbuilt work gets a Verification line.
-- `applyOptimistic()` sits at **line 92**, behind `await store.upsertSupplementLog(...)`, `await
-  store.queueMutation(...)` and `await cancelSupplementReminder(s.id)` (`:89`), with `if (toggling)
-  return` (`:47`) disabling the row for that whole span. The web-fallback branch is worse —
-  `await fetch(...)` at `:101`, paint at `:106`.
-- **The repo already fixed this exact shape and wrote down why**, `components/mood-checkin-sheet.tsx:264`:
-  *"Started, NOT awaited. 'The local write is fast' held only while nothing else was using the DB:
-  the Capacitor plugin has one connection, so a tap that lands during the sync pull's applyDelta
-  transaction queues behind the whole delta. Awaiting it left the button reading 'Saving…' for ~2
-  minutes on 2026-08-13."* Supplements write to that same single-connection store from the Nutrition
-  tab, which is where `pullDelta` also lands.
-- **Fix:** move `applyOptimistic()` and the haptic above the `try`, as the mood sheet does; run the
-  store writes and `cancelSupplementReminder` un-awaited and revert only on failure. In the fallback
-  branch, paint first and reconcile on `!res.ok`.
-- **Not established:** `getLocalStore()` returns null off the APK, so the contention was **not
-  reproduced here**. This rests on the source ordering plus the repo's own recorded measurement of
-  the identical shape — which is why the gate is the device.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the guard line is `supplements-section.tsx:48`.
+- **Lane:** B. **Added:** 2026-09-20 · Review sweep 51. **Shipped 2026-09-25** —
+  `components/nutrition/supplements-section.tsx`.
+- **Verify: device**
+- **Keep:** the device look, which this entry always said was the verification rather than a gate.
+  On the S25, tick a supplement from the Nutrition tab **while a sync pull is running** — the tick
+  should appear on the tap, not after a pause. The row stays briefly non-interactive; that is
+  deliberate (below).
+- **✅ Shipped as the entry specified**, in the shape `mood-checkin-sheet.tsx` already used and
+  documented: paint first, run the store writes and `cancelSupplementReminder` in an un-awaited
+  block, reconcile after. The justification is the repo's OWN measurement of the identical shape —
+  one Capacitor SQLite connection, so a tap during `applyDelta` queues behind the whole delta, which
+  left the mood button reading "Saving…" for ~2 minutes on 2026-08-13.
+- **⛔ Two adjustments the entry did not cover.** It says to move "`applyOptimistic()` and the
+  haptic" above the `try`; **there is no haptic in this file** — none was added, because that is new
+  device behaviour on a daily surface with no way to verify it here. And painting first means a
+  failure must now **undo** the tick explicitly: the old code could leave its `catch` silent only
+  because it had not painted yet.
+- **⛔ The in-flight guard is deliberately NOT released with the paint.** Moving the writes off the
+  await path would otherwise have cleared `toggling` immediately and re-opened the double-tap window
+  — the class that once turned five taps into four `complete-workout` POSTs. It now clears when the
+  write settles, so what comes back instantly is the tick, not the ability to tap again.
+- **Not established, and unchanged by this:** `getLocalStore()` returns null off the APK, so the
+  contention was never reproduced here. The fix rests on source ordering plus that recorded
+  measurement, which is exactly why the device look is owed.
+- **Guard:** `components/nutrition/__tests__/rv68-supplement-tick-paints-first.test.ts` asserts the
+  ORDERING, which no output assertion could catch — it only diverges under contention the sandbox
+  cannot stage. 2 of its 3 assertions fail against `origin/main`.
 
 ### [app-shell] RV-71 — the shared Button has no press state on a touch-only product, while 45 files hand-roll one
 

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.54",
+    date: "2026-09-25",
+    changes: [
+      "Ticking a supplement now shows the tick straight away. It used to wait for the save to finish, which is instant most of the time but can take much longer if the app happens to be syncing \u2014 so the tap looked like it had not registered.",
+    ],
+  },
+  {
     version: "1.465.53",
     date: "2026-09-25",
     changes: [
