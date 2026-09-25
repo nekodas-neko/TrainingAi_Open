@@ -5140,71 +5140,35 @@ drift.
 - **Worth doing only if RV-186 shows script evaluation matters at cold start.** FCP is already
   1.02 s, and the service worker caches the chunks after the first load.
 
-### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
+### [platform] LA-145 — a date's SHAPE is checked in 25 files; its VALIDITY in 9
 
 - **Lane: A**
-- **Keep:** the date group, the unscoped/dead pair and the phase-set schemas all shipped
-  2026-09-25, and both rate limits with them. **Two groups remain, NEITHER re-verified** — the two
-  unbounded written weight dates, and `calendar-data`'s NaN year with its validate-before-auth
-  ordering plus the two unguarded body ids. Re-verify each against `main` before writing code: **three** of
-  this entry's claims have already turned out stale or backwards.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
-gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
-- **✅ SHIPPED 2026-09-25 — both missing rate limits**
-  ([entry](overview/entries/2026-09-25-rv177-rate-limits.md)). Claims confirmed: the meal PATCH's
-  `scaleToTarget` branch really does reach `generateObject` (through `scaleWithTopUp`) with no cap,
-  and `log-calendar-event` had neither a limit nor a schema.
-  - The meal PATCH is limited **on the scale branch only**, at 40/h to match `generate/meal`'s
-    per-meal granularity — limiting the whole handler would throttle a rename, which costs nothing.
-  - `log-calendar-event` gets 30/h plus a `.strict()` Zod body. Its `!startMs` guard passed any
-    truthy value into `new Date(startMs).toISOString()`, so a string or `1e20` threw RangeError and
-    answered a bodiless 500.
-- **No clock bound on a written weight date (Q-494's missed siblings):**
-  - `sync-health/route.ts:108-111`, where an invalid date also poisons the whole batch.
-  - `body-metadata/route.ts:288-292`.
-- **✅ SHIPPED 2026-09-25 — the date group, all four**
-  ([entry](overview/entries/2026-09-25-rv177-date-validity-group.md)). `ai/health-insight` and
-  `food-logging-complete` take `normalizeDateParamIso` in the handler; `activity-logs` and
-  `fitness-tests` get `.refine(isCalendarDate)` in their **shared** validators, which also closes the
-  `pushMutations` path they share.
-  - **⚠ The entry framed health-insight's slash half as a validation gap and it is the opposite.**
-    The schema allows `2026/09/10` deliberately — that is what the client's `localDateString()`
-    emits — and the handler then built `new Date('2026/09/10T00:00:00.000Z')`, Invalid for a real
-    day. So the fix ACCEPTS and converts it rather than rejecting it. A test asserting 400 there was
-    written, failed against the fixed route, and was corrected.
-  - The line numbers in the original were stale: `activity-logs:38` and `fitness-tests:38` are
-    inside `POST`, and neither route has a `date` query param at all — their dates arrive through the
-    shared body validators.
-- **🔎 The general form is bigger than these four, and is NOT filed yet.** The
-  `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex is repeated in **20+ files**, while `isCalendarDate` —
-  which exists for exactly this (Q-496) — guards only about five of them. Worth its own sweep entry
-  rather than being smuggled into this one.
-- **✅ SHIPPED 2026-09-25 — Zod on the three phase-set writes**
-  ([entry](overview/entries/2026-09-25-rv177-phase-set-schemas.md)). Claim confirmed exactly: all
-  three took a raw cast with no Zod at all. `PhaseSetWriteBody`/`PhaseSetCloneBody` in
-  `packages/shared/src/validation/phase-set.ts`, both `.strict()`.
-  - **⚠ The bounds came from production, not from the obvious precedent.** `generated-program.ts`
-    bounds `durationCycles` at `min(1)` and copying it was the first move — but the editor's stepper
-    floors at `Math.max(0, …)` and production holds **8 phases at `duration_cycles = 0`**, so
-    `min(1)` would have 400ed the owner re-saving his own data. It is `min(0)`.
-  - **Whether 0 cycles should be reachable at all is open**, and is a product question rather than a
-    validation one: the AI path forbids it, the editor allows it, and 8 rows have it.
-- **`calendar-data/route.ts:8-9`:** a NaN year slips past the range check, and params are validated
-  before auth.
-- **Body ids reach the uuid cast unguarded on POST**, which RV-47 did not cover:
-  `nutrition/food-logs/route.ts:44` and `oura/hr-sync/route.ts:29`.
-- **✅ SHIPPED 2026-09-25 — unscoped and dead code**
-  ([entry](overview/entries/2026-09-25-rv177-ownership-and-dead-code.md)).
-  - `createFoodItem`'s id-bearing read-back is now scoped on `userId` and refuses a 409 when the
-    client-supplied id belongs to someone else. It was handing that row — name, brand, macros —
-    back to the caller. The scope rather than a blanket refusal is deliberate: the branch exists so
-    an outbox retry of the same id by the same user stays idempotent, and a control pins that.
-  - `logExerciseWithId` and `logSets` deleted; neither was on the `WorkoutRepository` interface.
-  - **⚠ The "no real coverage is lost" note above was wrong, and the fix is better for it.** The two
-    `logSets` cases were NOT redundant: `logSets` collapsed on `set_number` while the live
-    `logExerciseAndSets` collapses on `set.id`, a different conflict target with **no direct test of
-    its own**. So the coverage was MOVED onto the live path rather than deleted, and removing that
-    live collapse now fails a test.
+- **Added:** 2026-09-25 · split out of RV-177, which closed the same day. RV-177 fixed four
+  date-validity gaps one at a time and the pattern under them was never filed, which is what this
+  entry is for. **The counts here are measured, not estimated** (`grep -rl` over `app/ lib/
+  packages/`, 2026-09-25): **25 files** carry the `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex, **9**
+  reach `isCalendarDate` or `normalizeDateParamIso`.
+- **Why the shape is not the check.** The regex accepts `2026-02-31` and `2026-99-99`. Both then
+  reach a `date` column and fail at the driver — `22008 date/time field value out of range` — which
+  surfaces as a bodiless 500, or, on a batch route, takes every record travelling with it. RV-177
+  measured exactly that on `sync-health`: a three-day payload with one bad day wrote none of it.
+- **The 11 files with a shape regex and no validity check**, as measured:
+  `app/api/admin/timing-baseline/route.ts` · `app/api/dexa-scans/route.ts` ·
+  `app/api/measured-rmr/route.ts` · `app/api/nutrition/plan-meal-answers/route.ts` ·
+  `app/api/water-log/route.ts` · `packages/shared/src/validation/injury.ts` ·
+  `packages/shared/src/validation/supplement.ts` · `packages/shared/src/validators/chat.ts` ·
+  `packages/shared/src/validation/health-connect-ingest.ts` · `app/api/sync-health/route.ts` ·
+  `lib/observability/sentry-scrub.ts`
+- **⚠ The last three are known false positives and must not be "fixed" blindly.**
+  `sentry-scrub.ts` matches dates to REDACT them, not to accept them — validity is meaningless
+  there. `sync-health` and `health-connect-ingest` both route their dates through
+  `ingestDayRejection`/`resolveIngestDate`, which call `isCalendarDate` internally; the grep cannot
+  see through the import. **So this is per-file triage, not a sweep** — the count is the reason to
+  look, never the size of the fix.
+- **The fix per file is one of two things**, both already in the tree: `.refine(isCalendarDate)` on
+  the validator where the date is a plain field, or `normalizeDateParamIso` in the handler where it
+  arrives as a param. Prefer ONE of them per route — RV-177 added both to `body-metadata` and the
+  mutation pass showed the second killed nothing, so it was reverted.
 
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 

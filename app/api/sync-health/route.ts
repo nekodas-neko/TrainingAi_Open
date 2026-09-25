@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from "@trainingai/shared/date-utils";
 import { z } from "zod";
 import { activityImplausibleReason, sleepImplausibleReason } from "@trainingai/shared/validation/plausibility";
+import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
@@ -105,11 +106,23 @@ export async function POST(req: NextRequest) {
   // sync forever (the poison-pill class, G-2). The reasons ride back in the response instead.
   const rejected: string[] = [];
 
+  // The `date` field was the one the per-record policy above did not cover, and it is the field
+  // most able to take the batch down with it: a shape-valid non-day such as `2026-99-99` reaches
+  // the `date` column and fails the INSERT for every record travelling with it (RV-177).
+  const tz = session.user.timezone ?? DEFAULT_TZ;
+  const today = todayInTz(tz);
+  const unusableDay = (date: string) => ingestDayRejection(date, today);
+
   // ── Body metrics (weight, body fat, steps, distance, calories, macros) ────
-  if (body.dailyMetrics?.length) {
+  const usableMetrics = (body.dailyMetrics ?? []).filter(d => {
+    const reason = unusableDay(d.date);
+    if (reason) rejected.push(`metrics ${d.date}: ${reason}`);
+    return !reason;
+  });
+  if (usableMetrics.length) {
     await repo.upsertBodyMetrics(
       userId,
-      body.dailyMetrics.map(d => ({
+      usableMetrics.map(d => ({
         date:       d.date,
         weightKg:   d.weightKg,
         bodyFatPct: d.bodyFatPct,
@@ -129,8 +142,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Exercise sessions (deduplicate on date+startTime) ─────────────────────
-  if (body.exerciseSessions?.length) {
-    const dates = [...new Set(body.exerciseSessions.map(s => s.date))].sort();
+  const usableSessions = (body.exerciseSessions ?? []).filter(s => {
+    const reason = unusableDay(s.date);
+    if (reason) rejected.push(`exercise ${s.date} ${s.startTime}: ${reason}`);
+    return !reason;
+  });
+  if (usableSessions.length) {
+    // Filtered BEFORE this, because the range query below is keyed on the first and last date —
+    // an unusable one poisons the lookup as surely as it poisons the write.
+    const dates = [...new Set(usableSessions.map(s => s.date))].sort();
     const existing = await repo.listActivityLogs(userId, dates[0], dates[dates.length - 1]);
     const existingKeys = new Set(existing.map(s => `${s.date}|${s.startTime}`));
 
@@ -143,7 +163,7 @@ export async function POST(req: NextRequest) {
     const knownTypes = new Set((await repo.listActivityTypes()).map(t => t.id));
     const FALLBACK_ACTIVITY_TYPE = 'other';
 
-    for (const s of body.exerciseSessions) {
+    for (const s of usableSessions) {
       if (existingKeys.has(`${s.date}|${s.startTime}`)) continue;
       const reason = activityImplausibleReason(s);
       if (reason) { rejected.push(`exercise ${s.date} ${s.startTime}: ${reason}`); continue; }
@@ -168,6 +188,8 @@ export async function POST(req: NextRequest) {
   // ── Sleep sessions (dedup handled by UNIQUE(user_id, sleep_start)) ────────
   if (body.sleepRecords?.length) {
     for (const s of body.sleepRecords) {
+      const dayReason = unusableDay(s.date);
+      if (dayReason) { rejected.push(`sleep ${s.date}: ${dayReason}`); continue; }
       const sleepStart = new Date(s.sleepStart);
       const sleepEnd = new Date(s.sleepEnd);
       // `sleepStart`/`sleepEnd` are free-form strings from the aggregator, so an unparseable one
@@ -200,7 +222,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Enrichment candidates: recent activity logs missing HR/distance/calories ─
-  const tz = session.user.timezone ?? DEFAULT_TZ;
   const from3d = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 3 * 86_400_000), tz);
   const recent = await repo.listActivityLogs(userId, from3d, todayInTz(tz));
   const enrichmentCandidates = recent
