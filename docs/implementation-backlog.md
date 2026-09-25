@@ -3182,7 +3182,11 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   this in next."*
 - **Lane: A** — it needs a **migration** (see the blocker below), and migrations are Lane A's alone.
   The UI half is Lane B's and can follow; the engine half lands first per §3.
-- **Needs:** BF-193 — three policy choices the owner has to make, and two of them change the diff.
+- **Needs:** — nothing. BF-193's three policy choices were **answered by the owner on 2026-09-24** and are carried here so this entry is buildable without chasing a second one:
+  - **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are **deleted outright**, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
+  - **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
+  - **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: that would need a scheduled job and this repo has no cron layer.
+  BF-193 keeps the full reasoning behind each, as a `Reference:` entry.
   Filed separately so they reach the Orchestrator rather than sitting in this body.
 - **⚠ This carries a store-compliance claim, so understate rather than overstate it.** Apple requires
   an in-app account-deletion path for any app offering account creation, and **Google Play carries an
@@ -3288,7 +3292,7 @@ drift.
   **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are deleted outright, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
   **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
   **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: it would need a scheduled job and this repo has no cron layer.
-- **This entry is now DONE as a decision and hands its answers to `BF-192`**, which names it in `Needs:` because two of the three change its diff. Nothing here is buildable — `BF-192` builds it.
+- **Reference:** the three answers now live in `BF-192`, which builds them; this entry keeps the reasoning behind each so a later reader can see why each was chosen rather than only what was chosen. Nothing here is buildable and nothing is owed.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -3531,6 +3535,7 @@ drift.
 
 ### [activity] BF-191 — the walk-end fix shipped; three phantom rows are still in the history
 
+- **Ask:** owner — three phantom walk rows to soft-delete from the activity list by hand: `b8083d04` (09-24), `ea77ce16` (07-30), `a85568a4` (09-14). The code fix shipped; these three predate it and no migration should touch them.
 - **Lane: O** — what is left needs the owner's hand and a phone, not code. **Added:** 2026-09-24 ·
   BugFix intake. **Code shipped 2026-09-24 (Lane B)** together with BF-190: the elapsed seconds now
   travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and

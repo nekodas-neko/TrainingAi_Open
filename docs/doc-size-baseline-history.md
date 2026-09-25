@@ -17242,3 +17242,16 @@ unreachable from every today-envelope key and the fix is one line in Lane A's `c
 amendment records the two Lane-B-only shapes that were tried and rejected, with the reason each
 fails, because both look workable and one of them would have duplicated the LB-150 defect across
 three call sites to keep the item in this lane.
+
+## 2026-09-25 — `docs/agents/state/bugfix.md` → 340 (the duration cluster, BF-187 → BF-197)
+
+Raised by 11 after cutting 15. The filing manifests for BF-1→BF-9 and BF-122→BF-133 went to one line
+each — they are recoverable by grepping the backlog and the journal, so the baton was storing them
+twice — and a paragraph that already said of itself that it was superseded came out.
+
+What replaced them is four traps that cost this session real time and are not in the traps list
+above: an estimate agreeing with its own budget is not evidence it is true; an owner question needs
+an `Ask:` field or it never reaches the WAITING section; an answered decision has to hand its answers
+to the entry that builds them; and a gate run through a pipe reports the pipe's exit status, which
+committed through a failing check. The baton is meant to carry what a successor cannot re-derive, and
+a trap that already fired once is exactly that.
