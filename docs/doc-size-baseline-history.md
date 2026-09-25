@@ -17527,7 +17527,7 @@ concluded the item was stale.
 The rest of the delta is the measurement (628,197 inserts and 574,974 deletes against 140,181 live
 rows, 95 updates) and one line keeping `oura_heartrate_pkey` — 7 MB, 0 scans — on the record, since
 dropping a primary key is a migration and ships alone.
-## 2026-09-25 — `docs/implementation-backlog.md` 31335 → 31353 (+18)
+## 2026-09-25 — `docs/implementation-backlog.md` 31335 → 31356 (+21)
 
 `RV-67` keeps its entry — one key of five is proved and flagged, so this is genuinely partial work
 rather than something to strike — and `LB-154` is new, filed from what the proof turned up.
@@ -17538,6 +17538,10 @@ written proof per key. A proof that lives only in a merged PR body is a proof th
 cannot check, so the entry carries its shape: four repository writers, two routes, one client file,
 every mutating call invalidating, and — the part that nearly sank it — no sync writer, because the
 offline mirror is fed FROM the cached response rather than independently of it.
+
+It also records which reads deliberately stay UNFLAGGED — the sync-provider warm list and its
+notification-path fetch — because those are what bound cross-device staleness, and flagging a
+warming read would defeat the point of warming.
 
 It also records the two things the entry did not know: `useCachedValue` had no such option at all,
 and the screen that WRITES meal types is deliberately left unflagged.

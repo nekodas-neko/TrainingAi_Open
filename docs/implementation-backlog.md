@@ -5970,6 +5970,9 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   *from* this cached response, so it is downstream of the cache rather than a writer.
   `components/nutrition/__tests__/rv67-meal-types-ttl-gate.test.ts` pins the fragile half: a new
   mutating caller outside the manager would break the proof silently, costing a six-hour stale list.
+  **Cross-device staleness is bounded by leaving the WARMING reads unflagged** — `sync-provider.tsx`
+  :85 (warm list) and :276 (the notification path) both still refetch, so a sync pass refreshes the
+  entry. Flag the component read paths, never the warming ones.
 - **⛔ Two things the entry did not know, both resolved here.** `useCachedValue` had **no** `freshWithinTtl` option at
   all, so one read site could not be flagged without widening the hook (done — `lib/hooks/**` is
   Lane B's). And the **writer screen is deliberately left unflagged**: the manager edits meal types,

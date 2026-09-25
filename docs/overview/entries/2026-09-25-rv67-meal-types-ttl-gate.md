@@ -42,6 +42,18 @@ visited rarely, and a network read there costs nothing anyone notices — wherea
 the writer set costs six hours of a stale list on the one screen where it would be obvious. Every
 write there does invalidate before reloading, so the flag would be safe; this is defence in depth.
 
+## What bounds cross-device staleness, and why two sites stay unflagged
+
+A flagged read is cleared by any local write, so the residual risk is a change made on **another**
+device: this one would not see it until the TTL lapsed. Two sites deliberately keep revalidating and
+between them close that window.
+
+`components/sync-provider.tsx` holds both — the warm-list entry at :85, and a real `cachedFetch` of
+the key at :276 inside the notification-scheduling path. Neither is flagged, so a sync pass refetches
+the list unconditionally and refreshes the entry every other read then hits. That is the design:
+**flag the component read paths, not the warming ones.** Flagging the warm pass would be the actual
+mistake here, because warming exists precisely to go and look.
+
 ## The guard
 
 `components/nutrition/__tests__/rv67-meal-types-ttl-gate.test.ts` pins the fragile half — a new
