@@ -1,7 +1,7 @@
 /**
  * The health-source precedence ladder, in one place and free of any database driver.
  *
- * `manual > scale_ble > oura_ble > oura_cloud > health_connect > unknown(legacy)`. A direct scale
+ * `manual > scale_ble > oura_ble > oura_cloud > health_connect/apple_health > unknown(legacy)`. A direct scale
  * reading is a real device measurement, so it outranks the ring; the user's own entry still
  * outranks the scale. `oura_cloud` keeps its rung even though nothing writes at it any more —
  * every pre-re-key row's stored `source_map` still names it, and a live BLE write has to out-rank
@@ -13,12 +13,13 @@
  * `mergeSet` and the rest of the SQL-building half stay there and import this.
  */
 
-export const HEALTH_SOURCES = ['health_connect', 'oura_cloud', 'oura_ble', 'scale_ble', 'manual'] as const
+export const HEALTH_SOURCES = ['health_connect', 'apple_health', 'oura_cloud', 'oura_ble', 'scale_ble', 'manual'] as const
 export type HealthSource = (typeof HEALTH_SOURCES)[number]
 
 /** Ascending precedence. Anything absent here — including `null` on a legacy row — ranks 0. */
 export const SOURCE_RANK: Record<HealthSource, number> = {
   health_connect: 1,
+  apple_health: 1,
   oura_cloud: 2,
   oura_ble: 3,
   scale_ble: 4,

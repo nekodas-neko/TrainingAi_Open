@@ -808,6 +808,11 @@ the Orchestrator's to do.
 - **Not established:** which component dominates the task — the next measurement is a CPU profile of
   one tap (`Profiler.start` over CDP around `dev.tab()`), not a guess.
 - **Pass test (device):** `perf.js longtasks` — every tab tap's longest task under 50 ms.
+- **⚑ THAT PASS TEST IS DV'S, NOT THE OWNER'S (2026-09-25, owner instruction).** `Lane: B` is right —
+  the fix is Lane B's — and `Gate: device` is right, because the check must follow the fix. What was
+  not said is **who runs it**: `perf.js longtasks` under 50 ms is a number, not a look, so it belongs
+  to the device agent and should never consume an owner sitting. Run it in the same sitting as
+  `OR-162`'s canvas census; they are the same screen and the same batch.
 - **Still open after LB-144 (2026-09-24), which shipped RV-113's half of the batch.** No chart
   change was made: `OR-162`'s three directions are still unmeasured, and the count that was to
   choose between them **cannot be taken off-device** — see the census recorded there. Shipping a
@@ -819,8 +824,16 @@ the Orchestrator's to do.
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
 
-- **Gate:** device — the count that chooses between (a), (b) and (c) needs the phone.
-- **Lane: B** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 ·
+- **Lane: DV** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 ·
+- **⚑ RE-LANED `B` → `DV` and UNGATED, 2026-09-25, on the owner's instruction** (*"Make sure anything
+  that can be done by DV agent is assigned to it. I shouldn't need to do device checks are possible
+  by DV"*). It carried `Lane: B` + `Gate: device`, which PARKED it into the owner's `--sittings` list —
+  but the next action is stated in this entry's own words: *"count
+  `document.querySelectorAll('canvas')` per panel, then attribute."* That is a measurement nobody has
+  taken, with an objective result, runnable over the DevTools protocol without a human looking at
+  anything. **It was never the owner's.** The gate is removed rather than kept beside the lane because
+  `Gate: device` parks an entry, which is what hid this one. The FIX remains Lane B's — hand it back
+  once the count exists.
   Orchestrator, answering `DV-12`'s open question without the phone. **Gated 2026-09-24 (LB-145)
   for the same reason as `DV-12`** — its own choice between (a), (b) and (c) turns on a count that
   the harness cannot take.
@@ -21138,6 +21151,20 @@ Measured against `lib/walk/segment-stats.ts`:
   WASM instantiation cannot be asserted anywhere else, Task 6 is a soak with both paths agreeing,
   and Task 7 is the single-writer flip. The server-side work this entry named is complete and is
   recorded below; what is left is not startable from a sandbox.
+- **⚑ CHECKED AGAINST THE DV QUESTION AND IT IS **NOT** DV'S — 2026-09-25, owner instruction.** Tasks
+  3, 4 and 6 do end in objective comparisons a device agent could run (identical rollup output, WASM
+  instantiation, a soak with both paths agreeing), which is why this entry reads like a DV candidate.
+  It is not one, because **the thing those tasks would verify does not exist yet**: this entry's own
+  text says *"what remains of Task 3 is the device half"*, that Task 3 *"needs the model session
+  injected the same way the I/O is"*, and that Task 4 still wants `getWebSession`. So the next action
+  is **Lane A code**, and sending it to the phone would be CLAUDE.md's trap (a) — *"the agent can run
+  the check" is NOT "the entry belongs to DV"*. The verification is DV's the moment the device half
+  lands; not before.
+- **⚠ A SEPARATE PROBLEM, FLAGGED FOR THE ORCHESTRATOR RATHER THAN CHANGED HERE.** If the next action
+  is Lane A code, then `Gate: device` is parking work a lane could start — the same defect `DV-12` and
+  `RV-166` had, in reverse. Whether Lane A can meaningfully begin the injection work from a sandbox is
+  a judgement about this entry's substance, not a routing call, so it is recorded and left rather than
+  re-laned by a Tuning session reading it from outside.
 
 > **✅ TASK 2 SHIPPED (extraction only) — the rest of the entry stands.** `aggregateOuraRawSamples`
 > is now `runOuraRollup(io, timezone, opts)` in `lib/oura-ble/rollup/run.ts`, taking a `RollupIO`
@@ -29604,6 +29631,20 @@ the `lfhf` epoch field and `W_LFHF = 0.5` are all on `main`.
   [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
   ⛔ Its verdict is blocked on a device check (is the `spo2V` debug column even populated, and does
   it separate?) — on the owner checklist. Do not tune `W_SPO2` before that answer exists.
+- **⚑ TWO OF THIS ENTRY'S CHECKS ARE DV'S, AND ONE MAY NOT NEED A DEVICE AT ALL (2026-09-25, owner
+  instruction: *"I shouldn't need to do device checks are possible by DV"*).**
+  **(1) The reachability check is objective and is DV's.** *"tapping through from the sleep tile"*
+  either reaches the staging data or it does not — a navigation reproduction with a yes/no answer,
+  runnable over the DevTools protocol. It is on the owner's checklist and should not be.
+  **(2) The `spo2V` half is probably answerable off-device, and someone should try before the phone is
+  picked up.** `spo2Var` is **not a stored column** — it is computed per epoch inside the rollup
+  (`lib/oura-ble/rollup/run.ts:372`, `spo2VariabilityFromSamples(b.sp)`), so "is the debug column
+  populated" is the wrong question as posed. The two SpO₂ columns that do exist are
+  `body_metrics.spo2_pct` and `oura_bucket.spo2_pct`, and **`oura_bucket` is EMPTY — 0 rows** (measured
+  2026-09-25). **Not offered as the answer:** the stager reads its samples from the rollup's own
+  accumulator, not from `oura_bucket`, so an empty bucket table is suggestive and not decisive. Tracing
+  `b.sp` to its source is a read, not a sitting — do that first, and only gate on the device if it
+  turns out the samples exist nowhere queryable.
 - ✅ **Item 2 (ultradian ~95-min cycle prior)** — shipped 2026-08-02, v1.251.1, see
   [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
   Added alongside the linear `W_TIME` term, not replacing it; `W_CYCLE = 0.15`. The plan's

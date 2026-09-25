@@ -6,7 +6,7 @@
 // (e.g. logging a manual weight must not stop the ring's HRV or Health Connect's steps from
 // updating that same day).
 //
-// Precedence: manual > scale_ble > oura_ble > oura_cloud > health_connect > unknown(legacy). A
+// Precedence: manual > scale_ble > oura_ble > oura_cloud > health_connect/apple_health > unknown(legacy). A
 // higher-or-equal source overwrites a field; a strictly-lower source may only fill a NULL, never
 // clobber. scale_ble ranks above oura_ble/oura_cloud (a direct scale reading is a real device
 // measurement for weight/body-comp fields) but below manual (the user's own entry should still
