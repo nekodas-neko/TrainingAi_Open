@@ -1,7 +1,7 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-145 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-147 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
@@ -14,10 +14,10 @@ exits keep nothing — his call). Four of eight named one surface and had a seco
 Review sweeps reordered the head in one day. **The owner's stated highest priority is tab/page
 switch speed**, so `DV-12` heads the lane the moment the phone is available. Otherwise RV-183, then
 RV-185, RV-178, RV-122.
-**RV-166 is parked properly now** (`Needs: RV-170`) — it was blocked in prose only, so the runner
-offered it twice. If an entry looks blocked but reads READY, check for that shape.
-**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is in the Orchestrator's chat;
-do not re-ask or re-make). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
+**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate:
+device`) both headed READY while unstartable. The field must LEAD its own bullet; inline after
+`Lane:` parses as nothing.
+**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
 ## Blocked / owed
 
@@ -36,7 +36,8 @@ do not re-ask or re-make). **BF-177's plan is STALE** — LB-128 (#1456) may hav
   instant the five are green; no run for your head = conflicted PR.
 - **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
   entry when the floor is a judgement rather than a fit.
-- **A BATCH CAN SHIP HALF** — `tab-switch-speed`'s other half needed a device measurement that does not exist. Ship the measurable half and sharpen the rest; SAY which half, in the PR and the entry.
+- **GREP THE FIELD, NOT THE FILES THE ENTRY NAMES** — five in a row named one surface and had more. BF-196 said "one string"; a third had already solved it, so the fix was to MATCH its phrasing, not ship the entry's nicer one.
+- **A BATCH CAN SHIP HALF** — ship the measurable half, sharpen the rest, and SAY which half in the PR and the entry.
 - **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
   lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
   #1587 red; `no-console` allows info/warn/error) · `pnpm test` · `pnpm build` · `tsc`. The doc-size
