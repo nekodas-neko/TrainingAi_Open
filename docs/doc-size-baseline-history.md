@@ -17784,6 +17784,19 @@ at all, the tray is topmost over its own rect), why the meal list needs no secon
 component), and that acceptance clause ③ — the day jumping to Yesterday — is **not claimed**. That
 last line is the one a future reader needs: it is downstream of the same swallowed tap and may clear
 with it, but if it survives it is its own entry rather than a re-open of this one.
+## 2026-09-25 — `docs/implementation-backlog.md` 31756 → 31760 (RV-177 ownership + dead code)
+
+Four lines. RV-177's unscoped/dead bullet was replaced with what shipped, and the `Keep:` narrowed
+from six open groups to four.
+
+The lines that stayed are a **correction to my own note from earlier the same day**, which is the
+part worth keeping: that note said deleting `logSets`'s tests lost no coverage. It did. `logSets`
+collapsed duplicates on `set_number` while the live `logExerciseAndSets` collapses on `set.id` — a
+different conflict target with no direct test of its own — so the coverage was moved onto the live
+path instead of deleted. The `Keep:` also now states plainly that **none** of the four remaining
+groups has been re-verified, since three of this entry's claims have already turned out stale or
+backwards and the next session should not assume otherwise.
+
 
 
 ## 2026-09-26 — `docs/implementation-backlog.md` → BF-199 (does the prescription need AI)

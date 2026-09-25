@@ -4773,11 +4773,11 @@ drift.
 ### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
 
 - **Lane: A**
-- **Keep:** the date group shipped 2026-09-25; **six groups remain** and each wants its own
-  verification before code — the two missing rate limits, the two unbounded written weight
-  dates, Zod on the three phase-set writes, `calendar-data`'s NaN year and validate-before-auth
-  ordering, the two unguarded body ids, and the unscoped/dead pair above. Of those, only the
-  dead-code pair and `createFoodItem`'s unscoped read-back have been re-verified so far.
+- **Keep:** the date group and the unscoped/dead pair both shipped 2026-09-25. **Four groups
+  remain, NONE of them re-verified yet** — the two missing rate limits, the two unbounded written
+  weight dates, Zod on the three phase-set writes, `calendar-data`'s NaN year with its
+  validate-before-auth ordering, and the two unguarded body ids. Re-verify each against `main`
+  before writing code: **three** of this entry's claims have already turned out stale or backwards.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
 gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
 - **No rate limit:**
@@ -4810,14 +4810,18 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   before auth.
 - **Body ids reach the uuid cast unguarded on POST**, which RV-47 did not cover:
   `nutrition/food-logs/route.ts:44` and `oura/hr-sync/route.ts:29`.
-- **Unscoped and dead code:**
-  - `createFoodItem`'s read-back is not user-scoped (`slices/nutrition.ts:300`; latent).
-  - `logExerciseWithId` (`adapter.ts:948`) and `logSets` (`:969`) write with no user parameter and
-    have no PRODUCTION callers. **Re-verified 2026-09-25: neither is on the `WorkoutRepository`
-    interface**, so deleting them is contained. Two nuances the original missed — `logSets` IS
-    called by `batch-upsert-duplicate-collapse.test.ts`, which goes with it; and that is safe
-    because `collapseOnConflict` has its own dedicated test and the LIVE set-logging path at
-    `adapter.ts:1087` uses it too, so no real coverage is lost.
+- **✅ SHIPPED 2026-09-25 — unscoped and dead code**
+  ([entry](overview/entries/2026-09-25-rv177-ownership-and-dead-code.md)).
+  - `createFoodItem`'s id-bearing read-back is now scoped on `userId` and refuses a 409 when the
+    client-supplied id belongs to someone else. It was handing that row — name, brand, macros —
+    back to the caller. The scope rather than a blanket refusal is deliberate: the branch exists so
+    an outbox retry of the same id by the same user stays idempotent, and a control pins that.
+  - `logExerciseWithId` and `logSets` deleted; neither was on the `WorkoutRepository` interface.
+  - **⚠ The "no real coverage is lost" note above was wrong, and the fix is better for it.** The two
+    `logSets` cases were NOT redundant: `logSets` collapsed on `set_number` while the live
+    `logExerciseAndSets` collapses on `set.id`, a different conflict target with **no direct test of
+    its own**. So the coverage was MOVED onto the live path rather than deleted, and removing that
+    live collapse now fails a test.
 
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 

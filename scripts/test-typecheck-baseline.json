@@ -34,7 +34,6 @@
   "lib/ai-chat/__tests__/tools-recovery.test.ts": 1,
   "lib/ai/__tests__/instrument.test.ts": 6,
   "lib/data/postgres/__tests__/app-load-report.test.ts": 4,
-  "lib/data/postgres/__tests__/batch-upsert-duplicate-collapse.test.ts": 1,
   "lib/data/postgres/__tests__/blood-panel-storage.test.ts": 4,
   "lib/data/postgres/__tests__/body-fat-correction-consumers.test.ts": 8,
   "lib/data/postgres/__tests__/dexa-scans.test.ts": 5,
