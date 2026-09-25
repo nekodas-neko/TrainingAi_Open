@@ -207,11 +207,10 @@ function memoFor(anchors: ClockAnchor[]): { epoch: number | null; offsets: Map<n
   return memo
 }
 
-export function resolveDsToMs(ds: number, anchors: ClockAnchor[], epoch?: number): number | null {
+/** The epoch's robust offset, memoised per anchor array. **Both directions go through this**, which
+ *  is what makes them exact inverses rather than two models that agree by accident (LA-141). */
+function offsetForEpoch(anchors: ClockAnchor[], ep: number): number | null {
   const memo = memoFor(anchors)
-  const ep = epoch ?? memo.epoch
-  if (ep == null) return null
-
   let offset = memo.offsets.get(ep)
   if (offset === undefined) {
     const inEpoch = anchors.filter(a => a.epoch === ep)
@@ -221,36 +220,43 @@ export function resolveDsToMs(ds: number, anchors: ClockAnchor[], epoch?: number
     offset = inEpoch.length === 0 ? null : robustOffsetMs(inEpoch)
     memo.offsets.set(ep, offset)
   }
-  if (offset == null) return null
+  return offset
+}
 
+export function resolveDsToMs(ds: number, anchors: ClockAnchor[], epoch?: number): number | null {
+  const ep = epoch ?? memoFor(anchors).epoch
+  if (ep == null) return null
+  const offset = offsetForEpoch(anchors, ep)
+  if (offset == null) return null
   return ds * MS_PER_DS + offset
 }
 
 /**
  * Inverse of `resolveDsToMs` — wall clock back to a ring ds, for callers that only have a
- * phone timestamp but must store a ds-keyed value (`step_live_windows`, so the merge in
- * `lib/health/step-estimate.ts` stays in one domain).
+ * phone timestamp but must store or query a ds-keyed value.
  *
- * Symmetric with the forward direction: interpolate between the two observations bracketing
- * the instant, else extrapolate from the nearest.
+ * **A true inverse, by construction: it is `resolveDsToMs` solved for `ds`, through the same
+ * `offsetForEpoch`.** It is written that way because it previously was not, and said it was
+ * (LA-141). It interpolated between the two anchors bracketing the instant, and its comment called
+ * that *"symmetric with the forward direction"* — but the forward direction had stopped
+ * interpolating in Q-139, precisely because the slope that derives, `Δutc / Δds`, is not a property
+ * of either clock. While the ring drains buffered history, ds advances far faster than the wall
+ * clock and that ratio collapses: Q-139 measured 17,094 ds (28.5 min of ring time) arriving in 95 s,
+ * an 18x squeeze, which is how a 60 s step block came to hold 1,555 steps.
+ *
+ * So the two directions disagreed by the whole of that error. On Q-139's own drain shape a ds
+ * round-tripped **16,144 ds — 26.9 minutes of ring time — away from itself**. And a burst of anchors
+ * minted seconds apart while a backlog drains does not bracket anything meaningful, which a second
+ * measurement confirmed independently over nine real nights: every one shifted 10-48 minutes later.
+ *
+ * The same trade-off the forward direction states applies here and is worth restating rather than
+ * rediscovering: one offset per epoch ignores the ring's crystal drift across that epoch, seconds
+ * per day. That is the error accepted in exchange for removing one measured in tens of minutes.
  */
 export function resolveMsToDs(utcMs: number, anchors: ClockAnchor[], epoch?: number): number | null {
-  const ep = epoch ?? currentEpoch(anchors)
+  const ep = epoch ?? memoFor(anchors).epoch
   if (ep == null) return null
-  const inEpoch = anchors.filter(a => a.epoch === ep).sort((a, b) => a.anchorUtcMs - b.anchorUtcMs)
-  if (inEpoch.length === 0) return null
-
-  let before: ClockAnchor | null = null
-  let after: ClockAnchor | null = null
-  for (const a of inEpoch) {
-    if (a.anchorUtcMs <= utcMs) before = a
-    else { after = a; break }
-  }
-
-  if (before && after && after.anchorUtcMs > before.anchorUtcMs) {
-    const t = (utcMs - before.anchorUtcMs) / (after.anchorUtcMs - before.anchorUtcMs)
-    return before.anchorDs + t * (after.anchorDs - before.anchorDs)
-  }
-  const nearest = before ?? after!
-  return nearest.anchorDs + (utcMs - nearest.anchorUtcMs) / MS_PER_DS
+  const offset = offsetForEpoch(anchors, ep)
+  if (offset == null) return null
+  return (utcMs - offset) / MS_PER_DS
 }
