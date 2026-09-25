@@ -7,9 +7,14 @@ import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { invalidBodyResponse, invalidUuidResponse, routeErrorResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { rateLimit } from '@/lib/rate-limit'
 
 // One meal with its ingredient snapshot.
 const MAX_BODY_BYTES = 256 * 1024
+
+// Matches `meal-plans/generate/meal` — the same per-meal granularity and the same model behind it.
+// The whole-plan route sits at 10/h because it generates every meal at once.
+const SCALE_RATE_LIMIT_PER_HOUR = 40
 
 // Whitelisted, same reasoning as the plan PATCH. The repository proves ownership by joining this
 // meal's variant back to its plan before writing — the meal id alone says nothing about who owns it.
@@ -58,6 +63,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
   const { scaleToTarget, ...input } = parsed.data
 
   if (scaleToTarget && input.ingredients) {
+    // Limited HERE rather than at the top of the handler: `scaleWithTopUp` is a `generateObject`
+    // call, and this is the only branch that reaches it. Limiting the whole PATCH would throttle a
+    // plain rename or reorder, which costs nothing (RV-177).
+    if (!rateLimit(`${userId}:meal-plan-scale-meal`, SCALE_RATE_LIMIT_PER_HOUR, 3_600_000)) {
+      return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
+    }
     // Scale against the meal's OWN stored targets, read here rather than taken from the request —
     // a client that sent the wrong targets would otherwise silently reprice the meal.
     const current = await repo.getMealPlanMeal(mealId, userId)
