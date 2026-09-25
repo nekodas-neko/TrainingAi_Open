@@ -2045,28 +2045,33 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
-### [readiness][platform] LA-142 — LA-140 was one of eleven: six `oura_daily_derived` columns have no writer, and two of them are READ
+### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
-- **Lane: A** — `lib/oura-ble/rollup/run.ts`, `lib/health/readiness-payload.ts`, `oura_daily_derived`.
+- **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
 - **Added:** 2026-09-25, Lane A — found while fixing LA-140, by asking how many columns share its
-  shape instead of assuming it was alone.
+  shape. **Corrected the same day; the first version of this entry was wrong, see below.**
 - **Measured on production 2026-09-25: 11 of `oura_daily_derived`'s columns are NULL on every row.**
-  All-NULL is not proof of a missing writer — `chronic_stress_*` is gated on 21 complete nights by
-  its own model, and `recovery_index_hours` writes from `run.ts:561` — so each was checked against
-  the code. **Six have no writer at all**: `active_calories_est`, `pwv`, `worn_hours_ble`,
-  `training_load_ots`, `training_load_high`, `vascular_age`. (`night_hrv_baseline_ms` was the
-  seventh; LA-140 fixed it.)
-- **⚠ Two of the six are READ by live surfaces, which makes them LA-140's trap with consumers.**
-  `weekly-digest/route.ts:192` computes `otsHigh` from `trainingLoadHigh` — permanently **false** —
-  and `ai-chat/tools.ts:121` filters `trainingLoadOts != null`, so the `trainingStress` tool always
-  returns an **empty array**. Neither fails; both quietly report "nothing to say".
-- **The work is per column and is a judgement each time**, exactly as LA-140's was: persist what
-  something already computes, or delete the column and its plumbing. `training_load_*` has readers,
-  so it wants a writer; `pwv`/`worn_hours_ble`/`active_calories_est` have neither, so deleting is
-  probably right. Do not batch them into one sweep without deciding each.
+  All-NULL is not proof of a missing writer — so each was checked against the code.
+- **Four have no writer at all:** `active_calories_est`, `pwv`, `worn_hours_ble`, and the derived
+  `vascular_age` (distinct from `oura_daily.vascular_age`, which is a different table and is
+  written). None of the four has a reader either, so **deleting them and their plumbing is probably
+  right** — the ~40-member push path stops carrying dead fields. That is a migration plus a local
+  SQLite version bump, so it ships alone and is not a drive-by.
+- **⚠ RETRACTION — `training_load_ots` and `training_load_high` are NOT unwritten.** This entry first
+  said six columns had no writer and that two of them were read by live surfaces, making them
+  LA-140's trap with consumers. **`app/api/training-stress/route.ts:89` writes both**, on the
+  success branch. The repo-wide grep behind the original claim truncated its output per column and
+  that file never surfaced — the same "measured the wrong thing" failure this entry was filed to
+  describe.
+- **The symptom is real and belongs to TN-79, not here.** Both columns ARE all-NULL, so
+  `weekly-digest/route.ts:192`'s `otsHigh` is permanently false and `ai-chat/tools.ts:121`'s
+  `trainingStress` always returns an empty array. The cause is that the route's gate never reaches
+  `ok` and persists a reason instead — which is exactly what **TN-79** is already open for. Fixing
+  the gate fills the columns; nothing here needs a new writer.
 - **A ratchet is worth considering and is NOT free.** A check that every derived column has a writer
-  would catch the class, but the gated-but-legitimate cases above mean it needs a reasoned
-  allowlist rather than a bare scan — so it is its own piece of work, not a drive-by.
+  would catch the genuine four, but `chronic_stress_*` (gated on 21 complete nights),
+  `recovery_index_hours` and the training-load pair are all legitimately written-but-empty — so it
+  needs a reasoned allowlist rather than a bare scan, and is its own piece of work.
 
 ### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
 
