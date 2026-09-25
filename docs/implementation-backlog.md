@@ -1885,9 +1885,12 @@ which is the right shape for something that can only be validated by living with
       re-centering as history triples — **and is NOT established as the cause.** What it does show
       is that "the owner got worse" and "the scale moved under him" are both still live, and the
       raw series is where to separate them.
-    - **`night_hrv_baseline_ms` could not be used for the same comparison, because it is dead —
-      see LA-140.** hrvBalance's raw input is therefore unavailable from the database, which is why
-      only RHR is quoted above.
+    - **`night_hrv_baseline_ms` could not be used for the same comparison, because it was dead —
+      LA-140, fixed 2026-09-25.** hrvBalance's raw input was therefore unavailable from the
+      database, which is why only RHR is quoted above. **The column has a writer now, but that does
+      NOT retroactively answer this question**: the 130 existing rows are still NULL. The rollup
+      re-derives each day from the packed raw tier, so a wide pass would fill history — that pass is
+      the work, and it has not been run.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -2042,31 +2045,28 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
-### [readiness][devices] LA-140 — `night_hrv_baseline_ms` is plumbed end to end and written by nothing: 0 of 130 rows
+### [readiness][platform] LA-142 — LA-140 was one of eleven: six `oura_daily_derived` columns have no writer, and two of them are READ
 
-- **Lane: A** — `lib/oura-ble/rollup/run.ts` (the producer), `oura_daily_derived`.
-- **Added:** 2026-09-25 · found while doing TN-70's contributor read, which the column would have
-  answered had it held anything.
-- **Measured on production 2026-09-25: `night_hrv_baseline_ms` is NULL on all 130 rows.** The
-  plumbing is complete — `schema.ts`, `DERIVED_COLS`, the row mapper, the `pushMutations` branch,
-  the local SQLite table and the sync delta all carry it — and **no writer ever sets it**.
-  `run.ts:1170` is the only mention in the rollup and it is the *input* to
-  `computeResilienceForDay`, not a persist.
-- **No functional impact today, and that is why it survived.** The resilience compute uses the
-  in-memory `nightHrvMs`, so scoring is unaffected, and nothing in product code reads the stored
-  column.
-- **The cost is diagnostic, and it is not hypothetical.** A reader who sees NULL reasonably
-  concludes the input was missing — `computeResilienceForDay` gates `contributorsOk` on exactly
-  this field being non-null, and falls back to a **fabricated 50** for the stress scaling
-  (`stress-resilience.ts:395`). While doing TN-70's read I drew that inference myself before
-  checking the producer. A column that is always null beside a guard that tests for null is a trap.
-- **Two ways to close it, and the choice is the work:** persist what the rollup already computes
-  (one line in the derived patch, makes the HRV half of TN-70's comparison possible), or delete the
-  column and its plumbing (smaller sync surface, and the ~40-member push path stops carrying a dead
-  field). Persisting is probably right *because* TN-70 wanted it — but that is a judgement, not a
-  given.
-- **⚠ Do not "fix" the `?? 50` fallback by reading the stored column** — it is null, so that would
-  swap a fabricated constant for a guaranteed one.
+- **Lane: A** — `lib/oura-ble/rollup/run.ts`, `lib/health/readiness-payload.ts`, `oura_daily_derived`.
+- **Added:** 2026-09-25, Lane A — found while fixing LA-140, by asking how many columns share its
+  shape instead of assuming it was alone.
+- **Measured on production 2026-09-25: 11 of `oura_daily_derived`'s columns are NULL on every row.**
+  All-NULL is not proof of a missing writer — `chronic_stress_*` is gated on 21 complete nights by
+  its own model, and `recovery_index_hours` writes from `run.ts:561` — so each was checked against
+  the code. **Six have no writer at all**: `active_calories_est`, `pwv`, `worn_hours_ble`,
+  `training_load_ots`, `training_load_high`, `vascular_age`. (`night_hrv_baseline_ms` was the
+  seventh; LA-140 fixed it.)
+- **⚠ Two of the six are READ by live surfaces, which makes them LA-140's trap with consumers.**
+  `weekly-digest/route.ts:192` computes `otsHigh` from `trainingLoadHigh` — permanently **false** —
+  and `ai-chat/tools.ts:121` filters `trainingLoadOts != null`, so the `trainingStress` tool always
+  returns an **empty array**. Neither fails; both quietly report "nothing to say".
+- **The work is per column and is a judgement each time**, exactly as LA-140's was: persist what
+  something already computes, or delete the column and its plumbing. `training_load_*` has readers,
+  so it wants a writer; `pwv`/`worn_hours_ble`/`active_calories_est` have neither, so deleting is
+  probably right. Do not batch them into one sweep without deciding each.
+- **A ratchet is worth considering and is NOT free.** A check that every derived column has a writer
+  would catch the class, but the gated-but-legitimate cases above mean it needs a reasoned
+  allowlist rather than a bare scan — so it is its own piece of work, not a drive-by.
 
 ### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
 

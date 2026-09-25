@@ -1179,8 +1179,23 @@ export async function runOuraRollup(
         // number exists to explain. A day that resilience skipped now records how many minutes of
         // daytime stress it actually had, so the gate can be checked against
         // `minDaytimeStressHours` from data instead of inferred.
-        if (res.dailyIndices || res.level != null || res.daytimeStressCoverageMin != null) {
+        // LA-140: `nightHrvMs` joins this write, and `nightHrvBaselineMs != null` joins the guard.
+        //
+        // The column was plumbed end to end — schema, `DERIVED_COLS`, the row mapper, the
+        // `pushMutations` branch, the local SQLite table, the sync delta, the validator — and no
+        // writer ever set it, so it was NULL on all 130 production rows. That is a trap rather
+        // than a nuisance: `computeResilienceForDay` gates `contributorsOk` on this exact field
+        // being non-null and falls back to a fabricated 50 for the stress scaling, so a reader who
+        // finds NULL reasonably concludes the input was missing. TN-70 hit it — it could measure
+        // the resting-heart-rate half of its regime comparison and not the HRV half.
+        //
+        // **It joins the GUARD, not just the patch, deliberately.** Gating the night's own input on
+        // the resilience score being produced is backwards: a day the score skipped is precisely a
+        // day someone needs the input for. The value comes from `latest.hrvBaseline`/`hrvAvgMs` at
+        // the top of this loop and does not depend on `res` at all.
+        if (res.dailyIndices || res.level != null || res.daytimeStressCoverageMin != null || nightHrvMs != null) {
           await io.upsertDailyDerived(day, {
+            nightHrvBaselineMs: nightHrvMs,
             resilienceLevel: res.level,
             resilienceGranular: res.granular,
             resilienceConfidence: res.confidence,
