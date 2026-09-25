@@ -1738,10 +1738,19 @@ which is the right shape for something that can only be validated by living with
     property of the method, not the learning-period meaning its neighbours carry. Gating it on
     `provisional` would null it on every day forever. The **comment** was the defect and is corrected
     in this PR; `run.ts` is right as written.
-  - **The decisive re-run is still NOT done, deliberately.** Re-running the rollup against production
-    would rewrite `oura_daily_derived` rows — a production write, which is the owner's call rather
-    than Lane A's. The non-destructive form is a local run against an injected `io` (`runOuraRollup`
-    takes one); that is the next step and is what remains of this entry.
+  - **⚠ The decisive re-run is NOT doable from a container — measured 2026-09-25, so this entry's
+    prescribed next step needs REPLACING rather than retrying.** Re-running against production
+    rewrites `oura_daily_derived` (a production write, the owner's call). The non-destructive form
+    needs the raw frames locally, and there are **191,191** rows in `oura_raw_samples` plus
+    **1,508** packed, against an `/api/admin/db-query` that caps a response at ~1,000 rows —
+    hundreds of paginated calls across many tags. `runOuraRollup` also takes a ~40-member `io` and
+    **no test in the repo builds one**, so the fake is a project, not a fixture.
+    - **What would unblock it:** a production-side replay that computes without persisting, or a
+      database restore into the local instance. Either is its own entry.
+    - **And the question may now be answerable without a replay at all.** This entry's own
+      measurement already showed the switch is carried by `resilience_daily_sleep_recovery`, and its
+      four contributor inputs **are** stored in `readiness_contributors`. "Were the July
+      contributor scores wrong" is a read. Try that before building a replay harness.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -1895,30 +1904,6 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   deliberately counts **days with any qualifying sample**, which sparsity can only bias downward.
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
-
-### [devices][platform] LA-139 — the ring clock anchors disagree with each other: 39 of 40 consecutive pairs drift by more than a minute
-
-- **Lane: A** — `lib/data/postgres/adapter.ts` (`getOuraClockAnchor`, `insert` path),
-  `oura_ble_clock_anchors`.
-- **Added:** 2026-09-25 · found while investigating TN-79; filed separately because it is NOT that
-  bug (see below) and is worth its own look.
-- **Measured on production 2026-09-25.** The table holds **12,545 anchors** (since 2026-07-07). An
-  anchor is a `(ring_ds ↔ utc)` pair, so any two of them imply a ring clock rate: `Δds/10` seconds
-  should match `Δutc` seconds. Over the 40 most recent pairs, **39 disagree by more than 60 s**,
-  worst **3,359 s (56 minutes)**. Three consecutive anchors written within **4 real seconds** carry
-  ring times **~19 minutes apart**.
-- **Why that shape:** the anchors look like they are stamped per drained batch — that batch's ring
-  timestamp against the server's arrival time — so during a backfill the pair describes history,
-  not now. `getOuraClockAnchor` then takes `ORDER BY created_at DESC LIMIT 1` and uses that one pair
-  to convert **every** ds↔UTC in the request.
-- **⚠ This is NOT TN-79's cause, and the evidence is explicit.** TN-79's replay used this same
-  newest anchor and still bucketed 1,000+ clean MET samples per day into sensible Brisbane days, and
-  the newest frame maps to ~6 minutes before the anchor. So the mapping is usable for recent data.
-  Do not "fix" TN-79 by rewriting anchors.
-- **What is NOT established:** whether any consumer is actually harmed. Sleep and HR times would be
-  the place to look, and the 2026-08-03 wake-time investigation is prior art worth reading first.
-  A table growing at ~170 anchors/day with mutually inconsistent contents is a hazard on its own
-  terms even if nothing is currently wrong.
 
 ### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
 
