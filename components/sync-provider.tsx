@@ -5,7 +5,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { initSQLite } from '@/lib/sqlite/sqlite-service';
 import { MIGRATIONS } from '@/lib/sqlite/migrations';
 import { getCached, mirrorToSessionCache, cachedFetch, cachedFetchToday } from '@/lib/sqlite/cache';
-import { reconcileMealReminders, scheduleEndOfDayReminder } from '@/lib/meal-reminders';
+import { reconcileMealReminders, scheduleEndOfDayReminder, type MealTypeForReminders } from '@/lib/meal-reminders';
 import { scheduleEveningReminder, scheduleWeeklyRecapReminder } from '@/lib/day-review-reminders';
 import { reconcileWorkoutReminder } from '@/lib/workout-reminders';
 import { reconcileSupplementReminders } from '@/lib/supplement-reminders';
@@ -246,15 +246,43 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       if (localStorage.getItem('ta_pref_meal_reminders') !== 'false') {
         try {
           const today = todayInTz(tz);
-          let mealTypes: unknown = null;
-          let foodLogs: unknown = null;
-          await Promise.all([
-            cachedFetch('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG, d => { mealTypes = d; }),
-            cachedFetch(`nutrition-food-logs-${today}`, `/api/nutrition/food-logs?date=${today}`, NUTRITION_FOOD_LOGS_TTL, d => { foodLogs = d; }),
-          ]);
-          if (mealTypes != null && foodLogs != null) {
-            const mealTypeList = Array.isArray(mealTypes) ? mealTypes : []
-            const foodLogList = Array.isArray(foodLogs) ? foodLogs : []
+          // Local-first, for the same reason as the supplement reconcile below (RV-183): food logs
+          // are an offline-first domain, so the device holds the truth and the API holds whatever
+          // has synced. Reconciling from the server meant a meal logged offline kept nagging you to
+          // log it until the next pull — and it spent two GETs doing so on every launch and resume.
+          //
+          // No join is needed and none is built: the reminder logic reads `mealTypeId` off a food
+          // log and five fields off a meal type, all of which the local rows already carry (see
+          // `MealTypeForReminders`).
+          let mealTypeList: MealTypeForReminders[] | null = null;
+          let foodLogList: { mealTypeId: string }[] | null = null;
+
+          const store = userId ? getLocalStore(userId) : null;
+          if (store) {
+            const [types, logs] = await Promise.all([store.getMealTypes(), store.getFoodLogs(today)]);
+            // An empty meal-type table is an unhydrated store, not a user with no meals — fall
+            // through rather than cancel every reminder. Zero food logs IS meaningful, though:
+            // it is the case the reminder exists for.
+            if (types.length > 0) {
+              mealTypeList = types;
+              foodLogList = logs.map(l => ({ mealTypeId: l.mealTypeId }));
+            }
+          }
+
+          if (mealTypeList == null) {
+            let mealTypes: unknown = null;
+            let foodLogs: unknown = null;
+            await Promise.all([
+              cachedFetch('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG, d => { mealTypes = d; }),
+              cachedFetch(`nutrition-food-logs-${today}`, `/api/nutrition/food-logs?date=${today}`, NUTRITION_FOOD_LOGS_TTL, d => { foodLogs = d; }),
+            ]);
+            if (mealTypes != null && foodLogs != null) {
+              mealTypeList = Array.isArray(mealTypes) ? mealTypes : [];
+              foodLogList = Array.isArray(foodLogs) ? foodLogs : [];
+            }
+          }
+
+          if (mealTypeList != null && foodLogList != null) {
             await reconcileMealReminders(mealTypeList, foodLogList)
             await scheduleEndOfDayReminder(mealTypeList, foodLogList)
           }

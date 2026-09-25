@@ -4228,10 +4228,46 @@ drift.
   The local→`SupplementWithStatus` mapping was extracted to `lib/supplements/local-status.ts`
   because a second copy is precisely BF-112, where the inline one dropped the dose fields and a
   prompt that worked on the web never fired on the APK.
-- **Still open, all of it measured and none of it done:** the food-log/meal-types pair on the same
-  reconcile (same local-first argument, but `reconcileMealReminders` needs a join this PR did not
-  build), the three fetches duplicating Home's, `next-session`, and the Lane A halves
+- **✅ THE MEAL HALF SHIPPED TOO (LB-147, 2026-09-25) — and "it needs a join" was WRONG.** The
+  previous amendment deferred this saying `reconcileMealReminders` needed a join nobody had built.
+  Reading it rather than assuming: it takes `Pick<FoodLog, 'mealTypeId'>[]` and reads exactly six
+  fields off a meal type, **all of which `LocalFoodLog` and `LocalMealType` already carry**. There
+  is no join. What blocked it was the declared parameter type — `MealType[]` demanded `userId`,
+  `sortOrder`, `timeStartHour` and `createdAt` that the file never reads, so the local row could not
+  be passed without inventing them. Narrowed to `MealTypeForReminders`, and the reconcile now reads
+  the device first. Same correctness point as the supplements: **a meal logged offline kept nagging
+  you to log it** until the next pull.
+  An empty meal-type table falls through to the API (an unhydrated store, not a user with no meals);
+  zero food logs deliberately does NOT, because that is the case the reminder exists for.
+- **Still open:** the three fetches duplicating Home's, `next-session`, and the Lane A halves
   (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
+- **Found on the way out, filed as `LB-148`:** the three reminder modules time every notification in
+  Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`.
+
+### [platform][nutrition] LB-148 — every notification the app schedules is timed in Brisbane or in the phone's zone, never the user's
+
+- **Lane: B** — `lib/meal-reminders.ts`, `lib/supplement-reminders.ts`, `lib/workout-reminders.ts`.
+- **Added:** 2026-09-25 · found while shipping RV-183's meal half (LB-147's sibling sweep).
+- **RV-176 fixed this class in `app/**` and `components/**` and MISSED `lib/*.ts` entirely**, because
+  that sweep scanned `.tsx`. The reminder modules are the biggest remaining pocket: **8 sites across
+  3 files**, in the code that decides *when a notification fires*.
+  - **Bare `todayInTz()` — the Brisbane default nobody overrides:** `meal-reminders.ts:90,152`,
+    `supplement-reminders.ts:75`, `workout-reminders.ts:69`. Each is the "have I already notified
+    today" key, so on a user outside Brisbane the day rolls at the wrong hour and a reminder either
+    repeats or is suppressed.
+  - **Device-local `setHours` — the scheduled instant:** `meal-reminders.ts:42,168`,
+    `supplement-reminders.ts:40`, `workout-reminders.ts:30`. `new Date(now).setHours(h, m)` sets the
+    hour in the DEVICE's zone, so a reminder configured for 08:00 fires at 08:00 wherever the phone
+    is, not at the user's 08:00.
+- **Why it is filed rather than fixed in LB-147's PR:** it changes *when notifications fire*, which
+  is user-visible behaviour on a daily surface, and it needs the user's timezone threaded into three
+  modules that currently take none. That is its own change with its own verification, not a rider on
+  a local-first read.
+- **Invisible for the owner today** — his phone and his profile are both Brisbane, so every one of
+  these is correct for him right now and wrong for anyone else, which is exactly why the class keeps
+  surviving.
+- **`scripts/check-client-today-timezone.js` does not catch these** (RV-179 owns widening it). A fix
+  here without widening that check leaves the next instance free to land.
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 

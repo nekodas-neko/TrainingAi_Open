@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.44",
+    date: "2026-09-25",
+    changes: [
+      "Meal reminders now read what is on your phone rather than what has reached the server, so a meal you logged offline stops reminding you straight away instead of nagging until the next sync. Two more network requests gone from every app open and resume.",
+    ],
+  },
+  {
     version: "1.465.43",
     date: "2026-09-25",
     changes: [

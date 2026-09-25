@@ -17207,3 +17207,20 @@ vendor constants are absent here and present in production, so a null result loc
 LA-139 is the clock-anchor finding, filed separately with an explicit note that it is NOT TN-79's
 cause — because the tempting move, on seeing 12,545 mutually-inconsistent anchors, is to "fix" them
 in service of a bug they do not cause.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 30977 → 31013 (LB-147, #…)
+
+Thirty-six lines, and twenty-four of them are a new entry that should have existed a day ago.
+
+`LB-148` records that the three reminder modules time every notification in Brisbane or in the
+phone's zone — eight sites across `meal-reminders.ts`, `supplement-reminders.ts` and
+`workout-reminders.ts`. RV-176 fixed exactly this class and missed them, because that sweep scanned
+`.tsx` and these are `lib/*.ts`. The entry is long because it lists all eight with what each one
+governs: four are the "already notified today" key and four are the scheduled instant, and they fail
+differently, so a fix that treats them as one thing will get half of them wrong. It also records why
+it was filed rather than folded into the PR that found it — it changes when notifications fire.
+
+The remaining twelve amend RV-183, including a retraction: the previous amendment deferred the meal
+half saying the reconciler needed a join. It does not. It takes `Pick<FoodLog, 'mealTypeId'>[]` and
+six fields the local rows already carry; what blocked it was an over-wide parameter type. Leaving
+the wrong reason in place would have kept the next reader from trying.
