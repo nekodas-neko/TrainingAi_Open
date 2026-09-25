@@ -884,7 +884,10 @@ the Orchestrator's to do.
   Component names are minified, so **which** chart(s) and why is not established — the suspect is a
   responsive resize when a panel leaves `content-visibility: hidden`.
 
-- **Gate:** device — the remaining question needs the phone.
+- **Device check owed on merge:** `perf.js longtasks`, every tab tap's longest task under 50 ms.
+  **⚠ Deliberately prose and NOT a field — the gate was REMOVED 2026-09-25, see below.** `Gate: device`
+  parks an entry as unstartable and `Verify: device` reads as shipped; startable work that will need a
+  device check at the end carries neither, which is the shape CLAUDE.md's protocol section names.
 - **Lane: B** · **Batch: tab-switch-speed** — **re-laned from `DV` on 2026-09-24,
   because the measurement it was parked for HAS BEEN TAKEN.**
   **⚠ `Gate: device` added 2026-09-24 (LB-145) after this entry headed Lane B's READY list while
@@ -904,6 +907,20 @@ the Orchestrator's to do.
   the profile's component names are minified. Finding which charts render inside a tab panel is a grep
   in `components/shell/**` and the tab screens; the suspect is already named — a responsive resize
   when a panel leaves `content-visibility: hidden`.
+- **⛔ THE GATE IS REMOVED, 2026-09-25 — it was answered and then outlived its answer.** It was added by
+  `LB-145` because *"the remaining question needs the phone"*, and the entry's own next line said the
+  opposite: *"What is still unknown is answerable from SOURCE, not from the phone."* Both halves of that
+  question are now settled below, so the gate was parking the owner's **highest-priority** entry for a
+  question nobody still had. What remains needs the phone only to **verify**, which is why this carries a
+  prose `Device check owed on merge:` rather than a field — a `Verify:` here would file unbuilt work as
+  shipped, which the protocol names as the worse error.
+- **⛔ AND THE FIX HAS NO ONE-LINE HOME, which is the first thing the implementer needs to know.** The
+  obvious lever is chart.js's own `resizeDelay`, and the obvious place for it is a shared default — but
+  **there is no shared chart module**: all twenty chart components call `ChartJS.register(...)` at their
+  own module scope and build their own inline options object. `Chart.defaults.resizeDelay` set in a new
+  `components/ui/chart-setup.ts` would be one source of truth, but a module only runs when imported, so
+  every chart file still needs an import line; that is a twenty-file sweep either way, just a cheaper one
+  than twenty options keys. **Decide it with the measurement below in hand, not before.**
 - **✅ THE SOURCE HALF IS ANSWERED (Lane B, 2026-09-25), so the `Gate: device` is now the thing to argue
   about rather than the mechanism.** The suspect is confirmed from source: **20 chart components set
   `responsive: true` and NONE sets `resizeDelay`** (`grep -rn 'responsive: true' components/`), and
@@ -911,16 +928,36 @@ the Orchestrator's to do.
   incoming one — so **both** panels' canvases change size on every tap and each `responsive` chart gets a
   ResizeObserver callback → `update → _tickSize → _computeLabelSizes → set font`. That is the profiled
   chain, and it explains why it fires on *every* tap rather than only on the Health tab.
-- **⚠ AND A MEASUREMENT THAT CUTS AGAINST A CHART-ONLY FIX — take this before building one.** Driving tab
-  taps in the Playwright harness with a `PerformanceObserver('longtask')`: **216, 228, 465, 91, 235 ms**
-  on successive switches with **zero `<canvas>` elements on the page at all** (`canvasTotal: 0` — the
-  seeded e2e user has no chart data). So a large main-thread cost on tab switch exists **independently of
-  chart.js**, and a fix aimed only at the charts may not move the owner's number.
-  **What that measurement is NOT:** it is `next dev` (unminified, React dev mode, on-demand compilation)
-  against an unseeded user, so the absolute figures do not transfer to the APK and it cannot test the
-  chart hypothesis at all — there are no charts to resize. It is evidence about the *residual*, not about
-  the lead. **Reproducing the chart half here needs a seeded user with chart data**, which is the next
-  concrete step and is a fixture change, not a device sitting.
+- **⛔ RETRACTED, SAME DAY, BY ME — the "zero canvases" measurement was measuring a page whose charts had
+  not loaded.** It read *"216, 228, 465, 91, 235 ms with `canvasTotal: 0`, so a large cost exists
+  independently of chart.js"*. **Health does render canvases — five of them — but only after ~18 s**
+  (0 at 3 s, 0 at 8 s, 5 at 18 s: dynamic imports plus the data fetches behind them). The probe waited
+  1.5 s per switch, so it was timing a *loading* page, not a chart-free one. The seeded user has data all
+  along: 16 `body_metrics`, 22 `sleep_sessions`, 9 `workout_sessions`. Corrected rather than deleted,
+  because the entry had already shipped with the wrong figure attached.
+- **✅ RE-MEASURED with the charts genuinely mounted (5 canvases throughout), and then the obvious fix was
+  A/B'd.** Longest long task per tab tap, harness, `next dev`:
+  | switch | baseline | with `resizeDelay: 200` on all 20 charts |
+  |---|---|---|
+  | → More | 233, 255 ms | 283, 187 ms |
+  | → Health | 480, 319, 0 ms | 420, 407, 93 ms |
+  | → Home | 87 ms | 73 ms |
+  **No effect that survives the noise** — the run-to-run spread inside each column is larger than any
+  difference between them. The experiment was applied by script to all 20 sites and reverted.
+- **⚑ SO THE FIRST TASK IS NOT THE FIX — IT IS A MEASUREMENT THAT CAN TELL A FIX FROM A NO-OP, AND THE
+  HARNESS IS NOT IT.** `next dev` is unminified, in React dev mode, and compiles on demand, so its tab
+  switches are dominated by work the APK never does; that is consistent both with `resizeDelay` being
+  ineffective *and* with it being effective but invisible here. **Shipping a twenty-file sweep on this
+  evidence would repeat BF-61 exactly** — a change that looks right, with no measurement able to
+  distinguish it from nothing.
+- **⛔ AND THE OBVIOUS WAY OUT OF THE DEV-MODE CONFOUND IS CLOSED HERE — tried 2026-09-25, do not spend it
+  again.** `pnpm build` succeeds, but `pnpm start` **refuses to boot in this sandbox**:
+  *"An error occurred while loading instrumentation hook: [instrumentation] MODEL CONSTANTS UNAVAILABLE —
+  could not list the bucket: SignatureDoesNotMatch (403)"*, and every request 500s. The production build
+  cannot be profiled locally without those object-storage credentials.
+  **So the remaining discriminators are:** instrument chart.js's resize path and count callbacks per tap
+  (answers the MECHANISM without needing the timing to move, and works in dev), or take it to the phone.
+  The second is why a device pass is owed on merge — but it is verification, not a reason to park.
 - **So the fix has no obvious home yet, and that is a real finding:** there is no shared chart-options
   module (`packages/shared/src/chart-colors.ts` is colours only), so `resizeDelay` is either 20 call sites
   or a new shared helper — and a helper under `components/` is Lane B's while one under `packages/shared/`
