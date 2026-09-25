@@ -17255,3 +17255,17 @@ an `Ask:` field or it never reaches the WAITING section; an answered decision ha
 to the entry that builds them; and a gate run through a pipe reports the pipe's exit status, which
 committed through a failing check. The baton is meant to carry what a successor cannot re-derive, and
 a trap that already fired once is exactly that.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31057 → 31082 (TN-70 read + LA-140)
+
+Net +25 across two entries, and both halves are there to stop work rather than start it.
+
+TN-70 gains a killed hypothesis — the baseline was NOT still learning during the level-5 run, 0 of
+68 days under `BASELINE_MIN_NIGHTS` — which is the first thing anyone would check and now nobody
+needs to. It also gains the measured asymmetry (resting heart rate moved 4%, its score 37%),
+written as a pointer rather than a cause, because a suggestive ratio is not a finding.
+
+LA-140 is the dead `night_hrv_baseline_ms` column. Its value is not the null itself, which harms
+nothing, but the inference the null invites: the resilience model gates on that exact field being
+non-null. The entry records that trap explicitly, and that both closing moves — persist it, or
+delete the plumbing — are real options rather than one obvious fix.
