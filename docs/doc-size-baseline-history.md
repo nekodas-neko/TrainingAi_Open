@@ -17363,6 +17363,8 @@ baseline, so the `.size` file conflicted on a value neither branch was wrong abo
 the merged file each time rather than picking a side — two PRs raising the same document is the one
 conflict in this file that is a genuine disagreement rather than two independent additions.
 
+---
+
 ## 2026-09-25 — `docs/implementation-backlog.md` 31159 → 31173 (+14)
 
 `LB-152` — the RV-99 migration turned out to be a visible app-wide restyle rather than a refactor
@@ -17391,7 +17393,29 @@ journal, and would otherwise size the remaining work against a number that has a
 be wrong once. The formulation benchmarks and the rest of the story were trimmed out to the journal
 entry, which is what kept this to eight lines instead of nineteen.
 
-## 2026-09-25 — `docs/implementation-backlog.md` 31181 → 31185 (OR-166 / LA-85)
+---
+
+## 2026-09-25 — `docs/agents/state/tuning.md` 731 → 744 (+13), the owner's scope rule for the Tuning role
+
+The owner narrowed what the Tuning session may put to him: *"The only questions asked from me in this
+agent should be about tuning in general for our pillars or workouts etc — nothing to do with other
+avenues."* A standing instruction about what a role may ask its owner is that role's state, so it
+belongs in the baton rather than a journal entry — a journal entry is read once, a baton is read at
+the start of every session of that role.
+
+**Why 13 lines and not 3.** The rule alone is one line. The rest is what stops a successor repeating
+the mistake: the explicit do-not list (PR approvals, CI and branch protection, device routing, lane
+assignment, backlog process, another agent's queue), and the distinction that makes it survivable —
+**filing a cross-domain finding `Lane: O` is correct, briefing the owner on it in chat is not**.
+Without that split, a successor reads "stay in your lane" and stops filing real findings, which is
+worse than the failure being corrected. A first attempt ran to 31 lines and was cut after this very
+check refused it; the narrative moved to the journal entry.
+
+The same edit flags the baton **stale below "Now"**: its header reads `Next ID: TN-30` while the real
+next free is TN-81, and everything under it predates the TN-55…TN-80 run. One line, and it stops a
+successor trusting a four-week-old state section. A full rewrite is owed and was not that PR's work.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31266 → 31270 (OR-166 / LA-85)
 
 Four lines, and they are net: OR-166 shipped and its entry was cut down to what a shipped
 `Verify: owner` entry needs, which paid for most of what LA-85 gained.
