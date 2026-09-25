@@ -17310,3 +17310,21 @@ it — the analysis took a PR of its own.
 `RV-185` gained `Needs: RV-186`. Its own text already said it was "worth doing only if RV-186 shows
 script evaluation matters at cold start", and RV-186 is the unrun device baseline, so it was
 self-describing as blocked while printing as ready.
+
+## 2026-09-25 — `CLAUDE.md` → 1006 and `projectOverview.md` → 12851, the ruleset was Disabled (OR-164)
+
+Both orientation docs grow for the same reason, and it is not the good news. `main` is genuinely
+protected now, which could be recorded in a line. What costs the lines is that **the mechanism on
+file was wrong twice**: CLAUDE.md first said the checks were enforced, then that they were not, and
+both versions blamed the wrong thing. The real cause was the ruleset's Enforcement field sitting at
+`Disabled` since 2026-08-17 — configured and inert.
+
+The correction has to say more than "now fixed", because anything a session reads about the
+2026-08-17 → 2026-09-25 window is unreliable: a merge in that period proves nothing about its checks,
+and the force-push and deletion guarantees the file asserted were false too, since those rules sat in
+the same disabled ruleset.
+
+The remaining length is two things a future session would otherwise undo: **`strict` is off on
+purpose** (main moves faster than CI completes, so requiring a current base can livelock — seven
+re-merges on one PR the day before), and **the empty bypass list means a broken CI cannot be fixed**
+without temporarily adding one, which is stated rather than pre-configured.

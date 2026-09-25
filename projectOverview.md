@@ -1348,7 +1348,15 @@ and the spec passes. Two placement calls: a **second tsconfig** rather than edit
 would have failed CI on the entry's own suggestion
 ([journal](docs/overview/history-2026-09-10-folded-5.md#2026-09-01-typecheck-tests)).
 
-**⚠ One decision is waiting on the owner: whether the E2E job becomes a required check (Q-297).**
+**✅ ANSWERED AND IN FORCE, 2026-09-25 (OR-164): E2E is NOT a required check, and the other five now
+genuinely are.** The owner set the `ProtectMain` ruleset to **Active** — it had been sitting at
+Enforcement `Disabled` since 2026-08-17, which is why none of its rules bound anything. Required:
+`Lint, Tests, Build, Migration Check, Custom Rules`. Also enforced now: PR-before-merge, **squash as
+the only merge method**, force-pushes and deletions blocked. The paragraph below is the state of the
+question before it was answered, kept because its measurement is what made E2E safe to require had
+he wanted to.
+
+**⚠ (Historical) One decision was waiting on the owner: whether the E2E job becomes a required check (Q-297).**
 **Measured rather than read — it is NOT required today:** PR #776 merged while its E2E job was still
 `in_progress`. LA-22 has since made the job always-run and always-report specifically so it is safe
 to require, so the only remaining question is whether to, and it is **branch protection** — a shared
