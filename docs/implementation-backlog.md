@@ -904,6 +904,27 @@ the Orchestrator's to do.
   the profile's component names are minified. Finding which charts render inside a tab panel is a grep
   in `components/shell/**` and the tab screens; the suspect is already named — a responsive resize
   when a panel leaves `content-visibility: hidden`.
+- **✅ THE SOURCE HALF IS ANSWERED (Lane B, 2026-09-25), so the `Gate: device` is now the thing to argue
+  about rather than the mechanism.** The suspect is confirmed from source: **20 chart components set
+  `responsive: true` and NONE sets `resizeDelay`** (`grep -rn 'responsive: true' components/`), and
+  `tab-shell.tsx:209` puts `[content-visibility:hidden]` on the outgoing panel and takes it off the
+  incoming one — so **both** panels' canvases change size on every tap and each `responsive` chart gets a
+  ResizeObserver callback → `update → _tickSize → _computeLabelSizes → set font`. That is the profiled
+  chain, and it explains why it fires on *every* tap rather than only on the Health tab.
+- **⚠ AND A MEASUREMENT THAT CUTS AGAINST A CHART-ONLY FIX — take this before building one.** Driving tab
+  taps in the Playwright harness with a `PerformanceObserver('longtask')`: **216, 228, 465, 91, 235 ms**
+  on successive switches with **zero `<canvas>` elements on the page at all** (`canvasTotal: 0` — the
+  seeded e2e user has no chart data). So a large main-thread cost on tab switch exists **independently of
+  chart.js**, and a fix aimed only at the charts may not move the owner's number.
+  **What that measurement is NOT:** it is `next dev` (unminified, React dev mode, on-demand compilation)
+  against an unseeded user, so the absolute figures do not transfer to the APK and it cannot test the
+  chart hypothesis at all — there are no charts to resize. It is evidence about the *residual*, not about
+  the lead. **Reproducing the chart half here needs a seeded user with chart data**, which is the next
+  concrete step and is a fixture change, not a device sitting.
+- **So the fix has no obvious home yet, and that is a real finding:** there is no shared chart-options
+  module (`packages/shared/src/chart-colors.ts` is colours only), so `resizeDelay` is either 20 call sites
+  or a new shared helper — and a helper under `components/` is Lane B's while one under `packages/shared/`
+  is Lane A's. Decide that in the implementing PR, with the measurement above in hand.
   Superseded field, demoted to prose so it cannot route this entry: it read *“Lane DV —
   re-channelled from `B` by Lane B, 2026-09-23. The fix will be Lane B's; the next ACTION is not.”* This entry's own "Not established" line says what it needs: a CPU profile of one
   tap, to name the component that dominates the task. That is a measurement nobody has taken, with
