@@ -5466,7 +5466,7 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **What is NOT in this question:** the one real defect was shipped separately (see RV-99), amber is
   imperceptible and can go either way, and identity colours (rarity, HR zones, macro colours, the
   per-metric Home tints) keep their hex regardless.
-- **Ask:** owner
+- **Ask:** owner — migrating ~113 hard-coded greens and reds to the design tokens makes them all visibly brighter (green `rgb(34,197,94)`→`rgb(86,238,102)`). Keep today's look, or take the token's? Retuning the token to today's hex first gets the same one-source benefit with no visual change.
 - **The three answers, any of which unblocks it:** (a) migrate to the token and accept the brighter
   green and red; (b) retune the token to today's `#22c55e`/`#ef4444` first, then migrate — same
   one-source benefit, appearance unchanged; (c) leave it, and close RV-99's Lane B half.
