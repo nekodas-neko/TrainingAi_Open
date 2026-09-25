@@ -6065,22 +6065,6 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   from scratch. They were not hard questions — they were questions nobody had been asked, because
   each lived in a session transcript that ended. **Writing them in one place was the whole of the
   work.** That is the argument for this ledger continuing to exist after these six clear.
-### [nutrition][platform] LB-154 — the food-logger sheet fetches meal types with a bare `fetch`
-
-- **Lane: B** — `components/nutrition/food-logger-sheet.tsx:245-247`.
-- **Added:** 2026-09-25 · found building RV-67's invalidation proof for `nutrition-meal-types`.
-- Every other read of that key goes through `cachedFetch`/`useCachedValue`; this one calls
-  `fetch('/api/nutrition/meal-types')` directly, against the standing rule that client GETs of
-  `/api/*` use `cachedFetch` with a `readCacheSync` seed.
-- **It does not break RV-67's proof** — it is a read, not a write — but it bypasses the cache
-  entirely, so it pays a request every time the sheet opens while its siblings now skip the network
-  inside the TTL. Filed rather than fixed in RV-67's PR to keep that diff to the key it proves.
-- The site's own comment says the local store's `getMealTypes` returns a narrower row type than
-  `mealTypeForHour` wants, which is presumably why it reached for the raw endpoint — so converting
-  it means reconciling those two types, not just swapping the call.
-- **⛔ This is 1 of 69, not a one-off — measured 2026-09-25 while shipping RV-79.** See `LB-155`:
-  the rule has 69 live violations, so fixing them one filed entry at a time is not a plan.
-
 ### [platform] LB-155 — the bare-`fetch` rule is ENFORCED now and its exemptions are written down; ~20 conversions remain
 
 - **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79. **Enforcement shipped
@@ -6101,6 +6085,10 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `sync/pull`, `oura-ble/rollup-state`, `exercise-library`, `ai-periodization/session` — several
   already pass `cache: 'no-store'`, which is the tell); and **26 tracked across 19 files**,
   shrink-only.
+- **Now 65 / 24 tracked across 18 files**, after `LB-154` cleared `food-logger-sheet.tsx`'s two on
+  2026-09-25. The baseline row was **deleted rather than lowered**, which is what makes the ratchet
+  the regression guard: a re-introduced bare GET in that file now fails the check outright instead of
+  fitting under a remaining allowance.
 - **Remaining work — the ~20 conversions, triaged in the BASELINE itself so nobody re-derives it.**
   Weakest first: six are **per-query** (`?q=`, `?code=`, `?threadId=`, `?sessionId=`) where a key
   must carry the query, and a search-as-you-type key churns the cache for nothing. Strongest are the

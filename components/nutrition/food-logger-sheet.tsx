@@ -15,7 +15,8 @@ import { todayInTz, secondsSinceLocalMidnight } from '@trainingai/shared/date-ut
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { scanOriginToSource, logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
-import { readCacheSync } from '@/lib/sqlite/cache'
+import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { hapticLight } from '@/lib/haptics'
 import { toast } from 'sonner'
@@ -221,11 +222,16 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
       const store = userId ? getLocalStore(userId) : null
       let meal = store ? (await store.getSavedMeals()).find(m => m.id === mealId) ?? null : null
       if (!meal) {
-        const res = await fetch('/api/nutrition/saved-meals')
-        if (res.ok) {
-          const list = (await res.json()) as SavedMeal[]
-          meal = list.find(m => m.id === mealId) ?? null
-        }
+        // `cachedFetch` and not a bare `fetch` (LB-154), on the shared `saved-meals` key every other
+        // reader of this list already uses. Awaited for the value, which is the shape
+        // `use-saved-meal-summaries.ts` established: it paints the cached list first and then the
+        // network's, so what lands here is the fresher of the two — a bare fetch could not consult
+        // the cache at all, and a `readCacheSync` alone would miss a meal saved on another device.
+        await cachedFetch<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM,
+          // `?? null`, not `?? meal`: onData can fire twice — the cached list, then the network's —
+          // and the fresher answer has to win both ways round, including when the meal was deleted
+          // on another device and the cached list still carries it.
+          list => { if (list) meal = list.find(m => m.id === mealId) ?? null })
       }
       // **Two different things land here and the old copy asserted the wrong one** (BF-57). This
       // branch resolves an id against the SCANNING user's own meals, so it is reached both when the
@@ -242,10 +248,15 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
 
       // The same cache key the nutrition screens fill (TTL_LONG), so this is warm offline. The
       // local store's own getMealTypes returns a narrower row type than mealTypeForHour wants.
+      //
+      // The miss path goes through `cachedFetch` (LB-154), so a cold scan WRITES what it fetched and
+      // the next one is warm — the bare `fetch` it replaced left the key empty however often this
+      // ran. It also joins the in-flight dedup, which matters here because the nutrition screen
+      // behind this sheet fetches the same key on mount.
       let mealTypes = readCacheSync<MealType[]>('nutrition-meal-types') ?? []
       if (mealTypes.length === 0) {
-        const r = await fetch('/api/nutrition/meal-types')
-        if (r.ok) mealTypes = (await r.json()) as MealType[]
+        await cachedFetch<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG,
+          d => { if (d) mealTypes = d })
       }
       const bucket = preselectedMealTypeId ?? mealTypeForHour(mealTypes, Math.floor(secondsSinceLocalMidnight(tz) / 3600))
       if (!bucket) { toast.error('No meal type available'); return }

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.59",
+    date: "2026-09-25",
+    changes: [
+      "Scanning a meal label with no signal now finds meals saved on your other devices, instead of only the ones this phone has stored. The first scan after opening the app also stops re-downloading your meal types.",
+    ],
+  },
+  {
     version: "1.465.58",
     date: "2026-09-25",
     changes: [
