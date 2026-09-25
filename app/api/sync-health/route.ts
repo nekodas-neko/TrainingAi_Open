@@ -31,9 +31,8 @@ const SyncHealthSchema = z.object({
     date:             z.string().regex(DATE_RE),
     steps:            int(200_000, 0),
     distanceKm:       num(500),
-    // Legacy Android total energy; never reinterpret it as active energy.
     caloriesBurned:   num(20_000),
-    activeCalories:   num(20_000), // active energy only, in kcal
+    activeCalories:   num(20_000),
     weightKg:         num(500),
     bodyFatPct:       num(100),
     calories:         num(20_000),
