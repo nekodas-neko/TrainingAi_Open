@@ -17310,3 +17310,18 @@ it — the analysis took a PR of its own.
 `RV-185` gained `Needs: RV-186`. Its own text already said it was "worth doing only if RV-186 shows
 script evaluation matters at cold start", and RV-186 is the unrun device baseline, so it was
 self-describing as blocked while printing as ready.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31156 (+4, net of RV-122 leaving)
+
+`LB-151` arrived and `RV-122` left in the same PR, so the file grew by four lines rather than by the
+entry's full length.
+
+The entry is the length it is because of one paragraph that is not a finding: **what it does not
+establish.** `pushMutations` having no in-flight guard is measured and certain; whether two
+overlapping drains actually double-*write* is not, because the per-domain handlers may be upserts.
+Those are a correctness bug and a bandwidth annoyance respectively, and the entry has to be readable
+by someone who picks it up cold without collapsing the second into the first. Cutting that paragraph
+would leave a confident-sounding entry that overstates what was measured, which is the failure mode
+this queue has been correcting all week.
+
+One pass of tightening was done first and bought a single line; the rest is load-bearing.
