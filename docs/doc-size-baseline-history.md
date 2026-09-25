@@ -17784,3 +17784,21 @@ at all, the tray is topmost over its own rect), why the meal list needs no secon
 component), and that acceptance clause ③ — the day jumping to Yesterday — is **not claimed**. That
 last line is the one a future reader needs: it is downstream of the same swallowed tap and may clear
 with it, but if it survives it is its own entry rather than a re-open of this one.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31756 → 31777 (+21, DV-12's source half)
+
+DV-12 is the owner's stated highest priority and was parked `Gate: device` for a question its own text
+said was *"answerable from SOURCE, not from the phone"*. That half is now answered on the entry: **20
+chart components set `responsive: true`, none sets `resizeDelay`**, and `tab-shell.tsx:209` toggles
+`[content-visibility:hidden]` on both the outgoing and the incoming panel — so every `responsive` chart
+in both takes a ResizeObserver callback on every tap, which is the profiled `_computeLabelSizes` chain.
+
+The lines that earn their place are the **counter-measurement**, because it is the one that stops the
+obvious fix being built on a half-truth: tab taps in the harness produced 216/228/465/91/235 ms long
+tasks with **zero canvases on the page**. A large cost exists independently of chart.js, so a
+chart-only fix may not move his number — and the harness cannot test the chart half at all, because the
+seeded user has no chart data. Stated with its limits (dev build, unseeded), since the absolute figures
+do not transfer to the APK.
+
+Recorded on the ENTRY rather than in the baton on purpose: whoever picks DV-12 up reads the entry and
+never reads Lane B's baton, and a finding filed where it cannot be found is a finding lost.
