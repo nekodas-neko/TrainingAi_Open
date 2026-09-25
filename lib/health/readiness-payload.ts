@@ -661,10 +661,24 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const hasSufficientData = ouraToday?.readinessScore != null ||
     (sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null))
 
-  // Early deload — only for automatic periodization, not already in deload
+  // Early deload — the periodization modes the app drives, and not already in deload.
+  //
+  // TN-64(b), owner-approved 2026-09-24. This used to read `=== 'automatic'` alone, which made the
+  // one automatic protective action in the app unreachable: measured 2026-09-25, the owner's two
+  // `automatic` programs are his OLDEST and both inactive, while the active one is `ai_dynamic`.
+  // So this was not "a gate that rarely fires" — it was dead for every session logged since he
+  // moved across, 118 of them, none an early deload.
+  //
+  // `manual` stays out deliberately. What he approved was extending the recommender to the mode
+  // the app itself periodizes; under `manual` he drives the phases, so the app proposing one is a
+  // different question and is not this entry's to answer.
+  //
+  // The thresholds are NOT touched here (EARLY_DELOAD_SCORE_MAX / EARLY_DELOAD_ACWR_MIN). Moving
+  // them in the same change would make it impossible to tell whether a prompt appeared because the
+  // gate opened or because the bar dropped — and a threshold is Tuning's proposal, not this one's.
   let earlyDeloadRecommended = false
   let earlyDeload: EarlyDeloadReason | null = null
-  if (program?.phaseMode === 'automatic') {
+  if (program?.phaseMode === 'automatic' || program?.phaseMode === 'ai_dynamic') {
     const phaseList = program.startedAt ? await repo.listProgramPhases(userId, program.id) : []
     let inDeloadPhase = false
     if (phaseList.length > 0 && program.sessionsPerCycle && program.startedAt) {

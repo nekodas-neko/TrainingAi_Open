@@ -1068,11 +1068,41 @@ below keep their gate — they really are blocked pending an answer — and this
   number of other days each change moves — a bare gate on a scoring constant is a question he
   cannot answer, and routing them here would just move the silence.
 
+### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
+
+- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch), `program_phases`.
+- **Added:** 2026-09-25 · found while building TN-64(b); filed rather than fixed, because it is a
+  different question from the one the owner answered.
+- **Measured on production 2026-09-25:** `program_phases` holds **0 rows for all five programs** —
+  the two `automatic` ones included. The active program also has `started_at` NULL, which
+  short-circuits the phase lookup before it runs (`phaseList = program.startedAt ? … : []`).
+- **So `inDeloadPhase` has always been `false`**, and the guard that is supposed to stop the app
+  recommending a deload while the owner is *already* in one has never suppressed anything. That was
+  harmless while the gate itself was unreachable (TN-64). Now that the gate is live, it is the
+  difference between "asked once" and "asked during a deload week".
+- **Not urgent, and not a correctness bug:** every prompt still requires the owner's confirmation,
+  so the worst case is a redundant question, not an unwanted deload.
+- **What is NOT established:** whether `ai_dynamic` is *meant* to write phase rows at all, or
+  tracks its cycle another way. Answer that before writing code — if it tracks it elsewhere, the
+  fix is to read that source, not to start populating `program_phases`.
+
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 
 - **✅ ANSWERED BY THE OWNER 2026-09-24: extend the recommender to `ai_dynamic` and persist ACWR,
   keeping the owner-confirmation step.** He took the recommendation as written, over *leave it off
   and delete the gate* and over *lower the thresholds*.
+- **⚙ PARTS (b) AND (c) SHIPPED TOO — the gate is live.** The condition at
+  `readiness-payload.ts:681` now reads
+  `phaseMode === 'automatic' || phaseMode === 'ai_dynamic'`. `manual` stays out: under it the owner
+  drives the phases, and extending the recommender there is a product question nobody has answered.
+  Thresholds untouched, per this entry. (c) needed no change — the read path only ever set a flag —
+  and that is now pinned by a test asserting `readiness-payload.ts` never reaches
+  `confirmEarlyDeload`, so a later refactor cannot quietly make the app deload him on its own.
+- **Keep:** the owner watching what it proposes. This entry's own success test is *"a prompt
+  appearing on a genuinely low day"*, and nothing in a container can judge that. Prompts on
+  ordinary days mean the thresholds are wrong — which is Tuning's proposal, not this entry's — and
+  **the ACWR column only fills forward from 2026-09-25**, so there is no history to judge it
+  against yet.
 - **⚙ PART (a) SHIPPED — ACWR is now recorded.** Migration **282** adds `oura_daily_derived.acwr`
   (with its `claude_ro` twin **283**); the readiness read path writes it on the same patch as the
   composite score, so both halves of the gate land on one row for one day and cannot disagree.

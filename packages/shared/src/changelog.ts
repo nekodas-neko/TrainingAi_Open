@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.43",
+    date: "2026-09-25",
+    changes: [
+      "The app can now suggest an early deload week when your readiness is low and your training load is high at the same time. It always could in principle \u2014 but the check only ran for programs on the older automatic periodization setting, and your last three programs have all used the AI-driven one, so in 118 logged sessions it had never once been able to fire. It now runs for both. Nothing deloads on its own: it puts the suggestion in front of you with the two numbers behind it, and waits for you to accept.",
+    ],
+  },
+  {
     version: "1.465.42",
     date: "2026-09-25",
     changes: [
