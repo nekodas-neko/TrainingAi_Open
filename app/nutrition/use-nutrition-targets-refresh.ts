@@ -33,6 +33,13 @@ export function useNutritionTargetsRefresh(
     await cachedFetch<NutritionTargets>(
       'nutrition-targets', '/api/nutrition/targets', TTL_LONG,
       d => setTargets(d ?? null),
+      // RV-67: skip the network inside the TTL. The payload is a stored row, not a derivation, and
+      // every writer of it is in `invalidateGoalRecommendations()` — including the non-obvious one,
+      // `PUT /api/user/goals`, which upserts targets as a side effect. Proof in the journal entry.
+      //
+      // Safe here specifically because of the `useInvalidationRefetch` below: a write clears the
+      // entry AND re-runs this, so the flag only ever suppresses a request nothing has invalidated.
+      { freshWithinTtl: true },
     )
   }, [setTargets])
 

@@ -59,7 +59,9 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
       setMealTypes(data)
       // functional update: onData fires twice (cached + fresh) — don't clobber a user pick
       setSelectedId(prev => prev ?? mealTypeForHour(data, hourInTz))
-    }).catch(() => {}).finally(() => setLoadingTypes(false))
+      // RV-67: with the flag this fires ONCE on a warm cache, which is the point — the second
+      // call was a network round-trip the old comment claimed was already being skipped.
+    }, { freshWithinTtl: true }).catch(() => {}).finally(() => setLoadingTypes(false))
     const targetDate = logDate ?? todayInTz(tz)
     cachedFetch<FoodLogWithItem[]>(
       `nutrition-food-logs-${targetDate}`, `/api/nutrition/food-logs?date=${targetDate}`, NUTRITION_FOOD_LOGS_TTL,

@@ -3117,6 +3117,40 @@ Device Verification agent's — and **RV-124's device probe settles this class b
 these three included. Detail:
 [`2026-09-23-rv106-rv107-rv109-stale-surfaces`](docs/overview/history-2026-09-24-folded-2.md#2026-09-23-rv106-rv107-rv109-stale-surfaces).
 
+### [app-shell][activity] ⚠️ A navigation from inside a closing sheet or dialog is no longer undone — NOT device-verified, and the device is 60× faster at breaking it (BF-165, DV-2, 2026-09-25, v1.465.61) · needs: device
+
+The owner's *"when I try click the treadmill; or any Other activity nothing actually happens"*. The
+push always happened: the sheet's own history entry was popped by its close **7 ms later on the
+S25**, so `/cardio` came straight back, at the top of its nested scroller. *Leave* on *"Leave
+workout?"* was the same mechanism in a dialog — the one `history.back()` meant to leave the screen
+was spent on the dialog's entry. Both now hand that entry to the navigation **before it starts**
+(`releaseTopSurfaceEntry`), so nothing is left to pop; the forward case also `replace`s rather than
+pushes, or backing out would cost two presses with the first doing nothing. **Three cheaper fixes
+were built and measured as failing first** — waiting for the pop to drain (it is not yet pending),
+reordering the call site (the view transition holds the close behind the navigation), and
+lengthening the navigation cap (it turns a dead tap into a slow one). Reproduced and control-run in
+the harness for the sheet half; **the dialog half cannot be — it needs the Android back gesture over
+a Capacitor channel Playwright cannot fire.** Pass tests: on the S25, Cardio → *Other activity* →
+*Treadmill* lands and stays, one back returns to the hub; and start a workout, back, *Leave* → the
+screen leaves `/workout?session=…`. Detail:
+[`2026-09-25-lane-b-back-gesture-sitting`](docs/overview/entries/2026-09-25-lane-b-back-gesture-sitting.md).
+
+### [nutrition][platform] ⚠️ "kcal left" now subscribes to the post-push invalidation — NOT device-verified, and the device is where it failed three times (BF-177, 2026-09-25, v1.465.57) · needs: device
+
+The card's refetch fired at the **local** write and reached the server ~60–70 ms before
+`POST /api/sync/push` did, so it re-cached the pre-log figure and the number sat wrong until the
+user left the tab and came back — the owner's report, traced on the S25 with response bodies
+(857 · push · 846, the correct answer belonging to somebody else's request). Three fixes each added
+another one-shot refetch and the device failed each time; the web path awaits its POST, which is why
+the e2e spec stayed green throughout. `log-food.ts` was already invalidating a second time *after*
+the push — nothing was listening. `use-energy-balance-refetch.ts` now subscribes to
+`energy-balance:` and refetches the day on screen, and takes that date as a required argument so the
+subscription is live before the hook's first fetch. **Exercised against `pnpm dev`, the suite and
+the gate only: native SQLite, the outbox push and Samsung's WebView are the whole mechanism here and
+none was run.** Pass test: log a food on the S25, "kcal left" changes within 3 s without leaving the
+tab. Detail:
+[`2026-09-25-lane-b-bf177-balance-subscribes`](docs/overview/entries/2026-09-25-lane-b-bf177-balance-subscribes.md).
+
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 
 The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,

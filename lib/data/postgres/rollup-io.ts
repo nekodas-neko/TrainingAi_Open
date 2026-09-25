@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, notInArray, sql } from 'drizzle-orm'
 import * as s from './schema'
 import * as oura from './slices/oura'
 import { readRawFrames } from './slices/oura-raw-frames'
@@ -66,11 +66,16 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
         gte(s.workoutSessions.startedAt, since),
         isNull(s.workoutSessions.deletedAt),
       )),
-    deleteBleHeartrateFrom: async since => {
+    deleteBleHeartrateNotIn: async (since, keep) => {
       await db.delete(s.ouraHeartrate).where(and(
         eq(s.ouraHeartrate.userId, userId),
         eq(s.ouraHeartrate.source, 'ble'),
         gte(s.ouraHeartrate.timestamp, since),
+        // An empty `keep` means the window is genuinely empty, so everything in it goes — the old
+        // blanket delete's behaviour, which is right here. It is spelled out because `notInArray`
+        // with no values is not a no-op to reason about, and the wrong reading of it (keep
+        // everything) would silently strand rows the rollup had dropped.
+        ...(keep.length ? [notInArray(s.ouraHeartrate.timestamp, keep)] : []),
       ))
     },
     upsertHeartrate: async rows => { await oura.upsertOuraHeartrate(db, userId, rows) },

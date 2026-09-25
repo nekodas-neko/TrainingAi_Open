@@ -257,6 +257,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             const store = userId ? getLocalStore(userId) : null;
             if (store && types.length) store.replaceMealTypes(types).catch(() => {});
           },
+          // RV-67: every writer of this key is in `invalidateMealTypes()` — proof in the journal
+          // entry — so a tab revisit inside the TTL is a real cache hit rather than a request.
+          { freshWithinTtl: true },
         ),
         refreshTargets(),
         refreshDerived(),
@@ -291,7 +294,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // BF-177. Balance-only refetch; the hook carries why it is not `fetchData` and not a
   // client-side subtraction.
   const { refetch: refetchBalance, failed: balanceRefetchFailed, retry: retryBalance,
-    refreshing: balanceRefreshing } = useEnergyBalanceRefetch(setEnergyBalance)
+    refreshing: balanceRefreshing } = useEnergyBalanceRefetch(setEnergyBalance, selectedDateRef)
 
   const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
     if (newLog) {

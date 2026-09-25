@@ -19,6 +19,7 @@ import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { selectLibraryMeals } from '@trainingai/shared/nutrition/library-match'
 import { planNameFromMeals, restDayCarbLine } from '@trainingai/shared/nutrition/plan-naming'
+import { macrosForDayType } from '@trainingai/shared/nutrition/rest-day-macros'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
@@ -93,9 +94,6 @@ const DraftSchema = z.object({
   })),
   restDayAdjustment: z.string().describe('One line on what changes on a rest day, or "" if not applicable'),
 })
-
-/** Carbohydrate difference between a training day and a rest day, as a fraction of the daily total. */
-const REST_DAY_CARB_REDUCTION = 0.15
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -197,8 +195,9 @@ export async function POST(req: Request) {
   // one decision for the whole plan: the same ingredient list serves both variants and is rescaled
   // per variant, exactly as a pinned meal already is. So the match runs once, against the
   // unshifted slots.
+  const dailyMacros = { calories: dailyCalories, proteinG: dailyProtein, carbsG: dailyCarbs, fatG: dailyFat }
   const canonicalSlots = splitMacrosAcrossMeals(
-    { calories: dailyCalories, proteinG: dailyProtein, carbsG: dailyCarbs, fatG: dailyFat },
+    dailyMacros,
     mealCount,
     { trainingTime: input.trainingTime ?? null },
   )
@@ -303,7 +302,7 @@ export async function POST(req: Request) {
       planName: planNameFromMeals([...kept.map(k => k.name), ...libraryPicks.map(p => p.meal.name)]),
       meals: [],
       restDayAdjustment: input.splitTrainingRest
-        ? restDayCarbLine(dailyCarbs * REST_DAY_CARB_REDUCTION)
+        ? restDayCarbLine(macrosForDayType(dailyMacros, 'rest').carbShiftG)
         : '',
     }
   } else {
@@ -354,21 +353,18 @@ export async function POST(req: Request) {
   }
 
   const variants = await Promise.all(dayTypes.map(async dayType => {
-    const carbShift = dayType === 'rest' ? Math.round(dailyCarbs * REST_DAY_CARB_REDUCTION) : 0
-    const carbs = dailyCarbs - carbShift
-    // Removing carbs removes their calories too; protein and fat are held, per D3.
-    const calories = dailyCalories - carbShift * 4
+    const target = macrosForDayType(dailyMacros, dayType)
     const slots = splitMacrosAcrossMeals(
-      { calories, proteinG: dailyProtein, carbsG: carbs, fatG: dailyFat },
+      target,
       mealCount,
       { trainingTime: dayType === 'rest' ? null : input.trainingTime ?? null },
     )
     return {
       dayType,
-      targetCalories: calories,
-      targetProteinG: dailyProtein,
-      targetCarbsG: carbs,
-      targetFatG: dailyFat,
+      targetCalories: target.calories,
+      targetProteinG: target.proteinG,
+      targetCarbsG: target.carbsG,
+      targetFatG: target.fatG,
       meals: await Promise.all(slots.map(async (slot, i) => {
         // The model states reference values and is told not to make them add up, so the portions
         // are decided here. One ingredient list serves both variants — scaling it per variant is

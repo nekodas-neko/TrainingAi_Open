@@ -25,7 +25,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
-import { MIN_RELIABLE_SAMPLES, CORROBORATION } from '@trainingai/shared/health/observed-hr'
+import { MIN_RELIABLE_SAMPLES, CORROBORATION, computeObservedHr } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
 type Day = { day: string; seconds: [number, number, number, number, number] }
@@ -33,6 +33,7 @@ type Day = { day: string; seconds: [number, number, number, number, number] }
 const getZoneMinutesRange = vi.fn(async (..._a: unknown[]) => [] as Day[])
 const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number; timestamp: Date; source: string | null }[])
+const getObservedHrProfile = vi.fn(async (..._a: unknown[]) => computeObservedHr([]))
 const getUserById = vi.fn(async (_u: string) => ({ dateOfBirth: '1990-01-01', heightCm: 180, sex: 'male', activityLevel: 'moderate' }) as Row | null)
 const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getActiveRunningPlan = vi.fn(async (_u: string) => null as Row | null)
@@ -43,7 +44,7 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getZoneMinutesRange, listActivityLogs, getHrForWindow, getUserById,
+    getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getUserById,
     listBodyMetrics, getActiveRunningPlan, getDayExerciseNames,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -66,7 +67,7 @@ const freshUser = (over: { timezone?: string } = {}) => {
 }
 
 /** `computeObservedHr` only calls a max corroborated once it has this many plausible readings. */
-const reliableBpms = (bpm: number) => Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm }))
+const reliableBpms = (bpm: number) => Array.from({ length: MIN_RELIABLE_SAMPLES }, () => bpm)
 
 /**
  * Enough readings to HAVE a corroborated max, but not enough to be called reliable.
@@ -76,29 +77,28 @@ const reliableBpms = (bpm: number) => Array.from({ length: MIN_RELIABLE_SAMPLES 
  * never reached. Only a window in this band tests the rule that is actually written.
  */
 const corroboratedButUnreliable = (bpm: number) =>
-  Array.from({ length: CORROBORATION + 5 }, () => ({ bpm }))
+  Array.from({ length: CORROBORATION + 5 }, () => bpm)
 
 /**
- * Place each reading in TIME, because the route no longer asks for its windows separately.
+ * Answer each of the route's three windows separately, by the window it asks for.
  *
- * RV-73 — `cardio-week` used to issue two `getHrForWindow` calls of its own on top of the one
- * `resolveHrProfile` makes, and this helper answered them by which window was asked for. Both of
- * those windows sit inside the profile's 90 days, so the route now slices the rows it was already
- * given and there is exactly ONE call to answer. A fixture that returns bare `{ bpm }` cannot
- * survive that, which is the honest signal: the split moved from the query to the timestamps.
- *
- * Anchored on the user's local midnight, the same base the route derives its windows from — 15
- * days back is inside the current 30-day window, 45 is inside the prior one, and neither is near a
- * boundary where an inclusive/exclusive end could decide the test.
+ * RV-181 — the route used to take the profile's 90 days of ROWS and slice its two reported windows
+ * out of them (RV-73), so this helper had to place each reading in time and let one mocked query
+ * answer all three. Every one of those windows is a database-side aggregate now, so the split is
+ * back in the query where it started: the mock keys on the span it is handed. The 90-day one is
+ * the profile's; of the two 30-day ones, the CURRENT window ends now and the prior one ends thirty
+ * days back.
  */
-const hrByWindow = ({ current, prior }: { current: { bpm: number }[]; prior: { bpm: number }[] }) => {
+const hrByWindow = ({ current, prior }: { current: number[]; prior: number[] }) => {
   const midnight = todayMidnightUtc(TZ).getTime()
-  const at = (daysBack: number) => new Date(midnight - daysBack * 86_400_000)
-  getHrForWindow.mockResolvedValue([
-    ...prior.map(r => ({ ...r, timestamp: at(45), source: null })),
-    ...current.map(r => ({ ...r, timestamp: at(15), source: null })),
-  ])
+  getObservedHrProfile.mockImplementation(async (..._a: unknown[]) => {
+    const [, from, to] = _a as [string, Date, Date]
+    const spanDays = (to.getTime() - from.getTime()) / 86_400_000
+    if (spanDays >= 60) return computeObservedHr([...current, ...prior])
+    return computeObservedHr(to.getTime() > midnight - 86_400_000 ? current : prior)
+  })
 }
+
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -106,6 +106,7 @@ beforeEach(() => {
   getZoneMinutesRange.mockResolvedValue([])
   listActivityLogs.mockResolvedValue([])
   getHrForWindow.mockResolvedValue([])
+  getObservedHrProfile.mockResolvedValue(computeObservedHr([]))
   getUserById.mockResolvedValue({ dateOfBirth: '1990-01-01', heightCm: 180, sex: 'male', activityLevel: 'moderate' })
   listBodyMetrics.mockResolvedValue([])
   getActiveRunningPlan.mockResolvedValue(null)
@@ -121,7 +122,7 @@ describe('/api/cardio-week', () => {
   // Eleven queries behind one card, and a broken one degrades rather than fails it — for the
   // reads that are actually guarded. The cost is a zero indistinguishable from an empty week.
   it('still paints when the guarded reads fail', async () => {
-    for (const m of [getZoneMinutesRange, listActivityLogs, getHrForWindow, getActiveRunningPlan, getDayExerciseNames]) {
+    for (const m of [getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getActiveRunningPlan, getDayExerciseNames]) {
       m.mockRejectedValue(new Error('db down'))
     }
     const res = await getWeek()
@@ -176,35 +177,38 @@ describe('/api/cardio-week', () => {
     expect((await (await getWeek()).json()).heart.maxHrDeltaBpm).toBe(6)
   })
 
-  // RV-73. The route reported on two 30-day windows that both sit inside the 90 days
-  // `resolveHrProfile` had already pulled, and fetched each of them again — three passes of the
-  // heaviest query in the app for rows already in memory.
-  it('asks for the HR window ONCE, not once per window it reports on', async () => {
+  // RV-181. The route asked for ninety days of rows to read six numbers off them, then sliced its
+  // own two windows out of the same array. All three are one-row aggregates now, so the count that
+  // matters is no longer "how many queries" but "how many rows" — and the answer is none.
+  it('reads each window as a statistic and never asks for the rows', async () => {
     hrByWindow({ current: reliableBpms(180), prior: reliableBpms(174) })
     await getWeek()
 
-    expect(getHrForWindow).toHaveBeenCalledTimes(1)
-    // And the one call is the profile's 90-day window, not either of the 30-day reported ones.
-    //
-    // **Asserted as a range, and that is the fix rather than a loosening.** The window runs from
-    // LOCAL MIDNIGHT ninety days back (`resolveHrProfileWithWindow`, which anchors there because
-    // the repo's date rule says ranges must) to `new Date()` — so its span is 90 days plus however
-    // much of today has elapsed, from 90.0 at midnight to just under 91.0. Pinning
-    // `Math.round(span) === 90` made this red from local **midday** onward: `Math.round` tips at
-    // 90.5, which is 12:00 Brisbane. It was failing for roughly half of every day, on every
-    // branch, and it blocked `main` for every lane until it was read rather than re-run.
-    //
-    // The range still separates 90 from 30, which is the only thing this assertion is for.
-    const [, from, to] = getHrForWindow.mock.calls[0] as [string, Date, Date]
-    const spanDays = (to.getTime() - from.getTime()) / 86_400_000
-    expect(spanDays, 'the one call is not the 90-day profile window').toBeGreaterThanOrEqual(90)
-    expect(spanDays, 'the window runs past a full extra day — it is not anchored at local midnight')
+    expect(getHrForWindow, 'the route still materialises an HR window').not.toHaveBeenCalled()
+    expect(getObservedHrProfile).toHaveBeenCalledTimes(3)
+
+    const spans = (getObservedHrProfile.mock.calls as [string, Date, Date][])
+      .map(([, from, to]) => (to.getTime() - from.getTime()) / 86_400_000)
+      .sort((a, b) => a - b)
+
+    // **Two of the three are asserted as RANGES, and that is a fix rather than a loosening.** The
+    // windows that END AT `new Date()` — the profile's and the current 30-day one — start at LOCAL
+    // MIDNIGHT (the repo's date rule: ranges anchor there), so each spans its nominal length plus
+    // however much of today has elapsed: 30.0 at midnight to just under 31.0 at 23:59, and 90.0 to
+    // just under 91.0. An earlier version of this file pinned `Math.round(span) === 90` and went
+    // red from local MIDDAY onward, because `Math.round` tips at 90.5 — failing for half of every
+    // day, on every branch. Only the PRIOR window has both ends fixed, so only it is exact.
+    expect(spans[0], 'the prior window should run midnight-to-midnight').toBe(30)
+    expect(spans[1]).toBeGreaterThanOrEqual(30)
+    expect(spans[1], 'the current window is not a 30-day one').toBeLessThan(31)
+    expect(spans[2], 'the third window is not the 90-day profile one').toBeGreaterThanOrEqual(90)
+    expect(spans[2], 'the window runs past a full extra day — it is not anchored at local midnight')
       .toBeLessThan(91)
   })
 
-  it('slices the two windows out of that one pull rather than merging them', async () => {
-    // Distinct values per window, so a slice that took the wrong rows shows up as a wrong delta
-    // rather than as a plausible-looking number.
+  // The delta is the whole point of the prior window, so a route that asked for the same window
+  // twice, or swapped them, would read as a plausible zero rather than as a failure.
+  it('measures the current window against the prior one, not against itself', async () => {
     hrByWindow({ current: reliableBpms(180), prior: reliableBpms(150) })
     const body = await (await getWeek()).json()
 
@@ -213,36 +217,26 @@ describe('/api/cardio-week', () => {
     expect(body.heart.maxHrDeltaBpm).toBe(30)
   })
 
-  it('keeps a reading landing exactly on the window boundary in BOTH windows', async () => {
-    // `getHrForWindow` was inclusive at both ends (`gte`/`lte`), and `priorTo === observedFrom`, so
-    // the two queries both returned a reading sitting exactly on that instant. The slice preserves
-    // that rather than quietly tightening one end — behaviour pinned, not endorsed.
-    const boundary = new Date(todayMidnightUtc(TZ).getTime() - 30 * 86_400_000)
-    getHrForWindow.mockResolvedValue(
-      Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm: 160, timestamp: boundary, source: null })),
-    )
-    const body = await (await getWeek()).json()
+  // A reading landing exactly on the shared boundary counts in BOTH windows — behaviour pinned,
+  // not endorsed. It used to be a property of this route's slice; it is a property of the query's
+  // inclusive ends now, so what is left to check HERE is that the two windows still meet at a
+  // point rather than overlapping or leaving a gap. The inclusivity itself is exercised against
+  // real Postgres in `observed-hr-sql-equivalence.test.ts`.
+  it('hands the two reported windows a shared boundary, with no gap and no overlap', async () => {
+    hrByWindow({ current: reliableBpms(180), prior: reliableBpms(174) })
+    await getWeek()
 
-    // Both windows saw the same readings, so every delta is exactly zero — which is only possible
-    // if the boundary reading landed in both.
-    expect(body.heart.avgHr).toBe(160)
-    expect(body.heart.avgHrDeltaBpm).toBe(0)
-    expect(body.heart.maxHrDeltaBpm).toBe(0)
-  })
-
-  it('drops readings older than the prior window instead of folding them in', async () => {
-    // Inside the profile's 90 days but outside both reported windows: the old code never saw these
-    // rows at all, because it asked for narrower windows. The slice has to exclude them.
-    const old = new Date(todayMidnightUtc(TZ).getTime() - 75 * 86_400_000)
-    getHrForWindow.mockResolvedValue([
-      ...Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm: 200, timestamp: old, source: null })),
-      ...Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm: 120, timestamp: new Date(todayMidnightUtc(TZ).getTime() - 15 * 86_400_000), source: null })),
-    ])
-    const body = await (await getWeek()).json()
-
-    expect(body.heart.avgHr).toBe(120)
-    // Nothing in the prior window, so there is no baseline to compare against.
-    expect(body.heart.avgHrDeltaBpm).toBeNull()
+    const thirties = (getObservedHrProfile.mock.calls as [string, Date, Date][])
+      .filter(([, from, to]) => {
+        const span = (to.getTime() - from.getTime()) / 86_400_000
+        return span >= 30 && span < 31
+      })
+      .sort((a, b) => a[1].getTime() - b[1].getTime())
+    expect(thirties).toHaveLength(2)
+    const [, , priorTo] = thirties[0]
+    const [, currentFrom] = thirties[1]
+    expect(priorTo.getTime()).toBe(currentFrom.getTime())
+    expect(currentFrom.getTime()).toBe(todayMidnightUtc(TZ).getTime() - 30 * 86_400_000)
   })
 
   // Measuring three days of a week against a seven-day goal always reads as failure.

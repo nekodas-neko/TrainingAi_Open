@@ -25,7 +25,7 @@ import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName 
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -943,58 +943,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.workoutSessions.userId, userId),
         isNull(s.workoutSessions.warmupEndedAt),
       ))
-  }
-
-  async logExerciseWithId(log: Omit<ExerciseLog, 'sets'> & { id: string }): Promise<void> {
-    await this.db.insert(s.exerciseLogs)
-      .values({
-        id: log.id,
-        workoutSessionId: log.workoutSessionId,
-        exerciseName: log.exerciseName,
-        styleId: log.styleId ?? null,
-        styleName: log.styleName ?? null,
-        estimated1rm: log.estimated1rm ?? null,
-        target80: log.target80 ?? null,
-        volume: log.volume ?? null,
-        avgReps: log.avgReps ?? null,
-        timeToComplete: log.timeToComplete ?? null,
-        muscleGroups: log.muscleGroups,
-        loggedAt: log.loggedAt,
-        interExerciseRestSec: log.interExerciseRestSec ?? null,
-        prepTimeSec: log.prepTimeSec ?? null,
-      })
-      .onConflictDoNothing()
-  }
-
-  async logSets(exerciseLogId: string, sets: Omit<SetLog, 'id' | 'exerciseLogId'>[]): Promise<SetLog[]> {
-    if (sets.length === 0) return []
-    // A payload naming one set_number twice rejects the whole INSERT (21000) and loses every set in
-    // the exercise, not just the repeat. Bare EXCLUDED arm → last wins. See `collapse-conflicts.ts`.
-    // Collapsed once and reused: the `.returning()` rows are zipped against this array by index
-    // below, so collapsing inline would misalign every set after the first duplicate.
-    const deduped = collapseOnConflict(sets, set => set.setNumber)
-    const rows = await this.db.insert(s.setLogs)
-      .values(deduped.map(set => ({
-        exerciseLogId, setNumber: set.setNumber, weightKg: set.weightKg,
-        reps: set.reps, setTimeSec: set.setTimeSec ?? null,
-        restTimeSec: set.restTimeSec ?? null, intensityPct: set.intensityPct ?? null,
-        useFor1rm: set.useFor1rm,
-        setStartMs: set.setStartMs ?? null,
-        setEndMs: set.setEndMs ?? null,
-        rpe: set.rpe ?? null,
-      })))
-      .onConflictDoUpdate({
-        target: [s.setLogs.exerciseLogId, s.setLogs.setNumber],
-        set: {
-          weightKg: sql`EXCLUDED.weight_kg`, reps: sql`EXCLUDED.reps`,
-          setTimeSec: sql`EXCLUDED.set_time_sec`, restTimeSec: sql`EXCLUDED.rest_time_sec`,
-          intensityPct: sql`EXCLUDED.intensity_pct`, useFor1rm: sql`EXCLUDED.use_for_1rm`,
-          setStartMs: sql`EXCLUDED.set_start_ms`, setEndMs: sql`EXCLUDED.set_end_ms`,
-          rpe: sql`EXCLUDED.rpe`,
-        },
-      })
-      .returning()
-    return rows.map((r, i) => ({ ...deduped[i], id: r.id, exerciseLogId }))
   }
 
   async logExerciseAndSets(
@@ -5807,6 +5755,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ epoch: r.epoch, anchorDs: Number(r.anchorDs), anchorUtcMs: new Date(r.anchorUtc).getTime() }))
   }
 
+  /** RV-182 ② — the offsets only, one row per epoch. Prefer this over `getOuraClockAnchors`
+   *  whenever the anchors are merely reduced to an offset, which was every read path but the
+   *  rollup's. */
+  async getOuraClockOffsets(userId: string): Promise<ClockOffsets> {
+    return oura.getOuraClockOffsets(this.db, userId)
+  }
+
   async getWorkoutSensorProbe(userId: string, sessionId?: string): Promise<import('../repository').WorkoutSensorProbe | null> {
     const [ws] = await this.db
       .select({ id: s.workoutSessions.id, startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
@@ -5840,10 +5795,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const hrSamples = hrRow?.c ?? 0
 
     let rawByTag: { tag: string; count: number }[] = []
-    const anchors = await this.getOuraClockAnchors(userId)   // LA-139: robust offset, not one pair
-    const probeEpoch = currentEpoch(anchors)
-    const probeFromDs = probeEpoch == null ? null : resolveMsToDs(start.getTime(), anchors, probeEpoch)
-    const probeToDs = probeEpoch == null ? null : resolveMsToDs(end.getTime(), anchors, probeEpoch)
+    // RV-182 ②: the offsets, not the anchor log — this path only converts timestamps.
+    const clock = await this.getOuraClockOffsets(userId)
+    const probeEpoch = clock.epoch
+    const probeFromDs = probeEpoch == null ? null : msToDs(start.getTime(), clock, probeEpoch)
+    const probeToDs = probeEpoch == null ? null : msToDs(end.getTime(), clock, probeEpoch)
     if (probeFromDs != null && probeToDs != null) {
       const startDs = Math.floor(probeFromDs)
       const endDs = Math.ceil(probeToDs)
@@ -5876,12 +5832,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  `resolveDsToMs` rather than a stored timestamp so it cannot go stale when the clock model
    *  changes — the same reason `getOuraRawSamples` stopped reading `measured_at`. */
   async getSleepCoverageEnd(userId: string): Promise<Date | null> {
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return null
     const ds = await oura.getOuraRollupWatermark(this.db, userId, epoch)
     if (ds == null) return null
-    const ms = resolveDsToMs(ds, anchors, epoch)
+    const ms = dsToMs(ds, clock, epoch)
     return ms == null ? null : new Date(ms)
   }
 
@@ -5903,14 +5859,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
     const daytimeHours: [number, number] = [9, 21]
     const clampedDays = Math.max(1, Math.min(30, Math.floor(days) || 7))
-    const anchors = await this.getOuraClockAnchors(userId)   // LA-139: robust offset, not one pair
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
 
     const nowMs = Date.now()
     const fromMs = nowMs - clampedDays * 86_400_000
-    const fromDs = resolveMsToDs(fromMs, anchors, epoch)
-    const toDs = resolveMsToDs(nowMs, anchors, epoch)
+    const fromDs = msToDs(fromMs, clock, epoch)
+    const toDs = msToDs(nowMs, clock, epoch)
     if (fromDs == null || toDs == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
@@ -5921,7 +5877,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
       const hist = perTag.get(r.tag) ?? new Array(24).fill(0)
-      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       const hour = Number(formatInTimeZone(new Date(tsMs), tz, 'H'))
       if (hour >= 0 && hour < 24) { hist[hour]++; perTag.set(r.tag, hist) }
@@ -5978,11 +5934,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // other readers in this file already use `resolveDsToMs`/`resolveMsToDs`, which take a robust
     // offset across the epoch — `getOuraClockAnchors`' own comment says reads "resolve it against
     // the observation nearest that frame, not the newest". These four were the exceptions.
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return { temp: [], met: [] }
-    const fromDs = resolveMsToDs(from.getTime(), anchors, epoch)
-    const toDs = resolveMsToDs(to.getTime(), anchors, epoch)
+    const fromDs = msToDs(from.getTime(), clock, epoch)
+    const toDs = msToDs(to.getTime(), clock, epoch)
     if (fromDs == null || toDs == null) return { temp: [], met: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
@@ -5992,7 +5948,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     for (const r of rows) {
       const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
       if (!decoded) continue
-      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
@@ -6010,11 +5966,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     voltageMv: number | null
     chargingTimeSec: number | null
   }>> {
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return []
-    const fromDs = resolveMsToDs(from.getTime(), anchors, epoch)
-    const toDs = resolveMsToDs(to.getTime(), anchors, epoch)
+    const fromDs = msToDs(from.getTime(), clock, epoch)
+    const toDs = msToDs(to.getTime(), clock, epoch)
     if (fromDs == null || toDs == null) return []
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
@@ -6024,7 +5980,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
       const kind = decoded?.kind
       if (kind !== 'battery_level_changed' && kind !== 'charging_time') continue
-      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       out.push({
         tsMs,
@@ -6171,14 +6127,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .onConflictDoNothing()
       .returning({ id: s.ouraRawSamples.id })
 
-    // Idempotent backfill: date any rows stored before the anchor existed (or
-    // whose insert predates this migration). Cheap no-op once caught up.
-    await this.db.execute(sql`
-      UPDATE oura_raw_samples
-      SET measured_at = ${new Date(anchor.anchorUtcMs)}::timestamptz
-        + make_interval(secs => (ring_timestamp_ds - ${anchor.anchorDs}) * 0.1)
-      WHERE user_id = ${userId} AND measured_at IS NULL
-    `)
+    // **There is no `measured_at` backfill here any more, and the invariant above is why.**
+    // RV-182 — an idempotent `UPDATE … WHERE measured_at IS NULL` ran on every ingest to date rows
+    // stored before migration 115 added the column. Its comment called it a cheap no-op once caught
+    // up. Measured against production on 2026-09-25 it was **4,932 calls, 90 s, 8.0% of all
+    // database time, and 0 rows updated** — no index serves that predicate, so each call seq-scanned
+    // the hot window to find the nothing it was always going to find. `measured_at` has had 0 nulls
+    // in ~192,772 rows since the backfill caught up.
+    //
+    // Deleting it is safe because a NULL can no longer be written: this is the only insert path into
+    // the table, `anchor` is non-null by the argument above, and `measuredAt()` therefore always
+    // returns a Date. (The only other writer sets `decoded`, and migration 190 sets `epoch`.)
+    // `oura-raw-sample-measured-at.test.ts` pins that — if a path ever does write a NULL, it fails
+    // there rather than being quietly re-dated by a statement nobody knew was load-bearing.
 
     // Q-541 Task 6 — retire sealed buckets to the cold tier. Fire-and-forget after the response's
     // work is done, throttled per user, and bounded; see `claimAutoPackSlot`.
@@ -7174,6 +7135,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
+  async getObservedHrProfile(userId: string, from: Date, to: Date) { return oura.getObservedHrProfile(this.db, userId, from, to) }
   async getZoneMinutesRange(userId: string, fromDay: string, toDay: string, tz: string, profile: { maxHr: number; restingHr: number }) { return oura.getZoneMinutesRange(this.db, userId, fromDay, toDay, tz, profile) }
   async insertRrIntervals(userId: string, rows: { at: Date; rrMs: number }[]) { return oura.insertRrIntervals(this.db, userId, rows) }
   async getRrForWindow(userId: string, from: Date, to: Date) { return oura.getRrForWindow(this.db, userId, from, to) }

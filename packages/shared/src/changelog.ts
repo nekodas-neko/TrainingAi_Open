@@ -6,6 +6,99 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.62",
+    date: "2026-09-25",
+    changes: [
+      "Fixed: swiping a food log or a saved meal and tapping Delete straight away now opens the confirmation on the first press, instead of needing a second tap once the row had finished sliding.",
+    ],
+  },
+  {
+    version: "1.465.61",
+    date: "2026-09-25",
+    changes: [
+      "Fixed: picking a type under \"Other activity\" on the Cardio hub did nothing — it now opens the activity screen, and one back returns to the hub.",
+      "Fixed: \"Leave\" on the \"Leave workout?\" prompt now actually leaves the workout screen instead of closing the prompt and staying put. Same for leaving a guided walk or an activity.",
+    ],
+  },
+  {
+    version: "1.465.60",
+    date: "2026-09-25",
+    changes: [
+      "The heart-rate trace on the just-finished-activity screen is kept, so it reappears instantly instead of being re-fetched, and entering a treadmill distance no longer requests it a second time.",
+      "Your dietary restrictions are remembered between meal-plan setups rather than re-downloaded each time.",
+    ],
+  },
+  {
+    version: "1.465.59",
+    date: "2026-09-25",
+    changes: [
+      "Scanning a meal label with no signal now finds meals saved on your other devices, instead of only the ones this phone has stored. The first scan after opening the app also stops re-downloading your meal types.",
+    ],
+  },
+  {
+    version: "1.465.58",
+    date: "2026-09-25",
+    changes: [
+      "The \"Warm up complete\" green on the warmup screen now matches the green the next screen uses for the same thing, instead of being a slightly different shade.",
+    ],
+  },
+  {
+    version: "1.465.57",
+    date: "2026-09-25",
+    changes: [
+      "On the Nutrition screen, \"kcal left\" now updates on its own after you log or delete a food, instead of holding the old number until you switch tabs and come back.",
+    ],
+  },
+  {
+    version: "1.465.56",
+    date: "2026-09-25",
+    changes: [
+      "On the Health screen, the ring around your readiness score now sweeps to its new position as the number counts up, instead of jumping there first.",
+    ],
+  },
+  {
+    version: "1.465.55",
+    date: "2026-09-25",
+    changes: [
+      "The Nutrition screen stops re-downloading your calorie and macro targets every time you open it. Editing them still updates everywhere immediately \u2014 it just no longer asks the server for numbers it already has.",
+    ],
+  },
+  {
+    version: "1.465.54",
+    date: "2026-09-25",
+    changes: [
+      "Ticking a supplement now shows the tick straight away. It used to wait for the save to finish, which is instant most of the time but can take much longer if the app happens to be syncing \u2014 so the tap looked like it had not registered.",
+    ],
+  },
+  {
+    version: "1.465.53",
+    date: "2026-09-25",
+    changes: [
+      "Opening the meal-type list \u2014 when logging food, assigning a meal, or reviewing a plan \u2014 no longer re-downloads it every time. It is the same list; it just stops asking for it again when it already has a recent copy.",
+    ],
+  },
+  {
+    version: "1.465.52",
+    date: "2026-09-25",
+    changes: [
+      "The muscle map now comes with a key, and its lightest shades are brighter. A muscle you had barely trained this week was almost the same colour as one you had not trained at all, so the map under-reported the very muscles it is there to flag.",
+    ],
+  },
+  {
+    version: "1.465.51",
+    date: "2026-09-25",
+    changes: [
+      "Every screen that shows your heart-rate zones \u2014 the Cardio hub, Baselines, the guided walk, and the zone bands during a workout \u2014 now asks the database for the three numbers it needs instead of downloading ninety days of raw heart rate and working them out on the phone. Same numbers, less waiting, and it no longer competes with logging a set for the same database connections.",
+    ],
+  },
+  {
+    version: "1.465.50",
+    date: "2026-09-25",
+    changes: [
+      "On the workout screen, a finished warmup set and the finished \u201cReady\u201d bar above it were two slightly different greens for the same thing. They match now.",
+    ],
+  },
+  {
     version: "1.465.49",
     date: "2026-09-25",
     changes: [
