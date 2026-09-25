@@ -5393,19 +5393,24 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
 
-### [platform][app-shell] RV-122 — the sync-failure card cannot trigger the sync that clears it
+### [platform] LB-151 — `pushMutations` has no in-flight guard, and several surfaces can call it at once
 
-- **Lane:** B — `components/more/sync-health-card.tsx:85`,
-  `components/more/data-sync-panel.tsx`. **Added:** 2026-09-22 · Review sweep 53.
-- The More tab's nav dot points at the sync-failure card, which lists pending and dead-lettered
-  mutations with a per-item retry. The global **"Sync now"** that usually clears them is one tap
-  deeper at `/more/data`. One task, two screens.
-- **Fix:** render "Sync now" on the failure card (or `DataSyncPanel` beneath it) when it is non-null.
-- **Keep it scoped — this is promoting one button, not merging a screen.** Restore and Export stay at
-  `/more/data`: they are rare and destructive-adjacent and do not belong on a card that appears
-  unprompted.
-- **Watch:** do not double-fire against `PullToSync`'s `handlePullSync` on the same screen.
-
+- **Lane: A** — `lib/local-store/sync-engine.ts` (Lane B found it while shipping RV-122).
+- **Added:** 2026-09-25 · from RV-122's own *"do not double-fire against `PullToSync`'s
+  `handlePullSync`"* note, which turned out to describe a gap in the engine rather than in the card.
+- **Measured:** `pushMutations` (`sync-engine.ts:839`) holds **no concurrency guard**. The only gate
+  is `push5xxUntil`, a server-error backoff. Two overlapping calls therefore both drain the outbox.
+- **Reachable today from eleven call sites** — `more-content.tsx:118` (`handlePullSync`),
+  `sync-provider.tsx:165`/`:220`, `push-then-revalidate.ts:33`, `sync-health-card.tsx` and
+  per-domain writes. The More tab alone has two on one screen: the pull gesture and the card.
+- **⚠ What is NOT established, and must be before this is sized:** whether a double drain actually
+  double-writes. The push endpoint shows no dedup on a mutation id, but the per-domain handlers may
+  be upserts, which would make it wasteful rather than wrong. **Read a couple of the domain writers
+  before deciding** — the answer changes this from a correctness bug to a bandwidth one.
+- **RV-122 did not make it worse and slightly improves it:** "Retry all" sends **one** push for N
+  failures where N taps of per-item Retry sent N.
+- **Fix if it is real:** a module-level in-flight promise that later callers await rather than
+  duplicate — the same shape `cachedFetch`'s in-flight map already uses for reads.
 
 ### [platform] OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
 
