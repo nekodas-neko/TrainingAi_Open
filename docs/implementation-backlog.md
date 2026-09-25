@@ -10559,9 +10559,65 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   read rather than built.
 - **Reversal cost:** none. It is queue metadata.
 
+### [app-shell] LB-157 — Home's header row cannot hold a date AND three chips at 412 dp: which reading moves?
+
+- **Lane: O** — measured by Lane B on 2026-09-25 and handed over, because every remaining option
+  changes what Home shows rather than how it is built. `BF-139` and `BF-96` both park on this.
+- **Ask:** owner — Home's date row is 8 px short of fitting *"Wed 30"* beside the weather and battery
+  chips on a sunny day, and there is no smaller format that fits. Two fixes have each shipped and each
+  re-broken it. Which do you want: the date on its own line, the battery readings moved off Home's
+  header, or no date in the header at all?
+- **⚑ THE ROW IS OUT OF WIDTH, AND THIS IS ARITHMETIC RATHER THAN A JUDGEMENT.** Measured in the
+  running app at a 412 dp viewport on 2026-09-25 (`getBoundingClientRect`, and the candidate date
+  formats measured in the row's own computed font):
+  | | px |
+  |---|---|
+  | the row | **224.0** |
+  | `gap-2` between date and chips | 8.0 |
+  | chips, night (no UV) | 156.1 |
+  | chips, daytime `UV 5` | 200.2 |
+  | chips, daytime `UV 11` | 208.6 |
+  | `Wednesday 30 September` — the longest real date | **158.7** |
+  | `Wed 30 Sep` | 71.7 |
+  | `Wed 30` | 45.3 |
+  | `30 Sep` | 41.7 |
+  So the date's remaining space is **59.9 px at night, 15.8 px at `UV 5`, and 7.4 px at `UV 11`.**
+  **In daylight nothing fits — not `30`, not two characters.** That is the owner's *"squished the day
+  of the week"* and *"Day is cut off"*, and it is why the third chip-shrinking fix would fail the same
+  way: the two chip fixes already shipped, and the slack they spent was the date's.
+- **Recommendation: put the date on its own line above the chips.** It is the only option that keeps
+  every reading, it costs about 18 px of vertical space on Home once, and a year out it is the shape
+  that survives the next chip — `BF-139` already notes a fourth is expected, since anything with a
+  battery is a candidate. The other two both delete information to buy width.
+- **The alternatives, and what each is genuinely better at:**
+  - **Move the battery readings off Home's header** (to Devices, or the More screen). The date then
+    gets 98.4 px, enough for `Wed 30 Sep`. **Better at:** keeping Home to one line, which is what it
+    looks like today. **Why it loses:** ring and scale battery are exactly the things worth a glance
+    rather than a visit — that is why they were put here (Q-111).
+  - **Drop the date from the header.** Cleanest, no layout change at all, and `BF-96` itself notes the
+    date is *"partly recoverable from the phone's own UI, the temperature and UV are not"*.
+    **Better at:** zero cost, zero risk. **Why it loses:** Android's status bar shows the time, not the
+    date, so it is not actually recoverable at a glance — and the day of the week is what a training
+    app is read against.
+  - **A responsive date** that shortens as space runs out. **Better at:** needing no decision.
+    **Why it loses on the numbers above:** it shows `Wed 30` at night and *nothing at all* in
+    daylight, so the date appears and disappears by weather. That reads as a bug, which is worse than
+    the truncation it replaces.
+- **Reversal cost: low for all three.** Each is a handful of lines in `header-meta-row.tsx` (plus one
+  card for option 2), no data and no migration. So this is worth deciding quickly rather than
+  carefully — the expensive part has been the two rounds of shipping a fix that could not work.
+- **A mockup of the chosen option is owed before it is built** (the large-UI rule): a two-line header
+  visibly rearranges the screen he reads daily. This entry is the question, not the build — `Gate:`
+  is deliberately absent so it prints as READY and someone puts it to him.
+- **What the sandbox cannot settle, and nobody should try again:** the seeded DB has no weather
+  snapshot, so `WeatherChip` renders a **56 px skeleton** and the real three-chip row cannot be
+  reproduced here. The chip figures above are the 2026-09-12 device measurements; the row width, the
+  gap and every date format were re-measured on 2026-09-25 and agree with the entry to 0.1 px.
+
 ### [app-shell] BF-139 — three header chips no longer fit beside the date (the fix FAILED on device; open work)
 
 - **Batch:** `header-row-width` — ships with **BF-96**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
+- **Needs: LB-157**
 
 - **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"Its now squished the day of the week. Might need to
   make it smaller or move it."*
@@ -10634,6 +10690,11 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   caught. Update it with any sizing change; do not delete it.
 - **Needs:** nothing.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** a fix that moves the date off the header row visibly rearranges Home, which may trigger the mockup rule (`Gate: owner`). A shrink-only fix is gate-free. The same applies to BF-96.
+- **⛔ MEASURED 2026-09-25 (Lane B): there is no shrink-only fix, so this cannot be built yet — see
+  `LB-157`.** The row is 224.0 px, the chips take 200.2–208.6 of it in daylight and the `gap-2` takes
+  8, leaving the date **7.4–15.8 px**. The longest real date is 158.7 px and even `30` does not fit.
+  So *"make it smaller"* is exhausted: the only levers left move a reading out of the row, which is
+  the owner's call and is now filed as a question rather than left as an unbuildable entry.
 
 ### [nutrition] BF-142 — the gap explainer gave a reason its own module rules out (fixed; the owner says whether it reads true)
 
@@ -15090,6 +15151,7 @@ two screens, and a user who sets one has no way to know the other exists.
 ### [app-shell] BF-96 — the temperature/UV pill wrapped (the fix FAILED on device; open work)
 
 - **Batch:** `header-row-width` — ships with **BF-139**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
+- **Needs: LB-157**
 
 - **❌ FAILED ON THE S25, 2026-09-13.** Owner: *"Day is cut off"*.
 - **⚠ THIS AND BF-139 ARE ONE DEFECT — batch them, and do not fix either alone.** BF-96 requires the
@@ -15140,6 +15202,11 @@ two screens, and a user who sets one has no way to know the other exists.
 - **Added:** 2026-09-01 · owner: *"I dont like how the temperature/uV pill sits. can we go back to
   the old way when it was side by side. you can make it smaller if needed."*
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** see BF-139: moving the date may need a mockup; shrinking does not. The code comment's 12–20 character range is stale (22 measured).
+- **⛔ MEASURED 2026-09-25 (Lane B): there is no shrink-only fix, so this cannot be built yet — see
+  `LB-157`.** The row is 224.0 px, the chips take 200.2–208.6 of it in daylight and the `gap-2` takes
+  8, leaving the date **7.4–15.8 px**. The longest real date is 158.7 px and even `30` does not fit.
+  So *"make it smaller"* is exhausted: the only levers left move a reading out of the row, which is
+  the owner's call and is now filed as a question rather than left as an unbuildable entry.
 
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 
