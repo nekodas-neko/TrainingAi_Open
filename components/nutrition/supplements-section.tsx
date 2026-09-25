@@ -63,54 +63,73 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
     const applyOptimistic = () => onChanged(supplements.map(x => x.id === s.id
       ? { ...x, loggedToday: logged, loggedAmount: applyManualToggle(x.loggedAmount, contribution) }
       : x))
-    try {
-      const store = userId ? getLocalStore(userId) : null
-      const today = todayInTz(tz)
-      let savedLocally = false
-      if (store) {
-        try {
-          if (s.loggedToday) {
-            await store.deleteSupplementLog(s.id, today)
-            await store.queueMutation({
-              userId: userId!, domain: 'supplement_logs', date: today,
-              payload: { supplementId: s.id, logDate: today, deleted: true },
-            })
-          } else {
-            const id = crypto.randomUUID()
-            await store.upsertSupplementLog({
-              id, supplementId: s.id, logDate: today,
-              ...(dose ? { amount: dose.amount, unit: dose.unit } : {}),
-              updatedAt: new Date().toISOString(), deletedAt: null, syncStatus: 'pending',
-            })
-            await store.queueMutation({
-              userId: userId!, domain: 'supplement_logs', date: today,
-              payload: { supplementId: s.id, logDate: today, ...(dose ?? {}) },
-            })
-            await cancelSupplementReminder(s.id)
+    // Restores exactly what was on screen before the tap: `applyOptimistic` maps from this same
+    // array, so handing it back is the pre-tap state.
+    const revertOptimistic = () => onChanged(supplements)
+
+    // RV-68: PAINT FIRST. This used to sit behind three awaited local writes and a native call, so
+    // the tick appeared only once they had all returned. The repo already measured why that is not
+    // "fast enough": the Capacitor SQLite plugin has ONE connection, so a tap landing during the
+    // sync pull's applyDelta transaction queues behind the whole delta — which left the mood sheet's
+    // button reading "Saving…" for about two minutes on 2026-08-13
+    // (`components/mood-checkin-sheet.tsx`). Supplements write to that same store from the Nutrition
+    // tab, which is where `pullDelta` also lands, so the shape is identical.
+    applyOptimistic()
+
+    // The guard is deliberately NOT released with the paint. It still clears when the write settles,
+    // below — a second tap before then is an ambiguous re-toggle against an in-flight write, which
+    // is the class that once fired four `complete-workout` POSTs from five taps. What the user gets
+    // back immediately is the tick, not the ability to tap again.
+    void (async () => {
+      try {
+        const store = userId ? getLocalStore(userId) : null
+        const today = todayInTz(tz)
+        let savedLocally = false
+        if (store) {
+          try {
+            if (s.loggedToday) {
+              await store.deleteSupplementLog(s.id, today)
+              await store.queueMutation({
+                userId: userId!, domain: 'supplement_logs', date: today,
+                payload: { supplementId: s.id, logDate: today, deleted: true },
+              })
+            } else {
+              const id = crypto.randomUUID()
+              await store.upsertSupplementLog({
+                id, supplementId: s.id, logDate: today,
+                ...(dose ? { amount: dose.amount, unit: dose.unit } : {}),
+                updatedAt: new Date().toISOString(), deletedAt: null, syncStatus: 'pending',
+              })
+              await store.queueMutation({
+                userId: userId!, domain: 'supplement_logs', date: today,
+                payload: { supplementId: s.id, logDate: today, ...(dose ?? {}) },
+              })
+              await cancelSupplementReminder(s.id)
+            }
+            pushThenRevalidate(userId!, invalidateSupplements)
+            invalidateSupplements().catch(() => {})
+            savedLocally = true
+          } catch (sqliteErr) {
+            console.error('Supplement log SQLite write failed, falling back to API:', sqliteErr)
           }
-          pushThenRevalidate(userId!, invalidateSupplements)
-          applyOptimistic()
-          invalidateSupplements().catch(() => {})
-          savedLocally = true
-        } catch (sqliteErr) {
-          console.error('Supplement log SQLite write failed, falling back to API:', sqliteErr)
         }
+        if (!savedLocally) {
+          const method = s.loggedToday ? 'DELETE' : 'POST'
+          const res = await fetch(`/api/supplements/${s.id}/log`, dose
+            ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dose) }
+            : { method })
+          if (!res.ok) throw new Error()
+          if (!s.loggedToday) await cancelSupplementReminder(s.id)
+          invalidateSupplements().catch(() => {})
+        }
+      } catch {
+        // The tick is already on screen, so failure has to undo it explicitly — the old code could
+        // stay silent here only because it had not painted yet.
+        revertOptimistic()
+      } finally {
+        setToggling(null)
       }
-      if (!savedLocally) {
-        const method = s.loggedToday ? 'DELETE' : 'POST'
-        const res = await fetch(`/api/supplements/${s.id}/log`, dose
-          ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dose) }
-          : { method })
-        if (!res.ok) throw new Error()
-        if (!s.loggedToday) await cancelSupplementReminder(s.id)
-        applyOptimistic()
-        invalidateSupplements().catch(() => {})
-      }
-    } catch {
-      // silent — checkbox snaps back
-    } finally {
-      setToggling(null)
-    }
+    })()
   }
 
   if (loading) {
