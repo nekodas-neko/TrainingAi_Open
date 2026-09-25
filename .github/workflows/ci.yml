@@ -73,10 +73,29 @@ jobs:
   # any type error already fails Build. A separate `tsc --noEmit` job was redundant
   # enforcement. Type errors are caught faster and more precisely by `pnpm ci:local`
   # (runs `tsc --noEmit` directly) before pushing.
-  test:
-    name: Tests
+  # OR-165. Sharded four ways: the suite is 844 files and ~7 minutes, and it is the ONLY job on
+  # CI's critical path — everything except Build finishes inside 70 seconds, so nothing else's
+  # duration is visible in the wall clock.
+  #
+  # ⚠ THE AGGREGATOR BELOW IS LOAD-BEARING, NOT TIDINESS. A matrix reports its checks as
+  # `Tests (1)`, `Tests (2)`… and the `ProtectMain` ruleset requires a check named exactly `Tests`.
+  # Shard without the aggregator and that required check NEVER REPORTS, which does not fail a PR —
+  # it leaves every PR in the repository permanently unmergeable. The `test` job below exists to
+  # publish that one name.
+  #
+  # Every shard gets its own Postgres rather than segregating the ~20 DB-backed files into one.
+  # Shards run in parallel, so four container starts cost nothing in wall clock, and a database per
+  # shard means FEWER files share one — which is the LA-32 collision class, not more of it.
+  test-shard:
+    name: Tests shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      # Without this, one shard failing cancels the rest and the log shows a single failure where
+      # there may be four. Diagnosing a red suite needs all of them.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # A real Postgres lets the DB integration tests run — without DATABASE_URL they
     # skipIf-skip (~20 files), leaving the rollup/repo DB behaviour with no CI coverage.
     services:
@@ -116,7 +135,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply all migrations
         run: node scripts/local-db/migrate.js
-      - run: pnpm test
+      - run: pnpm vitest run --shard=${{ matrix.shard }}/4
+
+  # The name the ruleset requires. Publishes one pass/fail for the four shards above; it installs
+  # nothing and runs in seconds.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-shard
+    # `always()` so this still reports when a shard fails — without it the job is SKIPPED, the
+    # required check never arrives, and the PR hangs exactly as it would with no aggregator at all.
+    # Deliberately NOT guarded on `schedule`: LB-31's nightly runs the suite and nothing else, so
+    # this is the only job that can report its result.
+    if: always()
+    steps:
+      - name: Every shard passed
+        run: |
+          echo "shards: ${{ needs.test-shard.result }}"
+          test "${{ needs.test-shard.result }}" = "success"
 
   build:
     name: Build
@@ -151,6 +188,20 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      # OR-165. `cache: 'pnpm'` on setup-node caches the dependency STORE, not Next's compilation
+      # output, so every CI build recompiled from cold — `pnpm build` is ~4m45s of this ~5m job
+      # while `pnpm install` is ~5s. Next documents `.next/cache` as the artefact to carry over.
+      # Keyed on the lockfile plus source, so a dependency bump or a source change reuses the
+      # nearest previous build rather than starting over; `restore-keys` is what makes a miss
+      # partial instead of total.
+      - name: Cache the Next build
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'lib/**', 'packages/**') }}
+          restore-keys: |
+            next-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-
       - run: pnpm build
       # LB-37. `tsconfig.json` excludes `**/__tests__/**`, so no spec has ever been typechecked and
       # a clean `tsc` said nothing about any of them. Shrink-only per-file baseline: every NEW spec

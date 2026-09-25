@@ -478,6 +478,45 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-166 — `googleapis` is 203 MB for one `google.calendar()` call
+
+- **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency
+  audit, prompted by an external contributor's view that CI is too slow.
+- **Measured 2026-09-25:** `googleapis@172` installs **203 MB** and is imported by exactly **one**
+  file — `import { google } from "googleapis"` — plus a `vi.mock` of it in one test. It is the second
+  heaviest package in the tree after `onnxruntime-node`.
+- **Why it costs more than disk.** Next traces the import graph for the server bundle, so the whole
+  package is walked on every build even though one client is used. Build is the second-longest job
+  and becomes the critical path once `OR-165`'s test sharding lands.
+- **Fix:** swap to the scoped `@googleapis/calendar`, which is the same generated client for one API.
+  The call site changes from `google.calendar({ version: 'v3', auth })` to that package's equivalent,
+  and the test's `vi.mock('googleapis', …)` moves with it.
+- **⚠ Not a drive-by, which is why this is an entry and not a commit.** The route creates calendar
+  events with the owner's OAuth refresh token — a working integration with a credential path, and
+  `docs/environment-variables.md` names its vars. **Verify an event is actually created end to end**,
+  not that the route returns 200.
+- **Not established:** how much build time this actually returns. The 203 MB is measured; the saving
+  is not, and it should be stated as a before/after rather than assumed.
+
+### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
+
+- **Lane: B** · **Added:** 2026-09-25 · OR-165's dependency audit.
+- **Gate: owner** — it changes icons on screens he uses during a run, so the look is his call and
+  not a lane's.
+- **Measured 2026-09-25:** `lucide-react` (**43 MB**) is imported by **270** files;
+  `@phosphor-icons/react` (**41 MB**) by **six**, for five icons — `HeartIcon`, `PauseIcon`,
+  `PlayIcon`, `StopIcon`, `FootprintsIcon` — all in the activity and run screens
+  (`components/activity/**`).
+- **Proposal:** move those five onto lucide (`Heart`, `Pause`, `Play`, `Square`, `Footprints`) and
+  drop the dependency. Two icon sets in one app is also a consistency problem independent of size.
+- **⚠ THE OWNER SEES THESE ICONS DURING A RUN, so this is a look change, not a cleanup.** Phosphor
+  and lucide draw the same concepts differently — weight, corner radius, the foot shape. **Show a
+  before/after at 384 px dark before building it**, per CLAUDE.md's mockup rule.
+- **Do not fold this into an unrelated PR.** A silent icon swap on a daily screen is exactly the
+  change that gets noticed and resented afterwards.
+- **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
+  `Footprints`, unchecked against the current glyph.
+
 ### [platform] OR-150 — fifteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
