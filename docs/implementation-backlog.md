@@ -478,6 +478,37 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-168 — nothing confirms a Railway deploy landed; notify when it does not
+
+- **Lane: A** — `app/api/version/route.ts` plus a workflow step. **Added:** 2026-09-25 · Orchestrator,
+  from the CI review. **Owner decided the posture 2026-09-25: NOTIFY ONLY, no automatic rollback.**
+- **The gap.** Merging to `main` auto-deploys to Railway and **nothing checks the result.** The
+  2026-08-17 outage — a database-free route unreachable for ~8 minutes — was found by the owner
+  noticing, not by anything telling him. `railway.json` does not exist and no healthcheck is
+  configured.
+- **Why notify-only and not rollback** (his call, and the reasoning is worth keeping): an automatic
+  revert across a migration can leave production worse than the bad deploy did. A check that tells
+  you is strictly better than no check; a check that *acts* is a mechanism that can itself fail.
+- **⚠ TWO FINDINGS THAT KILL THE OBVIOUS IMPLEMENTATION — read these before writing the poller.**
+  **(a) `/api/version` cannot identify a deploy today.** Its `version` is `CHANGELOG[0].version`, so
+  it only moves when a PR bumps the changelog — most merges do not, and a docs PR never does. Polling
+  it for "has my commit landed" would sit green against the *previous* deploy. **`nativeBuildSha` is
+  the APK's sha, not the web deploy's.**
+  **(b) The route is `Cache-Control: public, max-age=300`** — deliberately, and it is the single
+  written exemption in `scripts/check-api-no-store.js`. A poll can therefore read a **five-minute-old
+  answer** and report a deploy that has not happened. **Do not remove the header** to fix this; bust
+  it from the caller with a query param.
+- **What makes it work:** `process.env.RAILWAY_GIT_COMMIT_SHA` **is** available at runtime and is
+  already used — `app/sw.js/route.ts:12` keys the service-worker cache on it. Expose it as
+  `webBuildSha` on `/api/version`, then poll until it equals the merged commit, with a timeout.
+- **Shape:** a post-merge workflow step on `push` to `main`. Poll with a cache-busting param, fail the
+  step (which notifies) if the sha does not match within the timeout. It must **not** be a required
+  check — it runs after the merge, so gating on it would be circular.
+- **Not established:** how long a Railway deploy actually takes end to end, which sets the timeout.
+  `DV-14` measured that production was still serving 1.465.10 while `main` was at 1.465.16, so the lag
+  is real and unquantified. **Measure it before choosing a number**, or the first false alarm teaches
+  everyone to ignore the alarm.
+
 ### [platform] OR-166 — `googleapis` is 203 MB for one `google.calendar()` call
 
 - **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency
@@ -967,9 +998,17 @@ the Orchestrator's to do.
   and `DV`, so a sweep that produces findings has no channel of its own and sits in `O` — the same gap
   `OR-150` records for Tuning. Do not invent `Lane: R` for this one entry; if it recurs, that is the
   evidence for a fifth value.
-- **Needs the device for class 2, and the device agent is ARCHIVED** (noted 2026-09-24: its session is
-  archived while its title still ends in 🟢, so the session list reads as though it is live). Class 1
-  and class 3 can be swept from source without it.
+- **Class 2 needs the device; classes 1 and 3 sweep from source without it.**
+  **⚠ CORRECTION, 2026-09-25 (owner): an ARCHIVED Device Verification session is NORMAL, not a
+  fault.** This entry said the agent was archived "while its title still ends in 🟢, so the session
+  list reads as though it is live", and filed that as a gap. It is not one — DV runs **locally on the
+  owner's machine**, so it archives whenever it is not in use and comes back when there is a backlog
+  worth a sitting. His words: *"its just inactive until its needed."*
+  **The lesson is about reading another role's lifecycle as a defect.** The same signal means
+  different things for a container session and a local one, and nothing in the session list says
+  which you are looking at. **Do not file DV's archived state again**, and do not treat it as
+  blocking: the correct reading is that class 2 waits for a sitting, which is the owner's call on
+  timing, not an outage.
 
 ### [platform] RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here
 - **Keep:** two of the three are not the Orchestrator's to execute — item 2 is a GitHub account
