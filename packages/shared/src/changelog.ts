@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.50",
+    version: "1.465.51",
     date: "2026-09-25",
     changes: [
       "Every screen that shows your heart-rate zones \u2014 the Cardio hub, Baselines, the guided walk, and the zone bands during a workout \u2014 now asks the database for the three numbers it needs instead of downloading ninety days of raw heart rate and working them out on the phone. Same numbers, less waiting, and it no longer competes with logging a set for the same database connections.",
+    ],
+  },
+  {
+    version: "1.465.50",
+    date: "2026-09-25",
+    changes: [
+      "On the workout screen, a finished warmup set and the finished \u201cReady\u201d bar above it were two slightly different greens for the same thing. They match now.",
     ],
   },
   {
