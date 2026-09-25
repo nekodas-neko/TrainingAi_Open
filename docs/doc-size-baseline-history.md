@@ -17414,6 +17414,21 @@ check refused it; the narrative moved to the journal entry.
 The same edit flags the baton **stale below "Now"**: its header reads `Next ID: TN-30` while the real
 next free is TN-81, and everything under it predates the TN-55…TN-80 run. One line, and it stops a
 successor trusting a four-week-old state section. A full rewrite is owed and was not that PR's work.
+## 2026-09-25 — `docs/implementation-backlog.md` 31266 → 31276 (+10)
+
+`RV-101` shipped, and the entry it leaves behind is a Keep rather than a deletion — the device look
+at the new ramp and key is still owed, and it now prints in the `workouts` sitting.
+
++10 after a trim from +23 — recomputed on the merged tree, since two other raises landed on `main` while this branch was in the gate and the ratchet is base-relative. What survived the trim is the part a future reader needs in the QUEUE
+rather than the journal: the entry's two contrast figures were measured against the wrong background
+(`--card`, where the neighbour is actually the component's own `defaultFill` composited over it, so
+1.65:1 and 2.11:1 rather than 2.04 and 2.60), its prescribed fix cannot be built (there is 1.52:1 of
+total range to hold the two lifted stops and their separation), and two things it asked for are
+declined with reasons rather than silently skipped. Narrative went to
+`docs/overview/entries/2026-09-25-rv101-heatmap-ramp-and-key.md`.
+
+A refutation left out of the entry gets rediscovered by whoever picks it up next, which is what the
+extra lines buy.
 
 ## 2026-09-25 — `docs/implementation-backlog.md` 31266 → 31270 (OR-166 / LA-85)
 

@@ -5706,24 +5706,34 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   halves; adding it now fails CI on 183 legitimate-until-migrated sites.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **THE FIRST HALF SHIPPED AS #1441** (16cfd00e), not #1405, which was abandoned (OR-132). The four Lane A modules still carry hex: acwr ×3, calorie-balance ×3, strength-progress ×1, day-checkin ×3. The hex triad has 182 occurrences across 67 files.
 
-### [workouts][app-shell] RV-101 — the muscle heatmap paints two incompatible colour scales into one silhouette
+### [workouts][app-shell] RV-101 — the muscle heatmap's volume ramp: SHIPPED, the device look is owed
 
-- **Lane:** B — `components/muscle-heatmap.tsx:39-42,98,105-110`. **Added:** 2026-09-21 ·
-  Review sweep 52.
-- A categorical role scale (`PRIMARY #22c55e`, `SECONDARY #f59e0b`, `INJURED #ef4444`) and a
-  sequential ramp (`VOLUME_TINT_STEPS`) are declared three lines apart, and which one paints is
-  decided at `:98` purely by which prop the caller passed. **`#22c55e` is both step 4 of the ramp and
-  `PRIMARY_COLOR`** — the same fill means "primary mover" in one mode and "60–80% of volume target" in
-  the other, with no on-screen key: the only legend is an "Injured" swatch gated on an injury.
-- Contrast against `--card`: the bottom two ramp steps are **2.04:1 and 2.60:1**, under the 3:1
-  non-text floor — so a muscle under ~40% of target is near-indistinguishable from an untouched one,
-  and the heatmap under-reports exactly the muscles it exists to flag.
-- **Fix:** give the volume ramp its own hue so it cannot collide with the role scale, lift the bottom
-  two stops past 3:1, and render a key in **both** modes — it is the mode indicator as much as the
-  legend.
-- **Not established:** the unfilled-muscle default colour is drawn by the third-party body component
-  and was not read, so ramp separation is computed against `--card` rather than that default.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the key must render in compact mode.** Both volume callers (`body-muscle-card.tsx:53`, `weekly-muscle-sets-card.tsx:96`) pass `compact`, and the legend at `muscle-heatmap.tsx:103` is gated on `!compact`, so as written the key would be hidden exactly where it is needed.
+- **Lane:** B. **Added:** 2026-09-21 · Review sweep 52. **Shipped 2026-09-25** — `components/muscle-heatmap.tsx`, `scripts/check-contrast.js`.
+- **Verify: device**
+- **Keep:** the device look, and nothing else. On the S25, Health → the body/muscle card with sets
+  logged: the key reads *Under 20% … At target*, and a one-or-two-set muscle is plainly darker than
+  an untrained neighbour rather than merging into it.
+- **⛔ Both filed numbers were against the wrong background, and the defect was worse than filed.**
+  The neighbour is the component's `defaultFill` composited over `--card` — rgb(30,41,33) — not
+  `--card`. Measured there the bottom stops were **1.65:1 and 2.11:1**, not 2.04 and 2.60. The
+  entry's *"not established — the unfilled colour was not read"* was answerable on line 122 of the
+  file it cites.
+- **⛔ The prescribed fix cannot work: "lift the bottom two stops" has nowhere to go.** The floor is
+  at luminance 0.159 and the third stop was already 0.269, so two lifted stops plus their separation
+  from it share a total range of **1.52:1** — ~1.15:1 each, invisible. The ramp is re-spaced instead
+  and ends up more evenly stepped than before.
+- **⛔ `--card` carries the user's brand hue, so one hue is not a measurement.** green-700 reads
+  3.00:1 at hue 149 and **2.99:1 at 144**, so the opening stop is `#178a42`. The check scores every
+  stop at its worst hue, as it already did for the token pairs.
+- **✅ The key renders in COMPACT mode**, per the 2026-09-24 re-read — both volume callers pass it.
+- **⛔ Declined, not deferred: the ramp's own hue, and a role-mode key.** The middle stop is still
+  `PRIMARY_COLOR`, but the two scales are mutually exclusive props that never render together and
+  the key now names the scale in use, which is what the collision needed. Re-hueing a weekly surface
+  is a restyle with no standard against the present one (the test that kept RV-99 narrow); a
+  role-mode key would change seven call sites nobody reported. Reversal is one constant.
+- **Guard:** `check-contrast.js` (Custom Rules) reads ramp and fill out of the component and fails
+  if either regex stops matching; `components/__tests__/rv101-volume-ramp-and-key.test.ts` states the
+  rule independently — 3 of its 4 assertions fail against `origin/main`.
 
 ### [platform] RV-102 — three ad-hoc chart palettes, five dead theme tokens, and a duplicated colour table
 
