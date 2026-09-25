@@ -46,7 +46,7 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
   // plan meal to the library (the switch two lines below this list) clears `saved-meals`, and a
   // fetch-once effect would then offer a swap list that no longer matches what the user owns.
   const library = useCachedValue<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM) ?? EMPTY_MEALS
-  const mealTypes = useCachedValue<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG) ?? EMPTY_TYPES
+  const mealTypes = useCachedValue<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG, { freshWithinTtl: true }) ?? EMPTY_TYPES
   const [swapFor, setSwapFor] = useState<number | null>(null)
   const [instruction, setInstruction] = useState('')
   const variant = draft.variants[Math.min(variantIdx, draft.variants.length - 1)]

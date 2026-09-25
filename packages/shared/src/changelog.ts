@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.53",
+    date: "2026-09-25",
+    changes: [
+      "Opening the meal-type list \u2014 when logging food, assigning a meal, or reviewing a plan \u2014 no longer re-downloads it every time. It is the same list; it just stops asking for it again when it already has a recent copy.",
+    ],
+  },
+  {
     version: "1.465.52",
     date: "2026-09-25",
     changes: [

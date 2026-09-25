@@ -5942,31 +5942,49 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   from scratch. They were not hard questions — they were questions nobody had been asked, because
   each lived in a session transcript that ended. **Writing them in one place was the whole of the
   work.** That is the argument for this ledger continuing to exist after these six clear.
-### [platform] RV-67 — a comment states the TTL gate exists, the gate is opt-in, and 183 of 191 reads hit the network unconditionally
+### [platform] RV-67 — the TTL gate is opt-in; the false comment is fixed and the first key is proved
 
-- **Lane:** B — `app/health/health-content.tsx:338`, plus the read sites it licenses.
-  **Added:** 2026-09-20 · Review sweep 51.
-- **The comment:** *"No 'already loaded' bookkeeping is needed: cachedFetch dedups in flight and
-  **honours its TTL**, so re-firing a group on a tab revisit is a cache hit rather than a request."*
-- **The code:** the only TTL gate in `cachedFetchCore` is `if (freshWithinTtl) { … }`
-  (`lib/sqlite/cache.ts:294`) — opt-in. Without the flag it paints the cached value and **always**
-  falls through to `fetch(url, { cache: 'no-store' })`. Counted 2026-09-20: **191** cached read
-  sites, **8** with `freshWithinTtl`.
-- So every `tabEpoch` bump on Health re-fires `fetchSharedHealthData()` (5 tasks, one of which is
-  3 more fetches) and `fetchActiveTabHealthData()` believing they are cache hits. Home does the same.
-- **This is the Q-262 rule read in the direction nobody wrote down:** the TTL constants govern how
-  long a *seed* survives, not how often the app touches the network.
-- **⚠ Do not bulk-apply the flag.** `freshWithinTtl: true` converts a stale flash into hours of hard
-  staleness if any writer is missed, and CLAUDE.md requires a **written invalidation proof** per key:
-  list every write that changes the payload and show each one's group contains the key. Candidates,
-  all already `TTL_LONG` and already in a group: `workout-data:meta`, `muscle-recovery`,
-  `hr-profile`, `health-trends-summary`, `exercise-library`, `progression-styles`, `activity-types`,
-  `nutrition-meal-types`, `nutrition-targets`.
-- **Fix the comment in the same PR as the first key**, whichever ships — a reader who trusts it
-  today concludes there is nothing to do here.
-- **Not established:** no writer-set audit was done for any candidate (that proof *is* the work), and
-  the request burst was counted from source rather than a network trace.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** lines are now `health-content.tsx:334-335` and `lib/sqlite/cache.ts:306`. **Drop `hr-profile`** (RV-64 shows it cannot take the flag) **and the keys already flagged**: `exercise-library` ×3, `progression-styles`, `activity-types`. It overlaps RV-183 on the exercise catalogue.
+- **Lane:** B — `app/health/health-content.tsx`, plus the read sites it licenses.
+  **Added:** 2026-09-20 · Review sweep 51. **First key shipped 2026-09-25.**
+- **✅ Both of the entry's numbers reproduce exactly: 191 cached read sites, 8 with `freshWithinTtl`.**
+  Mechanism confirmed — the only gate in `cachedFetchCore` is `if (freshWithinTtl)`
+  (`lib/sqlite/cache.ts:380`); without it the cached value paints and the network fetch always runs.
+  ⚠ Count with a scan that allows a generic — call sites are `cachedFetch<Foo>(…)`, and a regex
+  requiring `(` immediately after the name finds 7 of the 191.
+- **✅ The false comment is fixed** (`health-content.tsx`), which is what made this invisible: it
+  claimed `cachedFetch` "honours its TTL, so re-firing a group on a tab revisit is a cache hit".
+- **✅ `nutrition-meal-types` is proved and flagged** at its three hot read sites. The proof, in
+  full, is in the journal entry: four repository writers reached from two routes, reached from one
+  client file (`meal-type-manager.tsx`), every mutating call there followed by `invalidateMealTypes()`,
+  and **no sync writer** — the offline mirror `replaceMealTypes` has one caller, which hydrates it
+  *from* this cached response, so it is downstream of the cache rather than a writer.
+  `components/nutrition/__tests__/rv67-meal-types-ttl-gate.test.ts` pins the fragile half: a new
+  mutating caller outside the manager would break the proof silently, costing a six-hour stale list.
+- **⛔ Two things the entry did not know, both resolved here.** `useCachedValue` had **no** `freshWithinTtl` option at
+  all, so one read site could not be flagged without widening the hook (done — `lib/hooks/**` is
+  Lane B's). And the **writer screen is deliberately left unflagged**: the manager edits meal types,
+  is visited rarely, and a network read there costs nothing anyone notices.
+- **Remaining candidates, each needing its OWN written proof** — this is the work, and it does not
+  generalise from the one above: `workout-data:meta`, `muscle-recovery`, `health-trends-summary`,
+  `nutrition-targets`. (The 2026-09-24 re-read already dropped `hr-profile`, `exercise-library`,
+  `progression-styles` and `activity-types`.)
+- **⚠ Do not bulk-apply the flag** — a missed writer turns a stale flash into hours of hard
+  staleness. CLAUDE.md requires the written proof per key.
+- **Not established:** the request burst was counted from source, never from a network trace.
+
+### [nutrition][platform] LB-154 — the food-logger sheet fetches meal types with a bare `fetch`
+
+- **Lane: B** — `components/nutrition/food-logger-sheet.tsx:245-247`.
+- **Added:** 2026-09-25 · found building RV-67's invalidation proof for `nutrition-meal-types`.
+- Every other read of that key goes through `cachedFetch`/`useCachedValue`; this one calls
+  `fetch('/api/nutrition/meal-types')` directly, against the standing rule that client GETs of
+  `/api/*` use `cachedFetch` with a `readCacheSync` seed.
+- **It does not break RV-67's proof** — it is a read, not a write — but it bypasses the cache
+  entirely, so it pays a request every time the sheet opens while its siblings now skip the network
+  inside the TTL. Filed rather than fixed in RV-67's PR to keep that diff to the key it proves.
+- The site's own comment says the local store's `getMealTypes` returns a narrower row type than
+  `mealTypeForHour` wants, which is presumably why it reached for the raw endpoint — so converting
+  it means reconciling those two types, not just swapping the call.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
 

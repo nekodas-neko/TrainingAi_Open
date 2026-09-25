@@ -331,10 +331,16 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // renderBodySection / renderTrainingSection / renderProgressSection actually
   // read, not guessed), and a tab's group fires when that tab is shown.
   //
-  // No "already loaded" bookkeeping is needed: cachedFetch dedups in flight and
-  // honours its TTL, so re-firing a group on a tab revisit is a cache hit rather
-  // than a request. That also keeps the tabEpoch refresh semantics intact — a
-  // return to Health still revalidates, it just revalidates one tab's worth.
+  // No "already loaded" bookkeeping is needed: cachedFetch dedups in flight, and a tab revisit
+  // repaints from cache immediately. It is NOT free, though — and this comment claimed it was
+  // until 2026-09-25 (RV-67). `cachedFetch` honours a TTL only when the call site passes
+  // `freshWithinTtl`, which 183 of 191 cached read sites do not: without it the cached value is
+  // painted and the network fetch runs anyway. So re-firing a group here is a fast paint plus a
+  // real request, not a cache hit. That is what keeps the tabEpoch refresh semantics intact — a
+  // return to Health genuinely revalidates, one tab's worth.
+  //
+  // A key earns the flag with a written invalidation proof, per key, not in bulk: every write that
+  // changes its payload, shown to be in a group that clears it. `nutrition-meal-types` has one.
   //
   // Concurrency stays capped so a burst can't demand more than the server's
   // 10-connection pool at once (each endpoint fans out 6–7 DB queries).
