@@ -17641,3 +17641,16 @@ targets writer.
 It also records that the flag **invalidates a recorded audit**. The 2026-08-16 goal-invalidation audit
 concluded all six keys of that group were inert; that is now five of six, and the audit itself carries
 the correction at its head rather than only this entry, because CLAUDE.md cites its headline.
+
+## 2026-09-25 — `projectOverview.md` 12851 → 12867 (+16, BF-177)
+
+One Known-Issues row. It is index material by definition — a shipped change that is **not** device
+verified, which is precisely what the Canonical Runtime gate says must appear here rather than only
+in a journal entry, because every session's orientation read is this file and the device sitting is
+planned off it.
+
+Longer than a bare row because the reason it is unverified is the reason it kept failing: the defect
+is a 60–70 ms race between the card's refetch and the outbox push, invisible on the web path and on
+three previous fixes' green suites. A row saying "not device-verified" without that would read as
+routine caution. The trace and the pass test are what make the device sitting actionable without
+opening the backlog.
