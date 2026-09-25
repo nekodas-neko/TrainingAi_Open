@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.62",
+    date: "2026-09-25",
+    changes: [
+      "Fixed: swiping a food log or a saved meal and tapping Delete straight away now opens the confirmation on the first press, instead of needing a second tap once the row had finished sliding.",
+    ],
+  },
+  {
     version: "1.465.61",
     date: "2026-09-25",
     changes: [
