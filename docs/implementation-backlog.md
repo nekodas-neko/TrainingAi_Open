@@ -5483,6 +5483,37 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **Fix if real:** a module-level in-flight promise later callers await, the shape `cachedFetch`'s
   in-flight map already uses for reads.
 
+### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
+
+- **Lane: O** — the owner's call, not a structural one. Split out of `RV-99`, which has the code detail.
+- **Added:** 2026-09-25 · Lane B, after measuring rather than migrating.
+- **The question, in one line:** RV-99 wants ~113 hard-coded greens and reds replaced by the design
+  tokens. Doing it **changes what you see** on screens you read daily. Which do you want to keep?
+- **What changes** (the app is dark-only, so these are the live values):
+
+  | | today | after | difference |
+  |---|---|---|---|
+  | green | `rgb(34,197,94)` — mid green | `rgb(86,238,102)` — brighter, lighter | large (67) |
+  | red | `rgb(239,68,68)` | `rgb(255,100,103)` — lighter, slightly pink | visible (50) |
+  | amber | `rgb(234,179,8)` | `rgb(239,175,0)` | none you could see (10) |
+
+- **Recommendation: migrate.** The tokens are the app's own design system; the hexes are copies that
+  drifted, and every new component already uses the tokens, so the split widens on its own. A year
+  out, one source means a theme change is one edit rather than 113.
+- **What that costs:** every band green and red gets brighter. If the current mid-green is what you
+  actually want, the honest fix is the reverse — change the TOKEN to `#22c55e` and migrate to it,
+  which gets the same one-source benefit while keeping today's appearance. That is equally easy
+  and the entry is neutral between them; only you can say which looks right.
+- **Reversal cost:** low but not free — a revert is a large mechanical diff, so it is worth looking
+  at a screen before rather than after.
+- **What is NOT in this question:** the one real defect was shipped separately (see RV-99), amber is
+  imperceptible and can go either way, and identity colours (rarity, HR zones, macro colours, the
+  per-metric Home tints) keep their hex regardless.
+- **Ask:** owner — migrating ~113 hard-coded greens and reds to the design tokens makes them all visibly brighter (green `rgb(34,197,94)`→`rgb(86,238,102)`). Keep today's look, or take the token's? Retuning the token to today's hex first gets the same one-source benefit with no visual change.
+- **The three answers, any of which unblocks it:** (a) migrate to the token and accept the brighter
+  green and red; (b) retune the token to today's `#22c55e`/`#ef4444` first, then migrate — same
+  one-source benefit, appearance unchanged; (c) leave it, and close RV-99's Lane B half.
+
 ### [platform] OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
 
 - **Lane: O** — the Routine's stored prompt, which is the owner's to edit; no repository file is
@@ -5571,7 +5602,23 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **Remaining, Lane A — four shared modules with genuine band semantics**, each needing its own
   consumer check first: `ai-periodization/acwr.ts` (also touched by RV-97),
   `nutrition/calorie-balance.ts`, `health/strength-progress.ts`, `types/day-checkin.ts`.
-- **Remaining, Lane B — the component sites.**
+- **⛔ Remaining, Lane B — MEASURED 2026-09-25, and most of it is NOT Lane B's to decide.**
+  **116 occurrences across 48 files** in `components/**` + `app/**` (65 green, 48 red, 3 amber);
+  none of the four must-not-touch files is in those paths. **The rendered colour changes, and by
+  how much decides everything** — the app is dark-only, so against the `.dark` tokens:
+  green `rgb(34,197,94)` → `rgb(86,238,102)` (sRGB distance **67**, clearly visible);
+  red `rgb(239,68,68)` → `rgb(255,100,103)` (**50**, visible); amber `rgb(234,179,8)` →
+  `rgb(239,175,0)` (**10**, imperceptible). So ~113 of the 116 are a **visible app-wide restyle of
+  colours the owner reads daily**, which is a product preference rather than a structural call.
+  **Split out as `LB-152` (`Lane: O`) — do not migrate them from this entry.**
+- **✅ The one defect in that population SHIPPED (LB-152's sibling, 2026-09-25):**
+  `components/workout/workout-clocks.tsx` painted the same `isDone` state two ways — the ready ramp
+  in `var(--accent-green)` and the warmup ramp directly below it in `#22c55e`/`rgba(34,197,94,…)`,
+  at the identical 30/7/12% mixes. Two greens for one meaning, stacked on one screen. Five literals
+  migrated. **Its `#ef4444` was deliberately NOT touched** — checked first, and it agrees with
+  `rest-ring.tsx`, so there is no disagreement to fix and changing it would be a restyle nobody
+  asked for. That test — *is there a second value for this same meaning?* — is what separates a
+  defect from a preference in the remaining 46 files.
 - **⛔ Do not migrate blind; this was re-confirmed by measurement, not inherited.** Verified
   legitimate one-off uses that must NOT be replaced: `rarity-colors.ts`, `health/hr-zones.ts` (the
   deliberate blue→red ramp), `nutrition/macro-colors.ts` (protein's identity colour) and

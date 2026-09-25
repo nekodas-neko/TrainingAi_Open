@@ -1,17 +1,17 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-152 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-153 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement/meal halves, LB-148, RV-178, RV-122. LB-141, LB-149, LB-150, LB-151 filed; RV-183's remaining fetch half proved Lane A's.
+RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement/meal halves, LB-148, RV-178, RV-122, RV-99's one defect. LB-141/149/150/151 filed; LB-152 put RV-99's restyle to the owner; RV-183's remaining fetch half proved Lane A's.
 
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; sweeps
 reorder the head daily. **The owner's stated top priority is tab/page switch speed**, so `DV-12`
-heads the lane once the phone is available. Otherwise RV-99, RV-101, RV-102 (RV-183 is Lane A's the whole way down now; RV-185 is parked behind RV-186's device baseline).
+heads the lane once the phone is available. Otherwise RV-101, RV-102, RV-67 (RV-183 is Lane A's the whole way down now; RV-185 is parked behind RV-186's device baseline).
 **A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate: device`) headed READY while unstartable. The field must LEAD its own bullet; inline after `Lane:` parses as nothing.
 **RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
@@ -32,7 +32,7 @@ heads the lane once the phone is available. Otherwise RV-99, RV-101, RV-102 (RV-
   instant the five are green; no run for your head = conflicted PR.
 - **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
   entry when the floor is a judgement rather than a fit.
-- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS *AND* ITS MECHANISM.** Eight in a row named a surface that had moved or was already fixed; RV-122 went further and prescribed a fix that could not work (promote "Sync now" onto the sync-failure card — that button only pulls). BF-196's third surface had already solved it (match it, don't re-coin); RV-183's catalogue claim was WRONG (`freshWithinTtl` since the snapshot) and its "3,040 server reads" was a 6 h TTL over many days — **a read count localises nothing**. Verify every bullet before building any of it, then retract or reconcile in the entry and say so.
+- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, ITS MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.** RV-99 reads as a refactor and is a VISIBLE app-wide restyle (green moves 67 in sRGB) = the owner's: `Lane: O` + `Ask: owner` (a FIELD; prose there fails the pointer check, and the queue prints what follows `owner —`). Only the file holding two values for ONE meaning was a defect. Eight in a row named a surface that had moved or was already fixed; RV-122 went further and prescribed a fix that could not work (promote "Sync now" onto the sync-failure card — that button only pulls). BF-196's third surface had already solved it (match it, don't re-coin); RV-183's catalogue claim was WRONG (`freshWithinTtl` since the snapshot) and its "3,040 server reads" was a 6 h TTL over many days — **a read count localises nothing**. Verify every bullet before building any of it, then retract or reconcile in the entry and say so.
 - **A BATCH OR A MULTI-PART ENTRY CAN SHIP HALF** — ship what holds, sharpen the rest, SAY which half.
 - **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
   lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
