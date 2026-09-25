@@ -4208,7 +4208,7 @@ drift.
 - **Fix:** store null, or scale with the coverage stated, when bin coverage is below a floor. DV's
   part is to check whether the H10 accelerometer stream starts late.
 - **✅ Code half SHIPPED 2026-09-24** (LB-142, #1574, `lib/stores/cadence-coverage.ts`) — null below
-  50% cover, not scaled, at both write paths ([journal](overview/entries/2026-09-24-fix-rv167-cadence-coverage.md)).
+  50% cover, not scaled, at both write paths ([journal](overview/history-2026-09-25-folded-1.md#2026-09-24-fix-rv167-cadence-coverage)).
   **The floor is a judgement, not a fit:** the good walks' cover was never recorded.
 - **Keep:** DV — does the H10's accelerometer stream start late, and how often? A walk under the
   floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
