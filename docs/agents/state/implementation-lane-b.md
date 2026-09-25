@@ -1,54 +1,55 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-153 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-154 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement/meal halves, LB-148, RV-178, RV-122, RV-99's one defect. LB-141/149/150/151 filed; LB-152 put RV-99's restyle to the owner; RV-183's remaining fetch half proved Lane A's.
+Shipped 2026-09-25: LB-148, RV-178, RV-122, RV-99's one defect (#1615), RV-101 (#1621), LB-149
+(#1623), RV-102 (#1627). RV-101 owes only its device look (`Verify: device`, `workouts` sitting).
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; sweeps
-reorder the head daily. **The owner's stated top priority is tab/page switch speed**, so `DV-12`
-heads the lane once the phone is available. Otherwise RV-101, RV-102, RV-67 (RV-183 is Lane A's the whole way down now; RV-185 is parked behind RV-186's device baseline).
-**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate: device`) headed READY while unstartable. The field must LEAD its own bullet; inline after `Lane:` parses as nothing.
-**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** RV-99 heads the lane but
+is blocked on LB-152; expect RV-67, RV-68, RV-79. **The owner's top priority is tab/page switch
+speed**, so `DV-12` heads it once the phone is free. **A BLOCKED ENTRY NEEDS A FIELD, NOT A
+PARAGRAPH** — it must LEAD its bullet. **RV-117/118/119 are `Lane: O`.** **BF-177's plan is STALE.**
 
 ## Blocked / owed
 
-- **LB-134 is the owner's** (branch protection). Until he rules, read the five job CONCLUSIONS before every merge and expect the merge race below.
-- **A QUESTION FILED `Lane: O` COMES BACK** — write the brief properly, then build it. Device checks are DV's to RUN, mine to RECORD.
+- **LB-152** (hex→token restyle) and **LB-153** (chart palette merge) are the owner's — `Lane: O`,
+  ungated, inline `Ask:`. A question filed there COMES BACK; write the brief, then build. Device
+  checks are DV's to RUN, mine to RECORD.
 
-## Claimed paths
-
-- None. (`lib/cache-groups.ts`, RV-178's two key registrations — released, #1605 merged.)
+## Claimed paths — none.
 
 ## Lessons that cost real time
 
-- **⚠ THE MERGE CALL IS NOT A GATE** (#1467 merged past a PENDING `Tests`, which then failed). Read
-  the five conclusions — `get_job_logs failed_only` is cheap but "0 failed" on a RUNNING run is not
-  green. **The merge race is arithmetic:** CI ~7 min vs a commit to `main` every ~4, so merge the
-  instant the five are green; no run for your head = conflicted PR.
-- **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
-  entry when the floor is a judgement rather than a fit.
-- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, ITS MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.** RV-99 reads as a refactor and is a VISIBLE app-wide restyle (green moves 67 in sRGB) = the owner's: `Lane: O` + `Ask: owner` (a FIELD; prose there fails the pointer check, and the queue prints what follows `owner —`). Only the file holding two values for ONE meaning was a defect. Eight in a row named a surface that had moved or was already fixed; RV-122 went further and prescribed a fix that could not work (promote "Sync now" onto the sync-failure card — that button only pulls). BF-196's third surface had already solved it (match it, don't re-coin); RV-183's catalogue claim was WRONG (`freshWithinTtl` since the snapshot) and its "3,040 server reads" was a 6 h TTL over many days — **a read count localises nothing**. Verify every bullet before building any of it, then retract or reconcile in the entry and say so.
-- **A BATCH OR A MULTI-PART ENTRY CAN SHIP HALF** — ship what holds, sharpen the rest, SAY which half.
-- **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
-  lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
-  #1587 red; `no-console` allows info/warn/error) · `pnpm test` · `pnpm build` · `tsc`. The doc-size
-  ratchet is BASE-RELATIVE, so a clean run before merging `main` proves nothing — that put #1574
-  red, and another lane hit it four minutes later.
-- **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS** — two sweeps inserting at one point is two
-  ADDITIONS; read the headings each side, then DIFF THE FULL HEADING SET after every merge (#1481
-  silently deleted RV-117/118).
-- **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — a shared header means a splice drops the other PR's entry; it conflicts on EVERY merge.
-- **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a gating vitest file. **A source scanner has four traps, all of which have bitten:** it
-  matches ITSELF (`git ls-files` hides it only while untracked, and `ls-files A B -- '*.tsx'` UNIONS
-  pathspecs — filter in JS); it matches the COMMENTS explaining the fix (strip them); **a regex cannot balance
-  parens — write the depth-counting scan FIRST** (this lesson was already here and `[^)]*` still
-  falsely accused 3 callers in LB-148, stopping at the `)` in `new Date()`); arity is per-function.
-- **A DEFERRAL IS A CLAIM — RE-READ IT BEFORE TRUSTING IT.** RV-183's meal half was deferred as "needs a join"; there was none, just an over-wide parameter type demanding four fields the file never reads.
-- **⚠ ASSERT EVERY SCRIPTED `str.replace`.** This file's "Now" line sat three PRs stale because one no-oped silently on text an earlier no-op never wrote. Code edits were asserted; the baton's were not, and the baton is what survives a compaction.
-- **RUN `pnpm lint` AND `check:rules` BEFORE BELIEVING A FIX IS DONE** — RV-178's first cut tripped three rules I would not have predicted: the fetch-once ratchet (a `cachedFetch` inside a `useEffect` is the banned shape — use `useCachedValue`), the component-size cap on `config-screen.tsx`, and RV-84's dead-`.catch` guard. Each pointed at a BETTER shape, not a workaround. Compare the lint WARNING COUNT against the base too — a new one is yours.
-- **A gate's exit code must be read DIRECTLY** — never via `&&`/`;` into `git commit`, and never through a PIPE (`| tail`, `| cut`) which returns the LAST command's status, so a failing check reads as 0 (hit again in LB-149); COMMIT before `git stash`/`checkout`; `tsc --noEmit` typechecks NEITHER an auth-gated page nor tests, so run `node scripts/check-test-typecheck.js` before pushing a spec; and vitest's unit project does not transform JSX, so a testable helper goes in a `.ts`.
+- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
+  Fifteen running were wrong: RV-122's fix could not work; RV-99 was a restyle sold as a refactor;
+  RV-101's contrast used the wrong background and its fix had nowhere to go; LB-149's hypothesis had
+  no lever (`workers: 1` already); RV-102 called two tables "identical" (13 keys vs 10) and
+  mis-assigned its lane. **A change that alters what renders without fixing a disagreement is the
+  OWNER'S:** `Lane: O` + `Ask: owner — <summary>`, never `Gate: owner`, which parks it.
+- **A BACKLOG EDIT IS A CODE CHANGE** — queue tooling runs `next-item.js` against the live backlog, so
+  a docs-only diff turned #1623 red. Never hand-pick affected tests; run `pnpm test`. Its cap is on
+  ROWS, so >10 READY with batches is not truncation.
+- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (repo-wide; compare the WARNING
+  COUNT to base) · `pnpm test` · `pnpm build` · `tsc`. Doc-size is BASE-RELATIVE.
+- **THE DOC-SIZE FILES CONFLICT ON EVERY PR** and main moves every ~8 min, so a 12-min gate loses the
+  race (#1623 refused twice). History is append-only (keep BOTH, main's first); the `.size` is a real
+  disagreement (`--fix`). Script it; do NOT re-gate a doc-size-only remerge.
+- **REBUILD `changelog.ts`/`package.json` FROM `origin/main`, NEVER SPLICE** — `package.json` does NOT
+  conflict when both sides pick the same version. Collided four times in one day.
+- **CI READS:** `list_workflow_runs` IGNORES `branch`; `get_check_runs` does not exist; `get_status`
+  is the legacy API; `get_job_logs failed_only`+`tail_lines` can return ONLY the Postgres dump
+  (LB-54) — fetch `logs_url` and grep locally. The ruleset is ACTIVE, so trying the merge is a safe
+  probe that names the blocker.
+- **CONTROL-RUN every new test against `origin/main` and MUTATION-TEST the guard** — stash only the
+  SOURCE files; `git stash -u` takes the new test and proves nothing.
+- **A scanner matches ITSELF and the COMMENTS explaining the fix**; `ls-files a b -- '*.ts'` UNIONS
+  pathspecs (filter in JS); a regex cannot balance parens; grep the TRACKED tree or `.next/` answers.
+- **Read a gate's exit code DIRECTLY**, never through a pipe. COMMIT before `stash`/`checkout`. `tsc`
+  checks neither auth-gated pages nor tests — run `check-test-typecheck.js`; vitest has no DOM
+  project, so a component guard is a source scan in a `.ts`.
+- **⚠ ASSERT EVERY SCRIPTED `str.replace`** — this file sat three PRs stale because one no-oped.

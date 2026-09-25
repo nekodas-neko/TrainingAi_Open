@@ -5696,9 +5696,13 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   read names an OOM kill and its RSS; an **empty** dmesg eliminates OOM outright, which nobody has
   been able to say in three sessions. Costs nothing on a green run.
 - **Keep — the cause is NOT established, and this entry closes when the next red E2E reports.**
-  Measurement 1 of the 3 consecutive runs on an unchanged head is in: **run 3069 PASSED** (28m53s),
-  so the fault is intermittent. If dmesg comes back empty on the next failure, OOM is out and the
-  next step is sampling memory during the run rather than after it.
+- **⛔ The entry's own discriminator is too weak, measured 2026-09-25.** It said 3 consecutive runs
+  on an unchanged head would settle spec-pair vs runner. All **3 of 3 PASSED** (28m53s, ~34 min,
+  ~33 min on run 3069 attempts 1–3), so the fault did not reproduce at all — it is rarer than
+  1-in-3, and no feasible number of reruns is a plan. **Do not read three greens as "fixed" or as
+  evidence for either hypothesis.** The dmesg witness is now the thing that answers it, on whichever
+  real failure comes next; if dmesg is empty there, OOM is out and the next step is sampling memory
+  during the run rather than after it.
 - **Note the second half of this entry is NOT Lane B's.** "Because E2E is advisory nobody looks" is
   a question about making E2E required, which `CLAUDE.md` records as the owner's call pending
   `LB-56`. Nothing here changes that.
@@ -5781,25 +5785,30 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   if either regex stops matching; `components/__tests__/rv101-volume-ramp-and-key.test.ts` states the
   rule independently — 3 of its 4 assertions fail against `origin/main`.
 
-### [platform] RV-102 — three ad-hoc chart palettes, five dead theme tokens, and a duplicated colour table
+### [platform][workouts] LB-153 — three chart palettes disagree; merging them changes colours you see daily
 
-- **Lane:** B — `components/chart-message.tsx:34-41`, `components/workout/hr-recovery-chart.tsx:22`,
-  `components/workout/utils.ts:8`, `components/more/home-widgets-section.tsx:27-38`.
-  **Added:** 2026-09-21 · Review sweep 52.
-- Three independent categorical palettes with three different "series 1" colours, all drawing from the
-  semantic triad — so in the workout screen set 1 is warning-amber and set 2 is good-green purely by
-  index. Meanwhile `app/globals.css:186-190` defines `--chart-1`…`--chart-5` and a repo-wide grep
-  finds **no consumer**: they are dead tokens. They could not be adopted as-is either — `--chart-1`
-  resolves to **2.72:1** against `--card`, under the 3:1 UI floor.
-- `CARD_DEFAULT_COLORS` is declared **twice** — `app/session-select/constants.ts:1-14` (what the cards
-  render) and a private shadow at `home-widgets-section.tsx:27-38` (**what the colour picker shows**).
-  Identical today, tied together by no test.
-- **Nothing is broken now** — this is filed so that a future edit to one table does not show the owner
-  a swatch the card does not honour.
-- **Fix:** one categorical series palette in `packages/shared/src/chart-colors.ts` beside
-  `resolveColor()`, none of them the band triad; delete the shadow constant; and either fix
-  `--chart-1`'s lightness or delete the five dead tokens rather than leave a dead alternative.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the dark `--chart-*` tokens are at `globals.css:185-189`.
+- **Lane: O**
+- **Ask: owner — three charts use three different palettes, and in the workout screen set 1 is amber and set 2 green purely by index. Merge them onto one neutral palette, or leave it?**
+- **Added:** 2026-09-25 · split out of RV-102 by Lane B, which shipped that entry's two invisible halves.
+- **Recommendation: merge them, and include the workout set colours.** One categorical palette, no
+  colour in it that also means good/warning/bad elsewhere.
+- **Why, a year out.** Right now `#22c55e` means "primary mover", "at target", "good score" *and*
+  "set 2" depending on where you look, so every new chart re-picks colours and the meaning of green
+  keeps thinning. One palette that is deliberately NOT the good/amber/bad triad ends that, and it is
+  what makes a future chart cheap to add correctly.
+- **What you would actually see change.** Three surfaces: the AI chat's charts, the HR-recovery
+  trace, and the workout set cards. The workout one is the one you look at every session — set 1 is
+  `#f59e0b` (amber) and set 2 `#22c55e` (green) today, which reads as a judgement on the set rather
+  than an index.
+- **Alternatives.** *Leave it* — zero risk, and genuinely fine if you read the set colours as
+  labels rather than verdicts; it is only confusing if you don't. *Merge the two charts but keep the
+  workout set colours* — no change to your daily screen, and it keeps the one case that actually
+  misreads. *Merge everything* — most consistent, biggest visual change.
+- **Reversal cost: one constant.** It is a colour table, not a structure; if you dislike it, it
+  reverts in a line.
+- **Then:** the palette itself lands in `packages/shared/src/chart-colors.ts` beside `resolveColor()`
+  — which already exists, and is **Lane A's** by the path rule, so re-lane this once answered.
+  RV-102 prescribed it to Lane B; that was wrong and is why only its invisible halves shipped.
 
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
