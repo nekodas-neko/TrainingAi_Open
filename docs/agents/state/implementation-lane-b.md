@@ -15,11 +15,10 @@ priority is tab/page switch speed.** **RV-117/118/119 are `Lane: O` — leave th
 
 ## Blocked / owed
 
-- **LB-155 is PARKED on `LB-156`** (Lane A: five cache keys need registering in the groups whose writes
-  change them). **`header-row-width` (BF-139 + BF-96) is PARKED on `LB-157`** — measured: the row is
-  224.0 px, the chips take 200–209 in daylight, the date gets **7.4 px**, and no format fits, so there is
-  no shrink-only fix left. **LB-152** (which RV-99 shrank from ~113 sites to **14**) and **LB-153** are
-  the owner's too — all `Lane: O`, ungated, inline `Ask:`.
+- **PARKED: LB-155 on `LB-156`** (Lane A: five cache keys need group entries); **`header-row-width`
+  (BF-139 + BF-96) on `LB-157`** — measured, the row is 224.0 px and the date gets **7.4 px** in daylight,
+  so no shrink-only fix exists. **LB-152** (which RV-99 shrank from ~113 sites to **14**) and **LB-153**
+  are the owner's too — all `Lane: O`, ungated, inline `Ask:`.
 
 ## Lessons that cost real time
 
@@ -31,21 +30,17 @@ priority is tab/page switch speed.** **RV-117/118/119 are `Lane: O` — leave th
   read-after-write, an offline-first hydration read feeding `applyDelta`, and a delta BASELINE (a cached
   pre-workout XP makes the gain read 0). A new key also needs a group entry in LANE A's `cache-groups.ts`.
 - **RE-READ YOUR OWN DIFF AGAINST THE CODE IT TALKS TO, not just against the entry.** DV-2's `go(-2)`
-  was wrong on a reachable path and no test here could reach it: the back handler raises the leave
-  prompt ON TOP of an open sheet. **Releasing a history entry does not REMOVE it** — it only stops the
-  surface popping it — so the distance is `1 + <pushed surfaces>`, counted, never the stack depth.
-  A `touchscreen.tap` below the fold hits nothing and reads as a dead control (`tapHitTested`), and a
-  `next dev` cold route hangs its RSC fetch the same way — warm the destination before any nav probe.
-- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (compare the WARNING COUNT to base:
-  811) · `pnpm test` (with `DATABASE_URL` set, or ~211 files skip — and NEVER hand-pick, since a
-  docs-only backlog diff turned #1623 red) · `pnpm build` · `tsc` · `check-test-typecheck`. Doc-size is BASE-RELATIVE, and its
-  files conflict on every PR while main moves every ~8 min: history is append-only (keep BOTH, main's
-  first), the `.size` is a real disagreement (`--fix`), and a doc-size-only remerge is NOT re-gated.
-  **REBUILD `changelog.ts`/`package.json` FROM `origin/main`, NEVER SPLICE.**
-- **CI: `curl -sS api.github.com/…/commits/<sha>/check-runs` WORKS UNAUTHENTICATED here** and is the
-  cheapest, least-laggy read there is. `list_workflow_runs` IGNORES `branch`; `get_check_runs` does not
-  exist; `get_job_logs failed_only`+`tail_lines` can return ONLY the Postgres dump (LB-54). Five required
-  checks; E2E `in_progress` is NOT a blocker. **Claimed paths: none.**
+  was wrong on a path no test here can reach — the back handler raises the leave prompt ON TOP of an open
+  sheet — because **releasing a history entry does not REMOVE it**. Two nav-probe traps that read as dead
+  controls: a `touchscreen.tap` below the fold (`tapHitTested`), and a `next dev` cold route's hung RSC.
+- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (WARNING COUNT vs base: 811) ·
+  `pnpm test` (with `DATABASE_URL`, or ~211 skip — never hand-pick, a docs-only backlog diff turned #1623
+  red) · `pnpm build` · `tsc` · `check-test-typecheck`. Doc-size is BASE-RELATIVE; history is append-only
+  (keep BOTH, main's first), the `.size` is a real disagreement (`--fix`), a doc-size-only remerge is NOT
+  re-gated. **REBUILD `changelog.ts`/`package.json` FROM `origin/main`, NEVER SPLICE.**
+- **CI: `curl -sS api.github.com/…/commits/<sha>/check-runs` WORKS UNAUTHENTICATED here**, the cheapest
+  and least-laggy read. `list_workflow_runs` IGNORES `branch`; `get_check_runs` does not exist;
+  `get_job_logs failed_only`+`tail_lines` can return ONLY the Postgres dump. **Claimed paths: none.**
 - **CONTROL-RUN every new test against `origin/main`; MUTATION-TEST the guard.** A worktree with
   symlinked `node_modules` breaks Next's resolution, so for an e2e control `git stash push -- <source
   files only>`, keeping the spec. `git checkout -- <file>` restores from the INDEX and silently reverted a
@@ -54,7 +49,6 @@ priority is tab/page switch speed.** **RV-117/118/119 are `Lane: O` — leave th
   cannot balance parens or angle brackets; `{ method }` shorthand has no colon; a same-line grep misses
   multi-line calls; a scanner matches ITSELF and the COMMENTS about the fix; and **two agreeing scanners
   are not corroboration when they share a blind spot** — a co-render scan is not a shared-MEANING scan.
-- **Read a gate's exit code DIRECTLY**, never through `| tail`. COMMIT before `stash`/`checkout`. `tsc`
-  checks neither auth-gated pages nor tests; vitest has NO DOM project, so a component guard is a source
-  scan in a `.ts` and React behaviour is not unit-testable here at all. **⚠ ASSERT EVERY SCRIPTED
-  `str.replace`** — this file sat three PRs stale because one no-oped.
+- **Read a gate's exit code DIRECTLY, never through a pipe** — a piped grep read as "clean" let `--fix`
+  RAISE this shrink-only file's baseline. COMMIT before `stash`/`checkout`. vitest has NO DOM project, so
+  a component guard is a source scan and React is not testable here. **ASSERT EVERY SCRIPTED `replace`.**
