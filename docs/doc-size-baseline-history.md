@@ -17797,6 +17797,33 @@ path instead of deleted. The `Keep:` also now states plainly that **none** of th
 groups has been re-verified, since three of this entry's claims have already turned out stale or
 backwards and the next session should not assume otherwise.
 
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-199 (does the prescription need AI)
+
+The owner asked whether the prescription needs a model at all. Answering it needs the evidence table —
+sets clamped to 2 in all 33 stored tuples, reps and pct on a ~2.25 %/rep curve the styles table
+already holds, rest the one free output and the one that reads as noise at 68 to 300 seconds — because
+the conclusion is unbelievable without it. The counter-argument costs lines too and had to stay: 35 of
+35 calls succeeded, so the case cannot lean on reliability.
+## 2026-09-25 — `docs/implementation-backlog.md` 31756 → 31777 (+21, DV-12's source half)
+
+DV-12 is the owner's stated highest priority and was parked `Gate: device` for a question its own text
+said was *"answerable from SOURCE, not from the phone"*. That half is now answered on the entry: **20
+chart components set `responsive: true`, none sets `resizeDelay`**, and `tab-shell.tsx:209` toggles
+`[content-visibility:hidden]` on both the outgoing and the incoming panel — so every `responsive` chart
+in both takes a ResizeObserver callback on every tap, which is the profiled `_computeLabelSizes` chain.
+
+The lines that earn their place are the **counter-measurement**, because it is the one that stops the
+obvious fix being built on a half-truth: tab taps in the harness produced 216/228/465/91/235 ms long
+tasks with **zero canvases on the page**. A large cost exists independently of chart.js, so a
+chart-only fix may not move his number — and the harness cannot test the chart half at all, because the
+seeded user has no chart data. Stated with its limits (dev build, unseeded), since the absolute figures
+do not transfer to the APK.
+
+Recorded on the ENTRY rather than in the baton on purpose: whoever picks DV-12 up reads the entry and
+never reads Lane B's baton, and a finding filed where it cannot be found is a finding lost.
+
 ## 2026-09-26 — `docs/implementation-backlog.md` → 31822 (BF-200, the deload that skipped one exercise)
 
 The owner noticed one deloaded exercise carrying his normal working weight. The four-row table is the
