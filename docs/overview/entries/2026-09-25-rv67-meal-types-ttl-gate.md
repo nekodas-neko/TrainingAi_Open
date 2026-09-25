@@ -14,6 +14,14 @@ I "corrected" a correct entry: my first count returned **7 and 0**, because call
 the fourth scanner trap this session, and the first one where the scanner's answer would have
 discredited the entry rather than the code.
 
+> **Corrected later the same day:** the real figures were **199 and 8**, not 191 and 8. My scanner
+> skipped a call's type argument with a **paren-free** character class, so every
+> `cachedFetch<{ x: import('…').T }>` was invisible to it — and the entry's author evidently had the
+> same blind spot, which is why the numbers matched. **"Reproduces exactly" meant "reproduces the
+> same error"; two scanners agreeing is not corroboration when they share a blind spot.** The
+> conclusion is unaffected — 191 of 199 still do not opt in. Both scanners now skip the type argument
+> by balancing angle brackets.
+
 ## The proof, which is the actual work
 
 `freshWithinTtl: true` means a read inside the 6-hour TTL never touches the network, so a missed
