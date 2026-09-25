@@ -184,17 +184,11 @@ a number is only as good as the enumeration of who reads it.*
 Full narrative in
 [`docs/handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md`](../../handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md).
 
-Filed **BF-1** (blood panels), **BF-2** (DEXA filter), **BF-3** (dosed substances), **BF-4** (scan
-slowdown, dated to `#112` via the archive), **BF-5** (week-in-review), **BF-6** (finished-logging
-unreachable — shipped, #355), **BF-7** (session-length slider), **BF-8** (Intensity vs auto-deload —
-shipped, #353), **BF-9** (trainer role, design approved). Also merged **PR #124**, another session's
-stale-but-approved auth fix.
+Filed **BF-1** → **BF-9** (blood panels, DEXA filter, dosed substances, scan slowdown,
+week-in-review, finished-logging #355, session-length slider, auto-deload #353, trainer role). Also
+merged **PR #124**, another session's stale-but-approved auth fix.
 
 ### 2026-08-25 → 08-27 — the long nutrition + clinical session (BF-10 → BF-46)
-
-**Where the queue stood at the time** — superseded, see the 2026-08-31/09-01 entry below. Do not
-work from this paragraph: run `node scripts/next-item.js --lane <A|B>`, which is the only thing that
-knows what is startable right now.
 
 **Owner decisions taken this session — recorded in the entries, do not re-open:**
 
@@ -254,16 +248,13 @@ the Orchestrator prompt, handed over but never run.
 
 ### 2026-09-06 → 09-08 — the game feature, a program pass, and two live engine defects (BF-105 → BF-133)
 
-**Filed:** BF-122a/b (the cat collection — three ladders fed by workouts/steps/sleep, decay window
-derived from the training schedule) · BF-123/124 (the 48 px tap floor turning sub-48 px `<button>`
-chips into circles; the role picker's overflow) · BF-125 (the builder review shows the role badge and
-cannot edit it) · BF-126 (no cap on primaries/secondaries per generated session) · BF-127 (the
-baseline banner renders a bodyweight 1RM index as kilograms — *"load 82.5 kg on a pull-up"*) ·
-BF-128 (the session planner charges rest after the final set, prescribing 4 exercises where 90 days
-of history does 5) · BF-129/130 (22 library rows with no equipment, so machines pass a home-gym
-filter; no home-gym knee-flexion hamstring exercise exists) · BF-131/132 (the AMRAP baseline never
-completes; one tap deletes a program session with no confirmation and no tombstone) · BF-133 (the
-full user overview card). BF-105 was **respecified**, not re-filed, when the owner chose spoken cues.
+**Filed:** BF-122a/b (cat collection) · BF-123/124 (48 px tap floor; role-picker overflow) · BF-125
+(role badge uneditable) · BF-126 (no cap on primaries per session) · BF-127 (bodyweight 1RM index as
+kg — *"load 82.5 kg on a pull-up"*) · **BF-128 (the planner charges rest after the final set,
+prescribing 4 where history does 5 — the class BF-197 later found in `estimateExerciseDurationSec`)**
+· BF-129/130 (22 library rows with no equipment) · BF-131/132 (AMRAP baseline never completes; one
+tap deletes a session, no tombstone) · BF-133 (user overview card). BF-105 was **respecified** when
+the owner chose spoken cues.
 
 **Owner still owes:** tapping **"Use prior data →"** on Push and Pull to clear the stuck baseline
 (BF-131's workaround, valid today); **rebuilding the deleted Lower session** — both candidate
@@ -303,6 +294,25 @@ unbuilt entry into `next-item.js`'s VERIFY section and hides it from READY. Thre
 that way and Lane B reported READY (1) with two of its own items invisible. Same shape for `Keep:`
 (shipped, residue owed) and `Reference:` (read by others, never next). **Run `node scripts/next-item.js
 --lane A|B` after filing** — the file cannot tell you where an entry actually landed.
+
+### 2026-09-24/25 — the duration cluster (BF-187 → BF-197)
+
+Eleven reports traced; narrative in `docs/overview/entries/2026-09-24-docs-bf-196-working-minutes-label.md`.
+**BF-197** is the durable one: the estimate over-reserves **14.2 min** (a rest after each exercise's
+last set, skipped on 93.5% of 309 exercises, and a transition after the last exercise), so his missing
+third set is an arithmetic bug. It also breaks **LA-65**'s `5 × 240 = 4 × 300` — that cancels the
+CONSTANT, and his measured 319 s/gap does not.
+
+**Four traps, each of which bit this session:**
+- **An estimate agreeing with itself is not evidence it is true.** *"51 = 51, so no room is unused"*
+  was mine, same day, and wrong. Put an estimate against the measured outcome, never its own budget.
+- **An owner question needs an `Ask:` field, not just `Lane: O`** — otherwise it sits below `TOP_N`
+  and never reaches the WAITING section. Three of mine did, including one filed as BF-194 about this
+  exact invisibility. Run `next-item.js --lane O` after filing.
+- **An answered decision must hand its answers to the entry that BUILDS them** — BF-193 held three
+  owner answers while BF-192 carried only a `Needs:` pointer.
+- **Never chain on a gate through a pipe** — `pnpm check:rules | tail && git commit` commits through
+  a FAILING gate, because the pipeline's exit status is `tail`'s.
 
 ## What this session learned that the traps list did not already say
 

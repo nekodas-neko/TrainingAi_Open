@@ -20,7 +20,7 @@ import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-period
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
-import { computeActivityScore } from '@trainingai/shared/health/activity-score'
+import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
@@ -468,11 +468,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
   const yesterdayIso = toAestDay(new Date(todayMid.getTime() - 86_400_000), tz)
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
-  const prevDayActivityScore = (yesterdayMetrics || sessions7d > 0) ? (computeActivityScore({
+  // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
+  // today's, so on a training day the "previous day" score reacted to this morning's session.
+  const prevWindow = strengthWindowEndingAt(recentSessions, todayMid.getTime() - 86_400_000)
+  const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
     steps: yesterdayMetrics?.steps ?? null,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
-    sessions7d,
-    volume7dKg,
+    sessions7d: prevWindow.sessions7d,
+    volume7dKg: prevWindow.volume7dKg,
     typicalSessionVolumeKg,
     goals,
   })?.preTaperScore ?? null) : null

@@ -17242,3 +17242,71 @@ unreachable from every today-envelope key and the fix is one line in Lane A's `c
 amendment records the two Lane-B-only shapes that were tried and rejected, with the reason each
 fails, because both look workable and one of them would have duplicated the LB-150 defect across
 three call sites to keep the item in this lane.
+
+## 2026-09-25 — `docs/agents/state/bugfix.md` → 340 (the duration cluster, BF-187 → BF-197)
+
+Raised by 11 after cutting 15. The filing manifests for BF-1→BF-9 and BF-122→BF-133 went to one line
+each — they are recoverable by grepping the backlog and the journal, so the baton was storing them
+twice — and a paragraph that already said of itself that it was superseded came out.
+
+What replaced them is four traps that cost this session real time and are not in the traps list
+above: an estimate agreeing with its own budget is not evidence it is true; an owner question needs
+an `Ask:` field or it never reaches the WAITING section; an answered decision has to hand its answers
+to the entry that builds them; and a gate run through a pipe reports the pipe's exit status, which
+committed through a failing check. The baton is meant to carry what a successor cannot re-derive, and
+a trap that already fired once is exactly that.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31057 → 31082 (TN-70 read + LA-140)
+
+Net +25 across two entries, and both halves are there to stop work rather than start it.
+
+TN-70 gains a killed hypothesis — the baseline was NOT still learning during the level-5 run, 0 of
+68 days under `BASELINE_MIN_NIGHTS` — which is the first thing anyone would check and now nobody
+needs to. It also gains the measured asymmetry (resting heart rate moved 4%, its score 37%),
+written as a pointer rather than a cause, because a suggestive ratio is not a finding.
+
+LA-140 is the dead `night_hrv_baseline_ms` column. Its value is not the null itself, which harms
+nothing, but the inference the null invites: the resilience model gates on that exact field being
+non-null. The entry records that trap explicitly, and that both closing moves — persist it, or
+delete the plumbing — are real options rather than one obvious fix.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31082 → 31102 (LA-138 corrected)
+
+Twenty lines, and they buy a retraction that is worth more than the entry was.
+
+LA-138 was filed yesterday claiming `program_phases` was empty for every program. It is not — 46
+rows across 8 phase sets, 8 of them deload phases. The zero came from joining on `program_id`, a
+legacy column that is NULL on all 46 rows since phases moved under `phase_set_id`, so the query
+returned a confident zero with no error.
+
+The rewrite quotes the wrong claim before the right one rather than replacing it silently, because
+the trap is the reusable part: the obvious join shape still returns a false zero for the next person
+who tries it. The narrower real finding survives — an `ai_dynamic` program has no in-deload
+suppression — but the fix it pointed at (populate the table) would have been work against the
+design.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31102 → 31116 (TN-77 part a)
+
+Fourteen lines recording what shipped and, more usefully, what did not.
+
+TN-77 has two halves. (a) was an off-by-one — "yesterday's activity" read today's training window —
+and is fixed. (b) is a weight-base mismatch the entry itself calls possibly deliberate, and it stays
+open with a `Keep:`, because deciding what the contributor is meant to measure is a different
+question from fixing which day it reads.
+
+The lines also record that the same-day window was left alone on purpose. It has no upper bound, and
+giving it one would have shifted the same-day score — a change nobody asked for, arriving inside an
+off-by-one fix. Writing that down is what stops the next reader "finishing the job".
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31052 → 31057 (+5)
+
+Queue hygiene, not new material. Two entries headed Lane B's READY list while unstartable, both
+because the thing blocking them was written as prose where the tooling reads a field.
+
+`RV-183`'s lane became `A`: its caller half shipped, and the remainder needs `lib/sqlite/cache.ts`.
+Three of the five lines are the reason, kept in the entry so the next B session does not re-derive
+it — the analysis took a PR of its own.
+
+`RV-185` gained `Needs: RV-186`. Its own text already said it was "worth doing only if RV-186 shows
+script evaluation matters at cold start", and RV-186 is the unrun device baseline, so it was
+self-describing as blocked while printing as ready.

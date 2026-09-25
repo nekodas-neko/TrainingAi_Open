@@ -1751,10 +1751,33 @@ which is the right shape for something that can only be validated by living with
     property of the method, not the learning-period meaning its neighbours carry. Gating it on
     `provisional` would null it on every day forever. The **comment** was the defect and is corrected
     in this PR; `run.ts` is right as written.
-  - **The decisive re-run is still NOT done, deliberately.** Re-running the rollup against production
-    would rewrite `oura_daily_derived` rows — a production write, which is the owner's call rather
-    than Lane A's. The non-destructive form is a local run against an injected `io` (`runOuraRollup`
-    takes one); that is the next step and is what remains of this entry.
+  - **⚠ The decisive re-run is NOT doable from a container — measured 2026-09-25, so this entry's
+    prescribed next step needs REPLACING rather than retrying.** Re-running against production
+    rewrites `oura_daily_derived` (a production write, the owner's call). The non-destructive form
+    needs the raw frames locally, and there are **191,191** rows in `oura_raw_samples` plus
+    **1,508** packed, against an `/api/admin/db-query` that caps a response at ~1,000 rows —
+    hundreds of paginated calls across many tags. `runOuraRollup` also takes a ~40-member `io` and
+    **no test in the repo builds one**, so the fake is a project, not a fixture.
+    - **What would unblock it:** a production-side replay that computes without persisting, or a
+      database restore into the local instance. Either is its own entry.
+    - **And the question may now be answerable without a replay at all.** This entry's own
+      measurement already showed the switch is carried by `resilience_daily_sleep_recovery`, and its
+      four contributor inputs **are** stored in `readiness_contributors`. "Were the July
+      contributor scores wrong" is a read. Try that before building a replay harness.
+  - **⚙ THAT READ IS DONE (2026-09-25), and it kills one hypothesis and measures one asymmetry.**
+    - **The baseline was NOT still learning in July — hypothesis dead, do not re-run it.**
+      `BASELINE_MIN_NIGHTS` is 14, and **0 of 68 days** in the span had `n_history` below it. The
+      level-5 span carried 18–54 nights, September 63–81.
+    - **But raw physiology barely moved while its SCORE collapsed.** Averaged across the two
+      regimes: resting heart rate **52.7 → 54.8 bpm** (about 4%) while its contributor score went
+      **63.9 → 40.3** (37%). The app's own sleep score went 79.1 → 53.7. So a small real change is
+      being amplified several-fold by the scoring, which is consistent with a baseline that keeps
+      re-centering as history triples — **and is NOT established as the cause.** What it does show
+      is that "the owner got worse" and "the scale moved under him" are both still live, and the
+      raw series is where to separate them.
+    - **`night_hrv_baseline_ms` could not be used for the same comparison, because it is dead —
+      see LA-140.** hrvBalance's raw input is therefore unavailable from the database, which is why
+      only RHR is quoted above.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -1909,47 +1932,69 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
-### [devices][platform] LA-139 — the ring clock anchors disagree with each other: 39 of 40 consecutive pairs drift by more than a minute
+### [readiness][devices] LA-140 — `night_hrv_baseline_ms` is plumbed end to end and written by nothing: 0 of 130 rows
 
-- **Lane: A** — `lib/data/postgres/adapter.ts` (`getOuraClockAnchor`, `insert` path),
-  `oura_ble_clock_anchors`.
-- **Added:** 2026-09-25 · found while investigating TN-79; filed separately because it is NOT that
-  bug (see below) and is worth its own look.
-- **Measured on production 2026-09-25.** The table holds **12,545 anchors** (since 2026-07-07). An
-  anchor is a `(ring_ds ↔ utc)` pair, so any two of them imply a ring clock rate: `Δds/10` seconds
-  should match `Δutc` seconds. Over the 40 most recent pairs, **39 disagree by more than 60 s**,
-  worst **3,359 s (56 minutes)**. Three consecutive anchors written within **4 real seconds** carry
-  ring times **~19 minutes apart**.
-- **Why that shape:** the anchors look like they are stamped per drained batch — that batch's ring
-  timestamp against the server's arrival time — so during a backfill the pair describes history,
-  not now. `getOuraClockAnchor` then takes `ORDER BY created_at DESC LIMIT 1` and uses that one pair
-  to convert **every** ds↔UTC in the request.
-- **⚠ This is NOT TN-79's cause, and the evidence is explicit.** TN-79's replay used this same
-  newest anchor and still bucketed 1,000+ clean MET samples per day into sensible Brisbane days, and
-  the newest frame maps to ~6 minutes before the anchor. So the mapping is usable for recent data.
-  Do not "fix" TN-79 by rewriting anchors.
-- **What is NOT established:** whether any consumer is actually harmed. Sleep and HR times would be
-  the place to look, and the 2026-08-03 wake-time investigation is prior art worth reading first.
-  A table growing at ~170 anchors/day with mutually inconsistent contents is a hazard on its own
-  terms even if nothing is currently wrong.
+- **Lane: A** — `lib/oura-ble/rollup/run.ts` (the producer), `oura_daily_derived`.
+- **Added:** 2026-09-25 · found while doing TN-70's contributor read, which the column would have
+  answered had it held anything.
+- **Measured on production 2026-09-25: `night_hrv_baseline_ms` is NULL on all 130 rows.** The
+  plumbing is complete — `schema.ts`, `DERIVED_COLS`, the row mapper, the `pushMutations` branch,
+  the local SQLite table and the sync delta all carry it — and **no writer ever sets it**.
+  `run.ts:1170` is the only mention in the rollup and it is the *input* to
+  `computeResilienceForDay`, not a persist.
+- **No functional impact today, and that is why it survived.** The resilience compute uses the
+  in-memory `nightHrvMs`, so scoring is unaffected, and nothing in product code reads the stored
+  column.
+- **The cost is diagnostic, and it is not hypothetical.** A reader who sees NULL reasonably
+  concludes the input was missing — `computeResilienceForDay` gates `contributorsOk` on exactly
+  this field being non-null, and falls back to a **fabricated 50** for the stress scaling
+  (`stress-resilience.ts:395`). While doing TN-70's read I drew that inference myself before
+  checking the producer. A column that is always null beside a guard that tests for null is a trap.
+- **Two ways to close it, and the choice is the work:** persist what the rollup already computes
+  (one line in the derived patch, makes the HRV half of TN-70's comparison possible), or delete the
+  column and its plumbing (smaller sync surface, and the ~40-member push path stops carrying a dead
+  field). Persisting is probably right *because* TN-70 wanted it — but that is a judgement, not a
+  given.
+- **⚠ Do not "fix" the `?? 50` fallback by reading the stored column** — it is null, so that would
+  swap a fabricated constant for a guaranteed one.
 
-### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
+### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
 
-- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch), `program_phases`.
-- **Added:** 2026-09-25 · found while building TN-64(b); filed rather than fixed, because it is a
-  different question from the one the owner answered.
-- **Measured on production 2026-09-25:** `program_phases` holds **0 rows for all five programs** —
-  the two `automatic` ones included. The active program also has `started_at` NULL, which
-  short-circuits the phase lookup before it runs (`phaseList = program.startedAt ? … : []`).
-- **So `inDeloadPhase` has always been `false`**, and the guard that is supposed to stop the app
-  recommending a deload while the owner is *already* in one has never suppressed anything. That was
-  harmless while the gate itself was unreachable (TN-64). Now that the gate is live, it is the
-  difference between "asked once" and "asked during a deload week".
-- **Not urgent, and not a correctness bug:** every prompt still requires the owner's confirmation,
-  so the worst case is a redundant question, not an unwanted deload.
-- **What is NOT established:** whether `ai_dynamic` is *meant* to write phase rows at all, or
-  tracks its cycle another way. Answer that before writing code — if it tracks it elsewhere, the
-  fix is to read that source, not to start populating `program_phases`.
+- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch),
+  `packages/shared/src/ai-periodization/`.
+- **Added:** 2026-09-25 while building TN-64(b). **⚠ REWRITTEN 2026-09-25 — the original filing's
+  central measurement was WRONG, and the wrong version is quoted here so it is not re-derived.**
+- **What the first version claimed:** *"`program_phases` holds 0 rows for all five programs."*
+  **False.** It came from a query joining `program_phases` on **`program_id`** — a legacy column
+  that is **NULL on all 46 rows** since phases moved under `phase_set_id`. The join matched nothing
+  and read as a clean zero. No error, no warning: the same silent-absence failure the External API
+  field-name rule in `CLAUDE.md` exists for, in a diagnostic query rather than in product code.
+- **Measured properly 2026-09-25:** `program_phases` holds **46 rows across 8 phase sets**,
+  **8 of them `phase_type = 'deload'`**, all 46 keyed by `phase_set_id`.
+
+  | program | mode | phase set | phases |
+  |---|---|---|---:|
+  | Bankai (**active**) | `ai_dynamic` | none | 0 |
+  | Shikai | `ai_dynamic` | none | 0 |
+  | AI-Phase1 | `ai_dynamic` | none | 0 |
+  | Main | `automatic` | yes | 6 |
+  | Strength + Hypertrophy | `automatic` | yes | 6 |
+
+- **So the real finding is narrower and still real.** `listProgramPhases` resolves through
+  `programs.phase_set_id` and returns `[]` when there is none, so on any `ai_dynamic` program
+  `inDeloadPhase` is always false. For the two `automatic` programs the suppression works exactly
+  as written. Since TN-64(b) extended the gate to `ai_dynamic`, the **active** program is now gated
+  without any in-deload suppression at all.
+- **The prior question is therefore answered: `ai_dynamic` is not *supposed* to write phase rows.**
+  It periodizes dynamically instead of from a fixed set, which is the point of the mode. **Do not
+  populate `program_phases` for it** — that was the trap the first version of this entry set up.
+- **What is actually open:** `ai_dynamic` has its own deload notion (`ai-dynamic.ts` carries an
+  elevated-temperature deload trigger), and the early-deload gate does not consult it. Whether it
+  should is the question. Worst case today is a redundant prompt, since every early deload needs
+  the owner's confirmation.
+- **Also worth a sweep, separately:** `program_phases.program_id` is dead — 0 of 46 populated — and
+  its presence is what made the bad query look answered. Dropping it is a migration and belongs to
+  whoever next touches that table, not here.
 
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
@@ -2277,6 +2322,20 @@ volume7dKg,                             // likewise
   both times, or state in the code why it cannot be passed. Which of the two is the defect is worth
   separating: (a) is plainly unintended, (b) may be deliberate — yesterday's intraday HR is available
   and simply is not fetched — but nothing says so.
+- **⚙ (a) SHIPPED 2026-09-25 (Lane A). (b) IS STILL OPEN — it is the half that needs a decision.**
+  Both call sites now take yesterday's window from one shared helper,
+  `strengthWindowEndingAt(sessions, dayMidMs)` in `activity-score.ts`, rather than computing it
+  twice. Verified against `main` first: `readiness-payload.ts:471` and `build-day-audit.ts:182`
+  both passed today's `sessions7d`/`volume7dKg`, exactly as the entry says, and `recentSessions`
+  already covers 28 days so the corrected window costs no extra query.
+  - **The same-day window was deliberately NOT touched.** It has no upper bound today; giving it one
+    would shift the same-day activity score, which is a change nobody asked for on a number the
+    owner reads daily. The helper is shared across the two *prev-day* sites — where the duplication
+    that caused this actually lives — and the same-day computation is left exactly as it was.
+  - **Keep:** part **(b)**, the weight-base mismatch. The prev-day call still passes no
+    `zoneMinutes`/`moveHours`/`strengthSessionToday`/`acwr`, so it remains on a 63-point base and
+    ~71% strength-weighted. The entry itself says this "may be deliberate", and deciding what the
+    contributor is meant to measure is not something to settle while fixing an off-by-one.
 - **What this does NOT establish.** (a) is reconstructed, not read from stored values: there is no
   persisted `prevDayActivity` sub-score to check it against, and the reconstruction carries the sd 8.8
   per-day error TN-76 describes, so the per-day figures above are indicative and the distribution is
@@ -3195,7 +3254,11 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   this in next."*
 - **Lane: A** — it needs a **migration** (see the blocker below), and migrations are Lane A's alone.
   The UI half is Lane B's and can follow; the engine half lands first per §3.
-- **Needs:** BF-193 — three policy choices the owner has to make, and two of them change the diff.
+- **Needs:** — nothing. BF-193's three policy choices were **answered by the owner on 2026-09-24** and are carried here so this entry is buildable without chasing a second one:
+  - **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are **deleted outright**, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
+  - **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
+  - **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: that would need a scheduled job and this repo has no cron layer.
+  BF-193 keeps the full reasoning behind each, as a `Reference:` entry.
   Filed separately so they reach the Orchestrator rather than sitting in this body.
 - **⚠ This carries a store-compliance claim, so understate rather than overstate it.** Apple requires
   an in-app account-deletion path for any app offering account creation, and **Google Play carries an
@@ -3301,7 +3364,7 @@ drift.
   **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are deleted outright, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
   **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
   **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: it would need a scheduled job and this repo has no cron layer.
-- **This entry is now DONE as a decision and hands its answers to `BF-192`**, which names it in `Needs:` because two of the three change its diff. Nothing here is buildable — `BF-192` builds it.
+- **Reference:** the three answers now live in `BF-192`, which builds them; this entry keeps the reasoning behind each so a later reader can see why each was chosen rather than only what was chosen. Nothing here is buildable and nothing is owed.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -3544,6 +3607,7 @@ drift.
 
 ### [activity] BF-191 — the walk-end fix shipped; three phantom rows are still in the history
 
+- **Ask:** owner — three phantom walk rows to soft-delete from the activity list by hand: `b8083d04` (09-24), `ea77ce16` (07-30), `a85568a4` (09-14). The code fix shipped; these three predate it and no migration should touch them.
 - **Lane: O** — what is left needs the owner's hand and a phone, not code. **Added:** 2026-09-24 ·
   BugFix intake. **Code shipped 2026-09-24 (Lane B)** together with BF-190: the elapsed seconds now
   travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and
@@ -4207,7 +4271,9 @@ drift.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
-- **Lane: B** (callers), Lane A for `lib/local-store/push-then-revalidate.ts` / `cache-groups.ts`.
+- **Lane: A** — was `B (callers)`, corrected 2026-09-25 once the caller half was done and the
+  remainder proved to need `lib/sqlite/cache.ts`. Nothing here is Lane B's any more; the lane field
+  is changed so the next B session does not re-derive that from scratch.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Counted from code; RV-186 counts them on the phone.
 - **Every launch and every resume sends 6 reminder-reconcile GETs** (`sync-provider.tsx:253-383`):
   meal-types, today's food logs, next-session, supplements, readiness-score and body-battery.
@@ -4299,7 +4365,10 @@ drift.
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
-- **Lane: B** — measure first (RV-186), then trim.
+- **Lane: B** — measure first, then trim.
+- **Needs: RV-186** — the entry's own bar is *"worth doing only if RV-186 shows script evaluation
+  matters at cold start"*, and RV-186 row 1 is what records it. That was prose, so this headed
+  Lane B's READY list while unstartable; it is a field now.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
 - **`next build` on `main` (e5a5b9e7), First Load JS:**
   - Home, Health, Nutrition and More: **457 kB** each.
@@ -4345,22 +4414,6 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   - `logExerciseWithId` (`adapter.ts:947`) and `logSets` (`:968`) write with no user parameter and
     have no callers. Delete them.
 
-### [app-shell] RV-178 — client-side gaps from the rules census: one card, two guards, three small fetches
-
-- **Lane: B**
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **CLEAN:** bottom action rows use floored safe-area utilities, and write callbacks carry the
-written entity.
-- **`components/home-day-timeline.tsx:251-252`:** a failure and an empty day both render nothing,
-  with no `onError`, so Home's timeline vanishes on a failed cold load.
-- **No in-flight guard:**
-  - `config-screen.tsx:309` `clonePhaseSet`: a double tap makes two copies, and it has no
-    try/catch.
-  - `ai-insight-card.tsx:93` Refresh: repeated taps spend the 10-per-hour AI limit.
-- **`React.memo` defeated by a render-body function passed by name:** `mood-checkin-sheet.tsx:394`
-  and `saved-meals-sheet.tsx:545`.
-- **Bare GETs with no seed:** `components/more/oura-section.tsx:89` (the "last synced" line is blank
-  until the network answers) and `app/profile/[userId]/page.tsx:26`.
-
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 
 - **Lane: O** — decide which to widen. Each is a small script change, and each one has a live
@@ -4384,6 +4437,12 @@ written entity.
 - **Doc drift:** CLAUDE.md's Cache Invalidation section says the fetch-once ratchet holds *"11
   across 9 files"*. The script now reports **23 across 18**, because RV-105 widened what it counts,
   and the "can-bite is EMPTY" claim has not been re-verified against the wider population.
+- **RV-178 confirmed the `memo()` check's blind spot, with two live instances (2026-09-25).**
+  `check-memo-stable-props.js` catches an inline arrow or object at the call site and **not a
+  render-body function passed by name** — `onToggle={toggleSoreMuscle}`. Both were real: the
+  children are `memo()`-wrapped and the handlers were re-created every render, so the memo was
+  doing nothing while the code read as optimised. Both are now `useCallback`, so widening the check
+  starts from two fewer.
 - **LB-148 cleared the biggest pocket this check cannot see (2026-09-25).** The three reminder
   modules held 8 of them — bare `todayInTz()` beside device-local `setHours`, in the code deciding
   when a notification fires — and are now clean, guarded by a scanner test local to them
