@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.46",
+    date: "2026-09-25",
+    changes: [
+      "Your readiness score has a \u201cyesterday\u2019s activity\u201d part, and on days you trained it was quietly counting that morning\u2019s session as part of yesterday. It now looks at the seven days ending yesterday, as the name says. Expect the score to move by about a point on some days and not at all on most \u2014 it is a correction, not a re-scoring, and nothing in your history is rewritten.",
+    ],
+  },
+  {
     version: "1.465.45",
     date: "2026-09-25",
     changes: [
