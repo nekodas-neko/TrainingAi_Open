@@ -50,3 +50,40 @@ alarm teaches everyone to ignore the alarm.
 
 `pnpm check:rules` — Ran 78 of 78. `check-backlog-pointers` — OK, 499 entries. Docs only; the route
 change itself is Lane A's and is not in this diff.
+
+
+## Amendment — four owner answers, three of which rejected the question
+
+Put four decisions to him in one sitting. **Three came back as product direction rather than a pick
+from the options offered**, which is the more useful outcome and worth recording as a pattern: the
+options were built from what the entries asked, and the entries were asking narrowly.
+
+**`RV-164` (calorie target) — not declined, NOT TRUSTED.** It asked whether he meant to apply the
+09-14 recommendation of 1,618 kcal against the 1,660 still budgeted, offering *declined* or
+*slipped*. Both wrong: **"I didnt accept cause I wasnt sure if its been calibrated correctly yet."**
+So the blocker is confidence in the recommender, and applying either number fixes nothing — he would
+decline the next one identically. Filed as **`OR-169`**, Tuning's, because what is missing is a
+derivation he can audit.
+
+**`RV-166` (walks vs runs) — he rejected the frame.** Three ways to link a walk to a prescribed *run*
+were offered; he answered **"Maybe we need it to be prescribed heart health activity and
+run/walk/other activity counts."** That is a rename plus a widening, not a linking fix. Filed as
+**`OR-170`** with `Gate: owner`, because it changes a screen he uses and owes a mockup. The
+production data supports him: 26 prescribed runs, 0 completed, 17 pending days already carrying a
+walk — the prescription and the behaviour have been different things for the feature's whole life.
+
+**`Q-72` (sleep ratings) — he redesigned the prompt.** The recommendation was to retire the
+validation, since 35 of 36 mornings sat on the neutral 3. He answered: **"Sleep is hard to rate. Its
+mostly normal. Maybe instead it auto sets it as normal; but if score is high or low it asks was it a
+good or bad sleep?"** Better than the option offered, and the reason is that a daily prompt collects
+35 neutral answers at the cost of 36 interactions, while an outlier-triggered one collects a rating
+exactly where the app's number and his experience might disagree — fewer prompts AND more signal.
+Filed as **`OR-171`**; the retire-it recommendation is superseded and the entry says so.
+
+**`RV-161` item 1 — approved as offered:** run `rederive-baselines`, dry-run first. A recompute from
+stored inputs, which is the class he already approved under `RV-170`.
+
+**The pattern, which is the thing to carry forward:** an entry that has framed its question narrowly
+produces options that are all slightly wrong, and a good answer then arrives as a rejection of the
+frame. Three of four here. When the owner's reply reads as "maybe we need X instead", that is the
+entry's framing failing, not an evasion — file the reframe rather than re-asking the original.

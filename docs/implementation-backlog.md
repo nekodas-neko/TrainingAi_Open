@@ -478,6 +478,68 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [nutrition] OR-169 — the calorie recommendation was not declined; it was not TRUSTED
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `RV-164`.
+- **`RV-164` asked the wrong question and got a better answer.** It asked whether he meant to apply
+  the 09-14 recommendation of **1,618 kcal** (the app still budgets **1,660**). Both offered readings
+  — *he declined it* or *it slipped* — were wrong. His words: **"I didnt accept cause I wasnt sure if
+  its been calibrated correctly yet."**
+- **So the blocker is confidence in the recommender, not the number.** Applying 1,618 would not fix
+  it and neither would re-recommending: he would decline the next one for the same reason. **Any
+  entry that treats this as a value to set is solving the wrong problem.**
+- **What would actually unblock it:** show how the recommendation was derived and what evidence backs
+  it — which inputs, over what window, and what it predicted last time against what happened. A
+  number he can audit is a number he can accept.
+- **This is Tuning's, not an implementer's.** It is a calibration-validation question, and CLAUDE.md
+  is explicit that a proposal must state **how many other days the change moves**. That figure is
+  exactly the missing reassurance here.
+- **Not established:** how the target is currently derived, and whether any back-test of it exists.
+  Neither was checked when this was filed — do that before proposing anything.
+
+### [cardio][activity] OR-170 — he wants "prescribed heart-health activity", not "prescribed run"
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `RV-166`.
+- **Gate: owner** — the mockup is owed before this is built, per the large-UI-change rule.
+- **`RV-166` offered three ways to link a walk to a prescribed RUN. He rejected the frame:**
+  **"Maybe we need it to be prescribed heart health activity and run/walk/other activity counts."**
+- **That is a rename plus a widening, not a linking fix.** The prescription becomes a *heart-health
+  activity* and any qualifying activity — run, walk, treadmill, other — completes it. It changes what
+  the plan is called, what the card says, and what counts, so it is an information-architecture
+  change to a screen he uses, not a bug fix.
+- **Why it is probably right:** production has **26 prescribed runs, 0 completed**, while 17 of the
+  pending days already carry a walk or treadmill session. The data says the prescription and the
+  behaviour have been different things for the life of the feature, and the app has been silently
+  scoring him against the wrong one.
+- **What has to be settled before anything is built** — and the mockup should answer all three:
+  **(a)** does every activity count equally, or does intensity/duration qualify it?
+  **(b)** does the history show *what was actually done* (a walk) rather than "run: complete"?
+  **(c)** what happens to the 20 past days — backfill under the recompute policy, or leave them?
+- **`RV-166` stays for the mechanical half** (`linkPrescribedRun` only fires on `activityType ===
+  'run'`), which is real regardless of the rename. Do not build it until this entry resolves, or it
+  will be built twice.
+
+### [sleep] OR-171 — ask for a sleep rating only when the score is surprising
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `Q-72` (`RV-161` item 2).
+- **The problem, measured:** no sleep rating since **2026-08-17**, and **35 of the last 36 mornings**
+  sat on the neutral 3. The rank re-validation that depends on those ratings has no signal.
+- **He diagnosed it rather than answering it:** **"Sleep is hard to rate. Its mostly normal. Maybe
+  instead it auto sets it as normal; but if score is high or low it asks was it a good or bad
+  sleep?"**
+- **That is a better design than either option offered, and the reason is worth keeping.** Asking
+  every morning collects 35 neutral 3s — data that cost him 36 interactions and carries almost no
+  information. Asking **only when the computed score is an outlier** collects a rating exactly where
+  it is diagnostic: the days where the app's number and his experience might disagree. **Fewer
+  prompts and more signal, not a trade between them.**
+- **The unanswered design question, which is the whole of it:** what counts as high or low enough to
+  ask? Too wide and it is the daily prompt again; too narrow and the validation starves as it has.
+  **Derive the threshold from the existing score distribution** rather than picking one — the data to
+  do that is already stored.
+- **Do not retire the rank re-validation** (`RV-161` item 2's recommendation, now superseded). It was
+  recommended on the belief that the ratings were not coming; they are not coming *from the current
+  prompt*, which is a different finding with a different fix.
+
 ### [platform] OR-168 — nothing confirms a Railway deploy landed; notify when it does not
 
 - **Lane: A** — `app/api/version/route.ts` plus a workflow step. **Added:** 2026-09-25 · Orchestrator,
