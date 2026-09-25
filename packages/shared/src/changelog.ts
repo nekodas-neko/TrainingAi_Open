@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.39",
+    date: "2026-09-25",
+    changes: [
+      "The two workout time figures now say which time they mean. The estimate on the prescription card is working time \u2014 it already excludes your warm-up \u2014 so on a 60-minute session it reads about 51, which is a full session rather than one nine minutes short. It now says \"of work\". The figure on the finished-workout screen is the whole session including the warm-up, and its tile now says \"Total time\". Both numbers were always right; neither said what it was counting, and side by side they looked like one was short.",
+    ],
+  },
+  {
     version: "1.465.38",
     date: "2026-09-24",
     changes: [
