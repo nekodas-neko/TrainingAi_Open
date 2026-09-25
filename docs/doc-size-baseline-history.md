@@ -17609,3 +17609,22 @@ Three lines, for the two things a later reader would otherwise redo: the entry a
 be moved above the `try` and there is no haptic in that file (none was added — new device behaviour
 on a daily surface, unverifiable here), and the in-flight guard is deliberately NOT released with
 the paint, since moving the writes off the await path would otherwise re-open the double-tap window.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31390 → 31408 (RV-169)
+
+RV-169 re-measured against production and rewritten. The lines are corrections, not additions: the
+entry's span was **too small** (it said 09-01 → 09-16; the table begins 2026-08-24 and every day to
+09-16 is affected — 24 days, 253 of 774 buckets at 32.7%, not "about a fifth"), and its lane and
+gate were both wrong in my first draft of this rewrite.
+
+I wrote `Gate: owner` on the reasoning that a wide recompute rewrites 24 days of health numbers.
+That gate does not exist: **RV-170's policy was answered on 2026-09-24 — recompute-from-stored-inputs
+YES, repeatable at will** — so the pass is already authorised, and RV-170 routes such recomputes to
+the device agent. The entry is `Lane: DV`, and the mechanism already exists
+(`POST /api/oura-ble/samples/redecode`, admin-gated, `fullHistory: true`), so there is nothing to
+build. The entry says outright that I read that route rather than ran it, and names confirming it
+rewrites the stress buckets as the one open question.
+
+The entry also carries a **do-not** that is the point of filing it: widening the recompute to 21
+days on every pass would reintroduce exactly the per-ingest growth RV-182 was opened to remove,
+behind every ring drain.
