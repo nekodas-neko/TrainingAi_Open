@@ -4239,11 +4239,50 @@ drift.
   you to log it** until the next pull.
   An empty meal-type table falls through to the API (an unhydrated store, not a user with no meals);
   zero food logs deliberately does NOT, because that is the case the reminder exists for.
-- **Still open:** the three fetches duplicating Home's, `next-session`, and the Lane A halves
-  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
+- **⚠ THE REMAINING FETCH HALF IS LANE A's, NOT LANE B's — established 2026-09-25 (LB-149's
+  sibling read), and this entry said the opposite.** All four remaining reads
+  (`next-session`, `readiness-score`, `body-battery`, plus the warm list's own) are
+  **`cachedFetchToday`**, and plain `cachedFetch*` ALWAYS revalidates, so each resume spends a GET
+  on an entry that is already fresh. The one-line fix is `freshWithinTtl` — **and
+  `cachedFetchToday` passes `undefined` for it** (`lib/sqlite/cache.ts:604`, the 7th positional
+  arg), so the flag is unreachable from every today-envelope key. Exposing it is a one-line change
+  in Lane A's file and composes correctly: the today-check lives in the unwrap, the TTL check in
+  `isFreshWithinTtl`.
+  **The two Lane-B-only shapes were both examined and both are wrong.** `getCached()` respects the
+  TTL but returns the raw `{date, data}` envelope, and neither `unwrapToday` nor `TodayEnvelope` is
+  exported — so three call sites would hand-roll a date comparison that is **itself defective**
+  (LB-150). `readTodayCacheSync()` keeps the unwrap in one place but is not TTL-aware, so a
+  health-alert reconcile would act on a reading up to a Brisbane day old. **Do not hand-roll it at
+  the call sites to keep the item in Lane B.**
+- **Still open:** the four `cachedFetchToday` reads above (blocked on the Lane A enabler), and the
+  other Lane A halves (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
 - **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
   Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
   across the 3 modules now take the user's zone.
+
+### [platform][app-shell] LB-150 — the "today" cache envelope rolls over at Brisbane midnight for every user
+
+- **Lane: A** — `lib/sqlite/cache.ts` (Lane B found it; the letter records the finder, the lane the builder).
+- **Added:** 2026-09-25 · found reading `cachedFetchToday` while working RV-183's remaining half.
+- **`unwrapToday` compares `envelope.date !== todayInTz()`** (`cache.ts:546`) and the writer stamps
+  `todayInTz()` (`:603`) — **both the bare Brisbane default**. They agree with each other, which is
+  why this is invisible in every test and to the owner, and why the sync-provider's recent
+  writer/reader fix (which corrected a genuine *disagreement*) did not touch it.
+- **What it costs a user outside Brisbane.** The envelope exists to stop yesterday's data painting
+  as today's. It rolls at **Brisbane** midnight, while every server route computes "today" in the
+  **user's** zone. Between the user's midnight and Brisbane's, a cached reading from the user's
+  previous day still satisfies the guard and is served as current — 14 hours a day in New York, the
+  same window Q-478 measured for the guards commented directly below this one.
+- **The comment two lines under it already states this rule** for `isBodyMetadataFresh` and
+  `isWorkoutDataToday` — *"Omit it and the comparison silently becomes 'is the server's date equal
+  to Brisbane's date'"*. `unwrapToday` is the one that does not take a `tz` at all.
+- **Population:** ~10 keys write the envelope (`readiness-score`, `body-battery`, `next-session`,
+  `supplements`, `weekly-stats-rt`, `cardio-week`, `oura-stats`, `running-plan`,
+  `health-trends-summary`) and ~14 read it via `readTodayCacheSync`, adding `training-load`,
+  `training-stress`, `progress-summary` and `weekly-stats`.
+- **Both sides must change together.** Stamping in the user's zone while reading in Brisbane (or
+  the reverse) is strictly worse than the current self-consistent state — it makes the entry
+  unreadable the moment it lands, which is the failure the sync-provider fix was written to undo.
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 

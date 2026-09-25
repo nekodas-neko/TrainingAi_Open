@@ -1,18 +1,18 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-150 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-151 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148. LB-141, LB-149 filed.
+RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148. LB-141, LB-149, LB-150 filed; RV-183's remaining fetch half proved Lane A's.
 
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; sweeps
 reorder the head daily. **The owner's stated top priority is tab/page switch speed**, so `DV-12`
-heads the lane once the phone is available. Otherwise RV-183 (its Lane A halves remain),
-RV-185, RV-178, RV-122.
+heads the lane once the phone is available. Otherwise RV-185, RV-178, RV-122 —
+RV-183 is now Lane A's the whole way down.
 **A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate: device`) headed READY while unstartable. The field must LEAD its own bullet; inline after `Lane:` parses as nothing.
 **RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
