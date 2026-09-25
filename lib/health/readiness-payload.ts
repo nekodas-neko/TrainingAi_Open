@@ -720,6 +720,16 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       readinessContributors: ownComposite.contributors,
       readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
       modelVersions: { readiness: READINESS_MODEL_VERSION },
+      // TN-64(a): the OTHER half of the early-deload gate. The score has always been stored and
+      // the ACWR never was, so "the gate never opened" could not be told apart from "the gate was
+      // never reached" — and no change to that condition can be validated until both halves are on
+      // the record. Written from the same computed value the gate reads, on the same row and the
+      // same day key, so the two can never disagree about what today's inputs were.
+      //
+      // Rides this persist rather than getting its own: it is a readiness-read-path value, and
+      // `mergeDerivedPersists` collapses same-day entries into one statement — a second push here
+      // would be a second pillar name for one number nobody computes separately.
+      acwr,
     } })
   }
 

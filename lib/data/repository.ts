@@ -1484,6 +1484,8 @@ export interface OuraDailyDerivedRow {
   activeCaloriesEst: number | null
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
+  /** TN-64: acute:chronic workload ratio, the half of the early-deload gate nothing recorded. */
+  acwr: number | null
   // Q-270. NULL = the training-stress route never ran for this day; 'ok' = it scored; anything
   // else is the gate that refused. `string | null` matches its siblings (`illnessFlag`,
   // `readinessSource`) rather than importing the health package's union into the data layer.
