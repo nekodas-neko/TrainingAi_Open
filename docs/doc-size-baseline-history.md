@@ -17115,3 +17115,68 @@ so the obvious verification (`perf.js longtasks`) will show no improvement; with
 so, the next reader measures it, sees nothing, and records a working fix as a failed one. The 68–118
 ms long task under it is DV-12, still open. A row that only said "not verified on device" would have
 cost more than the lines it saved.
+
+
+## 2026-09-24 — `projectOverview.md` → 12796 (BF-195)
+
+Twenty-five lines for the owner's own report, and three of them are the reason it cannot be struck.
+
+The fix is one sentence: connectivity was a boolean, the fetch had no timeout, so a request on a
+dying connection never settled and the screen held its skeleton. What needs the space is the list of
+what is still owed — the device look (and that the honest reproduction is throttling, **not** airplane
+mode, which exercises the path that already worked), the banner copy that still over-promises on a
+screen with nothing saved, and that the 8 s figure is a starting value nobody has measured.
+
+The separately-observed month-stale sleep card is recorded as NOT diagnosed, with the reason: a
+screenshot cannot tell a stale cache entry from the card's own fallback. Writing it as part of BF-195
+would send the next session to fix the wrong thing.
+
+## 2026-09-24 — projectOverview.md 12796 → 12807 (BF-195 correction)
+
++11 lines on the BF-195 Known-Issues row, recording that the **first** version of that fix — an
+`AbortSignal.timeout` that cancelled the request — was wrong, and why. It is kept rather than
+quietly overwritten because the row's own caveat predicted the wrong failure: it said *"a finding
+about the number is not a finding about the approach"*, and the defect was the approach. A future
+session reaching for a cancelling timeout on a slow connection should find the reason it was
+already tried and reverted, not just the current code.
+
+## 2026-09-25 — `projectOverview.md` → 12821 (BF-195 merge recompute)
+
+Not a deliberate raise: two branches added Known-Issues rows to the same document in parallel, so the
+`.size` conflicted on a single number. Recomputed with `--fix` on the merged file rather than taking
+either side — picking one would have encoded a count that matches neither branch's reality, and the
+check would then fail on `main` for whoever merged second.
+
+## 2026-09-24 — `docs/implementation-backlog.md` 30487 → 30520 (TN-70 verification)
+
+Thirty-three lines on TN-70, and the reason they are worth it is that most of them stop work rather
+than describe it.
+
+The entry asked for a rollup re-run. The verification narrowed that to a single stored index and
+showed why it dominates (a `.pt`-faithful broadcast makes sleep recovery ~14× the other recovery
+term), which turns an open-ended re-run into a specific question about one input. It also records
+that the level-5 run carries the series' *worst* stress and restorative time — the fact that makes
+the regime look like an error rather than a change.
+
+The largest block is a trap. Three contributors are gated inconsistently on `provisional`, and the
+doc comment appeared to confirm the odd one out was a bug. It is not: recoveryIndex is flagged
+provisional on every day by design, so "fixing" the asymmetry would disable the contributor
+permanently. Writing that down is cheaper than the next session rediscovering it by shipping it.
+
+## 2026-09-24 — `projectOverview.md` → 12793 (RV-165)
+
+Twenty-two lines, and the sentence that earns most of them is "expect the displayed number to DROP
+about a point."
+
+This changes a figure the owner reads daily. A row that said only "calibration fixed" would leave him
+to notice a one-point fall in his body fat and wonder which of the two numbers to believe. So the row
+states the direction, the size, and that it is the correction rather than a new fault.
+
+The rest is the split that keeps the entry open: the LIVE value is fixed because it is derived at
+read time, and the STORED rows still hold 160 cm composition — that is RV-170 and the owner's call.
+Without both halves written down, "fixed" reads as though the history was repaired too.
+
+The last paragraph says the +2.3 rests on a single DEXA pair. The calibration's own comment already
+warns that n = 1 supports an offset and not a ratio; repeating it here stops the new number being
+read as more authoritative than the old one. What improved is that the pair is compared like for
+like, not that the offset is now known to be right.

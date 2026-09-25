@@ -1672,6 +1672,39 @@ which is the right shape for something that can only be validated by living with
   only mean "what the vendor model yields on sound inputs".
 - **Where the mechanism is:** `lib/health/stress-resilience.ts` (the port, `confidence` at 310, the
   coverage gate at 144), `lib/oura-ble/rollup/run.ts:1179` (the write and its Q-510 comment).
+- **⚙ VERIFIED against `main` + production 2026-09-24 (Lane A), and NARROWED.** The entry's two-regime
+  table reproduces exactly (16 days / levels `{5}` / conf 0.464; 14 days / levels `{1,2,3,4}` / conf
+  0.434), and its ⚠ about `daytime_stress_coverage_min` is confirmed — 0 rows early against 14 late is
+  precisely the column's age. Do not re-derive either.
+  - **The switch is carried by ONE stored index: `resilience_daily_sleep_recovery`**, ~10–56 in July
+    against 0–17.6 (mostly exactly **0**) from September. A stored 0.0 means `polyval` went negative
+    and hit the clamp, so those days are saturated at the floor rather than measured.
+  - **Why that one index dominates.** `runStressResilience` builds its two recovery terms
+    differently (`stress-resilience.ts:303-306`, replicating a documented `.pt` broadcast):
+    restorative time is a weighted **mean**, sleep recovery is a **sum** that works out to
+    ≈ `windowLength × mean(sleeprec)` — ~14×, independent of valid-day count. July's window mean of
+    ~36 becomes ~511 where September's ~3 becomes ~42, which swamps stress and restorative time and
+    pins the label at the top band. **This is the mechanism of the switch, not a claim the ×14 is
+    wrong** — it is commented as faithful to the `.pt`.
+  - **It explains the shape the entry found odd:** the level-5 run carries the series' *highest*
+    stress (71–82) and *lowest* restorative time (15–26). The top band went to the worst-looking days
+    because the sleep-recovery term outweighed both.
+  - **Three of the four inputs behind it fell together** — sleepScore ~90→~48, hrvBalance ~80→~10,
+    RHR ~70→~25 — while recoveryIndex moved the *other* way (~20→~40). A whole-composite decline
+    makes a single upstream producer fault (the PS-30 hypothesis) less likely than the entry assumes.
+  - **⚠ TRAP, and it would have broken the model.** `recoveryIndex.provisional` is `true` on all 23
+    days, and `run.ts:1166-1168` gates its two neighbours on `provisional` but gates recoveryIndex on
+    `recoveryIndexHours != null`. That reads as a missed check, and the doc comment then at
+    `stress-resilience.ts:345` said `provisional/null → today contributes no index`, appearing to
+    confirm it. **Both were wrong.** `score-audit/readiness.ts:158` states recoveryIndex is
+    *"Approximation — always flagged provisional"* — for this contributor the flag is a permanent
+    property of the method, not the learning-period meaning its neighbours carry. Gating it on
+    `provisional` would null it on every day forever. The **comment** was the defect and is corrected
+    in this PR; `run.ts` is right as written.
+  - **The decisive re-run is still NOT done, deliberately.** Re-running the rollup against production
+    would rewrite `oura_daily_derived` rows — a production write, which is the owner's call rather
+    than Lane A's. The non-destructive form is a local run against an injected `io` (`runOuraRollup`
+    takes one); that is the next step and is what remains of this entry.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -2985,75 +3018,54 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [platform][app-shell] BF-195 — the app handles OFFLINE and hangs on BARELY ONLINE, which is the state a gym is in
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). Owner: *"I went to an area with
-  low reception and nothing really worked on the app. It should still have most functionality."*
-- **Lane: A** — `lib/sqlite/cache.ts` is the fetch layer every screen reads through. The surface
-  symptoms are Lane B's, but one change upstream fixes all of them and three separate UI patches
-  would not.
-- **⚑ THE DEFECT IS THAT CONNECTIVITY IS MODELLED AS A BOOLEAN.** `useOnlineStatus`
-  (`lib/use-online-status.ts`) is `navigator.onLine` plus Capacitor's
-  `Network.addListener('networkStatusChange', s => s.connected)`. **Both report TRUE whenever the
-  radio is attached**, regardless of whether anything completes. Low reception is not offline — it
-  is *online with no throughput*, and the app has no state for it.
-- **⚑ MEASURED — there is NO fetch timeout anywhere in the client data layer.** Grepped
-  `lib/sqlite/`, `lib/hooks/` and `lib/local-store/` for `AbortController` and
-  `AbortSignal.timeout`: **zero matches**. So a request issued on a dying connection hangs until the
-  OS gives up, and **there is no path from "hanging" to any rendered state** — not to the cached
-  value, not to an error card, not to an empty state.
-- **The chain, end to end, and each link is in the code rather than inferred:**
-  1. Reception drops but the radio stays attached → `online === true`, so the offline branch of
-     `cachedFetchCore` (which explicitly paints saved data — `cache.ts:286`, *"Offline with saved
-     data is the sanctioned offline-first case"*) **never runs**.
-  2. The fetch is issued with no timeout and does not settle.
-  3. `refreshing` stays `true` forever. `session-select-content.tsx:1036` —
-     `showHomeSkeleton = refreshing && activeSessions.length === 0 && recommendation === null &&
-     readiness === null` — so the Workout tab holds its skeleton indefinitely.
-  4. **The in-flight map compounds it:** a second caller for the same key joins the hanging
-     request's waiter list rather than firing its own, so one stuck request can hold several
-     screens at once.
-- **⚑ The owner's screenshots show three distinct behaviours, and the split is the evidence:**
+- **Branch:** `lane-a/bf195-low-reception` · **Added:** 2026-09-24 (BugFix intake). Owner: *"I went to
+  an area with low reception and nothing really worked on the app. It should still have most
+  functionality."* **Engine half shipped 2026-09-24 (Lane A); see Keep.**
+- **Lane: A** — `lib/sqlite/cache.ts` is the fetch layer every screen reads through.
+- **⚑ THE DEFECT IS THAT CONNECTIVITY IS MODELLED AS A BOOLEAN.** `useOnlineStatus` is
+  `navigator.onLine` plus Capacitor's `networkStatusChange`. **Both report TRUE whenever the radio is
+  attached**, regardless of whether anything completes. Low reception is not offline — it is *online
+  with no throughput*, and the app had no state for it.
+- **✅ SHIPPED — the fetch has a timeout, so hanging collapses into the failure path that already
+  existed.** `AbortSignal.timeout(8000)` at `lib/sqlite/cache.ts`'s single `fetch`. It makes the
+  request **throw**, which lands in `cachedFetchCore`'s existing catch: machinery that already keeps
+  the cached value and reports through `onError`/`onRevalidateError`. One call site, every screen.
+  8 s is a starting value, not tuned.
+- **✅ SHIPPED — `online` now means "requests are completing", not "the radio is attached."** A
+  module-level reachability flag in `cache.ts` (`requestsCompleting()` /
+  `subscribeToReachability()`), flipped false by a timeout and true by any settled response.
+  `useOnlineStatus` ANDs it with the radio state.
+  - **A rejected response still counts as reachable.** A 500 proves the connection carried a request
+    and brought an answer back, which is the question the flag asks. Requiring `ok` would strand the
+    app "offline" behind a server error on a good connection.
+  - **An ordinary network throw deliberately does NOT flip it** (DNS, refused, server down). That is
+    a different failure, already handled, and calling it "no reception" would put an Offline banner
+    in front of a working connection. `AbortSignal.timeout` rejects with a `TimeoutError`, which is
+    what separates the two.
+- **⚠ WHAT ACTUALLY HELD THE SKELETON — corrected here, because the entry's chain implies an error
+  callback was missing and it was not.** `session-select-content.tsx` clears `refreshing` in a
+  **`finally`**. It never ran because the promise never settled. **Settling is the fix**; the test
+  asserts that rather than asserting a callback fired. A timeout with nothing cached therefore
+  produces the *empty state*, not an error card — correct, and it is what "treat a timed-out fetch as
+  offline for display purposes" means in practice.
+- **Keep — three things, none of them engine:**
+  1. **The device look, and it is the only real verification.** The honest reproduction is **network
+     throttling, not airplane mode** — airplane mode exercises the path that already worked. Confirm
+     the session list renders from cache within the timeout, the banner appears only when requests
+     are actually failing, and no screen holds a skeleton. **None of this reproduces in the sandbox.**
+  2. **The banner copy is still a false promise on a seedless screen (Lane B).**
+     `components/shell/offline-indicator.tsx` says *"Offline — showing saved data"*. The engine now
+     makes the banner appear at the right *times*; it cannot make that sentence true on a screen that
+     has nothing saved. That string is Lane B's to fix.
+  3. **Whether 8 s is right.** A finding about the number is not a finding about the approach.
+- **⚠ Separately observed, NOT diagnosed and NOT addressed here: the sleep card read
+  "Last: 2026-08-25"** — a month stale. `sleep-sessions` IS warmed at every app open, so a month-old
+  payload is anomalous. A screenshot cannot distinguish a stale cache entry from the card's own
+  fallback. Read the device's cache entry before treating this as part of BF-195.
+- **⚠ Do NOT fix the remaining blank screens by seeding them.** A seed is a first-paint accelerator;
+  adding seeds to the three blank surfaces would paper over the hang for those three and leave the
+  next screen to rediscover it. The timeout is the one that generalises.
 
-  | surface | what it did | why |
-  |---|---|---|
-  | Health → **Body** | **worked** — RHR 55, HRV 54, SpO₂ 93.5, −0.6 kg/wk | painted from `readCacheSync` seeds; never waits on the fetch |
-  | Health → Training, **AI Periodization** / muscle volume | empty skeletons | gated on a fetch that never settles |
-  | **Workout** tab | blank card, no sessions | seed empty *and* `refreshing` stuck — cannot start a workout at all |
-  | Training **calendar**, September | zero days marked | `calendar-data:` seed absent or empty |
-  | Progress → **Trends** | empty | same |
-
-  **The Body tab working is the important half of this table.** It proves the offline-first
-  architecture is sound where it was applied, and that what fails is the layer above it.
-- **⚠ THE BANNER IS CURRENTLY A FALSE PROMISE.** *"Offline — showing saved data"* was on screen
-  while the surfaces behind it showed nothing. Whatever else is done, that string must not claim
-  saved data is being shown on a screen that is showing none.
-- **⚑ THE PRODUCT CONSEQUENCE, stated plainly: a gym is the canonical low-reception location for
-  this app.** The one screen that must work on bad signal is the session list, and it is the one
-  that renders nothing. Everything else here is secondary to that.
-- **Fix: give the fetch a timeout, so "hanging" collapses into the failure path that already
-  exists.** `cachedFetchCore` already handles a failed revalidation correctly — it keeps the cached
-  value and reports through `onRevalidateError`. A timeout converts the unhandled state into the
-  handled one, at one call site, for every screen. **Suggested 8 s, not tuned** — long enough that a
-  slow-but-working connection still succeeds, short enough that a lifter is not staring at a
-  skeleton. If it reads wrong in use that is a finding about the number, not about the approach.
-- **Second half: treat a timed-out fetch as offline for display purposes.** `online` should mean
-  *"requests are completing"*, not *"the radio is attached"* — otherwise the banner keeps lying and
-  the offline branch keeps not running. One flag, derived from the timeout, not a new subsystem.
-- **⚠ Do NOT fix this by seeding more screens.** A seed is a first-paint accelerator; adding seeds
-  to the three blank surfaces would paper over the hang for those three and leave the next screen
-  to rediscover it. The timeout is the one that generalises.
-- **⚠ Separately observed, NOT diagnosed: the sleep card read "Last: 2026-08-25"** — a month stale,
-  on a day when production holds sleep through 2026-09-24. `sleep-sessions` IS warmed at every app
-  open by the sync provider (`sync-provider.tsx:78`, `TTL_MEDIUM`), so a month-old payload is
-  anomalous. **A screenshot cannot distinguish a stale cache entry from the card's own fallback, and
-  guessing between them is how the wrong thing gets fixed.** Read the device's cache entry before
-  treating this as part of BF-195 — it may be its own defect.
-- **Verification:** the honest reproduction is **network throttling, not airplane mode** — airplane
-  mode exercises the path that already works. On the device, set the WebView/proxy to a very slow or
-  lossy profile, or stand where the owner was, and confirm: the session list renders from cache
-  within the timeout, the banner appears only when requests are actually failing, and no screen
-  holds a skeleton indefinitely. **Device look owed** — none of this reproduces in the sandbox,
-  where the network is fast and `getLocalStore` returns null.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the single fix site is `lib/sqlite/cache.ts:351` (`fetch(url, { cache: 'no-store' })`). No `AbortController` or `AbortSignal.timeout` exists anywhere in `lib/sqlite`, `lib/hooks` or `lib/local-store`.
 
 ### [platform][app-shell] BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws
 
@@ -3859,27 +3871,51 @@ drift.
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
-- **Lane: A** — `lib/scale-ble/composition.ts`, `packages/shared/src/health/body-fat-calibration.ts`.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **The step:** body fat goes from **25.2 to 26.3 overnight on 08-30 → 09-01** at +0.25 kg; BMR
-  drops 10 and metabolic age goes from 38 to 39.
-- **The cause:** composition is computed once, at ingest, from the profile of that moment
-  (`scale-ble/samples/route.ts:97`, the pending confirm route `:36`, and
-  `computeBodyComposition` at `composition.ts:118-161`). Solving the formula from the stored outputs,
-  the 08-30 reading reproduces **only at h=160.1**, and 09-01 fits **h≈157.3–157.9**. The BF-78
-  journal records the height being corrected from 160 to 158 to match the DEXA printout.
-- **Why it matters:** the calibration is derived live from `dexa_scans` × the same-day stored scale
-  value (`body-fat-calibration.ts:68`). The 08-27 pair is DEXA 28.5 against a stored 25.3 computed at
-  160 cm, giving an offset of **+3.2**. At 158 cm that weigh-in reads 26.26, which gives **+2.2**.
-  So every corrected body-fat value since 09-01 reads about **1 point high** (28.6 against ~27.6),
-  lean mass about 0.7 kg low, and RMR/Cunningham moves by ~15 kcal/day. The trend also shows a false
-  +1.1 jump.
-- **Fix shape:**
-  - Store what composition needs from the raw sample, and re-derive when height, date of birth or
-    sex changes.
-  - At the least, recompute the calibration pair at the current profile.
-- **Rewriting the stored rows is a history edit (RV-170).** Fixing the live offset is not: it is
-  derived at read time.
+- **Branch:** `lane-a/rv165-height-calibration` · **Added:** 2026-09-24 · Review sweep 57.
+  **Live half shipped 2026-09-24 (Lane A); the history edit is NOT done and is not this entry's.**
+- **Lane: A** — `lib/scale-ble/composition.ts`, `lib/data/postgres/adapter.ts`.
+- **The step:** body fat goes from **25.2 to 26.3 overnight on 08-30 → 09-01** at +0.25 kg; BMR drops
+  10 and metabolic age goes from 38 to 39.
+- **The cause:** composition is computed once, at ingest, from the profile of that moment. The
+  calibration is then derived **live** from `dexa_scans` × the same-day stored scale value, so the
+  08-27 pair — a 160 cm number — set an offset of **+3.2** where the corrected reading gives
+  **+2.3**. Every body-fat value shown since read about a point high.
+- **⛔ THE FIRST FIX SHAPE IS UNNECESSARY AND IS RETIRED.** The entry proposed *"store what
+  composition needs from the raw sample"* — a migration, and one that could not recover history
+  anyway. **Nothing extra needs storing.** Two properties of the formula make the original inputs
+  recoverable from columns already written:
+  1. **`bmr_kcal` is Mifflin-St Jeor** — `10w + 6.25h − 5a + sexTerm` — with **no impedance term**
+     and linear in height, so the height used at ingest falls straight out of it.
+  2. **Impedance enters the model through `bodyFatPct` alone**; every other output is a function of
+     body fat, weight, height, age and sex. So once the height is known, the impedance follows.
+- **✅ Verified against production, not derived on paper.** 08-27 and 09-01 carry the **same weight
+  (71.7 kg)** and BMRs of **1557 and 1545**. The 12 kcal gap is 12/6.25 = **1.92 cm**, and solving
+  each gives exactly **160** and **158** at age 33 — the documented correction, recovered from the
+  table alone. The 08-27 impedance comes back at **~494 Ω**, inside the file's own 300–1200 Ω band,
+  and re-deriving at 158 cm gives **26.2**.
+- **✅ SHIPPED:** `heightUsedForStoredBmr` and `recomputeStoredBodyFatPctAtHeight`
+  (`lib/scale-ble/composition.ts`, beside the formula they invert — only the INVERSE lives there, the
+  forward half calls `computeBodyComposition` so the two cannot drift), and
+  `getBodyFatCalibration` restates each reading at the **current** profile before pairing, using the
+  age **at the reading** rather than today's.
+- **⚠ A reading that cannot be re-derived is KEPT AS STORED, not dropped — and the first version got
+  this wrong.** Dropping looks cautious and is not: without a BMR there is no evidence the reading is
+  stale, only an inability to check, and discarding it left **zero pairs** for any fixture lacking
+  one, so the calibration returned null and **no correction was applied at all**.
+  `body-fat-correction-consumers.test.ts` caught it. Keeping the stored value is exactly today's
+  behaviour, so this can substitute a better value but can never produce a worse calibration.
+- **⚠ The guards overlap, which makes them easy to test wrongly.** An absurd body-fat value usually
+  implies a NEGATIVE impedance index, caught before the plausibility band is ever reached — so a
+  carelessly chosen fixture passes with the guard it is meant to pin deleted. The three refusal cases
+  are each computed to clear the earlier guards and stop at their own; two of them exist only because
+  the mutation pass showed the first attempt did not.
+- **Keep — the stored rows, and they are NOT this entry's to rewrite.** Every `body_metrics` row
+  before the correction still holds 160 cm composition. Restating them is a history edit (**RV-170**)
+  and the owner's call. This entry fixes only what is derived at read time.
+- **Not measured:** whether **+2.3** is right in any absolute sense. It is one DEXA pair, and
+  `deriveBodyFatCalibration`'s own comment is explicit that n = 1 supports an offset and not a ratio.
+  What changed is that the pair is now compared like for like.
+
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
 

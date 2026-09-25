@@ -6,10 +6,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.40",
+    version: "1.465.42",
     date: "2026-09-25",
     changes: [
       "Supplement reminders are now worked out from what is on your phone rather than from what has reached the server. If you added or stopped a supplement while offline, the reminder could be wrong until the next sync \u2014 it now matches what you actually have straight away. It also drops two network requests from every app open and every resume.",
+    ],
+  },
+  {
+    version: "1.465.41",
+    date: "2026-09-25",
+    changes: [
+      "Your body-fat reading is now compared against the height it was actually measured at, so the DEXA calibration is fitted like for like. Body composition is worked out once when the scale reading arrives, using your profile at that moment \u2014 so when your height was corrected from 160 cm to 158 cm, every earlier reading was still a 160 cm number while the calibration was being fitted to it live. Expect the displayed body fat to drop by about a point: that is the correction, not a new problem. Your stored history is untouched.",
+    ],
+  },
+  {
+    version: "1.465.40",
+    date: "2026-09-25",
+    changes: [
+      "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. It now notices when answers have stopped arriving and shows you your saved data instead of a spinner, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely. Slow requests are never cancelled \u2014 on a weak connection your data still arrives, it just tells you honestly that the connection is struggling while you wait.",
     ],
   },
   {

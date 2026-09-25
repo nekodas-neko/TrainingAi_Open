@@ -2612,6 +2612,64 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][app-shell] ⚠️ Low reception hung the app instead of showing saved data — engine fixed, NOT seen on the phone (BF-195, 2026-09-24)
+
+The owner: *"I went to an area with low reception and nothing really worked on the app."* Connectivity
+was a boolean — `navigator.onLine` and Capacitor both answer *"is the radio attached"*, and in low
+reception it is. So the offline branch that paints saved data never ran, the request was issued with
+**no timeout at all**, and it never settled. The Workout tab held its skeleton indefinitely and a
+workout could not be started, while the banner claimed *"Offline — showing saved data"* over screens
+showing none.
+
+**Fixed 2026-09-24** — a watchdog reports a request that passes 8 s as slow **without touching the
+request**, and `online` now means *"requests are completing"* rather than *"the radio is attached"*.
+Two slow responses in a row are required before the app calls itself unreachable; one settled
+response — including a 500 — clears it.
+
+**The first version of this fix aborted the request at 8 s, and that was wrong.** It is recorded
+here rather than quietly replaced, because the note below predicted the wrong failure. Aborting
+destroys a *slow-but-working* request, which is precisely the state a lifter on a weak connection
+is in: it replaced arriving data with an error, and made every GET in the app retry-prone. CI
+caught it — the E2E suite ran against a dev server whose first-compile responses take 9–19 s, the
+aborts fired, and a spec asserting *"a same-day resume must not refetch"* saw two requests. The
+watchdog that replaced it changes no request semantics at all.
+
+**What is still owed, and the fix is not confirmed without it:**
+- **The device look.** Nothing here reproduces in the sandbox. The honest reproduction is **network
+  throttling, not airplane mode** — airplane mode exercises the path that already worked.
+- **The banner still over-promises on a seedless screen.** The engine makes it appear at the right
+  *times*; it cannot make *"showing saved data"* true where nothing is saved. Lane B's copy to fix.
+- **Whether 8 s is right** is still unmeasured — but note that this line originally read *"a
+  finding about the number is not a finding about the approach"*, and the defect turned out to be
+  the **approach** (cancelling the request), not the number. The threshold now only decides when to
+  *report* slowness, so getting it wrong is cosmetic rather than destructive.
+
+**Not addressed, and not diagnosed:** the sleep card reading a month-stale *"Last: 2026-08-25"*. A
+screenshot cannot distinguish a stale cache entry from the card's own fallback, and guessing between
+them is how the wrong thing gets fixed.
+
+### [body][nutrition] ⚠️ Your body fat has read about a point high since 01 September — live value fixed, stored history not (RV-165, 2026-09-24)
+
+Body composition is computed **once, at ingest**, from the profile of that moment. The height was
+corrected from 160 to 158 cm to match a DEXA printout, so every earlier reading is still a 160 cm
+number — and the DEXA calibration offset is derived **live** from those stored values. The 08-27 pair
+therefore set an offset of **+3.2** where the corrected reading gives **+2.3**.
+
+**Fixed 2026-09-24 (live values only).** Readings are now restated at the current profile before the
+offset is fitted. Nothing extra had to be stored: `bmr_kcal` has no impedance term and is linear in
+height, so it gives back the height used, and impedance then follows from the stored body-fat value.
+Verified on production — 08-27 and 09-01 share a weight of 71.7 kg with BMRs of 1557 and 1545, which
+solves to exactly 160 and 158 cm.
+
+**Expect the displayed number to DROP about a point.** That is the correction, not a new problem.
+
+**Still owed:**
+- **The stored rows are untouched** and still hold 160 cm composition. Restating them is a history
+  edit (**RV-170**) and the owner's call, not this fix's.
+- **Whether +2.3 is right in absolute terms is unmeasured.** It rests on one DEXA pair, and the
+  calibration's own comment is explicit that n = 1 supports an offset and not a ratio. What changed
+  is that the pair is now compared like for like.
+
 ### [platform] ⚠️ Database errors were forwarding row values — including an email — to sentry.io (RV-194, 2026-09-24)
 
 `beforeSend` scrubbed the request and left the **exception message** untouched, and Drizzle puts the

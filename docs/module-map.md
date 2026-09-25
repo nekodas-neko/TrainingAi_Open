@@ -553,7 +553,9 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 | Weather | `lib/weather/use-weather.ts` |
 | PiP mode / actions | `hooks/use-pip-mode.ts`, `hooks/use-pip-actions.ts` |
 | Health calcs | `app/health/hooks/use-health-calcs.ts` |
-| Online/offline status | `lib/use-online-status.ts` — `navigator.onLine` + DOM events + Capacitor Network |
+| Re-derive a stored scale reading at a different profile | **`recomputeStoredBodyFatPctAtHeight()`** / **`heightUsedForStoredBmr()`** (`lib/scale-ble/composition.ts`) — composition is computed once at ingest, so a later height/DOB/sex correction never reaches stored rows. `bmr_kcal` has no impedance term and is linear in height, so it gives the height back; impedance then follows from the stored body fat. Only the INVERSE lives there — the forward half calls `computeBodyComposition` (RV-165) |
+| Online/offline status | **`useOnlineStatus()`** (`lib/use-online-status.ts`) — DOM events + Capacitor Network, **ANDed with whether requests are actually completing**. It answers *"can the app reach the server"*, not *"is the radio attached"*: both native sources report true in low reception, which is the state a gym is in (BF-195) |
+| "Are requests getting through?" | **`requestsCompleting()` / `subscribeToReachability()`** (`lib/sqlite/cache.ts`) — one flag, flipped false by a fetch **timeout** and true by any settled response. A rejected response still counts (a 500 proves throughput); an ordinary network throw does NOT (that is server-down, not no-reception). Do not add a second connectivity source — read this one |
 
 | Cross-cutting UI | File |
 |---|---|
