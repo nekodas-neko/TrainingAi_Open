@@ -294,7 +294,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // BF-177. Balance-only refetch; the hook carries why it is not `fetchData` and not a
   // client-side subtraction.
   const { refetch: refetchBalance, failed: balanceRefetchFailed, retry: retryBalance,
-    refreshing: balanceRefreshing } = useEnergyBalanceRefetch(setEnergyBalance)
+    refreshing: balanceRefreshing } = useEnergyBalanceRefetch(setEnergyBalance, selectedDateRef)
 
   const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
     if (newLog) {

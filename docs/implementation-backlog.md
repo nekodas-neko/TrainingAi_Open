@@ -7650,6 +7650,7 @@ why the count of affected entries always understated the harm.
 
 - **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.
 - **Added:** 2026-09-19 (BugFix intake) · owner: *"requires page switching to show"*.
+- **Verify: device**
 - **✅ SHIPPED 2026-09-19** (`fix/bf177-kcal-left-stale-after-log`, v1.459.1). A balance-only refetch
   now runs on every write that changes intake. The entry's diagnosis was exactly right and is worth
   keeping: **the cache bust the owner proposed already existed** — `logFoodEntries` clears
@@ -7678,6 +7679,39 @@ why the count of affected entries always understated the harm.
   `useCachedValue`, which subscribes to invalidation (Q-402's fix).
 - **Branch:** `fix/bf177-kcal-left-stale-after-log`
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** point the fix at extending `use-nutrition-derived-refresh.ts:33`'s invalidation subscription to `energy-balance:`. `handleFoodLogged` (`nutrition-content.tsx:295-302`) still does one `refetchBalance`, and the card does not subscribe, so #1467's post-push invalidate cannot reach it.
+- **🔧 SHIPPED 2026-09-25 (v1.465.57) — the card subscribes to `energy-balance:` now, and the
+  one-shot refetch stays.** The re-read's diagnosis was right and its *location* was not: it pointed
+  at `use-nutrition-derived-refresh.ts:33`, RV-104's hook, which owns two other keys and a different
+  load function. The subscription belongs in `use-energy-balance-refetch.ts`, which already owns
+  this key, the retry ladder and the date — so every consumer of the hook gets it and there is no
+  second place that decides when the balance is refetched. Four links now pinned as a chain by
+  `app/nutrition/__tests__/bf177-balance-subscribes.test.ts`: log-food's post-push invalidate →
+  `invalidateNutritionWrite` clearing `energy-balance:` → the hook subscribing → refetching the day
+  on screen. Control run against `origin/main`: the three new-behaviour assertions fail, the two
+  pre-existing links pass.
+- **The hook now takes the date, and that is the load-bearing half.** `lastDateRef` is only ever set
+  by `refetch`, so a subscription reading it is dead until the hook has already fetched once — which
+  excludes the case subscribing exists for: a write made from another surface while the Nutrition tab
+  sits mounted in the persistent shell. `useEnergyBalanceRefetch` takes `selectedDateRef` as a
+  **required** second argument for that reason; optional, it would have shipped a subscription that
+  silently never fires.
+- **No new GET on the log path.** `cachedFetch` de-dupes by key (`inFlightRequests`), so the
+  first invalidation's subscription-driven fetch and `handleFoodLogged`'s explicit `refetchBalance`
+  attach to one request. The explicit calls were left in place: the **web fallback** branch of
+  `logFoodEntries` never reaches `pushThenRevalidate`, so on that path the one-shot is the only
+  refetch there is.
+- **⚠ The entry was wrong about one of the two "unswept" readers.**
+  `components/nutrition/end-of-day/day-read-through-section.tsx:37` is **not** a hand-rolled
+  `cachedFetch` — it uses `useCachedValue`, which subscribes to invalidation, and its own docblock
+  says why. It was already clean. `app/health/day/day-detail-content.tsx` is genuinely hand-rolled
+  and stays so deliberately: it guards each response against a date-swipe that has already moved on,
+  and it refetches after its own writes. Not swept into this PR — it is a route page rather than a
+  tab in the persistent shell, so it has no window in which another surface's write can strand it.
+- **What is NOT established:** the S25 look. The traces above are from sweeps 1 and 2; this change
+  has been exercised only against `pnpm dev` and the suite. **Pass test unchanged:** log a food on
+  the S25, *"kcal left"* changes within 3 s without leaving the tab. Native SQLite, the outbox push
+  and Samsung's WebView were not exercised here — which is the entire mechanism this fix is about,
+  so the device look is the verification, not a formality.
 
 ### [readiness][app-shell] TN-50 — the "self-report" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable
 

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.57",
+    date: "2026-09-25",
+    changes: [
+      "On the Nutrition screen, \"kcal left\" now updates on its own after you log or delete a food, instead of holding the old number until you switch tabs and come back.",
+    ],
+  },
+  {
     version: "1.465.56",
     date: "2026-09-25",
     changes: [
