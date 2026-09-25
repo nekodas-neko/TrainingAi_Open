@@ -4288,18 +4288,22 @@ drift.
   floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
   Pass/fail: walk with the strap already worn; record the first bin's tSec against the walk's start.
 
-### [workouts][platform] RV-168 — `session_exercises.exercise_id`, documented as the join key, is wiped by every program save
+### [workouts][platform] LA-143 — backfill `session_exercises.exercise_id` for the rows already saved
 
-- **Lane: A** — `lib/data/postgres/slices/programs.ts:313-323`.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **In production:** the active program Bankai has **0 of 25** ids set. The other programs have 1 of
-  25, 2 of 25 and 1 of 17. Only "Main", last saved 06-28, has 20 of 20.
-- **Why:** `saveProgram` deletes and re-inserts the rows without `exerciseId`. Migration 099 calls it
-  *"the join key"* and backfilled it once. Only the coach swap writes it, which explains the strays.
-- **Effect:** none today. Programs resolve exercises by name, and `exercise_logs.exercise_id` is
-  100% filled with 0 mismatches. It is Q-474's trap: a documented key that is empty in practice, so
-  the first join on it returns nothing.
-- **Fix:** set it in `saveProgram` by library lookup, or mark it dead as `unusedProgramSessionId` was.
+- **Lane: A** — a one-statement migration, no new table or column so no `claude_ro` twin.
+- **Gate: owner** — it writes production rows, the only reason it is not already done.
+- **Added:** 2026-09-25, Lane A, while shipping RV-168.
+- **What is left.** RV-168 made `saveProgram` fill the FK, so it is correct from each program's next
+  save onward. Rows saved before that are still NULL — Bankai **0 of 25**, the others 1/25, 2/25,
+  1/17 — and fill in on their own when the owner next saves each. Nothing reads the column yet, so
+  nothing is broken meanwhile.
+- **Recommended.** The statement is migration 099's own backfill re-run, `WHERE exercise_id IS NULL`
+  so it cannot overwrite a Coach-set value; `SET exercise_id = NULL` undoes it exactly.
+  ```sql
+  UPDATE session_exercises se SET exercise_id = el.id
+    FROM exercise_library el
+   WHERE el.name = se.exercise_name AND se.exercise_id IS NULL;
+  ```
 
 ### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen: 09-01 → 09-16 still count sleep as daytime stress
 

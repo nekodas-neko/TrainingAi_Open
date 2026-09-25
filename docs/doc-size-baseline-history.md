@@ -17562,3 +17562,12 @@ warming read would defeat the point of warming.
 
 It also records the two things the entry did not know: `useCachedValue` had no such option at all,
 and the screen that WRITES meal types is deliberately left unflagged.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31361 → 31365 (RV-168)
+
+RV-168's entry left the queue on shipping and **LA-143** took its place: the same column's remaining
+half, backfilling the rows saved before the fix. Four lines net. LA-143 is longer than the entry it
+replaces because it carries its exact `UPDATE` and a `Gate: owner`, which is the point of it — it
+writes production rows, so it has to be startable by whoever picks it up without re-deriving the
+statement. Trimmed from 21 lines to 16 before raising the number rather than banking the whole of
+the first draft.
