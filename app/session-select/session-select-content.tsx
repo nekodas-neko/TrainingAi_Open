@@ -621,16 +621,23 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       } catch { /* store not ready — fall through to the API */ }
     }
     try {
-      const res = await fetch(`/api/mood?date=${today}`);
-      if (!res.ok) return;
-      const d = await res.json() as import('@trainingai/shared/types/mood').MoodLog | null;
-      if (d !== null) {
-        setMoodLog(d);
-        setCached(key, d, MOOD_TTL).catch(() => {});
-      } else {
-        const cached = readCacheSync<import('@trainingai/shared/types/mood').MoodLog | null>(key);
-        if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
-      }
+      // RV-79: through `cachedFetch`, per the standing rule, so this read joins the in-flight dedup
+      // the mood sheet's reads of the same key already use rather than firing a second request.
+      //
+      // `shouldCache` is what makes the conversion safe, and it is not optional here. A plain
+      // `cachedFetch` writes the response unconditionally after any 2xx — measured — so a server
+      // `null` would overwrite an optimistic local log, and `readCacheSync` parses a stored "null"
+      // back as a value rather than a miss. The seeds below would then paint `null` and the
+      // check-in card would re-prompt: the session-167 bug, reintroduced by the fix for a rule.
+      await cachedFetch<import('@trainingai/shared/types/mood').MoodLog | null>(
+        key, `/api/mood?date=${today}`, MOOD_TTL,
+        d => {
+          if (d !== null) { setMoodLog(d); return; }
+          const cached = readCacheSync<import('@trainingai/shared/types/mood').MoodLog | null>(key);
+          if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
+        },
+        { shouldCache: d => d != null },
+      );
     } catch { /* offline — keep the seeded value */ }
   }, [userId, tz]);
 
