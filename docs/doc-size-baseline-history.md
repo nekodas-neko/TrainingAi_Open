@@ -17363,6 +17363,24 @@ baseline, so the `.size` file conflicted on a value neither branch was wrong abo
 the merged file each time rather than picking a side — two PRs raising the same document is the one
 conflict in this file that is a genuine disagreement rather than two independent additions.
 
+---
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31159 → 31173 (+14)
+
+`LB-152` — the RV-99 migration turned out to be a visible app-wide restyle rather than a refactor
+(green moves 67 in sRGB on screens the owner reads daily), so it is his call rather than Lane B's.
+
+Long for its size because an owner question is only answerable if the entry carries the numbers: a
+three-row table of what each colour is today and becomes, and three answers that each unblock it —
+including retuning the token to today's hex first, which gets the same single-source benefit with no
+visual change. Without those he would have to re-derive the measurement to answer, which is the
+thing the entry exists to spare him.
+
+RV-99 itself also gained the measurement (116 occurrences across 48 files, and which of the four
+must-not-touch files are even in Lane B's paths) so the next session does not repeat it.
+
+---
+
 ## 2026-09-25 — `docs/agents/state/tuning.md` 731 → 744 (+13), the owner's scope rule for the Tuning role
 
 The owner narrowed what the Tuning session may put to him: *"The only questions asked from me in this
