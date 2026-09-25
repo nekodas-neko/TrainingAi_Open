@@ -17115,3 +17115,34 @@ so the obvious verification (`perf.js longtasks`) will show no improvement; with
 so, the next reader measures it, sees nothing, and records a working fix as a failed one. The 68–118
 ms long task under it is DV-12, still open. A row that only said "not verified on device" would have
 cost more than the lines it saved.
+
+
+## 2026-09-24 — `projectOverview.md` → 12796 (BF-195)
+
+Twenty-five lines for the owner's own report, and three of them are the reason it cannot be struck.
+
+The fix is one sentence: connectivity was a boolean, the fetch had no timeout, so a request on a
+dying connection never settled and the screen held its skeleton. What needs the space is the list of
+what is still owed — the device look (and that the honest reproduction is throttling, **not** airplane
+mode, which exercises the path that already worked), the banner copy that still over-promises on a
+screen with nothing saved, and that the 8 s figure is a starting value nobody has measured.
+
+The separately-observed month-stale sleep card is recorded as NOT diagnosed, with the reason: a
+screenshot cannot tell a stale cache entry from the card's own fallback. Writing it as part of BF-195
+would send the next session to fix the wrong thing.
+
+## 2026-09-24 — projectOverview.md 12796 → 12807 (BF-195 correction)
+
++11 lines on the BF-195 Known-Issues row, recording that the **first** version of that fix — an
+`AbortSignal.timeout` that cancelled the request — was wrong, and why. It is kept rather than
+quietly overwritten because the row's own caveat predicted the wrong failure: it said *"a finding
+about the number is not a finding about the approach"*, and the defect was the approach. A future
+session reaching for a cancelling timeout on a slow connection should find the reason it was
+already tried and reverted, not just the current code.
+
+## 2026-09-25 — `projectOverview.md` → 12821 (BF-195 merge recompute)
+
+Not a deliberate raise: two branches added Known-Issues rows to the same document in parallel, so the
+`.size` conflicted on a single number. Recomputed with `--fix` on the merged file rather than taking
+either side — picking one would have encoded a count that matches neither branch's reality, and the
+check would then fail on `main` for whoever merged second.

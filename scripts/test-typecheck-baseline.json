@@ -19,7 +19,6 @@
   "lib/__tests__/ai-dynamic.test.ts": 4,
   "lib/__tests__/ai-retry.test.ts": 1,
   "lib/__tests__/app-load-metrics.test.ts": 3,
-  "lib/__tests__/cache-http-layer-bypass.test.ts": 2,
   "lib/__tests__/capacitor-plugin-thenable.test.ts": 1,
   "lib/__tests__/goal-write-invalidation.test.ts": 1,
   "lib/__tests__/log-food-invalidation.test.ts": 1,

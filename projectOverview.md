@@ -2612,6 +2612,42 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][app-shell] ⚠️ Low reception hung the app instead of showing saved data — engine fixed, NOT seen on the phone (BF-195, 2026-09-24)
+
+The owner: *"I went to an area with low reception and nothing really worked on the app."* Connectivity
+was a boolean — `navigator.onLine` and Capacitor both answer *"is the radio attached"*, and in low
+reception it is. So the offline branch that paints saved data never ran, the request was issued with
+**no timeout at all**, and it never settled. The Workout tab held its skeleton indefinitely and a
+workout could not be started, while the banner claimed *"Offline — showing saved data"* over screens
+showing none.
+
+**Fixed 2026-09-24** — a watchdog reports a request that passes 8 s as slow **without touching the
+request**, and `online` now means *"requests are completing"* rather than *"the radio is attached"*.
+Two slow responses in a row are required before the app calls itself unreachable; one settled
+response — including a 500 — clears it.
+
+**The first version of this fix aborted the request at 8 s, and that was wrong.** It is recorded
+here rather than quietly replaced, because the note below predicted the wrong failure. Aborting
+destroys a *slow-but-working* request, which is precisely the state a lifter on a weak connection
+is in: it replaced arriving data with an error, and made every GET in the app retry-prone. CI
+caught it — the E2E suite ran against a dev server whose first-compile responses take 9–19 s, the
+aborts fired, and a spec asserting *"a same-day resume must not refetch"* saw two requests. The
+watchdog that replaced it changes no request semantics at all.
+
+**What is still owed, and the fix is not confirmed without it:**
+- **The device look.** Nothing here reproduces in the sandbox. The honest reproduction is **network
+  throttling, not airplane mode** — airplane mode exercises the path that already worked.
+- **The banner still over-promises on a seedless screen.** The engine makes it appear at the right
+  *times*; it cannot make *"showing saved data"* true where nothing is saved. Lane B's copy to fix.
+- **Whether 8 s is right** is still unmeasured — but note that this line originally read *"a
+  finding about the number is not a finding about the approach"*, and the defect turned out to be
+  the **approach** (cancelling the request), not the number. The threshold now only decides when to
+  *report* slowness, so getting it wrong is cosmetic rather than destructive.
+
+**Not addressed, and not diagnosed:** the sleep card reading a month-stale *"Last: 2026-08-25"*. A
+screenshot cannot distinguish a stale cache entry from the card's own fallback, and guessing between
+them is how the wrong thing gets fixed.
+
 ### [platform] ⚠️ Database errors were forwarding row values — including an email — to sentry.io (RV-194, 2026-09-24)
 
 `beforeSend` scrubbed the request and left the **exception message** untouched, and Drizzle puts the
