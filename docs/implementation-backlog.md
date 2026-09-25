@@ -5356,6 +5356,26 @@ written entity.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
+### [platform] LB-149 — the E2E job's browser dies mid-run, and because E2E is advisory nobody looks
+
+- **Lane: B**
+- **Added:** 2026-09-25 · found reading CI after merging #1598 on the five required checks.
+- **Measured on run 3031** (`fix/rv183-meal-reminders-local-first`): two specs failed in **1.0s
+  each** with `Error: browser.newContext: Target page, context or browser has been closed` —
+  `day-detail-sheets.spec.ts:99` and `diary-nested-meal.spec.ts:132`. A 1-second failure before any
+  test body runs is the browser process going away, not an assertion. The same suite passes locally:
+  124 specs, exit 0, checked 2026-09-25.
+- **Why this is worth an entry rather than a shrug.** E2E is advisory, so the standing merge
+  procedure reads the five required conclusions and goes — correct, but it makes a red E2E
+  invisible by policy, and the only end-to-end signal the repo has then degrades silently. Two
+  consecutive runs ended `failure` on E2E alone (#1589, #1598); only the second was diagnosed, so
+  read "twice" as one confirmed crash plus one unestablished.
+- **Do not start by rewriting the two specs** — they are the victims, and which two die will move.
+  Establish the cause: worker count against runner memory (`playwright.config.ts`), where in the
+  run it clusters, and whether `--workers=1` removes it. **The measurement that settles it** is 3
+  consecutive runs on an unchanged head — same two specs means a spec pair, moving victims means
+  the runner.
+
 ### [platform][app-shell] RV-99 — the hex band triad is still copy-pasted at ~180 sites
 
 - **Lane:** B for `components/**` and `app/**`; **A** for the four shared modules listed below.

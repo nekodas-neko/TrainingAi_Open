@@ -1,11 +1,11 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-149 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-150 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148. LB-141 filed.
+RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148. LB-141, LB-149 filed.
 
 ## Next
 
