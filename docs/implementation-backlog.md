@@ -478,25 +478,21 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] OR-166 — `googleapis` is 203 MB for one `google.calendar()` call
+### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
-- **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency
-  audit, prompted by an external contributor's view that CI is too slow.
-- **Measured 2026-09-25:** `googleapis@172` installs **203 MB** and is imported by exactly **one**
-  file — `import { google } from "googleapis"` — plus a `vi.mock` of it in one test. It is the second
-  heaviest package in the tree after `onnxruntime-node`.
-- **Why it costs more than disk.** Next traces the import graph for the server bundle, so the whole
-  package is walked on every build even though one client is used. Build is the second-longest job
-  and becomes the critical path once `OR-165`'s test sharding lands.
-- **Fix:** swap to the scoped `@googleapis/calendar`, which is the same generated client for one API.
-  The call site changes from `google.calendar({ version: 'v3', auth })` to that package's equivalent,
-  and the test's `vi.mock('googleapis', …)` moves with it.
-- **⚠ Not a drive-by, which is why this is an entry and not a commit.** The route creates calendar
-  events with the owner's OAuth refresh token — a working integration with a credential path, and
-  `docs/environment-variables.md` names its vars. **Verify an event is actually created end to end**,
-  not that the route returns 200.
-- **Not established:** how much build time this actually returns. The 203 MB is measured; the saving
-  is not, and it should be stated as a before/after rather than assumed.
+- **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency audit.
+- **Verify:** owner
+- **SHIPPED 2026-09-25** ([entry](overview/entries/2026-09-25-or166-scoped-calendar-client.md)):
+  `@googleapis/calendar` at **884 kB** replaces `googleapis` at **203 MB** — the same generated
+  Calendar v3 client without the other ~380 APIs. The saving the entry called unestablished, cold
+  `pnpm build`: **6m16s before → 5m09s and 4m54s after**, the two after-runs 15 s apart, so the
+  ~70 s gap is outside the noise. The swap also bumps `google-auth-library` 10→11 and
+  `googleapis-common` 8→9 — a risk the entry did not name, since this route classifies failures by
+  reading the error — and both libraries were driven against live Google side by side and throw the
+  identical object, so the contract is unchanged. Details and the LA-85 finding are in the entry.
+- **Keep:** one end-to-end confirmation that an event is still created — complete a workout and look
+  for it in Google Calendar. **Not reachable from the container**, which has no Google refresh token;
+  everything short of a real credential was exercised, the live token exchange included.
 
 ### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
 
@@ -30418,6 +30414,14 @@ them from it entirely.
 - `GaxiosError` sets `this.code` **only** from an underlying `cause.code`, or from the response
   body's `error.code`, which for Google is the **number** `403`. The route tests
   `errCode === 'ERR_HTTP_403'` — a strict compare against a string — which cannot match either.
+  - **Confirmed at RUNTIME, 2026-09-25 (OR-166), which this bullet previously could not claim.**
+    Driving a real `events.insert` against live Google with a bogus credential throws
+    `GaxiosError` carrying `code: 401` **as a number** and `status: 401` — so the numeric-`code`
+    mechanism is observed, not inferred, and `errCode === 'ERR_HTTP_403'` is dead for certain. What
+    is still unobserved is a genuine **403**, and with it the message text the other three
+    conditions search — which is what this entry's live capture is still for.
+  - **The library swap in OR-166 does not move any of this**: `googleapis@172` and
+    `@googleapis/calendar@20` were driven side by side and threw the identical object.
 - The HTTP status lands on `.status`, which the route never reads.
 - `extractAPIErrorFromResponse` builds the message from `error.message` and, when present, the
   `errors[].message` values. The `reason` field (`insufficientPermissions`) is **not** joined in.

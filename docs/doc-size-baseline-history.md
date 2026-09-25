@@ -17390,3 +17390,21 @@ against ~354 ms — about a third. An implementer picking up either open part re
 journal, and would otherwise size the remaining work against a number that has already been shown to
 be wrong once. The formulation benchmarks and the rest of the story were trimmed out to the journal
 entry, which is what kept this to eight lines instead of nineteen.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31181 → 31185 (OR-166 / LA-85)
+
+Four lines, and they are net: OR-166 shipped and its entry was cut down to what a shipped
+`Verify: owner` entry needs, which paid for most of what LA-85 gained.
+
+**LA-85's gain is the part worth the baseline.** That entry says the calendar route's scope check
+may not match what Google actually throws, and its central mechanism — `GaxiosError.code` is the
+numeric status, so the route's strict compare against the string `'ERR_HTTP_403'` can never
+match — was *read from the pinned `gaxios` source* and explicitly marked as not yet observed at
+runtime. OR-166 drove a real `events.insert` against live Google and observed it: `code: 401` as a
+number. That converts the entry's weakest claim from inference to measurement, and it also records
+that OR-166's library swap does not move it — both libraries were driven side by side and threw the
+identical object.
+
+An entry whose open question is "does the real thing behave the way we read in the source" is
+exactly where a runtime observation has to live, rather than in a journal entry for a different
+item that nobody reading LA-85 would open.

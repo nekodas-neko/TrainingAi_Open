@@ -41,11 +41,9 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({ createFeedback, listPendingScaleSamples, listRecentDismissedScaleSamples })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
-vi.mock('googleapis', () => ({
-  google: {
-    auth: { OAuth2: class { setCredentials(...a: unknown[]) { setCredentials(...a) } } },
-    calendar: () => ({ events: { insert: (...a: unknown[]) => eventsInsert(...a) } }),
-  },
+vi.mock('@googleapis/calendar', () => ({
+  auth: { OAuth2: class { setCredentials(...a: unknown[]) { setCredentials(...a) } } },
+  calendar: () => ({ events: { insert: (...a: unknown[]) => eventsInsert(...a) } }),
 }))
 
 import { POST as postFeedback } from '@/app/api/feedback/route'
