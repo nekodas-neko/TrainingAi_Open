@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { resolveHrProfile } from '../hr-profile'
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { computeObservedHr } from '../observed-hr'
 
 // A 40-year-old → 220 − 40 = 180 age-predicted.
 const DOB = '1986-01-01'
@@ -9,7 +10,9 @@ function repoWith({ bpms, dob = DOB, rhr }: { bpms: number[]; dob?: string | nul
   return {
     getUserById: async () => ({ dateOfBirth: dob }),
     listBodyMetrics: async () => (rhr ?? []).map((v, i) => ({ date: `2026-07-${10 + i}`, restingHeartRate: v })),
-    getHrForWindow: async () => bpms.map((bpm, i) => ({ timestamp: new Date(i * 1000), bpm, source: 'ble' })),
+    // The resolver reads the profile as an aggregate now (RV-181); the fixture still describes
+    // readings, and the mock applies the same corroboration rules the SQL does.
+    getObservedHrProfile: async () => computeObservedHr(bpms),
   } as unknown as WorkoutRepository
 }
 
@@ -69,11 +72,11 @@ describe('resolveHrProfile — one resolver, corroborated', () => {
     expect(defaulted.restingHrSource).toBe('default')
   })
 
-  it('survives an HR-window read failure rather than failing the whole profile', async () => {
+  it('survives an HR-profile read failure rather than failing the whole profile', async () => {
     const repo = {
       getUserById: async () => ({ dateOfBirth: DOB }),
       listBodyMetrics: async () => [],
-      getHrForWindow: async () => { throw new Error('db down') },
+      getObservedHrProfile: async () => { throw new Error('db down') },
     } as unknown as WorkoutRepository
     const p = await resolveHrProfile(repo, 'u', 'Australia/Brisbane')
     expect(p.maxHr).toBe(180)

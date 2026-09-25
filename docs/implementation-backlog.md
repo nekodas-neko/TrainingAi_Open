@@ -4245,25 +4245,44 @@ drift.
 - **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
   recompute from stored inputs (RV-170).
 
-### [heart-rate][platform] RV-181 — the HR profile pulls 90 days of raw heart rate to compute three numbers: 51% of all database time
+### [heart-rate][platform] RV-181 — the HR profile pulled 90 days of raw heart rate to compute six numbers
 
-- **Lane: A** — `packages/shared/src/health/hr-profile.ts:98-102`, `lib/data/postgres/slices/oura.ts:801`.
+- **Lane: A** — `packages/shared/src/health/hr-profile.ts`, `lib/data/postgres/slices/oura.ts`.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
-- **`pg_stat_statements`, 25.2 days:** the `getHrForWindow` range select ran **12,463 calls, 558 s of
-  1,083 s total DB time (51.5%)**, and returned **209 M rows**. The 90-day window alone is
-  **133,727 rows** today.
-- **Callers:** `hr-profile`, `zone-minutes`, `cardio-week`, `cardio-trends`, `computeWorkoutHr`,
-  `computeHrRecoveryProfile`, and the SSR of Baselines and guided walk.
-- **Why it repeats:** it is in `invalidateOuraSync`, and `useHrProfile` is mounted on the active
-  workout and exercise summary screens, so **every ring drain during a workout refetches it**. Drains
-  run 20–32 an hour at 07–09.
-- **Evidence it is fixable:** sweep 51 measured the same statistic as a SQL aggregate at **54 ms,
-  one row**. RV-64 only hoisted the fetch.
-- **Fix:** compute the observed-max statistic in SQL (`percentile_disc`, or top-k). Fetch 30 days,
-  not 90, for `cardio-week`, which needs the series. Memo per user per local day.
-- **Same shape, smaller:** `/api/health/trends` (`route.ts:73-84`) re-derives HR recovery from raw
-  HR, with 2 queries per session over 14 days (~20). But `workout_hr_stats.hrr1_best` is stored for
-  **10 of 10** of those sessions. Read it, after checking the two agree per day.
+- **The headline SURVIVED re-measurement on 2026-09-25**, three weeks on and against a moving
+  window: **565 s of 1,117 s of all database time (50.6%)**, **12,591 calls**, **44.84 ms mean**,
+  **16,843 rows a call**, **212 M rows**. The 90-day window is 134,425 raw rows, **133,041** after
+  the chest-strap merge.
+- **SHIPPED (2026-09-25):** `repo.getObservedHrProfile` computes the profile in SQL — one row
+  instead of the window. The seven callers of `resolveHrProfile` no longer fetch rows at all, and
+  `/api/cardio-week` reads its two 30-day windows as aggregates too, so `resolveHrProfileWithWindow`
+  (RV-73's shared pull) is gone with the boundary caveat it carried. Equivalence with
+  `computeObservedHr` is held by `lib/data/postgres/__tests__/observed-hr-sql-equivalence.test.ts`.
+- **⚠ The entry's EVIDENCE line was wrong, and it is the reason to state the real saving here rather
+  than let the next reader infer it.** Sweep 51's *"the same statistic as a SQL aggregate at 54 ms"*
+  measured a plain aggregate over the raw window — **no chest-strap merge**, which is 78% of the
+  rows and the whole cost. Measured against production 2026-09-25: that plain form is **67 ms**, the
+  merge-preserving form actually shipped is **225–260 ms** warm (fastest of three formulations
+  tried; a hash anti-join was 317–333 and a `bool_or` window 394–438, all three returning identical
+  values), against a row fetch of **~354 ms** — inferred from the mean at 2.66 µs a row, since a
+  `count(*)` wrapper elides the tuple formation that is most of it. **So the database-time saving is
+  about a third, not the seven-eighths "54 ms" implies.** The rest of the win is real but different
+  in kind: 133,041 rows stop crossing the wire and stop being materialised in Node on every resolve.
+- **STILL OPEN — the part that actually holds the other two thirds.** The 90-day shape ran **~1,460
+  times in 25.2 days, ~58 a day**, and that is the number the aggregate does not touch.
+  `useHrProfile` is mounted on the active-workout and exercise-summary screens and `hr-profile` sits
+  in `invalidateOuraSync`, so **every ring drain during a workout refetches it** — drains run 20–32
+  an hour at 07–09. A memo in front of the resolver collapses the burst, and the reason it was not
+  shipped alongside the aggregate is that it needs a freshness call rather than a mechanism: the
+  profile is a 90-day k-th order statistic, so it cannot move within a burst without five new
+  readings above the current k-th highest, but `use-hr-profile.ts` documents at length why
+  `freshWithinTtl` was rejected for this key, and that argument has to be answered rather than
+  routed around. **Re-measure first** — with the row fetch gone, `pg_stat_statements` now reports
+  the small-window callers only, so the share this would save is measurable rather than modelled.
+- **STILL OPEN — same shape, smaller.** `/api/health/trends` (`route.ts:73-84`) re-derives HR
+  recovery from raw HR, 2 queries per completed session over 14 days (~20), though
+  `workout_hr_stats.hrr1_best` is stored for **10 of 10** of those sessions. Read the column instead
+  — **after** checking the two agree per day, which is a production read this entry has not done.
 
 ### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
 
