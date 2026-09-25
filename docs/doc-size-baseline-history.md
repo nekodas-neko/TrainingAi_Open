@@ -17480,3 +17480,18 @@ is in the queue rather than only in a journal entry nobody will be looking for.
 
 It also records the blast radius — nine adapter call sites, four of them LA-139's from the same
 day — because that is the part someone debugging a skewed ds window needs to find.
+## 2026-09-25 — `docs/implementation-backlog.md` 31312 → 31321 (+9)
+
+`LB-149` — the E2E browser death. The entry grew because what it now carries is a list of things
+RULED OUT, and each one is what stops the next session re-testing it: `workers: 1` is already the
+config so the entry's own leading hypothesis has no lever; nothing under `e2e/` closes the browser;
+the victims were #20 and #28 of 124 in run order, and the specs preceding them — the real suspects,
+since the browser was dead before the victim started — are two of the lightest files in the suite.
+
+An elimination is worth more lines than a theory, because a theory gets re-argued and an elimination
+does not. Three sessions had only theories. (Recomputed on the merged tree — OR-166 landed while
+this branch was in the gate, so the baseline moved under it; the +9 is unchanged.)
+
+The entry stays open deliberately: `ci.yml` now dumps `dmesg` on an E2E failure, and the cause is
+established by the next red run rather than by this PR. Narrative in
+`docs/overview/entries/2026-09-25-lb149-e2e-browser-death.md`.
