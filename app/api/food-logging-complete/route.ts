@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
-import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // A date and a boolean.
@@ -46,7 +46,10 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const tz = session.user.timezone ?? DEFAULT_TZ
-  const logDate = parsed.data.date?.replace(/\//g, '-') ?? todayInTz(tz)
+  // The schema bounds the shape only, so an impossible-but-well-formed day such as `2026-02-31`
+  // reached the date column and came back as a driver error recorded as a server fault (RV-177).
+  const logDate = parsed.data.date ? normalizeDateParamIso(parsed.data.date) : todayInTz(tz)
+  if (logDate === null) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
 
   const repo = await getRepository()
   // Preserve whatever the evening check-in holds — this write is only about the food-log flag, and
