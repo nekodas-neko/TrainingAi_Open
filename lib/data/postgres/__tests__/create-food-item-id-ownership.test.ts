@@ -18,12 +18,12 @@ const OTHER = '00000000-0000-4000-8000-000000177a02'
 
 describe.skipIf(!canRun)('createFoodItem does not hand back another user\'s row (RV-177)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
 
   const ITEM = {
     name: 'RV177 Other Persons Chicken', brand: 'Private', servingSizeG: 100,
     calories: 165, proteinG: 31, carbsG: 0, fatG: 3.6,
-    source: 'manual' as const,
+    source: 'manual' as const, region: 'AU',
   }
 
   beforeAll(async () => {

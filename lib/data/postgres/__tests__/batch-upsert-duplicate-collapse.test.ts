@@ -44,7 +44,7 @@ describe.skipIf(!canRun)('batch upserts collapse duplicates on the conflict targ
   let pool: import('pg').Pool
   let db: Awaited<ReturnType<typeof import('@/lib/data/postgres/client').getDb>>
   let oura: typeof import('@/lib/data/postgres/slices/oura')
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
 
   beforeAll(async () => {
     const { getPool, getDb } = await import('@/lib/data/postgres/client')
@@ -195,7 +195,7 @@ describe.skipIf(!canRun)('batch upserts collapse duplicates on the conflict targ
 
     // And the returned ids line up with what was stored — `.returning()` is zipped by index, so a
     // collapse done inline would shift every set after the duplicate onto the wrong row.
-    for (const sl of setLogs) {
+    for (const sl of setLogs as { id: string; setNumber: number }[]) {
       const stored = rows.find(r => r.id === sl.id)
       expect(stored, `returned an id that is not in set_logs: ${sl.id}`).toBeDefined()
       expect(stored!.set_number).toBe(sl.setNumber)
