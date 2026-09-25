@@ -17796,3 +17796,13 @@ different conflict target with no direct test of its own — so the coverage was
 path instead of deleted. The `Keep:` also now states plainly that **none** of the four remaining
 groups has been re-verified, since three of this entry's claims have already turned out stale or
 backwards and the next session should not assume otherwise.
+
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-199 (does the prescription need AI)
+
+The owner asked whether the prescription needs a model at all. Answering it needs the evidence table —
+sets clamped to 2 in all 33 stored tuples, reps and pct on a ~2.25 %/rep curve the styles table
+already holds, rest the one free output and the one that reads as noise at 68 to 300 seconds — because
+the conclusion is unbelievable without it. The counter-argument costs lines too and had to stay: 35 of
+35 calls succeeded, so the case cannot lean on reliability.
