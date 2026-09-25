@@ -16873,6 +16873,35 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
 - **Still not run: the meal-list half.** Sweep 3 covered the food rows. COULD NOT CHECK, not a pass.
 - **`BF-29`'s 2026-08-30 pass is not evidence**: it was the meal list, tapped slowly.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the entry names no file**: it is `components/ui/swipe-actions.tsx:89-101`. `z-10` applies only once `isOpen` (`offset <= -width`), so the first tap misses during the slide.
+- **Verify: device**
+- **✅ FIXED 2026-09-25 (v1.465.62) — the raise was gated on the END of the journey, not the start.**
+  Sweep 59's read was right about the file and understated the window. `isOpen` is
+  `offset <= -width`, i.e. true only once the row has travelled the **full** tray width, so the
+  `z-10` arrived when the slide finished and everything before it was still the original bug. The
+  gate is `offset < 0` now — the tray is raised for the whole of the window in which it is visible,
+  which is the invariant that actually matters: **if you can see it, you can hit it.** `aria-hidden`
+  and `tabIndex` follow the same flag, so there is no visible-but-`aria-hidden` clickable button.
+- **⚠ THE EXISTING REGRESSION TEST PASSES ON THE UNFIXED COMPONENT, which is why this shipped once
+  and failed on the device twice.** Control-run 2026-09-25 with the fix stashed and the spec kept:
+  *"the first tap on Delete opens the confirmation, even mid-animation"* — **green**. It stretches the
+  transition and taps after the row has **rested open**, so it only ever exercised the half that was
+  already fixed. Sweep 3's tap landed before React had committed the rest-open state at all, and that
+  window is **narrower than one CDP round-trip**, so no arrangement of `tap` calls can reach it.
+- **So the new test asserts the PROPERTY instead of racing it** — *while the row is displaced at all,
+  finger still down, the tray is the topmost element over its own rect.* Timing-free, held mid-drag at
+  36 px against a 64 px tray (displaced-but-not-open, exactly where the old gate left the tray
+  underneath). It **fails** against the unfixed component and passes with the fix. It also reads the
+  row's transform before probing, because the first version of it reported *"the tray is under the
+  row"* when the truth was that the drag had never happened.
+- **The meal list is covered by construction, not by a second fix.** `SwipeActions` is shared —
+  `meal-card.tsx` and `saved-meal-card.tsx` render the same component — so there is no per-surface
+  copy to miss. Still unverified on the device there, as the entry notes.
+- **Keep: the device pass, all three clauses.** On the S25, swipe and tap Delete **immediately**:
+  ① the confirmation appears on the **first** press, on **both** the meal list and the food rows;
+  ② the slow tap keeps working; ③ the next rightward swipe closes the tray and leaves the day alone.
+  **Clause ③ is not separately fixed and is not claimed** — sweep 3 found the day jumping to Yesterday
+  only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
+  survives, it is its own entry with its own mechanism, not a re-open of this one.
 
 ### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
 

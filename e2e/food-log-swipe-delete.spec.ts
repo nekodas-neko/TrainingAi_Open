@@ -199,6 +199,82 @@ test('the first tap on Delete opens the confirmation, even mid-animation', async
   expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
 })
 
+/**
+ * BF-61, sweep 3 — the invariant, rather than a timing window.
+ *
+ * The test above stretches the transition and taps after the row has rested open, which is the shape
+ * the first fix was built for and passes. **The device then failed anyway, twice**: sweep 3 fired the
+ * tap in the same `adb shell` call as the swipe, so it landed before React had committed the rest-open
+ * state at all — no confirmation, 2 of 2, while the slow tap worked 3 of 3. That window is *narrower
+ * than one CDP round-trip*, so no arrangement of `tap` calls can reproduce it here.
+ *
+ * So this asserts the property instead of racing it: **while the row is displaced at all — finger
+ * still down, mid-drag — the tray must be the topmost element over its own rect.** Timing-free, and it
+ * covers every window the timing tests cannot reach, including the uncommitted one. Held mid-drag at
+ * 36 px against a 64 px tray, which is displaced-but-not-open: exactly where the old `isOpen` gate
+ * left the tray underneath the row.
+ */
+test('the tray is hit-testable the moment the row moves, not only once it rests open', async ({ page }) => {
+  await withDb(db => seedLog(db, 1))
+  await openYesterday(page)
+
+  const row = diaryRow(page)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  const box = await stableBox(row)
+  const y = box.y + box.height / 2
+  // 16 px in from the right edge, as `swipeRowLeft` does — a drag started at the row's centre lands
+  // on the row's own controls, and the probe below then reports them rather than the tray.
+  const startX = box.x + box.width - 16
+
+  type TouchType = 'touchStart' | 'touchMove' | 'touchEnd'
+  const cdp = await page.context().newCDPSession(page)
+  const touch = (type: TouchType, x: number) => cdp.send('Input.dispatchTouchEvent', {
+    type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+  })
+
+  let moved = ''
+  let hit = { onTray: false, tag: 'not probed' }
+  try {
+    // Pointer DOWN and moved, never released — the state under test is a LIVE drag, and 36 px
+    // against a 64 px tray is displaced-but-not-open: exactly where the old `isOpen` gate left the
+    // tray underneath the row.
+    await touch('touchStart', startX)
+    for (const dx of [12, 24, 36]) {
+      await touch('touchMove', startX - dx)
+      await page.waitForTimeout(16)
+    }
+
+    // Read the row's own transform first. Without this a failure below is ambiguous between "the
+    // tray is under the row" and "the drag never happened", and the first version of this test hit
+    // the second while reporting the first.
+    moved = await row.evaluate((el) => {
+      const surface = el.closest('[data-swipe-actions]')?.lastElementChild as HTMLElement | null
+      return surface ? getComputedStyle(surface).transform : 'no surface'
+    })
+
+    // 52 px into the tray, the same point the timing test uses: the row uncovers the tray's right
+    // edge first, so a point deep in it is the one that stays covered.
+    hit = await page.evaluate(([px, py]) => {
+      const el = document.elementFromPoint(px as number, py as number)
+      const button = el?.closest('button')
+      return {
+        onTray: !!button && /^Delete /.test(button.getAttribute('aria-label') ?? ''),
+        tag: el ? `${el.tagName}${el.className ? '.' + String(el.className).slice(0, 44) : ''}` : 'null',
+      }
+    }, [box.x + box.width - 52, y])
+  } finally {
+    await touch('touchEnd', 0)
+    await cdp.detach()
+  }
+
+  expect(moved, 'the drag never moved the row, so the probe proves nothing').not.toBe('none')
+  expect(
+    hit.onTray,
+    `mid-drag at ${moved}, a tap would land on ${hit.tag} rather than the tray`,
+  ).toBe(true)
+})
+
 test('the drag opens the tray without also stepping the diary to the next day', async ({ page }) => {
   await withDb(db => seedLog(db, 1))
   await openYesterday(page)
