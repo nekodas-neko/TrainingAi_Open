@@ -6885,7 +6885,32 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
-- **Ask:** owner — generate the doc-size baselines in CI instead of committing them? RV-134 already did the cheap half and rejected this one with a reason; re-measure the tax before deciding.
+- **Ask:** owner — the approval on 2026-09-25 was given on a framing that omitted this entry's own objection, and the re-measurement changes the answer. Generating ALL baselines in CI removes the ceiling from CLAUDE.md and projectOverview.md too, which is what the ratchet is for. The narrower fix targets the one file that actually collides. Recommendation and the measurement are below; the build was started and reverted rather than shipped against a stale premise.
+- **📏 RE-MEASURED 2026-09-25, and the tax is real but it is ONE FILE.** Of the last 63 `.size`
+  changes on `main`: **54 are `docs/doc-size/docs/implementation-backlog.md.size`**, against
+  `projectOverview.md` 7, and 1 each for `CLAUDE.md`, `tuning.md`, `bugfix.md`. So `RV-134`'s slack
+  fix did NOT end the class — but the residue is not slack detection, it is that **every agent edits
+  the backlog and it genuinely grows**, so two PRs raise the same number and conflict by
+  construction. That is a ratchet working correctly on the wrong file.
+- **The membership rule is in the script's own first line:** *"Shrink-only size ratchet for the
+  documents every session reads before it can start."* **The backlog is not one of those** — CLAUDE.md
+  instructs an implementer to start from `node scripts/next-item.js`, not a hand-scan, and nobody
+  reads 32,026 lines to orient. Its size is already controlled by the protocol that removes a
+  finished entry and by the compaction sweep.
+- **RECOMMENDED: drop the backlog from the ratchet and REPORT its size instead** — printed on every
+  run, never failing, no committed number to collide on. That removes 54 of 63 of the churn and keeps
+  every ceiling that matters. **Do NOT generate all baselines in CI:** a derived baseline makes every
+  increment inherited, so `projectOverview.md` could grow ten lines a PR forever — and it once reached
+  **9,647 lines** while its own opening line called it a lean index.
+- **⚠ A TEST PINS THE OPPOSITE, which is why this is not already done.**
+  `scripts/__tests__/doc-size-baselines.test.ts:104` asserts the backlog *"must stay tracked"*, listing
+  it among *"the orientation docs every session reads"*. That is an assumption encoded as a test, not
+  a measurement — but it is someone's deliberate call, and reversing it is the decision here rather
+  than a detail of the implementation.
+- **Reversal cost: low.** Restoring the `.size` file and the test assertion is a two-line revert; the
+  baseline can be regenerated with `--fix` at any time.
+- **The implementation was written and REVERTED 2026-09-25** rather than shipped against a premise
+  two signals contradicted. Redoing it is ~20 minutes once the call is made.
 
 - **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
   REJECTED this one with a reason.** The two were filed hours apart by different sessions and

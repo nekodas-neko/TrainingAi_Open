@@ -174,3 +174,35 @@ Four were false positives and were left alone — quoted text from a Routine pro
 field, and prose describing a swipe rather than a decision. **Checking each rather than bulk-adding
 is the whole difference**, since an `Ask:` on an entry that is not really his is how the owner's
 queue fills with things he should not be reading.
+
+## LA-129 — started, measured, and reverted before shipping
+
+The owner approved *"generate the doc-size baselines in CI"*. Starting it, the entry's own first
+bullet said **RE-VERIFY BEFORE BUILDING** and then rejected the approach with a reason. Re-measuring
+changed the answer, so the build was written and then reverted rather than shipped.
+
+**The tax is real and it is one file.** Of the last 63 `.size` changes on `main`, **54 are the
+backlog's baseline** — against `projectOverview.md` 7, and 1 each for `CLAUDE.md`, `tuning.md`,
+`bugfix.md`. `RV-134`'s slack fix did not end the class, but the residue is not slack detection: every
+agent edits the backlog and it genuinely grows, so two PRs raise the same number and conflict by
+construction. **That is a ratchet working correctly on the wrong file.**
+
+**The membership rule is the script's own first line** — *"the documents every session reads before
+it can start"*. The backlog is not one: CLAUDE.md instructs an implementer to start from
+`next-item.js`, and nobody reads 32,026 lines to orient. Its size is already controlled by the
+protocol that removes finished entries and by the compaction sweep.
+
+**So the approved fix is the wrong one, and the reason matters more than the conclusion.** Generating
+all baselines in CI makes every increment inherited — `projectOverview.md` could then grow ten lines a
+PR forever, and it once reached **9,647 lines** while its own opening line called it a lean index.
+The narrower fix — drop the backlog from the ratchet, report its size instead — removes 54 of 63 of
+the churn and keeps every ceiling that matters.
+
+**What stopped the build was a second signal, not the first.** `doc-size-baselines.test.ts:104`
+asserts the backlog *"must stay tracked"*, listing it among the orientation docs. That is an
+assumption encoded as a test rather than a measurement, but it is someone's deliberate call, and
+reversing it is the decision rather than an implementation detail. Two independent signals
+contradicting the premise is where building stops and asking starts.
+
+The measurement, the recommendation and the reversal cost are on `LA-129`. Redoing the
+implementation is about twenty minutes once the call is made.
