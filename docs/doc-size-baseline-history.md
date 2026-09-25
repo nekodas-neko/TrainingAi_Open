@@ -17714,3 +17714,21 @@ reachable path — the back handler raises the leave prompt ON TOP of an already
 distance is `1 + <pushed surfaces>`. The correction is worth its lines because the mistake under it is
 easy to repeat: **releasing an entry does not remove it**, so it still has to be travelled. Recorded in
 the entry, the journal and two new unit cases, since no test in this repo can reach that path.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31574 → 31641 (+67, LB-157)
+
+A measurement that makes an unbuildable entry honest, and the entry it produced. `header-row-width`
+(BF-139 + BF-96) had been at the top of Lane B with both halves FAILED on device and a prescribed
+direction of *"something must own the date"*. Measured at 412 dp: the row is **224.0 px**, the chips
+take 200.2–208.6 of it in daylight and the gap takes 8, so the date gets **7.4–15.8 px** against
+158.7 for the longest real date and 41.7 for `30 Sep`. **Nothing fits**, so no shrink-only fix exists
+and the third chip-shrinking attempt would have failed the way the first two did.
+
+Most of the addition is `LB-157`'s decision brief — the recommendation, the two alternatives with what
+each is genuinely better at, and the reversal cost — because the owner's answer is the only thing that
+unblocks either entry, and a brief he has to reconstruct from a scrollback is not one. The rest is a
+`⛔ MEASURED` note on each parked entry so neither reads as startable.
+
+The figures that are NOT re-measurable here are labelled as such: the seeded DB has no weather
+snapshot, so the chip renders a 56 px skeleton and the chip widths remain the 2026-09-12 device
+readings. The row width, the gap and every date format were re-measured and agree to 0.1 px.
