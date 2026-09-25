@@ -68,7 +68,10 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {error && (
+        {/* `!profile` because `onError` fires on a REVALIDATION failure too, not only the first load.
+            A profile that painted from cache and then failed a background refresh should keep
+            showing the profile, not an error banner stacked on top of good data. */}
+        {error && !profile && (
           <div className="flex flex-col items-center gap-2 pt-12 text-center">
             <UserIcon className="h-12 w-12 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">{error}</p>

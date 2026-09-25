@@ -41,6 +41,12 @@ its deps, not by how fast someone can tap, and the test asserts the split in bot
 
 `clonePhaseSet` has no equivalent hazard: nothing calls it but the button.
 
+A second one from the same re-read: `useCachedValue`'s `onError` fires on a **revalidation**
+failure too, not only the first load. So a profile that painted from cache and then failed a
+background refresh would have shown an error banner stacked on top of perfectly good data — the
+error branch is gated on `!profile` now. Worth knowing for any other card adopting `onError`: it is
+not an initial-load callback.
+
 ## Three things the gate caught that a reading would not have
 
 **The fetch-once ratchet rejected my first profile-page fix.** I converted a bare `fetch` in a

@@ -91,13 +91,10 @@ export function OuraConnectionSection() {
     ).catch(() => {}).finally(() => setLoading(false))
   }
 
-  // RV-178: this was a bare `fetch`, so "Ring synced …" was blank on every open until the network
-  // answered — on a card whose whole job is telling you when the ring last synced. `cachedFetch`
-  // paints the last-known value first and revalidates, and the key is in `invalidateOuraSync()` so
-  // a drain evicts it.
-  // No `onError`: a failed read leaves the last-known "Ring synced …" on screen, which is the right
-  // outcome for this line — and a handler in the `.catch` would never run anyway, because
-  // `cachedFetch` swallows `!res.ok` (RV-84). The bare catch is for a rejected promise only.
+  // RV-178: was a bare `fetch`, so "Ring synced …" — the card's whole job — was blank on every open
+  // until the network answered. Seeded and revalidated now, with the key in `invalidateOuraSync()`
+  // so a drain evicts it. No `onError`: a failure should leave the last-known value on screen, and
+  // a handler in the `.catch` would never run anyway (`cachedFetch` swallows `!res.ok`, RV-84).
   async function loadFreshness() {
     await cachedFetch<{ lastMeasuredAt: string | null }>(
       FRESHNESS_KEY, '/api/oura-ble/freshness', TTL_MEDIUM,
