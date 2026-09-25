@@ -6,9 +6,42 @@ import { auth } from "@/auth";
 import { auth as googleAuth, calendar as calendarApi } from "@googleapis/calendar";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
 
 // One calendar event.
 const MAX_BODY_BYTES = 16 * 1024
+
+// A write to an external service on workout completion. Far above real use — a handful of sessions
+// a day — but it bounds a client stuck in a retry loop, which is what the rule asks for (RV-177).
+const RATE_LIMIT_PER_HOUR = 30
+
+/** Well past any real session; the 16 kB body cap is the binding limit. */
+const MAX_EXERCISES = 500
+/** How many reach the event description, unchanged from before this schema existed. */
+const DESCRIPTION_EXERCISE_CAP = 50
+
+// `new Date(startMs).toISOString()` throws RangeError outside the Date range, and the old
+// `!startMs` guard passed anything truthy — a string, a float, 1e20 — straight into it, so a bad
+// client body was a bodiless 500 rather than a 400. Bounded to a plausible calendar window rather
+// than to Date's own +/-8.64e15, which would still accept the year 200000.
+const MS_LOWER = Date.UTC(2000, 0, 1)
+const MS_UPPER = Date.UTC(2100, 0, 1)
+const EventBody = z.object({
+  sessionType: z.string().trim().min(1).max(120),
+  startMs: z.number().int().min(MS_LOWER).max(MS_UPPER),
+  endMs: z.number().int().min(MS_LOWER).max(MS_UPPER),
+  exercises: z.array(z.object({
+    name: z.string().max(200),
+    setWeights: z.array(z.number()).max(50).default([]),
+    reps: z.array(z.number()).max(50).default([]),
+  // Bounded but NOT capped at 50: the route has always TRUNCATED a long list into the description
+  // rather than refusing it, and `feedback-calendar-scale-routes.test.ts` pins that. A `.max(50)`
+  // here turned a 60-exercise session into a 400 — the event simply never reached the calendar.
+  // The ceiling is a sanity bound (the 16 kB body limit is the real one); the slice below is the
+  // behaviour.
+  })).max(MAX_EXERCISES).default([]),
+}).strict().refine(b => b.endMs >= b.startMs, { message: 'endMs precedes startMs', path: ['endMs'] })
 
 function makeOAuth2(refreshToken: string) {
   const oauth2 = new googleAuth.OAuth2(
@@ -25,29 +58,28 @@ export async function POST(req: NextRequest) {
   const refreshToken = session?.refreshToken;
   if (!refreshToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const userId = session?.user?.id ?? 'anon';
+  if (!rateLimit(`${userId}:log-calendar-event`, RATE_LIMIT_PER_HOUR, 3_600_000)) {
+    return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 });
+  }
+
   const read = await readJsonLimited(req, MAX_BODY_BYTES);
   if (!read.ok) {
     return read.reason === 'too_large'
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const body = read.body as {
-    sessionType: string;
-    startMs: number;
-    endMs: number;
-    exercises: { name: string; setWeights: number[]; reps: number[] }[];
-  };
-
-  const { sessionType, startMs, endMs } = body;
-  if (!sessionType || !startMs || !endMs) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  const parsed = EventBody.safeParse(read.body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const exercises = Array.isArray(body.exercises) ? body.exercises.slice(0, 50) : [];
+  const { sessionType, startMs, endMs, exercises } = parsed.data;
 
   const oauthClient = makeOAuth2(refreshToken);
   const calendar = calendarApi({ version: "v3", auth: oauthClient });
 
   const description = exercises
+    .slice(0, DESCRIPTION_EXERCISE_CAP)
     .map((ex) => {
       const sets = (ex.setWeights ?? [])
         .map((w, i) => `  Set ${i + 1}: ${w}kg × ${ex.reps?.[i] ?? "?"}`)

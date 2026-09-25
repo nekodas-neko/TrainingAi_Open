@@ -4795,16 +4795,21 @@ drift.
 
 - **Lane: A**
 - **Keep:** the date group, the unscoped/dead pair and the phase-set schemas all shipped
-  2026-09-25. **Three groups remain, NONE re-verified** — the two missing rate limits, the two
-  unbounded written weight dates, `calendar-data`'s NaN year with its validate-before-auth ordering,
-  and the two unguarded body ids. Re-verify each against `main` before writing code: **three** of
+  2026-09-25, and both rate limits with them. **Two groups remain, NEITHER re-verified** — the two
+  unbounded written weight dates, and `calendar-data`'s NaN year with its validate-before-auth
+  ordering plus the two unguarded body ids. Re-verify each against `main` before writing code: **three** of
   this entry's claims have already turned out stale or backwards.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
 gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
-- **No rate limit:**
-  - `nutrition/meal-plans/meals/[mealId]/route.ts:66` (PATCH `scaleToTarget` → model call; its
-    siblings cap at 40/h and 10/h).
-  - `log-calendar-event/route.ts:20` (a Google write, with an unvalidated `startMs`).
+- **✅ SHIPPED 2026-09-25 — both missing rate limits**
+  ([entry](overview/entries/2026-09-25-rv177-rate-limits.md)). Claims confirmed: the meal PATCH's
+  `scaleToTarget` branch really does reach `generateObject` (through `scaleWithTopUp`) with no cap,
+  and `log-calendar-event` had neither a limit nor a schema.
+  - The meal PATCH is limited **on the scale branch only**, at 40/h to match `generate/meal`'s
+    per-meal granularity — limiting the whole handler would throttle a rename, which costs nothing.
+  - `log-calendar-event` gets 30/h plus a `.strict()` Zod body. Its `!startMs` guard passed any
+    truthy value into `new Date(startMs).toISOString()`, so a string or `1e20` threw RangeError and
+    answered a bodiless 500.
 - **No clock bound on a written weight date (Q-494's missed siblings):**
   - `sync-health/route.ts:108-111`, where an invalid date also poisons the whole batch.
   - `body-metadata/route.ts:288-292`.

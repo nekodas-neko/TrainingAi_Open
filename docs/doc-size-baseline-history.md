@@ -17833,3 +17833,14 @@ The lines are there for one reason: the bound. `generated-program.ts` already bo
 editor floors at 0 and **production holds 8 phases at `duration_cycles = 0`**, so `min(1)` would
 have 400ed the owner re-saving his own phase set. The entry records that, and records that whether
 0 should be reachable is a product question left open rather than settled by a validator.
+
+## 2026-09-25 — `docs/implementation-backlog.md` (RV-177 rate limits)
+
+RV-177's rate-limit bullet replaced with what shipped, and the `Keep:` narrowed from three open
+groups to two.
+
+The lines record that both claims held on re-verification — the meal PATCH really does reach
+`generateObject` through `scaleWithTopUp`, and `log-calendar-event` had neither a limit nor a schema
+— and that the meal limit sits **inside** the scale branch rather than at the top of the handler,
+because the same route serves a rename that costs nothing. That placement is the kind of thing a
+later reader would otherwise "tidy" into a handler-level guard.
