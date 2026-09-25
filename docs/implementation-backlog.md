@@ -1436,7 +1436,7 @@ the Orchestrator's to do.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
-- **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
+- **Ask:** owner — FOUR questions now, not seven, each with a recommendation. Items 5 and 7 are resolved and item 2 has lost its structural half; what is left is LA-89 (an external caller only he can know about), LA-82's render question, Q-231 (a product preference), BF-77 (one sentence), and the twelve-entry admin sitting. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -1463,12 +1463,20 @@ below keep their gate — they really are blocked pending an answer — and this
    *Only he can answer whether something outside this repo calls it* — a curl in a runbook, a Tasker
    profile, an old APK. **Recommend: delete the route and its test together.** Renaming is worse; it
    keeps a second way into the pipeline that Q-122 was closing. Reversal: restore 50 tested lines.
+   **Re-verified 2026-09-25:** still zero live callers across `app/`, `lib/`, `components/`,
+   `packages/`, `android/` and `scripts/` — the only hits are two comments in
+   `app/api/complete-workout/` recording that the caller was removed, and the tests. **Two facts
+   found while checking that strengthen the delete and were not in this item:** the route is **not
+   admin-gated** (unlike both of its neighbours in the same test file — it acts on the caller's own
+   data), and it **answers `success: true` even when the pipeline throws**, deliberately. So what is
+   being kept alive is an unauthenticated-to-admin entry point that cannot report its own failure.
 2. **`LA-82` — should a heart-rate profile with an unreadable age render zones at all?** With no age
    it silently uses a max of 190 against his real 184, a 6 bpm shift across every zone, and
    `maxHrSource` still reads `estimated`. **Recommend: render, with the degradation marked** — the
-   alternative hides the screen on a transient read failure. The second half (a new `maxHrSource`
-   value vs a separate `degraded` flag) is structural and is the Orchestrator's; one consumer reads
-   it, so either is cheap.
+   alternative hides the screen on a transient read failure. **The second half is now DECIDED and off
+   this list (2026-09-25): a new `maxHrSource` value, not a separate `degraded` flag** — one field
+   that already means provenance beats two that must agree. It was marked structural here and
+   structural calls are the agent's. **So item 2 is one question now, not two.**
 3. **`Q-231` — retire the "Exercise detected" card, or feed it from the BLE classifier?** Its only
    writer was the Oura Cloud sync; the table's newest row is `2026-07-05` and the card has shown
    nothing since about 2026-08-04. Either branch is a different feature and nothing in the repo
@@ -1482,6 +1490,9 @@ below keep their gate — they really are blocked pending an answer — and this
    (ten in prose → nine counted → ten → twelve) and every rise came from reading a gate that said
    only `owner` and finding a button press behind it. **Read the batch fields, never the prose**, and
    recount before asking rather than quoting this line.
+   **Recounted 2026-09-25 from the batch FIELDS, as instructed: still TWELVE** — 6
+   `owner-admin-sitting` + 6 `admin-console-sitting`. The number has held for a day, so it is quotable
+   now; recount anyway, because that is what the last four moves were about.
 5. ~~**`owner-branch-protection`**~~ — **DONE 2026-09-25 (OR-164).** The `ProtectMain` ruleset was
    sitting at Enforcement `Disabled`, which is why nothing it listed was enforced; the owner set it
    **Active**, dropped E2E from the required list and restricted merges to **squash**. `LB-52` is
@@ -1491,11 +1502,14 @@ below keep their gate — they really are blocked pending an answer — and this
    the docs-only planning PR is startable today and that gate comes off; if he wants to be in it, it
    is a calendar item. One sentence either way, and it is the only thing between this entry and
    progress.
-7. **`LB-53` — back-fill readiness over the 58 derived rows that have no score?** A production write
-   that rewrites months of history in one pass, and a re-scored trend is not silently reversible.
-   **Ask it inside `RV-170`'s history-row policy**, not separately — it is the same question that
-   entry splits by kind, and `RV-170`'s recommendation (recompute-from-stored-inputs: yes) already
-   covers this shape.
+7. ~~**`LB-53` — back-fill readiness over the 58 derived rows that have no score?**~~ — **RESOLVED
+   2026-09-25, and it never needed asking.** This item's own instruction was to ask it *inside*
+   `RV-170`'s history-row policy. That policy was **answered on 2026-09-24**, by **kind** rather than
+   by entry: recompute-from-stored-inputs YES. `backfill-derived-scores` recomputes through
+   `buildDayAudit`, which is that kind exactly, so the gate is struck and the entry is the device
+   agent's to run. It was missed because `RV-170` released the entries that carried a pointer at it
+   and this one stated the dependency in a gate field instead — which is this entry's whole thesis,
+   arriving on this entry's own list.
 
 - **Done when** each numbered item has an answer recorded on its own entry and that entry's gate is
   struck. This entry leaves the queue when the list is empty, not when it has been read once.
@@ -12811,10 +12825,20 @@ resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no re
   `'estimated'`, identical to the ordinary estimated case. So guarding it without a marker converts
   a loud failure into a quiet wrong answer, which is the shape this repo keeps paying for.
 
-- **Gate:** owner — for the second half only. Two questions, and neither is derivable from the code:
-  whether a degraded profile should render zones at all (a quota measured against a guessed max is
-  wrong in a way the screen cannot show), and whether the marker belongs on `maxHrSource` as a new
-  value or as a separate `degraded` flag. Only one consumer reads the source today
+- **✅ THE SECOND OF THE TWO QUESTIONS IS DECIDED, 2026-09-25 (Orchestrator) — it was never his.**
+  *Where the marker belongs:* **a new `maxHrSource` value, not a separate `degraded` flag.* That field
+  already exists to say **where the max came from**, and *"his age could not be read, so this is a
+  default"* is exactly a provenance answer. A parallel boolean creates two fields that have to agree
+  and will eventually not — it would permit `maxHrSource: 'estimated'` beside `degraded: true`
+  without saying which estimate is meant, and every future reader would have to check both. One field
+  stays one source of truth. Reversal: one enum value and one consumer, so this is cheap enough that
+  deliberating it further costs more than being wrong would. Per CLAUDE.md's standing narrowing,
+  structural calls are the agent's and get written down rather than asked.
+- **Gate:** owner — for ONE question now, not two: **should a degraded profile render zones at all?**
+  A quota measured against a guessed max is wrong in a way the screen cannot show, and the
+  recommendation is **render, with the degradation marked** — hiding the screen on a transient read
+  failure is the worse failure. That half is a genuine product preference and stays his. Only one
+  consumer reads the source today
   (`app/api/hr-profile/route.ts:49`, as `workingMaxSource`), so either shape is cheap to wire.
 
 Ship the resting half whenever; it needs no decision.
@@ -20697,6 +20721,15 @@ without a queue entry is a dropped finding.*
 
 ### [sleep][platform] LB-53 — `oura_daily_derived`: what actually writes it, and the one thing still owed
 
+- **Lane: DV** — set 2026-09-25 with the release above. The remaining action is **running** the
+  back-fill, not writing code, and `backfill-derived-scores` authenticates through `auth()` +
+  `requireAdmin` with no bearer-token path — so no sandboxed agent can fire it and the device agent
+  can, which is the same routing `RV-170` applied to `LA-56`, `Q-71` and `LA-68`.
+- **⚠ Run it under `TN-62`'s constraints, which are already written there:** the endpoint is ~370
+  queries per call against a `max: 10` pool, one page at a time, dry-run first, never concurrent with
+  another admin route or a sweep. It is `DV-13`'s shape. The range is ≤31 days per call, so 109 days
+  of history is four paged calls, not one pass.
+
 > **⛔ REFUTED AS FILED, 2026-09-04 — `computed_at` does not mean what this entry read it to mean, and
 > the fix it implied is not the fix.** The column is stamped `now()` by **every** write of **any** of
 > the 36 columns on the row (`upsertOuraDailyDerived` sets `computedAt: new Date()` unconditionally,
@@ -20737,7 +20770,8 @@ without a queue entry is a dropped finding.*
 > `body_comp` for the whole history, every run; (5) the device push (`oura_daily_derived` outbox
 > domain, `adapter.ts`). All five stamp `computed_at`.
 
-- **Lane:** A
+  The A-lane assignment this entry carried until 2026-09-25 is superseded by the device
+  routing above; the code half it referred to has shipped, so what is left is the run.
 - **Branch:** `fix/backfill-readiness-model-stamp` (the stamp half, shipped 2026-09-04)
 - **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
   the next day"* · refuted and re-scoped 2026-09-04
@@ -20746,7 +20780,21 @@ without a queue entry is a dropped finding.*
   route only ever writes today and nothing has back-filled the rest. The tool to fix it already
   exists and now stamps correctly; running it is a **`Gate: owner`** action, not a code change,
   because it writes months of history in one pass and a re-scored trend is not silently reversible.
-- **Gate:** owner — a PRODUCTION WRITE, not a decision: back-filling readiness across the 58 of his 109 derived rows that carry no score. The tool exists and now stamps correctly; what stops it is that it rewrites months of history in one pass and a re-scored trend is not silently reversible. Same class as `RV-170`'s history-row policy — ask them together.
+- **✅ RELEASED BY `RV-170`(a), 2026-09-25 (Orchestrator) — the gate is struck and nothing is owed by him.**
+  The gate said this was *"a PRODUCTION WRITE, not a decision"*: back-filling readiness across the 58
+  of his 109 derived rows that carry no score, blocked because a re-scored trend is not silently
+  reversible, and it asked to be put to him *"together with `RV-170`"*. **It was — and the answer
+  covers it.** On 2026-09-24 he took the split-by-kind recommendation: **recompute-from-stored-inputs
+  YES**, hand-edits NO. He answered by **kind**, not by entry, which is the whole point of that split.
+  This is squarely the authorised kind: `app/api/admin/backfill-derived-scores` recomputes each day
+  through `buildDayAudit` — *"the same compute functions the live route serves from, no formula
+  restated"* — so it is deterministic and repeatable at will, the two properties the yes rests on.
+  **Why it was missed:** `RV-170` named the entries it released by reading which ones carried a
+  pointer at it (`LA-56`, `Q-71`, `LA-68`). This one stated the same dependency in an owner-gate
+  field instead, so it was invisible to that pass — the exact mechanism failure `OR-145` exists to
+  catch, landing on `OR-145`'s own list.
+  **If he disagrees, re-gating costs nothing** — nothing has been run, and this note is what makes
+  the call visible rather than silent.
 - **Not a defect, recorded so it is not re-opened:** a day's score freezing when the day ends is
   correct behaviour, not staleness. The narrow real case is a day whose last app open happened
   before the ring synced — that day's stored score is built from an incomplete night and nothing
