@@ -874,8 +874,11 @@ export async function runOuraRollup(
   }))
   if (hrSeriesRows.length > 0) {
     await step('hr_series', async () => {
-      await io.deleteBleHeartrateFrom(toDate(hrSeriesCutoffDs))
+      // Upsert BEFORE the delete, deliberately (RV-182 ③). Deleting first left a window where
+      // the rows were absent, and — because it removed exactly the rows about to be written —
+      // meant the upsert never hit a conflict, so its `IS DISTINCT FROM` guard never applied.
       await io.upsertHeartrate(hrSeriesRows)
+      await io.deleteBleHeartrateNotIn(toDate(hrSeriesCutoffDs), hrSeriesRows.map(r => r.timestamp))
       // The zone-minutes cache is derived from these HR rows; drop the cached days we just
       // rewrote so they recompute on the next read (J-1/C-5 — owns-its-rows invalidation).
       await io.deleteZoneMinutesFrom(dayForDs(hrSeriesCutoffDs))

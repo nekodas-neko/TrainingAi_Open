@@ -17511,3 +17511,19 @@ Two corrections RV-102 was carrying are kept in the journal rather than the queu
 only tracks open work: the entry called the two colour tables "identical today" (they are not — 13
 keys against 10, which is exactly why the dedupe needed checking), and it prescribed the shared
 palette to Lane B although `packages/shared/**` is Lane A's.
+
+## 2026-09-25 — `docs/implementation-backlog.md` → 31335 (RV-182 ③, five of the lines)
+
+Five lines net from this branch — the baseline landed at 31335 because RV-102 grew the file in
+parallel — and they are a **retraction**, which is why they sit in the queue.
+
+RV-182's third item proposed "upsert with IS DISTINCT FROM". That was already shipped, and had been
+since review B1/R1 — `upsertOuraHeartrate` carries the guard, with a comment explaining it. What the
+entry did not see is that a blanket delete ran immediately in front of it, removing the rows the
+guard existed to match, so the guard had never once applied. An implementer taking the item as
+written would have gone looking for an upsert to add, found one already there, and reasonably
+concluded the item was stale.
+
+The rest of the delta is the measurement (628,197 inserts and 574,974 deletes against 140,181 live
+rows, 95 updates) and one line keeping `oura_heartrate_pkey` — 7 MB, 0 scans — on the record, since
+dropping a primary key is a migration and ships alone.
