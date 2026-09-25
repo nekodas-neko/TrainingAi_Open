@@ -1801,6 +1801,85 @@ which is the right shape for something that can only be validated by living with
 - **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
   `generativelanguage.googleapis.com` at the same time.
 
+### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
+- **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
+- **Added:** 2026-09-25 · Review sweep 61 ([`docs/reviews/2026-09-25-sweep-61-ai-to-logic.md`](reviews/2026-09-25-sweep-61-ai-to-logic.md)). **Owner request, 2026-09-25:** *"we use AI more than we need to … use logic instead to save on tokens and offline compatibility."* That request is the product decision, so **no further owner gate is needed**. The only cost is the AI's phrasing.
+- **The four, each measured at source:**
+  1. **daily-digest** runs automatically when the End-of-Day review opens (`day-digest-card.tsx:37-47`).
+     - Every fact line is already built in `app/api/daily-digest/route.ts:59-142`.
+     - The model is also fed the day's earlier AI insights, so it summarises other model output.
+     - **Replace:** render the fact lines as a short list, using a pure shared builder.
+  2. **session-explain insight** runs automatically on every page open (`app/api/session-explain/insight/route.ts:41-57`).
+     - `groupSignals`/`trendPhrase` (`group-signals.ts:42-83`) already turn the same signals into words on the same page.
+     - **Replace:** a template that names the heaviest-weighted signal.
+     - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
+  3. **running-plan explain** runs automatically, once per day per run (`prescribed-run-card.tsx:61-85`).
+     - The route's own header says it only rewords the deterministic `rationale` and is "never load-bearing".
+     - **Delete the route and the fetch;** the rationale is already on the card.
+  4. **nutrition-goals-recommend**: since RV-66, every number comes from `calculateBaseline`.
+     - The model now only picks an activity level, using a threshold its own prompt spells out (`route.ts:316`), and writes prose.
+     - A model failure still returns **500 and a "Failed to get recommendation" toast, discarding numbers already computed** (`:373-377`).
+     - **Replace:** the threshold becomes a function and the "built from…" sentence becomes a template.
+     - Correct the stale "AI adjusts this baseline" header in `components/profile/goal-baseline.ts`.
+- **Where it can, the text is built on the device, so it works offline:** daily-digest and session-explain read local-first data.
+- **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
+
+### [platform][app-shell] RV-201 — health-insight and weekly-digest: show computed text first, and let the week page work offline
+- **Lane: A**, then **B**. One PR. **Supersedes PS-31(a) and (b) for these two routes**; update PS-31 when this lands.
+- **Added:** 2026-09-25 · Review sweep 61.
+- **health-insight** has 26 calls in 30 days, the most of any prose route. It runs automatically on every Health detail screen (`ai-insight-card.tsx:72-77`).
+  - Every data line is computed in `app/api/ai/health-insight/route.ts:100-181`, and the numbers-only fallback already exists (`:195-198`).
+  - The cache key hashes the prompt, and the prompt includes a "Past week scores" line (`:116`) that changes daily. So it **regenerates every day**, and again on any back-fill.
+  - It is also where Q-292's false "perfect" and the imperial units came from: 16% of 117 insights audited.
+  - **Fix:** a template per section (band, weakest contributor, today against the 7-day values), rendered immediately and offline.
+  - Keep the model only if the owner later wants the prose back. The recommendation is to drop it.
+- **weekly-digest** runs automatically on **every Home visit** until the week's result is cached (`weekly-recap-banner.tsx:53`), and when `/health/week` opens.
+  - **The week page's charts ride on the AI POST**, so offline the whole page shows its error state.
+  - The rate-limit exit (`route.ts:277-279`) returns 429 **without** the metrics it has already computed.
+  - **Fix:** serve `WeeklyDigestMetrics` from a GET through `cachedFetch`, so the charts paint offline, and template the bullets from the week-over-week deltas.
+- **Done when:** both surfaces render with the network off, and neither shows a superlative or an imperial unit.
+
+### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
+- **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
+- **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
+- **What:**
+  1. **Model failure → 502** (`generate-prescription.ts:316`).
+     - The client ignores the non-ok response and polls `PRESCRIPTION_POLL_MAX = 10` times at 3 s.
+     - The user watches "Preparing your AI workout…" for about 30 s, then gets the base program.
+     - **The deterministic path already exists:** the whole-session deload builds a full prescription with no model (`:59`), and `fitToBudget`/autoregulation run after the model anyway.
+     - **Fix:** on failure, return the deterministic prescription flagged `source: 'rules'` instead of 502.
+  2. **A duration preset change re-runs the whole model call** (`use-duration-preset.ts:52`, `mood-checkin-sheet.tsx:148`), although the budget fit is pure code.
+     - **Fix:** re-fit the stored prescription with `fitToBudget`, with no model call. That also works offline.
+  3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
+     - The pending flag only comes from a server response (`workout-screen.tsx:446`).
+     - **Fix (B):** label the source ("Base program" or "From {date}").
+- **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
+
+### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
+- **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
+- **Added:** 2026-09-25 · Review sweep 61. nutrition-scan is the second-largest AI user, with 29 calls in 30 days.
+- **Photo and recipe-link scans stay on the model;** they genuinely need it. Everything below is logic-first, with the model kept as the fallback:
+  1. **Describe goes straight to the model** (`capture-actions.tsx:219-223`) and never searches the user's own foods. `store.searchFoodItems` already powers `ingredient-picker.tsx:87` and `food-list.tsx:105`.
+     - **Fix:** search saved foods (including earlier AI estimates) and saved meals first, and offer the model only when nothing matches.
+  2. **Barcode always calls Open Food Facts** (`capture-actions.tsx:250`), so a product scanned before still fails offline.
+     - **Fix:** look up the user's saved foods by barcode first.
+  3. **"Refine" with a portion correction** ("it was 300 g") calls the model again (`review-step.tsx:129`).
+     - **Fix:** parse a plain weight or serving count and rescale with the existing weight editor. Anything else still goes to the model.
+  4. **Meal plans default to inventing every meal:** `useLibrary` starts `false` (`meal-plan-setup-sheet.tsx:81`).
+     - **Fix:** default it on when the user has saved meals, so the model fills only the gaps. The route already skips the model when every slot is filled (`generate/route.ts:297-307`).
+- **Done when:** a repeat Describe or barcode for a known food works offline with no `nutrition-scan` row logged.
+
+### [workouts] RV-204 — workout-review and the recap have code that already does their job; neither ran in 30 days
+- **Lane: A.** Low priority: zero calls in 30 days.
+- **Added:** 2026-09-25 · Review sweep 61.
+- **workout-review** (runs automatically when its sheet opens from Config):
+  - `reconcileReview` already clamps every adjustment, refuses unsafe drops, back-fills what the model omitted, and recomputes duration and weekly volume (`reconcile.ts:104-220`).
+  - `dropToBudget`/`fitToBudget` already fit a session to its budget.
+  - **Fix:** run those directly, losing only the free-text drop reasons (a fallback string already exists, `:177`). Size M.
+- **Recap:**
+  - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
+  - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
+
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
 - **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
@@ -4831,11 +4910,11 @@ drift.
 ### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
 
 - **Lane: A**
-- **Keep:** the date group and the unscoped/dead pair both shipped 2026-09-25. **Four groups
-  remain, NONE of them re-verified yet** — the two missing rate limits, the two unbounded written
-  weight dates, Zod on the three phase-set writes, `calendar-data`'s NaN year with its
-  validate-before-auth ordering, and the two unguarded body ids. Re-verify each against `main`
-  before writing code: **three** of this entry's claims have already turned out stale or backwards.
+- **Keep:** the date group, the unscoped/dead pair and the phase-set schemas all shipped
+  2026-09-25. **Three groups remain, NONE re-verified** — the two missing rate limits, the two
+  unbounded written weight dates, `calendar-data`'s NaN year with its validate-before-auth ordering,
+  and the two unguarded body ids. Re-verify each against `main` before writing code: **three** of
+  this entry's claims have already turned out stale or backwards.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
 gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
 - **No rate limit:**
@@ -4862,8 +4941,16 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex is repeated in **20+ files**, while `isCalendarDate` —
   which exists for exactly this (Q-496) — guards only about five of them. Worth its own sweep entry
   rather than being smuggled into this one.
-- **No Zod on phase-set writes:** `phase-sets/[id]/route.ts:30`, `phase-sets/route.ts:34` and
-  `phase-sets/clone/route.ts:21`. `durationCycles` is unchecked, and a bad body gives a bodiless 500.
+- **✅ SHIPPED 2026-09-25 — Zod on the three phase-set writes**
+  ([entry](overview/entries/2026-09-25-rv177-phase-set-schemas.md)). Claim confirmed exactly: all
+  three took a raw cast with no Zod at all. `PhaseSetWriteBody`/`PhaseSetCloneBody` in
+  `packages/shared/src/validation/phase-set.ts`, both `.strict()`.
+  - **⚠ The bounds came from production, not from the obvious precedent.** `generated-program.ts`
+    bounds `durationCycles` at `min(1)` and copying it was the first move — but the editor's stepper
+    floors at `Math.max(0, …)` and production holds **8 phases at `duration_cycles = 0`**, so
+    `min(1)` would have 400ed the owner re-saving his own data. It is `min(0)`.
+  - **Whether 0 cycles should be reachable at all is open**, and is a product question rather than a
+    validation one: the AI path forbids it, the editor allows it, and 8 rows have it.
 - **`calendar-data/route.ts:8-9`:** a NaN year slips past the range check, and params are validated
   before auth.
 - **Body ids reach the uuid cast unguarded on POST**, which RV-47 did not cover:
@@ -13425,6 +13512,7 @@ neighbours. Until then `excludeLowWearDays` drops all 22 from the HRV/RHR baseli
 nulling the column is data-dropping, and a Redecode restores real numbers.
 
 ### [platform] PS-31 — AI calls with no data gate, a missing maxRetries, and a blind fingerprint
+- **🔎 2026-09-25 (Review sweep 61):** (a) and (b) are still open. For `health-insight` and `weekly-digest`, **RV-201 supersedes them**: it replaces the prose with computed templates, so the gate and the fingerprint stop mattering there. (c), `running-plan/explain`'s retries, becomes moot under **RV-200**, which deletes that route.
 
 - **Lane:** A — `app/api/ai/health-insight/route.ts`, `app/api/weekly-digest/route.ts`,
   `app/api/running-plan/explain/route.ts`, `app/api/nutrition/scan/route.ts:184`.
