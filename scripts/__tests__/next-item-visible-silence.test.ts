@@ -23,13 +23,34 @@ const run = (...args: string[]) =>
     cwd: repoRoot, encoding: 'utf8',
   })
 
+// The cap is on ROWS, and a batch is one row carrying several entries — so "READY (12)" can be
+// fully printed inside a 10-row cap with nothing withheld. Counting the entries the output actually
+// shows is the only way to ask "did the cap hide anything?" without re-encoding a fact about
+// today's batches. An entry line is `NN. <id> …` or, inside a batch, an indented `<id> …`; the
+// batch header itself carries no id and so is not counted.
+const ENTRY = /^\s*(?:\d+\.\s+)?((?:[A-Z]{2}|Q)-\d+[a-z]?)\s/
+function printedEntries(out: string): number {
+  // The block runs to the next SECTION HEADER, which is the only thing at column 0 — not to the
+  // next blank line. `--lane O` and `--lane DV` print a blank line and an indented note about owed
+  // device checks between the READY header and the first entry, so stopping at the blank found
+  // zero entries in exactly the two lanes most likely to be truncated.
+  const lines = out.split('\n')
+  const start = lines.findIndex((l) => l.startsWith('READY ('))
+  if (start < 0) return 0
+  let end = lines.length
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^\S/.test(lines[i])) { end = i; break }
+  }
+  return lines.slice(start + 1, end).filter((l) => ENTRY.test(l)).length
+}
+
 describe('next-item does not stay silent about what it withheld (TN-61)', () => {
   it('names the withheld count whenever READY is truncated', () => {
     const out = run('--lane', 'A')
     const readyCount = Number(/READY \((\d+)\)/.exec(out)?.[1])
     expect(readyCount).toBeGreaterThan(0)
 
-    if (readyCount > 10) {
+    if (printedEntries(out) < readyCount) {
       const m = /showing (\d+) of (\d+)/.exec(out)
       expect(m, 'a truncated READY must say so').not.toBeNull()
       // The regression itself: the TOTAL has to be READY's own count. The old line could not be
@@ -42,21 +63,33 @@ describe('next-item does not stay silent about what it withheld (TN-61)', () => 
   })
 
   // The truncation line appears IF AND ONLY IF the cap hid something — asserted across every lane,
-  // because this case has now broken twice for the same reason: it encoded a fact about the DATA
-  // rather than the behaviour. First it searched for the bare word "showing" and went red when
+  // because this case has now broken THREE times for the same reason: it encoded a fact about the
+  // DATA rather than the behaviour. First it searched for the bare word "showing" and went red when
   // RV-128 ("does the tab switch drop a frame showing neither panel?") entered the lane; then it
   // hard-wired DV as the everything-fits lane and went red when DV grew past the cap. A test that
   // names a lane is a test that expires.
+  //
+  // The third was `ready > 10` standing in for "the cap hid something". The cap is on ROWS and a
+  // batch is one row holding several entries, so the two part company as soon as enough batches sit
+  // near the top: measured 2026-09-25, lane B printed all 12 of its READY entries inside 10 rows —
+  // three of them batches — and correctly stayed silent, while this test demanded a truncation line
+  // for work that was in front of the reader. It failed on a branch whose diff was a CI comment and
+  // a backlog entry, which is the tell that the assertion was about the data. Comparing the entries
+  // the output actually PRINTS against READY's own count is the behaviour, and it catches the
+  // original TN-61 bug too — there, printed really was less than READY and nothing said so.
   it('claims truncation exactly when the cap hid something, in every lane', () => {
     for (const lane of ['A', 'B', 'O', 'DV']) {
       const out = run('--lane', lane)
       const ready = Number(/READY \((\d+)\)/.exec(out)?.[1])
+      const shown = printedEntries(out)
       const line = /showing (\d+) of (\d+)/.exec(out)
-      if (ready > 10) {
-        expect(line, `lane ${lane} shows ${ready} READY and must say what it withheld`).not.toBeNull()
+      expect(shown, `lane ${lane} printed more READY entries than it counted`).toBeLessThanOrEqual(ready)
+      if (shown < ready) {
+        expect(line, `lane ${lane} printed ${shown} of ${ready} READY and must say what it withheld`).not.toBeNull()
+        expect(Number(line![1])).toBe(shown)
         expect(Number(line![2])).toBe(ready)
       } else {
-        expect(line, `lane ${lane} fits in the cap and must not claim truncation`).toBeNull()
+        expect(line, `lane ${lane} printed all ${ready} READY entries and must not claim truncation`).toBeNull()
       }
     }
   })

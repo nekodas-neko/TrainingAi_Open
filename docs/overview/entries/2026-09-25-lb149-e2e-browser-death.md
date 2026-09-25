@@ -57,6 +57,33 @@ empty commits. Those reruns execute the *old* `ci.yml`, so they answer "do the v
 Also corrected: `ci.yml` described the full E2E job as costing "~10 min". Measured on that run it is
 **~29**, which matters because it is the number anyone waiting on a UI PR is implicitly told.
 
+## A test that expired for the third time, and this PR's own lesson
+
+CI went red on the first push, on `scripts/__tests__/next-item-visible-silence.test.ts` (TN-61) —
+a file whose own comment reads *"this case has now broken twice for the same reason: it encoded a
+fact about the DATA rather than the behaviour"* and *"a test that names a lane is a test that
+expires."*
+
+It was right, and this was the third time. The assertion was `ready > 10` implies a truncation line.
+But the cap is on **rows**, and a batch is one row carrying several entries — so the two part
+company as soon as enough batches sit near the top. Measured here: lane B printed **all 12** of its
+READY entries inside 10 rows, three of them batches, and correctly said nothing; the test demanded
+a truncation line for work that was in front of the reader. `next-item.js` was not wrong.
+
+It now compares the entries the output actually PRINTS against READY's own count, which is the
+behaviour rather than today's batch shape. Two things were needed to make that hold: the READY block
+runs to the next **section header** (column 0), not to the next blank line — `--lane O` and
+`--lane DV` print an indented note about owed device checks after a blank, so stopping at the blank
+counted zero entries in exactly the two lanes most likely to be truncated. And the fix was
+mutation-tested: reintroducing the original silence in `next-item.js` turns both assertions red with
+the right messages, and restoring it turns them green.
+
+**The lesson is mine, not the test's.** I skipped the full suite on this PR, reasoning that the diff
+contained no TypeScript — a YAML comment and a backlog entry. That is true and it was the wrong
+inference: the diff changed **data the tests assert against**. A backlog edit is a code change as far
+as the queue-tooling tests are concerned, and the five files I hand-picked as "the ones that read
+ci.yml" could not have caught it.
+
 ## Not this lane's
 
 The entry's other half — *"because E2E is advisory nobody looks"* — is a question about making E2E
