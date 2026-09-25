@@ -1,12 +1,11 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
+**Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
 **Next ID:** LB-148 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111, RV-121, RV-164, BF-190/191, RV-171, RV-167, RV-176 shipped. LB-141 filed (two of three walk
-exits keep nothing — his call). Four of eight named one surface and had a second.
+RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement half. LB-141 filed.
 
 ## Next
 
@@ -51,4 +50,5 @@ device`) both headed READY while unstartable. The field must LEAD its own bullet
   matches ITSELF (`git ls-files` hides it only while untracked, and `ls-files A B -- '*.tsx'` UNIONS
   pathspecs — filter in JS); it matches the COMMENTS explaining the fix (strip them); a regex cannot
   balance parens (`f\([^,)]+\)` flags the corrected `f(g(x), tz)`); arity is per-function.
+- **⚠ ASSERT EVERY SCRIPTED `str.replace`.** This file's "Now" line sat three PRs stale because one no-oped silently on text an earlier no-op never wrote. Code edits were asserted; the baton's were not, and the baton is what survives a compaction.
 - **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; COMMIT before `git stash`/`checkout`; `tsc --noEmit` typechecks NEITHER an auth-gated page nor tests, so run `node scripts/check-test-typecheck.js` before pushing a spec; and vitest's unit project does not transform JSX, so a testable helper goes in a `.ts`.
