@@ -17797,8 +17797,17 @@ path instead of deleted. The `Keep:` also now states plainly that **none** of th
 groups has been re-verified, since three of this entry's claims have already turned out stale or
 backwards and the next session should not assume otherwise.
 
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-199 (does the prescription need AI)
+
+The owner asked whether the prescription needs a model at all. Answering it needs the evidence table —
+sets clamped to 2 in all 33 stored tuples, reps and pct on a ~2.25 %/rep curve the styles table
+already holds, rest the one free output and the one that reads as noise at 68 to 300 seconds — because
+the conclusion is unbelievable without it. The counter-argument costs lines too and had to stay: 35 of
+35 calls succeeded, so the case cannot lean on reliability.
 **2026-09-25 · `docs/implementation-backlog.md` · Review sweep 61, `review/sweep-61-ai-to-logic`.**
-31760 → 31840 (+80). Five entries (RV-200 to RV-204) at the owner's request to move AI calls to logic where
+31836 → 31916 (+80; rebased). Five entries (RV-200 to RV-204) at the owner's request to move AI calls to logic where
 possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
 cites the computed code the model currently rewords, which is what makes it buildable without
 re-deriving it.
