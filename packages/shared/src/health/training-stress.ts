@@ -3,7 +3,7 @@ import { deriveVo2Max, type Vo2MaxInputs } from '@trainingai/shared/health/vo2ma
 
 export type TrainingStressResult =
   | { status: 'ok'; ots: number; high: boolean; vo2max: number | null; vo2maxMethod: string | null }
-  | { status: 'gated'; reason: 'readiness_learning' | 'no_readiness' | 'insufficient_met' | 'no_profile' }
+  | { status: 'gated'; reason: 'readiness_learning' | 'no_readiness' | 'insufficient_met' | 'no_profile' | 'scorer_no_output' }
 
 export interface TrainingStressInputs {
   startTimestampMs: number
@@ -79,6 +79,15 @@ export function computeTrainingStress(i: TrainingStressInputs): TrainingStressRe
     age: i.age, biologicalSex, rhr: i.rhr, noOts: 0, tzChange: i.tzChange,
     readiness: i.readiness, vo2max: vo2.value ?? NaN,
   })
-  if (!out) return { status: 'gated', reason: 'insufficient_met' }
+  // TN-79: this used to answer `insufficient_met` as well, and that one shared string cost five
+  // weeks. `training_load_ots` has been NULL on all 130 days while `training_load_gate` read
+  // `insufficient_met` on the 21 it recorded — so every investigation went looking at the MET
+  // stream, which is fine: replaying the owner's own stored frames through `metGridFromDaytimeSamples`
+  // puts 8 of 9 recent days over BOTH floors above, comfortably (e.g. 2026-09-23: a 1421-minute grid,
+  // 1073 valid minutes, against 720 and 360). The data was never the problem; the scorer returned
+  // nothing and the reason named the wrong half of the pipeline.
+  //
+  // A distinct reason costs one string and makes the next day of production say which half it is.
+  if (!out) return { status: 'gated', reason: 'scorer_no_output' }
   return { status: 'ok', ots: out.ots, high: out.high, vo2max: vo2.value, vo2maxMethod: vo2.method }
 }

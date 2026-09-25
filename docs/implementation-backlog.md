@@ -1068,24 +1068,6 @@ below keep their gate — they really are blocked pending an answer — and this
   number of other days each change moves — a bare gate on a scoring constant is a question he
   cannot answer, and routing them here would just move the silence.
 
-### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
-
-- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch), `program_phases`.
-- **Added:** 2026-09-25 · found while building TN-64(b); filed rather than fixed, because it is a
-  different question from the one the owner answered.
-- **Measured on production 2026-09-25:** `program_phases` holds **0 rows for all five programs** —
-  the two `automatic` ones included. The active program also has `started_at` NULL, which
-  short-circuits the phase lookup before it runs (`phaseList = program.startedAt ? … : []`).
-- **So `inDeloadPhase` has always been `false`**, and the guard that is supposed to stop the app
-  recommending a deload while the owner is *already* in one has never suppressed anything. That was
-  harmless while the gate itself was unreachable (TN-64). Now that the gate is live, it is the
-  difference between "asked once" and "asked during a deload week".
-- **Not urgent, and not a correctness bug:** every prompt still requires the owner's confirmation,
-  so the worst case is a redundant question, not an unwanted deload.
-- **What is NOT established:** whether `ai_dynamic` is *meant* to write phase rows at all, or
-  tracks its cycle another way. Answer that before writing code — if it tracks it elsewhere, the
-  fix is to read that source, not to start populating `program_phases`.
-
 ### [readiness][workouts] TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structurally cannot
 
 - **✅ ANSWERED BY THE OWNER 2026-09-24: extend the recommender to `ai_dynamic` and persist ACWR,
@@ -1914,6 +1896,48 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
+### [devices][platform] LA-139 — the ring clock anchors disagree with each other: 39 of 40 consecutive pairs drift by more than a minute
+
+- **Lane: A** — `lib/data/postgres/adapter.ts` (`getOuraClockAnchor`, `insert` path),
+  `oura_ble_clock_anchors`.
+- **Added:** 2026-09-25 · found while investigating TN-79; filed separately because it is NOT that
+  bug (see below) and is worth its own look.
+- **Measured on production 2026-09-25.** The table holds **12,545 anchors** (since 2026-07-07). An
+  anchor is a `(ring_ds ↔ utc)` pair, so any two of them imply a ring clock rate: `Δds/10` seconds
+  should match `Δutc` seconds. Over the 40 most recent pairs, **39 disagree by more than 60 s**,
+  worst **3,359 s (56 minutes)**. Three consecutive anchors written within **4 real seconds** carry
+  ring times **~19 minutes apart**.
+- **Why that shape:** the anchors look like they are stamped per drained batch — that batch's ring
+  timestamp against the server's arrival time — so during a backfill the pair describes history,
+  not now. `getOuraClockAnchor` then takes `ORDER BY created_at DESC LIMIT 1` and uses that one pair
+  to convert **every** ds↔UTC in the request.
+- **⚠ This is NOT TN-79's cause, and the evidence is explicit.** TN-79's replay used this same
+  newest anchor and still bucketed 1,000+ clean MET samples per day into sensible Brisbane days, and
+  the newest frame maps to ~6 minutes before the anchor. So the mapping is usable for recent data.
+  Do not "fix" TN-79 by rewriting anchors.
+- **What is NOT established:** whether any consumer is actually harmed. Sleep and HR times would be
+  the place to look, and the 2026-08-03 wake-time investigation is prior art worth reading first.
+  A table growing at ~170 anchors/day with mutually inconsistent contents is a hazard on its own
+  terms even if nothing is currently wrong.
+
+### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
+
+- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch), `program_phases`.
+- **Added:** 2026-09-25 · found while building TN-64(b); filed rather than fixed, because it is a
+  different question from the one the owner answered.
+- **Measured on production 2026-09-25:** `program_phases` holds **0 rows for all five programs** —
+  the two `automatic` ones included. The active program also has `started_at` NULL, which
+  short-circuits the phase lookup before it runs (`phaseList = program.startedAt ? … : []`).
+- **So `inDeloadPhase` has always been `false`**, and the guard that is supposed to stop the app
+  recommending a deload while the owner is *already* in one has never suppressed anything. That was
+  harmless while the gate itself was unreachable (TN-64). Now that the gate is live, it is the
+  difference between "asked once" and "asked during a deload week".
+- **Not urgent, and not a correctness bug:** every prompt still requires the owner's confirmation,
+  so the worst case is a redundant question, not an unwanted deload.
+- **What is NOT established:** whether `ai_dynamic` is *meant* to write phase rows at all, or
+  tracks its cycle another way. Answer that before writing code — if it tracks it elsewhere, the
+  fix is to read that source, not to start populating `program_phases`.
+
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
 - **Branch:** `tuning/training-load-gate-diagnosis`
@@ -1954,6 +1978,35 @@ unverified"* is now answered: it persists.
   places the loss between `oura_raw_samples` and `computeTrainingStress` — in
   `getOuraDaytimeSignals` / `readRawFrames` / the ds conversion — and **not** in data availability.
   That is the narrowing this entry contributes: Q-270 can stop asking whether the producer runs.
+
+- **⚙ NARROWED FURTHER 2026-09-25 (Lane A), and the reason string was the trap.**
+  **`insufficient_met` meant TWO unrelated things.** `computeTrainingStress` returned it both from
+  the MET floors (`training-stress.ts:72`) and from *"the scorer returned nothing"* (`:82`). Every
+  investigation read the stored reason, went to the MET stream, and found it healthy — because it
+  is. **This PR gives the second case its own name, `scorer_no_output`**, so one day of production
+  says which half it is.
+  - **The MET data is confirmed sufficient, by replay rather than inference.** The owner's stored
+    `0x50` frames were pulled and pushed through the repo's own `metGridFromDaytimeSamples`:
+    **8 of 9 recent days clear BOTH floors** (09-23: a 1421-minute grid holding 1073 valid minutes,
+    against 720 and 360). Only the two partial edge days fail, as expected.
+  - **The upstream gates are ruled out too:** `readiness_source` is `ble-derived` with real scores
+    (44–59), and date-of-birth, sex and RHR are all present — so `no_readiness`,
+    `readiness_learning` and `no_profile` cannot be what is firing.
+  - **⚠ Two hypotheses were formed and KILLED here — do not re-run them.**
+    ① *`validate()` rejects any NaN, and grid gaps become NaN.* True of the code, **not** the cause:
+    a gap-filled series with **zero** nulls still returns null. ② *The scorer never works at all.*
+    Also false — `inference/__tests__/ots.test.ts` holds golden-vector tests that produce real
+    scores.
+  - **⚠ And the sandbox CANNOT answer the rest.** Those golden tests are
+    `skipIf(!hasRealConstants())`, and `lib/oura-models/constants/MANIFEST.json` is absent from the
+    public repo and CI (`private-paths.json`). So "a uniform dense series returns null here" says
+    nothing about production — where `resilience_level` **is** populated, proving some model
+    constants do load. `constants/index.ts:45` notes production downloads them at boot and warns
+    *"boot does not necessarily run in the process that serves"*.
+  - **The next step is therefore a READ, not a code change:** after this deploys, check whether the
+    21 days read `scorer_no_output`. If they do, the question is whether
+    `training_stress_score_0_2_1.constants.json` is loaded in the serving process — not anything
+    about MET.
 - **Gate ordering rules out three causes for free.** `no_readiness`, `readiness_learning` and
   `no_profile` are all checked **before** `insufficient_met`, so readiness is present and
   `ble-derived`, the baseline is past `BASELINE_MIN_NIGHTS`, and age/sex/RHR are all set. Whatever is

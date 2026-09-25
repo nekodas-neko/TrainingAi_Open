@@ -17192,3 +17192,18 @@ anything. It was invisible while the gate itself was unreachable, and shipping T
 makes it matter. It is filed rather than fixed because the prior question — whether `ai_dynamic`
 writes phase rows at all — decides whether the fix is to read another source or to populate a table
 nothing reads. Writing that down costs fourteen lines and saves the next session from picking one.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 30924 → 30977 (TN-79 narrowing + LA-139)
+
+Fifty-three lines, and most of them exist to stop work rather than start it.
+
+TN-79's amendment records that `insufficient_met` meant two different things, that the MET data is
+confirmed sufficient by replaying the owner's own frames, and — the expensive part to rediscover —
+that **two plausible hypotheses were formed and killed**: the NaN-rejection in `validate()`, and
+"the scorer never works". Each is exactly where a fresh reader would start, and each is a dead end
+that costs an afternoon. It also records that the sandbox *cannot* settle the remainder, because the
+vendor constants are absent here and present in production, so a null result locally proves nothing.
+
+LA-139 is the clock-anchor finding, filed separately with an explicit note that it is NOT TN-79's
+cause — because the tempting move, on seeing 12,545 mutually-inconsistent anchors, is to "fix" them
+in service of a bug they do not cause.
