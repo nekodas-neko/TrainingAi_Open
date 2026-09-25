@@ -6,6 +6,7 @@ import { DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils
 import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { isUuid } from '@trainingai/shared/validation/uuid'
 
 // A date, two ids and a multiplier. 8 KB is generous for four fields.
 const MAX_BODY_BYTES = 8 * 1024
@@ -60,6 +61,15 @@ export async function POST(req: Request) {
   }
   if (mealGroupId != null && typeof mealGroupId !== 'string') {
     return NextResponse.json({ error: 'mealGroupId must be a string' }, { status: 400 })
+  }
+  // All four are `uuid` columns, and a malformed one fails at the driver with 22P02 rather than
+  // returning no rows — so `foodLogRefsValid` below 500s on input that is plainly a 400 (RV-177).
+  // The type guards above were BF-39's and stop a non-string; they do not stop "not-a-uuid".
+  for (const [name, value] of [['mealTypeId', mealTypeId], ['foodItemId', foodItemId],
+                               ['savedMealId', savedMealId], ['mealGroupId', mealGroupId]] as const) {
+    if (value != null && !isUuid(value)) {
+      return NextResponse.json({ error: `${name} must be a uuid` }, { status: 400 })
+    }
   }
   const repo = await getRepository()
   // `savedMealId` is a client-supplied row id, so it is ownership-checked alongside the other two

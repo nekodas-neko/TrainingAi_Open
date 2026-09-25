@@ -17890,3 +17890,10 @@ because the same route serves a rename that costs nothing. That placement is the
 later reader would otherwise "tidy" into a handler-level guard.
 
 32044 → 32049 (+5; rebased twice as main moved under this branch).
+
+## 2026-09-25 — `docs/implementation-backlog.md` (RV-177 closes, LA-145 opens)
+
+32051 → 32015 (−36 against a main that moved twice under this branch; −82 from where the branch
+started). RV-177's nine-gap entry left the queue whole and the one finding inside it that
+had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files against 9 — became LA-145,
+which is a third the length. Lowered rather than left as slack because this PR is editing the file.

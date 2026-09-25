@@ -216,4 +216,66 @@ describe.skipIf(!canRun)('RV-55/56 — route input that used to reach the driver
   it.each(['2026-09-10', '2026/09/10'])('still accepts the real day %s', async (openedOn) => {
     expect((await postVial({ ...VIAL, openedOn })).status).toBe(201)
   })
+
+  /**
+   * RV-177 — three more of the same shape, all measured as live 500s on 2026-09-25.
+   *
+   * `calendar-data` is the sharpest: `parseInt("abc")` is NaN and every comparison against NaN is
+   * false, so the route's own range check waved it through into `RangeError: Invalid time value`.
+   * The other two are `uuid` columns rejecting a malformed value at the driver with 22P02 — which
+   * is exactly what `isUuid` exists for, and what the type guards already there do not cover: they
+   * stop a non-string, not `"not-a-uuid"`.
+   */
+  const getCalendar = async (qs: string) => {
+    const { GET } = await import('@/app/api/calendar-data/route')
+    return GET(new Request(`http://localhost/api/calendar-data${qs}`) as never)
+  }
+
+  it.each(['?year=abc&month=3', '?year=2026&month=xyz', '?year=&month='])(
+    'calendar-data answers 400 for %s rather than throwing', async (qs) => {
+      expect((await getCalendar(qs)).status).toBe(400)
+    })
+
+  // The control: the guard is about NaN, not about tightening the accepted range.
+  it.each(['?year=2026&month=3', '?year=2000&month=1', '?year=2100&month=12', ''])(
+    'calendar-data still answers 200 for %s', async (qs) => {
+      expect((await getCalendar(qs)).status).toBe(200)
+    })
+
+  it.each([
+    ['a non-uuid string', 'not-a-uuid'],
+    ['a number', 5],
+  ])('oura/hr-sync answers 400 for a workoutSessionId that is %s', async (_label, workoutSessionId) => {
+    const { POST } = await import('@/app/api/oura/hr-sync/route')
+    const res = await POST(new Request('http://localhost/api/oura/hr-sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workoutSessionId }),
+    }) as never)
+    expect(res.status).toBe(400)
+  })
+
+  // A well-formed uuid that names no row must still reach the lookup and answer 404 — the guard is
+  // about the value's shape, and turning "not yours" into 400 would be a different change.
+  it('oura/hr-sync still answers 404 for a well-formed id that names nothing', async () => {
+    const { POST } = await import('@/app/api/oura/hr-sync/route')
+    const res = await POST(new Request('http://localhost/api/oura/hr-sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workoutSessionId: '00000000-0000-4000-8000-0000000004f0' }),
+    }) as never)
+    expect(res.status).toBe(404)
+  })
+
+  it.each(['mealTypeId', 'foodItemId', 'savedMealId', 'mealGroupId'])(
+    'nutrition/food-logs answers 400 for a non-uuid %s', async (field) => {
+      const { POST } = await import('@/app/api/nutrition/food-logs/route')
+      const valid = '00000000-0000-4000-8000-0000000004f1'
+      const res = await POST(new Request('http://localhost/api/nutrition/food-logs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: '2026-09-10', mealTypeId: valid, foodItemId: valid, [field]: 'not-a-uuid',
+        }),
+      }) as never)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toContain(field)
+    })
 })
