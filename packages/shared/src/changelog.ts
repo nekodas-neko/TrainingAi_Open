@@ -6,11 +6,38 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.41",
+    date: "2026-09-25",
+    changes: [
+      "Your body-fat reading is now compared against the height it was actually measured at, so the DEXA calibration is fitted like for like. Body composition is worked out once when the scale reading arrives, using your profile at that moment \u2014 so when your height was corrected from 160 cm to 158 cm, every earlier reading was still a 160 cm number while the calibration was being fitted to it live. Expect the displayed body fat to drop by about a point: that is the correction, not a new problem. Your stored history is untouched.",
+    ],
+  },
+  {
+    version: "1.465.40",
+    date: "2026-09-25",
+    changes: [
+      "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. It now notices when answers have stopped arriving and shows you your saved data instead of a spinner, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely. Slow requests are never cancelled \u2014 on a weak connection your data still arrives, it just tells you honestly that the connection is struggling while you wait.",
+    ],
+  },
+  {
+    version: "1.465.39",
+    date: "2026-09-25",
+    changes: [
+      "The two workout time figures now say which time they mean. The estimate on the prescription card is working time \u2014 it already excludes your warm-up \u2014 so on a 60-minute session it reads about 51, which is a full session rather than one nine minutes short. It now says \"of work\". The figure on the finished-workout screen is the whole session including the warm-up, and its tile now says \"Total time\". Both numbers were always right; neither said what it was counting, and side by side they looked like one was short.",
+    ],
+  },
+  {
+    version: "1.465.38",
+    date: "2026-09-24",
+    changes: [
+      "Switching tabs no longer blanks the screen. The panel you were leaving was hidden in the same instant the new one appeared, but the new one then faded in from nothing \u2014 so for about a tenth of a second every switch showed neither, just the background. The fade is gone and the new tab is drawn straight away. This is the flicker, not the lag: the tab switch is still doing too much work behind the scenes, and that is being worked on separately.",
+    ],
+  },
+  {
     version: "1.465.37",
     date: "2026-09-24",
     changes: [
-      "Your body fat percentage will drop by about a point, and the old number was the wrong one. The scale works out your composition once, when you step on it, using your height at that moment \u2014 so when you corrected your height from 160 to 158cm to match your DEXA printout, every earlier reading kept the old figure. The app then calibrates against your DEXA scan using one of those earlier readings, which made the correction it applies about a point too big. It now re-works those readings at your current height before comparing them, so the number you see lines up with the scan.",
-      "Your stored weigh-in history is unchanged for now \u2014 the older rows still hold the figures worked out at 160cm. Rewriting them is a separate decision, since it edits records you have already seen.",
+      "Thirteen screens worked out the date, the month or the time of day from the phone's clock instead of your timezone. The readiness and activity screens asked for the wrong day's AI insight, the calendar could look up the wrong month around a month boundary, and a logged meal could land in the wrong part of the day. None of this was visible while the phone sat in Brisbane, which is why it lasted; it is now wrong nowhere rather than right in one place.",
     ],
   },
   {

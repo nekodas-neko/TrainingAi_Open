@@ -1877,7 +1877,7 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 
 **The DEXA correction is finished and the chain works end to end — but no screen shows it yet (BF-2, all four steps).** The correction is **+3.2 points**, derived from pairs pulled out of `dexa_scans` × `body_metrics` rather than stored, so **no new table and no migration** — and a second scan re-derives on its own: verified, offset **3.2 → 2.6** and `pairCount` 1 → 2 with no entry step, which is the accumulation you asked for. It is an **offset, not a ratio**: with one pair they agree on the measured point and diverge everywhere else, and only the offset makes no claim about readings never observed. **Entering a scan through BF-71's new form (More › Health › DEXA & RMR) makes it live with no other action** — one POST moved resting burn **1832 → 1773 kcal/day** and the calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` still reading the raw 25.3. **The safe-looking design was the wrong one:** correcting inside the shared `listBodyMetrics` read would make a missed consumer impossible, but the Health log sheet seeds from that read and POSTs back at source `manual`, which **outranks `scale_ble`** — so saving an untouched field would overwrite your own measurement and collapse the next calibration toward zero. It is applied per consumer instead, with `check-body-fat-correction.js` (Custom Rules, 64) failing CI on one that forgets — **two rules, because the calorie goal never calls a deriver at all**. The payload carries `bodyFat` (raw), `bodyFatCorrected` and `bodyFatIsCorrected` per reading, plus the offset itself. **No screen reads any of it yet — LA-45**, so your Health card shows 25.3 while your calorie goal already uses 28.5, and two numbers disagreeing on screen is worse than neither being corrected ([engine](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-body-fat-calibration), [consumers](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-correction-consumers), [payload](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-corrected-payload), [end to end](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-chain-end-to-end)).
 
-**Your DEXA scan and your RMR test have nowhere to go — both tables are empty and neither has a form (LA-44, found while planning BF-2).** `dexa_scans` shipped 2026-08-30 with `GET`/`POST /api/dexa-scans`; `measured_rmr` shipped days earlier with `personalRmr` and its own route. Both engines are correct and **nothing in the app calls either** — no screen, no form, no fetch — so the 2026-08-27 results have sat transcribed in `docs/clinical-baseline-2026-08-27.md` for four days with no way in. **Nothing was going to catch this**: no test breaks when a table stays empty. BF-2's own plan is now written ([`2026-08-31-dexa-filter.md`](docs/superpowers/plans/2026-08-31-dexa-filter.md)) and reverses two of its assumptions — the calibration pairs are **derived** from `dexa_scans` × `body_metrics` rather than stored (a stored pair is a stored counter, and every one here has drifted), which takes the whole entry off the migration budget; and the correction is an **offset**, not a ratio, because one pair supports neither and an offset is the one that makes no claim about readings never observed. The engine can ship first and is inert with zero pairs — but nothing shows until a scan can be entered ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-plan-dexa-filter)).
+**Your DEXA scan and your RMR test have nowhere to go — both tables are empty and neither has a form (LA-44, found while planning BF-2).** `dexa_scans` shipped 2026-08-30 with `GET`/`POST /api/dexa-scans`; `measured_rmr` shipped days earlier with `personalRmr` and its own route. Both engines are correct and **nothing in the app calls either** — no screen, no form, no fetch — so the 2026-08-27 results had sat transcribed in a clinical-baseline doc for four days (that doc was removed from the repo 2026-09-24, RV-199; the owner holds it) with no way in. **Nothing was going to catch this**: no test breaks when a table stays empty. BF-2's own plan is now written ([`2026-08-31-dexa-filter.md`](docs/superpowers/plans/2026-08-31-dexa-filter.md)) and reverses two of its assumptions — the calibration pairs are **derived** from `dexa_scans` × `body_metrics` rather than stored (a stored pair is a stored counter, and every one here has drifted), which takes the whole entry off the migration budget; and the correction is an **offset**, not a ratio, because one pair supports neither and an offset is the one that makes no claim about readings never observed. The engine can ship first and is inert with zero pairs — but nothing shows until a scan can be entered ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-plan-dexa-filter)).
 
 **AI program generation deleted every exercise it phrased differently, and said nothing (LA-43).** The prompt tells the model to match library names exactly; the model writes *"Barbell Deadlifts"*, *"Press Dumbbell Incline"*, *"Pull-Ups"*. An exact-match filter removed each one with no trace — so a session came back short of the exercise count its own time budget was computed from, and nothing in the response, the logs or `error_events` said why. **The entry was filed against a different line and that line turned out to be dead code**: the `?? ex.mainMuscles` fallback three lines under a comment saying the model's muscles are never trusted could not fire, because the filter above it had already guaranteed a hit. Names now resolve through exact → normalised → word-order tiers and are kept under the **library's** spelling, because `personal_records` and `exercise_estimates` are unique on `(user_id, exercise_name)` and a surviving paraphrase starts that lift's history from zero. It stops short of subset matching on purpose — that would reach "Bench Press" from "Incline Bench Press", and a wrong merge is unrecoverable while a miss costs one exercise. Measured against the real 142-row catalogue: **0** names stopped resolving, and plurals went from **49 of 121 unreachable to 0**. A genuine miss is now reported; a session left empty returns 502 instead of an unusable program. **Proven end-to-end against real Gemini** ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-fix-generate-program-name-resolution)).
 
@@ -2612,6 +2612,42 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][app-shell] ⚠️ Low reception hung the app instead of showing saved data — engine fixed, NOT seen on the phone (BF-195, 2026-09-24)
+
+The owner: *"I went to an area with low reception and nothing really worked on the app."* Connectivity
+was a boolean — `navigator.onLine` and Capacitor both answer *"is the radio attached"*, and in low
+reception it is. So the offline branch that paints saved data never ran, the request was issued with
+**no timeout at all**, and it never settled. The Workout tab held its skeleton indefinitely and a
+workout could not be started, while the banner claimed *"Offline — showing saved data"* over screens
+showing none.
+
+**Fixed 2026-09-24** — a watchdog reports a request that passes 8 s as slow **without touching the
+request**, and `online` now means *"requests are completing"* rather than *"the radio is attached"*.
+Two slow responses in a row are required before the app calls itself unreachable; one settled
+response — including a 500 — clears it.
+
+**The first version of this fix aborted the request at 8 s, and that was wrong.** It is recorded
+here rather than quietly replaced, because the note below predicted the wrong failure. Aborting
+destroys a *slow-but-working* request, which is precisely the state a lifter on a weak connection
+is in: it replaced arriving data with an error, and made every GET in the app retry-prone. CI
+caught it — the E2E suite ran against a dev server whose first-compile responses take 9–19 s, the
+aborts fired, and a spec asserting *"a same-day resume must not refetch"* saw two requests. The
+watchdog that replaced it changes no request semantics at all.
+
+**What is still owed, and the fix is not confirmed without it:**
+- **The device look.** Nothing here reproduces in the sandbox. The honest reproduction is **network
+  throttling, not airplane mode** — airplane mode exercises the path that already worked.
+- **The banner still over-promises on a seedless screen.** The engine makes it appear at the right
+  *times*; it cannot make *"showing saved data"* true where nothing is saved. Lane B's copy to fix.
+- **Whether 8 s is right** is still unmeasured — but note that this line originally read *"a
+  finding about the number is not a finding about the approach"*, and the defect turned out to be
+  the **approach** (cancelling the request), not the number. The threshold now only decides when to
+  *report* slowness, so getting it wrong is cosmetic rather than destructive.
+
+**Not addressed, and not diagnosed:** the sleep card reading a month-stale *"Last: 2026-08-25"*. A
+screenshot cannot distinguish a stale cache entry from the card's own fallback, and guessing between
+them is how the wrong thing gets fixed.
+
 ### [body][nutrition] ⚠️ Your body fat has read about a point high since 01 September — live value fixed, stored history not (RV-165, 2026-09-24)
 
 Body composition is computed **once, at ingest**, from the profile of that moment. The height was
@@ -3035,6 +3071,20 @@ param-delivery problem** — instrumenting the reader showed `searchParams` arri
 both the initializer and the effect, and `setReviewOpen(true)` running, on the failing run. The
 defect is downstream, in what the sheet renders or is gated on during a cold first render. Filed
 with a probe recipe rather than chased inside RV-110's PR.
+
+### [app-shell] ⚠️ The tab switch no longer blanks, and nobody has looked at it (RV-113, OR-161, 2026-09-24, v1.465.38) · needs: device
+
+The opacity ramp is gone from `ta-tab-enter`, so the incoming panel is painted for the whole
+switch instead of held at opacity 0 for 58–109 ms. **Not verified on device** — the Device
+Verification session is archived, and this is a perceptual change on the app's most frequent
+interaction, so the check is a look rather than a measurement.
+
+**Read `perf.js longtasks` here and you will conclude it failed.** It removes a BLANK, not a DELAY:
+the 68–118 ms long task underneath is `DV-12`, still open and untouched. The two numbers describe
+the same frames, which is why they were batched and why only half of the batch shipped.
+
+Also fixed: the two code comments (`globals.css`, `tab-shell.tsx:186`) that asserted this defect
+could not happen and are why it survived review.
 
 ### [app-shell] ⚠️ Cross-tab navigation goes through the shell now — the teardown premise is UNVERIFIED (RV-110, RV-112, 2026-09-23, v1.465.8) · needs: device
 

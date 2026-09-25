@@ -223,8 +223,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       if (!userId) return;
       const store = getLocalStore(userId);
       if (!store) return;
-      const cutoff = new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000);
-      const cutoffStr = toAestDay(cutoff);
+      const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
+      const cutoffStr = toAestDay(cutoff, tz);
       const [localMetrics, localSleep] = await Promise.all([
         store.getBodyMetrics(cutoffStr),
         store.getSleepSessions(cutoffStr),

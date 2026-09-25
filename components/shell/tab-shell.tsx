@@ -185,12 +185,15 @@ export function TabShell({ initialTab, session }: { initialTab: TabKey; session:
               key={key}
               className={cn(
                 "absolute inset-0",
-                // Short opacity crossfade on the incoming panel. A tab swap has
-                // no network wait — every panel is already mounted — so this
-                // animates content that is genuinely there, which is why it reads
-                // as smooth rather than as a stall. A slide would be wrong here:
-                // tabs are peers, not a hierarchy, so lateral motion implies a
-                // depth relationship that doesn't exist.
+                // A scale settle on the incoming panel — NOT a crossfade, and not
+                // an opacity ramp. This comment used to claim the animation ran
+                // over "content that is genuinely there"; it did not. The line
+                // below hides the outgoing panel in this same commit, so an
+                // incoming fade plays over an empty screen, measured at 58-109 ms
+                // on 10 of 10 switches (RV-113). The ramp is gone; keep it gone.
+                // A slide would be wrong here regardless: tabs are peers, not a
+                // hierarchy, so lateral motion implies a depth relationship that
+                // doesn't exist.
                 isActive && "tab-panel-enter",
                 // invisible (not display:none / unmount) keeps layout, scroll
                 // position, and component state alive; content-visibility lets

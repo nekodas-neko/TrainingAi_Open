@@ -210,7 +210,15 @@ export function AiPrescriptionCard({
             </p>
             <p className="text-[11px] text-muted-foreground truncate">
               {prescription.deload ? "Deload session" : `Confidence ${Math.round(prescription.confidence * 100)}%`}
-              {prescription.estimatedSessionDurationMin > 0 && ` · ~${prescription.estimatedSessionDurationMin} min`}
+              {/* "of work", not a bare number (BF-196). The estimate is measured against the
+                  WORKING budget — the session budget minus the measured warm-up carve-out — so on a
+                  60-minute session it reads 51 and the only available reading was "nine short". It
+                  was exactly full: 51 planned against a 51-minute working budget.
+
+                  The wording matches SessionDurationPicker, which renders the SAME number directly
+                  above this card and already named it. Two phrasings for one quantity, six lines
+                  apart in pre-workout-screen, is the divergence worth more than the nicer phrase. */}
+              {prescription.estimatedSessionDurationMin > 0 && ` · ~${prescription.estimatedSessionDurationMin} min of work`}
               {/* Once a transition has been APPLIED (auto or accepted) the action is history —
                   still calling it "suggested" would invite a tap on a decision already made. */}
               {isTransitionRecommended && (isPending

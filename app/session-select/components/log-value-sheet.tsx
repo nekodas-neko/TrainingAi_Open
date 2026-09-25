@@ -117,8 +117,8 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
           pushThenRevalidate(userId!, () => Promise.all([invalidateBodyMetricWrite(), invalidateReadinessInputs()]));
           toast.success(`${widget.label} saved`);
           onClose();
-          const cutoff = new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000);
-          const fresh = await store.getBodyMetrics(toAestDay(cutoff));
+          const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
+          const fresh = await store.getBodyMetrics(toAestDay(cutoff, tz));
           const todayMeta = fresh.find(r => r.date === date) ?? null;
           if (todayMeta) {
             setMetaToday({
