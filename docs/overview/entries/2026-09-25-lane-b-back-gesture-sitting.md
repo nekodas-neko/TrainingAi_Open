@@ -54,8 +54,26 @@ the first one visibly doing nothing. So `selectType` uses **`router.replace`** w
 sheet's, overwriting it, and `push` when it was not. The `false` branch is real rather than
 defensive: `openSurface` deliberately skips its push while one of our own pops is in flight.
 
-DV-2's three `onLeave` handlers share a `leaveScreen()`: release, then **one** `history.go(-2)`. One
-call and not two `back()`s, for the same timing reason — and `-1` when the dialog had no entry.
+DV-2's three `onLeave` handlers share a `leaveScreen()`: release, then **one** `history.go(-n)`. One
+call rather than n `back()`s, for the same timing reason.
+
+## The hole in my own fix, found before merge
+
+`go(-2)` — release the dialog's entry, cross it and the screen's — is wrong on a path that is
+reachable rather than theoretical. The Capacitor back handler checks the three session guards
+**before** `hasOpenSurface()`, deliberately, so that a mid-workout back press *answers* this prompt
+instead of closing whatever is open. With a sheet already up — the 1RM calculator, an exercise-stats
+sheet — the dialog therefore opens **on top of it**, history is `[…, /workout, sheet, dialog]`, and
+`go(-2)` lands on `/workout`: the screen *Leave* exists to leave.
+
+The mistake underneath it is worth stating plainly, because it is easy to make again: **releasing an
+entry does not remove it.** Clearing `pushed` only stops the surface popping it; the entry is still in
+history and still has to be travelled. So the distance is `1 + releaseAllSurfaceEntries()`, and it is
+**counted** rather than taken from the stack depth — a surface that skipped its push contributes 0,
+and going one too far leaves a screen the user never asked to leave.
+
+Found by re-reading the diff against the back handler, not by a test — which is the argument for that
+re-read, since no test in this repo can reach the path.
 
 ## The spec reproduces it, and the control run is the evidence
 
@@ -90,9 +108,11 @@ before dispatching, naming what it would have hit instead.
 
 The sheet half is reproduced and control-run in the harness. **The dialog half cannot be** — reaching
 it needs the Android system back gesture over a Capacitor channel Playwright cannot fire. What covers
-the mechanism for both is `lib/hooks/__tests__/sheet-back-stack.test.ts`, six new cases driving the
-release directly against an injected history, mutation-tested three ways: leaking a self-pop
-(2 fail), releasing the bottom surface instead of the top (1 fail), always returning true (2 fail).
+the mechanism for both is `lib/hooks/__tests__/sheet-back-stack.test.ts`, nine new cases driving both
+releases against an injected history, mutation-tested five ways: leaking a self-pop (2 fail),
+releasing the bottom surface instead of the top (1 fail), always returning true (2 fail), counting the
+stack depth instead of the pushed entries (1 fail), and taking only the top when the caller needs all
+(1 fail).
 
 ## Swept, and one thing deliberately left
 

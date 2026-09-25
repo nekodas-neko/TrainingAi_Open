@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  openSurface, closeSurface, handlePop, releaseTopSurfaceEntry, resetSheetBackStack,
-  type HistoryLike,
+  openSurface, closeSurface, handlePop, releaseAllSurfaceEntries, releaseTopSurfaceEntry,
+  resetSheetBackStack, type HistoryLike,
 } from '../sheet-back-stack'
 
 /**
@@ -201,21 +201,57 @@ describe('BF-165 / DV-2 — a navigation takes over the closing surface\'s entry
     expect(releaseTopSurfaceEntry()).toBe(false)
   })
 
-  it('releases only the TOP surface — the one under it keeps its entry', () => {
-    // A dialog raised from inside a sheet: navigating from the dialog must not strand the sheet's
-    // entry, or backing out of the destination lands on a dead entry at the page's own URL.
+  it('releaseTopSurfaceEntry takes exactly one entry — what `replace` can overwrite', () => {
+    // The forward case travels one entry: `router.replace` overwrites the CURRENT one, which is the
+    // top surface's. It cannot reach a second, so this must not claim one — the surface underneath
+    // still owns its entry and still has to undo it.
     const h = fakeHistory()
     const sheet = openSurface('sheet', vi.fn(), h.history)
     const dialog = openSurface('dialog', vi.fn(), h.history)
 
     expect(releaseTopSurfaceEntry()).toBe(true)
     expect(dialog.pushed).toBe(false)
-    expect(sheet.pushed, "the sheet underneath still owns its entry").toBe(true)
+    expect(sheet.pushed, 'the sheet underneath still owns its entry').toBe(true)
 
     closeSurface(dialog, h.history)
     expect(h.pending(), 'the dialog pops nothing').toBe(0)
     closeSurface(sheet, h.history)
     expect(h.pending(), 'the sheet still undoes its own').toBe(1)
+  })
+
+  it('releaseAllSurfaceEntries counts every stacked entry, which is how far DV-2 has to travel', () => {
+    // **The reachable case, and `go(-2)` is wrong for it.** The Capacitor back handler checks the
+    // three session guards BEFORE `hasOpenSurface()`, deliberately, so a mid-workout back press with
+    // a sheet already open raises "Leave workout?" ON TOP of it. History is
+    // `[…, /workout, sheet, dialog]` and a go(-2) from the dialog lands on `/workout` — the screen
+    // Leave exists to leave. Releasing does not REMOVE the entries, it only stops the surfaces
+    // popping them, so the caller has to cross all of them in one call.
+    const h = fakeHistory()
+    const sheet = openSurface('sheet', vi.fn(), h.history)
+    const dialog = openSurface('dialog', vi.fn(), h.history)
+
+    expect(releaseAllSurfaceEntries()).toBe(2)
+    expect(sheet.pushed).toBe(false)
+    expect(dialog.pushed).toBe(false)
+
+    closeSurface(dialog, h.history)
+    closeSurface(sheet, h.history)
+    expect(h.pending(), 'neither may pop — the navigation crossed both entries').toBe(0)
+  })
+
+  it('and does not count a surface that skipped its push', () => {
+    // Travelling one entry too far would leave a screen the user never asked to leave.
+    const h = fakeHistory()
+    const first = openSurface('first', vi.fn(), h.history)
+    closeSurface(first, h.history)                      // a self-pop is now in flight
+    const second = openSurface('second', vi.fn(), h.history)
+    expect(second.pushed, 'precondition: this surface skipped its push').toBe(false)
+
+    expect(releaseAllSurfaceEntries()).toBe(0)
+  })
+
+  it('counts 0 with nothing open, so the caller still goes back one', () => {
+    expect(releaseAllSurfaceEntries()).toBe(0)
   })
 
   it('a real back gesture arriving after the release still closes the surface', () => {

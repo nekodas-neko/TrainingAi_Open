@@ -17708,3 +17708,9 @@ It carries both pass tests so the sitting is actionable without opening the back
 Also kept: why the second half of the fix (`replace` rather than `push`) is not optional, and why the
 `tapHitTested` fixture exists — the coordinate artifact it prevents manufactured a second "dead
 button" that had to be retracted.
+
+**Raised again the same day, for a hole found in the fix before it merged.** `go(-2)` was wrong on a
+reachable path — the back handler raises the leave prompt ON TOP of an already-open sheet, so the
+distance is `1 + <pushed surfaces>`. The correction is worth its lines because the mistake under it is
+easy to repeat: **releasing an entry does not remove it**, so it still has to be travelled. Recorded in
+the entry, the journal and two new unit cases, since no test in this repo can reach that path.

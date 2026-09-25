@@ -13,7 +13,7 @@ import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
 import { backActionForPath } from "@/components/shell/tabs";
-import { hasOpenSurface, releaseTopSurfaceEntry } from "@/lib/hooks/sheet-back-stack";
+import { hasOpenSurface, releaseAllSurfaceEntries } from "@/lib/hooks/sheet-back-stack";
 import { navigateToTab } from "@/lib/shell-nav";
 
 /**
@@ -25,15 +25,19 @@ import { navigateToTab } from "@/lib/shell-nav";
  * `/workout?session=…`. The store reset, the dialog closed, and the screen stayed on the session that
  * had just been abandoned.
  *
- * One `history.go(-2)` rather than two `back()`s: the surface's pop is not reliably pending when this
+ * One `history.go(-n)` rather than n `back()`s: the surface's pop is not reliably pending when this
  * runs (7 ms on the device against 415 ms in the harness), which is the timing trap BF-165 measured.
- * Releasing the entry first means the dialog's close pops nothing, so this single call crosses both.
+ * Releasing the entries first means their closes pop nothing, so this single call crosses all of them.
  *
- * The `-1` branch is not defensive padding: a surface opened while one of our own pops is in flight
- * deliberately skips its push (`openSurface`), so "the dialog has an entry" is genuinely conditional.
+ * **`releaseAllSurfaceEntries`, not just the top one, and the difference is reachable.** The back
+ * handler above checks the three session guards **before** `hasOpenSurface()`, deliberately — so a
+ * mid-workout back press with a sheet already open (the 1RM calculator, an exercise-stats sheet)
+ * raises this dialog **on top of it**. History is then `[…, /workout, sheet, dialog]`, and a `go(-2)`
+ * lands on `/workout`: the screen *Leave* exists to leave. The count is what makes one call cross
+ * however many surfaces are stacked, and a surface that skipped its push contributes 0.
  */
 function leaveScreen(): void {
-  window.history.go(releaseTopSurfaceEntry() ? -2 : -1);
+  window.history.go(-(1 + releaseAllSurfaceEntries()));
 }
 
 export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {

@@ -93,6 +93,31 @@ export function releaseTopSurfaceEntry(): boolean {
   return true
 }
 
+/**
+ * The same handover, for a navigation that goes BACK past every open surface (DV-2).
+ *
+ * **Returns the count, because the caller has to travel that far in ONE call.** `releaseTopSurfaceEntry`
+ * is not enough here, and the difference is reachable rather than theoretical: the Capacitor back
+ * handler checks the three in-progress-session guards **before** `hasOpenSurface()`, deliberately, so
+ * a mid-workout back press with a sheet already open raises *"Leave workout?"* **on top of it**.
+ * History is then `[…, /workout, sheet, dialog]`, and a `go(-2)` from the dialog lands on `/workout` —
+ * the very screen *Leave* is meant to leave.
+ *
+ * **Releasing is not the same as removing.** The entries stay in history; clearing `pushed` only stops
+ * the surfaces popping them as they unmount. So the caller travels `1 + <this count>`, and every
+ * surface that skipped its push contributes 0 — which is why this counts rather than returning the
+ * stack depth.
+ */
+export function releaseAllSurfaceEntries(): number {
+  let released = 0
+  for (const surface of stack) {
+    if (!surface.pushed) continue
+    surface.pushed = false
+    released++
+  }
+  return released
+}
+
 export function handlePop(state: unknown, history: HistoryLike): void {
   if (pendingSelfPops > 0) {
     pendingSelfPops--

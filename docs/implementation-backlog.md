@@ -9462,14 +9462,25 @@ helper the call site calls.
   not two `back()`s, because the surface's pop is not reliably pending when this runs — 7 ms on the
   device against 415 ms in the harness, which is the trap this entry warned about. Releasing first is
   what makes the single call cross both entries.
-- **The `-1` branch is real.** `openSurface` skips its push while one of our own pops is in flight, so
-  a dialog genuinely can have no entry; going back two from there would leave a screen the user never
-  asked to leave.
+- **⚠ `go(-2)` was WRONG on a reachable path, found by re-reading the diff rather than by a test, and
+  corrected before merge.** The back handler checks the three session guards **before**
+  `hasOpenSurface()` — deliberately, so a mid-workout back press answers this prompt rather than
+  closing whatever is open — so with a sheet already up (the 1RM calculator, an exercise-stats sheet)
+  the dialog opens **on top of it**. History is then `[…, /workout, sheet, dialog]`, and `go(-2)` from
+  the dialog lands on `/workout`: the screen *Leave* exists to leave. **Releasing an entry does not
+  remove it** — it only stops the surface popping it — so the travel distance is
+  `1 + releaseAllSurfaceEntries()`, counted rather than assumed.
+- **The count, not the stack depth.** `openSurface` skips its push while one of our own pops is in
+  flight, so a surface genuinely can have no entry and going one too far would leave a screen the user
+  never asked to leave. Both mutations of that — returning `stack.length`, and taking only the top —
+  fail a different assertion.
 - **NOT covered by the e2e spec, deliberately and unavoidably.** Reaching this dialog needs the
   Android system back gesture over a Capacitor channel Playwright cannot fire. What IS covered is the
-  mechanism: `lib/hooks/__tests__/sheet-back-stack.test.ts` drives the release directly and was
-  mutation-tested three ways (leaking a self-pop, releasing the bottom surface, always returning
-  true) — each mutation fails a different assertion.
+  mechanism: `lib/hooks/__tests__/sheet-back-stack.test.ts` drives both releases directly and was
+  mutation-tested five ways (leaking a self-pop, releasing the bottom surface, always returning true,
+  counting the stack depth, counting only the top) — each fails a different assertion. **That is the
+  whole safety net for this half**, which is why the nested case above was worth a pre-merge fix
+  rather than a follow-up entry.
 - **Keep: the device pass test above, unchanged.** It is the only thing that can confirm this half.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
