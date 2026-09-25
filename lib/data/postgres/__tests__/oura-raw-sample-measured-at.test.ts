@@ -23,6 +23,7 @@
 //
 // Runs only against a real local dev Postgres — skips in CI.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import type { OuraRawSampleInput } from '@/lib/data/repository'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-00000000b182'
@@ -52,8 +53,10 @@ describe.skipIf(!canRun)('insertOuraRawSamples — measured_at is never left NUL
     await pool.query(`DELETE FROM oura_ble_clock_anchors WHERE user_id = $1`, [USER])
   })
 
-  const sample = (ds: number, hex: string) => ({
-    ringTimestampDs: ds, tag: 7, eventName: 'test', bodyHex: hex,
+  // `decoded` is required on the input and deliberately null: the ingest path stopped persisting it
+  // (culling lever 1), so null is what a real batch carries.
+  const sample = (ds: number, hex: string): OuraRawSampleInput => ({
+    ringTimestampDs: ds, tag: 7, eventName: 'test', bodyHex: hex, decoded: null,
   })
 
   async function nullCount(): Promise<number> {
