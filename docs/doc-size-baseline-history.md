@@ -17495,3 +17495,19 @@ this branch was in the gate, so the baseline moved under it; the +9 is unchanged
 The entry stays open deliberately: `ci.yml` now dumps `dmesg` on an E2E failure, and the cause is
 established by the next red run rather than by this PR. Narrative in
 `docs/overview/entries/2026-09-25-lb149-e2e-browser-death.md`.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31321 → 31326 (+5)
+
+`RV-102` LEAVES the queue — its two invisible halves shipped (five dead `--chart-*` tokens deleted,
+the duplicated `CARD_DEFAULT_COLORS` reduced to one typed table) and nothing is owed on it, not even
+a device look, because neither change alters a pixel.
+
+The +5 is the difference between the entry removed and `LB-153` added in its place: the palette
+merge it prescribed turns out to change what renders on three surfaces — including the workout set
+colours, where set 1 is amber and set 2 green purely by index — so it is a product preference and
+goes to the owner, ungated, with the numbers and three answers that each unblock it.
+
+Two corrections RV-102 was carrying are kept in the journal rather than the queue, since the queue
+only tracks open work: the entry called the two colour tables "identical today" (they are not — 13
+keys against 10, which is exactly why the dedupe needed checking), and it prescribed the shared
+palette to Lane B although `packages/shared/**` is Lane A's.
