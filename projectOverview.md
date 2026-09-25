@@ -2648,6 +2648,28 @@ watchdog that replaced it changes no request semantics at all.
 screenshot cannot distinguish a stale cache entry from the card's own fallback, and guessing between
 them is how the wrong thing gets fixed.
 
+### [body][nutrition] ⚠️ Your body fat has read about a point high since 01 September — live value fixed, stored history not (RV-165, 2026-09-24)
+
+Body composition is computed **once, at ingest**, from the profile of that moment. The height was
+corrected from 160 to 158 cm to match a DEXA printout, so every earlier reading is still a 160 cm
+number — and the DEXA calibration offset is derived **live** from those stored values. The 08-27 pair
+therefore set an offset of **+3.2** where the corrected reading gives **+2.3**.
+
+**Fixed 2026-09-24 (live values only).** Readings are now restated at the current profile before the
+offset is fitted. Nothing extra had to be stored: `bmr_kcal` has no impedance term and is linear in
+height, so it gives back the height used, and impedance then follows from the stored body-fat value.
+Verified on production — 08-27 and 09-01 share a weight of 71.7 kg with BMRs of 1557 and 1545, which
+solves to exactly 160 and 158 cm.
+
+**Expect the displayed number to DROP about a point.** That is the correction, not a new problem.
+
+**Still owed:**
+- **The stored rows are untouched** and still hold 160 cm composition. Restating them is a history
+  edit (**RV-170**) and the owner's call, not this fix's.
+- **Whether +2.3 is right in absolute terms is unmeasured.** It rests on one DEXA pair, and the
+  calibration's own comment is explicit that n = 1 supports an offset and not a ratio. What changed
+  is that the pair is now compared like for like.
+
 ### [platform] ⚠️ Database errors were forwarding row values — including an email — to sentry.io (RV-194, 2026-09-24)
 
 `beforeSend` scrubbed the request and left the **exception message** untouched, and Drizzle puts the

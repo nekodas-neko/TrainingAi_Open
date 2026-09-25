@@ -3871,27 +3871,51 @@ drift.
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
 
-- **Lane: A** — `lib/scale-ble/composition.ts`, `packages/shared/src/health/body-fat-calibration.ts`.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **The step:** body fat goes from **25.2 to 26.3 overnight on 08-30 → 09-01** at +0.25 kg; BMR
-  drops 10 and metabolic age goes from 38 to 39.
-- **The cause:** composition is computed once, at ingest, from the profile of that moment
-  (`scale-ble/samples/route.ts:97`, the pending confirm route `:36`, and
-  `computeBodyComposition` at `composition.ts:118-161`). Solving the formula from the stored outputs,
-  the 08-30 reading reproduces **only at h=160.1**, and 09-01 fits **h≈157.3–157.9**. The BF-78
-  journal records the height being corrected from 160 to 158 to match the DEXA printout.
-- **Why it matters:** the calibration is derived live from `dexa_scans` × the same-day stored scale
-  value (`body-fat-calibration.ts:68`). The 08-27 pair is DEXA 28.5 against a stored 25.3 computed at
-  160 cm, giving an offset of **+3.2**. At 158 cm that weigh-in reads 26.26, which gives **+2.2**.
-  So every corrected body-fat value since 09-01 reads about **1 point high** (28.6 against ~27.6),
-  lean mass about 0.7 kg low, and RMR/Cunningham moves by ~15 kcal/day. The trend also shows a false
-  +1.1 jump.
-- **Fix shape:**
-  - Store what composition needs from the raw sample, and re-derive when height, date of birth or
-    sex changes.
-  - At the least, recompute the calibration pair at the current profile.
-- **Rewriting the stored rows is a history edit (RV-170).** Fixing the live offset is not: it is
-  derived at read time.
+- **Branch:** `lane-a/rv165-height-calibration` · **Added:** 2026-09-24 · Review sweep 57.
+  **Live half shipped 2026-09-24 (Lane A); the history edit is NOT done and is not this entry's.**
+- **Lane: A** — `lib/scale-ble/composition.ts`, `lib/data/postgres/adapter.ts`.
+- **The step:** body fat goes from **25.2 to 26.3 overnight on 08-30 → 09-01** at +0.25 kg; BMR drops
+  10 and metabolic age goes from 38 to 39.
+- **The cause:** composition is computed once, at ingest, from the profile of that moment. The
+  calibration is then derived **live** from `dexa_scans` × the same-day stored scale value, so the
+  08-27 pair — a 160 cm number — set an offset of **+3.2** where the corrected reading gives
+  **+2.3**. Every body-fat value shown since read about a point high.
+- **⛔ THE FIRST FIX SHAPE IS UNNECESSARY AND IS RETIRED.** The entry proposed *"store what
+  composition needs from the raw sample"* — a migration, and one that could not recover history
+  anyway. **Nothing extra needs storing.** Two properties of the formula make the original inputs
+  recoverable from columns already written:
+  1. **`bmr_kcal` is Mifflin-St Jeor** — `10w + 6.25h − 5a + sexTerm` — with **no impedance term**
+     and linear in height, so the height used at ingest falls straight out of it.
+  2. **Impedance enters the model through `bodyFatPct` alone**; every other output is a function of
+     body fat, weight, height, age and sex. So once the height is known, the impedance follows.
+- **✅ Verified against production, not derived on paper.** 08-27 and 09-01 carry the **same weight
+  (71.7 kg)** and BMRs of **1557 and 1545**. The 12 kcal gap is 12/6.25 = **1.92 cm**, and solving
+  each gives exactly **160** and **158** at age 33 — the documented correction, recovered from the
+  table alone. The 08-27 impedance comes back at **~494 Ω**, inside the file's own 300–1200 Ω band,
+  and re-deriving at 158 cm gives **26.2**.
+- **✅ SHIPPED:** `heightUsedForStoredBmr` and `recomputeStoredBodyFatPctAtHeight`
+  (`lib/scale-ble/composition.ts`, beside the formula they invert — only the INVERSE lives there, the
+  forward half calls `computeBodyComposition` so the two cannot drift), and
+  `getBodyFatCalibration` restates each reading at the **current** profile before pairing, using the
+  age **at the reading** rather than today's.
+- **⚠ A reading that cannot be re-derived is KEPT AS STORED, not dropped — and the first version got
+  this wrong.** Dropping looks cautious and is not: without a BMR there is no evidence the reading is
+  stale, only an inability to check, and discarding it left **zero pairs** for any fixture lacking
+  one, so the calibration returned null and **no correction was applied at all**.
+  `body-fat-correction-consumers.test.ts` caught it. Keeping the stored value is exactly today's
+  behaviour, so this can substitute a better value but can never produce a worse calibration.
+- **⚠ The guards overlap, which makes them easy to test wrongly.** An absurd body-fat value usually
+  implies a NEGATIVE impedance index, caught before the plausibility band is ever reached — so a
+  carelessly chosen fixture passes with the guard it is meant to pin deleted. The three refusal cases
+  are each computed to clear the earlier guards and stop at their own; two of them exist only because
+  the mutation pass showed the first attempt did not.
+- **Keep — the stored rows, and they are NOT this entry's to rewrite.** Every `body_metrics` row
+  before the correction still holds 160 cm composition. Restating them is a history edit (**RV-170**)
+  and the owner's call. This entry fixes only what is derived at read time.
+- **Not measured:** whether **+2.3** is right in any absolute sense. It is one DEXA pair, and
+  `deriveBodyFatCalibration`'s own comment is explicit that n = 1 supports an offset and not a ratio.
+  What changed is that the pair is now compared like for like.
+
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
 

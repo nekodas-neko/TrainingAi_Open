@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.41",
+    date: "2026-09-25",
+    changes: [
+      "Your body-fat reading is now compared against the height it was actually measured at, so the DEXA calibration is fitted like for like. Body composition is worked out once when the scale reading arrives, using your profile at that moment \u2014 so when your height was corrected from 160 cm to 158 cm, every earlier reading was still a 160 cm number while the calibration was being fitted to it live. Expect the displayed body fat to drop by about a point: that is the correction, not a new problem. Your stored history is untouched.",
+    ],
+  },
+  {
     version: "1.465.40",
     date: "2026-09-25",
     changes: [
