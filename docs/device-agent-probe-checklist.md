@@ -388,3 +388,114 @@ code. With the app in the foreground at **23:55 Brisbane**, record which today-k
 00:00 and which do not until a tab switch or a restart: Home's day, Nutrition's diary date, the
 readiness card, the timeline. **Needs an overnight sitting the owner agrees to**, so it is the one
 probe here that cannot run whenever the phone is plugged in.
+
+---
+
+# Part D — the design and feel pass (P23–P28)
+
+**Added 2026-09-25 (Review sweep 62, owner request):** *"keep looking at reviewable actions for
+UI/performance/design that can be tested through DV — get it to write up a report or screenshots so
+you can work on them."* Parts A–C measure correctness and load. This part is for what a user
+**sees and feels**, and it is the first part whose main output is pictures.
+
+### How the pictures reach Review — and never the repo
+
+The baton's rule *"captures never leave this machine as images"* exists because **the repo is
+public**. It still holds for the repo. **A private Artifact on the owner's account is not the
+repo**, and the owner has asked for screenshots, so for this part:
+
+- Publish **one private Artifact per sitting**, titled `DV design capture — <date>`, with each
+  capture uploaded as an asset.
+- The page is a plain gallery. **Every image is labelled with its route, its state, orientation,
+  navigation mode, build and whether it is scrolled.** An unlabelled image cannot be filed.
+- Put the P24–P28 measurements on the same page as a table, or as a JSON text asset.
+- **Record the Artifact URL in the entry that asked for it** (RV-205), in its result line. The URL
+  is safe to commit, because only the owner can open it. **Never** commit an image, and never share
+  the link.
+- If the local session cannot publish an Artifact, the visual half is **COULD NOT CHECK**. Still
+  run P24–P28, whose output is numbers.
+
+Review reads the gallery (Artifact `read` with an asset `path` saves each image locally), writes the
+critique, and files the fixes to Lane B. **Review does not edit product code;** the lane does.
+
+## P23 — the screen gallery
+
+`tour.js` already walks the routes and captures each. **Extend it rather than hand-driving.** For
+every tab root and every pushed route:
+
+- **Full-length capture, not only the first viewport.** Scroll and stitch, or capture each
+  viewport in turn. Most layout faults live below the fold.
+- **States, where the harness can reach them without a write:**
+  - warm (the normal visit);
+  - cold (first paint after a restart, taken at about 300 ms, then settled);
+  - offline (`Network.setBlockedURLs` on `/api/*`, as sweep 3 did);
+  - one error state per card family, via P18's fault injection.
+- **Every sheet and dialog reachable by a tap that writes nothing**, open.
+- **Gesture navigation for at least Home, Workout, Nutrition and one sheet.** Three-button
+  navigation hides the bottom-clearance faults (see Part A).
+
+## P24 — tap-to-feedback latency
+
+P5 measures transitions between screens. This measures **the tap itself**. For about 20 primary
+controls (each tab, the start-workout button, log set, the supplement tick, a food row, sheet
+open/close, each segmented control), use `Input.dispatchTouchEvent` plus the screencast and record
+the time from the input to **the first frame that changes**.
+
+- Report per control: ms to first visual change, and ms to settled.
+- **Flag anything over 100 ms to first change.** That is the point where a tap stops feeling
+  instant.
+- A control that shows no pressed state at all before its result lands is a finding in its own
+  right, whatever its latency.
+
+## P25 — scroll smoothness on the long lists
+
+Fling-scroll (`Input.synthesizeScrollGesture`, repeated) with a `Tracing` or `rAF`-delta capture on:
+- the food diary on a full day;
+- the exercise library;
+- workout history;
+- Health's trend charts;
+- the timeline;
+- the admin tables.
+
+Report per list:
+- the frame count, the p50 and p95 frame time, and the number of frames over 16.7 ms;
+- the long tasks that overlapped the scroll, with their top function.
+
+## P26 — the soft keyboard
+
+For every text input reachable without a write (food search, describe, weigh-in field, notes,
+program editor, the feedback form), **focus it** and read `visualViewport.height` against:
+- the input's rect;
+- the rect of the primary button that submits it.
+
+Report every case where either is covered by the keyboard or pushed off-screen, with a capture.
+Sheets are the likely offenders.
+
+## P27 — design-token census
+
+For each route, collect from the computed styles of visible elements:
+- the distinct **font sizes** and **font weights**;
+- the distinct **text colours** and **background colours**;
+- the distinct **border radii** and **shadows**;
+- the distinct **gaps and padding values**.
+
+Report, per route and app-wide:
+- **the counts**, and the values used by fewer than three elements (the drift candidates);
+- **text under 12 px**;
+- **text/background contrast below 4.5:1** (3:1 at 18.66 px bold or 24 px and up), with the
+  selector and the nearest text.
+
+This is the numeric half of a design review: a page with nine greys and seven radii reads as
+inconsistent before anyone can say why.
+
+## P28 — motion inventory
+
+On each route and during each transition, read `document.getAnimations()` and any running CSS
+transitions. Report:
+- property, duration, easing and the target selector;
+- **every animation of a layout property** (`height`, `width`, `top`, `left`, `margin`), because
+  those re-layout every frame where `transform`/`opacity` would not;
+- the distinct durations and easings in use, app-wide. More than a handful means the motion has no
+  system.
+
+Confirm `reducedMotion="user"` is respected (P5 asks the same; one run answers both).
