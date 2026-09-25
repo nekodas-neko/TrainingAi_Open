@@ -478,6 +478,52 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [devices] OR-172 — the Oura BLE path is the OWNER'S setup, not a product feature
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer closing `OR-160`.
+- **`OR-160` (should Drive backup carry the ring's BLE key?) is CLOSED as moot.** His answer:
+  **"The oura ring key is EXCLUSIVE to me. We can have best practices for me (I have the key saved)
+  but for other people we should not rely on cracked ouras."** He holds the key, so the permanent-loss
+  argument that justified backing it up is gone. **Exclude it with everything else** — that keeps his
+  Google account out of the key's custody chain for no loss.
+- **The larger half, which is why this entry exists rather than a one-line close.** The BLE pipeline
+  is a **re-keyed ring on his own auth key**, and that is not something another user can be given.
+  So **nothing user-facing may assume a ring exists**, and any multi-user work treats ring-derived
+  data as absent by default rather than as the normal case.
+- **What to check when this is next touched:** whether any screen, score or recommendation currently
+  degrades badly with no ring data, as opposed to hiding cleanly. Not measured — the app has only
+  ever run for one user, who has one.
+- **`OR-159` (exclude the WebView session cookie from Android backup) is unaffected** and still
+  stands on its own; this removes the ring key from that conversation rather than changing it.
+
+### [devices][platform] OR-173 — the owner's storage principle vs the archive rule: computed on Railway, raw on the ring
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `Q-30`. **He said "we will discuss
+  this more", so this is a DIRECTION and not yet a decision** — the entry exists so the discussion
+  starts from the conflict rather than rediscovering it.
+- **What he stated:** **"We follow the structure of only saving computed/calculated data on railway.
+  Raw data should be saved on ring only."**
+- **⚠ THIS CONTRADICTS A STANDING RULE IN `CLAUDE.md`, and the rule has a reason.** The Oura
+  Direct-BLE section says the raw bytes on the SERVER are the archival source of truth and must never
+  be pruned or mutated, because **the ring's history buffer is finite and the sync cursor only moves
+  forward**. A decoder fix can only back-fill by re-decoding stored bytes; it can never re-drain the
+  ring. **So "raw on the ring only" means a decoder bug found next month is unfixable for every day
+  already past the ring's buffer.** That is the specific loss to weigh — not disk.
+- **Two things to settle before this becomes policy, and they are different questions:**
+  **(a) Ring or phone?** The device-local copy (D4's plan) is not the ring. The phone can hold a
+  rolling window; the ring's buffer is small and not addressable as storage. If he means the phone,
+  much of the conflict dissolves — **but ⚠ the 14-day device window HAS NOT SHIPPED** (`pruneRaw` has
+  no caller), so there is currently no device retention to rely on.
+  **(b) What is actually lost?** Nobody has measured how often the archive has been re-read. That
+  number decides whether the replay capability is theoretical or load-bearing.
+- **The cost side, measured 2026-09-25 so it is not the argument:** `oura_raw_packed` is **1,522 rows,
+  1,880,515 frames**. At Railway's $0.15/GB/month the whole archive is well under a cent a month, and
+  the ~0.7 MB/day trend adds roughly a cent a year. **Cost is not a reason to act here** — the
+  principle might be, which is what makes it worth discussing rather than deciding on a threshold
+  that has now been passed.
+- **Do nothing to the archive until this resolves.** `Q-30`'s ~20 MB threshold is retired as the
+  trigger: it was set before the cost was known, and the cost turned out not to matter.
+
 ### [nutrition] OR-169 — the calorie recommendation was not declined; it was not TRUSTED
 
 - **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `RV-164`.
@@ -1129,31 +1175,6 @@ the Orchestrator's to do.
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
-
-### [devices] OR-160 — should Google Drive backup carry the Oura ring's BLE key?
-- **Ask:** owner — should Android backup include the Oura ring's BLE key? Backing it up is the only thing that survives an uninstall, which today destroys the key permanently; the cost is that the Google account becomes the key's guard. Recommendation and both costs in the entry.
-
-- **Lane: O** · **Added:** 2026-09-24 · split out of `RV-199` item ③. **He approved *deciding*
-  this deliberately, which is not the same as approving an answer** — so it is still open, and
-  filing it as its own entry is what stops it being settled by whoever next edits the manifest.
-- **Why it is genuinely his.** It trades a real recovery path against a real exposure, and both
-  sides are serious.
-- **Recommendation: back it up, encrypted, and exclude everything else.** An uninstall destroys the
-  ring's BLE key **permanently** — `CLAUDE.md` is emphatic that it is not recoverable from this repo,
-  the server, or any log, and re-pairing means re-onboarding the official Oura app, which risks a
-  firmware update that breaks the reverse-engineered protocol. That is the worst outcome available
-  here, it is one mis-tap away, and a backup is the only thing standing between him and it.
-- **The cost, stated plainly:** the Google account becomes the key's guard. Anyone who compromises it
-  can restore a device that talks to his ring. Android backup is encrypted with the device PIN on
-  modern versions, so this is not a plaintext copy in Drive — but it is a copy, and it is outside his
-  phone.
-- **The alternative and what it is better at.** *Exclude the key with everything else* is better if
-  he would rather the key exist in exactly one place and accept that an uninstall is fatal to it. It
-  is the stronger position on paper and the weaker one in practice, because the failure it guards
-  against needs an attacker and the failure it invites needs a slip.
-- **Reversal cost: low both ways** — one XML file and an APK. But note the asymmetry: switching the
-  backup ON later does not recover a key already destroyed.
-- **`OR-159` ships regardless** and must not settle this by implication.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
@@ -12629,6 +12650,15 @@ call rather than a queue pass. Alternative: leave lookups as they are and add th
 `upsertUser`'s write only, which stops new divergence without touching matching.
 
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
+
+- **⬆ MOVED UP THE QUEUE 2026-09-25 on the owner's call** (`RV-161` item 5). **12 of 27 recent dates
+  are missing a night**, and sleep feeds readiness, the sleep score and several trends — so nearly
+  half of those are computing across a gap rather than on data. That makes it a data-integrity
+  problem sitting upstream of the scoring work waiting on Tuning, which is why it outranks entries
+  that merely sharpen a number.
+- **Establish the CAUSE before building the fix.** A night missing because the ring was not worn is
+  not the same defect as a night the pipeline dropped, and only the second is fixable here. The
+  census that found this did not separate them.
 
 - **⚑ STILL LIVE 2026-09-17, with current numbers and a consequence the entry does not state.**
   **5 of the last 13 days recorded a midday Brisbane fragment as the day's ONLY sleep session** —
@@ -25581,6 +25611,21 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   read the question as *why has the producer never run* rather than *why is this number odd*.
 
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
+
+- **✅ APPROVED 2026-09-25: null the corrupt fields, keep the row.** The owner took the
+  recommendation over deleting the row and over leaving it.
+- **This is a stated EXCEPTION to his own hand-edits-no policy (`RV-170`), and it was offered as
+  one.** The policy says recompute-from-stored-inputs yes, hand-edits no. This is a hand-edit: the
+  07-29 reading is known-bad and no recompute can fix it, because the stored input IS the corruption.
+  The exception is narrow — **a reading the device got wrong, not a number anyone dislikes** — and it
+  should not be cited to justify editing history generally.
+- **Why nulling beats deleting:** the row records that a measurement happened that day. Blank fields
+  say "measured, unusable"; a deleted row says "never measured", which is a different and false
+  claim.
+- **Lane A's, and it is a PRODUCTION WRITE** — present the exact UPDATE and the affected row count
+  before running it, per the destructive-change carve-out. One row, named fields only.
+- **It passes the 4% screen**, which is the reason this cannot be left: the guard reads it as valid
+  and it keeps feeding body-composition trends.
 
 - **⚠ ASK THIS AS A POLICY, NOT AS AN ENTRY — `history-row-policy` (grouped 2026-09-16, OR-118).**
   **Q-298** (10 one-rep-max rows), **Q-527** (1 backfilled row) and **LA-21** (7 sessions stamped with

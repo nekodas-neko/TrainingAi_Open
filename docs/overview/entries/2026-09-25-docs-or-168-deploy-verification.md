@@ -87,3 +87,41 @@ stored inputs, which is the class he already approved under `RV-170`.
 produces options that are all slightly wrong, and a good answer then arrives as a rejection of the
 frame. Three of four here. When the owner's reply reads as "maybe we need X instead", that is the
 entry's framing failing, not an evasion — file the reframe rather than re-asking the original.
+
+
+## Second batch — four more, and one contradicts a standing rule
+
+**The ring key (`OR-160`) closes as moot, and opens something bigger.** *"The oura ring key is
+EXCLUSIVE to me… for other people we should not rely on cracked ouras."* He holds the key, so the
+permanent-loss argument for backing it up is gone — exclude it, and his Google account stays out of
+the custody chain. **`OR-172`** carries the larger half: the BLE pipeline is a re-keyed ring on his
+own auth key and cannot be given to another user, so nothing user-facing may assume a ring exists.
+Nobody has checked whether any screen or score degrades badly without one; the app has only ever run
+for the one user who has one.
+
+**⚠ `Q-30` produced a principle that contradicts `CLAUDE.md`, and he flagged it as unfinished.**
+*"We follow the structure of only saving computed/calculated data on railway. Raw data should be
+saved on ring only"* — against the Oura Direct-BLE rule that the raw bytes on the **server** are the
+archival source of truth and must never be pruned, because the ring's history buffer is finite and
+the sync cursor only moves forward. **A decoder fix can only back-fill by re-decoding stored bytes.**
+So raw-on-ring-only means a decoder bug found next month is unfixable for every day past the ring's
+buffer.
+
+He said *"we will discuss this more"*, so **`OR-173`** records the direction and the conflict rather
+than deciding. Two things separate before it becomes policy: whether he means the **ring or the
+phone** (D4's device window is the phone, and ⚠ it has not shipped — `pruneRaw` has no caller), and
+**how often the archive has actually been re-read**, which nobody has measured and which decides
+whether replay is theoretical or load-bearing. Cost is deliberately not the argument: measured today
+the archive is 1,522 rows and 1,880,515 frames, under a cent a month. `Q-30`'s ~20 MB trigger is
+retired — it was set before the cost was known and the cost turned out not to matter.
+
+**`Q-527` approved: null the corrupt fields, keep the row.** Recorded as a **stated exception** to his
+own hand-edits-no policy, because it is one: the 07-29 reading is known-bad and no recompute can fix
+it, since the stored input *is* the corruption. Narrow — a reading the device got wrong, not a number
+anyone dislikes. Nulling beats deleting because the row records that a measurement happened; a
+deleted row claims none did.
+
+**`PS-17` moved up.** 12 of 27 recent dates missing a night, and sleep feeds readiness, the sleep
+score and several trends — so it sits upstream of the scoring work waiting on Tuning. The entry now
+says to establish the cause first: a night missing because the ring was off is not the same defect as
+one the pipeline dropped, and the census did not separate them.
