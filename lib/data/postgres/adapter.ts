@@ -945,58 +945,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
   }
 
-  async logExerciseWithId(log: Omit<ExerciseLog, 'sets'> & { id: string }): Promise<void> {
-    await this.db.insert(s.exerciseLogs)
-      .values({
-        id: log.id,
-        workoutSessionId: log.workoutSessionId,
-        exerciseName: log.exerciseName,
-        styleId: log.styleId ?? null,
-        styleName: log.styleName ?? null,
-        estimated1rm: log.estimated1rm ?? null,
-        target80: log.target80 ?? null,
-        volume: log.volume ?? null,
-        avgReps: log.avgReps ?? null,
-        timeToComplete: log.timeToComplete ?? null,
-        muscleGroups: log.muscleGroups,
-        loggedAt: log.loggedAt,
-        interExerciseRestSec: log.interExerciseRestSec ?? null,
-        prepTimeSec: log.prepTimeSec ?? null,
-      })
-      .onConflictDoNothing()
-  }
-
-  async logSets(exerciseLogId: string, sets: Omit<SetLog, 'id' | 'exerciseLogId'>[]): Promise<SetLog[]> {
-    if (sets.length === 0) return []
-    // A payload naming one set_number twice rejects the whole INSERT (21000) and loses every set in
-    // the exercise, not just the repeat. Bare EXCLUDED arm → last wins. See `collapse-conflicts.ts`.
-    // Collapsed once and reused: the `.returning()` rows are zipped against this array by index
-    // below, so collapsing inline would misalign every set after the first duplicate.
-    const deduped = collapseOnConflict(sets, set => set.setNumber)
-    const rows = await this.db.insert(s.setLogs)
-      .values(deduped.map(set => ({
-        exerciseLogId, setNumber: set.setNumber, weightKg: set.weightKg,
-        reps: set.reps, setTimeSec: set.setTimeSec ?? null,
-        restTimeSec: set.restTimeSec ?? null, intensityPct: set.intensityPct ?? null,
-        useFor1rm: set.useFor1rm,
-        setStartMs: set.setStartMs ?? null,
-        setEndMs: set.setEndMs ?? null,
-        rpe: set.rpe ?? null,
-      })))
-      .onConflictDoUpdate({
-        target: [s.setLogs.exerciseLogId, s.setLogs.setNumber],
-        set: {
-          weightKg: sql`EXCLUDED.weight_kg`, reps: sql`EXCLUDED.reps`,
-          setTimeSec: sql`EXCLUDED.set_time_sec`, restTimeSec: sql`EXCLUDED.rest_time_sec`,
-          intensityPct: sql`EXCLUDED.intensity_pct`, useFor1rm: sql`EXCLUDED.use_for_1rm`,
-          setStartMs: sql`EXCLUDED.set_start_ms`, setEndMs: sql`EXCLUDED.set_end_ms`,
-          rpe: sql`EXCLUDED.rpe`,
-        },
-      })
-      .returning()
-    return rows.map((r, i) => ({ ...deduped[i], id: r.id, exerciseLogId }))
-  }
-
   async logExerciseAndSets(
     userId: string,
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
