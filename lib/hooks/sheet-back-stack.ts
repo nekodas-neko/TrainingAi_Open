@@ -58,6 +58,66 @@ export function closeSurface(surface: Surface, history: HistoryLike): void {
   history.back()
 }
 
+/**
+ * A navigation is taking over the top surface's history entry (BF-165, DV-2).
+ *
+ * **The bug this exists for, and why nothing smaller works.** A surface pushes an entry on open and
+ * pops it on close, which is right in isolation. When the close is *caused by* a navigation, that pop
+ * lands on the entry the navigation just created and undoes it: measured on the S25, `pushState(…)`
+ * then `back()` **7 ms later**, screen unchanged. Three cheaper fixes were built and each failed on
+ * evidence rather than on reasoning:
+ *
+ * - **Waiting for the pop to drain** (`afterSelfPops`, using the `pendingSelfPops` counter above).
+ *   `pendingSelfPops` is still **0** when the navigation is issued, so the parked callback runs
+ *   inline and is eaten by a pop that has not happened yet.
+ * - **Reordering the call site's three statements.** `router.push` runs inside
+ *   `document.startViewTransition`, which suspends frame production and holds the React commit — so
+ *   the navigation is itself what delays the surface's close past it. No order separates them.
+ * - **Lengthening the navigation cap.** The push is fine; it is undone afterwards. That turns a dead
+ *   tap into a slow dead tap.
+ *
+ * So the entry is released **synchronously, before the navigation**, and the pop then never happens
+ * at all — there is no window for it to be mistimed in. It is tied to the surface OBJECT rather than
+ * to a module flag, which is what BF-34 established the difference between: *"a state that is not
+ * mine is indistinguishable from a real back gesture"*.
+ *
+ * **Returns whether that surface had an entry, and the caller must act on it.** Going forward, `true`
+ * means the current history entry is the surface's, so the navigation has to `replace` it — a `push`
+ * would leave a dead entry at the same URL as the page below, costing a back press that appears to do
+ * nothing. Going back, `true` means one extra entry stands between here and the destination.
+ */
+export function releaseTopSurfaceEntry(): boolean {
+  const top = stack[stack.length - 1]
+  if (!top || !top.pushed) return false
+  top.pushed = false
+  return true
+}
+
+/**
+ * The same handover, for a navigation that goes BACK past every open surface (DV-2).
+ *
+ * **Returns the count, because the caller has to travel that far in ONE call.** `releaseTopSurfaceEntry`
+ * is not enough here, and the difference is reachable rather than theoretical: the Capacitor back
+ * handler checks the three in-progress-session guards **before** `hasOpenSurface()`, deliberately, so
+ * a mid-workout back press with a sheet already open raises *"Leave workout?"* **on top of it**.
+ * History is then `[…, /workout, sheet, dialog]`, and a `go(-2)` from the dialog lands on `/workout` —
+ * the very screen *Leave* is meant to leave.
+ *
+ * **Releasing is not the same as removing.** The entries stay in history; clearing `pushed` only stops
+ * the surfaces popping them as they unmount. So the caller travels `1 + <this count>`, and every
+ * surface that skipped its push contributes 0 — which is why this counts rather than returning the
+ * stack depth.
+ */
+export function releaseAllSurfaceEntries(): number {
+  let released = 0
+  for (const surface of stack) {
+    if (!surface.pushed) continue
+    surface.pushed = false
+    released++
+  }
+  return released
+}
+
 export function handlePop(state: unknown, history: HistoryLike): void {
   if (pendingSelfPops > 0) {
     pendingSelfPops--
