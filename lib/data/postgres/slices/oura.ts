@@ -12,6 +12,7 @@ import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import { resolveDsToMs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
 const OURA_DAILY_SOURCE_COLS: SourceColumn[] = [
@@ -809,6 +810,88 @@ export async function getHrForWindow(db: Db, userId: string, from: Date, to: Dat
     ))
     .orderBy(asc(s.ouraHeartrate.timestamp))
   return preferStrapBuckets(rows)
+}
+
+/**
+ * The same profile `computeObservedHr` produces, computed in SQL — one row instead of the whole
+ * window.
+ *
+ * RV-181. `getHrForWindow` was 565 s of 1,117 s of all database time over 25.2 days (12,591 calls,
+ * 44.84 ms mean, 16,843 rows a call, 212 M rows total), and the great majority of that is the
+ * seven callers of `resolveHrProfile`, each dragging back 90 days — 133,041 rows after the merge,
+ * measured 2026-09-25 — to read six numbers off it.
+ *
+ * **Every rule `computeObservedHr` applies is reproduced here, and the equivalence is tested rather
+ * than asserted** (`observed-hr-sql-equivalence.test.ts` runs both paths over the same rows):
+ * `preferStrapBuckets` first (a ring row is dropped when a chest-strap row shares its 10-second
+ * bucket — and the bucket set is built from rows *inside the window*, which is why the subquery
+ * carries the same bounds as the outer one); then the plausible band; then `min`/`max` as k-th
+ * order statistics **with multiplicity**, which `ORDER BY … OFFSET k-1 LIMIT 1` gives exactly and
+ * `percentile_disc` does not. The mean comes back unrounded and TypeScript rounds it, so the
+ * rounding rule stays in one language.
+ *
+ * **What this is NOT is the 8× win RV-181's evidence line implies**, and the difference is worth
+ * stating because the number in that line is the reason to do the work. Sweep 51's "54 ms" was a
+ * plain aggregate over the raw window — no strap merge. Measured against production on 2026-09-25:
+ * that plain form is 67 ms, the merge-preserving form here is 225–260 ms warm, and the row fetch it
+ * replaces is ~360 ms. So the saving is about a third of the database time, not seven eighths. The
+ * rest of the win is that 133,041 rows stop crossing the wire and stop being materialised in Node
+ * on every resolve.
+ */
+export async function getObservedHrProfile(
+  db: Db, userId: string, from: Date, to: Date,
+): Promise<ObservedHrProfile> {
+  const k = CORROBORATION
+  const rows = await db.execute<{
+    merged_count: number; sample_count: number
+    avg_bpm: string | null; highest: number | null; kth_max: number | null; kth_min: number | null
+  }>(sql`
+    WITH merged AS MATERIALIZED (
+      SELECT h.bpm
+      FROM oura_heartrate h
+      WHERE h.user_id = ${userId}
+        AND h.timestamp >= ${from} AND h.timestamp <= ${to}
+        AND (h.source = 'chest_strap' OR NOT EXISTS (
+          SELECT 1 FROM oura_heartrate st
+          WHERE st.user_id = ${userId}
+            AND st.source = 'chest_strap'
+            AND st.timestamp >= ${from} AND st.timestamp <= ${to}
+            AND st.timestamp >= to_timestamp(floor(extract(epoch FROM h.timestamp) / 10) * 10)
+            AND st.timestamp <  to_timestamp(floor(extract(epoch FROM h.timestamp) / 10) * 10 + 10)
+        ))
+    )
+    SELECT
+      (SELECT count(*) FROM merged)::int AS merged_count,
+      (SELECT count(*) FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM})::int AS sample_count,
+      (SELECT avg(bpm) FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}) AS avg_bpm,
+      (SELECT max(bpm) FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}) AS highest,
+      (SELECT bpm FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}
+         ORDER BY bpm DESC OFFSET ${k - 1} LIMIT 1) AS kth_max,
+      (SELECT bpm FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}
+         ORDER BY bpm ASC  OFFSET ${k - 1} LIMIT 1) AS kth_min
+  `)
+  const r = (rows as unknown as { rows: Record<string, unknown>[] }).rows[0]
+  const mergedCount = Number(r?.merged_count ?? 0)
+  const sampleCount = Number(r?.sample_count ?? 0)
+  const outOfBandRejected = mergedCount - sampleCount
+
+  if (sampleCount === 0) {
+    return {
+      min: null, max: null, avg: null, sampleCount: 0, isReliable: false,
+      outOfBandRejected: mergedCount, highestPlausible: null,
+    }
+  }
+  const avg = Math.round(Number(r.avg_bpm))
+  const isReliable = sampleCount >= MIN_RELIABLE_SAMPLES
+  // Fewer readings than the corroboration depth: there is no k-th highest, so the profile reports
+  // the mean only — the same refusal `computeObservedHr` makes rather than falling back to a bare max.
+  if (sampleCount < k) {
+    return { min: null, max: null, avg, sampleCount, isReliable, outOfBandRejected, highestPlausible: null }
+  }
+  return {
+    min: Number(r.kth_min), max: Number(r.kth_max), avg, sampleCount, isReliable,
+    outOfBandRejected, highestPlausible: Number(r.highest),
+  }
 }
 
 // ── Time-in-HR-zone rollup cache (daily_zone_minutes, migration 129) ──────────────────────

@@ -517,6 +517,79 @@ below threshold and left in place for next time.
 - **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
   `Footprints`, unchecked against the current glyph.
 
+### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
+
+- **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
+  `Gate: owner` would park it, and getting these in front of him is the work.
+- **Ask:** owner — three PRs are waiting on him with no queue entry: **#1607** bearer tokens for native
+  login (auth, external contributor), **#1592** accept `activeCalories` in health imports (**already merged as #1616 —
+  no longer his**, kept for the Q-204/Q-524 consequence), **#1499** widen `/api/admin/db-query` (his own Lane A work, held
+  for his yes). Recommendations below.
+- **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
+  review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
+  message.
+- **Why this is a defect and not bookkeeping.** `grep -cE '#1607|#1592|#1499'` over this file returns
+  **0**. The seven decisions already in `Lane: O` are correctly routed — these are not routed at all.
+  A GitHub review request is a channel nobody is watching: #1499 has sat since **2026-09-24** and the
+  two external PRs since the small hours of 09-25. **CLAUDE.md's rule covers exactly this** — a
+  question for the owner is a task, and a question that lives only in a reply dies with the session.
+  It says nothing about PRs, which is why three of them slipped: the rule is written about backlog
+  questions and the gap is one category wider than the rule's wording.
+
+**The three, each with a recommendation.**
+
+  **#1607 — bearer tokens for native mobile login** (`native-token-exchange`, external contributor,
+  review requested from the owner). Adds an opt-in token response with expiry beside the existing
+  cookie login, for an Expo/React-Native iPhone client.
+  - **Recommendation: the owner reads this one himself before it merges, and no agent merges it.**
+    It is an **auth** change, which is his carve-out by CLAUDE.md's own list, and it arrives from
+    outside the standing-agent set. A second credential path is cheap to add and expensive to get
+    wrong — token lifetime, revocation and storage are the questions, and none of them is visible from
+    the PR title.
+  - **Not assessed here.** I have not read the diff; this entry routes it rather than reviewing it.
+    A security review before he reads it would be worth more than my summary — that is `Lane: A`'s
+    or a `/security-review` pass, and it should happen first.
+
+  **#1592 — accept `activeCalories` in daily health imports** — **⚠ IT MERGED AS #1616 on 2026-09-25**
+  (*"…, rounded"*, superseding #1592), before this entry reached him, so nothing is owed on it. Kept
+  because the consequence below stopped being hypothetical the moment it landed, and because **the
+  Q-524 amendment it invalidates is corrected in this same PR** rather than left wrong on `main`.
+  Forwards `dailyMetrics[].activeCalories` into `body_metrics.active_calories`.
+  - **Recommendation: mergeable on its own terms, and it must not merge silently.** It is a
+    reasonable Apple-Health feature and the storage column already exists. But that column is the
+    input to the Activity Score's `activeEnergy` contributor (weight 15), dead since 2026-07 — so
+    **this revives the input `Q-204` exists to remove**, from a direction nobody was watching, and
+    `Q-184`'s own check says do not revive it.
+  - **It also invalidates a conclusion I published yesterday.** The Q-524 amendment answered its
+    double-count blocker with *"not live, and probably never"*, resting on `activeEnergy` having no
+    live source. If this merges it has one, and the steps/energy double-count becomes live the moment
+    anyone builds the energy-derived step goal. **Whoever merges it should add that line to Q-204 and
+    Q-524 in the same PR**, or my amendment is wrong on `main` with nothing marking it.
+
+  **#1499 — scope `/api/admin/db-query` to a user who filed feedback** (`lane-a/or138-pivot-readonly-scope`,
+  his own Lane A work, explicitly held: *"AUTH/SECURITY — not merged on my own authority"*).
+  - **Recommendation: approve.** The widening is narrow — it reaches only users who have filed
+    feedback, which is one predicate to remove if he ever wants it broader, and the no-leak behaviour
+    was proven against a real pool pinned to `max: 1` rather than asserted. The PR also settled the
+    entry's own flagged unknown (a bare `SET` cannot stick, because every statement is wrapped in a
+    subquery), so the single-user guarantee was never as soft as feared.
+  - **One caveat worth his eye:** the audit trail goes in as a `-- claude_ro pivot: <uuid>` comment on
+    the audit row rather than a column, because a column is a migration and migrations ship alone.
+    Attributable, greppable, and tidier as a follow-up — not a reason to hold the PR.
+
+- **The process half, which is the durable part.** The rule that routes owner questions is written
+  about backlog entries and does not mention pull requests, so a PR awaiting the owner has no home in
+  the queue. **Recommendation: extend it** — when a PR needs the owner (auth, secrets, money, a
+  data-dropping migration, or an external contribution touching any of those), the opening agent files
+  a `Lane: O` entry with an `Ask:` naming the PR, and strikes it when the PR merges or closes. Cheap,
+  and it is the only thing that makes "everything goes to ORC" true for PRs as well as decisions.
+  Filed as a recommendation rather than edited into CLAUDE.md, because a standing-rule change is the
+  owner's to accept.
+- **What this entry does NOT do.** It does not review any of the three diffs — #1607's auth surface in
+  particular deserves a real read, and this is a routing entry. And it makes no claim about whether
+  the two external PRs are otherwise sound: CI state, test coverage and contributor provenance are all
+  unexamined here.
+
 ### [platform] OR-150 — fifteen scoring entries owe a Tuning proposal, not the owner's signature
 
 - **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
@@ -4245,25 +4318,33 @@ drift.
 - **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
   recompute from stored inputs (RV-170).
 
-### [heart-rate][platform] RV-181 — the HR profile pulls 90 days of raw heart rate to compute three numbers: 51% of all database time
+### [heart-rate][platform] RV-181 — the HR profile pulled 90 days of raw heart rate to compute six numbers
 
-- **Lane: A** — `packages/shared/src/health/hr-profile.ts:98-102`, `lib/data/postgres/slices/oura.ts:801`.
+- **Lane: A** — `packages/shared/src/health/hr-profile.ts`, `lib/data/postgres/slices/oura.ts`.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
-- **`pg_stat_statements`, 25.2 days:** the `getHrForWindow` range select ran **12,463 calls, 558 s of
-  1,083 s total DB time (51.5%)**, and returned **209 M rows**. The 90-day window alone is
-  **133,727 rows** today.
-- **Callers:** `hr-profile`, `zone-minutes`, `cardio-week`, `cardio-trends`, `computeWorkoutHr`,
-  `computeHrRecoveryProfile`, and the SSR of Baselines and guided walk.
-- **Why it repeats:** it is in `invalidateOuraSync`, and `useHrProfile` is mounted on the active
-  workout and exercise summary screens, so **every ring drain during a workout refetches it**. Drains
-  run 20–32 an hour at 07–09.
-- **Evidence it is fixable:** sweep 51 measured the same statistic as a SQL aggregate at **54 ms,
-  one row**. RV-64 only hoisted the fetch.
-- **Fix:** compute the observed-max statistic in SQL (`percentile_disc`, or top-k). Fetch 30 days,
-  not 90, for `cardio-week`, which needs the series. Memo per user per local day.
-- **Same shape, smaller:** `/api/health/trends` (`route.ts:73-84`) re-derives HR recovery from raw
-  HR, with 2 queries per session over 14 days (~20). But `workout_hr_stats.hrr1_best` is stored for
-  **10 of 10** of those sessions. Read it, after checking the two agree per day.
+- **The headline SURVIVED re-measurement on 2026-09-25**, against a moving window three weeks on:
+  **565 s of 1,117 s of all database time (50.6%)**, 12,591 calls, 44.84 ms mean, 16,843 rows a
+  call. The 90-day window is 134,425 raw rows, **133,041** after the chest-strap merge.
+- **SHIPPED 2026-09-25** ([entry](overview/entries/2026-09-25-rv181-observed-hr-sql-aggregate.md)):
+  `repo.getObservedHrProfile` computes the profile in SQL, one row instead of the window. The seven
+  `resolveHrProfile` callers fetch no rows; `/api/cardio-week` reads its two 30-day windows as
+  aggregates too, so `resolveHrProfileWithWindow` (RV-73) is gone with its boundary caveat.
+- **⚠ The EVIDENCE line was wrong — sweep 51's "same statistic as a SQL aggregate at 54 ms" had no
+  chest-strap merge**, which is 78% of the rows and the whole cost. Measured: plain form 67 ms, the
+  merge-preserving form shipped 225–260 ms, the row fetch ~354 ms. **So the saving is about a third,
+  not seven eighths.** The rest of the win is 133,041 rows no longer crossing the wire or being
+  materialised in Node per resolve. Formulations tried and their timings are in the journal entry.
+- **STILL OPEN — the memo, which holds the other two thirds.** The 90-day shape ran **~1,460 times
+  in 25.2 days (~58/day)** and the aggregate does not touch that count: `useHrProfile` is mounted on
+  the active-workout and exercise-summary screens and `hr-profile` is in `invalidateOuraSync`, so
+  every ring drain during a workout refetches it (drains run 20–32/hour at 07–09). Not shipped with
+  the aggregate because it needs a freshness call, not a mechanism — `use-hr-profile.ts` argues at
+  length against pinning this key and that argument has to be answered. **Re-measure first:** with
+  the row fetch gone, `pg_stat_statements` now reports the small-window callers only.
+- **STILL OPEN — same shape, smaller.** `/api/health/trends` (`route.ts:73-84`) re-derives HR
+  recovery from raw HR, 2 queries per completed session over 14 days (~20), though
+  `workout_hr_stats.hrr1_best` is stored for **10 of 10**. Read the column — after a per-day
+  agreement check against production, which has not been done.
 
 ### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
 
@@ -25171,8 +25252,20 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
   **Sequencing is unchanged:** the single-source read is still the first change and is independent of
   the formula. Ship precedence first, then provenance, then the formula.
-  **✅ THE DOUBLE-COUNT QUESTION IS ANSWERED — measured 2026-09-24 (Tuning), and the answer is "not
-  live, and probably never".** The trap above says *"deriving the step goal from an energy target
+  **⚠ RETRACTED IN PART, 2026-09-25 — "probably never" IS WRONG, and the reason landed the next day.**
+  **#1616** (*"Accept explicit active energy in daily health imports, rounded"*, superseding #1592)
+  merged, and `app/api/sync-health/route.ts` now accepts `dailyMetrics[].activeCalories` and writes it
+  **rounded** into `body_metrics.active_calories` — the exact column feeding the `activeEnergy`
+  contributor. So the pipe is **open in code**, and the double-count stops being structurally
+  impossible. **What survives:** it is still not live *today*, because no client sends the field yet —
+  the Apple-Health importer that would is unbuilt. **What does not:** "probably never" rested on the
+  source being dead, and it is not dead any more; the collision now needs only a client, not a
+  decision. **Whoever builds the energy-derived step goal must settle the double-count first**, and
+  cannot lean on this amendment to skip it. The original text follows, kept rather than deleted
+  because the measurements in it are still sound and only the forecast failed.
+
+  **THE DOUBLE-COUNT QUESTION AS ANSWERED ON 2026-09-24 (Tuning) — "not
+  live, and probably never":** The trap above says *"deriving the step goal from an energy target
   makes those two contributors measure the same walking twice — decide the double-count before
   shipping"*. Decided, on evidence rather than judgement:
   - **It is not live today.** `activeEnergy` scores `body_metrics.active_calories`, which holds a

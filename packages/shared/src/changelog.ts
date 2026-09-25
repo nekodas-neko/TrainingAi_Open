@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.52",
+    date: "2026-09-25",
+    changes: [
+      "The muscle map now comes with a key, and its lightest shades are brighter. A muscle you had barely trained this week was almost the same colour as one you had not trained at all, so the map under-reported the very muscles it is there to flag.",
+    ],
+  },
+  {
     version: "1.465.51",
     date: "2026-09-25",
     changes: [
-      "The muscle map now comes with a key, and its lightest shades are brighter. A muscle you have barely trained this week was almost the same colour as one you have not trained at all, so the map under-reported the very muscles it is there to flag.",
+      "Every screen that shows your heart-rate zones \u2014 the Cardio hub, Baselines, the guided walk, and the zone bands during a workout \u2014 now asks the database for the three numbers it needs instead of downloading ninety days of raw heart rate and working them out on the phone. Same numbers, less waiting, and it no longer competes with logging a set for the same database connections.",
     ],
   },
   {
