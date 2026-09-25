@@ -17544,3 +17544,21 @@ sentence the next reader adds a writer to a column that has one, and TN-79 keeps
 
 An entry filed to describe "measured the wrong thing" made that mistake within the hour, so the
 correction is worth more than the original finding.
+## 2026-09-25 — `docs/implementation-backlog.md` 31340 → 31361 (+21)
+
+`RV-67` keeps its entry — one key of five is proved and flagged, so this is genuinely partial work
+rather than something to strike — and `LB-154` is new, filed from what the proof turned up.
+
+The lines are the proof itself, compressed. RV-67's own warning is that `freshWithinTtl` turns a
+stale flash into six hours of hard staleness if a single writer is missed, and CLAUDE.md requires a
+written proof per key. A proof that lives only in a merged PR body is a proof the next session
+cannot check, so the entry carries its shape: four repository writers, two routes, one client file,
+every mutating call invalidating, and — the part that nearly sank it — no sync writer, because the
+offline mirror is fed FROM the cached response rather than independently of it.
+
+It also records which reads deliberately stay UNFLAGGED — the sync-provider warm list and its
+notification-path fetch — because those are what bound cross-device staleness, and flagging a
+warming read would defeat the point of warming.
+
+It also records the two things the entry did not know: `useCachedValue` had no such option at all,
+and the screen that WRITES meal types is deliberately left unflagged.

@@ -257,6 +257,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             const store = userId ? getLocalStore(userId) : null;
             if (store && types.length) store.replaceMealTypes(types).catch(() => {});
           },
+          // RV-67: every writer of this key is in `invalidateMealTypes()` — proof in the journal
+          // entry — so a tab revisit inside the TTL is a real cache hit rather than a request.
+          { freshWithinTtl: true },
         ),
         refreshTargets(),
         refreshDerived(),
