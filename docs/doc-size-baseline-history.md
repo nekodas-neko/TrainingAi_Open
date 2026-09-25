@@ -17341,3 +17341,24 @@ The remaining length is two things a future session would otherwise undo: **`str
 purpose** (main moves faster than CI completes, so requiring a current base can livelock — seven
 re-merges on one PR the day before), and **the empty bypass list means a broken CI cannot be fixed**
 without temporarily adding one, which is stated rather than pre-configured.
+
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31152 → 31159 (+7 after two rebases, net of RV-122 leaving)
+
+`LB-151` arrived and `RV-122` left in the same PR, so the file grew by four lines rather than by the
+entry's full length.
+
+The entry is the length it is because of one paragraph that is not a finding: **what it does not
+establish.** `pushMutations` having no in-flight guard is measured and certain; whether two
+overlapping drains actually double-*write* is not, because the per-domain handlers may be upserts.
+Those are a correctness bug and a bandwidth annoyance respectively, and the entry has to be readable
+by someone who picks it up cold without collapsing the second into the first. Cutting that paragraph
+would leave a confident-sounding entry that overstates what was measured, which is the failure mode
+this queue has been correcting all week.
+
+One pass of tightening was done first and bought a single line; the rest is load-bearing.
+
+The number moved twice more while this PR waited: #1609 and then #1611 each raised the same
+baseline, so the `.size` file conflicted on a value neither branch was wrong about. Recomputed from
+the merged file each time rather than picking a side — two PRs raising the same document is the one
+conflict in this file that is a genuine disagreement rather than two independent additions.

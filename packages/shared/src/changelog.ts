@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.49",
+    date: "2026-09-25",
+    changes: [
+      "When several changes fail to sync, the card listing them now has a single \u201cRetry all\u201d instead of making you tap Retry on each one. It also tells you honestly if only some of them went through.",
+    ],
+  },
+  {
     version: "1.465.48",
     date: "2026-09-25",
     changes: [
