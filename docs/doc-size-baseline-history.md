@@ -18,26 +18,6 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-25 — backlog baseline → 32139, file ends at 31896 (OR-168, eight owner decisions, a DV re-lane, two closures)
-
-Growth, and most of it is answers rather than new work. `OR-168` is the largest single addition:
-the deploy-verification gap carries two findings that kill the obvious implementation — `/api/version`
-reports `CHANGELOG[0].version`, so it does not move on a merge that skips the changelog, and the route
-is deliberately `max-age=300`, so a poll can confirm a deploy that has not happened. Both belong on the
-entry, because the next session would otherwise rediscover them by building the wrong poller.
-
-The rest: eight owner decisions recorded onto their entries rather than left in a chat scrollback,
-`OR-127` re-laned O→DV, and `LA-129` annotated with the measurement that contradicts its premise —
-54 of the last 63 `.size` changes on `main` are this very file's sibling, which is the argument for
-dropping the backlog from the ratchet rather than for generating baselines in CI. That measurement is
-recorded and NOT acted on; the entry says why.
-
-**Why the baseline sits 243 lines above the file.** It was raised to 32139 at the point `main` was
-merged in, and the file then *shrank* to 31896 when `DV-14` and `BF-12` were verified fixed and
-removed. `--fix` deliberately left the baseline where it was: 243 is inside the 643-line slack band,
-and leaving slack is the whole anti-collision mechanism — tightening it here would hand the next PR
-a conflict on this exact line for no gain. The compaction sweep tightens, with `--tighten`.
-
 ## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
 
 Growth, and it is the cheap kind: the device agent re-reported DV-15 from a sitting on v1.465.17,
@@ -17858,3 +17838,13 @@ have 400ed the owner re-saving his own phase set. The entry records that, and re
 possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
 cites the computed code the model currently rewords, which is what makes it buildable without
 re-deriving it.
+
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → 31822 (BF-200, the deload that skipped one exercise)
+
+The owner noticed one deloaded exercise carrying his normal working weight. The four-row table is the
+entry: three exercises land exactly on the round-up of 52% of their last real 1RM and the fourth does
+not, which is what turns "the deload is broken" into "the deload works and this one exercise took a
+different basis". Two mechanisms both produce 30 and the entry refuses to pick between them, so it
+carries both plus the existing `source` field that settles it.
