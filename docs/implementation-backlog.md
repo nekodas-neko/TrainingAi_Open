@@ -5686,9 +5686,13 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   read names an OOM kill and its RSS; an **empty** dmesg eliminates OOM outright, which nobody has
   been able to say in three sessions. Costs nothing on a green run.
 - **Keep — the cause is NOT established, and this entry closes when the next red E2E reports.**
-  Measurement 1 of the 3 consecutive runs on an unchanged head is in: **run 3069 PASSED** (28m53s),
-  so the fault is intermittent. If dmesg comes back empty on the next failure, OOM is out and the
-  next step is sampling memory during the run rather than after it.
+- **⛔ The entry's own discriminator is too weak, measured 2026-09-25.** It said 3 consecutive runs
+  on an unchanged head would settle spec-pair vs runner. All **3 of 3 PASSED** (28m53s, ~34 min,
+  ~33 min on run 3069 attempts 1–3), so the fault did not reproduce at all — it is rarer than
+  1-in-3, and no feasible number of reruns is a plan. **Do not read three greens as "fixed" or as
+  evidence for either hypothesis.** The dmesg witness is now the thing that answers it, on whichever
+  real failure comes next; if dmesg is empty there, OOM is out and the next step is sampling memory
+  during the run rather than after it.
 - **Note the second half of this entry is NOT Lane B's.** "Because E2E is advisory nobody looks" is
   a question about making E2E required, which `CLAUDE.md` records as the owner's call pending
   `LB-56`. Nothing here changes that.
