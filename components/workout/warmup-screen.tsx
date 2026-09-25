@@ -72,11 +72,17 @@ export function WarmupScreen({ sessionType, exercises, workoutStartMs, warmupGoa
       </header>
 
       {/* Warmup timer bar */}
+      {/* RV-99: the three greens below are the token, not `#22c55e`, because this "✓ Warm up
+          complete" is the same state the NEXT screen paints — `GetReadyProgress`'s "✓ Ready" and
+          `WarmupRampProgress`'s done segments, both `var(--accent-green)` since the workout-clocks
+          slice. Same meaning, same ✓-label-plus-filled-bar idiom, two greens one screen apart in a
+          flow the user walks through in seconds. The shadow keeps its own 53% (`#22c55e88`) rather
+          than adopting the brand branch's 60%: the colour is the disagreement, the opacity is not. */}
       <div className="px-4 pt-2.5 pb-1 border-b border-border/30">
         <div className="flex items-center justify-between mb-1.5">
           <span
             className="text-[11px] font-bold uppercase tracking-widest"
-            style={{ color: warmupDone ? "#22c55e" : "var(--color-brand)" }}
+            style={{ color: warmupDone ? "var(--accent-green)" : "var(--color-brand)" }}
           >
             {warmupDone ? "✓ Warm up complete" : "Warm up timer"}
           </span>
@@ -92,9 +98,9 @@ export function WarmupScreen({ sessionType, exercises, workoutStartMs, warmupGoa
               width: `${warmupProgress * 100}%`,
               transition: "width 1s linear",
               background: warmupDone
-                ? "#22c55e"
+                ? "var(--accent-green)"
                 : "linear-gradient(90deg, var(--color-brand), color-mix(in oklch, var(--color-brand) 60%, #00d4ff))",
-              boxShadow: warmupDone ? "0 0 8px #22c55e88" : "0 0 8px color-mix(in oklch, var(--color-brand) 60%, transparent)",
+              boxShadow: warmupDone ? "0 0 8px color-mix(in oklch, var(--accent-green) 53%, transparent)" : "0 0 8px color-mix(in oklch, var(--color-brand) 60%, transparent)",
             }}
           />
         </div>

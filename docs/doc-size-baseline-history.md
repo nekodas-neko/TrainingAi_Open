@@ -17654,3 +17654,22 @@ is a 60–70 ms race between the card's refetch and the outbox push, invisible o
 three previous fixes' green suites. A row saying "not device-verified" without that would read as
 routine caution. The trace and the pass test are what make the device sitting actionable without
 opening the backlog.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31424 → 31468 (+44, RV-99 / LB-152)
+
+A measurement, and it earns its lines by *shrinking* something. `RV-99` had carried four different
+counts of the hex-triad population (173, 183, 116, 182) and `LB-152` asked the owner to weigh
+"~113 hard-coded greens and reds getting brighter". Counted outside comments and classified by
+whether a condition picks the colour — all 33 conditional sites read individually — the real band
+population is **14**. The other 102 are card tints, chart colours, deliberate red→amber→green ramps,
+per-metric identity accents and a fallback default, none of which the question covers.
+
+Most of the addition is the **per-site `file:line` list** for those 33, which is the part a future
+session cannot regenerate cheaply: the split needs a human read, and a heuristic gets three of them
+wrong. Recording it is what stops the entry acquiring a fifth wrong number, and it converts
+`LB-152` from an app-wide restyle into a screen or two to glance at — a materially easier decision
+for the owner than the one the entry was posing.
+
+Also folded in: why `RV-99` is now `Lane: A` (its Lane B half is entirely the owner's), the second
+workout-clocks-class defect and why no same-screen scan could have found it, and one
+checked-and-dismissed One-Formula suspicion so nobody re-opens it.
