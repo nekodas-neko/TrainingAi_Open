@@ -6010,52 +6010,6 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   from scratch. They were not hard questions — they were questions nobody had been asked, because
   each lived in a session transcript that ended. **Writing them in one place was the whole of the
   work.** That is the argument for this ledger continuing to exist after these six clear.
-### [platform] RV-67 — the TTL gate is opt-in; the false comment is fixed and the first key is proved
-
-- **Lane:** B — `app/health/health-content.tsx`, plus the read sites it licenses.
-  **Added:** 2026-09-20 · Review sweep 51. **First key shipped 2026-09-25.**
-- **✅ Both of the entry's numbers reproduce exactly: 191 cached read sites, 8 with `freshWithinTtl`.**
-  Mechanism confirmed — the only gate in `cachedFetchCore` is `if (freshWithinTtl)`
-  (`lib/sqlite/cache.ts:380`); without it the cached value paints and the network fetch always runs.
-  ⚠ Count with a scan that allows a generic — call sites are `cachedFetch<Foo>(…)`, and a regex
-  requiring `(` immediately after the name finds 7 of the 191.
-- **✅ The false comment is fixed** (`health-content.tsx`), which is what made this invisible: it
-  claimed `cachedFetch` "honours its TTL, so re-firing a group on a tab revisit is a cache hit".
-- **✅ `nutrition-meal-types` is proved and flagged** at its three hot read sites. The proof, in
-  full, is in the journal entry: four repository writers reached from two routes, reached from one
-  client file (`meal-type-manager.tsx`), every mutating call there followed by `invalidateMealTypes()`,
-  and **no sync writer** — the offline mirror `replaceMealTypes` has one caller, which hydrates it
-  *from* this cached response, so it is downstream of the cache rather than a writer.
-  `components/nutrition/__tests__/rv67-meal-types-ttl-gate.test.ts` pins the fragile half: a new
-  mutating caller outside the manager would break the proof silently, costing a six-hour stale list.
-  **Cross-device staleness is bounded by leaving the WARMING reads unflagged** — `sync-provider.tsx`
-  :85 (warm list) and :276 (the notification path) both still refetch, so a sync pass refreshes the
-  entry. Flag the component read paths, never the warming ones.
-- **⛔ Two things the entry did not know, both resolved here.** `useCachedValue` had **no** `freshWithinTtl` option at
-  all, so one read site could not be flagged without widening the hook (done — `lib/hooks/**` is
-  Lane B's). And the **writer screen is deliberately left unflagged**: the manager edits meal types,
-  is visited rarely, and a network read there costs nothing anyone notices.
-- **✅ SECOND KEY: `nutrition-targets` is proved and flagged (2026-09-25).** Proof in its journal
-  entry. Two things made it more work than the first: the GET had to be shown to be a **stored row
-  rather than a derivation** (if targets were computed from body weight, every body-metric write
-  would be a writer of this key), and `upsertNutritionTargets` has a **second, non-obvious caller —
-  `PUT /api/user/goals`**, which upserts targets as a side effect, so every goals writer is a targets
-  writer. All four client writers do call `invalidateGoalRecommendations()`, and no sync or
-  local-store path carries `nutrition_targets`/`user_goals`.
-- **⚠ That flag INVALIDATES A RECORDED AUDIT, and the audit is cited in CLAUDE.md.**
-  [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](reviews/2026-08-16-goal-invalidation-audit.md)
-  concluded all six keys of `invalidateGoalRecommendations()` are **inert** — true then, and no longer
-  true of `nutrition-targets`, because that is exactly the Q-262 caveat: *a key that is inert today
-  becomes load-bearing the moment someone adds `freshWithinTtl` to it.* Do not read that audit as
-  current for this key.
-- **Remaining candidates, each needing its OWN written proof** — this is the work, and it does not
-  generalise from either key above: `workout-data:meta`, `muscle-recovery`, `health-trends-summary`.
-  (The 2026-09-24 re-read already dropped `hr-profile`, `exercise-library`, `progression-styles` and
-  `activity-types`.)
-- **⚠ Do not bulk-apply the flag** — a missed writer turns a stale flash into hours of hard
-  staleness. CLAUDE.md requires the written proof per key.
-- **Not established:** the request burst was counted from source, never from a network trace.
-
 ### [nutrition][platform] LB-154 — the food-logger sheet fetches meal types with a bare `fetch`
 
 - **Lane: B** — `components/nutrition/food-logger-sheet.tsx:245-247`.

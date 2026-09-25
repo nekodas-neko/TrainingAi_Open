@@ -14,6 +14,16 @@ I "corrected" a correct entry: my first count returned **7 and 0**, because call
 the fourth scanner trap this session, and the first one where the scanner's answer would have
 discredited the entry rather than the code.
 
+> **Corrected later the same day.** Measured against this very commit with a fixed scanner, the
+> figures were **198 read sites and 8 flagged** — so the *flagged* count was right and the *site*
+> count was not (198, not 191). My scanner skipped each call's type argument with a **paren-free**
+> character class, so every `cachedFetch<{ x: import('…').T }>` was invisible to it, and the entry's
+> author evidently had the same blind spot, which is why we agreed. **"Reproduces exactly" meant
+> "reproduces the same error": two scanners agreeing is not corroboration when they share a blind
+> spot.** The conclusion is unaffected — 190 of 198 did not opt in. Both scanners now skip the type
+> argument by balancing angle brackets, and the then-figure above was recovered by running the fixed
+> one in a worktree at that commit rather than by reasoning back from today's count.
+
 ## The proof, which is the actual work
 
 `freshWithinTtl: true` means a read inside the 6-hour TTL never touches the network, so a missed
