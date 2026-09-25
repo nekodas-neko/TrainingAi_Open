@@ -3709,6 +3709,68 @@ drift.
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
 
+### [workouts] BF-200 — the deload applied to four exercises and not the fifth: Skull Crusher was loaded at 30 kg where 52% of its 1RM is 19
+- **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
+- **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
+- **Needs:** — nothing.
+
+- **He is right, and it is one exercise out of five.** Measured against production for the deloaded
+  Upper session (prescription stored 2026-09-25 21:24, all five exercises `pct: 52`,
+  `deloaded: true`):
+
+  | exercise | last real 1RM | 52% of it | rounded to a loadable load | **app showed** | |
+  |---|---|---|---|---|---|
+  | Incline Bench Press | 56.25 | 29.25 | 30 | **30** | ✅ |
+  | Chest-Supported DB Row | 15.5 | 8.06 | 8.75 | **8.75** | ✅ |
+  | Dumbbell Lateral Raise | 11.25 | 5.85 | 6.25 | **6.25** | ✅ |
+  | **Barbell Skull Crusher** | **36.5** | **18.98** | **20 (empty bar)** | **30** | ❌ |
+
+  So the deload machinery works — three of four land exactly on the round-up of 52% × the last real
+  1RM. **Skull Crusher was loaded at 30 kg, which is his ordinary working weight**: his 2026-09-20
+  session was 30×8, 30×8, 30×8. A deload that prescribes last week's weight is not a deload, and it
+  is the only exercise where that happened.
+
+- **Two candidate mechanisms, both landing on exactly 30, and this entry does NOT pick between them.**
+  - **(a) the pct was applied to the ALL-TIME PR instead of the last real 1RM.** `personal_records`
+    holds **57.75 kg** for this exercise (achieved 2026-08-13) against a last-real of 36.5.
+    **52% × 57.75 = 30.03 → 30**, an exact match needing no rounding. This is the leading candidate
+    on precision alone.
+  - **(b) the deload pct was not applied at all and the normal target-80 was used.** The 2026-09-19
+    log stores `target_80 = 29.25`, which is not loadable on a 20 kg bar with paired plates and
+    would snap to **30**.
+  Both reproduce the number, so the arithmetic cannot separate them.
+
+- **⭐ The check that settles it, and it already exists.** `resolveWorkingBasisWithSource`
+  (`packages/shared/src/1rm.ts:500`) returns **`source: 'last_real' | 'seed' | 'pr'`** precisely so a
+  caller can say which input won. Log or assert that `source` for `Barbell Skull Crusher` on this
+  session: **`pr` proves (a)**, `last_real` proves (b) and moves the hunt to where the pct is applied.
+  No new instrumentation is needed — the field was built for this question.
+
+- **Why (a) would be possible at all, which is the part worth understanding.** The documented
+  precedence is `lastNonDeload1rm` → then `max(seed, pr)`, and the comment at `1rm.ts:469` says the
+  PR is *"reached only when there is no real logged session at all."* A usable 36.5 exists, so under
+  (a) the last-real value did **not** reach the resolver — which points at
+  `getLastRealOneRmBatch`'s exclusion of deload rows rather than at the resolver itself.
+  **`estimated_1rm` is stored as 0 on deload rows** (2026-09-04 and 2026-08-06 both read 0), so a
+  query that filters on that column can return nothing for an exercise whose recent history is
+  deload-heavy, and the fallback to a months-old PR is then silent.
+- **⚠ The PR itself looks inflated, which is what makes the failure land on exactly his working
+  weight rather than somewhere obviously wrong.** 57.75 kg against a current 36.5 is a 58% gap, and
+  30×8 implies roughly 36–38 by any standard formula. CLAUDE.md already records an inflated-PR class
+  from divergent 1RM copies with a wrong high-rep guard. **Whether this PR row is a survivor of that
+  is not established here** — it is flagged because a wrong basis and an inflated basis compound:
+  either alone would have been visible, together they produce a plausible-looking number.
+
+- **Reversal cost: low** for the fix itself; the risk is in the direction of the error, since a
+  deload that silently prescribes full weight is the failure mode that does not announce itself.
+- **Not diagnosed here.** Whether other sessions are affected — `Pull` is also a whole-session deload
+  (5 of 5) and was not checked exercise-by-exercise, and the same condition would hit any exercise
+  whose recent logs are mostly deloads.
+- **Verification:** for the deloaded Upper session, `resolveWorkingBasisWithSource('Barbell Skull
+  Crusher')` reports `last_real` with 36.5; the prescribed load reads ~20 kg (floored at the empty
+  bar) rather than 30; and the other four exercises are unchanged at 30 / 8.75 / 6.25 and their
+  bodyweight equivalent. **Device look owed** — the load is only visible on the exercise screen.
+
 ### [workouts] BF-199 — the prescription barely uses the model it is named after: sets are always clamped, reps/pct follow a table, and rest is the only free output and it is noise
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`, `app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`.
 - **Added:** 2026-09-26 · BugFix intake. Owner: *"Prescription uses ai right? Do we NEED ai for this? Can we do this through logic so its easy to prescribe and represcribe"*

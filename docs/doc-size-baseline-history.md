@@ -17839,6 +17839,15 @@ possible, plus a note on PS-31 marking which of its items the new entries supers
 cites the computed code the model currently rewords, which is what makes it buildable without
 re-deriving it.
 
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → 31822 (BF-200, the deload that skipped one exercise)
+
+The owner noticed one deloaded exercise carrying his normal working weight. The four-row table is the
+entry: three exercises land exactly on the round-up of 52% of their last real 1RM and the fourth does
+not, which is what turns "the deload is broken" into "the deload works and this one exercise took a
+different basis". Two mechanisms both produce 30 and the entry refuses to pick between them, so it
+carries both plus the existing `source` field that settles it.
 ## 2026-09-25 — `docs/implementation-backlog.md` 31857 → 31894 (+37, DV-12 un-gated, and a retraction)
 
 Three things, and the retraction is the one that had to be written down. `DV-12`'s `Gate: device` was
