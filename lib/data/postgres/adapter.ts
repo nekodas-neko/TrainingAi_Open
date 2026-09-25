@@ -6171,14 +6171,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .onConflictDoNothing()
       .returning({ id: s.ouraRawSamples.id })
 
-    // Idempotent backfill: date any rows stored before the anchor existed (or
-    // whose insert predates this migration). Cheap no-op once caught up.
-    await this.db.execute(sql`
-      UPDATE oura_raw_samples
-      SET measured_at = ${new Date(anchor.anchorUtcMs)}::timestamptz
-        + make_interval(secs => (ring_timestamp_ds - ${anchor.anchorDs}) * 0.1)
-      WHERE user_id = ${userId} AND measured_at IS NULL
-    `)
+    // **There is no `measured_at` backfill here any more, and the invariant above is why.**
+    // RV-182 — an idempotent `UPDATE … WHERE measured_at IS NULL` ran on every ingest to date rows
+    // stored before migration 115 added the column. Its comment called it a cheap no-op once caught
+    // up. Measured against production on 2026-09-25 it was **4,932 calls, 90 s, 8.0% of all
+    // database time, and 0 rows updated** — no index serves that predicate, so each call seq-scanned
+    // the hot window to find the nothing it was always going to find. `measured_at` has had 0 nulls
+    // in ~192,772 rows since the backfill caught up.
+    //
+    // Deleting it is safe because a NULL can no longer be written: this is the only insert path into
+    // the table, `anchor` is non-null by the argument above, and `measuredAt()` therefore always
+    // returns a Date. (The only other writer sets `decoded`, and migration 190 sets `epoch`.)
+    // `oura-raw-sample-measured-at.test.ts` pins that — if a path ever does write a NULL, it fails
+    // there rather than being quietly re-dated by a statement nobody knew was load-bearing.
 
     // Q-541 Task 6 — retire sealed buckets to the cold tier. Fire-and-forget after the response's
     // work is done, throttled per user, and bounded; see `claimAutoPackSlot`.
