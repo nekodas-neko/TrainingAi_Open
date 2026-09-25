@@ -6035,10 +6035,23 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   all, so one read site could not be flagged without widening the hook (done — `lib/hooks/**` is
   Lane B's). And the **writer screen is deliberately left unflagged**: the manager edits meal types,
   is visited rarely, and a network read there costs nothing anyone notices.
+- **✅ SECOND KEY: `nutrition-targets` is proved and flagged (2026-09-25).** Proof in its journal
+  entry. Two things made it more work than the first: the GET had to be shown to be a **stored row
+  rather than a derivation** (if targets were computed from body weight, every body-metric write
+  would be a writer of this key), and `upsertNutritionTargets` has a **second, non-obvious caller —
+  `PUT /api/user/goals`**, which upserts targets as a side effect, so every goals writer is a targets
+  writer. All four client writers do call `invalidateGoalRecommendations()`, and no sync or
+  local-store path carries `nutrition_targets`/`user_goals`.
+- **⚠ That flag INVALIDATES A RECORDED AUDIT, and the audit is cited in CLAUDE.md.**
+  [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](reviews/2026-08-16-goal-invalidation-audit.md)
+  concluded all six keys of `invalidateGoalRecommendations()` are **inert** — true then, and no longer
+  true of `nutrition-targets`, because that is exactly the Q-262 caveat: *a key that is inert today
+  becomes load-bearing the moment someone adds `freshWithinTtl` to it.* Do not read that audit as
+  current for this key.
 - **Remaining candidates, each needing its OWN written proof** — this is the work, and it does not
-  generalise from the one above: `workout-data:meta`, `muscle-recovery`, `health-trends-summary`,
-  `nutrition-targets`. (The 2026-09-24 re-read already dropped `hr-profile`, `exercise-library`,
-  `progression-styles` and `activity-types`.)
+  generalise from either key above: `workout-data:meta`, `muscle-recovery`, `health-trends-summary`.
+  (The 2026-09-24 re-read already dropped `hr-profile`, `exercise-library`, `progression-styles` and
+  `activity-types`.)
 - **⚠ Do not bulk-apply the flag** — a missed writer turns a stale flash into hours of hard
   staleness. CLAUDE.md requires the written proof per key.
 - **Not established:** the request burst was counted from source, never from a network trace.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.55",
+    date: "2026-09-25",
+    changes: [
+      "The Nutrition screen stops re-downloading your calorie and macro targets every time you open it. Editing them still updates everywhere immediately \u2014 it just no longer asks the server for numbers it already has.",
+    ],
+  },
+  {
     version: "1.465.54",
     date: "2026-09-25",
     changes: [
