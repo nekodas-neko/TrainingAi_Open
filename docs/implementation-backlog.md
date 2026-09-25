@@ -1738,10 +1738,19 @@ which is the right shape for something that can only be validated by living with
     property of the method, not the learning-period meaning its neighbours carry. Gating it on
     `provisional` would null it on every day forever. The **comment** was the defect and is corrected
     in this PR; `run.ts` is right as written.
-  - **The decisive re-run is still NOT done, deliberately.** Re-running the rollup against production
-    would rewrite `oura_daily_derived` rows — a production write, which is the owner's call rather
-    than Lane A's. The non-destructive form is a local run against an injected `io` (`runOuraRollup`
-    takes one); that is the next step and is what remains of this entry.
+  - **⚠ The decisive re-run is NOT doable from a container — measured 2026-09-25, so this entry's
+    prescribed next step needs REPLACING rather than retrying.** Re-running against production
+    rewrites `oura_daily_derived` (a production write, the owner's call). The non-destructive form
+    needs the raw frames locally, and there are **191,191** rows in `oura_raw_samples` plus
+    **1,508** packed, against an `/api/admin/db-query` that caps a response at ~1,000 rows —
+    hundreds of paginated calls across many tags. `runOuraRollup` also takes a ~40-member `io` and
+    **no test in the repo builds one**, so the fake is a project, not a fixture.
+    - **What would unblock it:** a production-side replay that computes without persisting, or a
+      database restore into the local instance. Either is its own entry.
+    - **And the question may now be answerable without a replay at all.** This entry's own
+      measurement already showed the switch is carried by `resilience_daily_sleep_recovery`, and its
+      four contributor inputs **are** stored in `readiness_contributors`. "Were the July
+      contributor scores wrong" is a read. Try that before building a replay harness.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -1895,30 +1904,6 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   deliberately counts **days with any qualifying sample**, which sparsity can only bias downward.
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
-
-### [devices][platform] LA-139 — the ring clock anchors disagree with each other: 39 of 40 consecutive pairs drift by more than a minute
-
-- **Lane: A** — `lib/data/postgres/adapter.ts` (`getOuraClockAnchor`, `insert` path),
-  `oura_ble_clock_anchors`.
-- **Added:** 2026-09-25 · found while investigating TN-79; filed separately because it is NOT that
-  bug (see below) and is worth its own look.
-- **Measured on production 2026-09-25.** The table holds **12,545 anchors** (since 2026-07-07). An
-  anchor is a `(ring_ds ↔ utc)` pair, so any two of them imply a ring clock rate: `Δds/10` seconds
-  should match `Δutc` seconds. Over the 40 most recent pairs, **39 disagree by more than 60 s**,
-  worst **3,359 s (56 minutes)**. Three consecutive anchors written within **4 real seconds** carry
-  ring times **~19 minutes apart**.
-- **Why that shape:** the anchors look like they are stamped per drained batch — that batch's ring
-  timestamp against the server's arrival time — so during a backfill the pair describes history,
-  not now. `getOuraClockAnchor` then takes `ORDER BY created_at DESC LIMIT 1` and uses that one pair
-  to convert **every** ds↔UTC in the request.
-- **⚠ This is NOT TN-79's cause, and the evidence is explicit.** TN-79's replay used this same
-  newest anchor and still bucketed 1,000+ clean MET samples per day into sensible Brisbane days, and
-  the newest frame maps to ~6 minutes before the anchor. So the mapping is usable for recent data.
-  Do not "fix" TN-79 by rewriting anchors.
-- **What is NOT established:** whether any consumer is actually harmed. Sleep and HR times would be
-  the place to look, and the 2026-08-03 wake-time investigation is prior art worth reading first.
-  A table growing at ~170 anchors/day with mutually inconsistent contents is a hazard on its own
-  terms even if nothing is currently wrong.
 
 ### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
 
@@ -3182,7 +3167,11 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   this in next."*
 - **Lane: A** — it needs a **migration** (see the blocker below), and migrations are Lane A's alone.
   The UI half is Lane B's and can follow; the engine half lands first per §3.
-- **Needs:** BF-193 — three policy choices the owner has to make, and two of them change the diff.
+- **Needs:** — nothing. BF-193's three policy choices were **answered by the owner on 2026-09-24** and are carried here so this entry is buildable without chasing a second one:
+  - **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are **deleted outright**, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
+  - **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
+  - **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: that would need a scheduled job and this repo has no cron layer.
+  BF-193 keeps the full reasoning behind each, as a `Reference:` entry.
   Filed separately so they reach the Orchestrator rather than sitting in this body.
 - **⚠ This carries a store-compliance claim, so understate rather than overstate it.** Apple requires
   an in-app account-deletion path for any app offering account creation, and **Google Play carries an
@@ -3288,7 +3277,7 @@ drift.
   **1. Anonymise two, purge the third.** `ai_call_log` and `error_events` keep their rows with a null user; `db_query_log` rows for the user are deleted outright, because its `sql_text` can carry their data and nulling a column does not anonymise a payload.
   **2. Do NOT clear the Oura ring's BLE key.** It is bound to the phone, not the account. Wrongly keeping it is a tap to fix; wrongly clearing it needs a factory reset and re-pair, and it is the one thing here no backup can restore.
   **3. Immediate, with a TYPED confirmation** — not a single tap. No grace period: it would need a scheduled job and this repo has no cron layer.
-- **This entry is now DONE as a decision and hands its answers to `BF-192`**, which names it in `Needs:` because two of the three change its diff. Nothing here is buildable — `BF-192` builds it.
+- **Reference:** the three answers now live in `BF-192`, which builds them; this entry keeps the reasoning behind each so a later reader can see why each was chosen rather than only what was chosen. Nothing here is buildable and nothing is owed.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 (BugFix intake). **Lane: O** — all three are the
   owner's, and per CLAUDE.md a question for him is a queue entry rather than a line in a reply.
@@ -3531,6 +3520,7 @@ drift.
 
 ### [activity] BF-191 — the walk-end fix shipped; three phantom rows are still in the history
 
+- **Ask:** owner — three phantom walk rows to soft-delete from the activity list by hand: `b8083d04` (09-24), `ea77ce16` (07-30), `a85568a4` (09-14). The code fix shipped; these three predate it and no migration should touch them.
 - **Lane: O** — what is left needs the owner's hand and a phone, not code. **Added:** 2026-09-24 ·
   BugFix intake. **Code shipped 2026-09-24 (Lane B)** together with BF-190: the elapsed seconds now
   travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and

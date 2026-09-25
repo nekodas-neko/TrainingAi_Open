@@ -19,7 +19,7 @@ import { inSequence } from './in-sequence'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
+import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
 
 /** Hard cap on `getOuraRawSamplesForTags`' lookback — the scan is over the biggest table in the DB
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
@@ -5840,10 +5840,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const hrSamples = hrRow?.c ?? 0
 
     let rawByTag: { tag: string; count: number }[] = []
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (anchor) {
-      const startDs = Math.floor(dsFromMeasuredAtMs(start.getTime(), anchor.anchorDs, anchor.anchorUtc.getTime()))
-      const endDs = Math.ceil(dsFromMeasuredAtMs(end.getTime(), anchor.anchorDs, anchor.anchorUtc.getTime()))
+    const anchors = await this.getOuraClockAnchors(userId)   // LA-139: robust offset, not one pair
+    const probeEpoch = currentEpoch(anchors)
+    const probeFromDs = probeEpoch == null ? null : resolveMsToDs(start.getTime(), anchors, probeEpoch)
+    const probeToDs = probeEpoch == null ? null : resolveMsToDs(end.getTime(), anchors, probeEpoch)
+    if (probeFromDs != null && probeToDs != null) {
+      const startDs = Math.floor(probeFromDs)
+      const endDs = Math.ceil(probeToDs)
       const rows = await readRawFrames(this.db, userId, { startDs, endDs })
       const counts = new Map<number, number>()
       for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1)
@@ -5860,7 +5863,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       accel: { chunks: chunks.length, samples: accelSamples, steps: accelSteps, coveragePct },
       hrSamples,
       rawByTag,
-      hasAnchor: !!anchor,
+      hasAnchor: probeEpoch != null,
     }
   }
 
@@ -5900,14 +5903,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
     const daytimeHours: [number, number] = [9, 21]
     const clampedDays = Math.max(1, Math.min(30, Math.floor(days) || 7))
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (!anchor) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
+    const anchors = await this.getOuraClockAnchors(userId)   // LA-139: robust offset, not one pair
+    const epoch = currentEpoch(anchors)
+    if (epoch == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
 
-    const anchorUtcMs = anchor.anchorUtc.getTime()
     const nowMs = Date.now()
     const fromMs = nowMs - clampedDays * 86_400_000
-    const startDs = Math.floor(dsFromMeasuredAtMs(fromMs, anchor.anchorDs, anchorUtcMs))
-    const endDs = Math.ceil(dsFromMeasuredAtMs(nowMs, anchor.anchorDs, anchorUtcMs))
+    const fromDs = resolveMsToDs(fromMs, anchors, epoch)
+    const toDs = resolveMsToDs(nowMs, anchors, epoch)
+    if (fromDs == null || toDs == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
+    const startDs = Math.floor(fromDs)
+    const endDs = Math.ceil(toDs)
     const tagsOfInterest = Object.keys(TAG_LABELS).map(Number)
 
     const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs })
@@ -5915,7 +5921,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
       const hist = perTag.get(r.tag) ?? new Array(24).fill(0)
-      const tsMs = measuredAtMs(Number(r.ds), anchor.anchorDs, anchorUtcMs)
+      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      if (tsMs == null) continue
       const hour = Number(formatInTimeZone(new Date(tsMs), tz, 'H'))
       if (hour >= 0 && hour < 24) { hist[hour]++; perTag.set(r.tag, hist) }
     }
@@ -5963,18 +5970,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
   }> {
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (!anchor) return { temp: [], met: [] }
-    const anchorUtcMs = anchor.anchorUtc.getTime()
-    const startDs = Math.floor(dsFromMeasuredAtMs(from.getTime(), anchor.anchorDs, anchorUtcMs))
-    const endDs = Math.ceil(dsFromMeasuredAtMs(to.getTime(), anchor.anchorDs, anchorUtcMs))
+    // LA-139: resolve against the WHOLE anchor series, not the newest one. `getOuraClockAnchor`
+    // returns a single `(ring_ds ↔ utc)` pair; measured 2026-09-25 the table holds 12,545 of them
+    // and 39 of the 40 most recent consecutive pairs disagree by more than a minute about the
+    // ring's clock rate (worst 56 min), because each is stamped per drained batch. One pair is
+    // therefore a sample of a noisy series, and using it alone slides the whole window. The six
+    // other readers in this file already use `resolveDsToMs`/`resolveMsToDs`, which take a robust
+    // offset across the epoch — `getOuraClockAnchors`' own comment says reads "resolve it against
+    // the observation nearest that frame, not the newest". These four were the exceptions.
+    const anchors = await this.getOuraClockAnchors(userId)
+    const epoch = currentEpoch(anchors)
+    if (epoch == null) return { temp: [], met: [] }
+    const fromDs = resolveMsToDs(from.getTime(), anchors, epoch)
+    const toDs = resolveMsToDs(to.getTime(), anchors, epoch)
+    if (fromDs == null || toDs == null) return { temp: [], met: [] }
+    const startDs = Math.floor(fromDs)
+    const endDs = Math.ceil(toDs)
     const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
     for (const r of rows) {
       const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
       if (!decoded) continue
-      const tsMs = measuredAtMs(Number(r.ds), anchor.anchorDs, anchorUtcMs)
+      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      if (tsMs == null) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
       } else {
@@ -5991,19 +6010,24 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     voltageMv: number | null
     chargingTimeSec: number | null
   }>> {
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (!anchor) return []
-    const anchorUtcMs = anchor.anchorUtc.getTime()
-    const startDs = Math.floor(dsFromMeasuredAtMs(from.getTime(), anchor.anchorDs, anchorUtcMs))
-    const endDs = Math.ceil(dsFromMeasuredAtMs(to.getTime(), anchor.anchorDs, anchorUtcMs))
+    const anchors = await this.getOuraClockAnchors(userId)
+    const epoch = currentEpoch(anchors)
+    if (epoch == null) return []
+    const fromDs = resolveMsToDs(from.getTime(), anchors, epoch)
+    const toDs = resolveMsToDs(to.getTime(), anchors, epoch)
+    if (fromDs == null || toDs == null) return []
+    const startDs = Math.floor(fromDs)
+    const endDs = Math.ceil(toDs)
     const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs })
     const out: Array<{ tsMs: number; kind: 'battery_level_changed' | 'charging_time'; batteryPct: number | null; voltageMv: number | null; chargingTimeSec: number | null }> = []
     for (const r of rows) {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
       const kind = decoded?.kind
       if (kind !== 'battery_level_changed' && kind !== 'charging_time') continue
+      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      if (tsMs == null) continue
       out.push({
-        tsMs: measuredAtMs(Number(r.ds), anchor.anchorDs, anchorUtcMs),
+        tsMs,
         kind,
         batteryPct: typeof decoded!.battery_pct === 'number' ? decoded!.battery_pct : null,
         voltageMv: typeof decoded!.voltage_mv === 'number' ? decoded!.voltage_mv : null,
