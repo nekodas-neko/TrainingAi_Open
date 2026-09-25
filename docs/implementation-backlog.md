@@ -4354,23 +4354,47 @@ drift.
    WHERE el.name = se.exercise_name AND se.exercise_id IS NULL;
   ```
 
-### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen: 09-01 → 09-16 still count sleep as daytime stress
+### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen, and the span is 24 days, not 16
 
-- **Lane: A** — `lib/oura-ble/rollup/run.ts:1040-1041`, and the claim itself.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **In production:** from 09-17 on, no stress bucket falls before 06:00, except 09-18, whose night is
-  missing (RV-163 and PS-17). **09-01 → 09-16 still hold 9–12 sleeping (pre-06:00) buckets a day.**
-  Each day was written once, at about 01:00 the next day, and never again.
-- **Why:** `RESILIENCE_MAX_DAYS = 21` is applied over `summaryRows`, which holds only the rows the
-  current pass covers. A routine incremental pass covers about one night, so only a full rollup
-  pass would reach back 21 days, and none has run.
-- **Effect:**
-  - Those days' `stress_high_minutes` and resilience daily indices still count sleep. #1256 put that
-    at about a fifth of the figure.
-  - Resilience's trailing 14-day window still reads them.
-  - The day-strip changes shape at 09-17.
-- **Fix:** correct the claim, or widen the stress recompute window. A one-off wide rollup pass is a
-  recompute from stored inputs (RV-170).
+- **Lane: DV** — an authorised recompute to run, not code to write. The Lane A half (correcting the
+  false claim and re-measuring the span) shipped 2026-09-25; `lib/oura-ble/rollup/run.ts:1043-1044`
+  is the mechanism and is **correct as written** — see the "do not widen" bullet below.
+- **Added:** 2026-09-24 · Review sweep 57 ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
+  **Re-measured and widened 2026-09-25 (Lane A).**
+- **The false claim is now corrected at source** — the paragraph in
+  [`history-2026-09-18-folded-1.md`](overview/history-2026-09-18-folded-1.md) carries a dated
+  correction in place, so it cannot be read as true by the next session that finds it.
+- **The mechanism, confirmed against `main`.** `startI = Math.max(1, summaryRows.length - 21)`, and
+  `summaryRows` holds only the days the **current pass** covers. A routine incremental pass covers
+  about one night, so `startI` is 1 and the pass rewrites that night alone. **`RESILIENCE_MAX_DAYS`
+  caps a wide pass; it never extends a narrow one.** No wide pass has run.
+- **⚠ Measured 2026-09-25, and the original entry's span was too small.** It said 09-01 → 09-16.
+  `oura_daytime_stress_buckets` actually begins **2026-08-24**, and **every day from 08-24 to 09-16
+  carries 9-12 sleeping (pre-06:00) buckets — 24 days**, plus 09-18, whose night is missing for the
+  separate reason in RV-163/PS-17. From 09-17 on the count is **0**. Table-wide that is **253 of 774
+  buckets, 32.7%**, not the "about a fifth" #1256 estimated.
+- **Effect** (unchanged, now correctly scoped): those days' `stress_high_minutes` and resilience
+  daily indices count sleep as waking stress; resilience's trailing 14-day window reads them; the
+  day-strip changes shape at 09-17.
+- **⚠ Do NOT "fix" this by widening the recompute to a trailing 21 days on every pass.** That is
+  exactly the class RV-182 was opened to remove — per-ingest database work that grows — and it would
+  put a 21-day recompute behind every ring drain (20-32/hour at 07-09). The narrow pass is correct;
+  what is missing is a way to run a wide one.
+- **The fix is a one-off wide pass, and it is NOT owner-gated — that was checked and the gate does
+  not exist.** RV-170 is the history-row *policy question*, and it was **answered on 2026-09-24**:
+  *"(a) Recompute-from-stored-inputs: **YES**. Deterministic, repeatable at will, and it corrects
+  history toward what the current code says."* A wide rollup pass is exactly that, so it is already
+  authorised by standing policy. RV-170's own answer routes such recomputes to the **device agent**
+  to run, which is why this carries `Lane: DV` and not `A`.
+- **The mechanism already exists** — `POST /api/oura-ble/samples/redecode` (admin-gated,
+  `requireAdmin`) runs the rollup with **`fullHistory: true`**. Nothing needs building.
+  **⚠ One thing to confirm before running it:** that a redecode rewrites
+  `oura_daytime_stress_buckets` for the covered span rather than only the decode-tier rows. That was
+  NOT verified here — the route was read, not run.
+- **Alternative worth pricing before doing either — NOT validated here.** Filter sleeping buckets at
+  **read** time instead, so the stored rows can stay wrong without mattering, with no production
+  rewrite and no per-ingest cost. It needs the sleep windows at read time (a join) and it puts the
+  rule in two places, so it is a real trade rather than an obvious win.
 
 ### [heart-rate][platform] RV-181 — the HR profile pulled 90 days of raw heart rate to compute six numbers
 
