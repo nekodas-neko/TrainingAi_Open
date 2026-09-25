@@ -17796,3 +17796,14 @@ different conflict target with no direct test of its own — so the coverage was
 path instead of deleted. The `Keep:` also now states plainly that **none** of the four remaining
 groups has been re-verified, since three of this entry's claims have already turned out stale or
 backwards and the next session should not assume otherwise.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31760 → 31768 (RV-177 phase-set schemas)
+
+Eight lines. RV-177's phase-set bullet replaced with what shipped, and the `Keep:` narrowed from
+four open groups to three.
+
+The lines are there for one reason: the bound. `generated-program.ts` already bounds
+`durationCycles` at `min(1)` and the repo's own reuse rule points straight at copying it — but the
+editor floors at 0 and **production holds 8 phases at `duration_cycles = 0`**, so `min(1)` would
+have 400ed the owner re-saving his own phase set. The entry records that, and records that whether
+0 should be reachable is a product question left open rather than settled by a validator.

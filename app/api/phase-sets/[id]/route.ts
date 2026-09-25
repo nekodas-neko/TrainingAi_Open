@@ -3,8 +3,8 @@ import { refusalResponse, isRefusal, invalidUuidResponse } from '@/lib/api/route
 import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import type { EditablePhase } from '@/components/config/phase-editor'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { PhaseSetWriteBody } from '@trainingai/shared/validation/phase-set'
 
 // A phase set: a name and its phases.
 const MAX_BODY_BYTES = 256 * 1024
@@ -27,11 +27,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-  const body = (read.body ?? {}) as { name: string; phases: EditablePhase[] }
+  const parsed = PhaseSetWriteBody.safeParse(read.body ?? {})
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  const body = parsed.data
 
   const repo = await getRepository()
   try {
-    const phases = (body.phases ?? []).map((p, i) => ({
+    const phases = body.phases.map((p, i) => ({
       position: i,
       name: p.name,
       durationCycles: p.durationCycles,
