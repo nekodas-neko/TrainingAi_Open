@@ -1436,7 +1436,7 @@ the Orchestrator's to do.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
-- **Ask:** owner — FOUR questions now, not seven, each with a recommendation. Items 5 and 7 are resolved and item 2 has lost its structural half; what is left is LA-89 (an external caller only he can know about), LA-82's render question, Q-231 (a product preference), BF-77 (one sentence), and the twelve-entry admin sitting. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
+- **✅ ALL SEVEN ANSWERED as of 2026-09-25.** Items 1, 2, 3 and 6 were put to him and answered (delete hr-sync; render zones with the degradation marked; retire the Exercise-detected card; an agent runs the BF-77 session). Items 5 and 7 resolved without asking, and item 2's structural half was decided by the Orchestrator. **What remains is NOT a question: the twelve-entry admin sitting is a scheduling ask, not a decision** — it stays below until those entries are picked up. Each answer is recorded on its own entry; this one leaves the queue when the gates it tracked are all struck.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -1470,6 +1470,9 @@ below keep their gate — they really are blocked pending an answer — and this
    admin-gated** (unlike both of its neighbours in the same test file — it acts on the caller's own
    data), and it **answers `success: true` even when the pipeline throws**, deliberately. So what is
    being kept alive is an unauthenticated-to-admin entry point that cannot report its own failure.
+   **✅ ANSWERED 2026-09-25 — DELETE IT.** The owner took the recommendation, which also settles the
+   one thing only he could know: nothing outside the repo calls it. Delete the route and its test
+   together; do not rename.
 2. **`LA-82` — should a heart-rate profile with an unreadable age render zones at all?** With no age
    it silently uses a max of 190 against his real 184, a 6 bpm shift across every zone, and
    `maxHrSource` still reads `estimated`. **Recommend: render, with the degradation marked** — the
@@ -1497,11 +1500,9 @@ below keep their gate — they really are blocked pending an answer — and this
    sitting at Enforcement `Disabled`, which is why nothing it listed was enforced; the owner set it
    **Active**, dropped E2E from the required list and restricted merges to **squash**. `LB-52` is
    removed, `Q-297`'s second residue is closed, and the batch is gone.
-6. **`BF-77` — is the "session to look into this" one he attends, or one an agent runs?** He asked
-   for it on 2026-09-20 instead of picking from the A/B/C sizing he was offered. If an agent runs it,
-   the docs-only planning PR is startable today and that gate comes off; if he wants to be in it, it
-   is a calendar item. One sentence either way, and it is the only thing between this entry and
-   progress.
+6. ~~**`BF-77` — is the "session to look into this" one he attends, or one an agent runs?**~~ —
+   **✅ ANSWERED 2026-09-25: an agent runs it.** He reads the result rather than sitting through the
+   investigation. The gate comes off and the docs-only planning PR is startable now.
 7. ~~**`LB-53` — back-fill readiness over the 58 derived rows that have no score?**~~ — **RESOLVED
    2026-09-25, and it never needed asking.** This item's own instruction was to ask it *inside*
    `RV-170`'s history-row policy. That policy was **answered on 2026-09-24**, by **kind** rather than
@@ -12870,12 +12871,12 @@ resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no re
   stays one source of truth. Reversal: one enum value and one consumer, so this is cheap enough that
   deliberating it further costs more than being wrong would. Per CLAUDE.md's standing narrowing,
   structural calls are the agent's and get written down rather than asked.
-- **Gate:** owner — for ONE question now, not two: **should a degraded profile render zones at all?**
-  A quota measured against a guessed max is wrong in a way the screen cannot show, and the
-  recommendation is **render, with the degradation marked** — hiding the screen on a transient read
-  failure is the worse failure. That half is a genuine product preference and stays his. Only one
-  consumer reads the source today
-  (`app/api/hr-profile/route.ts:49`, as `workingMaxSource`), so either shape is cheap to wire.
+- **✅ GATE STRUCK 2026-09-25 — RENDER the zones, with the degradation marked.** He took the
+  recommendation. A quota measured against a guessed max is wrong in a way the screen cannot show,
+  but hiding the whole cardio hub on what may be a transient age-read failure is the worse failure —
+  so it renders, and it says so. **Both halves of this entry are now settled:** the marker goes on
+  `maxHrSource` as a new value (decided by the Orchestrator above, structural), and the render
+  question was his and is answered. Nothing is owed by him.
 
 Ship the resting half whenever; it needs no decision.
 
@@ -17657,7 +17658,10 @@ the match. `Gate: owner` when it is next picked up.
 
 
 - **Lane:** A if a server path is chosen; B for anything built on the QR payload.
-- **Gate:** owner — and the gate has MOVED. He declined the A/B/C sizing on 2026-09-20 and asked for *"a session to look into this one"*; what is owed now is one clarification, not a choice: is that a session HE attends, or one an agent runs and reports back? If the latter, the planning PR is startable today and this gate comes off. Filed with `OR-145`.
+- **✅ GATE STRUCK 2026-09-25 — an AGENT runs the session, not him.** He was asked the one
+  clarification this entry was waiting on and chose to read the result rather than sit through the
+  investigation. **So the docs-only planning PR is startable now**, and nothing further is owed by
+  him until that plan comes back with a recommendation.
 - **Planning item** — the request contains two products and they resolve differently. Needs a
   decision from the owner before implementation. **The `Gate:` field above is what makes that
   legible to `next-item.js`** (added 2026-09-02): the prose said it from the day the entry was
@@ -27522,7 +27526,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Lane:** A
 - **Branch:** `fix/detected-activity-has-no-source`
-- **Gate:** owner — a product decision, not a code change: does the card retire, or does the BLE classifier feed it? Either branch is a different feature and the repo cannot answer it.
+- **✅ ANSWERED 2026-09-25 — RETIRE THE CARD.** The owner: *"If its not being used because we don't
+  use the oura sync then get rid of it."* A conditional yes, and **the condition was checked before
+  acting: it holds.** `upsertOuraWorkouts` now has **zero** callers in the repo — Q-224 removed the
+  last one — so `oura_workouts` cannot gain a row by any path that exists. The table is frozen at 13
+  rows, newest `day = 2026-07-05`.
+- **⚠ HE SAID HE DID NOT FULLY UNDERSTAND THE QUESTION, so the distinction he was owed is recorded
+  here rather than assumed.** *"Exercise detected" is not the app's auto activity detection.* Two
+  unrelated pipelines wear similar names: this card reads `oura_workouts`, written only ever by the
+  Oura **Cloud** sync, which is gone; the live auto-detection he actually sees writes `activity_logs`
+  from the **BLE** classifier (`lib/oura-ble/step-counter-pipeline.ts`, `rollup/run.ts`) and is
+  untouched by this. **Retiring this card removes nothing he currently sees working** — that is why
+  the condition he set is the right one and why it is satisfied. `Q-222` is about the live detector's
+  false positives and stays open on its own.
+- **Scope of the retirement, so it does not over-reach.** Remove the card, its route, the
+  `app/api/day-timeline/route.ts:255` walk filter against the same table, and the Cloud-shaped
+  `OuraWorkout` in `lib/oura/types.ts`. **Do NOT drop the table or its 13 rows** — that is a
+  data-dropping migration and a separate confirm-first decision he has not been asked. Do not restore
+  `upsertOuraWorkouts`; nothing can call it.
+- **If he wants it back later, the BLE branch is still open** — feeding the classifier into this
+  review UI was the alternative, and retiring the card does not foreclose building it, only the
+  Cloud-shaped plumbing.
 - **⚠ THE FIX IS A PRODUCT DECISION, NOT A CODE CHANGE (marked 2026-09-02).** The entry's own
   Fix line asks whether detected activities should come from the BLE classifier — feeding them
   into the existing review UI and retiring the Cloud-shaped `OuraWorkout` — or whether the card
@@ -31231,12 +31255,15 @@ adopted.
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
 - **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
   pinned as it stands; **not deleted**, because removing an HTTP surface is the owner's call.
-- **Gate:** owner — added 2026-09-10, and the reason is a live demonstration of why fields beat
-  prose. This entry said the decision was the owner's in three separate sentences and carried **no
-  `Gate:` field**, so `next-item.js` printed it as READY. A session picked it up on that basis and
-  wrote itself an instruction that *"the rename half is startable"* — which this entry explicitly
-  refutes below (renaming is the WORSE option, because it keeps a second way to reach the pipeline).
-  Prose does not block. The field does.
+- **✅ GATE STRUCK 2026-09-25 — he answered: DELETE the route and its test.** The gate asked the one
+  thing the repo could not: whether anything *outside* it calls `/api/oura/hr-sync` — a curl in a
+  runbook, a Tasker profile, an old APK. It does not. Re-verified the same day at **zero live callers**
+  in `app/`, `lib/`, `components/`, `packages/`, `android/` and `scripts/`; the only hits are two
+  comments in `app/api/complete-workout/` recording that the caller was removed, plus tests.
+  **Two facts found while re-checking, which is why the recommendation was to delete rather than rename:**
+  the route is **not admin-gated** (both of its neighbours in the same test file are), and it
+  **answers `success: true` even when the pipeline throws**, deliberately. Renaming would keep a
+  second way into the pipeline that Q-122 was closing. Reversal: restore ~50 tested lines from git.
 
 Two separate things, and only the second is a decision:
 
