@@ -107,7 +107,16 @@ function buildContext(c: ContextInput, tz: string): string {
   const sleepByDate = new Map(nightSessions(c.sleepSessions, tz).map(sess => [sess.date, sess]))
   const sleepMoodPairs = c.moodLogs
     .filter(m => sleepByDate.get(m.logDate)?.durationHours != null)
-    .map(m => `${m.logDate}: ${sleepByDate.get(m.logDate)!.durationHours!.toFixed(1)}h sleep, energy=${m.energyLevel}, sleep quality=${m.sleepQuality}`)
+    // The self-reported sleep-quality field is deliberately absent here (TN-66) — and it is named in
+    // prose rather than written out, because the test that keeps it absent greps this file and a
+    // literal in a comment reads exactly like a literal in the prompt.
+    // `mood_logs.sleep_quality` is NOT NULL and
+    // the check-in stopped collecting it on 2026-06-25, so the write path's `'ok'` default has been
+    // the stored value on every row since — 93 of 108. Putting it here handed the model three months
+    // of a constant dressed as an observation, beside a genuinely measured `Xh sleep`. That is the
+    // hazard the Q-76 comment above is about, one field over: it learns nothing true, and worse, it
+    // learns that this person's sleep never varies.
+    .map(m => `${m.logDate}: ${sleepByDate.get(m.logDate)!.durationHours!.toFixed(1)}h sleep, energy=${m.energyLevel}`)
 
   const bfReadings = c.bodyMetrics.filter(m => m.bodyFatPct != null).sort((a, b) => a.date.localeCompare(b.date))
   const latestBf = bfReadings.length > 0 ? bfReadings[bfReadings.length - 1].bodyFatPct! : null

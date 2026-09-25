@@ -172,3 +172,36 @@ export function computeActivityScore(input: ActivityScoreInput): ActivityScoreRe
 
   return { score, preTaperScore: preTaper, components, taperApplied: taper > 0 && score < preTaper }
 }
+
+/**
+ * The rolling 7-day strength window for the day ENDING at `dayMidMs` (inclusive of that day).
+ *
+ * TN-77(a). Readiness's `prevDayActivity` contributor scores *yesterday* by calling
+ * `computeActivityScore` a second time — and both call sites passed **today's** `sessions7d` and
+ * `volume7dKg` to it. Measured over 115 days that differs from yesterday's own window on **83 of
+ * them (72%)**, mean |difference| 4.45 points, worst −15/+10. At the contributor's 0.09 weight the
+ * worst case is ~1.4 readiness points, and the mean signed difference is −0.15 — noise, not bias.
+ *
+ * The material case is a training day: today's window contains this morning's session and
+ * yesterday's cannot, so the contributor describing *yesterday* reacted to a workout that had not
+ * happened yet.
+ *
+ * Shared rather than inlined twice because the two call sites are the same computation, and this
+ * entry exists because they drifted from their own intent in identical ways.
+ */
+export function strengthWindowEndingAt(
+  sessions: { startedAt: string | Date; exercises: { volume?: number | null }[] }[],
+  dayMidMs: number,
+): { sessions7d: number; volume7dKg: number } {
+  const DAY = 86_400_000
+  const from = dayMidMs - 7 * DAY
+  const to = dayMidMs + DAY               // exclusive: the day's own sessions count, later ones do not
+  const rows = sessions.filter(ws => {
+    const t = new Date(ws.startedAt).getTime()
+    return t >= from && t < to
+  })
+  return {
+    sessions7d: rows.length,
+    volume7dKg: rows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0),
+  }
+}

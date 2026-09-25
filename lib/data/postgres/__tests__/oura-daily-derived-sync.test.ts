@@ -18,7 +18,7 @@ const FULL_PAYLOAD = {
   sleepScore: 84, sleepContributors: JSON.stringify({ deep: 70 }),
   readinessScore: 78, readinessContributors: JSON.stringify({ hrv: 60 }), readinessSource: 'ble',
   activityScore: null, activityContributors: null, activeCaloriesEst: null,
-  trainingLoadOts: 42.5, trainingLoadHigh: true, trainingLoadGate: 'ok',
+  trainingLoadOts: 42.5, acwr: 1.37, trainingLoadHigh: true, trainingLoadGate: 'ok',
   recoveryIndexHours: 6.1, wornHoursBle: 21.3, nightHrvBaselineMs: 44.2,
   illnessFlag: 'none', illnessScore: 12, illnessBiomarkers: JSON.stringify({ temp: 0.1 }),
   daytimeStressScaled: 33, stressHighMinutes: 90, recoveryHighMinutes: 120,

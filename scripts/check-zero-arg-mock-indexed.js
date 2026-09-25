@@ -61,7 +61,6 @@ const BASELINE = {
   'app/api/sync/pull/__tests__/route.test.ts': 3,
   'components/nutrition/__tests__/save-meal-tags.test.ts': 2,
   'lib/__tests__/app-load-metrics.test.ts': 2,
-  'lib/__tests__/cache-http-layer-bypass.test.ts': 2,
   'lib/__tests__/register-inactive.test.ts': 1,
   'lib/ai/__tests__/instrument.test.ts': 3,
   'lib/home/__tests__/rest-day-write.test.ts': 1,

@@ -1709,6 +1709,7 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   activityContributors: jsonb('activity_contributors'),
   activeCaloriesEst:    integer('active_calories_est'),
   trainingLoadOts:      doublePrecision('training_load_ots'),
+  acwr:                 doublePrecision('acwr'),
   trainingLoadHigh:     boolean('training_load_high'),
   // Q-270. Why the route did not score this day: NULL = it never ran, 'ok' = it scored, else
   // the gate that refused. Written on every evaluation, which is what makes "never called"

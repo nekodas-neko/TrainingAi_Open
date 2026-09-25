@@ -1,54 +1,55 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-141 (LB-140 filed 2026-09-24) — allocate by grep, and check the JOURNAL too: a
-shipped entry leaves the queue, so the backlog alone reads low.
+**Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-156 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-DV-16/17, the DV-18 handover, LB-139, RV-144 shipped. LB-140 → `DV`: no prod-mode boot in a container.
+Shipped 2026-09-25: LB-148, RV-178, RV-122, RV-99's defect, RV-101, LB-149, RV-102, RV-67 (closed),
+RV-79, RV-68, LB-155. RV-101 and RV-68 owe only their device looks (`Verify: device`, in `--sittings`).
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; do
-not cut a branch until there is something to commit. The Orchestrator re-prioritises, so the top
-item changes between sessions — device findings jumped above LB-138 mid-run.
-
-**RV-117/118/119 are `Lane: O` — leave them.** Their owner gate IS satisfied; the mockup is in the
-Orchestrator's chat and it is exporting it to `docs/design/`. Do not re-ask him, do not re-make it.
-
-**BF-177's scratchpad plan is STALE** — LB-128 (#1456) may have voided its `cachedFetch`/`onError` premise.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** RV-99 heads the lane but
+is blocked on LB-152; then LB-154, LB-155's ~20 conversions, `motion-polish`, BF-177 (plan STALE).
+**The owner's top priority is tab/page switch speed**, so `DV-12` heads it once the phone is free.
+**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH.** **RV-117/118/119 are `Lane: O` — leave them.**
 
 ## Blocked / owed
 
-- **LB-134 is the owner's** — branch protection. Until he rules, read the five job CONCLUSIONS
-  before every merge, and expect the merge race below.
-- **LB-138** — `la109` is a REAL regression from #1431 (Lane B's own): back off Home reaches
-  `about:blank`. Start from `navigateToTab`'s history semantics, not the spec. Read with BF-49,
-  RV-111, RV-113 — same surface, device-reported.
-- Device checks are DV's to RUN, mine to RECORD. A FAILED check comes BACK as work.
-
-## Claimed paths — none.
+- **LB-152** (hex→token restyle) and **LB-153** (chart palette merge) are the owner's — `Lane: O`,
+  ungated, inline `Ask:`. A question filed there COMES BACK; write the brief, then build. Device
+  checks are DV's to RUN, mine to RECORD. **Claimed paths: none.**
 
 ## Lessons that cost real time
 
-- **⚠ THE MERGE CALL IS NOT A GATE HERE.** #1467 squash-merged with `Tests` FAILING. Confirm the
-  five jobs' conclusions via `list_workflow_jobs`; E2E is advisory (~31 min) and is red on `main`.
-- **THE MERGE RACE IS ARITHMETIC.** CI ~7 min vs a commit to `main` ~every 8, and every filing PR
-  touches the two doc-size files. Six cycles lost before I cut MY latency: check at 6 min, merge the
-  INSTANT the five are green. No run for your head = conflicted PR, never slow CI.
-- **⚠ AFTER ANY BACKLOG MERGE, DIFF THE FULL HEADING SET** — #1481 silently deleted RV-117/118;
-  counting only headings I had edited could not see a neighbour vanish. Every line of `diff <(git
-  show origin/main:docs/implementation-backlog.md|grep '^### '|sort) <(…)` must be one you INTENDED.
-- **READ THE CODE BEFORE THE ENTRY.** Three for three — RV-120, DV-16, DV-17 all mislocated their
-  own cause. An entry says where someone looked, not where the bug is.
-- **CONTROL-RUN every new test against `origin/main`** — a spec that passes either way is worse
-  than none. Revert via `git show origin/main:<file>`, not a `cp` snapshot.
-- **`grep` is case-sensitive**: `planLoaded` does not match `setPlanLoaded`. Use `-i` when counting
-  a camelCase symbol — I misread a complete file as half-applied.
-- **A gate's exit code must be read DIRECTLY** — not through a pipe, not via `&&` into `git commit`
-  (an intervening `echo` succeeds, so a RED gate still commits). Gates to a file, read the code.
-- **A `docs/overview/` fold conflict is TWO FOLDS on one pre-existing archive** — never splice; take
-  origin/main's whole and re-fold once. BF-188 already lost 12 entries on `main`; read it first.
-- **An auth-gated page never compiles from a dev-server GET** — `pnpm build` is what exercises it.
-- **`npx tsc --noEmit` DOES NOT typecheck test files** — Build runs `check-test-typecheck.js`.
+- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
+  Fifteen running were wrong: RV-122's fix could not work; RV-99 was a restyle sold as a refactor;
+  RV-101's contrast used the wrong background and its fix had nowhere to go; LB-149's hypothesis had
+  no lever (`workers: 1` already); RV-102 called two tables "identical" (13 keys vs 10) and
+  mis-assigned its lane. **A change that alters what renders without fixing a disagreement is the
+  OWNER'S:** `Lane: O` + `Ask: owner — <summary>`, never `Gate: owner`.
+- **A BACKLOG EDIT IS A CODE CHANGE** — queue tooling runs `next-item.js` against the live backlog, so
+  a docs-only diff turned #1623 red. Never hand-pick affected tests; run `pnpm test`.
+- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (compare the WARNING COUNT to
+  base) · `pnpm test` · `pnpm build` · `tsc`. Doc-size is BASE-RELATIVE.
+- **THE DOC-SIZE FILES CONFLICT ON EVERY PR** and main moves every ~8 min, so a 12-min gate loses the
+  race (#1623 refused twice). History is append-only (keep BOTH, main's first); the `.size` is a real
+  disagreement (`--fix`). Script it; do NOT re-gate a doc-size-only remerge.
+- **REBUILD `changelog.ts`/`package.json` FROM `origin/main`, NEVER SPLICE** — `package.json` does
+  NOT conflict when both sides pick the same version. Collided four times in one day.
+- **CI READS:** `list_workflow_runs` IGNORES `branch`; `get_check_runs` does not exist; `get_status`
+  is the legacy API; `get_job_logs failed_only`+`tail_lines` can return ONLY the Postgres dump
+  (LB-54) — fetch `logs_url` and grep locally. The ruleset is ACTIVE: trying the merge names the blocker.
+- **CONTROL-RUN every new test against `origin/main`; MUTATION-TEST the guard.** Stash only SOURCE
+  files — `git stash -u` takes the new test and proves nothing.
+- **FIVE scanner traps bit in one day, each a different mechanism, each producing an authoritative
+  wrong number:** a regex cannot balance parens; requiring `(` right after the name misses
+  `fn<T>(…)`; `{ method }` shorthand has no colon; a same-line grep misses multi-line calls; **a
+  generic can contain parens** (`import('…')`), so skip type args by balancing ANGLE brackets. Also:
+  a scanner matches ITSELF and the COMMENTS explaining the fix; `ls-files a b -- '*.ts'` UNIONS
+  pathspecs (filter in JS); grep the TRACKED tree or `.next/` answers. **Two scanners agreeing is not
+  corroboration when they share a blind spot** — that is how 199 was published as 191, "verified".
+- **Read a gate's exit code DIRECTLY**, never through a pipe. COMMIT before `stash`/`checkout`. `tsc`
+  checks neither auth-gated pages nor tests (`check-test-typecheck.js`); vitest has no DOM project,
+  so a component guard is a source scan in a `.ts`.
+- **⚠ ASSERT EVERY SCRIPTED `str.replace`** — this file sat three PRs stale because one no-oped.

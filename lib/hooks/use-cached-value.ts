@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync, subscribeToInvalidation,
+  type CacheFetchErrorInfo,
 } from '@/lib/sqlite/cache'
 
 /**
@@ -36,8 +37,13 @@ export function useCachedValue<T>(
      * Called when the fetch fails. `cachedFetch` swallows `!res.ok` — including this app's own rate
      * limit — so a card without this has no way to tell "no data" from "the request failed", and
      * the standing rule is that it must show an error state rather than vanishing.
+     *
+     * Receives the status (RV-178). Only the status — `cachedFetch` never surfaces the response
+     * body — but that is the difference between "this profile is friends-only" and one generic
+     * line for every failure. Widening from `() => void` is source-compatible: a handler that
+     * takes no argument ignores it.
      */
-     onError?: () => void
+     onError?: (info: CacheFetchErrorInfo) => void
     /**
      * Read and write through the today-scoped variant (`cachedFetchToday` / `readTodayCacheSync`)
      * for the date-less "today" keys, which treat an entry stored on a previous day as a miss.
@@ -50,6 +56,20 @@ export function useCachedValue<T>(
      * which is the exact drift the one-variant rule exists to stop.
      */
     today?: boolean
+    /**
+     * Skip the network entirely while the cached entry is inside its real TTL, rather than painting
+     * the cache and revalidating anyway — which is what `cachedFetch` does by default, and what the
+     * Health tab's comment wrongly assumed it already did (RV-67).
+     *
+     * **Only for a key with a written invalidation proof**: every write that changes the payload,
+     * shown to be in a group that clears this key. Miss one and a stale flash becomes stale for the
+     * whole TTL. Invalidation still reaches a flagged read — the group deletes the entry, so the
+     * freshness check misses and the fetch runs.
+     *
+     * Ignored when `today` is set: `cachedFetchToday` has no such parameter, and a today-scoped key
+     * already treats a previous day's entry as a miss.
+     */
+    freshWithinTtl?: boolean
   },
 ): T | null {
   const [data, setData] = useState<T | null>(null)
@@ -60,6 +80,7 @@ export function useCachedValue<T>(
   onErrorRef.current = opts?.onError
 
   const today = opts?.today ?? false
+  const freshWithinTtl = opts?.freshWithinTtl ?? false
 
   // Seed in an effect, never a useState initializer — a cache read in an initializer causes a
   // hydration mismatch (session 165).
@@ -78,7 +99,11 @@ export function useCachedValue<T>(
     const load = () => {
       void fetcher<T>(key, url, ttlSeconds, d => {
         if (alive && keyRef.current === key) setData(d ?? null)
-      }, { onError: () => { if (alive && keyRef.current === key) onErrorRef.current?.() } })
+      }, {
+        onError: info => { if (alive && keyRef.current === key) onErrorRef.current?.(info) },
+        // `cachedFetchToday` does not take it; passing it there would be a silent no-op either way.
+        ...(today ? {} : { freshWithinTtl }),
+      })
     }
     load()
 
@@ -89,7 +114,7 @@ export function useCachedValue<T>(
     })
 
     return () => { alive = false; unsubscribe() }
-  }, [key, url, ttlSeconds, today])
+  }, [key, url, ttlSeconds, today, freshWithinTtl])
 
   return data
 }

@@ -6,6 +6,218 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.55",
+    date: "2026-09-25",
+    changes: [
+      "The Nutrition screen stops re-downloading your calorie and macro targets every time you open it. Editing them still updates everywhere immediately \u2014 it just no longer asks the server for numbers it already has.",
+    ],
+  },
+  {
+    version: "1.465.54",
+    date: "2026-09-25",
+    changes: [
+      "Ticking a supplement now shows the tick straight away. It used to wait for the save to finish, which is instant most of the time but can take much longer if the app happens to be syncing \u2014 so the tap looked like it had not registered.",
+    ],
+  },
+  {
+    version: "1.465.53",
+    date: "2026-09-25",
+    changes: [
+      "Opening the meal-type list \u2014 when logging food, assigning a meal, or reviewing a plan \u2014 no longer re-downloads it every time. It is the same list; it just stops asking for it again when it already has a recent copy.",
+    ],
+  },
+  {
+    version: "1.465.52",
+    date: "2026-09-25",
+    changes: [
+      "The muscle map now comes with a key, and its lightest shades are brighter. A muscle you had barely trained this week was almost the same colour as one you had not trained at all, so the map under-reported the very muscles it is there to flag.",
+    ],
+  },
+  {
+    version: "1.465.51",
+    date: "2026-09-25",
+    changes: [
+      "Every screen that shows your heart-rate zones \u2014 the Cardio hub, Baselines, the guided walk, and the zone bands during a workout \u2014 now asks the database for the three numbers it needs instead of downloading ninety days of raw heart rate and working them out on the phone. Same numbers, less waiting, and it no longer competes with logging a set for the same database connections.",
+    ],
+  },
+  {
+    version: "1.465.50",
+    date: "2026-09-25",
+    changes: [
+      "On the workout screen, a finished warmup set and the finished \u201cReady\u201d bar above it were two slightly different greens for the same thing. They match now.",
+    ],
+  },
+  {
+    version: "1.465.49",
+    date: "2026-09-25",
+    changes: [
+      "When several changes fail to sync, the card listing them now has a single \u201cRetry all\u201d instead of making you tap Retry on each one. It also tells you honestly if only some of them went through.",
+    ],
+  },
+  {
+    version: "1.465.48",
+    date: "2026-09-25",
+    changes: [
+      "The AI Coach now follows the same writing rules as every other part of the app that talks about your numbers: quote what it was given rather than recomputing it, metric units only, and no calling anything \u201cperfect\u201d. It was the one place that streams free text about your own data without them \u2014 which is exactly how you previously got advice in Fahrenheit and a score of 80 described as perfect.",
+    ],
+  },
+  {
+    version: "1.465.47",
+    date: "2026-09-25",
+    changes: [
+      "Today's Timeline on Home now tells you when it could not load, instead of simply not being there \u2014 a failed load and a genuinely empty day looked identical.",
+      "The Oura card under More shows when the ring last synced straight away rather than after a pause, and a friend's profile opens from what is already on the phone instead of a spinner. A profile you cannot see now says why.",
+      "Cloning a phase set twice by double-tapping made two copies; it now makes one. Tapping Refresh on an AI insight repeatedly no longer spends the day's allowance on one card.",
+    ],
+  },
+  {
+    version: "1.465.46",
+    date: "2026-09-25",
+    changes: [
+      "Your readiness score has a \u201cyesterday\u2019s activity\u201d part, and on days you trained it was quietly counting that morning\u2019s session as part of yesterday. It now looks at the seven days ending yesterday, as the name says. Expect the score to move by about a point on some days and not at all on most \u2014 it is a correction, not a re-scoring, and nothing in your history is rewritten.",
+    ],
+  },
+  {
+    version: "1.465.45",
+    date: "2026-09-25",
+    changes: [
+      "Reminders are now timed by the timezone on your profile. Meal, supplement and workout reminders were working out both \"has today's one already gone out\" and \"what moment is 8am\" from two different clocks \u2014 one fixed to Brisbane, one following whatever zone the phone was set to. In Brisbane with a Brisbane phone the two agree and everything was correct; anywhere else they did not, so a reminder could fire at the wrong hour, repeat, or be skipped for the day.",
+    ],
+  },
+  {
+    version: "1.465.44",
+    date: "2026-09-25",
+    changes: [
+      "Meal reminders now read what is on your phone rather than what has reached the server, so a meal you logged offline stops reminding you straight away instead of nagging until the next sync. Two more network requests gone from every app open and resume.",
+    ],
+  },
+  {
+    version: "1.465.43",
+    date: "2026-09-25",
+    changes: [
+      "The app can now suggest an early deload week when your readiness is low and your training load is high at the same time. It always could in principle \u2014 but the check only ran for programs on the older automatic periodization setting, and your last three programs have all used the AI-driven one, so in 118 logged sessions it had never once been able to fire. It now runs for both. Nothing deloads on its own: it puts the suggestion in front of you with the two numbers behind it, and waits for you to accept.",
+    ],
+  },
+  {
+    version: "1.465.42",
+    date: "2026-09-25",
+    changes: [
+      "Supplement reminders are now worked out from what is on your phone rather than from what has reached the server. If you added or stopped a supplement while offline, the reminder could be wrong until the next sync \u2014 it now matches what you actually have straight away. It also drops two network requests from every app open and every resume.",
+    ],
+  },
+  {
+    version: "1.465.41",
+    date: "2026-09-25",
+    changes: [
+      "Your body-fat reading is now compared against the height it was actually measured at, so the DEXA calibration is fitted like for like. Body composition is worked out once when the scale reading arrives, using your profile at that moment \u2014 so when your height was corrected from 160 cm to 158 cm, every earlier reading was still a 160 cm number while the calibration was being fitted to it live. Expect the displayed body fat to drop by about a point: that is the correction, not a new problem. Your stored history is untouched.",
+    ],
+  },
+  {
+    version: "1.465.40",
+    date: "2026-09-25",
+    changes: [
+      "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. It now notices when answers have stopped arriving and shows you your saved data instead of a spinner, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely. Slow requests are never cancelled \u2014 on a weak connection your data still arrives, it just tells you honestly that the connection is struggling while you wait.",
+    ],
+  },
+  {
+    version: "1.465.39",
+    date: "2026-09-25",
+    changes: [
+      "The two workout time figures now say which time they mean. The estimate on the prescription card is working time \u2014 it already excludes your warm-up \u2014 so on a 60-minute session it reads about 51, which is a full session rather than one nine minutes short. It now says \"of work\". The figure on the finished-workout screen is the whole session including the warm-up, and its tile now says \"Total time\". Both numbers were always right; neither said what it was counting, and side by side they looked like one was short.",
+    ],
+  },
+  {
+    version: "1.465.38",
+    date: "2026-09-24",
+    changes: [
+      "Switching tabs no longer blanks the screen. The panel you were leaving was hidden in the same instant the new one appeared, but the new one then faded in from nothing \u2014 so for about a tenth of a second every switch showed neither, just the background. The fade is gone and the new tab is drawn straight away. This is the flicker, not the lag: the tab switch is still doing too much work behind the scenes, and that is being worked on separately.",
+    ],
+  },
+  {
+    version: "1.465.37",
+    date: "2026-09-24",
+    changes: [
+      "Thirteen screens worked out the date, the month or the time of day from the phone's clock instead of your timezone. The readiness and activity screens asked for the wrong day's AI insight, the calendar could look up the wrong month around a month boundary, and a logged meal could land in the wrong part of the day. None of this was visible while the phone sat in Brisbane, which is why it lasted; it is now wrong nowhere rather than right in one place.",
+    ],
+  },
+  {
+    version: "1.465.36",
+    date: "2026-09-24",
+    changes: [
+      "A walk whose strap starts reporting your cadence late no longer records a fraction of your steps as though it were the whole walk. One treadmill walk logged 584 steps where a normal one logs around 3,000, because the strap only picked up the last eight minutes \u2014 and the pace looked completely normal, because it was averaged over just those eight minutes. When the cadence reading covers less than half the walk, the step count is now left out rather than quietly counted short.",
+    ],
+  },
+  {
+    version: "1.465.35",
+    date: "2026-09-24",
+    changes: [
+      "Your dietary restrictions can no longer be wiped by opening the meal-plan setup. If the request that loads them failed, the screen started from a blank list and then saved that blank list over the top \u2014 erasing every allergy and intolerance, and building the plan without them. It now says the list could not load, leaves your saved ones alone, and only saves when you have actually changed something.",
+    ],
+  },
+  {
+    version: "1.465.34",
+    date: "2026-09-24",
+    changes: [
+      "Ending a guided walk early now records what you actually walked. It used to save the whole planned session \u2014 a walk you stopped 27 seconds in went into your history as 40 minutes and 133 calories, and the calories are worked out from the duration, so a made-up duration meant made-up calories every time.",
+      "Stopping in the first minute now offers to discard the walk instead, in the same dialog rather than a second one. And the three ways out of a walk no longer all claim the same thing: leaving by the back gesture or the tab bar keeps nothing, and now says so rather than telling you it will stop the walk early.",
+    ],
+  },
+  {
+    version: "1.465.33",
+    date: "2026-09-24",
+    changes: [
+      "Your collection now has a row in the More tab. It was only reachable through its Home card, and that card is off until you turn it on \u2014 so on a fresh install the screen existed with no way to open it. Home is unchanged: the card is still off by default.",
+    ],
+  },
+  {
+    version: "1.465.32",
+    date: "2026-09-24",
+    changes: [
+      "Your supplement doses keep the time you logged them and the strength you actually took. Every sync quietly wiped both off each tick, and because the app rebuilds a dose from whatever it has, history started re-doing the sums against whichever vial is current instead of the one you used at the time \u2014 which is exactly what the frozen dose is there to prevent. Most ticks will fill themselves back in on the next sync, because the server still had the real values and simply was not sending them. Any dose that got re-saved while the values were missing kept the wrong vial, and those cannot be recovered.",
+      "Your recent foods are in the right order again when you are offline. The list sorts by when each food was last updated, and the app was reading a field the server has never had \u2014 so it stored the word \"undefined\", which sorts above every real date and pinned a block of arbitrary foods to the top.",
+      "Deloaded sets stop being un-marked behind your back. A set logged as a deload was being reset to \"not a deload\" on the next sync, which has been happening for months.",
+    ],
+  },
+  {
+    version: "1.465.31",
+    date: "2026-09-24",
+    changes: [
+      "Applying a goal recommendation now checks that each change actually saved. It used to say \"Goals updated\" and tick the recommendation off whatever the server answered, so a refused save left the recommendation marked as applied while your targets kept their old values \u2014 which is what happened to the 14 September suggestion. If a save is refused now, the sheet stays open, tells you which goals did not save, and leaves the recommendation unapplied so you can try again.",
+    ],
+  },
+  {
+    version: "1.465.30",
+    date: "2026-09-24",
+    changes: [
+      "A long daytime rest can no longer be graded as last night. Any sleep over four hours counted as a night wherever it fell on the clock, and five parts of the app disagreed about which one to use when a day had two — so on 23 September your afternoon rest was scored instead of your actual night, giving a sleep score of 42 where the night deserved about 76, and a readiness of 44 built on top of that. They all use one rule now: the longest window on a day is that day's night.",
+      "Your Body Battery was flat that day for the same reason — it started counting from the end of the afternoon rest, so it saw 2 of the ring's 203 heart-rate readings. It now refuses to save a day that recorded no movement at all over one that did.",
+      "23 September and 27 August keep their old scores for now. Recalculating days you have already seen is a change to your stored history, so it needs your say-so first.",
+    ],
+  },
+  {
+    version: "1.465.29",
+    date: "2026-09-24",
+    changes: [
+      "Home no longer says \"Sleep: OK\" under your mood card. That was not something you told it — the check-in stopped asking about sleep quality back in June, and the app has been filling the blank with the same word ever since and showing it back to you as your own answer. It is gone rather than replaced; whether your morning sleep rating belongs there instead is a question for you.",
+      "The nutrition goal recommendations no longer feed that same made-up value to the model. It still gets your measured sleep hours and your real energy rating, which are both genuine.",
+    ],
+  },
+  {
+    version: "1.465.28",
+    date: "2026-09-24",
+    changes: [
+      "Exercise pictures no longer come up broken. An exercise the generator made only a still frame for — no animation — showed a broken-image icon in the workout screen and the warm-up list, because those pictures are behind your sign-in and the image pipeline was fetching them without it. Animated ones were unaffected, which is why it looked random.",
+      "Uploading a style reference in the admin tools now checks what the file actually is instead of trusting its name, and says so plainly if it is something that cannot be shown — a photo straight from the phone camera, for instance.",
+    ],
+  },
+  {
+    version: "1.465.27",
+    date: "2026-09-24",
+    changes: [
+      "The morning check-in card is now called \"Exercise Readiness\" everywhere you choose it, not just on the card itself. The widget picker, its colour swatch and the restore list all said \"Readiness\", which is the name of the readiness score in the chip row above it \u2014 two different numbers sharing one name in the one place you pick between them.",
+    ],
+  },
+  {
     version: "1.465.26",
     date: "2026-09-24",
     changes: [

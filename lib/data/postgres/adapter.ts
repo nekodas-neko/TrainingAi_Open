@@ -7,6 +7,7 @@ import { getDb } from './client'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
+import { recomputeStoredBodyFatPctAtHeight } from '@/lib/scale-ble/composition'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
 import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
@@ -18,13 +19,13 @@ import { inSequence } from './in-sequence'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
+import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
 
 /** Hard cap on `getOuraRawSamplesForTags`' lookback — the scan is over the biggest table in the DB
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -4026,13 +4027,57 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         date: s.bodyMetrics.date,
         bodyFatPct: s.bodyMetrics.bodyFatPct,
         sourceMap: s.bodyMetrics.sourceMap,
+        // RV-165 — the two columns that make a stale reading re-derivable. See below.
+        weightKg: s.bodyMetrics.weightKg,
+        bmrKcal: s.bodyMetrics.bmrKcal,
       })
       .from(s.bodyMetrics)
       .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
 
+    // RV-165. **Composition is computed once, at ingest, from the profile of that moment — so the
+    // stored value is only comparable to a DEXA scan if the profile has not moved since.** The
+    // owner's height was corrected from 160 to 158 to match a DEXA printout, and the 08-27 pair
+    // that sets the whole offset is still a 160 cm number. Fitted against it the offset came out
+    // +3.2 where the corrected reading gives +2.3, so every body-fat value the app has shown since
+    // has been about a point high.
+    //
+    // Re-deriving needs nothing that is not already stored: `bmr_kcal` has no impedance term and is
+    // linear in height, so it gives back the height used; impedance then follows from the stored
+    // body-fat value.
+    //
+    // **A reading that cannot be re-derived is KEPT AS STORED, not dropped.** Without a BMR there is
+    // no evidence the reading is stale — only an inability to check — and dropping it throws away a
+    // pair over a question that was never answered. Keeping it is exactly today's behaviour, so this
+    // can substitute a better value but never produce a worse calibration than the one it replaces.
+    // Dropping was tried first and collapsed the calibration to null for every reading without a
+    // stored BMR, which `body-fat-correction-consumers` caught.
+    const [profile] = await this.db
+      .select({ heightCm: s.users.heightCm, dateOfBirth: s.users.dateOfBirth, sex: s.users.sex })
+      .from(s.users).where(eq(s.users.id, userId)).limit(1)
+
+    const restated = readings.flatMap(r => {
+      const stored = r.bodyFatPct as number
+      // Without a profile there is nothing to restate to; the readings stand as stored, which is
+      // exactly today's behaviour.
+      if (profile?.heightCm == null || !profile.sex) return [{ ...r, bodyFatPct: stored }]
+      // Age AT THE READING, not today — a birthday between the weigh-in and now would otherwise
+      // shift the recovered height by 5/6.25 = 0.8 cm and quietly poison the inversion.
+      const ageYears = ageFromDob(profile.dateOfBirth ?? null, new Date(`${r.date}T12:00:00Z`))
+      if (ageYears == null) return [{ ...r, bodyFatPct: stored }]
+      const atCurrent = recomputeStoredBodyFatPctAtHeight({
+        storedBodyFatPct: stored,
+        storedBmrKcal: r.bmrKcal,
+        weightKg: r.weightKg as number,
+        ageYears,
+        sex: profile.sex,
+        heightCm: profile.heightCm,
+      })
+      return [{ ...r, bodyFatPct: atCurrent ?? stored }]
+    })
+
     const pairs = pairScansWithReadings(
       scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
-      readings.map(r => ({
+      restated.map(r => ({
         date: r.date,
         bodyFatPct: r.bodyFatPct as number,
         source: r.sourceMap?.body_fat_pct ?? null,
@@ -4251,6 +4296,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         amount: s.supplementLogs.amount, unit: s.supplementLogs.unit,
         doseText: s.supplementLogs.doseText,
         source: s.supplementLogs.source, sourceRef: s.supplementLogs.sourceRef,
+        // RV-172. `applyDelta` writes `taken_at=excluded.taken_at` and the three `vial_*` columns
+        // unconditionally, so omitting them here does not leave the local value alone — it writes
+        // NULL over it on every pull. The vial triple is the FROZEN dose snapshot: without all
+        // three, `frozenReconstitution` returns null and history re-renders against the current
+        // vial, which is the retroactive rewrite the freeze exists to prevent.
+        takenAt: s.supplementLogs.takenAt,
+        vialStrengthMg: s.supplementLogs.vialStrengthMg,
+        vialWaterMl: s.supplementLogs.vialWaterMl,
+        vialUnitsPerMl: s.supplementLogs.vialUnitsPerMl,
         updatedAt: s.supplementLogs.updatedAt,
         deletedAt: s.supplementLogs.deletedAt,
       }).from(s.supplementLogs)
@@ -4280,6 +4334,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         muscleGroups:         s.exerciseLogs.muscleGroups,
         loggedAt:             s.exerciseLogs.loggedAt,
         interExerciseRestSec: s.exerciseLogs.interExerciseRestSec,
+        // RV-172. Omitted, `Boolean(undefined)` wrote `exercise_deloaded = 0` over every synced
+        // row. Q-131 added the mapper for this and left the SELECT alone, so the field it was
+        // added to carry never arrived — the entry's "half fixed", confirmed.
+        //
+        // `prepTimeSec` is NOT added alongside it, though the entry pairs them: it exists only
+        // server-side. Nothing in `lib/local-store/` names it, so there is no local value to
+        // overwrite and sending it would be payload for no reader.
+        exerciseDeloaded:     s.exerciseLogs.exerciseDeloaded,
         updatedAt:            s.exerciseLogs.updatedAt,
         deletedAt:            s.exerciseLogs.deletedAt,
       }).from(s.exerciseLogs)
@@ -5233,6 +5295,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             activityContributors:  json(p.activityContributors),
             activeCaloriesEst:     int(p.activeCaloriesEst),
             trainingLoadOts:       num(p.trainingLoadOts),
+            acwr:                  num(p.acwr),
             trainingLoadHigh:      bool(p.trainingLoadHigh),
             trainingLoadGate:      str(p.trainingLoadGate),
             recoveryIndexHours:    num(p.recoveryIndexHours),
@@ -5744,6 +5807,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ epoch: r.epoch, anchorDs: Number(r.anchorDs), anchorUtcMs: new Date(r.anchorUtc).getTime() }))
   }
 
+  /** RV-182 ② — the offsets only, one row per epoch. Prefer this over `getOuraClockAnchors`
+   *  whenever the anchors are merely reduced to an offset, which was every read path but the
+   *  rollup's. */
+  async getOuraClockOffsets(userId: string): Promise<ClockOffsets> {
+    return oura.getOuraClockOffsets(this.db, userId)
+  }
+
   async getWorkoutSensorProbe(userId: string, sessionId?: string): Promise<import('../repository').WorkoutSensorProbe | null> {
     const [ws] = await this.db
       .select({ id: s.workoutSessions.id, startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
@@ -5777,10 +5847,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const hrSamples = hrRow?.c ?? 0
 
     let rawByTag: { tag: string; count: number }[] = []
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (anchor) {
-      const startDs = Math.floor(dsFromMeasuredAtMs(start.getTime(), anchor.anchorDs, anchor.anchorUtc.getTime()))
-      const endDs = Math.ceil(dsFromMeasuredAtMs(end.getTime(), anchor.anchorDs, anchor.anchorUtc.getTime()))
+    // RV-182 ②: the offsets, not the anchor log — this path only converts timestamps.
+    const clock = await this.getOuraClockOffsets(userId)
+    const probeEpoch = clock.epoch
+    const probeFromDs = probeEpoch == null ? null : msToDs(start.getTime(), clock, probeEpoch)
+    const probeToDs = probeEpoch == null ? null : msToDs(end.getTime(), clock, probeEpoch)
+    if (probeFromDs != null && probeToDs != null) {
+      const startDs = Math.floor(probeFromDs)
+      const endDs = Math.ceil(probeToDs)
       const rows = await readRawFrames(this.db, userId, { startDs, endDs })
       const counts = new Map<number, number>()
       for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1)
@@ -5797,7 +5871,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       accel: { chunks: chunks.length, samples: accelSamples, steps: accelSteps, coveragePct },
       hrSamples,
       rawByTag,
-      hasAnchor: !!anchor,
+      hasAnchor: probeEpoch != null,
     }
   }
 
@@ -5810,12 +5884,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  `resolveDsToMs` rather than a stored timestamp so it cannot go stale when the clock model
    *  changes — the same reason `getOuraRawSamples` stopped reading `measured_at`. */
   async getSleepCoverageEnd(userId: string): Promise<Date | null> {
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return null
     const ds = await oura.getOuraRollupWatermark(this.db, userId, epoch)
     if (ds == null) return null
-    const ms = resolveDsToMs(ds, anchors, epoch)
+    const ms = dsToMs(ds, clock, epoch)
     return ms == null ? null : new Date(ms)
   }
 
@@ -5837,14 +5911,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
     const daytimeHours: [number, number] = [9, 21]
     const clampedDays = Math.max(1, Math.min(30, Math.floor(days) || 7))
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (!anchor) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
+    if (epoch == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
 
-    const anchorUtcMs = anchor.anchorUtc.getTime()
     const nowMs = Date.now()
     const fromMs = nowMs - clampedDays * 86_400_000
-    const startDs = Math.floor(dsFromMeasuredAtMs(fromMs, anchor.anchorDs, anchorUtcMs))
-    const endDs = Math.ceil(dsFromMeasuredAtMs(nowMs, anchor.anchorDs, anchorUtcMs))
+    const fromDs = msToDs(fromMs, clock, epoch)
+    const toDs = msToDs(nowMs, clock, epoch)
+    if (fromDs == null || toDs == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
+    const startDs = Math.floor(fromDs)
+    const endDs = Math.ceil(toDs)
     const tagsOfInterest = Object.keys(TAG_LABELS).map(Number)
 
     const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs })
@@ -5852,7 +5929,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
       const hist = perTag.get(r.tag) ?? new Array(24).fill(0)
-      const tsMs = measuredAtMs(Number(r.ds), anchor.anchorDs, anchorUtcMs)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
+      if (tsMs == null) continue
       const hour = Number(formatInTimeZone(new Date(tsMs), tz, 'H'))
       if (hour >= 0 && hour < 24) { hist[hour]++; perTag.set(r.tag, hist) }
     }
@@ -5900,18 +5978,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
   }> {
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (!anchor) return { temp: [], met: [] }
-    const anchorUtcMs = anchor.anchorUtc.getTime()
-    const startDs = Math.floor(dsFromMeasuredAtMs(from.getTime(), anchor.anchorDs, anchorUtcMs))
-    const endDs = Math.ceil(dsFromMeasuredAtMs(to.getTime(), anchor.anchorDs, anchorUtcMs))
+    // LA-139: resolve against the WHOLE anchor series, not the newest one. `getOuraClockAnchor`
+    // returns a single `(ring_ds ↔ utc)` pair; measured 2026-09-25 the table holds 12,545 of them
+    // and 39 of the 40 most recent consecutive pairs disagree by more than a minute about the
+    // ring's clock rate (worst 56 min), because each is stamped per drained batch. One pair is
+    // therefore a sample of a noisy series, and using it alone slides the whole window. The six
+    // other readers in this file already use `resolveDsToMs`/`resolveMsToDs`, which take a robust
+    // offset across the epoch — `getOuraClockAnchors`' own comment says reads "resolve it against
+    // the observation nearest that frame, not the newest". These four were the exceptions.
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
+    if (epoch == null) return { temp: [], met: [] }
+    const fromDs = msToDs(from.getTime(), clock, epoch)
+    const toDs = msToDs(to.getTime(), clock, epoch)
+    if (fromDs == null || toDs == null) return { temp: [], met: [] }
+    const startDs = Math.floor(fromDs)
+    const endDs = Math.ceil(toDs)
     const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
     for (const r of rows) {
       const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
       if (!decoded) continue
-      const tsMs = measuredAtMs(Number(r.ds), anchor.anchorDs, anchorUtcMs)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
+      if (tsMs == null) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
       } else {
@@ -5928,19 +6018,24 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     voltageMv: number | null
     chargingTimeSec: number | null
   }>> {
-    const anchor = await this.getOuraClockAnchor(userId)
-    if (!anchor) return []
-    const anchorUtcMs = anchor.anchorUtc.getTime()
-    const startDs = Math.floor(dsFromMeasuredAtMs(from.getTime(), anchor.anchorDs, anchorUtcMs))
-    const endDs = Math.ceil(dsFromMeasuredAtMs(to.getTime(), anchor.anchorDs, anchorUtcMs))
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
+    if (epoch == null) return []
+    const fromDs = msToDs(from.getTime(), clock, epoch)
+    const toDs = msToDs(to.getTime(), clock, epoch)
+    if (fromDs == null || toDs == null) return []
+    const startDs = Math.floor(fromDs)
+    const endDs = Math.ceil(toDs)
     const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs })
     const out: Array<{ tsMs: number; kind: 'battery_level_changed' | 'charging_time'; batteryPct: number | null; voltageMv: number | null; chargingTimeSec: number | null }> = []
     for (const r of rows) {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
       const kind = decoded?.kind
       if (kind !== 'battery_level_changed' && kind !== 'charging_time') continue
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
+      if (tsMs == null) continue
       out.push({
-        tsMs: measuredAtMs(Number(r.ds), anchor.anchorDs, anchorUtcMs),
+        tsMs,
         kind,
         batteryPct: typeof decoded!.battery_pct === 'number' ? decoded!.battery_pct : null,
         voltageMv: typeof decoded!.voltage_mv === 'number' ? decoded!.voltage_mv : null,
@@ -6084,14 +6179,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .onConflictDoNothing()
       .returning({ id: s.ouraRawSamples.id })
 
-    // Idempotent backfill: date any rows stored before the anchor existed (or
-    // whose insert predates this migration). Cheap no-op once caught up.
-    await this.db.execute(sql`
-      UPDATE oura_raw_samples
-      SET measured_at = ${new Date(anchor.anchorUtcMs)}::timestamptz
-        + make_interval(secs => (ring_timestamp_ds - ${anchor.anchorDs}) * 0.1)
-      WHERE user_id = ${userId} AND measured_at IS NULL
-    `)
+    // **There is no `measured_at` backfill here any more, and the invariant above is why.**
+    // RV-182 — an idempotent `UPDATE … WHERE measured_at IS NULL` ran on every ingest to date rows
+    // stored before migration 115 added the column. Its comment called it a cheap no-op once caught
+    // up. Measured against production on 2026-09-25 it was **4,932 calls, 90 s, 8.0% of all
+    // database time, and 0 rows updated** — no index serves that predicate, so each call seq-scanned
+    // the hot window to find the nothing it was always going to find. `measured_at` has had 0 nulls
+    // in ~192,772 rows since the backfill caught up.
+    //
+    // Deleting it is safe because a NULL can no longer be written: this is the only insert path into
+    // the table, `anchor` is non-null by the argument above, and `measuredAt()` therefore always
+    // returns a Date. (The only other writer sets `decoded`, and migration 190 sets `epoch`.)
+    // `oura-raw-sample-measured-at.test.ts` pins that — if a path ever does write a NULL, it fails
+    // there rather than being quietly re-dated by a statement nobody knew was load-bearing.
 
     // Q-541 Task 6 — retire sealed buckets to the cold tier. Fire-and-forget after the response's
     // work is done, throttled per user, and bounded; see `claimAutoPackSlot`.
@@ -7087,6 +7187,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
+  async getObservedHrProfile(userId: string, from: Date, to: Date) { return oura.getObservedHrProfile(this.db, userId, from, to) }
   async getZoneMinutesRange(userId: string, fromDay: string, toDay: string, tz: string, profile: { maxHr: number; restingHr: number }) { return oura.getZoneMinutesRange(this.db, userId, fromDay, toDay, tz, profile) }
   async insertRrIntervals(userId: string, rows: { at: Date; rrMs: number }[]) { return oura.insertRrIntervals(this.db, userId, rows) }
   async getRrForWindow(userId: string, from: Date, to: Date) { return oura.getRrForWindow(this.db, userId, from, to) }

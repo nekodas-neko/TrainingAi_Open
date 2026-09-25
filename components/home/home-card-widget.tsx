@@ -203,21 +203,20 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
     case 'card_moodWidget': {
       if (!activeCardWidgets.includes('moodWidget')) return null
       const ENERGY_ICON: Record<string, LucideIcon> = { drained: BatteryLow, low: Frown, ok: Meh, good: Smile, pumped: Zap }
-      const SLEEP_LABEL: Record<string, string> = { terrible: "Terrible", poor: "Poor", ok: "OK", good: "Good", great: "Great" }
       const EnergyIcon = moodLog ? (ENERGY_ICON[moodLog.energyLevel] ?? Meh) : Meh
       const _mColor = cardColors['moodWidget'] ?? CARD_DEFAULT_COLORS.moodWidget
       return (
         <div className="px-4 pb-3 relative">
           {sectionEditMode && (
             <div className="absolute top-4 right-12 z-20" onClick={e => e.stopPropagation()}>
-              <ColorSwatchPicker value={_mColor} label="Readiness card" onChange={hex => onColorChange('moodWidget', hex)} />
+              <ColorSwatchPicker value={_mColor} label="Exercise Readiness card" onChange={hex => onColorChange('moodWidget', hex)} />
             </div>
           )}
           <div role="button" tabIndex={0} onClick={() => { if (!sectionEditMode) setMoodSheetOpen(true); }} className={cn("w-full rounded-2xl p-4 text-left active:scale-95 transition cursor-pointer", sectionEditMode && "pointer-events-none")} style={accentCardStyle(_mColor)}>
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--accent-amber)" }}>Exercise Readiness</p>
-                {moodLog === undefined ? <p className="text-sm text-muted-foreground">Loading…</p> : moodLog === null ? <div><p className="text-base font-semibold text-foreground">How are you feeling?</p><p className="text-[10px] text-muted-foreground mt-0.5">Tap to log energy &amp; soreness</p></div> : <div className="flex items-center gap-3"><EnergyIcon className="h-8 w-8 flex-none" style={{ color: "var(--accent-amber)" }} /><div><p className="text-sm font-semibold capitalize">{moodLog.energyLevel}</p><p className="text-[10px] text-muted-foreground">Sleep: {SLEEP_LABEL[moodLog.sleepQuality] ?? moodLog.sleepQuality}</p>{moodLog.soreMuscles.length > 0 && <p className="text-[10px] mt-0.5" style={{ color: "var(--accent-amber)" }}>Sore: {moodLog.soreMuscles.join(", ")}</p>}</div></div>}
+                {moodLog === undefined ? <p className="text-sm text-muted-foreground">Loading…</p> : moodLog === null ? <div><p className="text-base font-semibold text-foreground">How are you feeling?</p><p className="text-[10px] text-muted-foreground mt-0.5">Tap to log energy &amp; soreness</p></div> : <div className="flex items-center gap-3"><EnergyIcon className="h-8 w-8 flex-none" style={{ color: "var(--accent-amber)" }} /><div><p className="text-sm font-semibold capitalize">{moodLog.energyLevel}</p>{moodLog.soreMuscles.length > 0 && <p className="text-[10px] mt-0.5" style={{ color: "var(--accent-amber)" }}>Sore: {moodLog.soreMuscles.join(", ")}</p>}</div></div>}
               </div>
               <MessageCircle className="h-6 w-6 ml-2 flex-none" style={{ color: "var(--accent-amber)" }} />
             </div>

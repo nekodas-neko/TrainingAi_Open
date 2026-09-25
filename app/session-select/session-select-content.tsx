@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { calendarMonthInTz, previousCalendarMonth } from "@/lib/calendar-month";
 import { useDayRolloverRefresh, useLocalDay } from '@/components/shell/local-day-provider';
 import { getGreeting } from './greeting';
 import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
@@ -264,16 +265,14 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
     // Seed calendar and recommendation from cache so these sections render immediately.
     try {
-      const now = new Date();
       const merged: Record<string, string[]> = {};
       // TTL-backed reads (survive across sessions)
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const cachedCal = readCacheSync<{ trainedDays: Record<string, string[]> }>(`calendar-data:${now.getFullYear()}-${mm}`);
+      const cur = calendarMonthInTz(tz);
+      const cachedCal = readCacheSync<{ trainedDays: Record<string, string[]> }>(`calendar-data:${cur.year}-${cur.mm}`);
       if (cachedCal?.trainedDays) Object.assign(merged, cachedCal.trainedDays);
       // Also seed previous month so streaks spanning the month boundary are correct on first paint.
-      const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevMM = String(prevMonthDate.getMonth() + 1).padStart(2, '0');
-      const cachedPrevCal = readCacheSync<{ trainedDays: Record<string, string[]> }>(`calendar-data:${prevMonthDate.getFullYear()}-${prevMM}`);
+      const prev = previousCalendarMonth(cur);
+      const cachedPrevCal = readCacheSync<{ trainedDays: Record<string, string[]> }>(`calendar-data:${prev.year}-${prev.mm}`);
       if (cachedPrevCal?.trainedDays) Object.assign(merged, cachedPrevCal.trainedDays);
       const cachedStreak = readCacheSync<{ trainedDays: Record<string, string[]> }>('streak-data');
       if (cachedStreak?.trainedDays) Object.assign(merged, cachedStreak.trainedDays);
@@ -354,7 +353,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       if (store) {
         (async () => {
           try {
-            const cutoff = toAestDay(new Date(todayMidnightUtc().getTime() - 90 * 24 * 60 * 60 * 1000));
+            const cutoff = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 90 * 24 * 60 * 60 * 1000), tz);
             const history = await store.getWorkoutHistory(cutoff);
             const local: Record<string, string[]> = {};
             for (const { session, exerciseLogs } of history) {
@@ -382,17 +381,17 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const now = new Date();
-      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const cur = calendarMonthInTz(tz);
+      const prev = previousCalendarMonth(cur);
       const [thisMonth, lastMonth] = await Promise.all([
-        readLocalCalendarOverlay(userId, now.getFullYear(), now.getMonth() + 1),
-        readLocalCalendarOverlay(userId, prev.getFullYear(), prev.getMonth() + 1),
+        readLocalCalendarOverlay(userId, cur.year, cur.month),
+        readLocalCalendarOverlay(userId, prev.year, prev.month),
       ]);
       if (cancelled) return;
       setPendingDays(mergeCalendarOverlay(thisMonth, lastMonth).trainedDays);
     })();
     return () => { cancelled = true; };
-  }, [userId, refreshTick]);
+  }, [userId, refreshTick, tz]);
 
   // Keep the ref in sync with state so event handlers always read the latest order synchronously.
   useLayoutEffect(() => { sectionOrderRef.current = sectionOrder; });
@@ -453,7 +452,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     if (userId) {
       const store = getLocalStore(userId);
       if (store) {
-        const cutoffStr = toAestDay(new Date(todayMidnightUtc().getTime() - 30 * 24 * 60 * 60 * 1000));
+        const cutoffStr = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000), tz);
         const local = await store.getBodyMetrics(cutoffStr);
         const rows = local.filter(m => !m.deletedAt);
         if (rows.length > 0) {
@@ -622,16 +621,23 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       } catch { /* store not ready — fall through to the API */ }
     }
     try {
-      const res = await fetch(`/api/mood?date=${today}`);
-      if (!res.ok) return;
-      const d = await res.json() as import('@trainingai/shared/types/mood').MoodLog | null;
-      if (d !== null) {
-        setMoodLog(d);
-        setCached(key, d, MOOD_TTL).catch(() => {});
-      } else {
-        const cached = readCacheSync<import('@trainingai/shared/types/mood').MoodLog | null>(key);
-        if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
-      }
+      // RV-79: through `cachedFetch`, per the standing rule, so this read joins the in-flight dedup
+      // the mood sheet's reads of the same key already use rather than firing a second request.
+      //
+      // `shouldCache` is what makes the conversion safe, and it is not optional here. A plain
+      // `cachedFetch` writes the response unconditionally after any 2xx — measured — so a server
+      // `null` would overwrite an optimistic local log, and `readCacheSync` parses a stored "null"
+      // back as a value rather than a miss. The seeds below would then paint `null` and the
+      // check-in card would re-prompt: the session-167 bug, reintroduced by the fix for a rule.
+      await cachedFetch<import('@trainingai/shared/types/mood').MoodLog | null>(
+        key, `/api/mood?date=${today}`, MOOD_TTL,
+        d => {
+          if (d !== null) { setMoodLog(d); return; }
+          const cached = readCacheSync<import('@trainingai/shared/types/mood').MoodLog | null>(key);
+          if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
+        },
+        { shouldCache: d => d != null },
+      );
     } catch { /* offline — keep the seeded value */ }
   }, [userId, tz]);
 
@@ -739,7 +745,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     if (userId) {
       const store = getLocalStore(userId);
       if (store) {
-        const cutoff = toAestDay(new Date(todayMidnightUtc().getTime() - 14 * 24 * 60 * 60 * 1000));
+        const cutoff = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 14 * 24 * 60 * 60 * 1000), tz);
         store.getSleepSessions(cutoff).then(local => {
           if (local.length > 0 && !cancelled) {
             setSleepData(local.map(s => ({
@@ -760,7 +766,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       () => cancelled,
     );
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, tz]);
 
   useEffect(() => { loadTodayMood(); }, [loadTodayMood, localDay]);
 
@@ -1326,7 +1332,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                 card_nutritionDonut:     'Nutrition',
                 card_sleepWidget:        'Sleep',
                 card_stepsWidget:        'Steps',
-                card_moodWidget:         'Readiness',
+                card_moodWidget:         'Exercise Readiness',
                 card_acwrWidget:         'ACWR',
                 card_muscleStatusWidget: 'Muscle Status',
                 card_hrChartWidget:      'Heart Rate Chart',

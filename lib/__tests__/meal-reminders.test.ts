@@ -5,6 +5,12 @@ import {
   type MealReminderAction,
 } from '../meal-reminders'
 import type { MealType, FoodLog } from '@trainingai/shared/types/nutrition'
+import { fromZonedTime } from 'date-fns-tz'
+// Fixtures are wall-clock times in the USER's zone, not the device's. A bare
+// `new Date('2026-06-17T09:00:00')` is parsed device-local, which is how these tests used to agree
+// with a `setHours` implementation that had the same bug (LB-148).
+const TZ = 'Australia/Brisbane'
+const bne = (iso: string) => fromZonedTime(iso, TZ)
 
 function makeMealType(overrides: Partial<MealType> = {}): MealType {
   return {
@@ -28,7 +34,7 @@ function makeFoodLog(mealTypeId: string): Pick<FoodLog, 'mealTypeId'> {
 describe('computeMealReminderActions', () => {
   it('cancels the reminder when a food log already exists for the meal type', () => {
     const mealType = makeMealType({ id: 'meal-1', timeStartHour: 6, timeEndHour: 10 })
-    const now = new Date('2026-06-13T12:00:00')
+    const now = bne('2026-06-13T12:00:00')
     const actions = computeMealReminderActions([mealType], [makeFoodLog('meal-1')], now)
 
     expect(actions).toEqual<MealReminderAction[]>([{ mealTypeId: 'meal-1', type: 'cancel' }])
@@ -36,7 +42,7 @@ describe('computeMealReminderActions', () => {
 
   it('cancels the reminder when remindersEnabled is false, even if unlogged and window passed', () => {
     const mealType = makeMealType({ id: 'meal-1', timeStartHour: 6, timeEndHour: 10, remindersEnabled: false })
-    const now = new Date('2026-06-13T12:00:00')
+    const now = bne('2026-06-13T12:00:00')
     const actions = computeMealReminderActions([mealType], [], now)
 
     expect(actions).toEqual<MealReminderAction[]>([{ mealTypeId: 'meal-1', type: 'cancel' }])
@@ -44,7 +50,7 @@ describe('computeMealReminderActions', () => {
 
   it('fires an immediate catch-up notification when the window has passed and nothing is logged', () => {
     const mealType = makeMealType({ id: 'meal-1', timeStartHour: 6, timeEndHour: 10 })
-    const now = new Date('2026-06-13T12:00:00')
+    const now = bne('2026-06-13T12:00:00')
     const actions = computeMealReminderActions([mealType], [], now)
 
     expect(actions).toEqual<MealReminderAction[]>([
@@ -54,17 +60,17 @@ describe('computeMealReminderActions', () => {
 
   it('schedules a one-shot notification for the window end time when the window is still ahead', () => {
     const mealType = makeMealType({ id: 'meal-1', timeStartHour: 6, timeEndHour: 10 })
-    const now = new Date('2026-06-13T08:00:00')
+    const now = bne('2026-06-13T08:00:00')
     const actions = computeMealReminderActions([mealType], [], now)
 
     expect(actions).toEqual<MealReminderAction[]>([
-      { mealTypeId: 'meal-1', type: 'scheduled', at: new Date('2026-06-13T10:00:00'), emoji: '🍳', name: 'Breakfast' },
+      { mealTypeId: 'meal-1', type: 'scheduled', at: bne('2026-06-13T10:00:00'), emoji: '🍳', name: 'Breakfast' },
     ])
   })
 
   it('treats "now" exactly at the window end time as passed (immediate)', () => {
     const mealType = makeMealType({ id: 'meal-1', timeStartHour: 6, timeEndHour: 10 })
-    const now = new Date('2026-06-13T10:00:00')
+    const now = bne('2026-06-13T10:00:00')
     const actions = computeMealReminderActions([mealType], [], now)
 
     expect(actions).toEqual<MealReminderAction[]>([
@@ -74,17 +80,17 @@ describe('computeMealReminderActions', () => {
 
   it('clamps timeEndHour === 24 to 23:59 same day when scheduling', () => {
     const mealType = makeMealType({ id: 'meal-1', name: 'Evening Snack', emoji: '🌙', timeStartHour: 21, timeEndHour: 24 })
-    const now = new Date('2026-06-13T20:00:00')
+    const now = bne('2026-06-13T20:00:00')
     const actions = computeMealReminderActions([mealType], [], now)
 
     expect(actions).toEqual<MealReminderAction[]>([
-      { mealTypeId: 'meal-1', type: 'scheduled', at: new Date('2026-06-13T23:59:00'), emoji: '🌙', name: 'Evening Snack' },
+      { mealTypeId: 'meal-1', type: 'scheduled', at: bne('2026-06-13T23:59:00'), emoji: '🌙', name: 'Evening Snack' },
     ])
   })
 
   it('clamps timeEndHour === 24 to 23:59 and fires immediate if already past it', () => {
     const mealType = makeMealType({ id: 'meal-1', name: 'Evening Snack', emoji: '🌙', timeStartHour: 21, timeEndHour: 24 })
-    const now = new Date('2026-06-13T23:59:30')
+    const now = bne('2026-06-13T23:59:30')
     const actions = computeMealReminderActions([mealType], [], now)
 
     expect(actions).toEqual<MealReminderAction[]>([
@@ -94,7 +100,7 @@ describe('computeMealReminderActions', () => {
 
   it('skips re-notifying when the catch-up notification was already sent today', () => {
     const mealType = makeMealType({ id: 'meal-1', timeStartHour: 6, timeEndHour: 10 })
-    const now = new Date('2026-06-13T12:00:00')
+    const now = bne('2026-06-13T12:00:00')
     const actions = computeMealReminderActions([mealType], [], now, new Set(['meal-1']))
 
     expect(actions).toEqual<MealReminderAction[]>([
@@ -105,7 +111,7 @@ describe('computeMealReminderActions', () => {
   it('still fires the immediate notification for a meal type not in notifiedToday', () => {
     const breakfast = makeMealType({ id: 'meal-breakfast', name: 'Breakfast', emoji: '🍳', timeStartHour: 6, timeEndHour: 10 })
     const lunch = makeMealType({ id: 'meal-lunch', name: 'Lunch', emoji: '🥗', timeStartHour: 11, timeEndHour: 13 })
-    const now = new Date('2026-06-13T14:00:00')
+    const now = bne('2026-06-13T14:00:00')
     const actions = computeMealReminderActions([breakfast, lunch], [], now, new Set(['meal-breakfast']))
 
     expect(actions).toEqual<MealReminderAction[]>([
@@ -118,7 +124,7 @@ describe('computeMealReminderActions', () => {
     const breakfast = makeMealType({ id: 'meal-breakfast', name: 'Breakfast', emoji: '🍳', timeStartHour: 6, timeEndHour: 10 })
     const lunch = makeMealType({ id: 'meal-lunch', name: 'Lunch', emoji: '🥗', timeStartHour: 12, timeEndHour: 15 })
     const dinner = makeMealType({ id: 'meal-dinner', name: 'Dinner', emoji: '🍽️', timeStartHour: 17, timeEndHour: 21 })
-    const now = new Date('2026-06-13T13:00:00')
+    const now = bne('2026-06-13T13:00:00')
 
     const actions = computeMealReminderActions(
       [breakfast, lunch, dinner],
@@ -128,8 +134,8 @@ describe('computeMealReminderActions', () => {
 
     expect(actions).toEqual<MealReminderAction[]>([
       { mealTypeId: 'meal-breakfast', type: 'cancel' },
-      { mealTypeId: 'meal-lunch', type: 'scheduled', at: new Date('2026-06-13T15:00:00'), emoji: '🥗', name: 'Lunch' },
-      { mealTypeId: 'meal-dinner', type: 'scheduled', at: new Date('2026-06-13T21:00:00'), emoji: '🍽️', name: 'Dinner' },
+      { mealTypeId: 'meal-lunch', type: 'scheduled', at: bne('2026-06-13T15:00:00'), emoji: '🥗', name: 'Lunch' },
+      { mealTypeId: 'meal-dinner', type: 'scheduled', at: bne('2026-06-13T21:00:00'), emoji: '🍽️', name: 'Dinner' },
     ])
   })
 })

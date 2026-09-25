@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockRepo = vi.hoisted(() => ({
   activityTypes: [] as { id: string }[],
   saveActivityLog: vi.fn(),
+  upsertBodyMetrics: vi.fn(),
 }))
 
 vi.mock('@/auth', () => ({
@@ -12,7 +13,7 @@ vi.mock('@/auth', () => ({
 }))
 vi.mock('@/lib/data', () => ({
   getRepositoryAsync: vi.fn(async () => ({
-    upsertBodyMetrics: vi.fn(),
+    upsertBodyMetrics: mockRepo.upsertBodyMetrics,
     saveActivityLog: mockRepo.saveActivityLog,
     saveSleepSession: vi.fn(),
     listActivityLogs: vi.fn(async () => []),
@@ -130,5 +131,35 @@ describe('POST /api/sync-health — an unknown activityType must not sink the fl
     expect(rejected[0]).toContain('unknown activityType')
     expect(mockRepo.saveActivityLog).toHaveBeenCalledTimes(1)
     expect(mockRepo.saveActivityLog.mock.calls[0][1]).toMatchObject({ activityType: 'walk' })
+  })
+})
+
+// `active_calories` is an INTEGER column and the upsert is parameterised, so a fractional value
+// does not round on the way in — node-pg sends "412.6" and Postgres answers `invalid input syntax
+// for type integer`, which fails the WHOLE dailyMetrics write rather than the one field. That is
+// not an edge case: Health Connect's ActiveCaloriesBurned and Apple Health's activeEnergyBurned are
+// both Doubles, so fractional kcal is the normal payload. Every sibling integer field in the route
+// already rounds; this one shipped without it.
+describe('POST /api/sync-health — activeCalories reaches an integer column', () => {
+  beforeEach(() => { mockRepo.upsertBodyMetrics.mockClear() })
+
+  it('rounds a fractional value rather than passing it to the driver', async () => {
+    const res = await post({ dailyMetrics: [{ date: '2026-07-01', activeCalories: 412.6 }] })
+    expect(res.status).toBe(200)
+    const [, rows] = mockRepo.upsertBodyMetrics.mock.calls[0]
+    expect(rows[0].activeCalories).toBe(413)
+    expect(Number.isInteger(rows[0].activeCalories)).toBe(true)
+  })
+
+  it('keeps zero, which is a real reading and not an absent one', async () => {
+    await post({ dailyMetrics: [{ date: '2026-07-01', activeCalories: 0 }] })
+    const [, rows] = mockRepo.upsertBodyMetrics.mock.calls[0]
+    expect(rows[0].activeCalories).toBe(0)
+  })
+
+  it('leaves an omitted value undefined rather than writing 0', async () => {
+    await post({ dailyMetrics: [{ date: '2026-07-01', steps: 100 }] })
+    const [, rows] = mockRepo.upsertBodyMetrics.mock.calls[0]
+    expect(rows[0].activeCalories).toBeUndefined()
   })
 })

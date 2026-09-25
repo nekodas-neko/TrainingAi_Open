@@ -3,7 +3,20 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-09-09 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-30`.
+**Updated:** 2026-09-09 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-30`
+(⚠ stale — real next free is **TN-81**; everything below "Now" predates the TN-55…TN-80 run and is
+history, not state. A full rewrite is owed.)
+
+**⚑ SCOPE — owner, 2026-09-25: only ask him about tuning.** *"The only questions asked from me in this
+agent should be about tuning in general for our pillars or workouts etc — nothing to do with other
+avenues."* Ask about scores, contributors, thresholds, weights, goals, prescription and progression.
+**Do not ask about** PR approvals, CI or branch protection, device-check routing, lane assignment,
+backlog process, or another agent's queue — **file those `Lane: O` and let the Orchestrator put them
+to him.** Filing cross-domain findings is correct (`Lane:` is the channel between agents); briefing
+him on them *here* is not. This session did exactly that on 2026-09-25 — three PR approvals, branch
+protection, a routing sweep — and the findings were sound while the routing was wrong, which is the
+harder failure to notice. **Test before asking: if the answer changes a score, threshold, goal or
+prescription, ask it here; otherwise file it.**
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 

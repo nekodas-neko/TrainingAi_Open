@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest'
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { computeWorkoutReminderAction, type WorkoutReminderAction } from '../workout-reminders'
 
 const SESSION = 'Push'
 
-function at(hour: number, minute = 0): Date {
-  const d = new Date('2026-06-17T00:00:00+10:00')
-  d.setHours(hour, minute, 0, 0)
-  return d
-}
+// A wall-clock time in the USER's zone, not the device's. This helper used to call setHours,
+// which is device-local — the same bug the implementation had, so the two agreed (LB-148).
+const TZ = 'Australia/Brisbane'
+const at = (hour: number, minute = 0): Date =>
+  fromZonedTime(`2026-06-17T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`, TZ)
+const hhmm = (d: Date) => formatInTimeZone(d, TZ, 'HH:mm')
 
 describe('computeWorkoutReminderAction', () => {
   it('returns cancel when not a training day', () => {
@@ -31,8 +33,7 @@ describe('computeWorkoutReminderAction', () => {
     const action = computeWorkoutReminderAction(true, SESSION, true, '18:00', now) as { type: 'schedule'; at: Date; sessionName: string }
     expect(action.type).toBe('schedule')
     expect(action.sessionName).toBe('Push')
-    expect(action.at.getHours()).toBe(18)
-    expect(action.at.getMinutes()).toBe(0)
+    expect(hhmm(action.at)).toBe('18:00')
   })
 
   it('fires immediate notification when reminder time has already passed', () => {
@@ -51,7 +52,6 @@ describe('computeWorkoutReminderAction', () => {
     const now = at(9, 30)  // 9:30am, reminder at 9:45am
     const action = computeWorkoutReminderAction(true, SESSION, true, '09:45', now) as { type: 'schedule'; at: Date }
     expect(action.type).toBe('schedule')
-    expect(action.at.getHours()).toBe(9)
-    expect(action.at.getMinutes()).toBe(45)
+    expect(hhmm(action.at)).toBe('09:45')
   })
 })

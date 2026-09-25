@@ -11,7 +11,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 // own limit. 1 MB is generous past that.
 const MAX_BODY_BYTES = 1024 * 1024
 
-// Receives native Health Connect data from the Capacitor app.
+// Receives aggregate health data. Legacy Android callers default to Health Connect.
 // The JS layer pre-aggregates data into daily buckets and sends individual
 // exercise and sleep sessions. Server upserts into the relevant tables.
 
@@ -27,11 +27,13 @@ const HHMM_RE = /^\d{2}:\d{2}$/;
 const num = (max: number, min = 0) => z.number().min(min).max(max).optional();
 const int = (max: number, min: number) => z.number().int().min(min).max(max).optional();
 const SyncHealthSchema = z.object({
+  source: z.enum(['health_connect', 'apple_health']).default('health_connect'),
   dailyMetrics: z.array(z.object({
     date:             z.string().regex(DATE_RE),
     steps:            int(200_000, 0),
     distanceKm:       num(500),
     caloriesBurned:   num(20_000),
+    activeCalories:   num(20_000),
     weightKg:         num(500),
     bodyFatPct:       num(100),
     calories:         num(20_000),
@@ -116,12 +118,13 @@ export async function POST(req: NextRequest) {
         carbsG:     d.carbsG,
         fatG:       d.fatG,
         steps:            d.steps     != null ? Math.round(d.steps) : undefined,
+        activeCalories:   d.activeCalories != null ? Math.round(d.activeCalories) : undefined,
         distanceKm:       d.distanceKm,
         restingHeartRate: d.restingHeartRate,
         hrvMs:            d.hrvMs,
         spo2Pct:          d.spo2Pct,
       })),
-      'health_connect',
+      body.source,
     );
   }
 
@@ -192,7 +195,7 @@ export async function POST(req: NextRequest) {
         lightSleepHours: s.lightSleepHours,
         awakHours:       s.awakHours,
         sleepPhase5Min:  s.sleepPhase5Min,
-      }, 'health_connect');
+      }, body.source);
     }
   }
 

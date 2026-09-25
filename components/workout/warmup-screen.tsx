@@ -9,6 +9,7 @@ import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatTime } from "./utils";
 import { useElapsedSec } from "./session-clock";
 import { useExerciseMedia } from "@/lib/hooks/use-exercise-media";
+import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
 
 // Fallback only — used until the session's budget is known (`workout-data` has not landed yet).
 // The real goal is computed from the session budget by `warmupGoalSecFor` in workout-screen.tsx,
@@ -150,7 +151,7 @@ export function WarmupScreen({ sessionType, exercises, workoutStartMs, warmupGoa
                   {thumbSrc ? (
                     <div className="relative h-10 w-10 flex-none rounded-lg overflow-hidden bg-white">
                       <Image src={thumbSrc} alt="" fill sizes="40px"
-                        unoptimized={thumbSrc.endsWith('.gif')} className="object-cover" />
+                        unoptimized={mustBypassImageOptimizer(thumbSrc)} className="object-cover" />
                     </div>
                   ) : (
                     <div className="h-10 w-10 flex-none rounded-lg flex items-center justify-center" style={{ background: "color-mix(in oklch, var(--color-muted) 80%, transparent)" }}>

@@ -1,5 +1,12 @@
 name: CI
 
+# RV-198. Default the token to read-only for every job here. Nothing in this workflow writes to the
+# repository: the only token-bearing operation is `actions/upload-artifact`, which uses the Actions
+# runtime token rather than `GITHUB_TOKEN`. `android.yml` keeps `contents: write` because its publish
+# step genuinely needs it.
+permissions:
+  contents: read
+
 # Action versions are the MINIMUM that runs on Node 24, verified per action against each one's own
 # `action.yml` `runs.using` rather than bumped uniformly (LA-17). That distinction is load-bearing:
 # `upload-artifact@v5` is still `node20`, so a uniform "everything to v5" would have left it behind
@@ -51,7 +58,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -66,10 +73,29 @@ jobs:
   # any type error already fails Build. A separate `tsc --noEmit` job was redundant
   # enforcement. Type errors are caught faster and more precisely by `pnpm ci:local`
   # (runs `tsc --noEmit` directly) before pushing.
-  test:
-    name: Tests
+  # OR-165. Sharded four ways: the suite is 844 files and ~7 minutes, and it is the ONLY job on
+  # CI's critical path — everything except Build finishes inside 70 seconds, so nothing else's
+  # duration is visible in the wall clock.
+  #
+  # ⚠ THE AGGREGATOR BELOW IS LOAD-BEARING, NOT TIDINESS. A matrix reports its checks as
+  # `Tests (1)`, `Tests (2)`… and the `ProtectMain` ruleset requires a check named exactly `Tests`.
+  # Shard without the aggregator and that required check NEVER REPORTS, which does not fail a PR —
+  # it leaves every PR in the repository permanently unmergeable. The `test` job below exists to
+  # publish that one name.
+  #
+  # Every shard gets its own Postgres rather than segregating the ~20 DB-backed files into one.
+  # Shards run in parallel, so four container starts cost nothing in wall clock, and a database per
+  # shard means FEWER files share one — which is the LA-32 collision class, not more of it.
+  test-shard:
+    name: Tests shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      # Without this, one shard failing cancels the rest and the log shows a single failure where
+      # there may be four. Diagnosing a red suite needs all of them.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # A real Postgres lets the DB integration tests run — without DATABASE_URL they
     # skipIf-skip (~20 files), leaving the rollup/repo DB behaviour with no CI coverage.
     services:
@@ -99,7 +125,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -109,7 +135,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply all migrations
         run: node scripts/local-db/migrate.js
-      - run: pnpm test
+      - run: pnpm vitest run --shard=${{ matrix.shard }}/4
+
+  # The name the ruleset requires. Publishes one pass/fail for the four shards above; it installs
+  # nothing and runs in seconds.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-shard
+    # `always()` so this still reports when a shard fails — without it the job is SKIPPED, the
+    # required check never arrives, and the PR hangs exactly as it would with no aggregator at all.
+    # Deliberately NOT guarded on `schedule`: LB-31's nightly runs the suite and nothing else, so
+    # this is the only job that can report its result.
+    if: always()
+    steps:
+      - name: Every shard passed
+        run: |
+          echo "shards: ${{ needs.test-shard.result }}"
+          test "${{ needs.test-shard.result }}" = "success"
 
   build:
     name: Build
@@ -118,7 +162,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
+      # DV-14: the heap cap lives in `package.json`'s build script, so Railway's builder and this
+      # job run the SAME number. It used to be set here and nowhere else, which is why CI passed at
+      # 4096 while Railway — which sets no NODE_OPTIONS at all — died on Node's own ~4 GB default.
+      # A value set here would be overridden by the script's inline one, so it is not set here.
       # Q-311. Everything below is a throwaway literal for this ephemeral job, not a redacted
       # secret. This repo is public, and a reader cannot tell a dummy from a leak by looking, so:
       # the database is a service container destroyed with the runner, and the Google/Gemini/Tasker
@@ -133,7 +180,7 @@ jobs:
       WEBHOOK_USER_ID: placeholder
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -141,6 +188,20 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      # OR-165. `cache: 'pnpm'` on setup-node caches the dependency STORE, not Next's compilation
+      # output, so every CI build recompiled from cold — `pnpm build` is ~4m45s of this ~5m job
+      # while `pnpm install` is ~5s. Next documents `.next/cache` as the artefact to carry over.
+      # Keyed on the lockfile plus source, so a dependency bump or a source change reuses the
+      # nearest previous build rather than starting over; `restore-keys` is what makes a miss
+      # partial instead of total.
+      - name: Cache the Next build
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'lib/**', 'packages/**') }}
+          restore-keys: |
+            next-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-
       - run: pnpm build
       # LB-37. `tsconfig.json` excludes `**/__tests__/**`, so no spec has ever been typechecked and
       # a clean `tsc` said nothing about any of them. Shrink-only per-file baseline: every NEW spec
@@ -427,6 +488,9 @@ jobs:
       - name: Hex colour literals do not increase
         run: node scripts/check-hex-literals.js
 
+      - name: Bare fetch of an /api/ GET does not increase
+        run: node scripts/check-bare-api-fetch.js
+
       - name: No two DB test files share a TEST_USER_ID
         run: node scripts/check-test-user-ids.js
 
@@ -453,6 +517,13 @@ jobs:
       # RV-99 sat that way behind a marker that was a CORRECTION, not a block. Baselined at zero.
       - name: No entry is parked by prose alone
         run: node scripts/check-prose-parked-entries.js
+
+      # OR-146. `Gate: owner` parks an entry until the owner acts, without saying what he is asked
+      # FOR — a decision, a production write, or a reading. Measured 2026-09-24: 23 of 72 owner
+      # gates said nothing, so establishing what each owed meant reading up to 209 lines of body,
+      # and LA-89 sat correctly attributed and never asked for two weeks. 23 measured, cleared to zero the same day.
+      - name: An owner gate says what is owed
+        run: node scripts/check-owner-gate-states-what-is-owed.js
 
       # LA-26. A repository method nothing calls is invisible to tsc (an unused export is not an
       # error), to lint, and to the tests. It has shipped three times (Q-301, Q-270, Q-231) and was
@@ -565,7 +636,7 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
@@ -654,7 +725,9 @@ jobs:
       # its expensive half when nothing it can test has changed. That makes it safe to require.
       #
       # A non-UI PR still pays for checkout and the Postgres service (~20 s) rather than the full
-      # ~10 min. On a push to main there is no base to diff against, so everything runs.
+      # run — which is ~29 min, not the ~10 this line claimed until 2026-09-25 (LB-149, measured
+      # on run 3069: `pnpm e2e` 10:15:36 → 10:44:29 across 124 specs). On a push to main there is
+      # no base to diff against, so everything runs.
       - name: Does this change touch the UI?
         id: ui
         run: |
@@ -678,13 +751,17 @@ jobs:
           # (app/session-explain/__tests__/bf172-fit-not-readiness.test.ts) and bought four full
           # ~34-minute runs, drifting out of date during three of them. `e2e/` specs are NOT under
           # a `__tests__/` directory (checked: zero), so the browser suite still gates on itself.
-          if echo "$FILES" | grep -vE '^app/api/' | grep -vE '(^|/)__tests__/' | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No app/, components/, e2e/ or playwright.config.ts changes — skipping the browser run."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: pnpm/action-setup@v5
+          # LB-108: the prefix list missed `lib/`, and E2E reported GREEN IN 40 SECONDS on a
+          # ~28-minute suite for a PR that changed `lib/resume-repaint.ts` and
+          # `lib/hooks/use-resume-repaint.ts` — the log is Postgres starting and stopping, with no
+          # Playwright invocation. A longer prefix list does not fix it: `lib/` holds 282 source
+          # files, 81 reachable from a client module and 201 not, and the reachable set includes
+          # `lib/sqlite/cache.ts`, which every screen reads through. So reachability is COMPUTED
+          # from the `'use client'` roots. `app/api/**` and `__tests__/` stay excluded (LA-63), so
+          # an engine change still skips the browser and LA-63's saving is intact.
+          CHANGED=$(printf '%s\n' "$FILES" | node scripts/e2e-ui-touched.js)
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         if: steps.ui.outputs.changed == 'true'
         with:
           version: 10.33.0
@@ -740,6 +817,28 @@ jobs:
         run: npx playwright install --with-deps chromium
       - run: pnpm e2e
         if: steps.ui.outputs.changed == 'true'
+      # LB-149. Twice now the browser has simply vanished mid-run — two specs failing in 1.0s each
+      # with `browser.newContext: Target page, context or browser has been closed`, which means the
+      # process was already gone when the spec started. The run recorded NOTHING about why, so three
+      # sessions could only guess. What was ruled out by reading rather than measuring: `workers: 1`
+      # is already the standing config so there is no parallelism to reduce; nothing in `e2e/` closes
+      # the browser; and the two specs that died sat at #20 and #28 of 124 in alphabetical order,
+      # preceded by two of the LIGHTEST files in the suite, so "a heavy spec killed it" does not hold.
+      # That leaves the runner, and the kernel is the only witness. `dmesg` settles it in one line —
+      # an OOM kill names the process and its RSS; an empty dmesg eliminates OOM, which is just as
+      # useful and is what nobody has been able to say. Runs only on failure, so a green run pays
+      # nothing.
+      - name: If the browser died, say why
+        if: failure() && steps.ui.outputs.changed == 'true'
+        run: |
+          echo "::group::kernel OOM kills"
+          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom-kill" | tail -20 \
+            || echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+          echo "::endgroup::"
+          echo "::group::memory and the largest processes still alive"
+          free -m
+          ps -eo pid,rss,comm --sort=-rss | head -12
+          echo "::endgroup::"
       # Both directories, because they carry different halves and only one of them ever existed:
       # `playwright-report/` needs the `html` reporter (added in playwright.config.ts for LA-63) and
       # `test-results/` is where `trace: 'retain-on-failure'` and the failure screenshots land.

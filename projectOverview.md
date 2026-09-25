@@ -1348,7 +1348,15 @@ and the spec passes. Two placement calls: a **second tsconfig** rather than edit
 would have failed CI on the entry's own suggestion
 ([journal](docs/overview/history-2026-09-10-folded-5.md#2026-09-01-typecheck-tests)).
 
-**⚠ One decision is waiting on the owner: whether the E2E job becomes a required check (Q-297).**
+**✅ ANSWERED AND IN FORCE, 2026-09-25 (OR-164): E2E is NOT a required check, and the other five now
+genuinely are.** The owner set the `ProtectMain` ruleset to **Active** — it had been sitting at
+Enforcement `Disabled` since 2026-08-17, which is why none of its rules bound anything. Required:
+`Lint, Tests, Build, Migration Check, Custom Rules`. Also enforced now: PR-before-merge, **squash as
+the only merge method**, force-pushes and deletions blocked. The paragraph below is the state of the
+question before it was answered, kept because its measurement is what made E2E safe to require had
+he wanted to.
+
+**⚠ (Historical) One decision was waiting on the owner: whether the E2E job becomes a required check (Q-297).**
 **Measured rather than read — it is NOT required today:** PR #776 merged while its E2E job was still
 `in_progress`. LA-22 has since made the job always-run and always-report specifically so it is safe
 to require, so the only remaining question is whether to, and it is **branch protection** — a shared
@@ -1877,7 +1885,7 @@ would have missed it ([journal](docs/overview/history-2026-09-10-folded-4.md#202
 
 **The DEXA correction is finished and the chain works end to end — but no screen shows it yet (BF-2, all four steps).** The correction is **+3.2 points**, derived from pairs pulled out of `dexa_scans` × `body_metrics` rather than stored, so **no new table and no migration** — and a second scan re-derives on its own: verified, offset **3.2 → 2.6** and `pairCount` 1 → 2 with no entry step, which is the accumulation you asked for. It is an **offset, not a ratio**: with one pair they agree on the measured point and diverge everywhere else, and only the offset makes no claim about readings never observed. **Entering a scan through BF-71's new form (More › Health › DEXA & RMR) makes it live with no other action** — one POST moved resting burn **1832 → 1773 kcal/day** and the calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` still reading the raw 25.3. **The safe-looking design was the wrong one:** correcting inside the shared `listBodyMetrics` read would make a missed consumer impossible, but the Health log sheet seeds from that read and POSTs back at source `manual`, which **outranks `scale_ble`** — so saving an untouched field would overwrite your own measurement and collapse the next calibration toward zero. It is applied per consumer instead, with `check-body-fat-correction.js` (Custom Rules, 64) failing CI on one that forgets — **two rules, because the calorie goal never calls a deriver at all**. The payload carries `bodyFat` (raw), `bodyFatCorrected` and `bodyFatIsCorrected` per reading, plus the offset itself. **No screen reads any of it yet — LA-45**, so your Health card shows 25.3 while your calorie goal already uses 28.5, and two numbers disagreeing on screen is worse than neither being corrected ([engine](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-body-fat-calibration), [consumers](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-correction-consumers), [payload](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-corrected-payload), [end to end](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-dexa-chain-end-to-end)).
 
-**Your DEXA scan and your RMR test have nowhere to go — both tables are empty and neither has a form (LA-44, found while planning BF-2).** `dexa_scans` shipped 2026-08-30 with `GET`/`POST /api/dexa-scans`; `measured_rmr` shipped days earlier with `personalRmr` and its own route. Both engines are correct and **nothing in the app calls either** — no screen, no form, no fetch — so the 2026-08-27 results have sat transcribed in `docs/clinical-baseline-2026-08-27.md` for four days with no way in. **Nothing was going to catch this**: no test breaks when a table stays empty. BF-2's own plan is now written ([`2026-08-31-dexa-filter.md`](docs/superpowers/plans/2026-08-31-dexa-filter.md)) and reverses two of its assumptions — the calibration pairs are **derived** from `dexa_scans` × `body_metrics` rather than stored (a stored pair is a stored counter, and every one here has drifted), which takes the whole entry off the migration budget; and the correction is an **offset**, not a ratio, because one pair supports neither and an offset is the one that makes no claim about readings never observed. The engine can ship first and is inert with zero pairs — but nothing shows until a scan can be entered ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-plan-dexa-filter)).
+**Your DEXA scan and your RMR test have nowhere to go — both tables are empty and neither has a form (LA-44, found while planning BF-2).** `dexa_scans` shipped 2026-08-30 with `GET`/`POST /api/dexa-scans`; `measured_rmr` shipped days earlier with `personalRmr` and its own route. Both engines are correct and **nothing in the app calls either** — no screen, no form, no fetch — so the 2026-08-27 results had sat transcribed in a clinical-baseline doc for four days (that doc was removed from the repo 2026-09-24, RV-199; the owner holds it) with no way in. **Nothing was going to catch this**: no test breaks when a table stays empty. BF-2's own plan is now written ([`2026-08-31-dexa-filter.md`](docs/superpowers/plans/2026-08-31-dexa-filter.md)) and reverses two of its assumptions — the calibration pairs are **derived** from `dexa_scans` × `body_metrics` rather than stored (a stored pair is a stored counter, and every one here has drifted), which takes the whole entry off the migration budget; and the correction is an **offset**, not a ratio, because one pair supports neither and an offset is the one that makes no claim about readings never observed. The engine can ship first and is inert with zero pairs — but nothing shows until a scan can be entered ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-plan-dexa-filter)).
 
 **AI program generation deleted every exercise it phrased differently, and said nothing (LA-43).** The prompt tells the model to match library names exactly; the model writes *"Barbell Deadlifts"*, *"Press Dumbbell Incline"*, *"Pull-Ups"*. An exact-match filter removed each one with no trace — so a session came back short of the exercise count its own time budget was computed from, and nothing in the response, the logs or `error_events` said why. **The entry was filed against a different line and that line turned out to be dead code**: the `?? ex.mainMuscles` fallback three lines under a comment saying the model's muscles are never trusted could not fire, because the filter above it had already guaranteed a hit. Names now resolve through exact → normalised → word-order tiers and are kept under the **library's** spelling, because `personal_records` and `exercise_estimates` are unique on `(user_id, exercise_name)` and a surviving paraphrase starts that lift's history from zero. It stops short of subset matching on purpose — that would reach "Bench Press" from "Incline Bench Press", and a wrong merge is unrecoverable while a miss costs one exercise. Measured against the real 142-row catalogue: **0** names stopped resolving, and plurals went from **49 of 121 unreachable to 0**. A genuine miss is now reported; a session left empty returns 502 instead of an unusable program. **Proven end-to-end against real Gemini** ([journal](docs/overview/history-2026-09-10-folded-4.md#2026-08-31-fix-generate-program-name-resolution)).
 
@@ -2612,9 +2620,173 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [readiness][body][heart-rate] ⚠️ The Body Battery is fixed on provisional numbers, and three things are still owed (TN-55, 2026-09-24)
+### [platform][app-shell] ⚠️ Low reception hung the app instead of showing saved data — engine fixed, NOT seen on the phone (BF-195, 2026-09-24)
 
-Your *"it's pretty much useless"* was a rate-balance defect, and it is fixed: replayed over 66 days
+The owner: *"I went to an area with low reception and nothing really worked on the app."* Connectivity
+was a boolean — `navigator.onLine` and Capacitor both answer *"is the radio attached"*, and in low
+reception it is. So the offline branch that paints saved data never ran, the request was issued with
+**no timeout at all**, and it never settled. The Workout tab held its skeleton indefinitely and a
+workout could not be started, while the banner claimed *"Offline — showing saved data"* over screens
+showing none.
+
+**Fixed 2026-09-24** — a watchdog reports a request that passes 8 s as slow **without touching the
+request**, and `online` now means *"requests are completing"* rather than *"the radio is attached"*.
+Two slow responses in a row are required before the app calls itself unreachable; one settled
+response — including a 500 — clears it.
+
+**The first version of this fix aborted the request at 8 s, and that was wrong.** It is recorded
+here rather than quietly replaced, because the note below predicted the wrong failure. Aborting
+destroys a *slow-but-working* request, which is precisely the state a lifter on a weak connection
+is in: it replaced arriving data with an error, and made every GET in the app retry-prone. CI
+caught it — the E2E suite ran against a dev server whose first-compile responses take 9–19 s, the
+aborts fired, and a spec asserting *"a same-day resume must not refetch"* saw two requests. The
+watchdog that replaced it changes no request semantics at all.
+
+**What is still owed, and the fix is not confirmed without it:**
+- **The device look.** Nothing here reproduces in the sandbox. The honest reproduction is **network
+  throttling, not airplane mode** — airplane mode exercises the path that already worked.
+- **The banner still over-promises on a seedless screen.** The engine makes it appear at the right
+  *times*; it cannot make *"showing saved data"* true where nothing is saved. Lane B's copy to fix.
+- **Whether 8 s is right** is still unmeasured — but note that this line originally read *"a
+  finding about the number is not a finding about the approach"*, and the defect turned out to be
+  the **approach** (cancelling the request), not the number. The threshold now only decides when to
+  *report* slowness, so getting it wrong is cosmetic rather than destructive.
+
+**Not addressed, and not diagnosed:** the sleep card reading a month-stale *"Last: 2026-08-25"*. A
+screenshot cannot distinguish a stale cache entry from the card's own fallback, and guessing between
+them is how the wrong thing gets fixed.
+
+### [body][nutrition] ⚠️ Your body fat has read about a point high since 01 September — live value fixed, stored history not (RV-165, 2026-09-24)
+
+Body composition is computed **once, at ingest**, from the profile of that moment. The height was
+corrected from 160 to 158 cm to match a DEXA printout, so every earlier reading is still a 160 cm
+number — and the DEXA calibration offset is derived **live** from those stored values. The 08-27 pair
+therefore set an offset of **+3.2** where the corrected reading gives **+2.3**.
+
+**Fixed 2026-09-24 (live values only).** Readings are now restated at the current profile before the
+offset is fitted. Nothing extra had to be stored: `bmr_kcal` has no impedance term and is linear in
+height, so it gives back the height used, and impedance then follows from the stored body-fat value.
+Verified on production — 08-27 and 09-01 share a weight of 71.7 kg with BMRs of 1557 and 1545, which
+solves to exactly 160 and 158 cm.
+
+**Expect the displayed number to DROP about a point.** That is the correction, not a new problem.
+
+**Still owed:**
+- **The stored rows are untouched** and still hold 160 cm composition. Restating them is a history
+  edit (**RV-170**) and the owner's call, not this fix's.
+- **Whether +2.3 is right in absolute terms is unmeasured.** It rests on one DEXA pair, and the
+  calibration's own comment is explicit that n = 1 supports an offset and not a ratio. What changed
+  is that the pair is now compared like for like.
+
+### [platform] ⚠️ Database errors were forwarding row values — including an email — to sentry.io (RV-194, 2026-09-24)
+
+`beforeSend` scrubbed the request and left the **exception message** untouched, and Drizzle puts the
+bound parameters into it: `` `Failed query: ${query}\nparams: ${params}` ``, where `params` is an
+array the template comma-joins. So every uncaught database error sent real row values to a third
+party; on the `users` path that included an email address. Console breadcrumbs (whatever the app
+last logged), navigation `from`/`to`, `extra` and `contexts` were passing through as well, and no
+`maxValueLength` was set on any runtime.
+
+**Fixed 2026-09-24** — the message is cut at `\nparams:` and capped, console breadcrumbs are dropped
+as a category, `from`/`to` join `url` in the URL scrubber, `extra` is deleted and `contexts` is
+allowlisted to the SDK's own runtime keys. The parameterised SQL above the params line is
+deliberately kept, because it carries `$1` placeholders rather than values and is what makes the
+error diagnosable.
+
+**What is NOT claimed:** nothing was sent to sentry.io to check this. The scrubber is a pure
+function, tested against a message built from the **pinned** `drizzle-orm` constructor. What is
+verified is that the shape Drizzle documents gets scrubbed — not that production throws only that
+shape. `enabled` is false outside production, so a local capture could not have shown it either.
+
+**Already-sent events are not recalled by this.** Anything forwarded before today is in sentry.io
+and stays there; clearing it is an account-side action, not a code one, and nobody has measured how
+many events are affected.
+
+### [nutrition][platform] ⚠️ Supplement ticks lost their time and frozen dose on every sync — fixed, not yet seen on the phone (RV-172, 2026-09-24)
+
+`applyDelta` writes `col = excluded.col` unconditionally, so a column the sync delta omits is not
+left alone — it is **overwritten with NULL on every pull**. Three columns were in that state:
+`supplement_logs.taken_at` plus the vial triple, `exercise_logs.exercise_deloaded` (Q-131 added the
+mapper and left the SELECT, so `Boolean(undefined)` wrote `0` over synced rows for months), and
+`food_items` reading a field the server has never had, which stored the string `"undefined"` and
+sorted those rows above every real date in offline recent-foods.
+
+The supplement one was the damaging one: the vial triple is the **frozen** dose snapshot, so losing
+it made history re-render against the current vial — the retroactive rewrite the freeze exists to
+prevent, and LA-97's fix reappearing one layer up.
+
+**What is still owed:** the **device check**. The failure is a pull-path overwrite in native SQLite,
+which does not run in the sandbox, so this is verified at source and by the server-side suites only
+(`tsc`, Custom Rules 78/78, `lib/local-store` 200/200, adapter suites 109/109, 5 of 6 mutants killed
+with one equivalent control). On-device, the tell is a supplement tick **keeping** its logged time
+and units figure across a sync.
+
+**Already-synced rows are not repaired by this.** The NULLs already written locally stay NULL until
+the next pull re-sends the real values, which it now does — but any row whose server-side vial
+snapshot was itself re-stamped by a re-push before the fix is lost, and cannot be recovered from the
+device. No estimate of how many; it would need a production read of `supplement_logs` against the
+vial history.
+
+**Filed, not built:** the general version of the guard is **LA-137**. What shipped pins the three
+regressions that actually happened; the general check produced false positives and its four parsing
+traps are recorded in that entry.
+
+### [sleep][readiness] ⚠️ A long afternoon rest could be graded as last night — fixed, two days still wrong (RV-163, 2026-09-24)
+
+Any sleep window over four hours counts as a night wherever it falls on the clock, so one date can
+hold two. Five places in the app then picked between them by **four different rules** — longest,
+latest, latest-for-that-date, earliest — so one day could be a nap to one screen and a real night to
+the next.
+
+**2026-09-23 is the measured case.** Your overnight was 21:27–06:01 (7.92 h). A daytime rest ran
+10:42–17:25 (6.17 h). The app graded the afternoon one: **sleep score 42 instead of about 76**, and
+readiness took that 42 as the previous night and gave you **44**. Body Battery anchored its wake at
+17:25, so only **2** of the ring's 203 heart-rate samples fell inside the day it measured — which is
+why that day reads flat. **2026-08-27 has the same shape.**
+
+All five now use one rule: the longest window on a date is that date's night. The battery's guard
+was widened too — it refused a day that recorded *no* samples, and a 2-sample reading slipped past
+it; it now refuses any reading that recorded no movement at all.
+
+**⚠ The two damaged days are NOT re-scored.** That is a rewrite of stored scores, which is yours to
+authorise rather than a lane's — queued as **RV-170**. Until it runs, those two days keep the scores
+the old rule produced.
+
+**Not device-verified.**
+
+### [workouts][platform] ⚠️ Broken exercise pictures — fixed, not yet seen on the phone (DV-18, 2026-09-24)
+
+The device agent reported one broken image in the admin tools. It was six places, and one of them
+is the workout screen you use.
+
+Pictures under `/exercise-media/` sit behind your sign-in. Next's image pipeline fetches a picture
+**on the server, without your cookie**, so it was redirected to the sign-in page, got a web page
+where an image should be, and gave up — which the browser draws as a broken-image icon. Measured
+rather than guessed: the direct address answers `307 /sign-in`, and the optimiser answers
+`400 isn't a valid image`. Animations were exempted years ago for an unrelated reason, so GIFs
+worked and everything else broke, which is why it looked arbitrary. An exercise the generator made
+only a still frame for showed a broken picture in the workout screen and the warm-up list.
+
+**The filed cause was wrong and the entry said so honestly** — it diagnosed a phone photo stored
+under a `.png` name and marked itself unproven, needing production storage nobody in a container
+can reach. The real cause needed no storage at all. That upload defect was real too and is fixed
+alongside, but it was not this.
+
+**Still owed: the look on the S25.** Admin → Exercises shows the style reference, and an exercise
+with only a still frame shows it rather than a broken icon. Nothing is blocked on that check.
+
+### [readiness][body][heart-rate] ⚠️ The Body Battery's arithmetic is fixed; the result has not been seen yet, and three things are still owed (TN-55, 2026-09-24)
+
+**⚠ This heading used to say "is fixed on provisional numbers" and the paragraph below said the
+defect "is fixed". Corrected 2026-09-24: the arithmetic is fixed and demonstrated by replay; the
+outcome in production has not been observed.** The evidence is an offline replay of the shipped
+walk over real inputs, which is strong and is not the same thing as a stored day behaving. Verified
+against production the same day: the app serves **1.465.26**, so the fix is live, and
+`body_battery_daily` holds **zero v6 rows** — today's row is still `v5`, because the route rewrites
+it only when the app is opened. **The first v6 day lands on your next app open**, and TN-55's pass
+test needs several of them before it means anything. Nothing is stuck; it is waiting on use.
+
+Your *"it's pretty much useless"* was a rate-balance defect. Replayed over 66 days
 of your own history the battery went from a median **−48 points a day** ending at the floor on
 **67%** of days, to a median of **+0.2** ending at zero on **none** — with the spread intact
 (sd 25.1 → 25.2), which is what says it was calibrated rather than flattened to 50. Two things were
@@ -2628,10 +2800,20 @@ re-sweep then rather than leave it a countdown for another fortnight. The re-swe
 dial and is queued as **LA-134** — without it these numbers quietly become permanent.
 
 **The stored history does not re-score, and the plan said it would.** `body_battery_daily` is
-written only for *today*, by the `GET` itself; no backfill path exists. Every earlier row stays
-stamped `v5`. Nothing you look at reads those rows, and the one field the route does take from them
-across days is an observed heart-rate peak that none of these constants touch — so this costs
-nothing today and is recorded because the plan claimed otherwise.
+written only for *today*, by the `GET` itself; no backfill path exists. Every earlier row keeps the
+model that wrote it, permanently. Tuning reached the same conclusion independently and filed
+**TN-72** for a bounded admin re-derive; your 2026-08-26 *"recompute rather than freeze"* decision
+is **unsatisfied rather than implemented**.
+
+**⚠ So a battery trend spanning today will show a step from ~15 to ~60 that is a model change
+wearing the clothes of a recovery.** If the number looks dramatically better over the next few days,
+that jump is the new arithmetic, not you. What is worth reading is whether individual **v6** days
+stop ending at zero — not the shape of the line across the boundary.
+
+**⚠ This is older and wider than TN-55, which the first version of this row missed.** Measured in
+production 2026-09-24: the table holds **v1 (16 days), v2 (1), v4 (18), v5 (52)** — it has been
+mixing model generations since June, and v6 adds a fifth boundary rather than creating the problem.
+LA-135 covers the one place that actually correlates across it.
 
 **A workout day still barely separates from a rest day** — and it did not before either. Drain
 separates slightly better than it used to (Cohen *d* 0.31 → 0.37 across 48 workout days against 18
@@ -2783,7 +2965,7 @@ would have made both routes behave as though there were no active program, and `
 because the field is optional. **No latency figure** — the entry could not measure one and neither
 could this; filed as shape, not speed. **No per-user memo was added**, per the entry's own
 prohibition: it trades against config-save freshness and needs its own decision. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md`](docs/overview/entries/2026-09-23-lane-a-rv82-program-double-fetch.md).
+[`2026-09-23-lane-a-rv82-program-double-fetch`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-rv82-program-double-fetch).
 
 ### [nutrition][platform] ⚠️ Deleting a supplement left no tombstone and blanked five columns — NOT device-verified (DV-10, 2026-09-23)
 
@@ -2820,7 +3002,7 @@ A contributor at ±1.5σ now scores 90/10 rather than 100/0; a perfect day with 
 re-derivation is deliberately batched behind TN-6, BF-13 and LA-121, so existing rows keep their old
 scores and the pass test's "share-of-movement moves toward the declared weights" is **not claimed**
 until that single run. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-tn60-compressive-tail.md`](docs/overview/entries/2026-09-23-lane-a-tn60-compressive-tail.md).
+[`2026-09-23-lane-a-tn60-compressive-tail`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-tn60-compressive-tail).
 
 ### [platform][nutrition] ⚠️ A failed refresh of a cached key was unreportable — NOT device-verified (LB-128, 2026-09-23)
 
@@ -2837,7 +3019,7 @@ sanctioned offline-first case. `use-energy-balance-refetch` now takes both chann
 ⚠️ **Owed: the device check** (RV-103's `Keep:` ①) — the failure line and its Retry at S25 width in
 the card carrying "kcal left". Tests are jsdom against localStorage; the native SQLite cache path
 and a real offline transition are not exercised. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-lb128-revalidate-error.md`](docs/overview/entries/2026-09-23-lane-a-lb128-revalidate-error.md).
+[`2026-09-23-lane-a-lb128-revalidate-error`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-lb128-revalidate-error).
 
 ### [sleep][platform] ⚠️ `minutesFromNoon` read the device's clock, and its test only passed in UTC (DV-7, 2026-09-23)
 
@@ -2854,7 +3036,7 @@ helper and wake through its own device-local read, which a red consumer test exp
 now takes a `tz` and resolves both modes through one clock. **LB-131 carries what is left** — the
 card still takes the default, so every user gets Brisbane rather than their own zone, which ships
 with DV-9. Detail:
-[`docs/overview/entries/2026-09-23-lane-a-dv7-sleep-consistency-timezone.md`](docs/overview/entries/2026-09-23-lane-a-dv7-sleep-consistency-timezone.md).
+[`2026-09-23-lane-a-dv7-sleep-consistency-timezone`](docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-dv7-sleep-consistency-timezone).
 
 ### [platform] ⚠️ 162 test files can delete a user under a running migration; two are now guarded (DV-3, 2026-09-23)
 
@@ -2898,6 +3080,20 @@ both the initializer and the effect, and `setReviewOpen(true)` running, on the f
 defect is downstream, in what the sheet renders or is gated on during a cold first render. Filed
 with a probe recipe rather than chased inside RV-110's PR.
 
+### [app-shell] ⚠️ The tab switch no longer blanks, and nobody has looked at it (RV-113, OR-161, 2026-09-24, v1.465.38) · needs: device
+
+The opacity ramp is gone from `ta-tab-enter`, so the incoming panel is painted for the whole
+switch instead of held at opacity 0 for 58–109 ms. **Not verified on device** — the Device
+Verification session is archived, and this is a perceptual change on the app's most frequent
+interaction, so the check is a look rather than a measurement.
+
+**Read `perf.js longtasks` here and you will conclude it failed.** It removes a BLANK, not a DELAY:
+the 68–118 ms long task underneath is `DV-12`, still open and untouched. The two numbers describe
+the same frames, which is why they were batched and why only half of the batch shipped.
+
+Also fixed: the two code comments (`globals.css`, `tab-shell.tsx:186`) that asserted this defect
+could not happen and are why it survived review.
+
 ### [app-shell] ⚠️ Cross-tab navigation goes through the shell now — the teardown premise is UNVERIFIED (RV-110, RV-112, 2026-09-23, v1.465.8) · needs: device
 
 Fifteen `router.push` sites that target a tab href now call `navigateToTab`, and Home and More no
@@ -2919,7 +3115,7 @@ and nothing asks for a new value. No invalidation was added: all five keys were 
 and are now checked against `lib/cache-groups.ts` in the test. Owed: the device check, which is the
 Device Verification agent's — and **RV-124's device probe settles this class by measurement**,
 these three included. Detail:
-[`docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md`](docs/overview/entries/2026-09-23-rv106-rv107-rv109-stale-surfaces.md).
+[`2026-09-23-rv106-rv107-rv109-stale-surfaces`](docs/overview/history-2026-09-24-folded-2.md#2026-09-23-rv106-rv107-rv109-stale-surfaces).
 
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 

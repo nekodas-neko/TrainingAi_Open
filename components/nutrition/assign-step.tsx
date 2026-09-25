@@ -6,7 +6,8 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import type { EditableNutrition } from './review-step'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
+import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_LONG, NUTRITION_FOOD_LOGS_TTL } from '@trainingai/shared/cache-ttl'
 import { NUMBER_INPUT_RESET } from '@/components/ui/input'
@@ -45,21 +46,22 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
   const [todayCalories, setTodayCalories] = useState<number | null>(null)
 
   useEffect(() => {
+    // Was `new Date().getHours()` with the bucket search inlined twice — the device's hour, and a
+    // second copy of mealTypeForHour that would drift from the shared one (RV-176).
+    const hourInTz = Math.floor(secondsSinceLocalMidnight(tz) / 3600)
     const seededTypes = readCacheSync<MealType[]>('nutrition-meal-types')
     if (seededTypes?.length) {
       setMealTypes(seededTypes)
-      const hour = new Date().getHours()
-      const match = seededTypes.find(m => hour >= m.timeStartHour && hour < m.timeEndHour)
-      setSelectedId(prev => prev ?? (match?.id ?? seededTypes[0]?.id ?? null))
+      setSelectedId(prev => prev ?? mealTypeForHour(seededTypes, hourInTz))
       setLoadingTypes(false)
     }
     cachedFetch<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG, (data) => {
       setMealTypes(data)
-      const hour = new Date().getHours()
-      const match = data.find(m => hour >= m.timeStartHour && hour < m.timeEndHour)
       // functional update: onData fires twice (cached + fresh) — don't clobber a user pick
-      setSelectedId(prev => prev ?? (match?.id ?? data[0]?.id ?? null))
-    }).catch(() => {}).finally(() => setLoadingTypes(false))
+      setSelectedId(prev => prev ?? mealTypeForHour(data, hourInTz))
+      // RV-67: with the flag this fires ONCE on a warm cache, which is the point — the second
+      // call was a network round-trip the old comment claimed was already being skipped.
+    }, { freshWithinTtl: true }).catch(() => {}).finally(() => setLoadingTypes(false))
     const targetDate = logDate ?? todayInTz(tz)
     cachedFetch<FoodLogWithItem[]>(
       `nutrition-food-logs-${targetDate}`, `/api/nutrition/food-logs?date=${targetDate}`, NUTRITION_FOOD_LOGS_TTL,

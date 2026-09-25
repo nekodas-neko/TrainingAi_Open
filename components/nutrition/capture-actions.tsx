@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Camera as CameraIcon, Hash, PenLine, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
+import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelScan, type SharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { downscaleToJpegDataUrl, downscaleToThumbDataUrl, dataUrlToBlob, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
@@ -76,6 +77,17 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
   const [barcodeOutcome, setBarcodeOutcome] = useState<null | 'missing' | 'unavailable'>(null)
   const [pendingPhoto, setPendingPhoto] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null)
   const [photoNote, setPhotoNote] = useState('')
+
+  // RV-111 — the scanner REPLACES this sheet's body rather than opening a surface of its own, so
+  // without its own back-stack entry the only surface the listener can see is the Log Food sheet,
+  // and one back press threw away the whole capture flow. Confirmed on the S25, sweep 2.
+  //
+  // Registering it as a nested surface is what makes back step one level. The depth accounting is
+  // what makes that safe: popping the scanner's entry lands on the sheet's, so `arrivedDepth` is 1
+  // and `handlePop` closes only surfaces deeper than that. One press cannot take both — which
+  // matters more here than elsewhere, because the scanner hides every other body child with a
+  // global rule it only removes on unmount.
+  useSheetBackDismiss(showBarcode, () => setShowBarcode(false))
 
   /**
    * `imageDataUri` is the photo the user just took, downscaled to a stored thumbnail (OR-108).

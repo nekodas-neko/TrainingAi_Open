@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import type { MealType, FoodLog } from '@trainingai/shared/types/nutrition'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { instantAtLocalTime, localDayInTz } from '@/lib/reminders/local-instant'
 
 export const MEAL_REMINDERS_CHANNEL = 'meal-reminders'
 export const MEAL_REMINDER_ROUTE = '/nutrition'
@@ -23,11 +24,25 @@ export type MealReminderAction =
   | { mealTypeId: string; type: 'immediate'; emoji: string; name: string }
   | { mealTypeId: string; type: 'scheduled'; at: Date; emoji: string; name: string }
 
+/**
+ * What this module actually reads off a meal type: `id`, `name`, `emoji`, `remindersEnabled` and
+ * `timeEndHour` for the per-meal reminders, plus `required` for the end-of-day one.
+ *
+ * Declared as a Pick rather than `MealType` (RV-183) so the on-device row satisfies it directly —
+ * `LocalMealType` carries all six and lacks only `userId`, `sortOrder`, `timeStartHour` and
+ * `createdAt`, none of which this file touches. Widening it back to `MealType` would force the
+ * caller to invent those, and an invented field is how BF-112 shipped.
+ */
+export type MealTypeForReminders = Pick<
+  MealType, 'id' | 'name' | 'emoji' | 'remindersEnabled' | 'timeEndHour' | 'required'
+>
+
 export function computeMealReminderActions(
-  mealTypes: MealType[],
+  mealTypes: MealTypeForReminders[],
   foodLogs: Pick<FoodLog, 'mealTypeId'>[],
   now: Date = new Date(),
   notifiedToday: Set<string> = new Set(),
+  tz: string = DEFAULT_TZ,
 ): MealReminderAction[] {
   const loggedIds = new Set(foodLogs.map(l => l.mealTypeId))
 
@@ -38,8 +53,8 @@ export function computeMealReminderActions(
 
     const endHour = mt.timeEndHour >= 24 ? 23 : mt.timeEndHour
     const endMinute = mt.timeEndHour >= 24 ? 59 : 0
-    const endTime = new Date(now)
-    endTime.setHours(endHour, endMinute, 0, 0)
+    // The user's wall clock, not the phone's (LB-148).
+    const endTime = instantAtLocalTime(localDayInTz(now, tz), endHour, endMinute, tz)
 
     if (now >= endTime) {
       // Already sent the one-time catch-up notification for this meal today —
@@ -80,19 +95,20 @@ function clearNotifiedToday(mealTypeId: string): void {
 }
 
 export async function reconcileMealReminders(
-  mealTypes: MealType[],
+  mealTypes: MealTypeForReminders[],
   foodLogs: Pick<FoodLog, 'mealTypeId'>[],
   now: Date = new Date(),
+  tz: string = DEFAULT_TZ,
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
-    const today = todayInTz()
+    const today = localDayInTz(now, tz)
     const notifiedMap = readNotifiedToday()
     const notifiedToday = new Set(
       Object.entries(notifiedMap).filter(([, date]) => date === today).map(([mealTypeId]) => mealTypeId),
     )
-    const actions = computeMealReminderActions(mealTypes, foodLogs, now, notifiedToday)
+    const actions = computeMealReminderActions(mealTypes, foodLogs, now, notifiedToday, tz)
 
     for (const action of actions) {
       const id = mealReminderNotificationId(action.mealTypeId)
@@ -134,8 +150,9 @@ const EOD_REMINDER_ID = 9100
 const EOD_REMINDER_KEY = 'ta_eod_reminder_date'
 
 export async function scheduleEndOfDayReminder(
-  mealTypes: MealType[],
+  mealTypes: MealTypeForReminders[],
   foodLogs: Pick<FoodLog, 'mealTypeId'>[],
+  tz: string = DEFAULT_TZ,
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   try {
@@ -149,7 +166,7 @@ export async function scheduleEndOfDayReminder(
       return
     }
 
-    const today = todayInTz()
+    const today = todayInTz(tz)
     const lastScheduled = localStorage.getItem(EOD_REMINDER_KEY)
     if (lastScheduled === today) return
 
@@ -164,9 +181,9 @@ export async function scheduleEndOfDayReminder(
       }
     } catch { /* use fallback */ }
 
-    const at = new Date()
-    at.setHours(bedtimeHour, bedtimeMinute, 0, 0)
-    at.setMinutes(at.getMinutes() - 30)
+    // The user's wall clock, not the phone's (LB-148).
+    const windowEnd = instantAtLocalTime(today, bedtimeHour, bedtimeMinute, tz)
+    const at = new Date(windowEnd.getTime() - 30 * 60_000)
     // If that time has already passed today, don't schedule
     if (at <= new Date()) return
 

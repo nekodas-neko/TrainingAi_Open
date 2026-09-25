@@ -24,11 +24,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -108,11 +103,6 @@ html, body {
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -182,11 +172,6 @@ html, body {
   --border: oklch(1 0 0 / 7%);
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.185 0.028 var(--brand-hue, 149));
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -788,19 +773,24 @@ html[data-view-transition]::view-transition-new(root) { z-index: 1; }
    asserts a direction between screens, and tabs have no order to assert.
 
    Every tab panel is mounted at all times (TabShell keeps them alive for scroll
-   position and state), so a switch costs no network and no re-render — this
-   animates content that is already painted, which is why it reads as polish
-   rather than as waiting.
+   position and state), so a switch costs no network and no re-render.
 
-   Spec fade-through scales the incoming content 92% → 100% over 300ms. Both
-   numbers are relaxed here: 0.96 because a full-screen panel makes 92% read as a
-   zoom rather than a settle, and 180ms because the whole point of this app is to
-   feel instant. Opacity finishes ahead of the scale so the content is readable
-   before the motion has stopped. Transform + opacity only — both composite. */
+   ⚠ There is NO opacity ramp here, and re-adding one re-opens RV-113. The
+   outgoing panel is hidden in the SAME React commit that reveals the incoming
+   one, so an incoming ramp from opacity 0 plays over nothing: a per-frame
+   sampler on the S25 caught 58-109 ms with neither panel painted, on 10 of 10
+   switches. Fade-through as Material 3 specifies it fades the OUTGOING content
+   out first, and that half was never implemented — so the ramp was the second
+   half of a cross-fade with no first half. The route transition 50 lines above
+   does it correctly, holding a deliberate ~15% overlap (OR-161).
+
+   Scale stays at 0.96 — spec fade-through uses 92%, relaxed here because a
+   full-screen panel makes 92% read as a zoom rather than a settle, and 180ms
+   because the whole point of this app is to feel instant. Transform only, which
+   composites. */
 @keyframes ta-tab-enter {
-  from { opacity: 0; transform: scale(0.96); }
-  60%  { opacity: 1; }
-  to   { opacity: 1; transform: none; }
+  from { transform: scale(0.96); }
+  to   { transform: none; }
 }
 .tab-panel-enter { animation: ta-tab-enter 180ms cubic-bezier(0.05, 0.7, 0.1, 1) both; }
 

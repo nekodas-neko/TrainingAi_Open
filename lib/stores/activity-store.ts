@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { ActivityMode, ActivityDraftSummary } from '@/components/activity/types'
 import type { RoutePoint } from '@/lib/activity/route-encoding'
 import type { CadenceSummary } from '@trainingai/shared/health/cadence'
+import { stepsEstimateIfCovered } from './cadence-coverage'
 import { simplifyRoute, encodeRoute } from '@/lib/activity/route-encoding'
 import { debouncedLocalStorage } from '@/lib/stores/debounced-storage'
 import {
@@ -232,7 +233,11 @@ export const useActivityStore = create<ActivityStore>()(
             // Integrated at summarise time from strap readings only (Q-230) — carried here so the
             // done screen can save it without re-deriving from the binned series, which has lost
             // the per-reading source by then.
-            cadenceStepsEstimate: cadence.stepsEstimate ?? undefined,
+            //
+            // RV-167: dropped when the series covers too little of the activity. The defect was
+            // measured on a guided walk, but this is the same integration off the same tracker, so
+            // it is the same bug on the manual screen rather than a second one.
+            cadenceStepsEstimate: stepsEstimateIfCovered(cadence, activeMs / 1000) ?? undefined,
           }
         }
 

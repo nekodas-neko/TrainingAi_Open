@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { cachedFetch, readCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { invalidateNutritionWrite } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, ENERGY_BALANCE_TTL } from '@trainingai/shared/cache-ttl';
-import { todayInTz, shiftDateStr, formatDateDisplay } from "@trainingai/shared/date-utils";
+import { todayInTz, shiftDateStr, formatDateDisplay, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils';
 import { reconcileMealReminders, cancelAllMealReminders } from "@/lib/meal-reminders";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import type { NutritionAdherenceResponse } from "@/app/api/nutrition/adherence/route";
@@ -194,7 +194,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     setMealRemindersEnabled(val);
     savePreference('mealReminders', val);
     if (val) {
-      reconcileMealReminders(mealTypes, logs);
+      reconcileMealReminders(mealTypes, logs, new Date(), tz);
     } else {
       cancelAllMealReminders(mealTypes.map(mt => mt.id));
     }
@@ -257,6 +257,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             const store = userId ? getLocalStore(userId) : null;
             if (store && types.length) store.replaceMealTypes(types).catch(() => {});
           },
+          // RV-67: every writer of this key is in `invalidateMealTypes()` — proof in the journal
+          // entry — so a tab revisit inside the TTL is a real cache hit rather than a request.
+          { freshWithinTtl: true },
         ),
         refreshTargets(),
         refreshDerived(),
@@ -589,7 +592,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               <NutritionActionRow
                 todayWaterMl={todayWaterMl}
                 canLogFood={mealTypes.length > 0}
-                onLogFood={() => { const id = mealTypeForHour(mealTypes, new Date().getHours()); if (id) openLogger(id) }}
+                onLogFood={() => { const id = mealTypeForHour(mealTypes, Math.floor(secondsSinceLocalMidnight(tz) / 3600)); if (id) openLogger(id) }}
                 onLogWater={() => setWaterLogOpen(true)}
                 onOpenSavedMeals={() => setSavedMealsOpen(true)}
               />

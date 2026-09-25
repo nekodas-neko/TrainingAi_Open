@@ -98,9 +98,11 @@ export function GetReadyProgress({
           {formatTime(Math.min(readyElapsedSec, totalSec))} / {formatTime(totalSec)}
         </p>
       </div>
-      {/* The ramp beside this one still carries `#22c55e`/rgba for the same states. Those are its
-          three baselined literals and are not this component's to churn; new colour comes from the
-          token, which is what `check-hex-literals.js` is ratcheting toward. */}
+      {/* RV-99: the warmup ramp below used to carry `#22c55e`/rgba for this same done state, so the
+          two sat one above the other showing one meaning in two greens — rgb(34,197,94) against the
+          token's rgb(86,238,102). Both are the token now. The overtime red in this file is NOT
+          migrated: `#ef4444` agrees with `rest-ring.tsx`, so there is no disagreement to fix and
+          changing it would be a restyle nobody asked for. */}
       <div
         className="relative h-9 overflow-hidden rounded-xl border"
         style={{
@@ -176,12 +178,12 @@ export function WarmupRampProgress({
               className="relative rounded-xl overflow-hidden border px-2 py-2.5 text-center"
               style={{
                 borderColor: isDone
-                  ? "rgba(34,197,94,0.3)"
+                  ? "color-mix(in oklch, var(--accent-green) 30%, transparent)"
                   : isActive
                     ? "color-mix(in oklch, var(--color-brand) 30%, transparent)"
                     : "var(--color-border)",
                 background: isDone
-                  ? "rgba(34,197,94,0.07)"
+                  ? "color-mix(in oklch, var(--accent-green) 7%, transparent)"
                   : "color-mix(in oklch, var(--color-muted) 40%, transparent)",
               }}
             >
@@ -190,7 +192,7 @@ export function WarmupRampProgress({
                 style={{
                   width: `${fillPct}%`,
                   background: isDone
-                    ? "rgba(34,197,94,0.12)"
+                    ? "color-mix(in oklch, var(--accent-green) 12%, transparent)"
                     : "color-mix(in oklch, var(--color-brand) 12%, transparent)",
                   transition: isActive ? "width 1s linear" : "none",
                 }}
@@ -198,13 +200,13 @@ export function WarmupRampProgress({
               <div className="relative">
                 <p
                   className="text-[9px] font-bold uppercase tracking-wide mb-1"
-                  style={{ color: isDone ? "#22c55e" : isActive ? "var(--color-brand)" : "var(--color-muted-foreground)" }}
+                  style={{ color: isDone ? "var(--accent-green)" : isActive ? "var(--color-brand)" : "var(--color-muted-foreground)" }}
                 >
                   {isDone ? "✓" : `W${i + 1}`} · {w.label}
                 </p>
                 <p
                   className="text-sm font-black tabular-nums leading-tight"
-                  style={{ color: isDone ? "#22c55e" : isActive ? "var(--color-brand)" : "var(--color-muted-foreground)" }}
+                  style={{ color: isDone ? "var(--accent-green)" : isActive ? "var(--color-brand)" : "var(--color-muted-foreground)" }}
                 >
                   {w.weight} kg
                 </p>

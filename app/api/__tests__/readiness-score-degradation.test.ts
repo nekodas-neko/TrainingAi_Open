@@ -3,6 +3,7 @@
 // boundaries: nothing at all → no score and no fabricated one; generic tables only → a real,
 // explicitly-limited score; the ring's own inputs → byte-for-byte what it produced before.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { updateBaseline, type Baseline } from '@trainingai/shared/health/personal-baseline'
 
 const TZ = 'Australia/Brisbane'
@@ -28,6 +29,7 @@ vi.mock('@/lib/data', () => ({
     getOuraDaily:            async () => repo.ouraDaily,
     getActiveProgram:        async () => null,
     getHrForWindow:          async () => [],
+    getObservedHrProfile: async () => computeObservedHr([]),
     getOuraDailySummary:     async () => repo.dailySummaries,
     getOuraDailyDerived:     async () => repo.derived,
     getLatestOuraCloudVitals: async () => null,

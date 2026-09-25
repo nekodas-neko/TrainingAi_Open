@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { cachedFetchToday, readTodayCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { getLocalStore } from "@/lib/local-store";
+import { localSupplementsToStatus } from "@/lib/supplements/local-status";
 import { todayInTz } from "@trainingai/shared/date-utils";
-import { summariseSupplementDay } from "@trainingai/shared/nutrition/supplement-day-totals";
 import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
 
 /**
@@ -47,18 +47,7 @@ export function useSupplements(userId: string | undefined, tz: string, tabEpoch:
       // on the web, where `getLocalStore` is null and the server's own mapping is used. The dose
       // fields were dropped here, which is why a prompt that worked in the browser would never have
       // fired on the APK.
-      const day = summariseSupplementDay(logs);
-      setSupplements(defs.map(s => ({
-        id: s.id, userId: userId!, name: s.name, dose: s.dose,
-        defaultAmount: s.defaultAmount ?? null, unit: s.unit ?? null,
-        startedOn: s.startedOn ?? null, stoppedOn: s.stoppedOn ?? null,
-        dosePrompt: s.dosePrompt === true,
-        reminderEnabled: s.reminderEnabled, reminderTime: s.reminderTime,
-        sortOrder: s.sortOrder, active: s.active,
-        createdAt: s.updatedAt,
-        loggedToday: day.get(s.id)?.loggedToday === true,
-        loggedAmount: day.get(s.id)?.loggedAmount ?? null,
-      })));
+      setSupplements(localSupplementsToStatus(defs, logs, userId!));
       setLoading(false);
     }).catch(fromServer);
   }, [userId, tabEpoch, tz]);

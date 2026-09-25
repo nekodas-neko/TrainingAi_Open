@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { GifReviewSweep, type ReviewCandidate } from "@/components/admin/gif-review-sweep";
 import { invalidateExerciseLibrary } from "@/lib/cache-groups";
 import type { MuscleAssignment, ExerciseType } from "@trainingai/shared/types/program";
+import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
 
 interface ExerciseRow {
   id: string;
@@ -578,7 +579,7 @@ export default function ExerciseManager() {
         </div>
         {referenceUrl ? (
           <Image src={referenceUrl} alt="Reference figure" width={80} height={80}
-            unoptimized={referenceUrl.endsWith('.gif')} className="w-20 h-20 object-contain rounded-lg border bg-muted/30" />
+            unoptimized={mustBypassImageOptimizer(referenceUrl)} className="w-20 h-20 object-contain rounded-lg border bg-muted/30" />
         ) : (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ImageIcon className="w-4 h-4" />No reference — AI uses text prompts only
@@ -648,7 +649,7 @@ export default function ExerciseManager() {
                     <div className="relative h-10 w-10 flex-none rounded-lg overflow-hidden bg-white flex items-center justify-center">
                       {thumb ? (
                         <Image src={thumb} alt="" fill sizes="40px"
-                          unoptimized={thumb.endsWith('.gif')} className="object-cover" />
+                          unoptimized={mustBypassImageOptimizer(thumb)} className="object-cover" />
                       ) : (
                         <XCircle className="w-4 h-4 text-muted-foreground/70" />
                       )}

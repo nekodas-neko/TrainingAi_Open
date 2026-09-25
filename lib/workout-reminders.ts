@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { instantAtLocalTime, localDayInTz } from '@/lib/reminders/local-instant'
 
 export const WORKOUT_REMINDERS_CHANNEL = 'workout-reminders'
 export const WORKOUT_REMINDER_ROUTE = '/workout'
@@ -20,14 +21,15 @@ export function computeWorkoutReminderAction(
   reminderTime: string | null | undefined,
   now: Date = new Date(),
   alreadyNotifiedToday = false,
+  tz: string = DEFAULT_TZ,
 ): WorkoutReminderAction {
   if (!isTrainingDay || !reminderEnabled || !reminderTime || !sessionName) {
     return { type: 'cancel' }
   }
 
   const [hours, minutes] = reminderTime.split(':').map(Number)
-  const at = new Date(now)
-  at.setHours(hours, minutes, 0, 0)
+  // The user's wall clock, not the phone's (LB-148).
+  const at = instantAtLocalTime(localDayInTz(now, tz), hours, minutes, tz)
 
   if (now >= at) {
     if (alreadyNotifiedToday) return { type: 'skip' }
@@ -62,16 +64,17 @@ export async function reconcileWorkoutReminder(
   reminderEnabled: boolean,
   reminderTime: string | null | undefined,
   now: Date = new Date(),
+  tz: string = DEFAULT_TZ,
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
-    const today = todayInTz()
+    const today = localDayInTz(now, tz)
     const notifiedDate = readNotifiedDate()
     const alreadyNotifiedToday = notifiedDate === today
 
     const action = computeWorkoutReminderAction(
-      isTrainingDay, sessionName, reminderEnabled, reminderTime, now, alreadyNotifiedToday,
+      isTrainingDay, sessionName, reminderEnabled, reminderTime, now, alreadyNotifiedToday, tz,
     )
 
     if (action.type === 'cancel') {

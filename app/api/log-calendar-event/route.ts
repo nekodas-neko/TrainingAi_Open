@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { google } from "googleapis";
+// OR-166 — the SCOPED client, not the `googleapis` umbrella. Same generated Calendar v3 code;
+// `googleapis` bundles every Google API alongside it, which is 203 MB against this one's 884 kB,
+// and Next traces the whole import graph for the server bundle on every build.
+import { auth as googleAuth, calendar as calendarApi } from "@googleapis/calendar";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -8,7 +11,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 const MAX_BODY_BYTES = 16 * 1024
 
 function makeOAuth2(refreshToken: string) {
-  const oauth2 = new google.auth.OAuth2(
+  const oauth2 = new googleAuth.OAuth2(
     process.env.GOOGLE_CLIENT_ID!,
     process.env.GOOGLE_CLIENT_SECRET!,
     process.env.GOOGLE_REDIRECT_URI!,
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
   const exercises = Array.isArray(body.exercises) ? body.exercises.slice(0, 50) : [];
 
   const oauthClient = makeOAuth2(refreshToken);
-  const calendar = google.calendar({ version: "v3", auth: oauthClient });
+  const calendar = calendarApi({ version: "v3", auth: oauthClient });
 
   const description = exercises
     .map((ex) => {

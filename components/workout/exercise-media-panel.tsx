@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 import Image from "next/image";
 import { DumbbellIcon } from "lucide-react";
 import { useExerciseMediaFor } from "@/lib/hooks/use-exercise-media";
+import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
 
 /**
  * The exercise name with its clip, for the per-exercise ready screen (BF-65).
@@ -45,7 +46,7 @@ export const ExerciseMediaPanel = memo(function ExerciseMediaPanel({ name }: { n
               sizes="64px"
               // Mandatory on a GIF, and silent when forgotten: the optimizer returns a static image,
               // so the picture appears, looks right, and never moves.
-              unoptimized={src.endsWith(".gif")}
+              unoptimized={mustBypassImageOptimizer(src)}
               className="object-cover"
             />
           </button>
@@ -67,7 +68,7 @@ export const ExerciseMediaPanel = memo(function ExerciseMediaPanel({ name }: { n
             alt={`${name} demonstration`}
             fill
             sizes="100vw"
-            unoptimized={src.endsWith(".gif")}
+            unoptimized={mustBypassImageOptimizer(src)}
             className="object-contain"
           />
         </div>

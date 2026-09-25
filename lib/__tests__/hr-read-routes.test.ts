@@ -23,13 +23,14 @@
  * others.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { MIN_RELIABLE_SAMPLES, CORROBORATION } from '@trainingai/shared/health/observed-hr'
+import { MIN_RELIABLE_SAMPLES, CORROBORATION, computeObservedHr } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
 
 const getUserById = vi.fn(async (_u: string) => ({ dateOfBirth: '1990-01-01' }) as Row | null)
 const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number }[])
+const getObservedHrProfile = vi.fn(async (..._a: unknown[]) => computeObservedHr([]))
 const getSetHrStatsSince = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraWorkouts = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getSetHrStatsForExercise = vi.fn(async (..._a: unknown[]) => [] as Row[])
@@ -50,7 +51,7 @@ vi.mock('@trainingai/shared/workout/compute-workout-hr', () => ({
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getUserById, listBodyMetrics, getHrForWindow, getSetHrStatsSince, getOuraWorkouts,
+    getUserById, listBodyMetrics, getHrForWindow, getObservedHrProfile, getSetHrStatsSince, getOuraWorkouts,
     getSetHrStatsForExercise, getWorkoutSessionById, upsertWorkoutHrStats, upsertSetHrStats,
     getWorkoutHrStats,
   })
@@ -71,7 +72,7 @@ const trend = (query: string) => getTrend(nextish(`/api/workout/exercise-hr-tren
 const hrData = (query: string) => getHrData(nextish(`/api/oura/hr-data${query}`))
 
 /** `computeObservedHr` only calls a max corroborated once it has this many plausible readings. */
-const reliableBpms = (bpm: number) => Array.from({ length: MIN_RELIABLE_SAMPLES }, () => ({ bpm }))
+const reliableBpms = (bpm: number) => Array.from({ length: MIN_RELIABLE_SAMPLES }, () => bpm)
 
 /**
  * Enough readings to HAVE a max, too few to be called reliable.
@@ -80,7 +81,7 @@ const reliableBpms = (bpm: number) => Array.from({ length: MIN_RELIABLE_SAMPLES 
  * the reliability guard is never reached — a two-reading fixture tests the wrong half of the rule.
  */
 const corroboratedButUnreliable = (bpm: number) =>
-  Array.from({ length: CORROBORATION + 5 }, () => ({ bpm }))
+  Array.from({ length: CORROBORATION + 5 }, () => bpm)
 
 let seq = 0
 const freshUser = (over: { timezone?: string } = {}) => {
@@ -95,6 +96,7 @@ beforeEach(() => {
   getUserById.mockResolvedValue({ dateOfBirth: '1990-01-01' })
   listBodyMetrics.mockResolvedValue([])
   getHrForWindow.mockResolvedValue([])
+  getObservedHrProfile.mockResolvedValue(computeObservedHr([]))
   getSetHrStatsSince.mockResolvedValue([])
   getOuraWorkouts.mockResolvedValue([])
   getSetHrStatsForExercise.mockResolvedValue([])
@@ -124,7 +126,7 @@ describe('/api/hr-profile', () => {
   // A corroborated max BELOW the estimate is a quiet month, not a new ceiling. This fixture is
   // reliable in every respect — it simply never went above the estimate.
   it('keeps the estimate when a reliable observation sits under it', async () => {
-    getHrForWindow.mockResolvedValue(reliableBpms(150))
+    getObservedHrProfile.mockResolvedValue(computeObservedHr(reliableBpms(150)))
     const body = await (await getProfile()).json()
 
     expect(body.observed.isReliable).toBe(true)
@@ -136,7 +138,7 @@ describe('/api/hr-profile', () => {
   // that can tell `maxHr` from `estimatedMax` in everything derived from it below.
   it('takes the observation once it is reliable AND above the estimate', async () => {
     listBodyMetrics.mockResolvedValue([{ restingHeartRate: 50 }])
-    getHrForWindow.mockResolvedValue(reliableBpms(200))
+    getObservedHrProfile.mockResolvedValue(computeObservedHr(reliableBpms(200)))
     const body = await (await getProfile()).json()
 
     expect(body.workingMaxSource).toBe('observed')
@@ -154,7 +156,7 @@ describe('/api/hr-profile', () => {
   // at the estimate while the anchor drops to 150 — the one place the two deliberately disagree,
   // and invisible in every case where the observation wins or is discarded.
   it('anchors reachable targets on what was actually hit, not the ceiling', async () => {
-    getHrForWindow.mockResolvedValue(reliableBpms(150))
+    getObservedHrProfile.mockResolvedValue(computeObservedHr(reliableBpms(150)))
     const body = await (await getProfile()).json()
 
     expect(body.maxHr).toBe(body.estimatedMax)
@@ -171,7 +173,7 @@ describe('/api/hr-profile', () => {
   // 200 bpm as the case above; only the sample count differs — and it sits in the band that HAS a
   // max, so it is the reliability guard being tested rather than `max != null`.
   it('ignores an uncorroborated observation however high it is', async () => {
-    getHrForWindow.mockResolvedValue(corroboratedButUnreliable(200))
+    getObservedHrProfile.mockResolvedValue(computeObservedHr(corroboratedButUnreliable(200)))
     const body = await (await getProfile()).json()
 
     expect(body.observed.max).toBe(200)

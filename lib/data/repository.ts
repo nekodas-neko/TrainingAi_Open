@@ -23,6 +23,7 @@ import type {
 } from '@trainingai/shared/types/ai-periodization'
 import type { TimeseriesCursor, TimeseriesPage, OuraHrDeltaRow, OuraBucketDeltaRow } from './postgres/slices/oura'
 import type { BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
+import type { ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Result of an upsert-by-client-id workout session write. `wasInserted` is false when a
 // session with that id already existed — in that case the phase fields reflect what was
@@ -1126,6 +1127,9 @@ export interface WorkoutRepository {
    *  the observation nearest *it*, which bounds the lag to one drain interval instead of
    *  "time since the last sync" — see `resolveDsToMs` in lib/oura-ble/clock.ts. */
   getOuraClockAnchors(userId: string): Promise<import('@/lib/oura-ble/clock').ClockAnchor[]>
+  /** Each epoch's robust clock offset, aggregated in the database — what a caller needs when it
+   *  only converts timestamps, rather than the whole anchor log (RV-182 ②). */
+  getOuraClockOffsets(userId: string): Promise<import('@/lib/oura-ble/clock').ClockOffsets>
   /** How far in wall-clock time the BLE rollup's derivation has reached — the rollup watermark
    *  resolved through the clock anchors, or null when no watermark applies to the current epoch.
    *  A night ending within `PROVISIONAL_COVERAGE_MARGIN_MS` of this can still grow (BF-83); see
@@ -1267,6 +1271,10 @@ export interface WorkoutRepository {
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
+  /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
+   *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them
+   *  (RV-181). */
+  getObservedHrProfile(userId: string, from: Date, to: Date): Promise<ObservedHrProfile>
   /** Per-day time-in-HR-zone (seconds per zone) over a local-date range, reconcile-on-read cached
    *  in daily_zone_minutes. `today` is always recomputed (partial day). Server-derived, not synced. */
   getZoneMinutesRange(
@@ -1484,6 +1492,8 @@ export interface OuraDailyDerivedRow {
   activeCaloriesEst: number | null
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
+  /** TN-64: acute:chronic workload ratio, the half of the early-deload gate nothing recorded. */
+  acwr: number | null
   // Q-270. NULL = the training-stress route never ran for this day; 'ok' = it scored; anything
   // else is the gate that refused. `string | null` matches its siblings (`illnessFlag`,
   // `readinessSource`) rather than importing the health package's union into the data layer.

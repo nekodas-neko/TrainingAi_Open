@@ -47,13 +47,26 @@ describe('a dose written once reaches every write path', () => {
   });
 
   it('carries the dose fields through the DEVICE read path too', () => {
-    // The nutrition tab's local-first branch returns early, so a field it drops is missing on the
-    // APK and present in the browser — where there is no local store and the server's mapping wins.
-    const page = code(src('lib/hooks/use-supplements.ts'));
+    // The local-first branch returns early, so a field it drops is missing on the APK and present
+    // in the browser — where there is no local store and the server's mapping wins.
+    //
+    // The mapping moved out of `use-supplements.ts` into a shared module (RV-183) so the
+    // sync-provider's reminder reconcile could read the device without writing a SECOND copy of it
+    // — which is how these fields were dropped the first time. This assertion follows the code:
+    // it guards the one mapping, wherever the mapping lives.
+    const mapping = code(src('lib/supplements/local-status.ts'));
     for (const f of ['defaultAmount:', 'unit:', 'startedOn:', 'stoppedOn:', 'dosePrompt:', 'loggedAmount:']) {
-      expect(page, `${f} dropped on the local-first branch`).toContain(f);
+      expect(mapping, `${f} dropped on the local-first branch`).toContain(f);
     }
-    expect(page).toMatch(/summariseSupplementDay\(logs\)/);
+    expect(mapping).toMatch(/summariseSupplementDay\(logs\)/);
+  });
+
+  it('and there is still only ONE local mapping for these fields', () => {
+    // The guard above is only worth anything while the shared module is the sole copy. A hook that
+    // rebuilds the shape inline would pass it while shipping the original bug.
+    const hook = code(src('lib/hooks/use-supplements.ts'));
+    expect(hook).toMatch(/localSupplementsToStatus\(/);
+    expect(hook, 'the hook is building its own shape again').not.toMatch(/dosePrompt: s\.dosePrompt/);
   });
 
   it('and the section renders what was logged, through the shared helper', () => {

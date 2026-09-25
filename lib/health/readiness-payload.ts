@@ -19,8 +19,8 @@ import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
-import { computeActivityScore } from '@trainingai/shared/health/activity-score'
+import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
+import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
@@ -357,7 +357,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // a Sleep Score of 5 against a 7.86 h night. `nightSessions` classifies by circadian position and
   // reassembles fragmented nights, so a wake-up in the middle no longer splits one night into two.
   const nights = nightSessions(sleepSessions, tz)
-  const lastSleep  = nights[nights.length - 1]
+  const lastSleep  = canonicalLatestNight(nights)
   const sleepHours = lastSleep?.durationHours ?? null
   // Personal baselines for the Sleep Score's opt-in contributors (overnight HRV, overnight HR, and
   // habitual bed/wake times), derived from the *prior* nights only so the night being scored never
@@ -468,11 +468,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
   const yesterdayIso = toAestDay(new Date(todayMid.getTime() - 86_400_000), tz)
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
-  const prevDayActivityScore = (yesterdayMetrics || sessions7d > 0) ? (computeActivityScore({
+  // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
+  // today's, so on a training day the "previous day" score reacted to this morning's session.
+  const prevWindow = strengthWindowEndingAt(recentSessions, todayMid.getTime() - 86_400_000)
+  const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
     steps: yesterdayMetrics?.steps ?? null,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
-    sessions7d,
-    volume7dKg,
+    sessions7d: prevWindow.sessions7d,
+    volume7dKg: prevWindow.volume7dKg,
     typicalSessionVolumeKg,
     goals,
   })?.preTaperScore ?? null) : null
@@ -661,10 +664,24 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const hasSufficientData = ouraToday?.readinessScore != null ||
     (sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null))
 
-  // Early deload — only for automatic periodization, not already in deload
+  // Early deload — the periodization modes the app drives, and not already in deload.
+  //
+  // TN-64(b), owner-approved 2026-09-24. This used to read `=== 'automatic'` alone, which made the
+  // one automatic protective action in the app unreachable: measured 2026-09-25, the owner's two
+  // `automatic` programs are his OLDEST and both inactive, while the active one is `ai_dynamic`.
+  // So this was not "a gate that rarely fires" — it was dead for every session logged since he
+  // moved across, 118 of them, none an early deload.
+  //
+  // `manual` stays out deliberately. What he approved was extending the recommender to the mode
+  // the app itself periodizes; under `manual` he drives the phases, so the app proposing one is a
+  // different question and is not this entry's to answer.
+  //
+  // The thresholds are NOT touched here (EARLY_DELOAD_SCORE_MAX / EARLY_DELOAD_ACWR_MIN). Moving
+  // them in the same change would make it impossible to tell whether a prompt appeared because the
+  // gate opened or because the bar dropped — and a threshold is Tuning's proposal, not this one's.
   let earlyDeloadRecommended = false
   let earlyDeload: EarlyDeloadReason | null = null
-  if (program?.phaseMode === 'automatic') {
+  if (program?.phaseMode === 'automatic' || program?.phaseMode === 'ai_dynamic') {
     const phaseList = program.startedAt ? await repo.listProgramPhases(userId, program.id) : []
     let inDeloadPhase = false
     if (phaseList.length > 0 && program.sessionsPerCycle && program.startedAt) {
@@ -720,6 +737,16 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       readinessContributors: ownComposite.contributors,
       readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
       modelVersions: { readiness: READINESS_MODEL_VERSION },
+      // TN-64(a): the OTHER half of the early-deload gate. The score has always been stored and
+      // the ACWR never was, so "the gate never opened" could not be told apart from "the gate was
+      // never reached" — and no change to that condition can be validated until both halves are on
+      // the record. Written from the same computed value the gate reads, on the same row and the
+      // same day key, so the two can never disagree about what today's inputs were.
+      //
+      // Rides this persist rather than getting its own: it is a readiness-read-path value, and
+      // `mergeDerivedPersists` collapses same-day entries into one statement — a second push here
+      // would be a second pillar name for one number nobody computes separately.
+      acwr,
     } })
   }
 

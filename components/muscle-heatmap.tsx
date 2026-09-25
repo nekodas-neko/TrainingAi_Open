@@ -39,7 +39,19 @@ const MUSCLE_TO_SLUG: Record<string, Slug> = {
 const PRIMARY_COLOR = "#22c55e";
 const SECONDARY_COLOR = "#f59e0b";
 const INJURED_COLOR = "#ef4444";
-const VOLUME_TINT_STEPS = ["#14532d", "#166534", "#16a34a", "#22c55e", "#4ade80"];
+// Every stop clears the 3:1 non-text floor against an untouched muscle — which is `defaultFill`
+// below composited over `--card`, not `--card` itself. The old ramp opened on green-900/800, which
+// measured 1.65:1 and 2.11:1 against that: a muscle trained to a fifth of its target could not be
+// told from one never trained, so the map under-reported exactly what it exists to flag.
+//
+// Lifting only the bottom two stops — the obvious fix — does not work. The floor sits at luminance
+// 0.159 and the third stop was already 0.269, so the two lifted stops and their separation from it
+// would have to share a total contrast range of 1.52:1. The ramp is re-spaced instead, which also
+// makes the steps more even than before (1.34 / 1.45 / 1.31 / 1.24 against 1.28 / 2.16 / 1.45 / 1.31).
+//
+// The opening stop is not a Tailwind green: `--card` carries the user's brand hue, and green-700
+// falls to 2.99:1 at hue 144. `scripts/check-contrast.js` scores every stop at its worst hue.
+const VOLUME_TINT_STEPS = ["#178a42", "#16a34a", "#22c55e", "#4ade80", "#86efac"];
 const DEFAULT_VOLUME_TARGET = 10;
 
 function buildBodyData(activations: Map<string, "main" | "secondary" | "injured">): ExtendedBodyPart[] {
@@ -107,6 +119,22 @@ export const MuscleHeatmap = memo(function MuscleHeatmap({ muscleNames, assignme
             <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: INJURED_COLOR }} />
             Injured
           </span>
+        </div>
+      )}
+      {/* The volume ramp is a quantitative scale with no on-screen meaning, and its middle stop is
+          `PRIMARY_COLOR` — the same fill the role scale uses for "primary mover". The key is what
+          says which of the two is being read, so it is NOT gated on `!compact`: both volume callers
+          pass `compact`, which is precisely where it is needed. */}
+      {hasActivity && usingVolumes && (
+        <div className="flex items-center justify-center gap-1.5 mb-2 text-[10px] text-muted-foreground flex-wrap">
+          <span className="sr-only">Shading shows weekly sets as a share of target, from under 20% to at target.</span>
+          <span aria-hidden="true">Under 20%</span>
+          <span className="flex gap-px" aria-hidden="true">
+            {VOLUME_TINT_STEPS.map((tint) => (
+              <span key={tint} className="inline-block w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: tint }} />
+            ))}
+          </span>
+          <span aria-hidden="true">At target</span>
         </div>
       )}
       <div className={compact ? "grid grid-cols-2 gap-1 overflow-hidden" : "grid grid-cols-2 gap-4 overflow-hidden"}>

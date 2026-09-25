@@ -11,7 +11,8 @@ import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
-import { resolveDsToMs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
+import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
 const OURA_DAILY_SOURCE_COLS: SourceColumn[] = [
@@ -811,6 +812,139 @@ export async function getHrForWindow(db: Db, userId: string, from: Date, to: Dat
   return preferStrapBuckets(rows)
 }
 
+/**
+ * The same profile `computeObservedHr` produces, computed in SQL — one row instead of the whole
+ * window.
+ *
+ * RV-181. `getHrForWindow` was 565 s of 1,117 s of all database time over 25.2 days (12,591 calls,
+ * 44.84 ms mean, 16,843 rows a call, 212 M rows total), and the great majority of that is the
+ * seven callers of `resolveHrProfile`, each dragging back 90 days — 133,041 rows after the merge,
+ * measured 2026-09-25 — to read six numbers off it.
+ *
+ * **Every rule `computeObservedHr` applies is reproduced here, and the equivalence is tested rather
+ * than asserted** (`observed-hr-sql-equivalence.test.ts` runs both paths over the same rows):
+ * `preferStrapBuckets` first (a ring row is dropped when a chest-strap row shares its 10-second
+ * bucket — and the bucket set is built from rows *inside the window*, which is why the subquery
+ * carries the same bounds as the outer one); then the plausible band; then `min`/`max` as k-th
+ * order statistics **with multiplicity**, which `ORDER BY … OFFSET k-1 LIMIT 1` gives exactly and
+ * `percentile_disc` does not. The mean comes back unrounded and TypeScript rounds it, so the
+ * rounding rule stays in one language.
+ *
+ * **What this is NOT is the 8× win RV-181's evidence line implies**, and the difference is worth
+ * stating because the number in that line is the reason to do the work. Sweep 51's "54 ms" was a
+ * plain aggregate over the raw window — no strap merge. Measured against production on 2026-09-25:
+ * that plain form is 67 ms, the merge-preserving form here is 225–260 ms warm, and the row fetch it
+ * replaces is ~360 ms. So the saving is about a third of the database time, not seven eighths. The
+ * rest of the win is that 133,041 rows stop crossing the wire and stop being materialised in Node
+ * on every resolve.
+ */
+/**
+ * Each epoch's robust clock offset, computed in the database — one row per epoch instead of the
+ * whole anchor log.
+ *
+ * RV-182 ②. `getOuraClockAnchors` was **2,190 calls returning 9,736 rows each, 106 s, 9.4% of all
+ * database time**, and every one of those callers reduced the rows to a single scalar per epoch and
+ * threw the rest away. `robustOffsetMs` takes the 10th-percentile *lag* — an order statistic, so it
+ * is `ORDER BY … OFFSET floor(n * 0.1) LIMIT 1`, matching `Math.floor(lags.length * 0.1)` exactly.
+ * **Not `percentile_disc`**, which uses a different rank rule and disagrees at small n; the same
+ * trap RV-181 documented.
+ *
+ * **The formulation matters more than it looks, and the obvious one is slower than what it
+ * replaces.** Measured against production on 2026-09-25: the series read is ~48 ms; expressing this
+ * with `row_number() OVER (PARTITION BY epoch …)` costs **53–67 ms**, because the window sorts all
+ * 12,591 rows — a regression. Counting first and taking a top-N with `OFFSET` is **19–27 ms** warm.
+ * Both return the identical offset; only one is worth shipping.
+ *
+ * `floor(extract(epoch FROM anchor_utc) * 1000)` truncates to whole milliseconds because the JS
+ * path reads `new Date(anchor_utc).getTime()`, which does the same — without it a stored
+ * microsecond would put the two paths a fraction apart.
+ */
+export async function getOuraClockOffsets(db: Db, userId: string): Promise<ClockOffsets> {
+  const res = await db.execute<{ epoch: number; offset_ms: string | null }>(sql`
+    WITH lags AS (
+      SELECT epoch,
+             floor(extract(epoch FROM anchor_utc) * 1000) - anchor_ds * 100 AS lag_ms
+      FROM oura_ble_clock_anchors
+      WHERE user_id = ${userId}
+    ),
+    per_epoch AS (
+      -- The ::float8 cast is load-bearing. Bound beside a bigint count(*) the parameter is
+      -- inferred as bigint and 0.1 is rejected outright; the cast also makes this the same IEEE
+      -- double multiply as the JS lags.length * LAG_PERCENTILE, so the two floors cannot part.
+      SELECT epoch, floor(count(*) * ${LAG_PERCENTILE}::float8)::int AS idx FROM lags GROUP BY epoch
+    )
+    SELECT p.epoch,
+           (SELECT l.lag_ms::bigint FROM lags l WHERE l.epoch = p.epoch
+              ORDER BY l.lag_ms OFFSET p.idx LIMIT 1) AS offset_ms
+    FROM per_epoch p
+  `)
+  const rows = (res as unknown as { rows: { epoch: number; offset_ms: string | null }[] }).rows
+  const offsets = new Map<number, number | null>()
+  let epoch: number | null = null
+  for (const r of rows) {
+    const ep = Number(r.epoch)
+    offsets.set(ep, r.offset_ms == null ? null : Number(r.offset_ms))
+    if (epoch == null || ep > epoch) epoch = ep
+  }
+  return { epoch, offsets }
+}
+
+export async function getObservedHrProfile(
+  db: Db, userId: string, from: Date, to: Date,
+): Promise<ObservedHrProfile> {
+  const k = CORROBORATION
+  const rows = await db.execute<{
+    merged_count: number; sample_count: number
+    avg_bpm: string | null; highest: number | null; kth_max: number | null; kth_min: number | null
+  }>(sql`
+    WITH merged AS MATERIALIZED (
+      SELECT h.bpm
+      FROM oura_heartrate h
+      WHERE h.user_id = ${userId}
+        AND h.timestamp >= ${from} AND h.timestamp <= ${to}
+        AND (h.source = 'chest_strap' OR NOT EXISTS (
+          SELECT 1 FROM oura_heartrate st
+          WHERE st.user_id = ${userId}
+            AND st.source = 'chest_strap'
+            AND st.timestamp >= ${from} AND st.timestamp <= ${to}
+            AND st.timestamp >= to_timestamp(floor(extract(epoch FROM h.timestamp) / 10) * 10)
+            AND st.timestamp <  to_timestamp(floor(extract(epoch FROM h.timestamp) / 10) * 10 + 10)
+        ))
+    )
+    SELECT
+      (SELECT count(*) FROM merged)::int AS merged_count,
+      (SELECT count(*) FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM})::int AS sample_count,
+      (SELECT avg(bpm) FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}) AS avg_bpm,
+      (SELECT max(bpm) FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}) AS highest,
+      (SELECT bpm FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}
+         ORDER BY bpm DESC OFFSET ${k - 1} LIMIT 1) AS kth_max,
+      (SELECT bpm FROM merged WHERE bpm >= ${PLAUSIBLE_MIN_BPM} AND bpm <= ${PLAUSIBLE_MAX_BPM}
+         ORDER BY bpm ASC  OFFSET ${k - 1} LIMIT 1) AS kth_min
+  `)
+  const r = (rows as unknown as { rows: Record<string, unknown>[] }).rows[0]
+  const mergedCount = Number(r?.merged_count ?? 0)
+  const sampleCount = Number(r?.sample_count ?? 0)
+  const outOfBandRejected = mergedCount - sampleCount
+
+  if (sampleCount === 0) {
+    return {
+      min: null, max: null, avg: null, sampleCount: 0, isReliable: false,
+      outOfBandRejected: mergedCount, highestPlausible: null,
+    }
+  }
+  const avg = Math.round(Number(r.avg_bpm))
+  const isReliable = sampleCount >= MIN_RELIABLE_SAMPLES
+  // Fewer readings than the corroboration depth: there is no k-th highest, so the profile reports
+  // the mean only — the same refusal `computeObservedHr` makes rather than falling back to a bare max.
+  if (sampleCount < k) {
+    return { min: null, max: null, avg, sampleCount, isReliable, outOfBandRejected, highestPlausible: null }
+  }
+  return {
+    min: Number(r.kth_min), max: Number(r.kth_max), avg, sampleCount, isReliable,
+    outOfBandRejected, highestPlausible: Number(r.highest),
+  }
+}
+
 // ── Time-in-HR-zone rollup cache (daily_zone_minutes, migration 129) ──────────────────────
 // Server-side derived cache: recomputed on read from oura_heartrate via the pure zone-minutes
 // primitive. NOT an offline-first user-write domain (no local store / outbox).
@@ -1558,6 +1692,13 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   readinessScore: 'readiness_score', readinessContributors: 'readiness_contributors', readinessSource: 'readiness_source',
   activityScore: 'activity_score', activityContributors: 'activity_contributors', activeCaloriesEst: 'active_calories_est',
   trainingLoadOts: 'training_load_ots', trainingLoadHigh: 'training_load_high', trainingLoadGate: 'training_load_gate',
+  // TN-64(a). Present here and in the pushMutations branch, so a device that sends it is honoured
+  // and the `DERIVED_COLS` drift tripwire is satisfied — but deliberately absent from the DEVICE's
+  // local mirror, because nothing there computes or reads it. A device therefore never sends it,
+  // the COALESCE upsert leaves the server's value alone, and `applyDelta` ignores it on the way
+  // down. The cost is that a device backup does not carry ACWR; that is acceptable for a DERIVED,
+  // recomputable number in a way it would not be for a raw measurement.
+  acwr: 'acwr',
   recoveryIndexHours: 'recovery_index_hours', wornHoursBle: 'worn_hours_ble', nightHrvBaselineMs: 'night_hrv_baseline_ms',
   illnessFlag: 'illness_flag', illnessScore: 'illness_score', illnessBiomarkers: 'illness_biomarkers',
   daytimeStressScaled: 'daytime_stress_scaled', stressHighMinutes: 'stress_high_minutes', recoveryHighMinutes: 'recovery_high_minutes',
@@ -1614,6 +1755,7 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     activityContributors: r.activityContributors,
     activeCaloriesEst: r.activeCaloriesEst,
     trainingLoadOts: r.trainingLoadOts,
+    acwr: r.acwr,
     trainingLoadHigh: r.trainingLoadHigh,
     trainingLoadGate: r.trainingLoadGate,
     recoveryIndexHours: r.recoveryIndexHours,
