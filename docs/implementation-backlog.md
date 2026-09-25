@@ -6526,25 +6526,6 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   single-digit milliseconds. Filed for the shape, not a measured win.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** lines are now `next-session/route.ts:14,19,31`. **The two queries are not independent**: `:31` runs on the list already filtered at `:25`, so a naive `Promise.all` passes the wrong list. Fetch assignments for the unfiltered list, then filter. `weight-response-card.tsx:53` is only the no-local-store fallback, so there is no flash on the APK; drop the card half.
 
-### [nutrition][platform] LA-131 — the rest-day carb reduction is a four-line formula copied into two routes
-
-- **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts:98,356-359` and
-  `app/api/nutrition/meal-plans/[id]/structure/route.ts:47,128-131`.
-  **Added:** 2026-09-23 · Lane A, found while re-verifying RV-77.
-- `const REST_DAY_CARB_REDUCTION = 0.15` is **declared separately in both files**, and so is the
-  derivation that uses it — `carbShift = round(carbs × REDUCTION)`, `carbsG = carbs − carbShift`,
-  `calories = calories − carbShift × 4`. Two copies of one rule about what a rest day means.
-- **Why it matters rather than being tidy:** these two routes are the *generate* and *restructure*
-  paths for the same plan. If one copy is tuned and the other is not, restructuring a plan silently
-  re-targets every rest-day meal against a different definition of a rest day than the one that
-  generated it — and the drift is invisible, because both numbers look plausible.
-- **They agree today** (0.15, identical arithmetic), verified 2026-09-23. This is the cheap moment.
-- **Fix:** one exported helper beside the other nutrition math in `packages/shared/src/nutrition/`
-  taking the daily macros and a day type and returning the adjusted targets; both routes import it.
-- **Verification:** both routes produce byte-identical variant targets for the same input before and
-  after; `grep -rn REST_DAY_CARB_REDUCTION app/` returns one definition.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** `generate/route.ts` declares at `:98` and uses at `:357-360`, **plus a third use at `:306`** (`restDayCarbLine(dailyCarbs * REST_DAY_CARB_REDUCTION)`). The helper should cover the prompt line too. `structure/route.ts` is unchanged at `:47,129-131`.
-
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a
