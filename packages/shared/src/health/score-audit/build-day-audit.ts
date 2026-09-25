@@ -1,7 +1,7 @@
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
-import { computeActivityScore } from '@trainingai/shared/health/activity-score'
+import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
@@ -179,11 +179,14 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     goals, acwr,
   })?.preTaperScore ?? null
 
-  const prevDayActivityScore = (yesterdayMetrics || sessions7dRows.length > 0)
+  // TN-77(a): the audit shares readiness's defect, so it shares the fix — yesterday's contributor
+  // is scored on yesterday's window, not the day being audited.
+  const prevWindow = strengthWindowEndingAt(sessionsUpToDay, dayMid.getTime() - 86_400_000)
+  const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0)
     ? computeActivityScore({
         steps: yesterdayMetrics?.steps ?? null,
         activeCalories: yesterdayMetrics?.activeCalories ?? null,
-        sessions7d: activityInput.sessions7d, volume7dKg,
+        sessions7d: prevWindow.sessions7d, volume7dKg: prevWindow.volume7dKg,
         typicalSessionVolumeKg: load.typicalSessionVolumeKg, goals,
       })?.preTaperScore ?? null
     : null

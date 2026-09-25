@@ -2309,6 +2309,20 @@ volume7dKg,                             // likewise
   both times, or state in the code why it cannot be passed. Which of the two is the defect is worth
   separating: (a) is plainly unintended, (b) may be deliberate — yesterday's intraday HR is available
   and simply is not fetched — but nothing says so.
+- **⚙ (a) SHIPPED 2026-09-25 (Lane A). (b) IS STILL OPEN — it is the half that needs a decision.**
+  Both call sites now take yesterday's window from one shared helper,
+  `strengthWindowEndingAt(sessions, dayMidMs)` in `activity-score.ts`, rather than computing it
+  twice. Verified against `main` first: `readiness-payload.ts:471` and `build-day-audit.ts:182`
+  both passed today's `sessions7d`/`volume7dKg`, exactly as the entry says, and `recentSessions`
+  already covers 28 days so the corrected window costs no extra query.
+  - **The same-day window was deliberately NOT touched.** It has no upper bound today; giving it one
+    would shift the same-day activity score, which is a change nobody asked for on a number the
+    owner reads daily. The helper is shared across the two *prev-day* sites — where the duplication
+    that caused this actually lives — and the same-day computation is left exactly as it was.
+  - **Keep:** part **(b)**, the weight-base mismatch. The prev-day call still passes no
+    `zoneMinutes`/`moveHours`/`strengthSessionToday`/`acwr`, so it remains on a 63-point base and
+    ~71% strength-weighted. The entry itself says this "may be deliberate", and deciding what the
+    contributor is meant to measure is not something to settle while fixing an off-by-one.
 - **What this does NOT establish.** (a) is reconstructed, not read from stored values: there is no
   persisted `prevDayActivity` sub-score to check it against, and the reconstruction carries the sd 8.8
   per-day error TN-76 describes, so the per-day figures above are indicative and the distribution is

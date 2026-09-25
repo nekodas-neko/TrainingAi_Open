@@ -6,12 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.46",
+    version: "1.465.47",
     date: "2026-09-25",
     changes: [
       "Today's Timeline on Home now tells you when it could not load, instead of simply not being there \u2014 a failed load and a genuinely empty day looked identical.",
       "The Oura card under More shows when the ring last synced straight away rather than after a pause, and a friend's profile opens from what is already on the phone instead of a spinner. A profile you cannot see now says why.",
       "Cloning a phase set twice by double-tapping made two copies; it now makes one. Tapping Refresh on an AI insight repeatedly no longer spends the day's allowance on one card.",
+    ],
+  },
+  {
+    version: "1.465.46",
+    date: "2026-09-25",
+    changes: [
+      "Your readiness score has a \u201cyesterday\u2019s activity\u201d part, and on days you trained it was quietly counting that morning\u2019s session as part of yesterday. It now looks at the seven days ending yesterday, as the name says. Expect the score to move by about a point on some days and not at all on most \u2014 it is a correction, not a re-scoring, and nothing in your history is rewritten.",
     ],
   },
   {
