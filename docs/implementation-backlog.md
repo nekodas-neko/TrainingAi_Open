@@ -4856,11 +4856,11 @@ drift.
 ### [platform] RV-177 — API route hygiene: nine low-severity gaps from the route census
 
 - **Lane: A**
-- **Keep:** the date group and the unscoped/dead pair both shipped 2026-09-25. **Four groups
-  remain, NONE of them re-verified yet** — the two missing rate limits, the two unbounded written
-  weight dates, Zod on the three phase-set writes, `calendar-data`'s NaN year with its
-  validate-before-auth ordering, and the two unguarded body ids. Re-verify each against `main`
-  before writing code: **three** of this entry's claims have already turned out stale or backwards.
+- **Keep:** the date group, the unscoped/dead pair and the phase-set schemas all shipped
+  2026-09-25. **Three groups remain, NONE re-verified** — the two missing rate limits, the two
+  unbounded written weight dates, `calendar-data`'s NaN year with its validate-before-auth ordering,
+  and the two unguarded body ids. Re-verify each against `main` before writing code: **three** of
+  this entry's claims have already turned out stale or backwards.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). The census covered 227 route files and 297 handlers. **CLEAN:** auth on every handler, admin
 gating, Zod on every ingest route, try-catch on every AI call, and fail-closed secrets.
 - **No rate limit:**
@@ -4887,8 +4887,16 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex is repeated in **20+ files**, while `isCalendarDate` —
   which exists for exactly this (Q-496) — guards only about five of them. Worth its own sweep entry
   rather than being smuggled into this one.
-- **No Zod on phase-set writes:** `phase-sets/[id]/route.ts:30`, `phase-sets/route.ts:34` and
-  `phase-sets/clone/route.ts:21`. `durationCycles` is unchecked, and a bad body gives a bodiless 500.
+- **✅ SHIPPED 2026-09-25 — Zod on the three phase-set writes**
+  ([entry](overview/entries/2026-09-25-rv177-phase-set-schemas.md)). Claim confirmed exactly: all
+  three took a raw cast with no Zod at all. `PhaseSetWriteBody`/`PhaseSetCloneBody` in
+  `packages/shared/src/validation/phase-set.ts`, both `.strict()`.
+  - **⚠ The bounds came from production, not from the obvious precedent.** `generated-program.ts`
+    bounds `durationCycles` at `min(1)` and copying it was the first move — but the editor's stepper
+    floors at `Math.max(0, …)` and production holds **8 phases at `duration_cycles = 0`**, so
+    `min(1)` would have 400ed the owner re-saving his own data. It is `min(0)`.
+  - **Whether 0 cycles should be reachable at all is open**, and is a product question rather than a
+    validation one: the AI path forbids it, the editor allows it, and 8 rows have it.
 - **`calendar-data/route.ts:8-9`:** a NaN year slips past the range check, and params are validated
   before auth.
 - **Body ids reach the uuid cast unguarded on POST**, which RV-47 did not cover:
