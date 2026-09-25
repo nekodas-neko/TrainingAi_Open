@@ -3871,6 +3871,84 @@ drift.
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
 
+### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
+- **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
+- **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
+- **Needs:** — nothing.
+
+- **The measurement.** Scanning every queue entry for owner-decision language (*"owner signs"*,
+  *"the owner's call"*, *"not a lane's"*, *"needs the owner"*, *"Tuning proposes"*) in an entry whose
+  `Lane:` is `A` or `B` and which carries **no `Ask:` field**: **70 entries**. `Lane:` is what routes
+  an entry, so a decision inside a Lane A body never reaches the Orchestrator's list and the owner
+  never sees it — the exact shape `BF-201` was just split out of, and the shape `BF-194` was filed
+  about from the other direction.
+- **⚠ 70 is an UPPER BOUND, not a finding.** The scan is a keyword match and will catch prose that
+  merely mentions the owner without a live question — *"the owner decided X in August"* reads the
+  same to a grep as *"the owner must decide X"*. **The work is separating those**, which is exactly
+  the Orchestrator's stated primary job, and is why this is filed rather than swept here: BugFix's
+  remit is turning reports into traced entries, not re-laning the queue.
+- **Worth knowing before the sweep starts:** `LA-122` already exists as a `Reference:` entry naming
+  the six owner decisions Lane A is blocked on, so part of this is tracked and the sweep should
+  reconcile with it rather than duplicate it.
+- **⚑ One likely duplicate spotted in the scan, flagged not merged.** **`RV-65`** — *"the prescription
+  asks a model for numbers that deterministic code t…"* — is Review's earlier statement of what
+  `BF-199` measured this session, and `RV-200`/`RV-202` from sweep 61 cover adjacent ground. **Four
+  entries now describe the same AI-to-logic change from four angles.** Merging or superseding them is
+  a queue decision, so it belongs to whoever runs this sweep; BugFix deliberately left all four
+  standing rather than silently folding another agent's entry into its own.
+- **⭐ Recommend the sweep run in one pass, not opportunistically**, and produce two outputs per
+  entry: either an `Ask:` field added in place (when the decision is genuinely his and the entry is
+  otherwise correctly laned), or the decision split into its own `Lane: O` entry with the buildable
+  half left behind — the shape `BF-201` used. **Do not add `Gate: owner`** while doing it: that parks
+  the entry and removes it from the READY list, which inverts the intent.
+- **Verification:** the scan above returns a number the Orchestrator has read and classified, and
+  every entry it keeps carries either an `Ask:` field or a split-out `O` entry.
+
+### [workouts] BF-201 — two decisions about the loads he actually trains at, split out of BF-197 and BF-199 so they reach him
+- **Ask:** owner — two numbers, both recommended: (1) how much finish-early margin the duration model should keep once BF-197's double-count is removed, and (2) the rep→%1RM table BF-199 would replace the model's numbers with. Both change the weights and set counts on his screen.
+- **Lane: O** — **Added:** 2026-09-26 · BugFix intake, from the standing rule that a decision sitting INSIDE a `Lane: A` entry is invisible to the Orchestrator, because the lane field is what routes it.
+- **Needs:** — nothing, deliberately. **Neither lane is blocked on this.** BF-197's off-by-one fix is a correctness bug and should ship without waiting; BF-199 wants a plan doc first. Only the *numbers* below need him.
+
+- **Why these two and not the rest of BF-197/BF-199.** Both entries are architecture, which is the
+  lane's to decide under the 2026-09-22 narrowing. What is left over is **scoring calibration** — the
+  one category the same rule keeps with the owner, *"because a bad one is hard to notice from inside
+  and it changes numbers they read daily."* These are literally the kilograms on the bar.
+
+- **Decision 1 — the finish-early margin (from BF-197).** The duration estimate over-reserves
+  **14.2 min** by charging a rest he skips on 93.5% of exercises and a transition after the last
+  exercise. Removing that makes the estimate accurate at the median (37.2 vs a measured 39.9) — and
+  his working time has a **p90 of 53.9 min and a max of 81.7**, so more sessions will run past the
+  hour.
+  **⭐ Recommend: size the budget to his 75th percentile rather than the median**, which keeps roughly
+  the protection he has today but from a number that tracks his actual variance instead of from a
+  counting error. Alternatives: **a fixed named buffer** (simplest to reason about, better if he
+  wants one predictable number, but it does not adapt as he gets faster); **no margin at all**
+  (maximum volume, better if finishing late costs him nothing, and he has said the sessions land on
+  time *because* of the current conservatism); **leave the double-count in** — rejected, because a
+  margin that scales with exercise and set count rather than with his variance over-protects a 5×2
+  session and under-protects a 3×4 one.
+  **Reversal cost: one constant.**
+
+- **Decision 2 — the rep→%1RM table (from BF-199).** If the prescription's numbers move from the
+  model to rules, something has to say what percentage a given rep count implies. The curve the model
+  has been producing is already tight — **12→66, 11→68, 10→70.5, 9→72.5, 8→75, 7→76–77.5, 6→80**,
+  about +2.25% per rep fewer — and `style_sets` holds his own cleaner values beside it (75/8, 85/5,
+  60/12, 50/10).
+  **⭐ Recommend: adopt the observed curve as the starting table**, because it reproduces what he has
+  actually been training at, so the switch to rules changes nothing on day one and any later change
+  is visible as a deliberate edit. Alternatives: **a textbook table** (Brzycki/Epley — better
+  provenance, but it would silently re-weight every session on the day it ships); **his
+  `style_sets` values** (his own numbers, but they are per-style rather than per-rep, so they cannot
+  answer the question this table exists to answer).
+  **Reversal cost: low as code, high as training** — it moves every prescribed weight, so a wrong
+  table is felt before it is noticed.
+
+- **⚠ Whichever way both go, Tuning owes the same thing before anything ships:** a proposal stating
+  **how many of his past sessions the change would move**. That is the standing bar for a scoring
+  change, and it is what stops a table fitted to one week quietly re-scoring months of history.
+- **Verification:** this entry closes when both answers are recorded here with the date, and BF-197
+  and BF-199 are updated to point at them.
+
 ### [workouts] BF-200 — the deload applied to four exercises and not the fifth: Skull Crusher was loaded at 30 kg where 52% of its 1RM is 19
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
@@ -3994,7 +4072,8 @@ drift.
   used to instant represcribing, going back to a 2 s round trip will read as a regression.
 
 - **⚑ ONE PART IS NOT AN ENGINEERING CALL AND MUST NOT BE DECIDED BY A LANE: the rep→%1RM table
-  values.** Those are the loads he trains at, so they are calibration — **Tuning proposes, the owner
+  values** — split out as **`BF-201`** so it reaches him rather than sitting inside a `Lane: A` entry.
+  Those are the loads he trains at, so they are calibration — **Tuning proposes, the owner
   signs**, per the standing rule that Tuning never ships a scoring change. The *architecture* is the
   lane's; the *numbers in the table* are not. A proposal is incomplete until it states how many of his
   past sessions the table would have changed.
@@ -4134,7 +4213,9 @@ drift.
   protective** — it scales with exercise count and set count rather than with his variance, so it
   over-protects the 5×2 session and would under-protect a 3×4 one. **Recommended:** fix both
   off-by-ones, and if a margin is wanted, take it explicitly (a named buffer constant, or sizing to
-  a percentile of his measured working time rather than to the median). That is reversible in one
+  a percentile of his measured working time rather than to the median). **That margin SIZE is the
+  owner's and is split out as `BF-201`** — this entry's off-by-one fix does NOT wait on it, because a
+  double-count is a correctness bug either way. That is reversible in one
   constant; leaving the double-charge in place is not visible anywhere.
 
 - **Why it is worth more than the third set alone.** **Transitions are 59% of his working time** —

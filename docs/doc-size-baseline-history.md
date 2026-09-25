@@ -17897,3 +17897,12 @@ later reader would otherwise "tidy" into a handler-level guard.
 started). RV-177's nine-gap entry left the queue whole and the one finding inside it that
 had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files against 9 — became LA-145,
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-201 and BF-202 (routing owner decisions)
+
+Two entries the owner's instruction required. BF-201 carries the two calibration decisions that were
+buried inside BF-197 and BF-199, and it costs lines because each needs a recommendation, alternatives
+and a reversal cost to be answerable without reading the parent. BF-202 records that 70 entries across
+the queue share that shape, with the caveat that the number is a keyword upper bound rather than a
+finding — that caveat is the part worth the lines, since acting on 70 as if it were 70 real decisions
+would waste the sweep.
