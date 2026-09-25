@@ -45,6 +45,7 @@ const ASK_FIELD_LINE_RE = /^\s*[-*]\s*\*{0,2}Ask\*{0,2}(?::\*{0,2}|\s*[—–-])
 const { keepFromLines } = require('./lib/keep');
 const { keepKind, keepIsSettled } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
+const { orphanedFieldsBelow } = require('./lib/mid-entry-heading');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -84,7 +85,31 @@ for (let i = 0; i < queue.length; i++) {
   // A `## ` section heading ends the previous entry. Without this, a field written under a section
   // boundary — belonging to no entry — is attributed to the last entry above it. The queue carries
   // eight such boundaries.
+  //
+  // **The third member of the silently-ignored-field family below, and the one that cost a shipped
+  // entry.** A SUB-heading written at `## ` inside an entry ends it here and in `next-item.js` for
+  // the same reason, so every field after it belongs to nothing. BF-165 carried two — a
+  // `Verify: device` and a `Keep:` — and went on printing as READY for a batch that had already
+  // shipped, because the tool could not see the entry past its own retraction notice.
+  //
+  // **A real boundary and a mis-levelled sub-heading are told apart by what follows, not by the
+  // wording**, which is what makes this checkable: a boundary is followed by prose and then a
+  // `### ` entry, while a truncated entry's own FIELD bullets sit under it. Measured over the whole
+  // queue: seven mid-entry `## ` headings, six of them genuine boundaries with no field after them,
+  // one — BF-165's — orphaning two. Scanning to the next `### ` rather than the next heading is
+  // load-bearing: BF-165 has two such headings and the orphans sit after the second.
   if (line.startsWith('## ') && !line.startsWith('### ')) {
+    if (currentId) {
+      const orphans = orphanedFieldsBelow(queue, i).map((o) => o.slice(0, 100));
+      if (orphans.length) {
+        failures.push(
+          `${currentId}: a \`## \` heading inside this entry ENDS it, so the ${orphans.length} ` +
+            `field(s) below belong to no entry and are silently ignored — demote it to \`#### \`:\n` +
+            `    ${line.trim().slice(0, 100)}\n` +
+            orphans.map((o) => `      orphaned: ${o}`).join('\n'),
+        );
+      }
+    }
     currentId = null;
     continue;
   }
