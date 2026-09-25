@@ -17256,6 +17256,35 @@ to the entry that builds them; and a gate run through a pipe reports the pipe's 
 committed through a failing check. The baton is meant to carry what a successor cannot re-derive, and
 a trap that already fired once is exactly that.
 
+## 2026-09-25 — `docs/implementation-backlog.md` 31057 → 31082 (TN-70 read + LA-140)
+
+Net +25 across two entries, and both halves are there to stop work rather than start it.
+
+TN-70 gains a killed hypothesis — the baseline was NOT still learning during the level-5 run, 0 of
+68 days under `BASELINE_MIN_NIGHTS` — which is the first thing anyone would check and now nobody
+needs to. It also gains the measured asymmetry (resting heart rate moved 4%, its score 37%),
+written as a pointer rather than a cause, because a suggestive ratio is not a finding.
+
+LA-140 is the dead `night_hrv_baseline_ms` column. Its value is not the null itself, which harms
+nothing, but the inference the null invites: the resilience model gates on that exact field being
+non-null. The entry records that trap explicitly, and that both closing moves — persist it, or
+delete the plumbing — are real options rather than one obvious fix.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31082 → 31102 (LA-138 corrected)
+
+Twenty lines, and they buy a retraction that is worth more than the entry was.
+
+LA-138 was filed yesterday claiming `program_phases` was empty for every program. It is not — 46
+rows across 8 phase sets, 8 of them deload phases. The zero came from joining on `program_id`, a
+legacy column that is NULL on all 46 rows since phases moved under `phase_set_id`, so the query
+returned a confident zero with no error.
+
+The rewrite quotes the wrong claim before the right one rather than replacing it silently, because
+the trap is the reusable part: the obvious join shape still returns a false zero for the next person
+who tries it. The narrower real finding survives — an `ai_dynamic` program has no in-deload
+suppression — but the fix it pointed at (populate the table) would have been work against the
+design.
+
 ## 2026-09-25 — `docs/implementation-backlog.md` 31052 → 31057 (+5)
 
 Queue hygiene, not new material. Two entries headed Lane B's READY list while unstartable, both

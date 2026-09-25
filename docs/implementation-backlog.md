@@ -1751,6 +1751,20 @@ which is the right shape for something that can only be validated by living with
       measurement already showed the switch is carried by `resilience_daily_sleep_recovery`, and its
       four contributor inputs **are** stored in `readiness_contributors`. "Were the July
       contributor scores wrong" is a read. Try that before building a replay harness.
+  - **⚙ THAT READ IS DONE (2026-09-25), and it kills one hypothesis and measures one asymmetry.**
+    - **The baseline was NOT still learning in July — hypothesis dead, do not re-run it.**
+      `BASELINE_MIN_NIGHTS` is 14, and **0 of 68 days** in the span had `n_history` below it. The
+      level-5 span carried 18–54 nights, September 63–81.
+    - **But raw physiology barely moved while its SCORE collapsed.** Averaged across the two
+      regimes: resting heart rate **52.7 → 54.8 bpm** (about 4%) while its contributor score went
+      **63.9 → 40.3** (37%). The app's own sleep score went 79.1 → 53.7. So a small real change is
+      being amplified several-fold by the scoring, which is consistent with a baseline that keeps
+      re-centering as history triples — **and is NOT established as the cause.** What it does show
+      is that "the owner got worse" and "the scale moved under him" are both still live, and the
+      raw series is where to separate them.
+    - **`night_hrv_baseline_ms` could not be used for the same comparison, because it is dead —
+      see LA-140.** hrvBalance's raw input is therefore unavailable from the database, which is why
+      only RHR is quoted above.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -1905,23 +1919,69 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
-### [readiness][workouts] LA-138 — the early-deload block's "am I already in a deload" guard is inert: no program has ever had a phase row
+### [readiness][devices] LA-140 — `night_hrv_baseline_ms` is plumbed end to end and written by nothing: 0 of 130 rows
 
-- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch), `program_phases`.
-- **Added:** 2026-09-25 · found while building TN-64(b); filed rather than fixed, because it is a
-  different question from the one the owner answered.
-- **Measured on production 2026-09-25:** `program_phases` holds **0 rows for all five programs** —
-  the two `automatic` ones included. The active program also has `started_at` NULL, which
-  short-circuits the phase lookup before it runs (`phaseList = program.startedAt ? … : []`).
-- **So `inDeloadPhase` has always been `false`**, and the guard that is supposed to stop the app
-  recommending a deload while the owner is *already* in one has never suppressed anything. That was
-  harmless while the gate itself was unreachable (TN-64). Now that the gate is live, it is the
-  difference between "asked once" and "asked during a deload week".
-- **Not urgent, and not a correctness bug:** every prompt still requires the owner's confirmation,
-  so the worst case is a redundant question, not an unwanted deload.
-- **What is NOT established:** whether `ai_dynamic` is *meant* to write phase rows at all, or
-  tracks its cycle another way. Answer that before writing code — if it tracks it elsewhere, the
-  fix is to read that source, not to start populating `program_phases`.
+- **Lane: A** — `lib/oura-ble/rollup/run.ts` (the producer), `oura_daily_derived`.
+- **Added:** 2026-09-25 · found while doing TN-70's contributor read, which the column would have
+  answered had it held anything.
+- **Measured on production 2026-09-25: `night_hrv_baseline_ms` is NULL on all 130 rows.** The
+  plumbing is complete — `schema.ts`, `DERIVED_COLS`, the row mapper, the `pushMutations` branch,
+  the local SQLite table and the sync delta all carry it — and **no writer ever sets it**.
+  `run.ts:1170` is the only mention in the rollup and it is the *input* to
+  `computeResilienceForDay`, not a persist.
+- **No functional impact today, and that is why it survived.** The resilience compute uses the
+  in-memory `nightHrvMs`, so scoring is unaffected, and nothing in product code reads the stored
+  column.
+- **The cost is diagnostic, and it is not hypothetical.** A reader who sees NULL reasonably
+  concludes the input was missing — `computeResilienceForDay` gates `contributorsOk` on exactly
+  this field being non-null, and falls back to a **fabricated 50** for the stress scaling
+  (`stress-resilience.ts:395`). While doing TN-70's read I drew that inference myself before
+  checking the producer. A column that is always null beside a guard that tests for null is a trap.
+- **Two ways to close it, and the choice is the work:** persist what the rollup already computes
+  (one line in the derived patch, makes the HRV half of TN-70's comparison possible), or delete the
+  column and its plumbing (smaller sync surface, and the ~40-member push path stops carrying a dead
+  field). Persisting is probably right *because* TN-70 wanted it — but that is a judgement, not a
+  given.
+- **⚠ Do not "fix" the `?? 50` fallback by reading the stored column** — it is null, so that would
+  swap a fabricated constant for a guaranteed one.
+
+### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
+
+- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch),
+  `packages/shared/src/ai-periodization/`.
+- **Added:** 2026-09-25 while building TN-64(b). **⚠ REWRITTEN 2026-09-25 — the original filing's
+  central measurement was WRONG, and the wrong version is quoted here so it is not re-derived.**
+- **What the first version claimed:** *"`program_phases` holds 0 rows for all five programs."*
+  **False.** It came from a query joining `program_phases` on **`program_id`** — a legacy column
+  that is **NULL on all 46 rows** since phases moved under `phase_set_id`. The join matched nothing
+  and read as a clean zero. No error, no warning: the same silent-absence failure the External API
+  field-name rule in `CLAUDE.md` exists for, in a diagnostic query rather than in product code.
+- **Measured properly 2026-09-25:** `program_phases` holds **46 rows across 8 phase sets**,
+  **8 of them `phase_type = 'deload'`**, all 46 keyed by `phase_set_id`.
+
+  | program | mode | phase set | phases |
+  |---|---|---|---:|
+  | Bankai (**active**) | `ai_dynamic` | none | 0 |
+  | Shikai | `ai_dynamic` | none | 0 |
+  | AI-Phase1 | `ai_dynamic` | none | 0 |
+  | Main | `automatic` | yes | 6 |
+  | Strength + Hypertrophy | `automatic` | yes | 6 |
+
+- **So the real finding is narrower and still real.** `listProgramPhases` resolves through
+  `programs.phase_set_id` and returns `[]` when there is none, so on any `ai_dynamic` program
+  `inDeloadPhase` is always false. For the two `automatic` programs the suppression works exactly
+  as written. Since TN-64(b) extended the gate to `ai_dynamic`, the **active** program is now gated
+  without any in-deload suppression at all.
+- **The prior question is therefore answered: `ai_dynamic` is not *supposed* to write phase rows.**
+  It periodizes dynamically instead of from a fixed set, which is the point of the mode. **Do not
+  populate `program_phases` for it** — that was the trap the first version of this entry set up.
+- **What is actually open:** `ai_dynamic` has its own deload notion (`ai-dynamic.ts` carries an
+  elevated-temperature deload trigger), and the early-deload gate does not consult it. Whether it
+  should is the question. Worst case today is a redundant prompt, since every early deload needs
+  the owner's confirmation.
+- **Also worth a sweep, separately:** `program_phases.program_id` is dead — 0 of 46 populated — and
+  its presence is what made the bad query look answered. Dropping it is a migration and belongs to
+  whoever next touches that table, not here.
 
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
