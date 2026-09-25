@@ -3572,6 +3572,77 @@ drift.
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
 
+### [workouts] BF-198 — `Full` cannot override a WHOLE-SESSION deload, and the card's stated remedy does not exist
+- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts` (the session-level deload builder).
+- **Added:** 2026-09-26 · BugFix intake. Owner, on a Saturday Upper reading *"AI Prescription · Deload"* with `Full` selected: *"How am I supposed to select a full workout when the prescription is deload?"*
+- **Needs:** — nothing.
+
+- **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
+  REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,
+  `components/workout/utils.ts:186`). **The whole-session deload builder never writes that block.** It
+  maps every exercise to `DELOAD_SETS` / `DELOAD_REPS` / `DELOAD_LOWER_PCT` / `DELOAD_REST` and stamps
+  `deloaded: true` on each, with **no `preDeload`** — so there is nothing to revert to and the toggle is
+  inert by construction.
+
+- **Measured in production, and BOTH shapes are live in his own data** (`session_periodization`, six
+  most-recent prescriptions):
+
+  | session | `deload` | exercises deloaded | with `preDeload` | does `Full` work? |
+  |---|---|---|---|---|
+  | **Upper (the screenshot)** | true | **5 of 5** | **0** | **no** |
+  | Pull | true | 5 of 5 | 0 | **no** |
+  | Lower (earlier) | true | 1 of 5 | **1** | yes |
+  | Lower · Push · Legs | false | 0 | 0 | n/a |
+
+  So this is not an edge case and not a one-off: **a whole-session deload always produces the dead
+  toggle, a per-exercise one never does**, and the lifter has no way to tell which he is looking at
+  before pressing it. The 52% on his card is `DELOAD_LOWER_PCT`, confirming the session-level path.
+
+- **⚠ THE REMEDY THE CARD NAMES DOES NOT EXIST — this is the part worth acting on.**
+  `ai-prescription-card.tsx:260` tells him *"you would need a new prescription for that."* There is no
+  way to ask for one at full intensity: **`PrescribeBodySchema` is `.strict()` and accepts only
+  `excludeSessionId` and `durationPreset`** (`app/api/ai-periodization/session/[sessionId]/prescribe/route.ts:28`).
+  Intensity is not an input anywhere on that route. Changing the duration preset regenerates, but
+  re-derives the same deload. **So the card sends him to a door that is not there** — honest about the
+  first fact, wrong about the second.
+
+- **The second-order cost, which is worse than the dead toggle.** If he ignores the targets and simply
+  loads the bar heavier, **those sets still do not count toward his 1RM.** The stamp is
+  `deloaded: ex.deloaded === true || (isAnyDeload && !isBaseline)` (`workout-screen.tsx:1224`), and the
+  PR gate requires `!ex.deloaded` (`:1296`). Under an override `isAnyDeload` goes false, but
+  `ex.deloaded` stays **true** on all five because none could revert — so a genuinely full session is
+  recorded as a deload and earns nothing. He would have no way to know until a PR failed to appear.
+
+- **⭐ Recommend: have the session-level builder record `preDeload`, exactly as the per-exercise path
+  does.** The type is already `{ sets; reps; pct; restSec }` (`types/ai-periodization.ts:41`), the
+  builder is already mapping over `signals.exercises`, and the full-intensity numbers are the ones the
+  non-deload path uses from the same source — so this writes four fields it is holding at that moment.
+  **No route change, no schema change, no LLM call, works offline**, and it makes `Full` behave
+  identically on both deload shapes, which is what the toggle already claims. `reevaluate.ts:175` is
+  the reference for the shape.
+
+- **Alternatives, with what each is better at:**
+  - **Add an intensity input to `/prescribe`.** Better if a lifter should be able to request a genuinely
+    re-planned full session rather than the pre-deload numbers. It loses on cost and blast radius — a
+    schema change, a rebuild, an LLM call and a 429 budget, and it fails offline — to reach numbers the
+    device already holds. It is also the option `utils.ts:192` already considered and rejected for the
+    per-exercise case; nothing here changes that reasoning.
+  - **Disable the `Full` toggle when there is nothing to revert.** Better at never lying. It loses
+    because it removes the capability instead of supplying it, and the owner's question is a request
+    for the capability.
+  - **Leave it and reword the card.** Cheapest. It loses because the 1RM consequence above is invisible
+    and would remain so.
+- **Reversal cost: low.** One builder writing an optional field; the revert path already handles both
+  its presence and its absence.
+
+- **Not diagnosed here.** Why this session was deloaded at all — `deloadReason` is **NULL on every one
+  of the six** stored prescriptions, so the card cannot say why and neither can this entry. Worth its
+  own look: a deload the lifter cannot explain is one he is more likely to override.
+- **Verification:** a whole-session deload prescription stores a `preDeload` block on every exercise;
+  pressing `Full` on one returns all five to their pre-deload weights and sets; the card renders
+  *"Every exercise is back to its pre-deload weights"* rather than *"these weights are unchanged"*; and
+  a set logged under that override counts toward the 1RM. **Device look owed** on the real card.
+
 ### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
 - **Added:** 2026-09-24 · BugFix, from the owner's *"bar load and rest time should be able to be analyzed from past and can determine how much time is needed so not sure if that can be adjusted."*
@@ -16878,6 +16949,35 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
 - **Still not run: the meal-list half.** Sweep 3 covered the food rows. COULD NOT CHECK, not a pass.
 - **`BF-29`'s 2026-08-30 pass is not evidence**: it was the meal list, tapped slowly.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the entry names no file**: it is `components/ui/swipe-actions.tsx:89-101`. `z-10` applies only once `isOpen` (`offset <= -width`), so the first tap misses during the slide.
+- **Verify: device**
+- **✅ FIXED 2026-09-25 (v1.465.62) — the raise was gated on the END of the journey, not the start.**
+  Sweep 59's read was right about the file and understated the window. `isOpen` is
+  `offset <= -width`, i.e. true only once the row has travelled the **full** tray width, so the
+  `z-10` arrived when the slide finished and everything before it was still the original bug. The
+  gate is `offset < 0` now — the tray is raised for the whole of the window in which it is visible,
+  which is the invariant that actually matters: **if you can see it, you can hit it.** `aria-hidden`
+  and `tabIndex` follow the same flag, so there is no visible-but-`aria-hidden` clickable button.
+- **⚠ THE EXISTING REGRESSION TEST PASSES ON THE UNFIXED COMPONENT, which is why this shipped once
+  and failed on the device twice.** Control-run 2026-09-25 with the fix stashed and the spec kept:
+  *"the first tap on Delete opens the confirmation, even mid-animation"* — **green**. It stretches the
+  transition and taps after the row has **rested open**, so it only ever exercised the half that was
+  already fixed. Sweep 3's tap landed before React had committed the rest-open state at all, and that
+  window is **narrower than one CDP round-trip**, so no arrangement of `tap` calls can reach it.
+- **So the new test asserts the PROPERTY instead of racing it** — *while the row is displaced at all,
+  finger still down, the tray is the topmost element over its own rect.* Timing-free, held mid-drag at
+  36 px against a 64 px tray (displaced-but-not-open, exactly where the old gate left the tray
+  underneath). It **fails** against the unfixed component and passes with the fix. It also reads the
+  row's transform before probing, because the first version of it reported *"the tray is under the
+  row"* when the truth was that the drag had never happened.
+- **The meal list is covered by construction, not by a second fix.** `SwipeActions` is shared —
+  `meal-card.tsx` and `saved-meal-card.tsx` render the same component — so there is no per-surface
+  copy to miss. Still unverified on the device there, as the entry notes.
+- **Keep: the device pass, all three clauses.** On the S25, swipe and tap Delete **immediately**:
+  ① the confirmation appears on the **first** press, on **both** the meal list and the food rows;
+  ② the slow tap keeps working; ③ the next rightward swipe closes the tray and leaves the day alone.
+  **Clause ③ is not separately fixed and is not claimed** — sweep 3 found the day jumping to Yesterday
+  only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
+  survives, it is its own entry with its own mechanism, not a re-open of this one.
 
 ### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
 

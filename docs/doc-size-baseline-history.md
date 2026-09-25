@@ -17762,7 +17762,29 @@ backwards — the schema permits slashes on purpose and the right fix accepts an
 `Keep:` also records which of the remaining groups have been re-verified (two) and which have not
 (four), so the next session does not re-derive that.
 
-## 2026-09-25 — `docs/implementation-backlog.md` 31656 → 31660 (RV-177 ownership + dead code)
+## 2026-09-26 — `docs/implementation-backlog.md` → 31727 (BF-198, the dead `Full` toggle)
+
+The owner asked how to select a full workout when the prescription is a deload. The answer is that he
+cannot, so the entry has to carry why: the four-row production table showing both deload shapes in his
+own data (whole-session always dead, per-exercise always working), the `.strict()` schema proving the
+card's stated remedy has no route behind it, and the 1RM gate that makes lifting heavy anyway earn
+nothing. Each is a claim he would otherwise have to take on trust, and the third is invisible from the
+app entirely.
+## 2026-09-25 — `docs/implementation-backlog.md` 31655 → 31684 (+29, BF-61)
+
+The shipped note, and one paragraph that is the whole reason this entry came back twice: **the
+existing regression test passes on the unfixed component.** Control-run with the fix stashed and the
+spec kept, *"the first tap on Delete opens the confirmation, even mid-animation"* is green — it taps
+after the row has rested open, so it only ever exercised the half that was already fixed. An entry
+with a named mechanism, a regression test and a shipped fix failed on the phone twice, and that fact
+is worth more on the record than the fix is.
+
+The rest states what the new test asserts instead (a timing-free property: while the row is displaced
+at all, the tray is topmost over its own rect), why the meal list needs no second fix (one shared
+component), and that acceptance clause ③ — the day jumping to Yesterday — is **not claimed**. That
+last line is the one a future reader needs: it is downstream of the same swallowed tap and may clear
+with it, but if it survives it is its own entry rather than a re-open of this one.
+## 2026-09-25 — `docs/implementation-backlog.md` 31756 → 31760 (RV-177 ownership + dead code)
 
 Four lines. RV-177's unscoped/dead bullet was replaced with what shipped, and the `Keep:` narrowed
 from six open groups to four.
