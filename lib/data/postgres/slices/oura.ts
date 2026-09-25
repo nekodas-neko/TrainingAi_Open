@@ -1558,6 +1558,13 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   readinessScore: 'readiness_score', readinessContributors: 'readiness_contributors', readinessSource: 'readiness_source',
   activityScore: 'activity_score', activityContributors: 'activity_contributors', activeCaloriesEst: 'active_calories_est',
   trainingLoadOts: 'training_load_ots', trainingLoadHigh: 'training_load_high', trainingLoadGate: 'training_load_gate',
+  // TN-64(a). Present here and in the pushMutations branch, so a device that sends it is honoured
+  // and the `DERIVED_COLS` drift tripwire is satisfied — but deliberately absent from the DEVICE's
+  // local mirror, because nothing there computes or reads it. A device therefore never sends it,
+  // the COALESCE upsert leaves the server's value alone, and `applyDelta` ignores it on the way
+  // down. The cost is that a device backup does not carry ACWR; that is acceptable for a DERIVED,
+  // recomputable number in a way it would not be for a raw measurement.
+  acwr: 'acwr',
   recoveryIndexHours: 'recovery_index_hours', wornHoursBle: 'worn_hours_ble', nightHrvBaselineMs: 'night_hrv_baseline_ms',
   illnessFlag: 'illness_flag', illnessScore: 'illness_score', illnessBiomarkers: 'illness_biomarkers',
   daytimeStressScaled: 'daytime_stress_scaled', stressHighMinutes: 'stress_high_minutes', recoveryHighMinutes: 'recovery_high_minutes',
@@ -1614,6 +1621,7 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     activityContributors: r.activityContributors,
     activeCaloriesEst: r.activeCaloriesEst,
     trainingLoadOts: r.trainingLoadOts,
+    acwr: r.acwr,
     trainingLoadHigh: r.trainingLoadHigh,
     trainingLoadGate: r.trainingLoadGate,
     recoveryIndexHours: r.recoveryIndexHours,

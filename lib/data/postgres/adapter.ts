@@ -5295,6 +5295,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             activityContributors:  json(p.activityContributors),
             activeCaloriesEst:     int(p.activeCaloriesEst),
             trainingLoadOts:       num(p.trainingLoadOts),
+            acwr:                  num(p.acwr),
             trainingLoadHigh:      bool(p.trainingLoadHigh),
             trainingLoadGate:      str(p.trainingLoadGate),
             recoveryIndexHours:    num(p.recoveryIndexHours),

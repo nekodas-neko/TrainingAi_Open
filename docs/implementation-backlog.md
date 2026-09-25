@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **282** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **284** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v40** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -1073,6 +1073,31 @@ below keep their gate — they really are blocked pending an answer — and this
 - **✅ ANSWERED BY THE OWNER 2026-09-24: extend the recommender to `ai_dynamic` and persist ACWR,
   keeping the owner-confirmation step.** He took the recommendation as written, over *leave it off
   and delete the gate* and over *lower the thresholds*.
+- **⚙ PART (a) SHIPPED — ACWR is now recorded.** Migration **282** adds `oura_daily_derived.acwr`
+  (with its `claude_ro` twin **283**); the readiness read path writes it on the same patch as the
+  composite score, so both halves of the gate land on one row for one day and cannot disagree.
+  **Parts (b) and (c) are what is left**, and (b) is the behaviour change.
+  - **Re-verified against `main` and production 2026-09-25 before building.** The guard is at
+    `readiness-payload.ts:667` (not :665 — the entry's line number was one block off). `acwr`
+    appeared nowhere in `schema.ts`. **118** sessions now (the entry said 117), still **0** early
+    deloads, **5** programs, **0** carrying `early_deload_week_start`.
+  - **And the structural claim is stronger than the entry states.** Of the 5 programs, **3 are
+    `ai_dynamic` and 2 are `automatic`** — and the two `automatic` ones are the **oldest** (May 23,
+    Jun 5) and both inactive. The active program (*Bankai*, Sept 6) is `ai_dynamic`. So this is not
+    "the gate rarely fires": `automatic` is the legacy mode, and the gate has been dead since the
+    move to `ai_dynamic`.
+  - **Nothing is back-filled and that is deliberate.** The column fills forward only; days before
+    282 read NULL because nothing recorded them at the time. So (b) should not be judged until the
+    column has some days in it.
+  - **Not carried in the device's mirror, and the first attempt at that was WRONG.** It is in
+    `DERIVED_COLS` and in the `pushMutations` branch — the full-suite drift tripwire
+    (`oura-daily-derived-sync.test.ts`) requires that, because the device mirror is also the
+    BACKUP, and a column missing from the push path was a real incident
+    (`daytime_stress_coverage_min` and `chronic_stress_granular_nights` dropped silently for as
+    long as they existed). What is deliberately omitted is the **device's local SQLite table**:
+    nothing there computes or reads ACWR, so a device never sends it, COALESCE leaves the server's
+    value alone, and `applyDelta` ignores it coming down. The cost is that a device backup does not
+    carry ACWR — acceptable for a DERIVED, recomputable number, and not for a raw measurement.
 - **So this is now BUILDABLE and it is Lane A's.** Three parts, and the order matters:
   **(a)** persist ACWR — nothing stores it today, which is why the second leg of this entry's finding
   is inference rather than measurement, and no fix can be validated without it;
