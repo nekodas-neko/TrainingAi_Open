@@ -485,6 +485,270 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
+
+- **Lane: DV** — **re-laned from `O` on 2026-09-25**, when the owner asked which `O` entries belong to
+  the device agent. This is the definition of a DV task: a measurement **nobody has taken**, with an
+  objective pass/fail (*does `probe.js` connect to the S25 and return?*), on hardware only that agent
+  has. Superseded field, demoted to prose so it cannot route this entry: it read *“Lane O —
+  `scripts/device/**`”*. **Added:** 2026-09-22, owner-requested.
+- **⚠ It sat in `O` behind a `Keep:` that reads as finished, which is the trap CLAUDE.md names.** The
+  harness SHIPPED, so the entry looked done-with-residue — but **the residue IS the test**, and until
+  a phone answers, nothing here is verified, including that it connects at all.
+- **This outranks the rest of the device work.** The three check classes no sandbox can reach are
+  blocked on this harness working, so the sittings that would clear ~109 owed checks all depend on
+  it. **Run `probe.js` first**, before any sitting is planned around it.
+- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
+  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
+  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
+  what it takes to make it connect is the finding worth writing down.
+- **The `Keep:` field is REMOVED, 2026-09-25, and that is the point of the re-lane.** It read *"Keep:
+  the first real run, and the fix it will probably need"* — which buckets the entry under
+  *shipped, residue owed* and keeps it out of any lane's READY list. The first real run is not
+  residue; it is the entire remaining task, and it now sits in DV's work list where someone will pick
+  it up.
+
+**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
+build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
+Three classes of check are unreachable as a consequence, and they are precisely the ones the
+backlog is full of:
+
+| class | why no sandbox reaches it |
+|---|---|
+| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
+| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
+| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
+
+Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
+cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
+thing.
+
+- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
+  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
+  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
+- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
+  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
+  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
+  needs a *browser* target and an Android WebView commonly exposes only page targets
+  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
+  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
+  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
+- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
+  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
+  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
+  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
+  real differential when it was a coordinate artifact.
+- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
+  navigation reports a bottom inset of `0` and a broken clearance looks correct.
+- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
+  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
+  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
+  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
+  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
+  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
+  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
+  property or a layout one). Frames are written named by their offset from the start.
+  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
+  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
+  exactly that reason.
+- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
+  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
+  anything needing the owner physically present, or any *"does this feel instant"* judgement.
+  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
+  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
+  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
+  whether a sync button does anything. That is most of the `devices` group and all of
+  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
+  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
+  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
+  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
+  unambiguous ones and leave a shorter, harder list - not an empty one.
+- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
+  substitute. It narrows what the gate has to cover.
+
+**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
+instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
+answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
+
+1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
+   else is worthless until it passes.
+2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
+   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
+   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
+   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
+   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
+   first.**
+3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
+   returns null off the APK, so these have never been exercised. Highest value per check.
+4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
+   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
+   and the floored-utility rule it enforces has never been checkable at all.
+5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
+   for the reason the correction above records: this is the phone the ring and scale are paired to.
+   Mostly *"does this button do anything"*, which is binary.
+6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
+   sheet 300 ms or the stock 500.
+7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
+   those, and pretending otherwise is how a green run starts meaning less than it says.
+
+- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
+  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
+  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
+  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
+  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
+  a repository, which is a cost accepted only because it is bounded and auditable.
+  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
+    *in the page*: the real route, the active tab, visible error text, the button count, whether the
+    page scrolls horizontally, and the lowest action row's computed bottom padding against the
+    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
+    *"is this feature working"* questions are answerable from the digest alone.
+  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
+    the question); a live view (impossible — the reviewing session is a container with no path to a
+    USB device).
+- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
+  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
+  invalidates every clearance reading in step 4.
+
+
+### [devices] OR-172 — the Oura BLE path is the OWNER'S setup, not a product feature
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer closing `OR-160`.
+- **`OR-160` (should Drive backup carry the ring's BLE key?) is CLOSED as moot.** His answer:
+  **"The oura ring key is EXCLUSIVE to me. We can have best practices for me (I have the key saved)
+  but for other people we should not rely on cracked ouras."** He holds the key, so the permanent-loss
+  argument that justified backing it up is gone. **Exclude it with everything else** — that keeps his
+  Google account out of the key's custody chain for no loss.
+- **The larger half, which is why this entry exists rather than a one-line close.** The BLE pipeline
+  is a **re-keyed ring on his own auth key**, and that is not something another user can be given.
+  So **nothing user-facing may assume a ring exists**, and any multi-user work treats ring-derived
+  data as absent by default rather than as the normal case.
+- **What to check when this is next touched:** whether any screen, score or recommendation currently
+  degrades badly with no ring data, as opposed to hiding cleanly. Not measured — the app has only
+  ever run for one user, who has one.
+- **`OR-159` (exclude the WebView session cookie from Android backup) is unaffected** and still
+  stands on its own; this removes the ring key from that conversation rather than changing it.
+
+### [devices][platform] OR-173 — the owner's storage principle vs the archive rule: computed on Railway, raw on the ring
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `Q-30`. **He said "we will discuss
+  this more", so this is a DIRECTION and not yet a decision** — the entry exists so the discussion
+  starts from the conflict rather than rediscovering it.
+- **What he stated:** **"We follow the structure of only saving computed/calculated data on railway.
+  Raw data should be saved on ring only."**
+- **⚠ THIS CONTRADICTS A STANDING RULE IN `CLAUDE.md`, and the rule has a reason.** The Oura
+  Direct-BLE section says the raw bytes on the SERVER are the archival source of truth and must never
+  be pruned or mutated, because **the ring's history buffer is finite and the sync cursor only moves
+  forward**. A decoder fix can only back-fill by re-decoding stored bytes; it can never re-drain the
+  ring. **So "raw on the ring only" means a decoder bug found next month is unfixable for every day
+  already past the ring's buffer.** That is the specific loss to weigh — not disk.
+- **Two things to settle before this becomes policy, and they are different questions:**
+  **(a) Ring or phone?** The device-local copy (D4's plan) is not the ring. The phone can hold a
+  rolling window; the ring's buffer is small and not addressable as storage. If he means the phone,
+  much of the conflict dissolves — **but ⚠ the 14-day device window HAS NOT SHIPPED** (`pruneRaw` has
+  no caller), so there is currently no device retention to rely on.
+  **(b) What is actually lost?** Nobody has measured how often the archive has been re-read. That
+  number decides whether the replay capability is theoretical or load-bearing.
+- **The cost side, measured 2026-09-25 so it is not the argument:** `oura_raw_packed` is **1,522 rows,
+  1,880,515 frames**. At Railway's $0.15/GB/month the whole archive is well under a cent a month, and
+  the ~0.7 MB/day trend adds roughly a cent a year. **Cost is not a reason to act here** — the
+  principle might be, which is what makes it worth discussing rather than deciding on a threshold
+  that has now been passed.
+- **Do nothing to the archive until this resolves.** `Q-30`'s ~20 MB threshold is retired as the
+  trigger: it was set before the cost was known, and the cost turned out not to matter.
+
+### [nutrition] OR-169 — the calorie recommendation was not declined; it was not TRUSTED
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `RV-164`.
+- **`RV-164` asked the wrong question and got a better answer.** It asked whether he meant to apply
+  the 09-14 recommendation of **1,618 kcal** (the app still budgets **1,660**). Both offered readings
+  — *he declined it* or *it slipped* — were wrong. His words: **"I didnt accept cause I wasnt sure if
+  its been calibrated correctly yet."**
+- **So the blocker is confidence in the recommender, not the number.** Applying 1,618 would not fix
+  it and neither would re-recommending: he would decline the next one for the same reason. **Any
+  entry that treats this as a value to set is solving the wrong problem.**
+- **What would actually unblock it:** show how the recommendation was derived and what evidence backs
+  it — which inputs, over what window, and what it predicted last time against what happened. A
+  number he can audit is a number he can accept.
+- **This is Tuning's, not an implementer's.** It is a calibration-validation question, and CLAUDE.md
+  is explicit that a proposal must state **how many other days the change moves**. That figure is
+  exactly the missing reassurance here.
+- **Not established:** how the target is currently derived, and whether any back-test of it exists.
+  Neither was checked when this was filed — do that before proposing anything.
+
+### [cardio][activity] OR-170 — he wants "prescribed heart-health activity", not "prescribed run"
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `RV-166`.
+- **Gate: owner** — the mockup is owed before this is built, per the large-UI-change rule.
+- **`RV-166` offered three ways to link a walk to a prescribed RUN. He rejected the frame:**
+  **"Maybe we need it to be prescribed heart health activity and run/walk/other activity counts."**
+- **That is a rename plus a widening, not a linking fix.** The prescription becomes a *heart-health
+  activity* and any qualifying activity — run, walk, treadmill, other — completes it. It changes what
+  the plan is called, what the card says, and what counts, so it is an information-architecture
+  change to a screen he uses, not a bug fix.
+- **Why it is probably right:** production has **26 prescribed runs, 0 completed**, while 17 of the
+  pending days already carry a walk or treadmill session. The data says the prescription and the
+  behaviour have been different things for the life of the feature, and the app has been silently
+  scoring him against the wrong one.
+- **What has to be settled before anything is built** — and the mockup should answer all three:
+  **(a)** does every activity count equally, or does intensity/duration qualify it?
+  **(b)** does the history show *what was actually done* (a walk) rather than "run: complete"?
+  **(c)** what happens to the 20 past days — backfill under the recompute policy, or leave them?
+- **`RV-166` stays for the mechanical half** (`linkPrescribedRun` only fires on `activityType ===
+  'run'`), which is real regardless of the rename. Do not build it until this entry resolves, or it
+  will be built twice.
+
+### [sleep] OR-171 — ask for a sleep rating only when the score is surprising
+
+- **Lane: O** · **Added:** 2026-09-25 · from the owner's answer to `Q-72` (`RV-161` item 2).
+- **The problem, measured:** no sleep rating since **2026-08-17**, and **35 of the last 36 mornings**
+  sat on the neutral 3. The rank re-validation that depends on those ratings has no signal.
+- **He diagnosed it rather than answering it:** **"Sleep is hard to rate. Its mostly normal. Maybe
+  instead it auto sets it as normal; but if score is high or low it asks was it a good or bad
+  sleep?"**
+- **That is a better design than either option offered, and the reason is worth keeping.** Asking
+  every morning collects 35 neutral 3s — data that cost him 36 interactions and carries almost no
+  information. Asking **only when the computed score is an outlier** collects a rating exactly where
+  it is diagnostic: the days where the app's number and his experience might disagree. **Fewer
+  prompts and more signal, not a trade between them.**
+- **The unanswered design question, which is the whole of it:** what counts as high or low enough to
+  ask? Too wide and it is the daily prompt again; too narrow and the validation starves as it has.
+  **Derive the threshold from the existing score distribution** rather than picking one — the data to
+  do that is already stored.
+- **Do not retire the rank re-validation** (`RV-161` item 2's recommendation, now superseded). It was
+  recommended on the belief that the ratings were not coming; they are not coming *from the current
+  prompt*, which is a different finding with a different fix.
+
+### [platform] OR-168 — nothing confirms a Railway deploy landed; notify when it does not
+
+- **Lane: A** — `app/api/version/route.ts` plus a workflow step. **Added:** 2026-09-25 · Orchestrator,
+  from the CI review. **Owner decided the posture 2026-09-25: NOTIFY ONLY, no automatic rollback.**
+- **The gap.** Merging to `main` auto-deploys to Railway and **nothing checks the result.** The
+  2026-08-17 outage — a database-free route unreachable for ~8 minutes — was found by the owner
+  noticing, not by anything telling him. `railway.json` does not exist and no healthcheck is
+  configured.
+- **Why notify-only and not rollback** (his call, and the reasoning is worth keeping): an automatic
+  revert across a migration can leave production worse than the bad deploy did. A check that tells
+  you is strictly better than no check; a check that *acts* is a mechanism that can itself fail.
+- **⚠ TWO FINDINGS THAT KILL THE OBVIOUS IMPLEMENTATION — read these before writing the poller.**
+  **(a) `/api/version` cannot identify a deploy today.** Its `version` is `CHANGELOG[0].version`, so
+  it only moves when a PR bumps the changelog — most merges do not, and a docs PR never does. Polling
+  it for "has my commit landed" would sit green against the *previous* deploy. **`nativeBuildSha` is
+  the APK's sha, not the web deploy's.**
+  **(b) The route is `Cache-Control: public, max-age=300`** — deliberately, and it is the single
+  written exemption in `scripts/check-api-no-store.js`. A poll can therefore read a **five-minute-old
+  answer** and report a deploy that has not happened. **Do not remove the header** to fix this; bust
+  it from the caller with a query param.
+- **What makes it work:** `process.env.RAILWAY_GIT_COMMIT_SHA` **is** available at runtime and is
+  already used — `app/sw.js/route.ts:12` keys the service-worker cache on it. Expose it as
+  `webBuildSha` on `/api/version`, then poll until it equals the merged commit, with a timeout.
+- **Shape:** a post-merge workflow step on `push` to `main`. Poll with a cache-busting param, fail the
+  step (which notifies) if the sha does not match within the timeout. It must **not** be a required
+  check — it runs after the merge, so gating on it would be circular.
+- **Not established:** how long a Railway deploy actually takes end to end, which sets the timeout.
+  `DV-14` measured that production was still serving 1.465.10 while `main` was at 1.465.16, so the lag
+  is real and unquantified. **Measure it before choosing a number**, or the first false alarm teaches
+  everyone to ignore the alarm.
+
 ### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
 - **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency audit.
@@ -1101,9 +1365,17 @@ the Orchestrator's to do.
   and `DV`, so a sweep that produces findings has no channel of its own and sits in `O` — the same gap
   `OR-150` records for Tuning. Do not invent `Lane: R` for this one entry; if it recurs, that is the
   evidence for a fifth value.
-- **Needs the device for class 2, and the device agent is ARCHIVED** (noted 2026-09-24: its session is
-  archived while its title still ends in 🟢, so the session list reads as though it is live). Class 1
-  and class 3 can be swept from source without it.
+- **Class 2 needs the device; classes 1 and 3 sweep from source without it.**
+  **⚠ CORRECTION, 2026-09-25 (owner): an ARCHIVED Device Verification session is NORMAL, not a
+  fault.** This entry said the agent was archived "while its title still ends in 🟢, so the session
+  list reads as though it is live", and filed that as a gap. It is not one — DV runs **locally on the
+  owner's machine**, so it archives whenever it is not in use and comes back when there is a backlog
+  worth a sitting. His words: *"its just inactive until its needed."*
+  **The lesson is about reading another role's lifecycle as a defect.** The same signal means
+  different things for a container session and a local one, and nothing in the session list says
+  which you are looking at. **Do not file DV's archived state again**, and do not treat it as
+  blocking: the correct reading is that class 2 waits for a sitting, which is the owner's call on
+  timing, not an outage.
 
 ### [platform] RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here
 - **Keep:** two of the three are not the Orchestrator's to execute — item 2 is a GitHub account
@@ -1162,31 +1434,6 @@ the Orchestrator's to do.
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
-
-### [devices] OR-160 — should Google Drive backup carry the Oura ring's BLE key?
-- **Ask:** owner — should Android backup include the Oura ring's BLE key? Backing it up is the only thing that survives an uninstall, which today destroys the key permanently; the cost is that the Google account becomes the key's guard. Recommendation and both costs in the entry.
-
-- **Lane: O** · **Added:** 2026-09-24 · split out of `RV-199` item ③. **He approved *deciding*
-  this deliberately, which is not the same as approving an answer** — so it is still open, and
-  filing it as its own entry is what stops it being settled by whoever next edits the manifest.
-- **Why it is genuinely his.** It trades a real recovery path against a real exposure, and both
-  sides are serious.
-- **Recommendation: back it up, encrypted, and exclude everything else.** An uninstall destroys the
-  ring's BLE key **permanently** — `CLAUDE.md` is emphatic that it is not recoverable from this repo,
-  the server, or any log, and re-pairing means re-onboarding the official Oura app, which risks a
-  firmware update that breaks the reverse-engineered protocol. That is the worst outcome available
-  here, it is one mis-tap away, and a backup is the only thing standing between him and it.
-- **The cost, stated plainly:** the Google account becomes the key's guard. Anyone who compromises it
-  can restore a device that talks to his ring. Android backup is encrypted with the device PIN on
-  modern versions, so this is not a plaintext copy in Drive — but it is a copy, and it is outside his
-  phone.
-- **The alternative and what it is better at.** *Exclude the key with everything else* is better if
-  he would rather the key exist in exactly one place and accept that an uninstall is fatal to it. It
-  is the stronger position on paper and the weaker one in practice, because the failure it guards
-  against needs an attacker and the failure it invites needs a slip.
-- **Reversal cost: low both ways** — one XML file and an APK. But note the asymmetry: switching the
-  backup ON later does not recover a key already destroyed.
-- **`OR-159` ships regardless** and must not settle this by implication.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **Ask:** owner — seven questions from the gate triage, each with a recommendation. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
@@ -1424,6 +1671,8 @@ which is the right shape for something that can only be validated by living with
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
+- **Ask:** owner — the readiness score has no validated external agreement. Saving a check-in rating to validate it against is a PRODUCT change (one more thing to answer each morning), so it is his call, not an assumption. See `OR-171` — he has just redesigned a different rating prompt to fire only on outliers, and the same shape may apply here.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
   conclusion I had already drawn in this session.
 - **Lane: O** — nothing to build; it sets what may and may not be claimed about the score, and names a
@@ -1592,6 +1841,8 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+
+- **Ask:** owner — Home lost its sleep line and nothing replaced it. `sleepQualityFeel` (1–5, with a touched flag) IS collected and unused. Does he want a sleep line back on Home, and driven by that? A product preference; the code half is then Lane B.
 
 - **Lane: O** — it needs a product preference before it needs code, and the code half is then Lane B
   (`components/home/**`). **Added:** 2026-09-24 · Lane A, as the stated residue of TN-66.
@@ -2861,6 +3112,15 @@ volume7dKg,                             // likewise
 
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
+- **⛔ A dependency on `BF-13` was proposed 2026-09-25 and is DECLINED (Orchestrator).** The device
+  agent read this entry as not runnable until BF-13's re-derive lands. Two things say otherwise. The
+  endpoints are different, and this entry already establishes that below — BF-13 fires
+  `rederive-baselines` (the stored EMA baselines), this one fires `backfill-derived-scores` (the
+  readiness contributors). And the owner settled the ordering on 2026-09-24: *"re-derive NOW for the
+  rail fix, and again after the batch"* — two runs, deliberately, the first of them before BF-13.
+  Parking this behind BF-13 would invert that decision and hold a 🔴 LIVE score inversion in place for
+  the duration of the wait.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
   consequence of my own 2026-09-22 proposal** (LA-122 item 2a, the single batched recompute), not a
   defect in TN-60's fix.
@@ -3023,125 +3283,6 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   panel that is not on screen. **FAILED** means the fix belongs to the lane that owns that caller
   (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
   query and both are needed, and this entry closes.
-
-### [platform] DV-14 — ROOT-CAUSED: the Railway build runs out of memory, so almost every deploy fails
-
-- **⛔ ANSWERED 2026-09-24 ~19:30 AEST (Lane A). It was never a stall.** Of the last **40**
-  deployments, **39 FAILED**; the one success was 04:24 UTC. Every failure is the same:
-
-  ```
-  FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
-  [76:0x28c02000] 101405 ms: Mark-Compact 4072.1 (4176.3) -> 4071.7 (4188.3) MB
-  ... v8::internal::JsonStringifier::Stringify ...
-  ELIFECYCLE  Command failed with exit code 134
-  ```
-
-  `next build` hits Node's default ~4 GB old-space cap. **No `NODE_OPTIONS` is set anywhere** — not
-  in `package.json`, not in `nixpacks.toml`, not on the service.
-- **This retires the "it recovered on its own" reading, twice recorded above.** The build sits ON the
-  memory boundary, so it occasionally squeaks through — the 04:24 success is why production serves
-  `1.465.26` and why TN-55's battery fix is live at all. The earlier "recoveries" were lucky builds,
-  not recoveries, which is exactly why three measurement passes from outside found nothing.
-- **⚠ How to read this: the deploy log was reachable the whole time.** `RAILWAY_API_TOKEN` is in the
-  session environment and answers `https://backboard.railway.com/graphql/v2` with a
-  **`Project-Access-Token`** header (NOT `Authorization: Bearer`, which returns *Not Authorized* and
-  reads like a dead credential). Three sessions escalated this to the owner as unreachable. Query
-  `deployments(input:{projectId,environmentId})` for status and `buildLogs(deploymentId)` for the
-  reason; `projectToken { projectId environmentId }` returns both ids.
-- **CI's `Build` job passes**, so this is the Railway builder's memory rather than the code.
-- **⚠ `nixpacks.toml` may be dead config** — the build log shows `railpack-builder`, not nixpacks.
-  Worth confirming before anyone edits that file expecting it to take effect.
-- **Strong candidate for what grew, NOT proven:** `packages/shared/src/changelog.ts` is **661 KB,
-  1,257 entries, 9,883 lines** — the largest source file in the repo by a wide margin, imported into
-  **client** bundles by `about-panel.tsx` and `data-capture-console.tsx`, and appended to by **every
-  PR** under the standing version-bump rule (~7.5 KB/day at the current merge rate). The OOM frame
-  is `JsonStringify`. That fits a slow growth crossing a threshold, but 661 KB → 4 GB needs a
-  mechanism nobody has demonstrated. **The experiment that would settle it:** build twice with a
-  fixed heap cap, once with the changelog stubbed to a handful of entries, and compare peak RSS.
-- **Two fixes, and they are not alternatives — the first unblocks, the second is the actual repair.**
-  Raising the cap (`NODE_OPTIONS=--max-old-space-size=…`, in the build script or as a service
-  variable) gets 22 merges of shipped work deployed; if the container has under ~8 GB it trades a
-  clean exit-134 for a kernel OOM kill, so the value wants checking against the plan. Bounding the
-  changelog — a fragment file, or shipping only the last N entries to the client — is what stops it
-  recurring. **Owner asked 2026-09-24; the service-variable route is a production config change and
-  was not taken unilaterally.**
-
-**The history below is kept as filed — the measurements are sound, the conclusion drawn from them was not.**
-
-- **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
-  `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
-  **`1.465.28`** with its newest commit at **18:45**. **At least 8 first-parent merges are on `main`
-  and not live**, across roughly 3½ hours.
-- **The pattern is now the finding, not the individual stall.** Three stalls in about a day, two of
-  which ended on their own with no cause established. Per the repo's own rule, something that stops
-  is not something that was fixed — so the two recoveries are not evidence of health, and this third
-  one should not be waited out either.
-- **It is costing shipped work.** #1538 (DV-18, the broken exercise pictures) and #1539 merged into
-  this window, so the fix for a defect the owner can see is merged and not running. TN-55's battery
-  rebalance is the exception and only by luck: it IS live, because 1.465.26 is the version
-  production happens to be stuck on.
-- **⚠ Still blocked on the same thing, and it is now concrete rather than precautionary.** The
-  Railway deploy log is the only surface that distinguishes *failing* from *queued* from *never
-  triggered*, and those three have different fixes. No container can read it. Everything measurable
-  from here has been measured three times; the next useful step is not another measurement.
-
-- **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
-  "caught up by itself" update below was the lull, not the end.** Live `/api/version` answers
-  **`1.465.17`**; `main`'s `package.json` is **`1.465.22`**. 1.465.17 landed with **#1473 at
-  20:36 AEST on 09-23**, so production has been stuck for roughly **TEN HOURS**, against the two
-  the entry was filed for.
-  **Five merges are unshipped:** #1474 (23:32, post-push guard), #1477 (00:40, nutrition chunk
-  nesting), #1478 (01:07, route animations), #1479 (01:35, More sub-tabs), #1481 (03:34, Home's
-  APK banner). Every one is a UI change nobody can see and nobody can device-verify.
-  **The shape is a long stall, then a catch-up, then another stall** — not a single stuck deploy.
-  That distinction matters for the diagnosis: a deploy that is *failing* would stay failed, so
-  something is either batching, throttling, or intermittently succeeding.
-  **Still not established, and still the first step: Railway's deploy log.** It is not reachable
-  from the sandbox — no Railway API or CLI here — so this needs the owner or the device agent's
-  machine. Nothing else in this entry can move until someone reads it.
-- **⚠ This weakens DV-13's conclusion, and the correction belongs on both entries.** DV-13 records
-  that the 8-minute outage at 20:04 correlated with a production deploy from the 20:03 merge
-  (#1468). **That attribution assumed merges were deploying promptly, which this entry shows they
-  were not** — at 20:22 production was still serving 1.465.10, six versions behind. The outage is
-  still deploy-SHAPED (a database-free route down for minutes, then instantly healthy), but *which*
-  deploy, and whether it was a batched catch-up rather than #1468's, is **not** established. The
-  merge-cadence advice that came out of DV-13 stands on its own footing regardless.
-- **Historical, 20:27 AEST 09-23:** production caught up to **v1.465.16** by itself (confirmed from
-  a PC and from the APK after a restart). **Something that stopped is not something that was fixed**
-  — and it has now stopped and restarted twice, which is the evidence for that rule rather than
-  against it.
-
-- **Lane:** A — Railway's deploy for `main` (the build/start/health check), not application code.
-- **Added:** 2026-09-23 20:25 AEST · Device Verification, noticed while re-checking DV-13.
-- **Measured:** the public `/api/version` (from a PC, and from the APK) answers **`"version":"1.465.10"`**
-  at 20:22 AEST. `main` is at **1.465.16**. Not live: 1.465.11 (18:16, status-bar scrim — DV-6),
-  1.465.12 (18:55, sleep timing in the user's zone — DV-7/DV-9), 1.465.13 (19:11, switch names —
-  DV-11), 1.465.14 (19:38, weigh-in invalidation — RV-108), 1.465.15 (20:03, fat floor), 1.465.16
-  (20:18, #1467 — BF-177's post-push invalidation).
-- **Consequence for everyone:** every fix merged since 18:16 is **unverifiable on the device and
-  unshipped to the owner**, and any "merged, so it is live" reasoning since then is wrong. A deploy
-  that restarts and fails may also be DV-13's 8-minute outage (20:04, one minute after the 20:03
-  merge).
-- **First step:** Railway's deploy log for `main` from 18:16 — the first failing deploy names the
-  cause. Not established: whether deploys fail, are stuck queued, or are disabled.
-- **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
-- **✅ CAUSE CLOSED 2026-09-24 (Lane A, RV-188):** the heap cap was set in `ci.yml`'s Build job and
-  **nowhere else**, so Railway ran on Node's RAM-scaled default — ~4,051 MB there against 2,096 MB
-  in the sandbox — and failed ~45 MB short on the same commit CI passed. The number now lives in
-  `package.json` alone. See RV-188 for what shipped, and for the two part-2 fixes that were tried
-  and did not work.
-- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** production **caught up**: live 1.465.25 = `main` 1.465.25 (merged 11:26, live by 13:09). One read cannot show deploy latency, and the cause stays unread in Railway's log, so this is *stopped, not explained*.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** see the reproduction below and **RV-188**, which is now Lane A's first item. There is also a fourth version reading: live **1.465.26** against `main` **1.465.31** (21:30 AEST).
-- **🔬 REPRODUCED LOCALLY 2026-09-24 (Review sweep 59) — and the changelog is NOT the driver.**
-  `main` at f8311852, sandbox with 15 GB and 4 cores, Node 22, `pnpm build`:
-  | run | result |
-  |---|---|
-  | default heap | **passes**, 3.1 min. The `next build` process peaks at **7.85 GB RSS** (all node processes together ~11 GB) |
-  | default heap, `SENTRY_AUTH_TOKEN=dummy` (source maps on; no org, so no upload) | passes, ~11 GB. **Source maps make no difference** |
-  | `--max-old-space-size=3072` | **fails exactly like Railway**: exit 134 at ~94 s, Mark-Compact 3031 MB, `JsonStringify` frame |
-  | 3 GB + `changelog.ts` cut from 662 KB to 9.8 KB | **still fails**. The changelog is not what grew |
-  | 3 GB + `withSentryConfig` removed from `next.config.ts` | **compile passes** ("Compiled successfully in 106s"), then "Linting and checking validity of types" runs out of memory in its own process under the same cap |
-  So the build needs 3–4 GB of heap. **The Sentry webpack wrapper is what pushes the compile phase over**, and type-checking needs more than 3 GB on its own. The local 3 GB cap is now a **fast, deterministic reproduction loop** for any fix. The next step is **RV-188**.
 
 ### [workouts][app-shell] DV-16 — "Leave workout? Your workout is already done" — shipped, device pass owed
 
@@ -3329,6 +3470,13 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 
 ### [devices][platform] DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+
+- **⚠ BLAST RADIUS — recorded 2026-09-25 (Orchestrator, from the device agent's sweep-4 review).**
+  Five items wait on this one: `RV-186` row 9 (which is DV-13's own pass test), the
+  `admin-console-sitting` batch, `BF-10`, `LB-5` and `Q-538`. Two of them already say so in their own
+  text — *"Sweep 2: COULD NOT CHECK — device metrics never loaded"* and *"do not retry until DV-13 is
+  closed"*. That makes this the highest-fanout open device blocker in the queue, and the thing
+  unblocking all five is Lane A's row cap and per-request timeout, not another look at the phone.
 
 - **Update:** after production caught up (v1.465.16), `/api/oura-ble/rollup-state` answered 200
   twice from `/health` at 20:33 with no slowdown. That does not clear the admin console's
@@ -4120,6 +4268,8 @@ drift.
 
 ### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
 
+- **Ask:** owner — leaving a guided walk by the back gesture or the tab bar DISCARDS it; only the End button saves. A 39-minute walk vanishes with no row. What should the other two exits do — save, prompt, or keep discarding? A product decision with no single right answer.
+
 - **Lane: O** — a product decision about what happens to a walk, not a defect with one right answer.
   **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
   written per call site, which is what surfaced it).
@@ -4708,6 +4858,12 @@ drift.
   ```
 
 ### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen, and the span is 24 days, not 16
+
+- **⛔ A re-lane away from the device agent was proposed 2026-09-25 and is DECLINED (Orchestrator)**,
+  on the ground that a production recompute is not a device check. That was true until 2026-09-24 and
+  changed that day: `RV-170`'s answer authorises recompute-from-stored-inputs outright *and* routes
+  such runs to the device agent, because the route needs a signed-in admin session and no sandboxed
+  agent has one. The bullet below already records that reasoning. It stands.
 
 - **Lane: DV** — an authorised recompute to run, not code to write. The Lane A half (correcting the
   false claim and re-measuring the span) shipped 2026-09-25; `lib/oura-ble/rollup/run.ts:1043-1044`
@@ -5983,6 +6139,8 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
 
+- **Ask:** owner — seven independent banners can stack above Home's first card. Which collapse and which stay full-width is a look he sees daily, so it needs him before code, and it owes a mockup at 384 px dark.
+
 - **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
   owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
   saved to the repo, so no implementer can reach it. **Orchestrator: export it to
@@ -6816,7 +6974,32 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
-- **Ask:** owner — generate the doc-size baselines in CI instead of committing them? RV-134 already did the cheap half and rejected this one with a reason; re-measure the tax before deciding.
+- **Ask:** owner — the approval on 2026-09-25 was given on a framing that omitted this entry's own objection, and the re-measurement changes the answer. Generating ALL baselines in CI removes the ceiling from CLAUDE.md and projectOverview.md too, which is what the ratchet is for. The narrower fix targets the one file that actually collides. Recommendation and the measurement are below; the build was started and reverted rather than shipped against a stale premise.
+- **📏 RE-MEASURED 2026-09-25, and the tax is real but it is ONE FILE.** Of the last 63 `.size`
+  changes on `main`: **54 are `docs/doc-size/docs/implementation-backlog.md.size`**, against
+  `projectOverview.md` 7, and 1 each for `CLAUDE.md`, `tuning.md`, `bugfix.md`. So `RV-134`'s slack
+  fix did NOT end the class — but the residue is not slack detection, it is that **every agent edits
+  the backlog and it genuinely grows**, so two PRs raise the same number and conflict by
+  construction. That is a ratchet working correctly on the wrong file.
+- **The membership rule is in the script's own first line:** *"Shrink-only size ratchet for the
+  documents every session reads before it can start."* **The backlog is not one of those** — CLAUDE.md
+  instructs an implementer to start from `node scripts/next-item.js`, not a hand-scan, and nobody
+  reads 32,026 lines to orient. Its size is already controlled by the protocol that removes a
+  finished entry and by the compaction sweep.
+- **RECOMMENDED: drop the backlog from the ratchet and REPORT its size instead** — printed on every
+  run, never failing, no committed number to collide on. That removes 54 of 63 of the churn and keeps
+  every ceiling that matters. **Do NOT generate all baselines in CI:** a derived baseline makes every
+  increment inherited, so `projectOverview.md` could grow ten lines a PR forever — and it once reached
+  **9,647 lines** while its own opening line called it a lean index.
+- **⚠ A TEST PINS THE OPPOSITE, which is why this is not already done.**
+  `scripts/__tests__/doc-size-baselines.test.ts:104` asserts the backlog *"must stay tracked"*, listing
+  it among *"the orientation docs every session reads"*. That is an assumption encoded as a test, not
+  a measurement — but it is someone's deliberate call, and reversing it is the decision here rather
+  than a detail of the implementation.
+- **Reversal cost: low.** Restoring the `.size` file and the test assertion is a two-line revert; the
+  baseline can be regenerated with `--fix` at any time.
+- **The implementation was written and REVERTED 2026-09-25** rather than shipped against a premise
+  two signals contradicted. Redoing it is ~20 minutes once the call is made.
 
 - **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
   REJECTED this one with a reason.** The two were filed hours apart by different sessions and
@@ -11331,8 +11514,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   six proxy-path rows (Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick, Face Pull, Nordic
   Hamstring Curl) plus the reference figure stay broken. Orthogonal to everything shipped below —
   none of it touches storage or generation — but it gates the Mirror/AI paths and it is still owed.
-- **Verify:** device — the two-line row and the sweep sheet on the S25. Measured at 412 dp in the
-  harness, not seen on glass.
 - **Added:** 2026-09-11 · owner, on the Admin Console → Exercises tab: *"ui is bad and I also want a
   better way to make sure everything has the right gif. Maybe a way for me to flag if its wrong so
   you we can decide how to proceed."*
@@ -13391,6 +13572,15 @@ call rather than a queue pass. Alternative: leave lookups as they are and add th
 
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
 
+- **⬆ MOVED UP THE QUEUE 2026-09-25 on the owner's call** (`RV-161` item 5). **12 of 27 recent dates
+  are missing a night**, and sleep feeds readiness, the sleep score and several trends — so nearly
+  half of those are computing across a gap rather than on data. That makes it a data-integrity
+  problem sitting upstream of the scoring work waiting on Tuning, which is why it outranks entries
+  that merely sharpen a number.
+- **Establish the CAUSE before building the fix.** A night missing because the ring was not worn is
+  not the same defect as a night the pipeline dropped, and only the second is fixable here. The
+  census that found this did not separate them.
+
 - **⚑ STILL LIVE 2026-09-17, with current numbers and a consequence the entry does not state.**
   **5 of the last 13 days recorded a midday Brisbane fragment as the day's ONLY sleep session** —
   starts at 11:54, 12:10, 13:06, 12:25 and 14:25 local, 0.0–1.7 h, efficiency 0–48 — so the real
@@ -15144,6 +15334,8 @@ one. A swipe on the single Start button adds an affordance that does not current
   tab switch and an app restart (which is BF-84's half).
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
+
+- **Ask:** owner — one-line consent: may a deliberate client-side error be thrown in PRODUCTION to prove Sentry receives it? That is the whole remaining gate. It creates one real Sentry event; the earlier note that it "may page someone" is why nobody has just done it. Say yes and this becomes a DV check with an objective pass/fail.
 
 > **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
 > whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
@@ -20879,169 +21071,6 @@ lived context.
   the app feels, and there is a measurement showing why rather than an inference.
 - **Surface: device only.** Every negative above is from source inspection, not from a running S25.
 
-### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
-
-- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): no longer slow, and it stays.** Saved meal *Protein Granola* → **Log this
-  meal** → the row appears **271 ms** after the tap (push +136 ms, 298 ms), survives Home→Nutrition, and no
-  local-store-dead banner shows. It stored as a plain food log (`saved_meal_id` NULL) for this
-  one-ingredient meal. Deleted after (it then resurrected — DV-15).
-
-- **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
-- **Added:** 2026-08-24 · owner: *"nutrition is loading very slow; about 20 seconds from clicking
-  log to having it show up — when I swapped pages I see that it isn't in the nutrition log anymore
-  so maybe not going through properly."* Screenshot: `saved-meals-sheet.tsx`'s "Build a Meal" list,
-  **Ninja Creami Protein Ice Cream**'s "Log this meal" mid-spin.
-- **Checked production directly (`claude_ro.food_logs`, owner's rows, `date = 2026-08-24`) — the
-  writes are NOT lost, and they carry a specific fingerprint.** Two bursts land right at the
-  reported time (9:14–9:15pm Brisbane / 11:14–11:15 UTC): `BARILLA Spaghetti Protein` /
-  `Turkey Mince` / `Passata` (three rows, `updated_at` 11:14:17.072 / .457 / .886 — **staggered
-  ~0.4s apart**) and `Whey Protein Isolate` / `Full Cream Milk` (11:15:12.513 / .977, same ~0.46s
-  stagger). A local-first batch write would land these together in one JS tick; **a per-item
-  sequential network round trip would not** — this is the fingerprint of `logMealItems`'s **web
-  fallback branch**, not its local-store branch.
-- **Traced to source: `packages/shared/src/nutrition/log-meal.ts`.** `logMealItems` has two paths.
-  When `getLocalStore(userId)` returns a real store, every write is local-first (SQLite upserts,
-  `await`ed but not network-bound) and the function returns immediately with optimistic entries —
-  fast, matching the "saves feel instant" rule. **When `getLocalStore` returns `null`, it falls
-  through to a `for` loop of sequential `await fetch('/api/nutrition/food-logs', ...)` calls, one
-  per ingredient** (lines 97-110) — exactly the "never await POSTs serially in a loop" pattern
-  CLAUDE.md already names as a smell elsewhere in this codebase. For a 2-3 item meal that's 2-3
-  sequential round trips, which the production timestamps confirm are actually happening — though
-  0.4-0.9s of measured DB-write gap alone doesn't account for the full ~20s the owner felt; the rest
-  is plausibly per-request network/API latency between those writes, not visible from `updated_at`
-  alone.
-- **What makes `getLocalStore` return null on a real device: `isLocalStoreDead()`**
-  (`lib/sqlite/sqlite-service.ts`, the "K4" state) — the on-device SQLite DB failed to open. This is
-  documented as a real, recoverable-only-by-reinstall-or-retry failure mode elsewhere in this repo's
-  migration rules, not hypothetical. **There is already a visible banner for exactly this state**
-  (`components/shell/local-store-dead-banner.tsx`, "Local storage unavailable — saving online
-  only") — neither screenshot shows it, but the banner renders above the sheet and could be
-  occluded; this needs an on-device check, not a guess from the screenshot crop.
-- **The "vanished after navigating away" half is not fully explained by the above, and is flagged
-  open rather than diagnosed.** Once a fallback-path write lands server-side (confirmed above,
-  eventually), `invalidateNutritionWrite()` does cover the `nutrition-food-logs-` prefix
-  (`lib/cache-groups.ts:445`) and `useFoodLogsLoader`'s local-store-absent branch re-fetches through
-  `cachedFetch` against that same key — so a plain re-render should show it once the fetch settles.
-  Two things this entry does NOT resolve: (1) whether the specific "Ninja Creami" tap shown
-  mid-spinner in the screenshot is among the rows that landed, or whether that specific request was
-  abandoned (e.g. navigating away before a sequential fetch chain completes, in a WebView, has not
-  been checked); (2) whether "not there" meant genuinely absent on a fresh load, or present but not
-  yet re-painted because the owner looked before the ~20s chain finished.
-- **What would confirm the mechanism:** on-device, check whether `LocalStoreDeadBanner` is showing,
-  or read `isLocalStoreDead()`/`getLocalStore(userId) === null` via an admin console during a
-  reproduction. If confirmed dead, the underlying fix is whatever heals K4 (a retry path, or at
-  minimum surfacing the failure loudly enough that "slow" doesn't read as "broken") — this entry
-  does not scope that fix, only the trace to it.
-- **What would count as fixed:** logging a saved meal on this device completes in the sub-second
-  range the local-first path is designed for, or — if the local store is genuinely and permanently
-  dead on this install — the banner is visibly showing so the 20s delay reads as "expected, online
-  only" rather than "broken."
-- **Surface: device-only to confirm.** The mechanism traces cleanly from code + production data, but
-  confirming *why* this specific device's local store is null needs the device.
-- 🚧 **THE SERIAL-FETCH HALF SHIPPED 2026-08-24 (Lane A).** `logMealItems`'s fallback branch now
-  issues its per-ingredient POSTs through `Promise.allSettled` instead of a `for` loop of
-  sequential `await fetch`es, so an N-item meal costs one round trip's wall clock rather than N.
-  **Proven by mutation, not just by passing:** all three new cases in
-  `packages/shared/src/nutrition/__tests__/log-meal-fallback.test.ts` fail against the reverted
-  serial loop (the concurrency assertion sees 1 POST instead of 3) and pass with it restored. The
-  sibling `log-meal.test.ts` could not have caught this — it mocks `getLocalStore` to a working
-  store, so it never reaches the fallback at all; the new file mocks it to `null`.
-  - **A second defect was fixed in the same change, created by the first fix.** Concurrency makes
-    the rollback's completeness load-bearing: `Promise.all` rejects on the first failure without
-    reporting which siblings succeeded, so a partial failure would strand rows the rollback cannot
-    see — invisible to the user until they reappear as duplicates on the next tap. `allSettled`
-    records every landed id before rethrowing. Serially this could not happen, which is why it
-    needed a test now and not before.
-- **⚠️ THIS DOES NOT CLOSE THE ENTRY — two halves remain, both device-gated.** (1) *Why* this
-  device's local store is null (the K4 state) is untouched; the fallback being fast is a mitigation,
-  not the cure, and the entry's own "what would count as fixed" bar wants the local-first path or a
-  visible banner. (2) The "vanished after navigating away" half is still not explained. **Nothing
-  here was observed on the S25** — the change is verified by unit test and static reading only, and
-  `pnpm dev` could not be run in the sandbox (missing `@sentry/nextjs` in `node_modules`).
-- **Keep:** the on-device check this entry already asks for — whether `LocalStoreDeadBanner` is
-  showing during a reproduction — now also tells you whether the ~20s is gone or merely shorter.
-
-## Nutrition focus — the owner's priority, 2026-08-18
-
-*"lets focus on the nutrition changes now. id like to get this perfected today"*
-
-The nutrition cluster is **eight entries**, ordered by dependency rather than Q number, starting at
-Q-401 below. **Q-407** (the meal-plan wizard as a coach conversation) and **Q-409** (paste a recipe
-URL, get a meal) were added on 2026-08-19 from the owner. Q-407 sits after Q-398 because a
-conversational plan needs somewhere to land — plan meals becoming ordinary saved meals is its exit
-route. Q-409 sits after Q-407 because it extends the same step, but it depends on nothing and can be
-built into the existing stepper at any time.
-
-Two have shipped since this block was written: **Q-399** (#163, the centred label now has
-room for its ingredient list) and **Q-402** (#165, a component is told when its cache key is
-invalidated). Their entries were correctly removed on merge.
-
-~~**Q-359 sits above the block deliberately**~~ — **that placement expired and Q-359 has been moved
-down (2026-08-24).** It was put here because 36 fetch-once effects carried Q-402's bug and some of
-them were in the permanently-mounted shell, where it can actually bite. Four slices later the
-can-bite group is **zero**; the 12 that remain all unmount on navigate, and the check script's own
-per-site judgement is that **none of them is worth converting** — a subscription on a key nothing
-writes while the component is up adds a refetch with no reader waiting for it, which Q-359's entry
-itself warns against. It stays queued as the home of its ratchet, not as work.
-
-**Realistically today, and this is the honest split:**
-- **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
-  are done** — v1.325.0 gave the default label its three ingredient lines at 0.401 mm per module,
-  and v1.325.1 gave the cache an invalidation signal so Home's energy card stops freezing.)
-  (**Q-387 is done too** — its shared-module wiring shipped 2026-08-19 and its button, Undo and
-  N-of-10 counter in #330.)
-- **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
-  `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
-  first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
-  whatever else happens.
-
-**Parallel-safe:** the Lane B half of Q-401 is now unblocked on both counts. Everything else is
-sequential.
-
----
-
-**2026-08-19 — the owner reviewed the interactive prototype, and the cluster is now fully decided.**
-
-Prototype: <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>. **Nothing in this
-cluster is waiting on the owner any more.** Every open question that was blocking it has an answer,
-and the answers live in the entries rather than here:
-
-| decided | where it is written | build order |
-|---|---|---|
-| Label styles all draw **square** | **✅ Q-411 SHIPPED 2026-08-19 (v1.325.5)** — [`journal`](overview/history-2026-09-10-folded-2.md#2026-08-19-square-label-canvas) | done |
-| Save-to-gallery, and the PNG's missing physical size | **✅ Q-400 SHIPPED 2026-08-19** — [`journal`](overview/history-2026-09-10-folded-1.md#2026-08-19-label-save-to-gallery) | **needs the new APK; the print test is unblocked once it is installed** |
-| Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
-| Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
-| Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
-| Meal photo uploads from **Edit Meal**, 64 px tile left of the name | Q-396 | independent |
-| The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
-
-**✅ THE PRINT TEST IS DONE — 2026-08-19, and it passed on all three counts.** The owner printed a
-`Ninja Creami Protein Ice Cream` label from the APK carrying Q-400 and reported: *"at this size; it
-still scans fine after being printed."* That single print closed everything that had been stacked
-behind it:
-1. **The export path works** — Q-400's save-to-gallery reached a printer.
-2. **The physical size is right** — it printed as a label, not at 312 mm, so the dpi the PNG now
-   declares is being honoured.
-3. **Q-411's gain is real, and the crop-vs-scale question is moot** — the owner printed **square on
-   square stock**, so the artwork keeps its full 50 mm width and the default module holds at
-   **0.561 mm** rather than falling to 0.397. The scaling branch of that fork never applies.
-
-**So Q-411 may now be described as a scannability improvement rather than a simplification** — the
-caveat that stood all day is discharged by evidence, not by argument. `band` remains the tightest of
-the six and is still the one to re-test if a printer or label stock ever changes.
-
-**One defect the print made visible, filed as Q-416 and now FIXED** (2026-08-19) — the block was
-pinned to both margins at once, so a short ingredient list left up to 8.6 mm of dead space above the
-code. Half the slack now sits above the block instead. **Still owed: a print of the fixed artwork**,
-since the complaint that started it came from paper.
-
-**Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
-`saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
-already stale when written. What remains of Q-406 is the row component itself, and it now waits on
-Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
-design decision. See the correction at the top of that entry.
-
 ### [devices][heart-rate] BF-10 — the admin Device Metrics sparklines plot by sample index, not by time, so a night-only signal renders as if it ran all day
 
 - **📱 Sweep 2: COULD NOT CHECK** — device metrics never loaded (DV-13).
@@ -22745,118 +22774,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
-
-### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
-
-- **Lane: O** — `scripts/device/**`. **Added:** 2026-09-22, owner-requested.
-- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
-  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
-  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
-  what it takes to make it connect is the finding worth writing down.
-- **Keep:** the first real run, and the fix it will probably need. Until a phone has answered,
-  nothing here is verified — including the claim that it connects at all.
-
-**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
-build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
-Three classes of check are unreachable as a consequence, and they are precisely the ones the
-backlog is full of:
-
-| class | why no sandbox reaches it |
-|---|---|
-| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
-| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
-| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
-
-Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
-cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
-thing.
-
-- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
-  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
-  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
-- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
-  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
-  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
-  needs a *browser* target and an Android WebView commonly exposes only page targets
-  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
-  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
-  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
-- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
-  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
-  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
-  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
-  real differential when it was a coordinate artifact.
-- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
-  navigation reports a bottom inset of `0` and a broken clearance looks correct.
-- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
-  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
-  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
-  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
-  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
-  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
-  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
-  property or a layout one). Frames are written named by their offset from the start.
-  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
-  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
-  exactly that reason.
-- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
-  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
-  anything needing the owner physically present, or any *"does this feel instant"* judgement.
-  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
-  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
-  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
-  whether a sync button does anything. That is most of the `devices` group and all of
-  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
-  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
-  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
-  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
-  unambiguous ones and leave a shorter, harder list - not an empty one.
-- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
-  substitute. It narrows what the gate has to cover.
-
-**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
-instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
-answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
-
-1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
-   else is worthless until it passes.
-2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
-   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
-   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
-   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
-   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
-   first.**
-3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
-   returns null off the APK, so these have never been exercised. Highest value per check.
-4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
-   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
-   and the floored-utility rule it enforces has never been checkable at all.
-5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
-   for the reason the correction above records: this is the phone the ring and scale are paired to.
-   Mostly *"does this button do anything"*, which is binary.
-6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
-   sheet 300 ms or the stock 500.
-7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
-   those, and pretending otherwise is how a green run starts meaning less than it says.
-
-- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
-  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
-  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
-  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
-  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
-  a repository, which is a cost accepted only because it is bounded and auditable.
-  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
-    *in the page*: the real route, the active tab, visible error text, the button count, whether the
-    page scrolls horizontally, and the lowest action row's computed bottom padding against the
-    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
-    *"is this feature working"* questions are answerable from the digest alone.
-  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
-    the question); a live view (impossible — the reviewing session is a container with no path to a
-    USB device).
-- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
-  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
-  invalidates every clearance reading in step 4.
-
 
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
@@ -24900,6 +24817,12 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the title is now false in both halves.** Resilience carries a level on **30** rows (was 13, newest 09-22), falling **5 → 4 → 3 → 2 → 1** from 09-07. It sits **pinned at the bottom clamp (1.01) on 09-21 and 09-22**, and the daily sleep-recovery term is 0.0 on most recent days. So it no longer saturates at the top; it saturates at the other clamp. Re-measure before any proposal is written.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+
+- **⛔ A re-lane away from the device agent was proposed 2026-09-25 and is DECLINED (Orchestrator)**,
+  on the ground that this is Lane A code. There *is* Lane A code here — the heartbeat in the note
+  below — but the field names who acts **next**, and next is the hand-fired admin run the owner
+  assigned to the device agent on 2026-09-24: *"It should be able to do the admin sitting too."* The
+  heartbeat follows that run, because the run is what establishes whether a reap fires at all.
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
 - **✅ UNBLOCKED 2026-09-24.** It carried a `Needs:` on `RV-170` because it REWRITES stored history rather than filling a gap. He answered that policy the same day — recompute-from-stored-inputs YES, hand-edits NO — and this is a recompute, so it is authorised. Nothing further is owed by him; it is the device agent's to run.
 
@@ -26240,6 +26163,16 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
+
+- **⛔ Reported as a duplicate of `TN-1` on 2026-09-25; it is not, and nothing needed changing
+  (Orchestrator).** TN-1 **shipped** the diagnostic column that records *why* the model refuses. This
+  entry is the still-open question of whether to trigger the wide pass or relax the gate. What they
+  share is a **trigger**, not an identity — one hand-fired full rollup from an admin session — and the
+  batch field below already pairs them for exactly that reason (OR-148, 2026-09-24). Deduping would
+  have deleted a live question to save a line.
+  ⚠ A second batch field was nearly added here before the existing one was spotted 48 lines down.
+  That is the `Q-529` first-match-wins shape: **one field of a kind per entry**, and a `head`-truncated
+  read of an entry's fields is not a read of its fields.
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
 - **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
 
@@ -26390,6 +26323,21 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   read the question as *why has the producer never run* rather than *why is this number odd*.
 
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
+
+- **✅ APPROVED 2026-09-25: null the corrupt fields, keep the row.** The owner took the
+  recommendation over deleting the row and over leaving it.
+- **This is a stated EXCEPTION to his own hand-edits-no policy (`RV-170`), and it was offered as
+  one.** The policy says recompute-from-stored-inputs yes, hand-edits no. This is a hand-edit: the
+  07-29 reading is known-bad and no recompute can fix it, because the stored input IS the corruption.
+  The exception is narrow — **a reading the device got wrong, not a number anyone dislikes** — and it
+  should not be cited to justify editing history generally.
+- **Why nulling beats deleting:** the row records that a measurement happened that day. Blank fields
+  say "measured, unusable"; a deleted row says "never measured", which is a different and false
+  claim.
+- **Lane A's, and it is a PRODUCTION WRITE** — present the exact UPDATE and the affected row count
+  before running it, per the destructive-change carve-out. One row, named fields only.
+- **It passes the 4% screen**, which is the reason this cannot be left: the guard reads it as valid
+  and it keeps feeding body-composition trends.
 
 - **⚠ ASK THIS AS A POLICY, NOT AS AN ENTRY — `history-row-policy` (grouped 2026-09-16, OR-118).**
   **Q-298** (10 one-rep-max rows), **Q-527** (1 backfilled row) and **LA-21** (7 sessions stamped with
@@ -28436,6 +28384,12 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
+
+- **⛔ Asked again 2026-09-25; the answer has not moved (Orchestrator).** The device agent proposed
+  once more that only the screen look here is its own. The note below already answers it: the *What is
+  actually left* section has exactly **one** item, and that item **is** the screen look — the AI Coach
+  section of `docs/device-smoke-checklist.md` on two navless full-screen routes. There is no second
+  half to hand back to a code lane.
 
 - **The check that was gating this, now stated as the work (OR-136, 2026-09-23).** The gate is
   removed because it named the same actor as the lane — a `Lane: DV` entry gated on `device` parks
