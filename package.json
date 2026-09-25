@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.465.50",
+  "version": "1.465.51",
   "engines": {
     "node": ">=22.12"
   },

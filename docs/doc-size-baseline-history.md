@@ -17376,3 +17376,19 @@ thing the entry exists to spare him.
 
 RV-99 itself also gained the measurement (116 occurrences across 48 files, and which of the four
 must-not-touch files are even in Lane B's paths) so the next session does not repeat it.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31173 → 31183 (+10)
+
+`RV-101` shipped, and the entry it leaves behind is a Keep rather than a deletion — the device look
+at the new ramp and key is still owed, and it now prints in the `workouts` sitting.
+
++10 after a trim from +23. What survived the trim is the part a future reader needs in the QUEUE
+rather than the journal: the entry's two contrast figures were measured against the wrong background
+(`--card`, where the neighbour is actually the component's own `defaultFill` composited over it, so
+1.65:1 and 2.11:1 rather than 2.04 and 2.60), its prescribed fix cannot be built (there is 1.52:1 of
+total range to hold the two lifted stops and their separation), and two things it asked for are
+declined with reasons rather than silently skipped. Narrative went to
+`docs/overview/entries/2026-09-25-rv101-heatmap-ramp-and-key.md`.
+
+A refutation left out of the entry gets rediscovered by whoever picks it up next, which is what the
+extra lines buy.
