@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.48",
+    date: "2026-09-25",
+    changes: [
+      "The AI Coach now follows the same writing rules as every other part of the app that talks about your numbers: quote what it was given rather than recomputing it, metric units only, and no calling anything \u201cperfect\u201d. It was the one place that streams free text about your own data without them \u2014 which is exactly how you previously got advice in Fahrenheit and a score of 80 described as perfect.",
+    ],
+  },
+  {
     version: "1.465.47",
     date: "2026-09-25",
     changes: [
