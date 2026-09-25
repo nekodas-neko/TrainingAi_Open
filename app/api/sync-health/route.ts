@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
         carbsG:     d.carbsG,
         fatG:       d.fatG,
         steps:            d.steps     != null ? Math.round(d.steps) : undefined,
-        activeCalories:   d.activeCalories,
+        activeCalories:   d.activeCalories != null ? Math.round(d.activeCalories) : undefined,
         distanceKm:       d.distanceKm,
         restingHeartRate: d.restingHeartRate,
         hrvMs:            d.hrvMs,
