@@ -219,6 +219,11 @@ export async function invalidateOuraSync(): Promise<void> {
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
+    // RV-178 — `lastMeasuredAt` is what a drain moves, so "Ring synced 4m ago" is wrong the
+    // instant one lands. Registered with the key rather than after it: the seed only ever paints
+    // briefly (a plain `cachedFetch` always revalidates), but an unregistered key is how this
+    // becomes a real staleness bug the moment someone adds `freshWithinTtl` to it.
+    invalidateCache('oura-ble-freshness'),
     // prefix-invalidate every `oura-hr-day:<date>` entry
     invalidateCache('oura-hr-day:'),
     // per-day HR zone rollups (an Oura sync brings new oura_heartrate rows)
@@ -377,7 +382,14 @@ export async function invalidateHealthTrends(): Promise<void> {
  *  /api/user/profile cache key after the nutrition-user-profile/more-user-profile
  *  key collapse (CACHE-F13). */
 export async function invalidateUserProfile(): Promise<void> {
-  await invalidateCache('more-user-profile')
+  await Promise.all([
+    invalidateCache('more-user-profile'),
+    // RV-178 — `/profile/[userId]` renders the same name, avatar and equipped title. Usually it is
+    // someone ELSE's profile, which nothing on this device can change; the case this covers is
+    // viewing your own through a shared link after editing it. Prefix-invalidated, one entry per
+    // viewed user.
+    invalidateCache('public-profile:'),
+  ])
 }
 
 /** A Coach conversation was saved, or a suggested change applied — both change the
