@@ -17628,3 +17628,16 @@ rewrites the stress buckets as the one open question.
 The entry also carries a **do-not** that is the point of filing it: widening the recompute to 21
 days on every pass would reintroduce exactly the per-ingest growth RV-182 was opened to remove,
 behind every ring drain.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31405 → 31424 (+19)
+
+`RV-67`'s SECOND key, `nutrition-targets`, is proved and flagged. The entry grows by the proof's two
+non-obvious halves, both of which a later session would otherwise have to rediscover: the GET had to
+be shown to be a stored row rather than a derivation (if targets came from body weight, every
+body-metric write would be a writer of this key), and `upsertNutritionTargets` has a second caller in
+`PUT /api/user/goals`, which upserts targets as a side effect — so every goals writer is silently a
+targets writer.
+
+It also records that the flag **invalidates a recorded audit**. The 2026-08-16 goal-invalidation audit
+concluded all six keys of that group were inert; that is now five of six, and the audit itself carries
+the correction at its head rather than only this entry, because CLAUDE.md cites its headline.
