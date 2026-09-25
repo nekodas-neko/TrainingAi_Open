@@ -25,7 +25,7 @@ import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName 
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -5807,6 +5807,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ epoch: r.epoch, anchorDs: Number(r.anchorDs), anchorUtcMs: new Date(r.anchorUtc).getTime() }))
   }
 
+  /** RV-182 ② — the offsets only, one row per epoch. Prefer this over `getOuraClockAnchors`
+   *  whenever the anchors are merely reduced to an offset, which was every read path but the
+   *  rollup's. */
+  async getOuraClockOffsets(userId: string): Promise<ClockOffsets> {
+    return oura.getOuraClockOffsets(this.db, userId)
+  }
+
   async getWorkoutSensorProbe(userId: string, sessionId?: string): Promise<import('../repository').WorkoutSensorProbe | null> {
     const [ws] = await this.db
       .select({ id: s.workoutSessions.id, startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
@@ -5840,10 +5847,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const hrSamples = hrRow?.c ?? 0
 
     let rawByTag: { tag: string; count: number }[] = []
-    const anchors = await this.getOuraClockAnchors(userId)   // LA-139: robust offset, not one pair
-    const probeEpoch = currentEpoch(anchors)
-    const probeFromDs = probeEpoch == null ? null : resolveMsToDs(start.getTime(), anchors, probeEpoch)
-    const probeToDs = probeEpoch == null ? null : resolveMsToDs(end.getTime(), anchors, probeEpoch)
+    // RV-182 ②: the offsets, not the anchor log — this path only converts timestamps.
+    const clock = await this.getOuraClockOffsets(userId)
+    const probeEpoch = clock.epoch
+    const probeFromDs = probeEpoch == null ? null : msToDs(start.getTime(), clock, probeEpoch)
+    const probeToDs = probeEpoch == null ? null : msToDs(end.getTime(), clock, probeEpoch)
     if (probeFromDs != null && probeToDs != null) {
       const startDs = Math.floor(probeFromDs)
       const endDs = Math.ceil(probeToDs)
@@ -5876,12 +5884,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  `resolveDsToMs` rather than a stored timestamp so it cannot go stale when the clock model
    *  changes — the same reason `getOuraRawSamples` stopped reading `measured_at`. */
   async getSleepCoverageEnd(userId: string): Promise<Date | null> {
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return null
     const ds = await oura.getOuraRollupWatermark(this.db, userId, epoch)
     if (ds == null) return null
-    const ms = resolveDsToMs(ds, anchors, epoch)
+    const ms = dsToMs(ds, clock, epoch)
     return ms == null ? null : new Date(ms)
   }
 
@@ -5903,14 +5911,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
     const daytimeHours: [number, number] = [9, 21]
     const clampedDays = Math.max(1, Math.min(30, Math.floor(days) || 7))
-    const anchors = await this.getOuraClockAnchors(userId)   // LA-139: robust offset, not one pair
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
 
     const nowMs = Date.now()
     const fromMs = nowMs - clampedDays * 86_400_000
-    const fromDs = resolveMsToDs(fromMs, anchors, epoch)
-    const toDs = resolveMsToDs(nowMs, anchors, epoch)
+    const fromDs = msToDs(fromMs, clock, epoch)
+    const toDs = msToDs(nowMs, clock, epoch)
     if (fromDs == null || toDs == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
@@ -5921,7 +5929,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
       const hist = perTag.get(r.tag) ?? new Array(24).fill(0)
-      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       const hour = Number(formatInTimeZone(new Date(tsMs), tz, 'H'))
       if (hour >= 0 && hour < 24) { hist[hour]++; perTag.set(r.tag, hist) }
@@ -5978,11 +5986,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // other readers in this file already use `resolveDsToMs`/`resolveMsToDs`, which take a robust
     // offset across the epoch — `getOuraClockAnchors`' own comment says reads "resolve it against
     // the observation nearest that frame, not the newest". These four were the exceptions.
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return { temp: [], met: [] }
-    const fromDs = resolveMsToDs(from.getTime(), anchors, epoch)
-    const toDs = resolveMsToDs(to.getTime(), anchors, epoch)
+    const fromDs = msToDs(from.getTime(), clock, epoch)
+    const toDs = msToDs(to.getTime(), clock, epoch)
     if (fromDs == null || toDs == null) return { temp: [], met: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
@@ -5992,7 +6000,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     for (const r of rows) {
       const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
       if (!decoded) continue
-      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
@@ -6010,11 +6018,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     voltageMv: number | null
     chargingTimeSec: number | null
   }>> {
-    const anchors = await this.getOuraClockAnchors(userId)
-    const epoch = currentEpoch(anchors)
+    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
+    const epoch = clock.epoch
     if (epoch == null) return []
-    const fromDs = resolveMsToDs(from.getTime(), anchors, epoch)
-    const toDs = resolveMsToDs(to.getTime(), anchors, epoch)
+    const fromDs = msToDs(from.getTime(), clock, epoch)
+    const toDs = msToDs(to.getTime(), clock, epoch)
     if (fromDs == null || toDs == null) return []
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
@@ -6024,7 +6032,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
       const kind = decoded?.kind
       if (kind !== 'battery_level_changed' && kind !== 'charging_time') continue
-      const tsMs = resolveDsToMs(Number(r.ds), anchors, epoch)
+      const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       out.push({
         tsMs,
