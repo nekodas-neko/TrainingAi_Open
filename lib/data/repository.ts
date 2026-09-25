@@ -23,6 +23,7 @@ import type {
 } from '@trainingai/shared/types/ai-periodization'
 import type { TimeseriesCursor, TimeseriesPage, OuraHrDeltaRow, OuraBucketDeltaRow } from './postgres/slices/oura'
 import type { BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
+import type { ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Result of an upsert-by-client-id workout session write. `wasInserted` is false when a
 // session with that id already existed — in that case the phase fields reflect what was
@@ -1267,6 +1268,10 @@ export interface WorkoutRepository {
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
+  /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
+   *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them
+   *  (RV-181). */
+  getObservedHrProfile(userId: string, from: Date, to: Date): Promise<ObservedHrProfile>
   /** Per-day time-in-HR-zone (seconds per zone) over a local-date range, reconcile-on-read cached
    *  in daily_zone_minutes. `today` is always recomputed (partial day). Server-derived, not synced. */
   getZoneMinutesRange(

@@ -17379,6 +17379,20 @@ thing the entry exists to spare him.
 RV-99 itself also gained the measurement (116 occurrences across 48 files, and which of the four
 must-not-touch files are even in Lane B's paths) so the next session does not repeat it.
 
+## 2026-09-25 — `docs/implementation-backlog.md` 31173 → 31181 (RV-181)
+
+RV-181 shipped its main part and stayed in the queue with two, so the entry was rewritten rather
+than removed, and the rewrite is eight lines longer than what it replaced.
+
+The eight lines are a **retraction**, and that is why they belong in the queue rather than in the
+journal entry beside the rest of the narrative. The entry's evidence line offered a SQL aggregate at
+54 ms against a 90-day fetch, which reads as an eight-fold win; that measurement had no chest-strap
+merge in it, and the merge is 78% of the rows and the whole cost. The real aggregate is 225–260 ms
+against ~354 ms — about a third. An implementer picking up either open part reads the entry, not the
+journal, and would otherwise size the remaining work against a number that has already been shown to
+be wrong once. The formulation benchmarks and the rest of the story were trimmed out to the journal
+entry, which is what kept this to eight lines instead of nineteen.
+
 ---
 
 ## 2026-09-25 — `docs/agents/state/tuning.md` 731 → 744 (+13), the owner's scope rule for the Tuning role
