@@ -4123,11 +4123,32 @@ drift.
   refetches pre-write data, then refetches again after the push. That is 2N+1 requests where N+1
   would do; sweep 1 saw 3×2+1. **Offline, and when the push fails, keep the immediate round**
   (LB-4/LB-132's reason still holds).
-- **The exercise catalogue (~113 KB) is refetched and re-cached on every Workout tab show**
-  (`workout-select-content.tsx:176`). It changes only on admin edits. The server read the whole
-  table 3,040 times.
-- **`app/more/more-content.tsx:101-104`'s comment is false:** a re-show sends 2 GETs (5–6 on
-  Friends), not "nothing".
+- **⚠ THE EXERCISE-CATALOGUE CLAIM IS WRONG AND IS RETRACTED (LB-147, 2026-09-25).** It is **not**
+  refetched on every Workout tab show. `workout-select-content.tsx:176` passes
+  **`freshWithinTtl: true`** with `TTL_LONG` (6 h), and `cachedFetchCore` returns before any network
+  call when the entry is fresh (`lib/sqlite/cache.ts:306`). The flag has been there since the
+  initial snapshot, and `invalidateExerciseLibrary` — the key's only invalidator — fires on
+  catalogue edits alone. So the ceiling is ~4 fetches a day per device, not one per show. **The
+  3,040 server reads are real and are explained by that ceiling across many days and cold starts,
+  not by a defect.** Read counts do not localise a cause.
+- **`app/more/more-content.tsx`'s comment was false and is FIXED (LB-147).** It claimed
+  *"cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing"*; the TTL governs
+  whether the cached PAINT is used, never whether the request is sent, so a re-show did send 2 GETs.
+  The comment now says so. **The requests themselves remain** — `freshWithinTtl` on
+  `more-user-profile`/`more-seasons` needs the written invalidation proof, which nobody has done.
+- **✅ THE SUPPLEMENT HALF SHIPPED (LB-147), and it was a CORRECTNESS bug, not only waste.**
+  Supplements are CLAUDE.md's named reference for offline-first, so the device holds the truth —
+  yet `sync-provider.tsx` reconciled its reminder notifications from `/api/supplements`. **A
+  supplement added or stopped offline scheduled the wrong reminder until the next pull.** It now
+  reads the local store first, with the API kept as the fallback for the web and for a store that
+  failed to open; an empty local table falls through rather than cancelling live reminders.
+  The local→`SupplementWithStatus` mapping was extracted to `lib/supplements/local-status.ts`
+  because a second copy is precisely BF-112, where the inline one dropped the dose fields and a
+  prompt that worked on the web never fired on the APK.
+- **Still open, all of it measured and none of it done:** the food-log/meal-types pair on the same
+  reconcile (same local-first argument, but `reconcileMealReminders` needs a join this PR did not
+  build), the three fetches duplicating Home's, `next-session`, and the Lane A halves
+  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 

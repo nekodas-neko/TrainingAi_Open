@@ -9,10 +9,13 @@ import { reconcileMealReminders, scheduleEndOfDayReminder } from '@/lib/meal-rem
 import { scheduleEveningReminder, scheduleWeeklyRecapReminder } from '@/lib/day-review-reminders';
 import { reconcileWorkoutReminder } from '@/lib/workout-reminders';
 import { reconcileSupplementReminders } from '@/lib/supplement-reminders';
+import { localSupplementsToStatus } from '@/lib/supplements/local-status';
+import type { SupplementWithStatus } from '@trainingai/shared/types/supplement';
 import { reconcileHealthAlerts } from '@/lib/health-alerts';
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route';
 import type { BodyBatteryResponse } from '@/app/api/body-battery/route';
 import { todayInTz } from '@trainingai/shared/date-utils';
+import { getLocalStore } from '@/lib/local-store';
 import { pullDelta, pushMutations } from '@/lib/local-store/sync-engine';
 import { markLocalStoreDead } from '@/lib/local-store/dead-store-signal';
 import { reportClientError } from '@/lib/client-error';
@@ -319,12 +322,31 @@ export function SyncProvider({ userId }: SyncProviderProps) {
 
     async function reconcile() {
       try {
-        let supplements: unknown = null;
-        await cachedFetchToday('supplements', '/api/supplements', TTL_MEDIUM, d => { supplements = d; });
-        await reconcileSupplementReminders(
-          Array.isArray(supplements) ? supplements : [],
-          new Date(),
-        );
+        // Local-first, like every other read of this domain (RV-183). Supplements are CLAUDE.md's
+        // named reference for offline-first, so the device holds the truth and `/api/supplements`
+        // holds whatever has synced — reconciling reminders from the server meant a supplement
+        // added or stopped offline scheduled the wrong notification until the next pull. It also
+        // dropped two GETs from every launch and every resume, which is what the entry counted.
+        //
+        // The API stays as the fallback: `getLocalStore` returns null on the web and whenever the
+        // store failed to open, and an empty local table is indistinguishable from an unhydrated
+        // one — so both fall through rather than reconciling against nothing and cancelling live
+        // reminders.
+        let supplements: SupplementWithStatus[] | null = null;
+        const store = userId ? getLocalStore(userId) : null;
+        if (store) {
+          const [defs, logs] = await Promise.all([
+            store.getSupplements(),
+            store.getSupplementLogs(todayInTz(tz)),
+          ]);
+          if (defs.length > 0) supplements = localSupplementsToStatus(defs, logs, userId!);
+        }
+        if (!supplements) {
+          let fetched: unknown = null;
+          await cachedFetchToday('supplements', '/api/supplements', TTL_MEDIUM, d => { fetched = d; });
+          supplements = Array.isArray(fetched) ? fetched as SupplementWithStatus[] : [];
+        }
+        await reconcileSupplementReminders(supplements, new Date());
       } catch {
         // Network unavailable — skip
       }
@@ -339,7 +361,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
     })();
 
     return () => { handle?.remove(); };
-  }, [userId]);
+  }, [userId, tz]);
 
   // Fire on-device anomaly notifications (illness / high-stress / low-readiness) on app open + resume.
   // Reads the two today-envelope responses the app already warms and hands them to the pure

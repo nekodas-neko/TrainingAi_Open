@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.42",
+    date: "2026-09-25",
+    changes: [
+      "Supplement reminders are now worked out from what is on your phone rather than from what has reached the server. If you added or stopped a supplement while offline, the reminder could be wrong until the next sync \u2014 it now matches what you actually have straight away. It also drops two network requests from every app open and every resume.",
+    ],
+  },
+  {
     version: "1.465.41",
     date: "2026-09-25",
     changes: [

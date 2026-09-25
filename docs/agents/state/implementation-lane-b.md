@@ -1,7 +1,7 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-24 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-147 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-148 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
@@ -36,8 +36,8 @@ device`) both headed READY while unstartable. The field must LEAD its own bullet
   instant the five are green; no run for your head = conflicted PR.
 - **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
   entry when the floor is a judgement rather than a fit.
-- **GREP THE FIELD, NOT THE FILES THE ENTRY NAMES** — five in a row named one surface and had more. BF-196 said "one string"; a third had already solved it, so the fix was to MATCH its phrasing, not ship the entry's nicer one.
-- **A BATCH CAN SHIP HALF** — ship the measurable half, sharpen the rest, and SAY which half in the PR and the entry.
+- **GREP THE FIELD, NOT THE FILES THE ENTRY NAMES** — six in a row named one surface and had more, or one already fixed. BF-196's third surface had solved it (match it, don't re-coin); RV-183's catalogue claim was WRONG (`freshWithinTtl` since the snapshot) and its "3,040 server reads" was a 6 h TTL over many days — **a read count localises nothing**. Verify every bullet of a multi-part entry before building any of it, and retract what does not hold.
+- **A BATCH OR A MULTI-PART ENTRY CAN SHIP HALF** — ship what holds, sharpen the rest, SAY which half.
 - **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
   lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
   #1587 red; `no-console` allows info/warn/error) · `pnpm test` · `pnpm build` · `tsc`. The doc-size

@@ -101,7 +101,16 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
   // More was the one tab the persistent-shell plan never wired up (the other four thread `epoch`
   // through their own effects), so with every tab permanently mounted its profile, stats and season
   // badges were fetched once per app launch and never again — an app restart was the only refresh.
-  // cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing.
+  // ⚠ A re-show costs TWO GETs, not nothing (RV-183). An earlier version of this comment said
+  // "cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing" — it does not.
+  // `cachedFetchCore` paints the cached value and then ALWAYS revalidates over the network; the TTL
+  // governs whether the cached paint is used, never whether the request is sent. Only
+  // `freshWithinTtl: true` skips the round trip, and neither call in `refresh` passes it.
+  //
+  // Left as-is deliberately. Adding `freshWithinTtl` to `more-user-profile` and `more-seasons`
+  // needs the written invalidation proof CLAUDE.md requires — every write that changes either
+  // payload, shown to be in a group that clears the key — and a missed writer turns a brief stale
+  // paint into hours of hard staleness on the screen that shows who you are.
   useRefreshOnTabShow(refresh);
 
   const handlePullSync = useCallback(async () => {
