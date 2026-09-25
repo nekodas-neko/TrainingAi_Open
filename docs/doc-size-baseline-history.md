@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-25 — backlog → 32139 (OR-168 filed, plus eight owner decisions and a DV re-lane)
+
+Growth, and most of it is answers rather than new work. `OR-168` is the largest single addition:
+the deploy-verification gap carries two findings that kill the obvious implementation — `/api/version`
+reports `CHANGELOG[0].version`, so it does not move on a merge that skips the changelog, and the route
+is deliberately `max-age=300`, so a poll can confirm a deploy that has not happened. Both belong on the
+entry, because the next session would otherwise rediscover them by building the wrong poller.
+
+The rest: eight owner decisions recorded onto their entries rather than left in a chat scrollback,
+`OR-127` re-laned O→DV, and `LA-129` annotated with the measurement that contradicts its premise —
+54 of the last 63 `.size` changes on `main` are this very file's sibling, which is the argument for
+dropping the backlog from the ratchet rather than for generating baselines in CI. That measurement is
+recorded and NOT acted on; the entry says why.
+
 ## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
 
 Growth, and it is the cheap kind: the device agent re-reported DV-15 from a sitting on v1.465.17,
@@ -17823,3 +17837,18 @@ do not transfer to the APK.
 
 Recorded on the ENTRY rather than in the baton on purpose: whoever picks DV-12 up reads the entry and
 never reads Lane B's baton, and a finding filed where it cannot be found is a finding lost.
+## 2026-09-25 — `docs/implementation-backlog.md` 31857 → 31865 (RV-177 phase-set schemas)
+
+Eight lines. RV-177's phase-set bullet replaced with what shipped, and the `Keep:` narrowed from
+four open groups to three.
+
+The lines are there for one reason: the bound. `generated-program.ts` already bounds
+`durationCycles` at `min(1)` and the repo's own reuse rule points straight at copying it — but the
+editor floors at 0 and **production holds 8 phases at `duration_cycles = 0`**, so `min(1)` would
+have 400ed the owner re-saving his own phase set. The entry records that, and records that whether
+0 should be reachable is a product question left open rather than settled by a validator.
+**2026-09-25 · `docs/implementation-backlog.md` · Review sweep 61, `review/sweep-61-ai-to-logic`.**
+31865 → 31945 (+80; rebased). Five entries (RV-200 to RV-204) at the owner's request to move AI calls to logic where
+possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
+cites the computed code the model currently rewords, which is what makes it buildable without
+re-deriving it.
