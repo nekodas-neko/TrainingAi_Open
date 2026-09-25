@@ -5,6 +5,12 @@ import {
   type SupplementReminderAction,
 } from '../supplement-reminders'
 import type { SupplementWithStatus } from '@trainingai/shared/types/supplement'
+import { fromZonedTime } from 'date-fns-tz'
+// Fixtures are wall-clock times in the USER's zone, not the device's. A bare
+// `new Date('2026-06-17T09:00:00')` is parsed device-local, which is how these tests used to agree
+// with a `setHours` implementation that had the same bug (LB-148).
+const TZ = 'Australia/Brisbane'
+const bne = (iso: string) => fromZonedTime(iso, TZ)
 
 function makeSupplement(overrides: Partial<SupplementWithStatus> = {}): SupplementWithStatus {
   return {
@@ -25,14 +31,14 @@ function makeSupplement(overrides: Partial<SupplementWithStatus> = {}): Suppleme
 describe('computeSupplementReminderActions', () => {
   it('cancels when supplement is already logged today', () => {
     const sup = makeSupplement({ loggedToday: true })
-    const now = new Date('2026-06-17T09:00:00')
+    const now = bne('2026-06-17T09:00:00')
     const actions = computeSupplementReminderActions([sup], now)
     expect(actions).toEqual<SupplementReminderAction[]>([{ supplementId: 'sup-1', type: 'cancel' }])
   })
 
   it('cancels when reminderEnabled is false (NUT-5: was silently dropped, not cancelled)', () => {
     const sup = makeSupplement({ reminderEnabled: false })
-    const now = new Date('2026-06-17T09:00:00')
+    const now = bne('2026-06-17T09:00:00')
     const actions = computeSupplementReminderActions([sup], now)
     expect(actions).toEqual<SupplementReminderAction[]>([{ supplementId: 'sup-1', type: 'cancel' }])
   })
@@ -45,26 +51,26 @@ describe('computeSupplementReminderActions', () => {
 
   it('cancels an inactive supplement even with reminders otherwise fully configured (NUT-5)', () => {
     const sup = makeSupplement({ active: false })
-    const now = new Date('2026-06-17T09:00:00')
+    const now = bne('2026-06-17T09:00:00')
     const actions = computeSupplementReminderActions([sup], now)
     expect(actions).toEqual<SupplementReminderAction[]>([{ supplementId: 'sup-1', type: 'cancel' }])
   })
 
   it('schedules notification before reminder time', () => {
     const sup = makeSupplement({ reminderTime: '08:00' })
-    const now = new Date('2026-06-17T07:00:00')
+    const now = bne('2026-06-17T07:00:00')
     const actions = computeSupplementReminderActions([sup], now)
     expect(actions).toEqual<SupplementReminderAction[]>([{
       supplementId: 'sup-1',
       type: 'scheduled',
-      at: new Date('2026-06-17T08:00:00'),
+      at: bne('2026-06-17T08:00:00'),
       name: 'Creatine',
     }])
   })
 
   it('fires immediate when past reminder time and not notified', () => {
     const sup = makeSupplement({ reminderTime: '08:00' })
-    const now = new Date('2026-06-17T09:00:00')
+    const now = bne('2026-06-17T09:00:00')
     const actions = computeSupplementReminderActions([sup], now)
     expect(actions).toEqual<SupplementReminderAction[]>([{
       supplementId: 'sup-1',
@@ -75,14 +81,14 @@ describe('computeSupplementReminderActions', () => {
 
   it('skips when past reminder time but already notified today', () => {
     const sup = makeSupplement({ reminderTime: '08:00' })
-    const now = new Date('2026-06-17T09:00:00')
+    const now = bne('2026-06-17T09:00:00')
     const actions = computeSupplementReminderActions([sup], now, new Set(['sup-1']))
     expect(actions).toEqual<SupplementReminderAction[]>([{ supplementId: 'sup-1', type: 'skip' }])
   })
 
   it('fires immediate at exactly reminder time', () => {
     const sup = makeSupplement({ reminderTime: '08:00' })
-    const now = new Date('2026-06-17T08:00:00')
+    const now = bne('2026-06-17T08:00:00')
     const actions = computeSupplementReminderActions([sup], now)
     expect(actions[0].type).toBe('immediate')
   })
@@ -90,11 +96,11 @@ describe('computeSupplementReminderActions', () => {
   it('handles multiple supplements independently', () => {
     const creatine = makeSupplement({ id: 'sup-1', name: 'Creatine', reminderTime: '08:00', loggedToday: true })
     const magnesium = makeSupplement({ id: 'sup-2', name: 'Magnesium', reminderTime: '21:00', loggedToday: false })
-    const now = new Date('2026-06-17T09:00:00')
+    const now = bne('2026-06-17T09:00:00')
     const actions = computeSupplementReminderActions([creatine, magnesium], now)
     expect(actions).toEqual<SupplementReminderAction[]>([
       { supplementId: 'sup-1', type: 'cancel' },
-      { supplementId: 'sup-2', type: 'scheduled', at: new Date('2026-06-17T21:00:00'), name: 'Magnesium' },
+      { supplementId: 'sup-2', type: 'scheduled', at: bne('2026-06-17T21:00:00'), name: 'Magnesium' },
     ])
   })
 })
