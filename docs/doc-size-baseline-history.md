@@ -17180,3 +17180,15 @@ The last paragraph says the +2.3 rests on a single DEXA pair. The calibration's 
 warns that n = 1 supports an offset and not a ratio; repeating it here stops the new number being
 read as more authoritative than the old one. What improved is that the pair is compared like for
 like, not that the offset is now known to be right.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 30910 → 30924 (TN-64 b/c + LA-138)
+
+A net +14 across two entries, and the arithmetic is worth stating: TN-64 grew by the (b)/(c) note
+and its `Keep:`, LA-138 is new, and both are additions rather than one entry sprawling.
+
+LA-138 is the larger half and is a finding, not work: `program_phases` is empty for all five
+programs, so the early-deload block's "am I already in a deload" guard has never suppressed
+anything. It was invisible while the gate itself was unreachable, and shipping TN-64(b) is what
+makes it matter. It is filed rather than fixed because the prior question — whether `ai_dynamic`
+writes phase rows at all — decides whether the fix is to read another source or to populate a table
+nothing reads. Writing that down costs fourteen lines and saves the next session from picking one.
