@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.39",
+    date: "2026-09-25",
+    changes: [
+      "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. It now notices when answers have stopped arriving and shows you your saved data instead of a spinner, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely. Slow requests are never cancelled \u2014 on a weak connection your data still arrives, it just tells you honestly that the connection is struggling while you wait.",
+    ],
+  },
+  {
     version: "1.465.38",
     date: "2026-09-24",
     changes: [
-      "The app no longer freezes up in low reception. It could tell whether your phone had a signal, but not whether anything was actually getting through \u2014 so somewhere with bad reception it kept believing it was online, waited forever for answers that were never coming, and sat on loading spinners instead of showing what it had already saved. The worst of it was the workout screen, where you could not start a session at all. It now notices when answers have stopped arriving and shows you your saved data instead of a spinner, and the offline notice appears when things genuinely are not getting through rather than only when the signal has gone completely. Slow requests are never cancelled \u2014 on a weak connection your data still arrives, it just tells you honestly that the connection is struggling while you wait.",
+      "Switching tabs no longer blanks the screen. The panel you were leaving was hidden in the same instant the new one appeared, but the new one then faded in from nothing \u2014 so for about a tenth of a second every switch showed neither, just the background. The fade is gone and the new tab is drawn straight away. This is the flicker, not the lag: the tab switch is still doing too much work behind the scenes, and that is being worked on separately.",
     ],
   },
   {

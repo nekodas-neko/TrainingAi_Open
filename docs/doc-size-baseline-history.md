@@ -17104,6 +17104,18 @@ the amendment costs lines because the answer is that the two numbers he compares
 units: the card's estimate is working time, the summary's duration is wall clock. Recording it needs
 both the code anchors and the session's three timestamps, because "it is counting it" is not
 believable without them.
+## 2026-09-24 — `projectOverview.md` 12771 → 12785 (LB-144, #…)
+
+Fourteen lines: the Known-Issues row CLAUDE.md requires for a change that shipped without a device
+pass. The tab switch no longer blanks (RV-113), and the check owed is a *look*, not a measurement —
+the Device Verification session is archived.
+
+Most of the row is there to stop a specific wrong conclusion. RV-113 removes a blank, not a delay,
+so the obvious verification (`perf.js longtasks`) will show no improvement; without the row saying
+so, the next reader measures it, sees nothing, and records a working fix as a failed one. The 68–118
+ms long task under it is DV-12, still open. A row that only said "not verified on device" would have
+cost more than the lines it saved.
+
 
 ## 2026-09-24 — `projectOverview.md` → 12796 (BF-195)
 
@@ -17127,3 +17139,10 @@ quietly overwritten because the row's own caveat predicted the wrong failure: it
 about the number is not a finding about the approach"*, and the defect was the approach. A future
 session reaching for a cancelling timeout on a slow connection should find the reason it was
 already tried and reverted, not just the current code.
+
+## 2026-09-25 — `projectOverview.md` → 12821 (BF-195 merge recompute)
+
+Not a deliberate raise: two branches added Known-Issues rows to the same document in parallel, so the
+`.size` conflicted on a single number. Recomputed with `--fix` on the merged file rather than taking
+either side — picking one would have encoded a count that matches neither branch's reality, and the
+check would then fail on `main` for whoever merged second.

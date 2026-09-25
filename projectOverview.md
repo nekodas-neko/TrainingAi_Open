@@ -3050,6 +3050,20 @@ both the initializer and the effect, and `setReviewOpen(true)` running, on the f
 defect is downstream, in what the sheet renders or is gated on during a cold first render. Filed
 with a probe recipe rather than chased inside RV-110's PR.
 
+### [app-shell] ⚠️ The tab switch no longer blanks, and nobody has looked at it (RV-113, OR-161, 2026-09-24, v1.465.38) · needs: device
+
+The opacity ramp is gone from `ta-tab-enter`, so the incoming panel is painted for the whole
+switch instead of held at opacity 0 for 58–109 ms. **Not verified on device** — the Device
+Verification session is archived, and this is a perceptual change on the app's most frequent
+interaction, so the check is a look rather than a measurement.
+
+**Read `perf.js longtasks` here and you will conclude it failed.** It removes a BLANK, not a DELAY:
+the 68–118 ms long task underneath is `DV-12`, still open and untouched. The two numbers describe
+the same frames, which is why they were batched and why only half of the batch shipped.
+
+Also fixed: the two code comments (`globals.css`, `tab-shell.tsx:186`) that asserted this defect
+could not happen and are why it survived review.
+
 ### [app-shell] ⚠️ Cross-tab navigation goes through the shell now — the teardown premise is UNVERIFIED (RV-110, RV-112, 2026-09-23, v1.465.8) · needs: device
 
 Fifteen `router.push` sites that target a tab href now call `navigateToTab`, and Home and More no
