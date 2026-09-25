@@ -247,13 +247,19 @@ appearing **271 ms** after the tap with no dead-store banner. Both halves, so no
 makes it the highest-fanout open device blocker, and what unblocks all five is Lane A's row cap and
 per-request timeout — not another look at the phone. Worth its position being visible.
 
-### Modified
+### Corrected rather than applied
 
-**`Q-525` is not a duplicate of `TN-1`; it is batched with it.** TN-1 *shipped* the diagnostic column
-recording why the model refuses. Q-525 is the still-open question of whether to trigger the wide pass
-or relax the gate. They share a **trigger** — one hand-fired full rollup from an admin session — not
-an identity, so `Batch: owner-admin-sitting` is the fix. Deduping would have deleted a live question
-to save a line.
+**`Q-525` is not a duplicate of `TN-1`, and it needed no change.** TN-1 *shipped* the diagnostic
+column recording why the model refuses. Q-525 is the still-open question of whether to trigger the
+wide pass or relax the gate. They share a **trigger** — one hand-fired full rollup from an admin
+session — not an identity. Deduping would have deleted a live question to save a line.
+
+*And this one caught me.* The fix looked like "batch them", so a batch field was written — onto an
+entry that **already carried `Batch: owner-admin-sitting`**, added by OR-148 the day before, 48 lines
+further down. It was spotted only because the batch count was checked after the edit rather than
+assumed. That is the `Q-529` first-match-wins shape exactly, and the reason it nearly landed is
+narrow enough to be worth recording: the entry's fields were read through a `head`-truncated grep,
+which is not a read of its fields. The bullet is now a note, not a field, and says so.
 
 ### Declined, with the reason written onto each entry
 

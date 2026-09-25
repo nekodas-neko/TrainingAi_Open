@@ -26065,12 +26065,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
 
-- **Batch:** `owner-admin-sitting` — added 2026-09-25 (Orchestrator). The device agent reported this
-  as a duplicate of `TN-1`. It is not. TN-1 SHIPPED the diagnostic column that records *why* the model
-  refused; this entry is the still-open question of whether to trigger the wide pass or relax the gate.
-  What they share is a **trigger**, not an identity — both need the same hand-fired full rollup from an
-  admin session. So they are batched, which is what stops the second sitting, rather than deduped,
-  which would lose a live question.
+- **⛔ Reported as a duplicate of `TN-1` on 2026-09-25; it is not, and nothing needed changing
+  (Orchestrator).** TN-1 **shipped** the diagnostic column that records *why* the model refuses. This
+  entry is the still-open question of whether to trigger the wide pass or relax the gate. What they
+  share is a **trigger**, not an identity — one hand-fired full rollup from an admin session — and the
+  batch field below already pairs them for exactly that reason (OR-148, 2026-09-24). Deduping would
+  have deleted a live question to save a line.
+  ⚠ A second batch field was nearly added here before the existing one was spotted 48 lines down.
+  That is the `Q-529` first-match-wins shape: **one field of a kind per entry**, and a `head`-truncated
+  read of an entry's fields is not a read of its fields.
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
 - **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
 
