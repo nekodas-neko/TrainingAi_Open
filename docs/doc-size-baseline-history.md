@@ -17284,3 +17284,16 @@ the trap is the reusable part: the obvious join shape still returns a false zero
 who tries it. The narrower real finding survives — an `ai_dynamic` program has no in-deload
 suppression — but the fix it pointed at (populate the table) would have been work against the
 design.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31102 → 31116 (TN-77 part a)
+
+Fourteen lines recording what shipped and, more usefully, what did not.
+
+TN-77 has two halves. (a) was an off-by-one — "yesterday's activity" read today's training window —
+and is fixed. (b) is a weight-base mismatch the entry itself calls possibly deliberate, and it stays
+open with a `Keep:`, because deciding what the contributor is meant to measure is a different
+question from fixing which day it reads.
+
+The lines also record that the same-day window was left alone on purpose. It has no upper bound, and
+giving it one would have shifted the same-day score — a change nobody asked for, arriving inside an
+off-by-one fix. Writing that down is what stops the next reader "finishing the job".
