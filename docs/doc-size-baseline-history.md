@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-25 — backlog → 32046 (OR-145's gate triage reduced from seven questions to four)
+
+Net +2 lines, and the reason it is only +2 is the point: three of the seven items were **removed**
+from the ask, and the reasoning for removing them had to be written down where the next sweep would
+otherwise re-propose them. `LB-53`'s gate came off because `RV-170` answered its class on 09-24 and
+nobody noticed — that entry stated its dependency in a gate field instead of a pointer, so the
+release pass could not see it. `LA-82` lost the half that was structural rather than the owner's.
+`LA-89` gained two facts found while re-verifying it.
+
+Removing an owner question costs more lines than leaving it does, once. It costs fewer thereafter,
+which is the whole trade.
+
 ## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
 
 Growth, and it is the cheap kind: the device agent re-reported DV-15 from a sitting on v1.465.17,
