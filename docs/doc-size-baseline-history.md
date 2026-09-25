@@ -17796,3 +17796,11 @@ different conflict target with no direct test of its own — so the coverage was
 path instead of deleted. The `Keep:` also now states plainly that **none** of the four remaining
 groups has been re-verified, since three of this entry's claims have already turned out stale or
 backwards and the next session should not assume otherwise.
+
+## 2026-09-26 — `docs/implementation-backlog.md` → 31822 (BF-200, the deload that skipped one exercise)
+
+The owner noticed one deloaded exercise carrying his normal working weight. The four-row table is the
+entry: three exercises land exactly on the round-up of 52% of their last real 1RM and the fourth does
+not, which is what turns "the deload is broken" into "the deload works and this one exercise took a
+different basis". Two mechanisms both produce 30 and the entry refuses to pick between them, so it
+carries both plus the existing `source` field that settles it.
