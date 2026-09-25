@@ -1,0 +1,45 @@
+name: Deploy check
+
+# OR-168 — merging to `main` auto-deploys to Railway and, until this existed, nothing checked the
+# result. The logic, and the three findings that make the obvious version of it wrong, live in
+# `scripts/check-deploy-landed.js` where they can be unit-tested; this file only wires it to the
+# push.
+#
+# **Notify only, never act** (owner, 2026-09-25): an automatic revert across a migration can leave
+# production worse than the bad deploy did. A failure here IS the notification.
+#
+# A separate workflow rather than a job in `ci.yml`, because `ci.yml` deliberately has no
+# `push: [main]` trigger — re-running the full suite per merge costs ~11 billed minutes for a result
+# the PR run already produced, and that decision stands. This runs one script and no build.
+#
+# Deliberately NOT a required status check: it runs after the merge, so gating on it is circular.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  serving-this-commit:
+    name: Production serves this commit
+    runs-on: ubuntu-latest
+    # Comfortably past DEADLINE_SECONDS, so the script reports the timeout with its own diagnosis
+    # rather than the runner killing it and leaving a bare "cancelled".
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for Railway to serve this commit
+        env:
+          APP_URL: https://trainingai-production.up.railway.app
+          # MEASURED 2026-09-25: a real merge (5b10e329) reached production in **205s**, timed by
+          # polling the build-stamped service worker. That is ONE measurement, of a JS-only change;
+          # a merge that changes dependencies rebuilds more, and RV-188 has Railway builds sitting
+          # near a memory boundary. So the deadline is ~6x the measurement rather than 2x: the two
+          # failure modes do not cost the same — a false alarm teaches everyone to ignore the
+          # alarm, while a slow true alarm still arrives. Tighten it against MORE measurements,
+          # never to make the job feel snappier.
+          DEADLINE_SECONDS: 1200
+          POLL_SECONDS: 20
+        run: node scripts/check-deploy-landed.js
