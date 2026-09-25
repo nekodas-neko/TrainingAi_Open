@@ -17732,3 +17732,19 @@ unblocks either entry, and a brief he has to reconstruct from a scrollback is no
 The figures that are NOT re-measurable here are labelled as such: the seeded DB has no weather
 snapshot, so the chip renders a 56 px skeleton and the chip widths remain the 2026-09-12 device
 readings. The row width, the gap and every date format were re-measured and agree to 0.1 px.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31641 → 31655 (+14, the mid-entry-heading trap)
+
+Two additions, both about a defect in the file's own structure rather than in any entry. `BF-165`'s
+retraction and root-cause sections were written as `## ` headings, which **end** an entry — so its
+`Verify: device` and `Keep:` belonged to nothing and the entry kept printing as READY after its batch
+had shipped.
+
+The protocol paragraph is the durable half: it states the rule (`#### `, never `## `, for a
+sub-heading inside an entry) where someone writing an entry will read it, next to the sibling rule
+about inline fields that fails the same way. The note on BF-165 records why that entry in particular
+looked startable for a day, so the next reader does not re-diagnose it.
+
+The truncation itself is deliberate and stays — the queue carries real section boundaries between
+batches of entries, and six of the seven mid-entry `## ` headings are those. Only the seventh was
+wrong, and `check-backlog-pointers.js` now tells them apart by whether a FIELD bullet follows.

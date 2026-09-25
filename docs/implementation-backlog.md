@@ -104,6 +104,13 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   where an implementer can pick it up. Write it as prose and not as `**Verify:**` inline — the
 >   inline-field guard fails on that.
 >
+>   **And a sub-heading inside an entry is written `#### `, never `## `.** A `## ` ENDS the entry —
+>   in `next-item.js` and in the checker alike, and it must, because the queue carries real section
+>   boundaries between batches of entries. So every field below a mis-levelled one belongs to nothing:
+>   `BF-165` carried a `Verify: device` and a `Keep:` under its own retraction notice and went on
+>   printing as READY after the batch had shipped. `check-backlog-pointers.js` fails on it now,
+>   telling a boundary from a sub-heading by whether a FIELD bullet follows.
+>
 > - **`Verify: owner` / `Verify: device`** — **shipped, and awaiting a look.** Same two values as
 >   `Gate:`, and the difference from it is the point: a gate says *do not build this yet*; a
 >   `Verify:` says *this is done, see it on the phone when convenient.* `next-item.js` prints these
@@ -9219,7 +9226,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ---
 
-## ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
+#### ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
 
 **BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
 
@@ -9255,7 +9262,7 @@ not from the harness.
 
 ---
 
-## ✅ ROOT CAUSE FOUND, 2026-09-17 (Lane B) — CANDIDATE 3, and the retraction above was right to leave it UNPROVEN rather than refuted
+#### ✅ ROOT CAUSE FOUND, 2026-09-17 (Lane B) — CANDIDATE 3, and the retraction above was right to leave it UNPROVEN rather than refuted
 
 **It IS reproducible in the harness.** Two conditions have to hold at once, and every previous
 attempt — including the retraction's — had one of them wrong:
@@ -9416,6 +9423,13 @@ helper the call site calls.
 - **The residue question is answered by the fix, not separately:** `startActivity` still runs before
   the navigation, and the navigation now lands, so the selection it leaves in
   `localStorage.ta_activity_state` is correct rather than orphaned.
+- **⚠ THIS ENTRY WAS INVISIBLE TO THE QUEUE TOOL PAST ITS OWN RETRACTION NOTICE, and that is why it
+  kept printing as READY after the batch shipped.** Its retraction and root-cause sections were
+  written as `## ` headings, which END an entry — so the `Verify: device` and `Keep:` below them
+  belonged to no entry at all. Both are `#### ` now, and `check-backlog-pointers.js` fails on the
+  shape (`scripts/lib/mid-entry-heading.js`), telling a real section boundary from a mis-levelled
+  sub-heading by whether a FIELD bullet follows it. Measured across the queue: seven mid-entry `## `
+  headings, six genuine, this one orphaning two fields.
 - **Keep: the device pass.** On the S25: Cardio → *Other activity* → *Treadmill* lands on the
   activity screen and stays; one back returns to the Cardio hub. The harness cannot fire the Android
   back gesture, and the device undoes the navigation **60× faster** than the harness (7 ms vs 415 ms),
@@ -11572,7 +11586,7 @@ over a fixed 28 days, rounded (**52**); `readiness-payload.ts:343` averages its 
 low-wear days excluded, unrounded. Measured: **52.23 over 28 days, 53.39 over 60, 55.75 over 90** —
 about **1.5 bpm** on the Zone-2 floor today. Small now, and it is the same class of defect.
 
-## The decision, and the spec
+#### The decision, and the spec
 
 **⚑ The owner's objection retired this entry's original recommendation, and they were right.** This
 entry first proposed the corroborated observed max (168). That argument treated *"no reading above
@@ -11661,7 +11675,7 @@ gives each half an honest target:
 - **Run → the interval jog.** The fast phase then targets a reachable zone and the pacer's cue
   becomes informative instead of permanently "push".
 
-## The mapping — four of the owner's five names already exist
+#### The mapping — four of the owner's five names already exist
 
 **`RunType` is `recovery | easy | long | interval | tempo`** and six frameworks already sit on top
 (polarized, Norwegian 4×4, zone-2 base, speed/VO₂max, aerobic recovery, density progression). The
