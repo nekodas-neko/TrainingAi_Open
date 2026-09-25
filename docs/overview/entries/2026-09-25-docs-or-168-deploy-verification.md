@@ -206,3 +206,81 @@ contradicting the premise is where building stops and asking starts.
 
 The measurement, the recommendation and the reversal cost are on `LA-129`. Redoing the
 implementation is about twenty minutes once the call is made.
+
+---
+
+## The device agent's sweep-4 housekeeping: seven items, four applied
+
+The Device Verification agent sent seven queue-routing items from its sweep-4 plan review. Routing
+the queue is the Orchestrator's job, so they were worked here — but **each was checked against the
+entry rather than applied on trust, and three did not survive that.** The pattern in all three is
+the same and worth naming: they proposed reverting a decision the owner had already made on
+2026-09-24, because the reasoning lives on the entry and the sweep read the lane field alone.
+
+### Applied
+
+**`DV-14` — removed, and it is the one that was verified hardest.** It claimed 39 of the last 40
+Railway deploys failed on a build OOM. Both halves now check out as fixed: `package.json`'s build
+script carries `NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=6144}`, and the Railway
+deployments query the entry itself documents returns **29 `REMOVED` + 1 `SUCCESS` across the last
+30, with zero `FAILED`** (`REMOVED` is Railway's status for a deploy that succeeded and was later
+superseded; an OOM ends `FAILED` and stays there). Production serves 1.465.62, matching `main`'s
+changelog head. One fresh version number would only have proven the latest deploy worked, which is
+why the deployment list was read instead.
+
+*Carried forward, because it was never proven and is now moot rather than answered:* the entry's
+"strong candidate for what grew" was `packages/shared/src/changelog.ts`, which is **676 KB** and
+still growing. It is nowhere near 4 GB on its own, and with the heap at 6 GB the hypothesis is
+untestable from here. If deploys start failing again, that file is the first place to look — and
+`OR-168`'s notify-only check is what would surface it, which is the natural home for the note.
+
+**`BF-12` — removed.** The code fix shipped *and* the device pass confirms it.
+`packages/shared/src/nutrition/log-meal.ts:131` names the entry in its own comment — the web
+fallback's sequential `await fetch` loop is now `Promise.allSettled` — and sweep 3 measured the row
+appearing **271 ms** after the tap with no dead-store banner. Both halves, so nothing is owed.
+
+**`BF-147` — the device field discharged.** Its own sweep-3 bullet records the look as PASSING. The
+`Keep:` stays: nobody has checked the production S3 credentials, and that is not device work.
+
+**`DV-13` — blast radius recorded.** Five items wait on it (`RV-186` row 9, the
+`admin-console-sitting` batch, `BF-10`, `LB-5`, `Q-538`); two already say so in their own text. That
+makes it the highest-fanout open device blocker, and what unblocks all five is Lane A's row cap and
+per-request timeout — not another look at the phone. Worth its position being visible.
+
+### Modified
+
+**`Q-525` is not a duplicate of `TN-1`; it is batched with it.** TN-1 *shipped* the diagnostic column
+recording why the model refuses. Q-525 is the still-open question of whether to trigger the wide pass
+or relax the gate. They share a **trigger** — one hand-fired full rollup from an admin session — not
+an identity, so `Batch: owner-admin-sitting` is the fix. Deduping would have deleted a live question
+to save a line.
+
+### Declined, with the reason written onto each entry
+
+**`TN-62`** was proposed as not runnable until `BF-13`. The endpoints are different and the entry
+already says so — BF-13 fires `rederive-baselines` (stored EMA baselines), TN-62 fires
+`backfill-derived-scores` (readiness contributors) — and the owner settled the ordering on
+2026-09-24: *"re-derive NOW for the rail fix, and again after the batch."* Two runs, deliberately,
+the first before BF-13. Parking it would have inverted that decision and held a 🔴 LIVE score
+inversion in place for the wait. This was the costliest of the three had it been applied.
+
+**`LA-56`** was proposed as Lane A code. There is Lane A code on it — the heartbeat — but the lane
+field names who acts **next**, and next is the admin run the owner assigned to the device agent
+(*"It should be able to do the admin sitting too."*). The heartbeat follows the run, because the run
+establishes whether a reap fires at all.
+
+**`RV-169`** was proposed as "a production recompute, not a device check". True until 2026-09-24,
+when `RV-170`'s answer authorised recompute-from-stored-inputs outright *and* routed such runs to the
+device agent, on the ground that the route needs a signed-in admin session and no sandboxed agent
+has one.
+
+**`Q-168`** was asked again, and the entry already carries the answer from the last time. Its *What
+is actually left* section holds exactly one item and that item **is** the screen look. There is no
+second half to hand back.
+
+### The generalisable part
+
+Four of the seven turned on decisions recorded in an entry's body while the routing was read off its
+lane field. A field says *who*; only the body says *why*, and the why is what a re-lane has to
+argue with. The three declines are now written onto their entries in the same shape, so the next
+sweep meets the reasoning at the point it would otherwise re-propose the change.

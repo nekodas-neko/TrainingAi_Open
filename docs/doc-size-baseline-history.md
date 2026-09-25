@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-25 — backlog → 32139 (OR-168 filed, plus eight owner decisions and a DV re-lane)
+## 2026-09-25 — backlog baseline → 32139, file ends at 31896 (OR-168, eight owner decisions, a DV re-lane, two closures)
 
 Growth, and most of it is answers rather than new work. `OR-168` is the largest single addition:
 the deploy-verification gap carries two findings that kill the obvious implementation — `/api/version`
@@ -31,6 +31,12 @@ The rest: eight owner decisions recorded onto their entries rather than left in 
 54 of the last 63 `.size` changes on `main` are this very file's sibling, which is the argument for
 dropping the backlog from the ratchet rather than for generating baselines in CI. That measurement is
 recorded and NOT acted on; the entry says why.
+
+**Why the baseline sits 243 lines above the file.** It was raised to 32139 at the point `main` was
+merged in, and the file then *shrank* to 31896 when `DV-14` and `BF-12` were verified fixed and
+removed. `--fix` deliberately left the baseline where it was: 243 is inside the 643-line slack band,
+and leaving slack is the whole anti-collision mechanism — tightening it here would hand the next PR
+a conflict on this exact line for no gain. The compaction sweep tightens, with `--tighten`.
 
 ## 2026-09-24 — backlog → 27706 (device sweep 3 answered on DV-15 and DV-13)
 

@@ -3075,6 +3075,15 @@ volume7dKg,                             // likewise
 
 ### [readiness] TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE
 
+- **⛔ A dependency on `BF-13` was proposed 2026-09-25 and is DECLINED (Orchestrator).** The device
+  agent read this entry as not runnable until BF-13's re-derive lands. Two things say otherwise. The
+  endpoints are different, and this entry already establishes that below — BF-13 fires
+  `rederive-baselines` (the stored EMA baselines), this one fires `backfill-derived-scores` (the
+  readiness contributors). And the owner settled the ordering on 2026-09-24: *"re-derive NOW for the
+  rail fix, and again after the batch"* — two runs, deliberately, the first of them before BF-13.
+  Parking this behind BF-13 would invert that decision and hold a 🔴 LIVE score inversion in place for
+  the duration of the wait.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, on a status recheck. **This is a
   consequence of my own 2026-09-22 proposal** (LA-122 item 2a, the single batched recompute), not a
   defect in TN-60's fix.
@@ -3237,125 +3246,6 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   panel that is not on screen. **FAILED** means the fix belongs to the lane that owns that caller
   (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
   query and both are needed, and this entry closes.
-
-### [platform] DV-14 — ROOT-CAUSED: the Railway build runs out of memory, so almost every deploy fails
-
-- **⛔ ANSWERED 2026-09-24 ~19:30 AEST (Lane A). It was never a stall.** Of the last **40**
-  deployments, **39 FAILED**; the one success was 04:24 UTC. Every failure is the same:
-
-  ```
-  FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
-  [76:0x28c02000] 101405 ms: Mark-Compact 4072.1 (4176.3) -> 4071.7 (4188.3) MB
-  ... v8::internal::JsonStringifier::Stringify ...
-  ELIFECYCLE  Command failed with exit code 134
-  ```
-
-  `next build` hits Node's default ~4 GB old-space cap. **No `NODE_OPTIONS` is set anywhere** — not
-  in `package.json`, not in `nixpacks.toml`, not on the service.
-- **This retires the "it recovered on its own" reading, twice recorded above.** The build sits ON the
-  memory boundary, so it occasionally squeaks through — the 04:24 success is why production serves
-  `1.465.26` and why TN-55's battery fix is live at all. The earlier "recoveries" were lucky builds,
-  not recoveries, which is exactly why three measurement passes from outside found nothing.
-- **⚠ How to read this: the deploy log was reachable the whole time.** `RAILWAY_API_TOKEN` is in the
-  session environment and answers `https://backboard.railway.com/graphql/v2` with a
-  **`Project-Access-Token`** header (NOT `Authorization: Bearer`, which returns *Not Authorized* and
-  reads like a dead credential). Three sessions escalated this to the owner as unreachable. Query
-  `deployments(input:{projectId,environmentId})` for status and `buildLogs(deploymentId)` for the
-  reason; `projectToken { projectId environmentId }` returns both ids.
-- **CI's `Build` job passes**, so this is the Railway builder's memory rather than the code.
-- **⚠ `nixpacks.toml` may be dead config** — the build log shows `railpack-builder`, not nixpacks.
-  Worth confirming before anyone edits that file expecting it to take effect.
-- **Strong candidate for what grew, NOT proven:** `packages/shared/src/changelog.ts` is **661 KB,
-  1,257 entries, 9,883 lines** — the largest source file in the repo by a wide margin, imported into
-  **client** bundles by `about-panel.tsx` and `data-capture-console.tsx`, and appended to by **every
-  PR** under the standing version-bump rule (~7.5 KB/day at the current merge rate). The OOM frame
-  is `JsonStringify`. That fits a slow growth crossing a threshold, but 661 KB → 4 GB needs a
-  mechanism nobody has demonstrated. **The experiment that would settle it:** build twice with a
-  fixed heap cap, once with the changelog stubbed to a handful of entries, and compare peak RSS.
-- **Two fixes, and they are not alternatives — the first unblocks, the second is the actual repair.**
-  Raising the cap (`NODE_OPTIONS=--max-old-space-size=…`, in the build script or as a service
-  variable) gets 22 merges of shipped work deployed; if the container has under ~8 GB it trades a
-  clean exit-134 for a kernel OOM kill, so the value wants checking against the plan. Bounding the
-  changelog — a fragment file, or shipping only the last N entries to the client — is what stops it
-  recurring. **Owner asked 2026-09-24; the service-variable route is a production config change and
-  was not taken unilaterally.**
-
-**The history below is kept as filed — the measurements are sound, the conclusion drawn from them was not.**
-
-- **⛔ THIRD STALL, measured 2026-09-24 ~18:50 AEST (Lane A, while shipping TN-66).** Live
-  `/api/version` answers **`1.465.26`**, set by TN-55's merge (#1521) at **14:22**; `main` is
-  **`1.465.28`** with its newest commit at **18:45**. **At least 8 first-parent merges are on `main`
-  and not live**, across roughly 3½ hours.
-- **The pattern is now the finding, not the individual stall.** Three stalls in about a day, two of
-  which ended on their own with no cause established. Per the repo's own rule, something that stops
-  is not something that was fixed — so the two recoveries are not evidence of health, and this third
-  one should not be waited out either.
-- **It is costing shipped work.** #1538 (DV-18, the broken exercise pictures) and #1539 merged into
-  this window, so the fix for a defect the owner can see is merged and not running. TN-55's battery
-  rebalance is the exception and only by luck: it IS live, because 1.465.26 is the version
-  production happens to be stuck on.
-- **⚠ Still blocked on the same thing, and it is now concrete rather than precautionary.** The
-  Railway deploy log is the only surface that distinguishes *failing* from *queued* from *never
-  triggered*, and those three have different fixes. No container can read it. Everything measurable
-  from here has been measured three times; the next useful step is not another measurement.
-
-- **⛔ RE-MEASURED 2026-09-24 ~06:30 AEST (Lane A) — IT RECURRED, AND IT IS WORSE. The
-  "caught up by itself" update below was the lull, not the end.** Live `/api/version` answers
-  **`1.465.17`**; `main`'s `package.json` is **`1.465.22`**. 1.465.17 landed with **#1473 at
-  20:36 AEST on 09-23**, so production has been stuck for roughly **TEN HOURS**, against the two
-  the entry was filed for.
-  **Five merges are unshipped:** #1474 (23:32, post-push guard), #1477 (00:40, nutrition chunk
-  nesting), #1478 (01:07, route animations), #1479 (01:35, More sub-tabs), #1481 (03:34, Home's
-  APK banner). Every one is a UI change nobody can see and nobody can device-verify.
-  **The shape is a long stall, then a catch-up, then another stall** — not a single stuck deploy.
-  That distinction matters for the diagnosis: a deploy that is *failing* would stay failed, so
-  something is either batching, throttling, or intermittently succeeding.
-  **Still not established, and still the first step: Railway's deploy log.** It is not reachable
-  from the sandbox — no Railway API or CLI here — so this needs the owner or the device agent's
-  machine. Nothing else in this entry can move until someone reads it.
-- **⚠ This weakens DV-13's conclusion, and the correction belongs on both entries.** DV-13 records
-  that the 8-minute outage at 20:04 correlated with a production deploy from the 20:03 merge
-  (#1468). **That attribution assumed merges were deploying promptly, which this entry shows they
-  were not** — at 20:22 production was still serving 1.465.10, six versions behind. The outage is
-  still deploy-SHAPED (a database-free route down for minutes, then instantly healthy), but *which*
-  deploy, and whether it was a batched catch-up rather than #1468's, is **not** established. The
-  merge-cadence advice that came out of DV-13 stands on its own footing regardless.
-- **Historical, 20:27 AEST 09-23:** production caught up to **v1.465.16** by itself (confirmed from
-  a PC and from the APK after a restart). **Something that stopped is not something that was fixed**
-  — and it has now stopped and restarted twice, which is the evidence for that rule rather than
-  against it.
-
-- **Lane:** A — Railway's deploy for `main` (the build/start/health check), not application code.
-- **Added:** 2026-09-23 20:25 AEST · Device Verification, noticed while re-checking DV-13.
-- **Measured:** the public `/api/version` (from a PC, and from the APK) answers **`"version":"1.465.10"`**
-  at 20:22 AEST. `main` is at **1.465.16**. Not live: 1.465.11 (18:16, status-bar scrim — DV-6),
-  1.465.12 (18:55, sleep timing in the user's zone — DV-7/DV-9), 1.465.13 (19:11, switch names —
-  DV-11), 1.465.14 (19:38, weigh-in invalidation — RV-108), 1.465.15 (20:03, fat floor), 1.465.16
-  (20:18, #1467 — BF-177's post-push invalidation).
-- **Consequence for everyone:** every fix merged since 18:16 is **unverifiable on the device and
-  unshipped to the owner**, and any "merged, so it is live" reasoning since then is wrong. A deploy
-  that restarts and fails may also be DV-13's 8-minute outage (20:04, one minute after the 20:03
-  merge).
-- **First step:** Railway's deploy log for `main` from 18:16 — the first failing deploy names the
-  cause. Not established: whether deploys fail, are stuck queued, or are disabled.
-- **Pass test:** `/api/version` reports `main`'s version within ~10 minutes of a merge.
-- **✅ CAUSE CLOSED 2026-09-24 (Lane A, RV-188):** the heap cap was set in `ci.yml`'s Build job and
-  **nowhere else**, so Railway ran on Node's RAM-scaled default — ~4,051 MB there against 2,096 MB
-  in the sandbox — and failed ~45 MB short on the same commit CI passed. The number now lives in
-  `package.json` alone. See RV-188 for what shipped, and for the two part-2 fixes that were tried
-  and did not work.
-- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** production **caught up**: live 1.465.25 = `main` 1.465.25 (merged 11:26, live by 13:09). One read cannot show deploy latency, and the cause stays unread in Railway's log, so this is *stopped, not explained*.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** see the reproduction below and **RV-188**, which is now Lane A's first item. There is also a fourth version reading: live **1.465.26** against `main` **1.465.31** (21:30 AEST).
-- **🔬 REPRODUCED LOCALLY 2026-09-24 (Review sweep 59) — and the changelog is NOT the driver.**
-  `main` at f8311852, sandbox with 15 GB and 4 cores, Node 22, `pnpm build`:
-  | run | result |
-  |---|---|
-  | default heap | **passes**, 3.1 min. The `next build` process peaks at **7.85 GB RSS** (all node processes together ~11 GB) |
-  | default heap, `SENTRY_AUTH_TOKEN=dummy` (source maps on; no org, so no upload) | passes, ~11 GB. **Source maps make no difference** |
-  | `--max-old-space-size=3072` | **fails exactly like Railway**: exit 134 at ~94 s, Mark-Compact 3031 MB, `JsonStringify` frame |
-  | 3 GB + `changelog.ts` cut from 662 KB to 9.8 KB | **still fails**. The changelog is not what grew |
-  | 3 GB + `withSentryConfig` removed from `next.config.ts` | **compile passes** ("Compiled successfully in 106s"), then "Linting and checking validity of types" runs out of memory in its own process under the same cap |
-  So the build needs 3–4 GB of heap. **The Sentry webpack wrapper is what pushes the compile phase over**, and type-checking needs more than 3 GB on its own. The local 3 GB cap is now a **fast, deterministic reproduction loop** for any fix. The next step is **RV-188**.
 
 ### [workouts][app-shell] DV-16 — "Leave workout? Your workout is already done" — shipped, device pass owed
 
@@ -3543,6 +3433,13 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 
 ### [devices][platform] DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+
+- **⚠ BLAST RADIUS — recorded 2026-09-25 (Orchestrator, from the device agent's sweep-4 review).**
+  Five items wait on this one: `RV-186` row 9 (which is DV-13's own pass test), the
+  `admin-console-sitting` batch, `BF-10`, `LB-5` and `Q-538`. Two of them already say so in their own
+  text — *"Sweep 2: COULD NOT CHECK — device metrics never loaded"* and *"do not retry until DV-13 is
+  closed"*. That makes this the highest-fanout open device blocker in the queue, and the thing
+  unblocking all five is Lane A's row cap and per-request timeout, not another look at the phone.
 
 - **Update:** after production caught up (v1.465.16), `/api/oura-ble/rollup-state` answered 200
   twice from `/health` at 20:33 with no slowdown. That does not clear the admin console's
@@ -4862,6 +4759,12 @@ drift.
   ```
 
 ### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen, and the span is 24 days, not 16
+
+- **⛔ A re-lane away from the device agent was proposed 2026-09-25 and is DECLINED (Orchestrator)**,
+  on the ground that a production recompute is not a device check. That was true until 2026-09-24 and
+  changed that day: `RV-170`'s answer authorises recompute-from-stored-inputs outright *and* routes
+  such runs to the device agent, because the route needs a signed-in admin session and no sandboxed
+  agent has one. The bullet below already records that reasoning. It stands.
 
 - **Lane: DV** — an authorised recompute to run, not code to write. The Lane A half (correcting the
   false claim and re-measuring the span) shipped 2026-09-25; `lib/oura-ble/rollup/run.ts:1043-1044`
@@ -11512,8 +11415,6 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   six proxy-path rows (Ab Wheel, Barbell Shrug, Cable Crunch Abs, Donkey Kick, Face Pull, Nordic
   Hamstring Curl) plus the reference figure stay broken. Orthogonal to everything shipped below —
   none of it touches storage or generation — but it gates the Mirror/AI paths and it is still owed.
-- **Verify:** device — the two-line row and the sweep sheet on the S25. Measured at 412 dp in the
-  harness, not seen on glass.
 - **Added:** 2026-09-11 · owner, on the Admin Console → Exercises tab: *"ui is bad and I also want a
   better way to make sure everything has the right gif. Maybe a way for me to flag if its wrong so
   you we can decide how to proceed."*
@@ -21071,169 +20972,6 @@ lived context.
   the app feels, and there is a measurement showing why rather than an inference.
 - **Surface: device only.** Every negative above is from source inspection, not from a running S25.
 
-### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
-
-- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): no longer slow, and it stays.** Saved meal *Protein Granola* → **Log this
-  meal** → the row appears **271 ms** after the tap (push +136 ms, 298 ms), survives Home→Nutrition, and no
-  local-store-dead banner shows. It stored as a plain food log (`saved_meal_id` NULL) for this
-  one-ingredient meal. Deleted after (it then resurrected — DV-15).
-
-- **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
-- **Added:** 2026-08-24 · owner: *"nutrition is loading very slow; about 20 seconds from clicking
-  log to having it show up — when I swapped pages I see that it isn't in the nutrition log anymore
-  so maybe not going through properly."* Screenshot: `saved-meals-sheet.tsx`'s "Build a Meal" list,
-  **Ninja Creami Protein Ice Cream**'s "Log this meal" mid-spin.
-- **Checked production directly (`claude_ro.food_logs`, owner's rows, `date = 2026-08-24`) — the
-  writes are NOT lost, and they carry a specific fingerprint.** Two bursts land right at the
-  reported time (9:14–9:15pm Brisbane / 11:14–11:15 UTC): `BARILLA Spaghetti Protein` /
-  `Turkey Mince` / `Passata` (three rows, `updated_at` 11:14:17.072 / .457 / .886 — **staggered
-  ~0.4s apart**) and `Whey Protein Isolate` / `Full Cream Milk` (11:15:12.513 / .977, same ~0.46s
-  stagger). A local-first batch write would land these together in one JS tick; **a per-item
-  sequential network round trip would not** — this is the fingerprint of `logMealItems`'s **web
-  fallback branch**, not its local-store branch.
-- **Traced to source: `packages/shared/src/nutrition/log-meal.ts`.** `logMealItems` has two paths.
-  When `getLocalStore(userId)` returns a real store, every write is local-first (SQLite upserts,
-  `await`ed but not network-bound) and the function returns immediately with optimistic entries —
-  fast, matching the "saves feel instant" rule. **When `getLocalStore` returns `null`, it falls
-  through to a `for` loop of sequential `await fetch('/api/nutrition/food-logs', ...)` calls, one
-  per ingredient** (lines 97-110) — exactly the "never await POSTs serially in a loop" pattern
-  CLAUDE.md already names as a smell elsewhere in this codebase. For a 2-3 item meal that's 2-3
-  sequential round trips, which the production timestamps confirm are actually happening — though
-  0.4-0.9s of measured DB-write gap alone doesn't account for the full ~20s the owner felt; the rest
-  is plausibly per-request network/API latency between those writes, not visible from `updated_at`
-  alone.
-- **What makes `getLocalStore` return null on a real device: `isLocalStoreDead()`**
-  (`lib/sqlite/sqlite-service.ts`, the "K4" state) — the on-device SQLite DB failed to open. This is
-  documented as a real, recoverable-only-by-reinstall-or-retry failure mode elsewhere in this repo's
-  migration rules, not hypothetical. **There is already a visible banner for exactly this state**
-  (`components/shell/local-store-dead-banner.tsx`, "Local storage unavailable — saving online
-  only") — neither screenshot shows it, but the banner renders above the sheet and could be
-  occluded; this needs an on-device check, not a guess from the screenshot crop.
-- **The "vanished after navigating away" half is not fully explained by the above, and is flagged
-  open rather than diagnosed.** Once a fallback-path write lands server-side (confirmed above,
-  eventually), `invalidateNutritionWrite()` does cover the `nutrition-food-logs-` prefix
-  (`lib/cache-groups.ts:445`) and `useFoodLogsLoader`'s local-store-absent branch re-fetches through
-  `cachedFetch` against that same key — so a plain re-render should show it once the fetch settles.
-  Two things this entry does NOT resolve: (1) whether the specific "Ninja Creami" tap shown
-  mid-spinner in the screenshot is among the rows that landed, or whether that specific request was
-  abandoned (e.g. navigating away before a sequential fetch chain completes, in a WebView, has not
-  been checked); (2) whether "not there" meant genuinely absent on a fresh load, or present but not
-  yet re-painted because the owner looked before the ~20s chain finished.
-- **What would confirm the mechanism:** on-device, check whether `LocalStoreDeadBanner` is showing,
-  or read `isLocalStoreDead()`/`getLocalStore(userId) === null` via an admin console during a
-  reproduction. If confirmed dead, the underlying fix is whatever heals K4 (a retry path, or at
-  minimum surfacing the failure loudly enough that "slow" doesn't read as "broken") — this entry
-  does not scope that fix, only the trace to it.
-- **What would count as fixed:** logging a saved meal on this device completes in the sub-second
-  range the local-first path is designed for, or — if the local store is genuinely and permanently
-  dead on this install — the banner is visibly showing so the 20s delay reads as "expected, online
-  only" rather than "broken."
-- **Surface: device-only to confirm.** The mechanism traces cleanly from code + production data, but
-  confirming *why* this specific device's local store is null needs the device.
-- 🚧 **THE SERIAL-FETCH HALF SHIPPED 2026-08-24 (Lane A).** `logMealItems`'s fallback branch now
-  issues its per-ingredient POSTs through `Promise.allSettled` instead of a `for` loop of
-  sequential `await fetch`es, so an N-item meal costs one round trip's wall clock rather than N.
-  **Proven by mutation, not just by passing:** all three new cases in
-  `packages/shared/src/nutrition/__tests__/log-meal-fallback.test.ts` fail against the reverted
-  serial loop (the concurrency assertion sees 1 POST instead of 3) and pass with it restored. The
-  sibling `log-meal.test.ts` could not have caught this — it mocks `getLocalStore` to a working
-  store, so it never reaches the fallback at all; the new file mocks it to `null`.
-  - **A second defect was fixed in the same change, created by the first fix.** Concurrency makes
-    the rollback's completeness load-bearing: `Promise.all` rejects on the first failure without
-    reporting which siblings succeeded, so a partial failure would strand rows the rollback cannot
-    see — invisible to the user until they reappear as duplicates on the next tap. `allSettled`
-    records every landed id before rethrowing. Serially this could not happen, which is why it
-    needed a test now and not before.
-- **⚠️ THIS DOES NOT CLOSE THE ENTRY — two halves remain, both device-gated.** (1) *Why* this
-  device's local store is null (the K4 state) is untouched; the fallback being fast is a mitigation,
-  not the cure, and the entry's own "what would count as fixed" bar wants the local-first path or a
-  visible banner. (2) The "vanished after navigating away" half is still not explained. **Nothing
-  here was observed on the S25** — the change is verified by unit test and static reading only, and
-  `pnpm dev` could not be run in the sandbox (missing `@sentry/nextjs` in `node_modules`).
-- **Keep:** the on-device check this entry already asks for — whether `LocalStoreDeadBanner` is
-  showing during a reproduction — now also tells you whether the ~20s is gone or merely shorter.
-
-## Nutrition focus — the owner's priority, 2026-08-18
-
-*"lets focus on the nutrition changes now. id like to get this perfected today"*
-
-The nutrition cluster is **eight entries**, ordered by dependency rather than Q number, starting at
-Q-401 below. **Q-407** (the meal-plan wizard as a coach conversation) and **Q-409** (paste a recipe
-URL, get a meal) were added on 2026-08-19 from the owner. Q-407 sits after Q-398 because a
-conversational plan needs somewhere to land — plan meals becoming ordinary saved meals is its exit
-route. Q-409 sits after Q-407 because it extends the same step, but it depends on nothing and can be
-built into the existing stepper at any time.
-
-Two have shipped since this block was written: **Q-399** (#163, the centred label now has
-room for its ingredient list) and **Q-402** (#165, a component is told when its cache key is
-invalidated). Their entries were correctly removed on merge.
-
-~~**Q-359 sits above the block deliberately**~~ — **that placement expired and Q-359 has been moved
-down (2026-08-24).** It was put here because 36 fetch-once effects carried Q-402's bug and some of
-them were in the permanently-mounted shell, where it can actually bite. Four slices later the
-can-bite group is **zero**; the 12 that remain all unmount on navigate, and the check script's own
-per-site judgement is that **none of them is worth converting** — a subscription on a key nothing
-writes while the component is up adds a refetch with no reader waiting for it, which Q-359's entry
-itself warns against. It stays queued as the home of its ratchet, not as work.
-
-**Realistically today, and this is the honest split:**
-- **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
-  are done** — v1.325.0 gave the default label its three ingredient lines at 0.401 mm per module,
-  and v1.325.1 gave the cache an invalidation signal so Home's energy card stops freezing.)
-  (**Q-387 is done too** — its shared-module wiring shipped 2026-08-19 and its button, Undo and
-  N-of-10 counter in #330.)
-- **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
-  `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
-  first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
-  whatever else happens.
-
-**Parallel-safe:** the Lane B half of Q-401 is now unblocked on both counts. Everything else is
-sequential.
-
----
-
-**2026-08-19 — the owner reviewed the interactive prototype, and the cluster is now fully decided.**
-
-Prototype: <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>. **Nothing in this
-cluster is waiting on the owner any more.** Every open question that was blocking it has an answer,
-and the answers live in the entries rather than here:
-
-| decided | where it is written | build order |
-|---|---|---|
-| Label styles all draw **square** | **✅ Q-411 SHIPPED 2026-08-19 (v1.325.5)** — [`journal`](overview/history-2026-09-10-folded-2.md#2026-08-19-square-label-canvas) | done |
-| Save-to-gallery, and the PNG's missing physical size | **✅ Q-400 SHIPPED 2026-08-19** — [`journal`](overview/history-2026-09-10-folded-1.md#2026-08-19-label-save-to-gallery) | **needs the new APK; the print test is unblocked once it is installed** |
-| Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
-| Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
-| Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
-| Meal photo uploads from **Edit Meal**, 64 px tile left of the name | Q-396 | independent |
-| The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
-
-**✅ THE PRINT TEST IS DONE — 2026-08-19, and it passed on all three counts.** The owner printed a
-`Ninja Creami Protein Ice Cream` label from the APK carrying Q-400 and reported: *"at this size; it
-still scans fine after being printed."* That single print closed everything that had been stacked
-behind it:
-1. **The export path works** — Q-400's save-to-gallery reached a printer.
-2. **The physical size is right** — it printed as a label, not at 312 mm, so the dpi the PNG now
-   declares is being honoured.
-3. **Q-411's gain is real, and the crop-vs-scale question is moot** — the owner printed **square on
-   square stock**, so the artwork keeps its full 50 mm width and the default module holds at
-   **0.561 mm** rather than falling to 0.397. The scaling branch of that fork never applies.
-
-**So Q-411 may now be described as a scannability improvement rather than a simplification** — the
-caveat that stood all day is discharged by evidence, not by argument. `band` remains the tightest of
-the six and is still the one to re-test if a printer or label stock ever changes.
-
-**One defect the print made visible, filed as Q-416 and now FIXED** (2026-08-19) — the block was
-pinned to both margins at once, so a short ingredient list left up to 8.6 mm of dead space above the
-code. Half the slack now sits above the block instead. **Still owed: a print of the fixed artwork**,
-since the complaint that started it came from paper.
-
-**Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
-`saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
-already stale when written. What remains of Q-406 is the row component itself, and it now waits on
-Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
-design decision. See the correction at the top of that entry.
-
 ### [devices][heart-rate] BF-10 — the admin Device Metrics sparklines plot by sample index, not by time, so a night-only signal renders as if it ran all day
 
 - **📱 Sweep 2: COULD NOT CHECK** — device metrics never loaded (DV-13).
@@ -24980,6 +24718,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the title is now false in both halves.** Resilience carries a level on **30** rows (was 13, newest 09-22), falling **5 → 4 → 3 → 2 → 1** from 09-07. It sits **pinned at the bottom clamp (1.01) on 09-21 and 09-22**, and the daily sleep-recovery term is 0.0 on most recent days. So it no longer saturates at the top; it saturates at the other clamp. Re-measure before any proposal is written.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+
+- **⛔ A re-lane away from the device agent was proposed 2026-09-25 and is DECLINED (Orchestrator)**,
+  on the ground that this is Lane A code. There *is* Lane A code here — the heartbeat in the note
+  below — but the field names who acts **next**, and next is the hand-fired admin run the owner
+  assigned to the device agent on 2026-09-24: *"It should be able to do the admin sitting too."* The
+  heartbeat follows that run, because the run is what establishes whether a reap fires at all.
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
 - **✅ UNBLOCKED 2026-09-24.** It carried a `Needs:` on `RV-170` because it REWRITES stored history rather than filling a gap. He answered that policy the same day — recompute-from-stored-inputs YES, hand-edits NO — and this is a recompute, so it is authorised. Nothing further is owed by him; it is the device agent's to run.
 
@@ -26320,6 +26064,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
+
+- **Batch:** `owner-admin-sitting` — added 2026-09-25 (Orchestrator). The device agent reported this
+  as a duplicate of `TN-1`. It is not. TN-1 SHIPPED the diagnostic column that records *why* the model
+  refused; this entry is the still-open question of whether to trigger the wide pass or relax the gate.
+  What they share is a **trigger**, not an identity — both need the same hand-fired full rollup from an
+  admin session. So they are batched, which is what stops the second sitting, rather than deduped,
+  which would lose a live question.
 - **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
 - **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
 
@@ -28531,6 +28282,12 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
+
+- **⛔ Asked again 2026-09-25; the answer has not moved (Orchestrator).** The device agent proposed
+  once more that only the screen look here is its own. The note below already answers it: the *What is
+  actually left* section has exactly **one** item, and that item **is** the screen look — the AI Coach
+  section of `docs/device-smoke-checklist.md` on two navless full-screen routes. There is no second
+  half to hand back to a code lane.
 
 - **The check that was gating this, now stated as the work (OR-136, 2026-09-23).** The gate is
   removed because it named the same actor as the lane — a `Lane: DV` entry gated on `device` parks
