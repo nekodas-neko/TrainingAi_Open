@@ -17770,6 +17770,21 @@ own data (whole-session always dead, per-exercise always working), the `.strict(
 card's stated remedy has no route behind it, and the 1RM gate that makes lifting heavy anyway earn
 nothing. Each is a claim he would otherwise have to take on trust, and the third is invisible from the
 app entirely.
+## 2026-09-25 — `docs/implementation-backlog.md` 31655 → 31684 (+29, BF-61)
+
+The shipped note, and one paragraph that is the whole reason this entry came back twice: **the
+existing regression test passes on the unfixed component.** Control-run with the fix stashed and the
+spec kept, *"the first tap on Delete opens the confirmation, even mid-animation"* is green — it taps
+after the row has rested open, so it only ever exercised the half that was already fixed. An entry
+with a named mechanism, a regression test and a shipped fix failed on the phone twice, and that fact
+is worth more on the record than the fix is.
+
+The rest states what the new test asserts instead (a timing-free property: while the row is displaced
+at all, the tray is topmost over its own rect), why the meal list needs no second fix (one shared
+component), and that acceptance clause ③ — the day jumping to Yesterday — is **not claimed**. That
+last line is the one a future reader needs: it is downstream of the same swallowed tap and may clear
+with it, but if it survives it is its own entry rather than a re-open of this one.
+
 
 ## 2026-09-26 — `docs/implementation-backlog.md` → BF-199 (does the prescription need AI)
 
