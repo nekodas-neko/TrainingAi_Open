@@ -239,10 +239,12 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setListTab(next)
   }
 
-  function backToMeals() {
+  // RV-178: `MealBuilderHeader` is memo()'d and this was the one handler it takes that Q-357's
+  // useCallback sweep (line ~210, for SavedMealCard) did not reach.
+  const backToMeals = useCallback(() => {
     setTab('meals')
     setEditingMeal(null)
-  }
+  }, [])
 
 
   /**

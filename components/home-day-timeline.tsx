@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo } from "react";
+import { Fragment, memo, useState } from "react";
 import {
   Sunrise, Moon, Dumbbell, Footprints, Utensils,
   BedDouble, Flame, Clock, Zap, Tag,
@@ -234,8 +234,10 @@ function EventRow({ ev, isLast }: { ev: TimelineEvent; isLast: boolean; isFirst?
 function HomeDayTimelineComponent() {
   // `today: true` because 'home-day-timeline' is a date-less today key — one canonical variant per
   // key, and `sync-provider`'s warm list agrees.
+  const [failed, setFailed] = useState(false);
   const payload = useCachedValue<{ events: TimelineEvent[] }>(
-    "home-day-timeline", "/api/day-timeline", TTL_SHORT, { today: true },
+    "home-day-timeline", "/api/day-timeline", TTL_SHORT,
+    { today: true, onError: () => setFailed(true) },
   );
   const events = payload?.events ?? null;
 
@@ -248,7 +250,17 @@ function HomeDayTimelineComponent() {
   // before the event, and `lib/__tests__/cache-groups.test.ts` asserts that group clears this key —
   // so the dependency this now leans on is guarded, not assumed.
 
-  if (!events) return null;
+  // RV-178. `cachedFetch` swallows `!res.ok`, so without the `onError` above a failed cold load and
+  // an empty day were the same `null` and the timeline just was not there. An empty day is still
+  // nothing — there is genuinely no timeline — but a failure says so.
+  if (!events) {
+    if (!failed) return null;
+    return (
+      <section className="mx-4 mb-3 rounded-xl border border-border bg-muted/20 p-4">
+        <p className="text-xs text-muted-foreground">Couldn&apos;t load today&apos;s timeline.</p>
+      </section>
+    );
+  }
   if (events.length === 0) return null;
 
   const firstYesterdayIdx = events.findIndex(e => e.day === "yesterday");

@@ -5,14 +5,13 @@
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148. LB-141, LB-149, LB-150 filed; RV-183's remaining fetch half proved Lane A's.
+RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148, RV-178. LB-141, LB-149, LB-150 filed; RV-183's remaining fetch half proved Lane A's.
 
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; sweeps
 reorder the head daily. **The owner's stated top priority is tab/page switch speed**, so `DV-12`
-heads the lane once the phone is available. Otherwise RV-185, RV-178, RV-122 —
-RV-183 is now Lane A's the whole way down.
+heads the lane once the phone is available. Otherwise RV-122, RV-99, RV-101 (RV-183 is Lane A's the whole way down now; RV-185 is parked behind RV-186's device baseline).
 **A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate: device`) headed READY while unstartable. The field must LEAD its own bullet; inline after `Lane:` parses as nothing.
 **RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
@@ -23,7 +22,7 @@ RV-183 is now Lane A's the whole way down.
 
 ## Claimed paths
 
-- None. (`lib/calendar-month.ts`, LB-143, released — #1578 merged.)
+- `lib/cache-groups.ts` — ONE added line per new cache key (RV-178), released when that PR merges. Lane A's file; registering a key is not optional, so the choice was register it or do not add the key.
 
 ## Lessons that cost real time
 
@@ -51,4 +50,5 @@ RV-183 is now Lane A's the whole way down.
   falsely accused 3 callers in LB-148, stopping at the `)` in `new Date()`); arity is per-function.
 - **A DEFERRAL IS A CLAIM — RE-READ IT BEFORE TRUSTING IT.** RV-183's meal half was deferred as "needs a join"; there was none, just an over-wide parameter type demanding four fields the file never reads.
 - **⚠ ASSERT EVERY SCRIPTED `str.replace`.** This file's "Now" line sat three PRs stale because one no-oped silently on text an earlier no-op never wrote. Code edits were asserted; the baton's were not, and the baton is what survives a compaction.
+- **RUN `pnpm lint` AND `check:rules` BEFORE BELIEVING A FIX IS DONE** — RV-178's first cut tripped three rules I would not have predicted: the fetch-once ratchet (a `cachedFetch` inside a `useEffect` is the banned shape — use `useCachedValue`), the component-size cap on `config-screen.tsx`, and RV-84's dead-`.catch` guard. Each pointed at a BETTER shape, not a workaround. Compare the lint WARNING COUNT against the base too — a new one is yours.
 - **A gate's exit code must be read DIRECTLY** — never via `&&`/`;` into `git commit`, and never through a PIPE (`| tail`, `| cut`) which returns the LAST command's status, so a failing check reads as 0 (hit again in LB-149); COMMIT before `git stash`/`checkout`; `tsc --noEmit` typechecks NEITHER an auth-gated page nor tests, so run `node scripts/check-test-typecheck.js` before pushing a spec; and vitest's unit project does not transform JSX, so a testable helper goes in a `.ts`.

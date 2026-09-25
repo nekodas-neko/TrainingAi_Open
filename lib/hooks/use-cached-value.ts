@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync, subscribeToInvalidation,
+  type CacheFetchErrorInfo,
 } from '@/lib/sqlite/cache'
 
 /**
@@ -36,8 +37,13 @@ export function useCachedValue<T>(
      * Called when the fetch fails. `cachedFetch` swallows `!res.ok` — including this app's own rate
      * limit — so a card without this has no way to tell "no data" from "the request failed", and
      * the standing rule is that it must show an error state rather than vanishing.
+     *
+     * Receives the status (RV-178). Only the status — `cachedFetch` never surfaces the response
+     * body — but that is the difference between "this profile is friends-only" and one generic
+     * line for every failure. Widening from `() => void` is source-compatible: a handler that
+     * takes no argument ignores it.
      */
-     onError?: () => void
+     onError?: (info: CacheFetchErrorInfo) => void
     /**
      * Read and write through the today-scoped variant (`cachedFetchToday` / `readTodayCacheSync`)
      * for the date-less "today" keys, which treat an entry stored on a previous day as a miss.
@@ -78,7 +84,7 @@ export function useCachedValue<T>(
     const load = () => {
       void fetcher<T>(key, url, ttlSeconds, d => {
         if (alive && keyRef.current === key) setData(d ?? null)
-      }, { onError: () => { if (alive && keyRef.current === key) onErrorRef.current?.() } })
+      }, { onError: info => { if (alive && keyRef.current === key) onErrorRef.current?.(info) } })
     }
     load()
 
