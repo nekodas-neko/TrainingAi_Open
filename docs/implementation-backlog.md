@@ -4344,27 +4344,35 @@ drift.
 
 ### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
 
-- **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/rollup/run.ts`.
+- **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/clock.ts`, `lib/oura-ble/rollup/run.ts`.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **A backfill UPDATE that has matched nothing in 25 days** (`adapter.ts:6089-6094`,
-  `… SET measured_at … WHERE measured_at IS NULL`): **4,756 calls, 18.15 ms each, 0 rows
-  updated**. `measured_at` has 0 nulls in 192,772 rows. No index serves it, so it seq-scans the
-  whole hot window on every ingest, and it accounts for most of `oura_raw_samples`' **1.0 billion**
-  sequential tuple reads.
-  - **Fix: delete the statement.** It is not destructive. Dropping the column is a data-dropping
-    migration and needs the owner's sign-off.
-- **The clock-anchor table is read whole and only grows.**
-  - The full read is **2,125 × 48.8 ms = 104 s (9.6% of DB time)**.
-  - `getOuraClockEpochHead` (`:5698`) does a `GROUP BY` over everything, and
-    `getNewestOuraClockAnchorByUtc` (`:5721`) orders by an unindexed `anchor_utc`. That is 11,554
-    seq scans.
-  - An anchor is inserted on almost every batch.
-  - **Fix:** `ORDER BY epoch DESC, anchor_ds DESC LIMIT 1` on the existing index, an index on
-    `(user_id, anchor_utc DESC)`, thinner inserts, and one offset per epoch (RV-180).
-- **The rollup deletes and reinserts ~880 HR rows per pass even when nothing changed**
+- **SHIPPED 2026-09-25, part ① of three** ([entry](overview/entries/2026-09-25-rv182-noop-backfill.md)):
+  the backfill `UPDATE` is deleted. Re-measured that day before removing it — **4,932 calls, 90 s,
+  8.0% of all database time, 0 rows updated**, and `measured_at` has **0 nulls**. Safe because a NULL
+  can no longer be written: one insert path, a non-null anchor by construction, and
+  `oura-raw-sample-measured-at.test.ts` now pins that across the first-ever batch, an epoch open and
+  a history re-drain. **The column is NOT dropped** — that is a data-dropping migration and the
+  owner's.
+- **⚠ STILL OPEN ② — and the entry's attribution of it was WRONG, which is why it was not built
+  blind.** It read the anchor cost as one number across three functions and proposed
+  `ORDER BY epoch DESC, anchor_ds DESC LIMIT 1` plus an index on `(user_id, anchor_utc DESC)`.
+  Measured separately on 2026-09-25: **all 9.4% is `getOuraClockAnchors`**, the full-series read
+  (2,190 calls, 48.45 ms, 106 s). **The two the fix targets are already cheap** —
+  `getOuraClockEpochHead` 1.80 ms and `getNewestOuraClockAnchorByUtc` 1.71 ms, 4,942 calls each,
+  0.8% apiece on a 12,582-row table — so the index and the `LIMIT 1` buy at most 1.6% and leave the
+  9.4% untouched. And the expensive one **cannot** become `LIMIT 1`: LA-139 moved four call sites
+  onto the full series precisely because a single newest anchor was the wrong offset.
+- **② the real shape, and it is RV-181's.** `resolveDsToMs` needs **one scalar per epoch** — the
+  10th-percentile lag (`robustOffsetMs`) — and rebuilds it from every anchor row on every request:
+  2,190 calls × 9,735 rows to produce one number, with **1 distinct epoch** in 12,582 rows. Compute
+  that order statistic in SQL (`ORDER BY lag OFFSET floor(n*0.1) LIMIT 1`, **not** `percentile_disc`,
+  which disagrees with `Math.floor(n*0.1)` at small n — same trap RV-181 hit). `resolveMsToDs` is the
+  one real hold-out: it interpolates between the anchors *bracketing* an instant, so it wants a
+  two-row windowed query rather than an aggregate. Six call sites. Thinning the inserts (one anchor
+  per ingest batch, 4,942 of them describing one linear clock) is the complementary half.
+- **STILL OPEN ③ — the rollup deletes and reinserts ~880 HR rows per pass even when nothing changed**
   (`run.ts:877-878`): 535k deletes against 137k live rows. `oura_heartrate_pkey` (6.8 MB) has
-  **0 scans**.
-  - **Fix:** upsert with `IS DISTINCT FROM`, and delete only the timestamps that disappeared.
+  **0 scans**. **Fix:** upsert with `IS DISTINCT FROM`, and delete only the timestamps that disappeared.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 

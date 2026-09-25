@@ -17447,3 +17447,20 @@ identical object.
 An entry whose open question is "does the real thing behave the way we read in the source" is
 exactly where a runtime observation has to live, rather than in a journal entry for a different
 item that nobody reading LA-85 would open.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31280 → 31288 (RV-182 ①)
+
+RV-182 shipped the first of its three parts, and the entry grew by eight lines while doing it. Six
+of those are a **retraction**, which is the reason they are in the queue rather than only in the
+journal entry.
+
+The entry read the clock-anchor cost as one number across three functions and proposed an index plus
+a `LIMIT 1`. Measured separately, the two functions that fix targets are already cheap (1.7–1.8 ms,
+0.8% each) and all 9.4% sits in the full-series read — which *cannot* become a `LIMIT 1`, because
+LA-139 moved four call sites onto that series the same day, deliberately, because a single newest
+anchor was the wrong offset. An implementer taking part ② from the entry as previously written would
+have spent the work on 1.6% and undone a correctness fix on the way.
+
+So the eight lines buy: the split measurement, the reason the obvious fix is the wrong one, and the
+shape of the right one. The comparison table and the rest of the narrative were left in the journal
+entry, which is what kept this to eight lines rather than twelve.
