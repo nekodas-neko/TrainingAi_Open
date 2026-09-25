@@ -722,7 +722,9 @@ jobs:
       # its expensive half when nothing it can test has changed. That makes it safe to require.
       #
       # A non-UI PR still pays for checkout and the Postgres service (~20 s) rather than the full
-      # ~10 min. On a push to main there is no base to diff against, so everything runs.
+      # run — which is ~29 min, not the ~10 this line claimed until 2026-09-25 (LB-149, measured
+      # on run 3069: `pnpm e2e` 10:15:36 → 10:44:29 across 124 specs). On a push to main there is
+      # no base to diff against, so everything runs.
       - name: Does this change touch the UI?
         id: ui
         run: |
@@ -812,6 +814,28 @@ jobs:
         run: npx playwright install --with-deps chromium
       - run: pnpm e2e
         if: steps.ui.outputs.changed == 'true'
+      # LB-149. Twice now the browser has simply vanished mid-run — two specs failing in 1.0s each
+      # with `browser.newContext: Target page, context or browser has been closed`, which means the
+      # process was already gone when the spec started. The run recorded NOTHING about why, so three
+      # sessions could only guess. What was ruled out by reading rather than measuring: `workers: 1`
+      # is already the standing config so there is no parallelism to reduce; nothing in `e2e/` closes
+      # the browser; and the two specs that died sat at #20 and #28 of 124 in alphabetical order,
+      # preceded by two of the LIGHTEST files in the suite, so "a heavy spec killed it" does not hold.
+      # That leaves the runner, and the kernel is the only witness. `dmesg` settles it in one line —
+      # an OOM kill names the process and its RSS; an empty dmesg eliminates OOM, which is just as
+      # useful and is what nobody has been able to say. Runs only on failure, so a green run pays
+      # nothing.
+      - name: If the browser died, say why
+        if: failure() && steps.ui.outputs.changed == 'true'
+        run: |
+          echo "::group::kernel OOM kills"
+          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom-kill" | tail -20 \
+            || echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+          echo "::endgroup::"
+          echo "::group::memory and the largest processes still alive"
+          free -m
+          ps -eo pid,rss,comm --sort=-rss | head -12
+          echo "::endgroup::"
       # Both directories, because they carry different halves and only one of them ever existed:
       # `playwright-report/` needs the `html` reporter (added in playwright.config.ts for LA-63) and
       # `test-results/` is where `trace: 'retain-on-failure'` and the failure screenshots land.
