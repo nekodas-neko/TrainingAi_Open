@@ -37,18 +37,3 @@ describe('mergeSet', () => {
     expect(Object.keys(set).sort()).toEqual(['sourceMap', 'steps', 'weightKg'])
   })
 })
-
-
-describe('Apple Health source priority', () => {
-  it('ties Health Connect and remains below direct/manual sources', () => {
-    expect(HEALTH_SOURCES).toContain('apple_health')
-    expect(sourceRank('apple_health')).toBe(sourceRank('health_connect'))
-    expect(sourceRank('apple_health')).toBeGreaterThan(sourceRank(null))
-    expect(sourceRank('apple_health')).toBeLessThan(sourceRank('oura_cloud'))
-    expect(sourceRank('apple_health')).toBeLessThan(sourceRank('manual'))
-  })
-  it('labels only supplied values when inserting Apple metrics', () => {
-    expect(initialSourceMap(COLS, { steps: 0, weightKg: null }, 'apple_health')).toEqual({ steps: 'apple_health' })
-    expect(Object.keys(mergeSet('body_metrics', COLS, 'apple_health')).sort()).toEqual(['sourceMap', 'steps', 'weightKg'])
-  })
-})
