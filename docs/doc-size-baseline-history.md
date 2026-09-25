@@ -17544,3 +17544,12 @@ sentence the next reader adds a writer to a column that has one, and TN-79 keeps
 
 An entry filed to describe "measured the wrong thing" made that mistake within the hour, so the
 correction is worth more than the original finding.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31340 → 31344 (RV-168)
+
+RV-168's entry left the queue on shipping and **LA-143** took its place: the same column's remaining
+half, backfilling the rows saved before the fix. Four lines net. LA-143 is longer than the entry it
+replaces because it carries its exact `UPDATE` and a `Gate: owner`, which is the point of it — it
+writes production rows, so it has to be startable by whoever picks it up without re-deriving the
+statement. Trimmed from 21 lines to 16 before raising the number rather than banking the whole of
+the first draft.
