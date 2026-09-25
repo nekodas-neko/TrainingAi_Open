@@ -398,3 +398,8 @@ Live at the time of writing (2026-07-30):
   **state which half your PR touches.**
 - **Scan by name/manufacturer-id `0x02b2`, never MAC** (rotating RPA), and Samsung's stack does not
   honour `autoConnect=true`.
+
+## Proposed iOS backend support
+
+[iOS backend plan](../../superpowers/plans/2026-09-25-ios-backend-support.md) separates
+existing aggregate APIs from native authentication, sample imports and read-contract work.

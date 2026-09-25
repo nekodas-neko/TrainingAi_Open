@@ -30809,3 +30809,57 @@ don't bolt onto the existing single-episode-per-workout detector.
   recaps reuse client-scheduled local notifications, not real server-side push.
 - **Batch O remainder** — progress photos, warm-up protocol customization, voice
   logging, mesocycle retrospective. See `docs/planned_upgrades.md` § Batch O.
+
+## iOS backend support — proposed sequence
+
+### [devices][platform] PS-48 — Native token exchange
+
+- **Added:** 2026-09-25, requested iOS backend preparation.
+- **Lane:** A
+- **Plan:** [iOS backend support](superpowers/plans/2026-09-25-ios-backend-support.md)
+
+Extend the PKCE exchange for a native bearer response while retaining existing cookie clients. Acceptance criteria and dependencies are in the plan.
+
+### [devices][platform] PS-49 — HealthKit sample storage contract
+
+- **Added:** 2026-09-25, requested iOS backend preparation.
+- **Lane:** A
+- **Plan:** [iOS backend support](superpowers/plans/2026-09-25-ios-backend-support.md)
+
+Define sample identity, provenance, retention and deletion semantics with a separately reviewed database migration. Acceptance criteria and dependencies are in the plan.
+
+### [devices][platform] PS-50 — Idempotent HealthKit batch ingestion
+
+- **Added:** 2026-09-25, requested iOS backend preparation.
+- **Lane:** A
+- **Plan:** [iOS backend support](superpowers/plans/2026-09-25-ios-backend-support.md)
+- **Needs:** PS-49
+
+Implement bounded authenticated sample imports with safe retries, acknowledgments and deletion handling. Acceptance criteria and dependencies are in the plan.
+
+### [devices][platform] PS-51 — Historical HealthKit heart rate
+
+- **Added:** 2026-09-25, requested iOS backend preparation.
+- **Lane:** A
+- **Plan:** [iOS backend support](superpowers/plans/2026-09-25-ios-backend-support.md)
+- **Needs:** PS-50
+
+Support backfill with correct source labels, retention and replay behavior. Acceptance criteria and dependencies are in the plan.
+
+### [devices][platform] PS-52 — HealthKit daily and sleep projections
+
+- **Added:** 2026-09-25, requested iOS backend preparation.
+- **Lane:** A
+- **Plan:** [iOS backend support](superpowers/plans/2026-09-25-ios-backend-support.md)
+- **Needs:** PS-50
+
+Specify and implement timezone, stage, energy and source precedence semantics, including recomputation after deletion. Acceptance criteria and dependencies are in the plan.
+
+### [devices][platform] PS-53 — Mobile read contracts and isolated integration
+
+- **Added:** 2026-09-25, requested iOS backend preparation.
+- **Lane:** A
+- **Plan:** [iOS backend support](superpowers/plans/2026-09-25-ios-backend-support.md)
+- **Needs:** PS-48, PS-51, PS-52
+
+Audit existing reads and add only missing mobile contracts; verify against a separate test database before connecting the interface. Acceptance criteria and dependencies are in the plan.
