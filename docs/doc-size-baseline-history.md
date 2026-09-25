@@ -17572,7 +17572,34 @@ writes production rows, so it has to be startable by whoever picks it up without
 statement. Trimmed from 21 lines to 16 before raising the number rather than banking the whole of
 the first draft.
 
-## 2026-09-25 — `docs/implementation-backlog.md` 31365 → 31368 (+3)
+## 2026-09-25 — `docs/implementation-backlog.md` shrinks (LA-141 queue entry removed)
+
+LA-141 shipped in #1625 and its queue entry was never removed — it was filed and built in the same
+PR, and only the removal was missed. It carried no `Keep:` and no `STILL OPEN`, so
+`node scripts/next-item.js --lane A` kept offering finished work as READY at position 23. Its
+content is not lost: the Q-139 history, the 16,144 ds round-trip error, the nine adapter call sites
+and the fixture-that-could-not-fail lesson are all in
+`docs/overview/entries/2026-09-25-la141-clock-inverse.md`, checked line by line before deleting.
+
+Its two queue neighbours, RV-181 and RV-182, were checked at the same time and **stay** — each
+carries inline unfinished work (RV-181's memo and `/api/health/trends`; RV-182's
+`oura_heartrate_pkey` drop), which is what the retention rule is for.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31341 → 31390 (LA-144)
+
+The 09-23 Body Battery investigation Review sweep 59 asked to be split out of LA-134, root-caused
+against production and filed as its own entry. 49 lines, which is large for one entry and is the
+point of it: the investigation cost a production session and three hypotheses, **two of which were
+wrong and are recorded as wrong** so they are not re-run. It is not a write-once-early bug (the row
+was updated at 20:41 Brisbane and still saw 2 samples), and it must not be filed as "the sleep
+session is bad data" (the block is `oura_ble`-staged and this owner has genuine daytime sleep on the
+days either side). The entry also records that the obvious one-line guard is wrong — falling back to
+the first HR reading would model a real 6-hour sleep as waking — which is what stops the next
+session shipping it.
+
+LA-134 keeps only the constants re-sweep, still date-blocked to 2026-10-04, and its sweep-59 line
+now points at LA-144 instead of describing the split as hypothetical.
+## 2026-09-25 — `docs/implementation-backlog.md` 31390 → 31393 (+3)
 
 `RV-68` shipped and keeps its entry, because the device look it always named as its verification is
 genuinely owed — the contention this fixes cannot be staged off the APK, so the fix rests on source
