@@ -17770,3 +17770,11 @@ own data (whole-session always dead, per-exercise always working), the `.strict(
 card's stated remedy has no route behind it, and the 1RM gate that makes lifting heavy anyway earn
 nothing. Each is a claim he would otherwise have to take on trust, and the third is invisible from the
 app entirely.
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-199 (does the prescription need AI)
+
+The owner asked whether the prescription needs a model at all. Answering it needs the evidence table —
+sets clamped to 2 in all 33 stored tuples, reps and pct on a ~2.25 %/rep curve the styles table
+already holds, rest the one free output and the one that reads as noise at 68 to 300 seconds — because
+the conclusion is unbelievable without it. The counter-argument costs lines too and had to stay: 35 of
+35 calls succeeded, so the case cannot lean on reliability.
