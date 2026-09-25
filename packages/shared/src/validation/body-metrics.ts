@@ -107,6 +107,10 @@ export function validDistanceKmOrNull(n: number): number | null {
 const measurementCm = z.number().min(MEASUREMENT_CM_MIN).max(MEASUREMENT_CM_MAX).nullish()
 
 export const BodyMetadataPostSchema = z.object({
+  // Shape only — the DAY is checked in the handler, which needs the user's timezone anyway to
+  // decide whether it is in the future. Adding `.refine(isCalendarDate)` here too was tried and
+  // reverted: the mutation pass showed it killed nothing, because the handler's guard already
+  // rejects `2026-02-31`, and two guards for one property is two places to keep in step (RV-177).
   localDate:  z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).optional(),
   weightKg:   z.number().min(WEIGHT_KG_MIN).max(WEIGHT_KG_MAX).nullish(),
   bodyFat:    z.number().min(BODY_FAT_PCT_MIN).max(BODY_FAT_PCT_MAX).nullish(),

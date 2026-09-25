@@ -76,3 +76,33 @@ export function resolveIngestDate(
   const earliest = shiftDateStr(todayInUserTz, -pastToleranceDays)
   return iso < earliest ? earliest : iso
 }
+
+/**
+ * A client-sent day is either usable or it is not, and the caller decides what to do about it
+ * (RV-177). Where `resolveIngestDate` reconciles a day it intends to keep, this one answers whether
+ * keeping it is possible at all, so a batch route can refuse one record instead of the batch.
+ *
+ * **Measured 2026-09-25, on the two routes this was written for.** `sync-health` bounded every
+ * date by `DATE_RE` — shape only — so `2026-99-99` in one record reached the `date` column and
+ * `22008 date/time field value out of range` took down the whole flush: a three-record payload
+ * with two good days wrote **neither**. That is the poison-pill shape the handler's own comment
+ * says it exists to avoid, arriving through the one field the comment did not cover. In the same
+ * pass `{"date":"9999-12-30","weightKg":499}` answered 200 and wrote the row — Q-494's permanent
+ * capture of every "most recent weight" read, reproduced on a second route.
+ *
+ * **Why the future tolerance is a day and not zero.** The client buckets by ITS local date and the
+ * server computes today from the session's timezone. Around local midnight the two legitimately
+ * disagree, so a zero tolerance would discard the real steps of the hour the user is awake for.
+ *
+ * **Why there is no past bound**, unlike `resolveIngestDate`'s: `SYNC_DAYS_COLD` is 30, so a first
+ * install backfills a month, and clamping that to a 7-day window would merge three weeks of days
+ * into one. An old day is real history; a far-future one captures reads that no later write can
+ * outrank. Only the second is a defect.
+ */
+export const INGEST_FUTURE_TOLERANCE_DAYS = 1
+
+export function ingestDayRejection(date: string, todayInUserTz: string): string | null {
+  if (!isCalendarDate(date)) return `not a real calendar date: "${date.slice(0, 20)}"`
+  const latest = shiftDateStr(todayInUserTz, INGEST_FUTURE_TOLERANCE_DAYS)
+  return date.replace(/\//g, '-') > latest ? `dated after ${latest}` : null
+}

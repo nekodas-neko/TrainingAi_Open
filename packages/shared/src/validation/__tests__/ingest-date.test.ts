@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   resolveIngestDate,
   INGEST_PAST_TOLERANCE_DAYS,
+  INGEST_FUTURE_TOLERANCE_DAYS,
+  ingestDayRejection,
 } from '../ingest-clock'
 
 /**
@@ -69,5 +71,53 @@ describe('resolveIngestDate (Q-494)', () => {
 
   it('crosses a month and a year boundary correctly when clamping back', () => {
     expect(resolveIngestDate('2019-01-01', '2026-01-03')).toBe('2025-12-27')
+  })
+})
+
+/**
+ * RV-177 — the batch-route half. `resolveIngestDate` reconciles a day it means to keep;
+ * `ingestDayRejection` answers whether keeping it is possible, so `sync-health` can refuse one
+ * record rather than losing the flush.
+ */
+describe('ingestDayRejection (RV-177)', () => {
+  const TODAY = '2026-09-25'
+
+  it('passes an ordinary day, either separator', () => {
+    expect(ingestDayRejection('2026-09-20', TODAY)).toBeNull()
+    expect(ingestDayRejection('2026/09/20', TODAY)).toBeNull()
+  })
+
+  // The measured poison pill: this exact string took down a three-record flush, writing neither of
+  // the two good days travelling with it.
+  it('refuses a shape-valid non-day', () => {
+    expect(ingestDayRejection('2026-99-99', TODAY)).toContain('not a real calendar date')
+    expect(ingestDayRejection('2026-02-31', TODAY)).toContain('not a real calendar date')
+    expect(ingestDayRejection('not-a-date', TODAY)).toContain('not a real calendar date')
+  })
+
+  // Q-494's shape, which `sync-health` accepted with a 200 until this existed.
+  it('refuses a far-future day', () => {
+    expect(ingestDayRejection('9999-12-30', TODAY)).toContain('dated after')
+    expect(ingestDayRejection('3026-08-18', TODAY)).toContain('dated after')
+  })
+
+  // The client buckets by ITS local date; the server reads today from the session timezone. Around
+  // local midnight they legitimately disagree, and discarding that hour's steps would be the bug.
+  it('allows exactly one day of future skew, and no more', () => {
+    expect(INGEST_FUTURE_TOLERANCE_DAYS).toBe(1)
+    expect(ingestDayRejection('2026-09-26', TODAY)).toBeNull()
+    expect(ingestDayRejection('2026-09-27', TODAY)).toContain('dated after')
+  })
+
+  // The control that matters most: `SYNC_DAYS_COLD` backfills 30 days on a first install, so a
+  // past bound here would silently discard — or, if it clamped, merge — three weeks of real days.
+  it('imposes no past bound at all', () => {
+    expect(ingestDayRejection('2026-08-26', TODAY)).toBeNull()
+    expect(ingestDayRejection('2020-01-01', TODAY)).toBeNull()
+  })
+
+  it('crosses a month boundary when deciding the future edge', () => {
+    expect(ingestDayRejection('2026-10-01', '2026-09-30')).toBeNull()
+    expect(ingestDayRejection('2026-10-02', '2026-09-30')).toContain('dated after')
   })
 })

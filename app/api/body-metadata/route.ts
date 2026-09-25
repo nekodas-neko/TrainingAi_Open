@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/data";
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
 import { DEFAULT_TZ, startOfWeekInTz, ageFromDob } from "@trainingai/shared/date-utils";
 import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metrics";
+import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -285,9 +286,14 @@ export async function POST(req: NextRequest) {
   const body = parsed.data;
 
   const postTz = session?.user?.timezone ?? DEFAULT_TZ;
-  const date = body.localDate
-    ? body.localDate.replace(/\//g, "-")
-    : formatInTimeZone(new Date(), postTz, "yyyy-MM-dd");
+  const postToday = formatInTimeZone(new Date(), postTz, "yyyy-MM-dd");
+  const date = body.localDate ? body.localDate.replace(/\//g, "-") : postToday;
+
+  // Both POST clients send `todayInTz(tz)`, so a future day is a broken or tampered client rather
+  // than clock drift — and one accepted row in the year 3026 captures every "most recent weight"
+  // read permanently, which no later write can outrank (Q-494, measured again here on 2026-09-25).
+  const dayReason = ingestDayRejection(date, postToday);
+  if (dayReason) return NextResponse.json({ error: `Invalid localDate: ${dayReason}` }, { status: 400 });
 
   const repo = await getRepository();
   await repo.upsertBodyMetrics(userId, [{
