@@ -6032,6 +6032,35 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - The site's own comment says the local store's `getMealTypes` returns a narrower row type than
   `mealTypeForHour` wants, which is presumably why it reached for the raw endpoint — so converting
   it means reconciling those two types, not just swapping the call.
+- **⛔ This is 1 of 69, not a one-off — measured 2026-09-25 while shipping RV-79.** See `LB-155`:
+  the rule has 69 live violations, so fixing them one filed entry at a time is not a plan.
+
+### [platform] LB-155 — "client GETs use cachedFetch, never bare fetch" has 69 live violations, and most are probably fine
+
+- **Lane: B**
+- **Added:** 2026-09-25 · measured while shipping RV-79, which fixed one of them.
+- **The count:** 69 bare `fetch()` calls of an `/api/` GET in client code (excluding `app/api/**`,
+  tests, e2e and scripts; any call with an explicit `method:` dropped, ternaries included). Scan at
+  `/tmp/claude-0/barefetch.mjs` — rerun it rather than trusting this number.
+- **Where they are:** `components/oura-ble` **18**, admin consoles **15**, `components/nutrition`
+  **10**, then a long tail of ones and twos across `config-screen`, `workout-screen`, reminders and
+  settings.
+- **Why this is a triage and not a sweep.** Roughly half are BLE and admin debug consoles, where a
+  cached read is actively wrong — you want a live value when you are holding the device, and
+  CLAUDE.md already exempts those consoles from the sibling timezone rule for the same reason.
+  Others are per-query by nature (`food-items?q=`, `barcode?code=`) and would need the query inside
+  the key; `/api/version` is the one route deliberately exempt from the no-store rule and is read by
+  the update check, which must not be cached at all.
+- **So the work is to decide which of the ~36 product-surface sites genuinely want a cache key**,
+  convert those, and — the part that stops this recurring — **write the exemptions down**, either
+  as a checked list in a script or as a stated carve-out in the rule. A rule with 69 violations and
+  no exemption list cannot be enforced, and every future entry citing it will single out one site
+  as if it were exceptional, which is how RV-79 and LB-154 were both filed.
+- **⚠ A conversion is not mechanical** — RV-79 proved that. `cachedFetchCore` writes the response
+  after any 2xx, so a route that can return `null` needs `shouldCache`, or the conversion trades a
+  rule violation for the session-167 re-prompt bug.
+- **Not established:** no judgement has been made on any individual site beyond the two already
+  filed; the 18/15 split is by directory, not by a read of each call.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
 
@@ -6405,47 +6434,6 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **Verification:** both routes produce byte-identical variant targets for the same input before and
   after; `grep -rn REST_DAY_CARB_REDUCTION app/` returns one definition.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** `generate/route.ts` declares at `:98` and uses at `:357-360`, **plus a third use at `:306`** (`restDayCarbLine(dailyCarbs * REST_DAY_CARB_REDUCTION)`). The helper should cover the prompt line too. `structure/route.ts` is unchanged at `:47,129-131`.
-
-### [workouts][platform] RV-79 — Home reads today's mood with a bare `fetch`, against the standing rule
-
-- **Lane:** B — `app/session-select/session-select-content.tsx:613`. **Added:** 2026-09-20 ·
-  Review sweep 51.
-- `const res = await fetch(\`/api/mood?date=${today}\`)` inside `loadTodayMood`, invoked from two
-  effects (day rollover and `tabEpoch`). CLAUDE.md: *"Client GETs of `/api/*` use `cachedFetch` with
-  a `readCacheSync` seed, never bare `fetch`."* The key and TTL already exist (`MOOD_TTL`) and the
-  function already **writes** `mood:<date>` via `setCached` on both branches — it just never reads
-  through the cache layer, so it cannot join `cachedFetch`'s in-flight dedup with the mood sheet's
-  own reads of the same key.
-- **~~Fix:~~ route the API branch through `cachedFetch('mood:'+today, …, MOOD_TTL, …)`,
-  ~~preserving the existing null-guard in the `onData` callback~~.**
-  **THAT FIX REINTRODUCES THE BUG THE SAME BULLET CALLS LOAD-BEARING. Measured 2026-09-21,
-  Lane B.** `onData` has no power over the write:
-  `cachedFetchCore` (`lib/sqlite/cache.ts:366`) calls `await setCached(key, toStored(data),
-  ttlSeconds)` **unconditionally** after any 2xx, outside every null check, and `toStored` is
-  identity for `cachedFetch`. There was no `shouldCache`/`skipNull` option when this was
-  measured — the only opts were `freshWithinTtl` and `onError`. **That is no longer true; see the
-  unblocked note below.**
-- **Proven, not read off the source.** A probe seeded `mood:<date>` with an optimistic log, then
-  ran `cachedFetch` against a stubbed 200 returning `null`:
-  - `onData` fired **twice** — `[{logDate…, energyLevel:'high'}, null]`, so React state is clobbered
-    too, not only the cache.
-  - `readCacheSync('mood:<date>')` afterwards read **`null`**. `setCached` writes sessionStorage,
-    localStorage *and* SQLite, and `readCacheSync` parses a stored `"null"` back to `null` rather
-    than treating it as a miss — so the seeds at `session-select-content.tsx:211` and `:319` call
-    `setMoodLog(null)` on the next visit and **the check-in card re-prompts**. That is the
-    session-167 bug exactly.
-- **✅ UNBLOCKED 2026-09-24 (RV-189) — the enabling option SHIPPED and this entry is now buildable
-  as one line.** `LB-123` asked for it; #1394 landed it and `LB-123` is removed, so the `Needs:` is
-  gone. `cachedFetch` takes **`shouldCache?: (data: T) => boolean`** (`lib/sqlite/cache.ts:279`,
-  guarding the `setCached` at `:386`, threaded at `:443`/`:449`); `done-screen.tsx:125` is a live
-  caller. **The two bullets above are now stale where they say the option does not exist** — struck
-  rather than deleted, because the measurement under them is what justifies passing the predicate
-  and is still true.
-- **So the fix is:** `cachedFetch('mood:'+today, …, MOOD_TTL, …, { shouldCache: (d) => d != null })`.
-  Without that option the conversion trades a rule violation for a live bug; with it, neither.
-  **Still Lane B** — the engine half is done.
-- **Not established:** on the APK the local-store branch short-circuits before this fetch, so how
-  often it fires on device is unmeasured. Filed for the rule as much as the cost.
 
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
 
