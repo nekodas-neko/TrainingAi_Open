@@ -5685,6 +5685,18 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - **The three answers, any of which unblocks it:** (a) migrate to the token and accept the brighter
   green and red; (b) retune the token to today's `#22c55e`/`#ef4444` first, then migrate — same
   one-source benefit, appearance unchanged; (c) leave it, and close RV-99's Lane B half.
+- **⛔ CORRECTED 2026-09-25 — "~113" was wrong, and the real number changes how big a decision this
+  is.** Counted and classified rather than estimated (the working is on `RV-99`): of **116** literal
+  sites in `app/**` + `components/**`, only **33** have a condition choosing the colour, and reading
+  all 33 leaves **14 true bands**. The rest are things this question explicitly does not cover —
+  deliberate red→amber→green ramps, a state red that already agrees across three files, per-metric
+  identity accents, and a fallback default. The other **83** sites are unconditional card tints,
+  chart colours and icon gradients, which keep their hex whatever you decide.
+- **So the honest version: about FOURTEEN readings get brighter, not a hundred and thirteen.** Mostly
+  on Health — a body-fat delta, a goal's on-track label, the monotony meter, the weekly muscle-sets
+  bars — plus the streak card's broken state and the deload banner's severity. **That makes (a) "just
+  migrate" much cheaper than this entry implied:** a screen or two to glance at. (b) is unchanged and
+  still right if today's mid-green is what you want; (c) now reverts `warmup-screen.tsx` too.
 
 ### [platform] OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
 
@@ -5767,7 +5779,11 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 
 ### [platform][app-shell] RV-99 — the hex band triad is still copy-pasted at ~180 sites
 
-- **Lane:** B for `components/**` and `app/**`; **A** for the four shared modules listed below.
+- **Lane: A** — the four shared modules listed below are all that is buildable here. **Re-laned from
+  B on 2026-09-25 by Lane B, after measuring:** its half is a preference the owner holds (`LB-152`)
+  plus zero remaining disagreements, so heading Lane B's READY list was costing a pick-up per
+  session for nothing. `Needs: LB-152` is deliberately NOT set — Lane A's four modules do not wait
+  on the owner's answer, only the check script at the end does.
   **Added:** 2026-09-21 · Review sweep 52. **Half shipped 2026-09-22** — see below.
 - **✅ Done (PR #1405, Lane A):** `scoreBand()` and `scoreBandByLabel()` return
   `var(--accent-green)`/`var(--accent-amber)`/`var(--destructive)` via the exported
@@ -5812,6 +5828,45 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
   an identity tint is not a band and keeps it.
 - **The check script banning the three literals outside `score-band.ts` comes LAST**, after both
   halves; adding it now fails CI on 183 legitimate-until-migrated sites.
+- **⛔ MEASURED AND CLASSIFIED 2026-09-25 (Lane B) — the population is not what any of the four
+  figures in this entry says, and most of it is not a band at all.** The entry has carried 173, 183,
+  116 and 182 at various points; counted outside comments, `app/**` + `components/**` holds **116
+  literal sites across 55 files** after the fix below. Split by whether a **condition** picks the
+  colour, which is what separates a band from an identity tint:
+  - **33 are picked by a condition. All 33 were read** — the classification below is not a
+    heuristic's output: **14 true bands** (`health-sections.tsx:222,234`, `heart-rate/page.tsx:79`,
+    `deload-banner.tsx:24,27`, `streak-card.tsx:152,153,154`, `exercise-history-sheet.tsx:141`,
+    `body-fat-card.tsx:103`, `training-load-card.tsx:11`, `trends-section.tsx:51`,
+    `weekly-muscle-sets-card.tsx:23,106`); **6 an already-consistent state red** (`rest-ring.tsx` ×4,
+    `last-set-rest-timer.tsx:35`, `workout-clocks.tsx:258` — one value, three files, nothing to fix);
+    **7 deliberate ramps** of the exempt `hr-zones.ts` class (`metric-scale.tsx` ×3,
+    `zone-gauge.tsx` ×2, `weather-chip.tsx`'s UV ramp ×2); **3 a trained-today state**
+    (`recommendation-card.tsx:125,128,135`); **3 false positives** — a per-metric identity accent
+    (`rhr-hrv-spo2-card.tsx:101`, beside `#f97316` and `#06b6d4`), Steps' identity colour
+    (`goals-progress-card.tsx:50`) and a `|| '#22c55e'` fallback default (`sparkline-chart.tsx:25`).
+  - **83 are unconditional constants** — card tints through `accentCardStyle`, chart series colours,
+    icon gradients, the two app icons. **These were NOT read one by one**, and spot checks found they
+    are not uniformly identity either: `body-battery-card.tsx:30,31` is a charging/draining state
+    table and `admin/calibration-card.tsx:23` is a deliberate 5-step ramp. So 83 is an upper bound on
+    the identity population, not a verified count.
+  **So the band population RV-99 is actually about is ~14, not ~113**, and `LB-152`'s question
+  shrinks accordingly — recorded there too, because the size of the restyle is the whole of what the
+  owner is being asked to weigh.
+- **✅ The second defect of the workout-clocks class SHIPPED 2026-09-25** (`components/workout/warmup-screen.tsx`,
+  three greens). The first slice migrated `GetReadyProgress`'s *"✓ Ready"* and `WarmupRampProgress`'s
+  done segments and left the warmup screen's own *"✓ Warm up complete"* on `#22c55e` — same state,
+  same ✓-label-plus-filled-bar idiom, `rgb(34,197,94)` against the token's `rgb(86,238,102)`.
+  **Why the first sweep missed it, and the lesson for the remaining files:** the modes are exclusive,
+  so nothing puts the two on screen together — a same-file or same-screen scan cannot see it, and only
+  the *sequence* exposes it. `components/workout/__tests__/rv99-done-green-agrees.test.ts` now guards
+  the class rather than the two files: no screen in the workout flow may pick a green by a done
+  condition using a hex literal. The glow keeps its own 53% (from `#22c55e88`) rather than adopting
+  the brand branch's 60% — the colour was the disagreement, the opacity was not.
+- **Checked and NOT a One-Formula violation**, so nobody re-opens it: `training-load-card.tsx`'s
+  `monotonyColor` bands **monotony** on a 0–2.5 scale at 1.5/2, where `acwrBandByKey` bands **ACWR**
+  at `ACWR_THRESHOLDS`. Two metrics, two threshold sets, one shared palette. Not a duplicate.
+- **If the owner answers `LB-152` with (c) "leave it", this file reverts WITH `workout-clocks.tsx`** —
+  the two are now one decision, which is the point of fixing the disagreement rather than half of it.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **THE FIRST HALF SHIPPED AS #1441** (16cfd00e), not #1405, which was abandoned (OR-132). The four Lane A modules still carry hex: acwr ×3, calorie-balance ×3, strength-progress ×1, day-checkin ×3. The hex triad has 182 occurrences across 67 files.
 
 ### [workouts][app-shell] RV-101 — the muscle heatmap's volume ramp: SHIPPED, the device look is owed

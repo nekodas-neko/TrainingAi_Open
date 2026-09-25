@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.58",
+    date: "2026-09-25",
+    changes: [
+      "The \"Warm up complete\" green on the warmup screen now matches the green the next screen uses for the same thing, instead of being a slightly different shade.",
+    ],
+  },
+  {
     version: "1.465.57",
     date: "2026-09-25",
     changes: [
