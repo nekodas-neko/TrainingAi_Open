@@ -17464,7 +17464,23 @@ have spent the work on 1.6% and undone a correctness fix on the way.
 So the eight lines buy: the split measurement, the reason the obvious fix is the wrong one, and the
 shape of the right one. The comparison table and the rest of the narrative were left in the journal
 entry, which is what kept this to eight lines rather than twelve.
-## 2026-09-25 — `docs/implementation-backlog.md` 31288 → 31297 (+9)
+
+## 2026-09-25 — `docs/implementation-backlog.md` 31288 → 31312 (LA-141)
+
+A new entry, which is what the backlog is for. LA-141 records that `resolveMsToDs` was not the
+inverse of `resolveDsToMs` and its comment claimed it was — a ds round-tripped 26.9 minutes of ring
+time away from itself on the drain shape Q-139 measured.
+
+Twenty-one lines for one entry is more than most, and the reason is that this method has now been
+measured and rejected **three times** in this repository — Q-139's 18× compression, a later sweep's
+nine-night run where every night shifted 10–48 minutes later, and now the inverse. An entry that
+merely said "fixed the inverse" would leave the next reader free to reach for interpolation a fourth
+time; the entry names the two prior measurements and the conclusion they reached, so the reasoning
+is in the queue rather than only in a journal entry nobody will be looking for.
+
+It also records the blast radius — nine adapter call sites, four of them LA-139's from the same
+day — because that is the part someone debugging a skewed ds window needs to find.
+## 2026-09-25 — `docs/implementation-backlog.md` 31312 → 31321 (+9)
 
 `LB-149` — the E2E browser death. The entry grew because what it now carries is a list of things
 RULED OUT, and each one is what stops the next session re-testing it: `workers: 1` is already the

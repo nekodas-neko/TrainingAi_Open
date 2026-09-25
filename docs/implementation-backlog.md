@@ -4342,6 +4342,30 @@ drift.
   `workout_hr_stats.hrr1_best` is stored for **10 of 10**. Read the column — after a per-day
   agreement check against production, which has not been done.
 
+### [devices][heart-rate] LA-141 — `resolveMsToDs` was not the inverse of `resolveDsToMs`, and said it was
+
+- **Lane: A** — `lib/oura-ble/clock.ts`. **Added:** 2026-09-25, Lane A — found while measuring
+  RV-182 ②.
+- **SHIPPED 2026-09-25** ([entry](overview/entries/2026-09-25-la141-clock-inverse.md)): both
+  directions now go through one `offsetForEpoch`, so `resolveMsToDs` is `resolveDsToMs` solved for
+  `ds` by construction.
+- **What was wrong.** Q-139 removed bracket interpolation from `resolveDsToMs` because the slope it
+  derives, `Δutc / Δds`, is not a property of either clock: while the ring drains buffered history ds
+  advances far faster than the wall clock, and that ratio collapses. `resolveMsToDs` kept
+  interpolating, and its comment called that *"symmetric with the forward direction"*. On Q-139's own
+  measured drain shape (17,094 ds in 95 s) a ds round-tripped **16,144 ds — 26.9 minutes of ring
+  time — away from itself**.
+- **Twice measured before, in the other direction.** Q-139 found the 18× compression that put 1,555
+  steps in a 60 s block; a later sweep ran naive interpolation against nine real nights and every one
+  shifted 10–48 minutes later (one +79), concluding *"do not re-attempt naive interpolation"*. The
+  inverse was still doing it.
+- **Blast radius:** nine call sites in `adapter.ts` convert a wall-clock window to a ds range for
+  querying — including the four LA-139 moved onto the anchor series the same day. Their windows were
+  skewed for any span touching a drain.
+- **The pre-existing test asserted the right property against a fixture that could not fail it:**
+  anchors spanning 10,000 ds over exactly 1,000,000 ms, a slope of exactly 100 ms/ds, where both
+  models agree. The drain case is added beside it, and restoring the old body now fails it.
+
 ### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
 
 - **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/clock.ts`, `lib/oura-ble/rollup/run.ts`.
