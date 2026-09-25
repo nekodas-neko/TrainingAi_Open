@@ -40,14 +40,17 @@ because the ordering matters: checking it first would have saved the whole candi
 ## A correction to a number I called verified
 
 In #1631 I wrote that RV-67's figures — **191 cached read sites, 8 flagged** — *"reproduce exactly"*.
-They do not. The real figure was **199**. My scanner skipped each call's type argument with a
-paren-free character class, so every `cachedFetch<{ x: import('…').T }>` was invisible; the entry's
-author evidently had the same blind spot, which is why we agreed.
+They do not. Measured against that same commit with a fixed scanner: **198 read sites, 8 flagged** —
+so the flagged count was right and the site count was not. My scanner skipped each call's type
+argument with a paren-free character class, so every `cachedFetch<{ x: import('…').T }>` was
+invisible; the entry's author evidently had the same blind spot, which is why we agreed.
 
 **Two scanners agreeing is not corroboration when they share a blind spot** — "reproduces exactly"
 meant "reproduces the same error", and I presented it as the one entry that had held up. The
-conclusion is unharmed (191 of 199 still do not opt in) but the figure was wrong and was published as
-checked. Both scanners now skip the type argument by balancing angle brackets; #1631's journal entry
+conclusion is unharmed (190 of 198 did not opt in) but the figure was wrong and was published as
+checked. The then-figure was recovered by running the fixed scanner in a worktree at that commit,
+rather than reasoning back from today's count — which would have conflated two moments, and did in
+my first attempt at this correction. Both scanners now skip the type argument by balancing angle brackets; #1631's journal entry
 carries the correction inline.
 
 That is the **fifth** distinct scanner trap in one day, each a different mechanism: a regex cannot
