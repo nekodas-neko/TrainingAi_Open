@@ -125,3 +125,52 @@ deleted row claims none did.
 score and several trends — so it sits upstream of the scoring work waiting on Tuning. The entry now
 says to establish the cause first: a night missing because the ring was off is not the same defect as
 one the pipeline dropped, and the census did not separate them.
+
+## O-lane review for DV candidates — one re-routed, and a bigger finding
+
+The owner asked which `O`-lane entries belong to Device Verification. Forty-nine READY entries read
+against CLAUDE.md's test: DV takes an entry when the next action is **a measurement nobody has taken,
+with an objective pass/fail**, on hardware only that agent has.
+
+**One qualifies, and it is the one that unblocks the rest. `OR-127` → `Lane: DV`, at rank 1.** The
+device harness (`scripts/device/cdp.js`, `probe.js`) **shipped and has never been run against a
+phone** — every line was reasoned from the protocol rather than observed. Its own text says *"the
+first run on the S25 is the test"*. That is the definition of the field.
+
+**It was invisible because of a `Keep:`.** The entry read *"Keep: the first real run, and the fix it
+will probably need"*, which buckets it under *shipped, residue owed* — out of every lane's READY
+list. **The first real run is not residue; it is the entire remaining task.** The field is removed
+and the reason recorded, because this is exactly the trap `OR-100` describes: `Keep:` filing
+buildable work under a heading that tells the lane not to look. It now outranks the other device work,
+since the three check classes no sandbox can reach are blocked on this harness working at all — the
+sittings that would clear ~109 owed checks depend on it.
+
+**`BF-92` is a DV check behind one word of consent**, so it gets `Ask: owner` rather than a re-lane:
+may a deliberate client-side error be thrown in **production** to prove Sentry receives it? That is
+the whole remaining gate, and nobody has just done it because of a note that it *"may page someone"*.
+
+**Four were rejected, each for a different reason, and the reasons are the useful part:**
+`DV-1` — the pass test **has** been run on the device machine and failed with a named cause
+(`spawnSync npx.cmd EINVAL`) and a named fix. The next action is a scripts change, not another
+measurement. CLAUDE.md's trap (a).
+`Q-51` — `RV-138` already measured it: 90 warm visits, no outlier. A probe already run is no longer
+DV's. Trap (b).
+`LB-141`, `LA-136` — product decisions about what the app should do. Those go to the owner even
+though the phone is where he would look, per the looks-vs-measurement rule.
+
+## The bigger finding: nine entries said they needed him and nothing asked
+
+Scanning for it turned up **nine `O`-lane entries whose own text says they need the owner — "a
+product decision", "a product preference", "it needs the owner before code" — carrying neither
+`Ask:` nor `Gate:`.** They sat in READY looking like Orchestrator work.
+
+Four were real and now carry `Ask: owner`: **`TN-67`** (saving a check-in rating to validate
+readiness is a product change), **`LA-136`** (does Home get a sleep line back, driven by the
+`sleepQualityFeel` that is collected and unused), **`LB-141`** (leaving a walk by the back gesture or
+tab bar discards it — what should those exits do), **`RV-119`** (which of seven stacking banners
+collapse).
+
+Four were false positives and were left alone — quoted text from a Routine prompt, a demoted lane
+field, and prose describing a swipe rather than a decision. **Checking each rather than bulk-adding
+is the whole difference**, since an `Ask:` on an entry that is not really his is how the owner's
+queue fills with things he should not be reading.

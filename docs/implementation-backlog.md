@@ -478,6 +478,131 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
+
+- **Lane: DV** — **re-laned from `O` on 2026-09-25**, when the owner asked which `O` entries belong to
+  the device agent. This is the definition of a DV task: a measurement **nobody has taken**, with an
+  objective pass/fail (*does `probe.js` connect to the S25 and return?*), on hardware only that agent
+  has. Superseded field, demoted to prose so it cannot route this entry: it read *“Lane O —
+  `scripts/device/**`”*. **Added:** 2026-09-22, owner-requested.
+- **⚠ It sat in `O` behind a `Keep:` that reads as finished, which is the trap CLAUDE.md names.** The
+  harness SHIPPED, so the entry looked done-with-residue — but **the residue IS the test**, and until
+  a phone answers, nothing here is verified, including that it connects at all.
+- **This outranks the rest of the device work.** The three check classes no sandbox can reach are
+  blocked on this harness working, so the sittings that would clear ~109 owed checks all depend on
+  it. **Run `probe.js` first**, before any sitting is planned around it.
+- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
+  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
+  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
+  what it takes to make it connect is the finding worth writing down.
+- **The `Keep:` field is REMOVED, 2026-09-25, and that is the point of the re-lane.** It read *"Keep:
+  the first real run, and the fix it will probably need"* — which buckets the entry under
+  *shipped, residue owed* and keeps it out of any lane's READY list. The first real run is not
+  residue; it is the entire remaining task, and it now sits in DV's work list where someone will pick
+  it up.
+
+**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
+build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
+Three classes of check are unreachable as a consequence, and they are precisely the ones the
+backlog is full of:
+
+| class | why no sandbox reaches it |
+|---|---|
+| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
+| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
+| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
+
+Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
+cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
+thing.
+
+- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
+  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
+  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
+- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
+  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
+  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
+  needs a *browser* target and an Android WebView commonly exposes only page targets
+  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
+  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
+  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
+- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
+  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
+  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
+  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
+  real differential when it was a coordinate artifact.
+- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
+  navigation reports a bottom inset of `0` and a broken clearance looks correct.
+- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
+  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
+  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
+  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
+  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
+  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
+  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
+  property or a layout one). Frames are written named by their offset from the start.
+  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
+  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
+  exactly that reason.
+- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
+  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
+  anything needing the owner physically present, or any *"does this feel instant"* judgement.
+  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
+  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
+  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
+  whether a sync button does anything. That is most of the `devices` group and all of
+  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
+  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
+  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
+  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
+  unambiguous ones and leave a shorter, harder list - not an empty one.
+- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
+  substitute. It narrows what the gate has to cover.
+
+**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
+instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
+answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
+
+1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
+   else is worthless until it passes.
+2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
+   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
+   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
+   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
+   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
+   first.**
+3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
+   returns null off the APK, so these have never been exercised. Highest value per check.
+4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
+   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
+   and the floored-utility rule it enforces has never been checkable at all.
+5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
+   for the reason the correction above records: this is the phone the ring and scale are paired to.
+   Mostly *"does this button do anything"*, which is binary.
+6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
+   sheet 300 ms or the stock 500.
+7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
+   those, and pretending otherwise is how a green run starts meaning less than it says.
+
+- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
+  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
+  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
+  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
+  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
+  a repository, which is a cost accepted only because it is bounded and auditable.
+  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
+    *in the page*: the real route, the active tab, visible error text, the button count, whether the
+    page scrolls horizontally, and the lowest action row's computed bottom padding against the
+    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
+    *"is this feature working"* questions are answerable from the digest alone.
+  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
+    the question); a live view (impossible — the reviewing session is a container with no path to a
+    USB device).
+- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
+  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
+  invalidates every clearance reading in step 4.
+
+
 ### [devices] OR-172 — the Oura BLE path is the OWNER'S setup, not a product feature
 
 - **Lane: O** · **Added:** 2026-09-25 · from the owner's answer closing `OR-160`.
@@ -1412,6 +1537,8 @@ which is the right shape for something that can only be validated by living with
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 
+- **Ask:** owner — the readiness score has no validated external agreement. Saving a check-in rating to validate it against is a PRODUCT change (one more thing to answer each morning), so it is his call, not an assumption. See `OR-171` — he has just redesigned a different rating prompt to fire only on outliers, and the same shape may apply here.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
   conclusion I had already drawn in this session.
 - **Lane: O** — nothing to build; it sets what may and may not be claimed about the score, and names a
@@ -1580,6 +1707,8 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+
+- **Ask:** owner — Home lost its sleep line and nothing replaced it. `sleepQualityFeel` (1–5, with a touched flag) IS collected and unused. Does he want a sleep line back on Home, and driven by that? A product preference; the code half is then Lane B.
 
 - **Lane: O** — it needs a product preference before it needs code, and the code half is then Lane B
   (`components/home/**`). **Added:** 2026-09-24 · Lane A, as the stated residue of TN-66.
@@ -3815,6 +3944,8 @@ drift.
 
 ### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
 
+- **Ask:** owner — leaving a guided walk by the back gesture or the tab bar DISCARDS it; only the End button saves. A 39-minute walk vanishes with no row. What should the other two exits do — save, prompt, or keep discarding? A product decision with no single right answer.
+
 - **Lane: O** — a product decision about what happens to a walk, not a defect with one right answer.
   **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
   written per call site, which is what surfaced it).
@@ -5547,6 +5678,8 @@ gating, Zod on every ingest route, try-catch on every AI call, and fail-closed s
 - Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
+
+- **Ask:** owner — seven independent banners can stack above Home's first card. Which collapse and which stay full-width is a look he sees daily, so it needs him before code, and it owes a mockup at 384 px dark.
 
 - **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
   owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
@@ -14413,6 +14546,8 @@ one. A swipe on the single Start button adds an affordance that does not current
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
+- **Ask:** owner — one-line consent: may a deliberate client-side error be thrown in PRODUCTION to prove Sentry receives it? That is the whole remaining gate. It creates one real Sentry event; the earlier note that it "may page someone" is why nobody has just done it. Say yes and this becomes a DV check with an objective pass/fail.
+
 > **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
 > whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
 > `tunnelRoute: '/monitoring'`, so the browser POSTs **same-origin** — which `connect-src 'self'`
@@ -21978,118 +22113,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
-
-### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
-
-- **Lane: O** — `scripts/device/**`. **Added:** 2026-09-22, owner-requested.
-- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
-  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
-  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
-  what it takes to make it connect is the finding worth writing down.
-- **Keep:** the first real run, and the fix it will probably need. Until a phone has answered,
-  nothing here is verified — including the claim that it connects at all.
-
-**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
-build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
-Three classes of check are unreachable as a consequence, and they are precisely the ones the
-backlog is full of:
-
-| class | why no sandbox reaches it |
-|---|---|
-| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
-| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
-| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
-
-Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
-cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
-thing.
-
-- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
-  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
-  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
-- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
-  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
-  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
-  needs a *browser* target and an Android WebView commonly exposes only page targets
-  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
-  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
-  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
-- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
-  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
-  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
-  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
-  real differential when it was a coordinate artifact.
-- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
-  navigation reports a bottom inset of `0` and a broken clearance looks correct.
-- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
-  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
-  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
-  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
-  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
-  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
-  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
-  property or a layout one). Frames are written named by their offset from the start.
-  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
-  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
-  exactly that reason.
-- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
-  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
-  anything needing the owner physically present, or any *"does this feel instant"* judgement.
-  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
-  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
-  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
-  whether a sync button does anything. That is most of the `devices` group and all of
-  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
-  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
-  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
-  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
-  unambiguous ones and leave a shorter, harder list - not an empty one.
-- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
-  substitute. It narrows what the gate has to cover.
-
-**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
-instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
-answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
-
-1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
-   else is worthless until it passes.
-2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
-   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
-   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
-   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
-   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
-   first.**
-3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
-   returns null off the APK, so these have never been exercised. Highest value per check.
-4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
-   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
-   and the floored-utility rule it enforces has never been checkable at all.
-5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
-   for the reason the correction above records: this is the phone the ring and scale are paired to.
-   Mostly *"does this button do anything"*, which is binary.
-6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
-   sheet 300 ms or the stock 500.
-7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
-   those, and pretending otherwise is how a green run starts meaning less than it says.
-
-- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
-  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
-  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
-  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
-  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
-  a repository, which is a cost accepted only because it is bounded and auditable.
-  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
-    *in the page*: the real route, the active tab, visible error text, the button count, whether the
-    page scrolls horizontally, and the lowest action row's computed bottom padding against the
-    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
-    *"is this feature working"* questions are answerable from the digest alone.
-  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
-    the question); a live view (impossible — the reviewing session is a container with no path to a
-    USB device).
-- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
-  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
-  invalidates every clearance reading in step 4.
-
 
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
