@@ -17833,3 +17833,8 @@ The lines are there for one reason: the bound. `generated-program.ts` already bo
 editor floors at 0 and **production holds 8 phases at `duration_cycles = 0`**, so `min(1)` would
 have 400ed the owner re-saving his own phase set. The entry records that, and records that whether
 0 should be reachable is a product question left open rather than settled by a validator.
+**2026-09-25 · `docs/implementation-backlog.md` · Review sweep 61, `review/sweep-61-ai-to-logic`.**
+31865 → 31945 (+80; rebased). Five entries (RV-200 to RV-204) at the owner's request to move AI calls to logic where
+possible, plus a note on PS-31 marking which of its items the new entries supersede. Each entry
+cites the computed code the model currently rewords, which is what makes it buildable without
+re-deriving it.
