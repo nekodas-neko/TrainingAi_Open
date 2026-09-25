@@ -4377,23 +4377,18 @@ drift.
   `oura-raw-sample-measured-at.test.ts` now pins that across the first-ever batch, an epoch open and
   a history re-drain. **The column is NOT dropped** — that is a data-dropping migration and the
   owner's.
-- **⚠ STILL OPEN ② — and the entry's attribution of it was WRONG, which is why it was not built
-  blind.** It read the anchor cost as one number across three functions and proposed
-  `ORDER BY epoch DESC, anchor_ds DESC LIMIT 1` plus an index on `(user_id, anchor_utc DESC)`.
-  Measured separately on 2026-09-25: **all 9.4% is `getOuraClockAnchors`**, the full-series read
-  (2,190 calls, 48.45 ms, 106 s). **The two the fix targets are already cheap** —
-  `getOuraClockEpochHead` 1.80 ms and `getNewestOuraClockAnchorByUtc` 1.71 ms, 4,942 calls each,
-  0.8% apiece on a 12,582-row table — so the index and the `LIMIT 1` buy at most 1.6% and leave the
-  9.4% untouched. And the expensive one **cannot** become `LIMIT 1`: LA-139 moved four call sites
-  onto the full series precisely because a single newest anchor was the wrong offset.
-- **② the real shape, and it is RV-181's.** `resolveDsToMs` needs **one scalar per epoch** — the
-  10th-percentile lag (`robustOffsetMs`) — and rebuilds it from every anchor row on every request:
-  2,190 calls × 9,735 rows to produce one number, with **1 distinct epoch** in 12,582 rows. Compute
-  that order statistic in SQL (`ORDER BY lag OFFSET floor(n*0.1) LIMIT 1`, **not** `percentile_disc`,
-  which disagrees with `Math.floor(n*0.1)` at small n — same trap RV-181 hit). `resolveMsToDs` is the
-  one real hold-out: it interpolates between the anchors *bracketing* an instant, so it wants a
-  two-row windowed query rather than an aggregate. Six call sites. Thinning the inserts (one anchor
-  per ingest batch, 4,942 of them describing one linear clock) is the complementary half.
+- **SHIPPED ② 2026-09-25** ([entry](overview/entries/2026-09-25-rv182-clock-offset-sql.md)):
+  `getOuraClockOffsets` returns each epoch's robust offset as one row. Five adapter read paths that
+  only convert timestamps now take it; the rollup and three others keep the series, which they
+  genuinely need. **19–27 ms warm against the series read's ~48 ms.**
+- **⚠ The entry's ATTRIBUTION of ② was wrong, and so was the first fix I measured.** It read the cost
+  as one number across three functions. Measured separately: **all 9.4% is `getOuraClockAnchors`**
+  (2,190 calls, 48.45 ms, 106 s); `getOuraClockEpochHead` is 1.80 ms and `getNewestOuraClockAnchorByUtc`
+  1.71 ms, 0.8% apiece — so the proposed index and `LIMIT 1` bought at most 1.6% and left the 9.4%.
+  The expensive one could not become `LIMIT 1` either: LA-139 moved four call sites onto the full
+  series because a single newest anchor was the wrong offset. **And the obvious aggregate is a
+  REGRESSION** — `row_number() OVER (PARTITION BY epoch …)` measured **53–67 ms**, worse than the
+  read it replaces, because it sorts all 12,591 rows. Only the count-then-top-N shape wins.
 - **STILL OPEN ③ — the rollup deletes and reinserts ~880 HR rows per pass even when nothing changed**
   (`run.ts:877-878`): 535k deletes against 137k live rows. `oura_heartrate_pkey` (6.8 MB) has
   **0 scans**. **Fix:** upsert with `IS DISTINCT FROM`, and delete only the timestamps that disappeared.
