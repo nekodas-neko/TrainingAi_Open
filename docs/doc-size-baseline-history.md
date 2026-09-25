@@ -17848,6 +17848,23 @@ entry: three exercises land exactly on the round-up of 52% of their last real 1R
 not, which is what turns "the deload is broken" into "the deload works and this one exercise took a
 different basis". Two mechanisms both produce 30 and the entry refuses to pick between them, so it
 carries both plus the existing `source` field that settles it.
+## 2026-09-25 — `docs/implementation-backlog.md` 31857 → 31894 (+37, DV-12 un-gated, and a retraction)
+
+Three things, and the retraction is the one that had to be written down. `DV-12`'s `Gate: device` was
+removed — it parked the owner's **highest-priority** entry for a question the entry's own next line
+called source-answerable, and both halves of that question are now settled. What remains needs the
+phone only to verify, so it carries a prose `Device check owed on merge:` rather than a field.
+
+**The retraction:** the "216–465 ms with ZERO canvases" measurement I added to this entry hours earlier
+was measuring a page whose charts had not loaded. Health renders five canvases, but not until ~18 s in,
+and the probe waited 1.5 s. Corrected in place rather than deleted, because the wrong figure had already
+shipped.
+
+The rest is what a future session would otherwise re-spend: the re-measurement with charts genuinely
+mounted, an A/B of `resizeDelay: 200` across all twenty charts showing **no effect that survives the
+noise**, and the fact that `pnpm start` cannot boot in this sandbox (the instrumentation hook needs
+object-storage credentials), which closes the obvious route around the dev-mode confound. Together they
+say the first task on this entry is a measurement that can tell a fix from a no-op — not the fix.
 
 ## 2026-09-25 — `docs/implementation-backlog.md` (RV-177 rate limits)
 
@@ -17860,4 +17877,4 @@ The lines record that both claims held on re-verification — the meal PATCH rea
 because the same route serves a rename that costs nothing. That placement is the kind of thing a
 later reader would otherwise "tidy" into a handler-level guard.
 
-32007 → 32012 (+5; rebased onto main's 31945 and 31822 entries above).
+32044 → 32049 (+5; rebased twice as main moved under this branch).
