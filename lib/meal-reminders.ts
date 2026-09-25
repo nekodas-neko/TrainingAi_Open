@@ -23,8 +23,21 @@ export type MealReminderAction =
   | { mealTypeId: string; type: 'immediate'; emoji: string; name: string }
   | { mealTypeId: string; type: 'scheduled'; at: Date; emoji: string; name: string }
 
+/**
+ * What this module actually reads off a meal type: `id`, `name`, `emoji`, `remindersEnabled` and
+ * `timeEndHour` for the per-meal reminders, plus `required` for the end-of-day one.
+ *
+ * Declared as a Pick rather than `MealType` (RV-183) so the on-device row satisfies it directly —
+ * `LocalMealType` carries all six and lacks only `userId`, `sortOrder`, `timeStartHour` and
+ * `createdAt`, none of which this file touches. Widening it back to `MealType` would force the
+ * caller to invent those, and an invented field is how BF-112 shipped.
+ */
+export type MealTypeForReminders = Pick<
+  MealType, 'id' | 'name' | 'emoji' | 'remindersEnabled' | 'timeEndHour' | 'required'
+>
+
 export function computeMealReminderActions(
-  mealTypes: MealType[],
+  mealTypes: MealTypeForReminders[],
   foodLogs: Pick<FoodLog, 'mealTypeId'>[],
   now: Date = new Date(),
   notifiedToday: Set<string> = new Set(),
@@ -80,7 +93,7 @@ function clearNotifiedToday(mealTypeId: string): void {
 }
 
 export async function reconcileMealReminders(
-  mealTypes: MealType[],
+  mealTypes: MealTypeForReminders[],
   foodLogs: Pick<FoodLog, 'mealTypeId'>[],
   now: Date = new Date(),
 ): Promise<void> {
@@ -134,7 +147,7 @@ const EOD_REMINDER_ID = 9100
 const EOD_REMINDER_KEY = 'ta_eod_reminder_date'
 
 export async function scheduleEndOfDayReminder(
-  mealTypes: MealType[],
+  mealTypes: MealTypeForReminders[],
   foodLogs: Pick<FoodLog, 'mealTypeId'>[],
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return

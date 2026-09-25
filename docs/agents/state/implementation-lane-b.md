@@ -1,21 +1,19 @@
 # Implementation Agent (B) — baton
 
 **Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-148 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Next ID:** LB-149 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement half. LB-141 filed.
+RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves. LB-141, LB-148 filed.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; two
-Review sweeps reordered the head in one day. **The owner's stated highest priority is tab/page
-switch speed**, so `DV-12` heads the lane the moment the phone is available. Otherwise RV-183, then
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; sweeps
+reorder the head daily. **The owner's stated top priority is tab/page switch speed**, so `DV-12`
+heads the lane once the phone is available. Otherwise RV-183 (its Lane A halves remain), LB-148,
 RV-185, RV-178, RV-122.
-**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate:
-device`) both headed READY while unstartable. The field must LEAD its own bullet; inline after
-`Lane:` parses as nothing.
+**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate: device`) headed READY while unstartable. The field must LEAD its own bullet; inline after `Lane:` parses as nothing.
 **RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
 
 ## Blocked / owed
@@ -50,5 +48,6 @@ device`) both headed READY while unstartable. The field must LEAD its own bullet
   matches ITSELF (`git ls-files` hides it only while untracked, and `ls-files A B -- '*.tsx'` UNIONS
   pathspecs — filter in JS); it matches the COMMENTS explaining the fix (strip them); a regex cannot
   balance parens (`f\([^,)]+\)` flags the corrected `f(g(x), tz)`); arity is per-function.
+- **A DEFERRAL IS A CLAIM — RE-READ IT BEFORE TRUSTING IT.** RV-183's meal half was deferred as "needs a join"; there was none, just an over-wide parameter type demanding four fields the file never reads.
 - **⚠ ASSERT EVERY SCRIPTED `str.replace`.** This file's "Now" line sat three PRs stale because one no-oped silently on text an earlier no-op never wrote. Code edits were asserted; the baton's were not, and the baton is what survives a compaction.
 - **A gate's exit code must be read DIRECTLY**, never via `&&`/`;` into `git commit`; COMMIT before `git stash`/`checkout`; `tsc --noEmit` typechecks NEITHER an auth-gated page nor tests, so run `node scripts/check-test-typecheck.js` before pushing a spec; and vitest's unit project does not transform JSX, so a testable helper goes in a `.ts`.
