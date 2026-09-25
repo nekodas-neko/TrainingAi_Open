@@ -3,12 +3,6 @@ import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 
 export async function GET(req: NextRequest) {
-  // Auth first: the range check below answered 400 before anyone had proved who they were, which
-  // tells an unauthenticated caller the route exists and what it accepts.
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = new URL(req.url);
   const now = new Date();
   const year  = parseInt(searchParams.get("year")  ?? String(now.getFullYear()), 10);
@@ -21,6 +15,15 @@ export async function GET(req: NextRequest) {
       year < 2000 || year > 2100 || month < 1 || month > 12) {
     return NextResponse.json({ error: "Invalid year or month" }, { status: 400 });
   }
+
+  // The range check above runs BEFORE this one on purpose, and RV-177 called that a fault — it is
+  // not, so the order is unchanged. An
+  // out-of-range request answers the same whether or not the caller is signed in, so the route
+  // cannot be used to probe whether a session is still valid. `home-aggregate-routes.test.ts`
+  // pins the order with that reason, and it is the better one.
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { trainedDays, activityDays } = await (await getRepository()).getCalendarData(userId, year, month, session.user?.timezone);
   return NextResponse.json(
