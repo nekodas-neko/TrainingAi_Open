@@ -17986,3 +17986,18 @@ and a reversal cost to be answerable without reading the parent. BF-202 records 
 the queue share that shape, with the caveat that the number is a keyword upper bound rather than a
 finding — that caveat is the part worth the lines, since acting on 70 as if it were 70 real decisions
 would waste the sweep.
+
+
+## 2026-09-26 — `projectOverview.md` +17 → RV-203's Known-Issues row
+
+One open-issue row, which is what this section of the index is for. It costs 17 lines because
+three separate things have to survive being read cold: what changed (Describe now offers your own
+foods before the AI), **which half is unverified and why** (the local-store branch — `getLocalStore`
+returns null in the sandbox and there is no DOM project, so what ran was the cached-list branch),
+and the pass test that would close it. The last of those is the line that makes the row worth
+keeping rather than deleting on the next sweep — an entry that says "not device-verified" without
+saying what would verify it never leaves.
+
+It also carries the correction the finding needed: the barcode half cannot work offline for a
+different reason than the one Review gave, so the row points at `LB-158` instead of implying the
+work is merely unstarted.

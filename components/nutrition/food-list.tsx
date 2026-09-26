@@ -14,7 +14,9 @@ import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 
-const ALL_ITEMS_KEY = 'nutrition-food-items-all'
+/** Shared with `capture-actions.tsx`, which reads the same seeded list to suggest the user's own
+ *  foods for a typed description (RV-203 ①). One key for one endpoint, per CLAUDE.md. */
+export const ALL_ITEMS_KEY = 'nutrition-food-items-all'
 
 interface Props {
   /**

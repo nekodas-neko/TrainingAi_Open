@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..');
-const code = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-const src = (rel: string) => code(readFileSync(path.join(ROOT, rel), 'utf8'));
+/**
+ * The shared stripper, not the regex pair every other source-scan test in this repo copies.
+ *
+ * That pair treats the `/*` inside `accept="image/*"` as a comment opener and runs to the next
+ * `*` + `/`, which in `capture-actions.tsx` silently deleted 15 KB — the `<BarcodeScanner` render
+ * this file asserts on among it. It only surfaced because RV-203 added comments that moved the
+ * pairing; before that it happened to land somewhere harmless. A guard reading a mangled file is
+ * the LA-64 failure the stripper exists to prevent, so this uses `scripts/lib/strip-comments.js`,
+ * which walks string literals properly. The other copies are swept in LB-160.
+ */
+const src = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'));
 
 /**
  * RV-111 — one hardware back while the barcode scanner was open threw away the whole Log Food flow.

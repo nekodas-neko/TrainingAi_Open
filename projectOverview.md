@@ -2620,6 +2620,23 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] ⚠️ Describe now offers your own foods before the AI — the offline half NOT seen on the phone (RV-203, 2026-09-26)
+
+Typing a food into **Describe or enter** went straight to the AI, so a food already saved with real
+macros was re-estimated every time and the panel did nothing at all without a network. It now lists
+matching saved foods and saved meals above Analyse, from the local store and from the list the
+screen behind it has already loaded — nothing new is fetched. In the same change, a portion-only
+correction in the Review sheet (*"it was 300g"*) rescales on the device instead of asking the AI to
+redo the estimate.
+
+**Not verified: the local-store branch, which is the half that works offline.** `getLocalStore`
+returns null in the sandbox and in the test suite, so what ran was the cached-list branch; there is
+no DOM project either, so the wiring is held by source assertions rather than by rendering.
+**Pass test:** on the S25 in airplane mode, Log Food → *Describe or enter* → type the name of a food
+logged before → it appears under *"You already have"* and tapping it reaches the assign step.
+**Still open:** a barcode re-scan cannot work offline, and not for the reason the finding gave —
+the device has no `barcode` column to look one up in. Engine change, filed as `LB-158`.
+
 ### [platform][app-shell] ⚠️ Low reception hung the app instead of showing saved data — engine fixed, NOT seen on the phone (BF-195, 2026-09-24)
 
 The owner: *"I went to an area with low reception and nothing really worked on the app."* Connectivity
