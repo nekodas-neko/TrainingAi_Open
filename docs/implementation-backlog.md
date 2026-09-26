@@ -15201,7 +15201,27 @@ one. A swipe on the single Start button adds an affordance that does not current
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
-- **Ask:** owner — one-line consent: may a deliberate client-side error be thrown in PRODUCTION to prove Sentry receives it? That is the whole remaining gate. It creates one real Sentry event; the earlier note that it "may page someone" is why nobody has just done it. Say yes and this becomes a DV check with an objective pass/fail.
+- **✅ CONSENT GIVEN 2026-09-25 — the owner approved throwing a deliberate client-side error in
+  PRODUCTION.** That was the whole remaining gate, and it is now struck.
+- **Lane: DV** — this is a device check with an objective pass/fail, and only the device agent can run
+  it: the error has to originate in a real signed-in browser, because the tunnel at `/monitoring`
+  sits **behind** the auth gate (decided 2026-09-03, above) and no sandboxed agent holds a session.
+- **The pass test, stated so it cannot be run ambiguously.** On the S25, in the APK, signed in: throw
+  one client-side error, then confirm it **arrives in the Sentry project**. Record the Sentry event
+  id and the timestamp.
+  - **VERIFIED** — the event appears. This entry then leaves the queue: 13 days of client-side
+    silence had a cause and it is fixed.
+  - **FAILED** — the event does not appear. That is NOT verification debt; it is live work, and it
+    goes back to Lane A with what was thrown and what the network tab showed for the POST to
+    `/monitoring`.
+  - **COULD NOT CHECK** is a real answer here — say so rather than inferring from the absence of an
+    event, because absence is exactly the symptom under investigation.
+- **⚠ It creates ONE real Sentry event, and that is the point.** The earlier note that it *"may page
+  someone"* is why nobody had just done it; the owner has now weighed that and said yes. Throw one,
+  not a loop, and label it recognisably (an error message naming BF-92) so whoever sees it in Sentry
+  knows within a second that it is a deliberate probe and not an incident.
+- **This does not test the sign-in path**, which stays uncaptured by design — see the cost stated
+  below. A pass here means "errors from a signed-in session reach Sentry", nothing wider.
 
 > **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
 > whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
@@ -15258,7 +15278,9 @@ one. A swipe on the single Start button adds an affordance that does not current
 > the `Gate: device` below, unchanged, and it is still the only thing that proves this.
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
-- **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
+  Routing before 2026-09-25 was the queue's, while the consent above was outstanding; the
+  code half it refers to shipped 2026-09-03. Superseded by the device routing at the top of
+  this entry — one field of a kind per entry, per `Q-529`.
 - **Ungated 2026-09-24 (OR-143).** A deliberate client-side throw in **production** may page someone, so it is still asked before it is fired — but that ask is one sentence and it is the Orchestrator's to make. `Gate:` parked it instead, which is why thirteen days of silence went thirteen more.
   Once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
