@@ -35,6 +35,7 @@ const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null a
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
+const refitPrescriptionToBudget = vi.fn(async (..._a: unknown[]) => ({ ok: false, reason: 'no_baseline' }) as Row)
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -51,6 +52,9 @@ vi.mock('@/lib/data', () => {
 })
 vi.mock('@trainingai/shared/ai-periodization/generate-prescription', () => ({
   generatePrescriptionForSession: (...a: unknown[]) => generatePrescriptionForSession(...a),
+}))
+vi.mock('@trainingai/shared/ai-periodization/refit-prescription', () => ({
+  refitPrescriptionToBudget: (...a: unknown[]) => refitPrescriptionToBudget(...a),
 }))
 
 import { POST as prescribe } from '@/app/api/ai-periodization/session/[sessionId]/prescribe/route'
@@ -119,6 +123,7 @@ beforeEach(() => {
     setBaselineComplete, advancePhase, storePrescription, updatePrescriptionStatus,
     getLastExerciseLogsBatch, wasProgramSessionTrainedSince,
     listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
+    refitPrescriptionToBudget,
     revertAutoAdoptedBaseline]) m.mockClear()
   getActiveProgram.mockResolvedValue(program())
   ensureSessionPeriodization.mockResolvedValue(state())
@@ -129,6 +134,9 @@ beforeEach(() => {
   listPersonalRecords.mockResolvedValue(new Map())
   listPrevious1rm.mockResolvedValue(new Map())
   generatePrescriptionForSession.mockResolvedValue(generated())
+  // Declines by default, so every pre-existing case still exercises the generation path —
+  // which is also what production does until a prescription carrying a baseline exists.
+  refitPrescriptionToBudget.mockResolvedValue({ ok: false, reason: 'no_baseline' } as Row)
   freshUser()
 })
 
@@ -228,6 +236,39 @@ describe('POST …/session/[sessionId]/prescribe', () => {
   it('rate-limits the twenty-first generation in the hour', async () => {
     for (let i = 0; i < 20; i++) expect((await prescribePost()).status).toBe(200)
     expect((await prescribePost()).status).toBe(429)
+  })
+})
+
+describe('a duration change re-fits instead of re-generating (RV-202 ②)', () => {
+  const refitted = () => ({
+    ok: true,
+    prescription: { ...generated().prescription as Row, durationPreset: 'short' },
+    prescriptionStatus: 'pending',
+    estimatedSessionDurationMin: 25,
+  }) as Row
+
+  it('does not reach the model at all when the stored plan can answer', async () => {
+    refitPrescriptionToBudget.mockResolvedValue(refitted())
+    const res = await prescribePost({ durationPreset: 'short' })
+    expect(res.status).toBe(200)
+    expect(generatePrescriptionForSession).not.toHaveBeenCalled()
+    const [, , , tz, preset] = refitPrescriptionToBudget.mock.calls[0]
+    expect(tz).toBe('Australia/Brisbane')
+    expect(preset).toBe('short')
+    expect((await res.json()).durationPreset).toBe('short')
+  })
+
+  it('is never consulted when no preset was asked for', async () => {
+    await prescribePost()
+    expect(refitPrescriptionToBudget).not.toHaveBeenCalled()
+    expect(generatePrescriptionForSession).toHaveBeenCalled()
+  })
+
+  it('falls through to a full generation when the stored plan cannot answer', async () => {
+    const res = await prescribePost({ durationPreset: 'long' })
+    expect(res.status).toBe(200)
+    expect(refitPrescriptionToBudget).toHaveBeenCalled()
+    expect(generatePrescriptionForSession.mock.calls[0][5]).toBe('long')
   })
 })
 

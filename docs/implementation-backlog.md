@@ -2243,17 +2243,49 @@ which is the right shape for something that can only be validated by living with
      - **Fix:** thread the base sets/reps/pct into the signals, build a rules prescription from
        them through the existing `fitToBudget`, and return it flagged `source: 'rules'` instead of
        502. Do NOT reuse the deload builder.
-  2. **A duration preset change re-runs the whole model call** (`use-duration-preset.ts:52`, `mood-checkin-sheet.tsx:148`), although the budget fit is pure code.
-     - **Re-verified 2026-09-26:** confirmed. `components/workout/use-duration-preset.ts:48-58`
-       POSTs `{ durationPreset }` to `/api/ai-periodization/session/[sessionId]/prescribe`, whose
-       route (86 lines) passes it straight to `generatePrescriptionForSession` — the full model
-       call. **This item is the tractable half of the entry** and is independent of item 1: the
-       re-fit happens in that route, against the stored prescription.
-     - **Fix:** re-fit the stored prescription with `fitToBudget`, with no model call. That also works offline.
+  2. ~~**A duration preset change re-runs the whole model call**~~ — **SHIPPED 2026-09-26**
+     (`feat/duration-refit-without-the-model`). The route re-fits the stored plan through the
+     extracted `budget-stage.ts` and never reaches the model. Measured on the dev server against
+     a reachable model: **three preset changes, 0 rows added to `ai_call_log`**, ~0.4 s each.
+     - **The entry's "re-fit the stored prescription with `fitToBudget`" would have been wrong,
+       and quietly.** The budget passes only ever REMOVE sets, and a return to the session's own
+       length runs neither `dropToBudget` nor `expandToBudget` — so re-fitting the *stored*
+       (already-trimmed) plan cannot give sets back. Measured on the fixture: standard → short →
+       standard returned `{Squat 4, Row 2, Curl 3, Raise 3}` against the correct
+       `{4, 4, 2, 2}`. The row silently loses half its sets and nothing on screen says so.
+       The fix therefore stores the PRE-budget shape as `AiPrescription.refitBaseline`, the same
+       way `preDeload` keeps a revertible snapshot, and re-fits from that.
+     - **"That also works offline" was wrong too** and is retracted: the re-fit still needs
+       `aggregateSignals` for weekly volume, time profiles and targets, so it is a server round
+       trip. Doing it on the device is the local-store work this entry puts out of scope.
+     - Every prescription already in production has no baseline and falls through to a full
+       generation — which then writes one, so each session self-heals on its next real generation.
+     - **Not done, deliberately:** the re-fit still spends the route's `prescribe:` rate limit,
+       which is sized for model calls (20/hour). Splitting the buckets is a separate change; the
+       limit is an abuse guard on a DB-heavy path either way.
   3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
      - The pending flag only comes from a server response (`workout-screen.tsx:446`).
      - **Fix (B):** label the source ("Base program" or "From {date}").
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
+
+### [workouts] LA-147 — a duration change still spends the model's hourly budget, though it no longer calls the model
+
+- **Lane: A** (`app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`, `lib/rate-limit.ts`).
+- **Added:** 2026-09-26 · found while shipping RV-202 ②.
+- **What:** the prescribe route takes `rateLimit('prescribe:<user>', 20, 1h)` before it knows
+  whether the request is a generation or a re-fit. Since RV-202 ② a `durationPreset` request
+  usually re-fits the stored plan with no model call, so after 20 preset switches in an hour the
+  lifter is told *"Too many plan rebuilds this hour"* for work that cost nothing to the AI budget.
+  The limit's own comment cites preset-switching as the reason it is 20 rather than 10 — that
+  justification is now spent on the wrong thing.
+- **Not just "raise it to 60".** The re-fit runs a full `aggregateSignals` (~30 repository reads),
+  so it needs a real limit; what it does not need is the *model's* one. Two buckets, checked on the
+  branch that is actually taken.
+- **The ordering is the catch:** the branch is only knowable after `getSessionPeriodization`, and a
+  limit checked after a database read is a limit an attacker has already spent. Either check the
+  cheap generation limit first and refund/relax it on the re-fit path, or give the re-fit its own
+  bucket checked up front and let a request hold whichever it lands in.
+- **Low priority** — it needs 20 switches in an hour to bite, and the failure is a toast, not data.
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
 - **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
@@ -3514,7 +3546,29 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   fixes already queued, and before the single-purpose probes.
 - **What comes back:** Review turns the gallery and numbers into a design critique and Lane B
   entries, one per fault, each citing its image by label.
-- **Result:** _(DV: Artifact URL, date, build, navigation mode)_
+- **Start with Part D's "Start here":**
+  - prove the image channel with one capture before any others;
+  - work the tiers in order (Tier 1 is the daily screens);
+  - keep to about 60 images a sitting;
+  - use `rawTap`/`rawSwipe` rather than script focus or scroll.
+  **A sitting that only finishes Tier 1 is a success. Record how far it got.**
+- **Result:** _(DV: Artifact URL, date, build, navigation mode, tiers completed)_
+
+### [app-shell][platform] RV-206 — DEVICE: stress the design — large text, display size, slow phone, bad network, one hand, keyboards, launch, charts, overscroll, long values, a words-and-numbers census, back-position
+- **Lane: DV**
+- **Added:** 2026-09-26 · Review sweep 62, owner follow-up: *"do what you can and send to DV — can be excessive."*
+- **The probes are P29–P41,** Part E of [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
+  They use the same private-Artifact gallery channel and file naming as RV-205.
+- **Runs after RV-205's Tier 1.** P41 keeps that tier as the "before" for every design fix.
+- **Three probes change phone settings:** P29 font scale, P30 display size, and P31's battery-saver
+  half. **Ask the owner once for all three**, restore each in the same sitting, and record the
+  before and after values. The rest is read-only.
+- **Priority inside this entry:**
+  - P39 (words and numbers) and P33 (reach) need no capture and are quick, so run them first.
+  - Then P29, P32 and P34, which are the likeliest to find faults a user hits daily.
+  - The rest as time allows. **Record how far the sitting got.**
+- **What comes back:** Review files one Lane B entry per fault, each citing its image by file name.
+- **Result:** _(DV: Artifact URL, date, build, navigation mode, probes completed)_
 
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 

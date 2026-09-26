@@ -418,6 +418,58 @@ repo**, and the owner has asked for screenshots, so for this part:
 Review reads the gallery (Artifact `read` with an asset `path` saves each image locally), writes the
 critique, and files the fixes to Lane B. **Review does not edit product code;** the lane does.
 
+### Start here — the order, the budget and the harness calls (added after review, same day)
+
+Part D is more than one sitting. Run it in this order and stop wherever the sitting ends. A partial
+gallery of the screens the owner uses daily is worth more than a complete one of admin pages.
+
+**0. Prove the channel first: one image, then read it back.**
+- Publish the Artifact with **one** labelled capture (Home, warm).
+- Attach the image as a **published supporting file** (the Artifact tool's `files` map). Do not use
+  the asset store, which needs a declared capability.
+- Read it back with the Artifact tool's `read` and that file's `path`, and record the URL on RV-205.
+- **If either step fails, the visual half is COULD NOT CHECK.** Say why, and go straight to the
+  numeric probes. Do not capture a hundred images first and discover the channel is closed.
+
+**1. Tier 1 — about the first hour.**
+- **P23** warm, with gesture nav where it is on, for the five tab roots and pre-workout.
+  **Not the active workout:** starting one is a write.
+- **P24** on those screens' primary controls.
+- **P26** on food search and Describe.
+
+**2. Tier 2.**
+- P23 for the remaining pushed routes, plus offline, plus the sheets reachable without a write.
+- P25.
+- P27.
+
+**3. Tier 3.**
+- P23 cold and error states.
+- P28.
+- Admin pages.
+
+**Budget and naming.**
+- **About 60 images a sitting.** Use JPEG at quality 80, or PNG at the phone's native width, to
+  stay well inside the Artifact limits: 15 MB per file, 64 MB per version.
+- **Name every file `<route>__<state>__<nav>__<scrollN>.jpg`** (for example
+  `nutrition__offline__gesture__1.jpg`). The name is the label, so it survives even if the page
+  around it does not.
+
+**Harness calls that work on this phone** (`scripts/device/pw.js`):
+- **P24 and P26 use `rawTap`, not a programmatic `focus()` or `dispatchTouchEvent`.** On Android a
+  script focus does not raise the soft keyboard, so P26 would pass for the wrong reason. A real tap
+  is also what P24 is meant to time.
+- **P25 uses `rawSwipe`,** with a `requestAnimationFrame` delta logger injected before the swipe.
+  `Input.synthesizeScrollGesture` is not used anywhere in the harness and is unproven on this
+  WebView.
+- **P24's timing comes from the screencast frame timestamps** (`cdp.js` already streams them).
+  Time from the `rawTap` call to the first frame whose pixels differ.
+
+**P27's reference.**
+- The intended tokens are the `@theme` blocks in `app/globals.css` (45 `--color-*` tokens) and the
+  variants in `components/ui/`.
+- Report a value as drift only when it **does not resolve to one of those**. Otherwise the census
+  lists every intended grey as a finding.
+
 ## P23 — the screen gallery
 
 `tour.js` already walks the routes and captures each. **Extend it rather than hand-driving.** For
@@ -499,3 +551,106 @@ transitions. Report:
   system.
 
 Confirm `reducedMotion="user"` is respected (P5 asks the same; one run answers both).
+
+---
+
+# Part E — stress, settings and consistency (P29–P41)
+
+**Added 2026-09-26 (owner: *"do what you can and send to DV — can be excessive"*).** Part D looks at
+the app as it is normally used. Part E pushes it: bigger text, a slower phone, a worse network, one
+hand. It also reads its words and numbers for consistency.
+
+- Run it **after Part D Tier 1**, and use the same gallery channel and file naming, with the
+  probe's name in the state slot (`home__font130__gesture__1.jpg`).
+- **Any phone setting a probe changes is restored in the same sitting.** Record the before and after
+  values. P29, P30 and P31's battery-saver half change settings on the owner's phone: **ask him once
+  for the three together**, and mark them COULD NOT CHECK if he declines.
+
+## P29 — large text (Android font scale)
+- Run `adb shell settings put system font_scale 1.15`, then `1.3`. Restore to the recorded value.
+- At each scale, capture the five tab roots and pre-workout, and run P4's horizontal-overflow and
+  truncation checks.
+- Report: every element that overflows, clips, or wraps into a second line that pushes a card's
+  action off-screen.
+- Why: the WebView honours the system font scale, and the app has only ever been looked at in the
+  owner's own setting.
+
+## P30 — display size
+- Run `adb shell wm density` one step smaller and one step larger than current, then `wm density
+  reset`.
+- Capture the same six screens at each.
+- Report: layout that breaks. Fixed pixel sizes that stop fitting are the usual cause.
+
+## P31 — a slow phone
+- Set `Emulation.setCPUThrottlingRate` to 4, and re-run P24 (tap latency) and P25 (scroll) on
+  Home, Nutrition and pre-workout. Then set it back to 1.
+- Separately, with the owner's OK, switch battery saver on and repeat P24 on the tab bar alone.
+- Report: the latency and frame deltas against the unthrottled run.
+- Why: a warm phone or battery saver is the realistic bad day, and a design that only feels fast on
+  a cool flagship is not fast.
+
+## P32 — a bad network, as a picture
+- Set `Network.emulateNetworkConditions` to 400 kbps down, 400 ms RTT, the gym Wi-Fi of BF-195.
+- Cold-open each tab and capture at 0.5, 1, 2, 3 and 5 s.
+- Report what the user sees at each moment: skeleton, blank, stale, spinner, or content.
+- This is the loading-state design review. A card that is blank at 3 s is the finding.
+
+## P33 — one-hand reach
+- For each tab root and pre-workout, list every **primary** action whose centre sits in the top
+  30% of the screen. That is the thumb's dead zone on a 6.9-inch phone.
+- Use element rects from the DOM; no capture is needed.
+- Report: the action, its route, and its y-position as a share of the screen height.
+
+## P34 — which keyboard each field raises
+- `rawTap` every field where the user types a number: weight, reps, grams, kcal, weigh-in, body
+  fat, water, duration.
+- Capture the keyboard that appears. **A full QWERTY for a number is the finding.**
+- Also record whether the keyboard's action key reads Next, Done or Enter, and whether it does the
+  sensible thing.
+
+## P35 — status bar, nav bar and launch
+- **Cold launch:** capture 0–2 s of frames, and report any white flash, logo jump or double paint
+  between the splash and the first screen.
+- **Each tab root:** report whether the status-bar icons contrast against the header behind them,
+  and whether the navigation-bar colour matches the tab bar.
+- Report each mismatch with its capture.
+
+## P36 — chart legibility
+- For every chart (Health trends, heart rate, sleep, weight, cardio, readiness), capture at native
+  resolution.
+- Measure the axis label font size from the canvas or SVG where possible.
+- `rawTap` one data point and capture the tooltip.
+- Report: labels under 10 px, overlapping labels, clipped tooltips, and colours that are
+  indistinguishable to each other.
+
+## P37 — pull and overscroll
+- `rawSwipe` downward from the top of each tab root and each long list, and capture mid-gesture.
+- Report per screen: nothing, glow, bounce, or refresh.
+- **Inconsistency across tabs is the finding.** It reads as "some screens refresh and some do not".
+
+## P38 — the longest real values
+- Using read-only searches, find the owner's **longest** food name, exercise name, program and
+  session name, supplement name, and largest numbers (kcal, volume, steps).
+- Capture every screen where each renders.
+- Report: clipping, overflow, wrapping that breaks a row, and numbers that overflow their pill.
+
+## P39 — words and numbers census
+- Collect every visible string per route (`innerText` of visible leaf nodes). Report:
+  - **Casing:** Title Case against sentence case, per element role (headings, buttons, tabs, chips).
+  - **Units:** `kg`/`KG`/`Kg`, `min`/`mins`/`minutes`, `kcal`/`cal`/`Calories`, and
+    `g protein`/`protein g`.
+  - **Number formatting:** thousands separators (`1,660` against `1660`), decimal places for the
+    same metric on different screens, and `—` against `-` against `0` for missing values.
+  - **Dates and times:** every format in use (`Fri 26 Sep`, `26/09`, `2026-09-26`).
+- The deliverable is a table of each variant with its routes. Lane B picks one per row.
+
+## P40 — does "back" return you where you were
+- Scroll 60% down a long list (the food diary, exercise library, history, Health), open an item,
+  then go back with `systemBack()`.
+- Report whether the scroll position and any expanded or collapsed sections survive.
+- This extends RV-115 from Profile/Friends to the whole app.
+
+## P41 — keep Tier 1 as the "before"
+- Keep Part D Tier 1's gallery under its file names as the **baseline**.
+- When a Lane B design fix ships, re-capture only the affected screens under the same names in a
+  new gallery. That makes every design fix reviewable side by side.
