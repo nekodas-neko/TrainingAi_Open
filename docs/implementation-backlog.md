@@ -1436,7 +1436,7 @@ the Orchestrator's to do.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
-- **Ask:** owner — FOUR questions now, not seven, each with a recommendation. Items 5 and 7 are resolved and item 2 has lost its structural half; what is left is LA-89 (an external caller only he can know about), LA-82's render question, Q-231 (a product preference), BF-77 (one sentence), and the twelve-entry admin sitting. Ask them in ONE sitting with RV-161, RV-157 and RV-170.
+- **✅ ALL SEVEN ANSWERED as of 2026-09-25.** Items 1, 2, 3 and 6 were put to him and answered (delete hr-sync; render zones with the degradation marked; retire the Exercise-detected card; an agent runs the BF-77 session). Items 5 and 7 resolved without asking, and item 2's structural half was decided by the Orchestrator. **What remains is NOT a question: the twelve-entry admin sitting is a scheduling ask, not a decision** — it stays below until those entries are picked up. Each answer is recorded on its own entry; this one leaves the queue when the gates it tracked are all struck.
 
 - **Lane:** O — ungated on purpose. Per CLAUDE.md, `Gate:` PARKS an entry, so a question gated on
   the owner leaves nobody tasked with putting it to him. This entry is that task.
@@ -1470,6 +1470,9 @@ below keep their gate — they really are blocked pending an answer — and this
    admin-gated** (unlike both of its neighbours in the same test file — it acts on the caller's own
    data), and it **answers `success: true` even when the pipeline throws**, deliberately. So what is
    being kept alive is an unauthenticated-to-admin entry point that cannot report its own failure.
+   **✅ ANSWERED 2026-09-25 — DELETE IT.** The owner took the recommendation, which also settles the
+   one thing only he could know: nothing outside the repo calls it. Delete the route and its test
+   together; do not rename.
 2. **`LA-82` — should a heart-rate profile with an unreadable age render zones at all?** With no age
    it silently uses a max of 190 against his real 184, a 6 bpm shift across every zone, and
    `maxHrSource` still reads `estimated`. **Recommend: render, with the degradation marked** — the
@@ -1497,11 +1500,9 @@ below keep their gate — they really are blocked pending an answer — and this
    sitting at Enforcement `Disabled`, which is why nothing it listed was enforced; the owner set it
    **Active**, dropped E2E from the required list and restricted merges to **squash**. `LB-52` is
    removed, `Q-297`'s second residue is closed, and the batch is gone.
-6. **`BF-77` — is the "session to look into this" one he attends, or one an agent runs?** He asked
-   for it on 2026-09-20 instead of picking from the A/B/C sizing he was offered. If an agent runs it,
-   the docs-only planning PR is startable today and that gate comes off; if he wants to be in it, it
-   is a calendar item. One sentence either way, and it is the only thing between this entry and
-   progress.
+6. ~~**`BF-77` — is the "session to look into this" one he attends, or one an agent runs?**~~ —
+   **✅ ANSWERED 2026-09-25: an agent runs it.** He reads the result rather than sitting through the
+   investigation. The gate comes off and the docs-only planning PR is startable now.
 7. ~~**`LB-53` — back-fill readiness over the 58 derived rows that have no score?**~~ — **RESOLVED
    2026-09-25, and it never needed asking.** This item's own instruction was to ask it *inside*
    `RV-170`'s history-row policy. That policy was **answered on 2026-09-24**, by **kind** rather than
@@ -6955,103 +6956,6 @@ drift.
 - **Watch, unchanged:** a faster sheet gives its content less time to paint, so a sheet that fetches
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
-
-### [platform] LA-129 — generate the doc-size baselines in CI instead of committing them
-- **Ask:** owner — the approval on 2026-09-25 was given on a framing that omitted this entry's own objection, and the re-measurement changes the answer. Generating ALL baselines in CI removes the ceiling from CLAUDE.md and projectOverview.md too, which is what the ratchet is for. The narrower fix targets the one file that actually collides. Recommendation and the measurement are below; the build was started and reverted rather than shipped against a stale premise.
-- **📏 RE-MEASURED 2026-09-25, and the tax is real but it is ONE FILE.** Of the last 63 `.size`
-  changes on `main`: **54 are `docs/doc-size/docs/implementation-backlog.md.size`**, against
-  `projectOverview.md` 7, and 1 each for `CLAUDE.md`, `tuning.md`, `bugfix.md`. So `RV-134`'s slack
-  fix did NOT end the class — but the residue is not slack detection, it is that **every agent edits
-  the backlog and it genuinely grows**, so two PRs raise the same number and conflict by
-  construction. That is a ratchet working correctly on the wrong file.
-- **The membership rule is in the script's own first line:** *"Shrink-only size ratchet for the
-  documents every session reads before it can start."* **The backlog is not one of those** — CLAUDE.md
-  instructs an implementer to start from `node scripts/next-item.js`, not a hand-scan, and nobody
-  reads 32,026 lines to orient. Its size is already controlled by the protocol that removes a
-  finished entry and by the compaction sweep.
-- **RECOMMENDED: drop the backlog from the ratchet and REPORT its size instead** — printed on every
-  run, never failing, no committed number to collide on. That removes 54 of 63 of the churn and keeps
-  every ceiling that matters. **Do NOT generate all baselines in CI:** a derived baseline makes every
-  increment inherited, so `projectOverview.md` could grow ten lines a PR forever — and it once reached
-  **9,647 lines** while its own opening line called it a lean index.
-- **⚠ A TEST PINS THE OPPOSITE, which is why this is not already done.**
-  `scripts/__tests__/doc-size-baselines.test.ts:104` asserts the backlog *"must stay tracked"*, listing
-  it among *"the orientation docs every session reads"*. That is an assumption encoded as a test, not
-  a measurement — but it is someone's deliberate call, and reversing it is the decision here rather
-  than a detail of the implementation.
-- **Reversal cost: low.** Restoring the `.size` file and the test assertion is a two-line revert; the
-  baseline can be regenerated with `--fix` at any time.
-- **The implementation was written and REVERTED 2026-09-25** rather than shipped against a premise
-  two signals contradicted. Redoing it is ~20 minutes once the call is made.
-
-- **⚠ RE-VERIFY BEFORE BUILDING — `RV-134` shipped 2026-09-23 and did the cheap half, then
-  REJECTED this one with a reason.** The two were filed hours apart by different sessions and
-  neither could see the other. Read this before starting:
-  - **The conflicts were not caused by the committed baseline.** They were caused by **slack
-    detection failing on any gap**, which forced every PR that shrank a tracked doc by one line to
-    edit `.size` — and striking a completed entry is what almost every PR does. RV-134 tolerates
-    slack within `max(25, 2%)`, and the tax it was measured against (23 re-merge commits across
-    five branches in one night) should now be mostly gone. **Measure it again before assuming the
-    class still exists.**
-  - **Generating baselines in CI removes the CEILING, which is the part worth keeping.** A derived
-    baseline makes every increment "inherited", so a file can grow ten lines per PR forever with
-    nothing objecting. Slack detection exists because CLAUDE.md once sat **429 lines** under its
-    number. Any design here has to say how growth is still caught and how slack is still surfaced —
-    if it cannot, it is trading a merge conflict for the thing the ratchet is for.
-  - **A merge driver was also considered and rejected**: `merge.<name>.driver` must be configured in
-    every clone (CI, this sandbox, the Windows device machine) and silently does nothing where it is
-    missing, which is the old behaviour wearing a disguise.
-
-- **⛔ ITS JUSTIFICATION IS GONE — MEASURED 2026-09-23, and the conflict was self-inflicted.**
-  RV-134 gave every tracked file a `max(25, 2%)` slack band so an ordinary PR need **not** touch its
-  `.size` file at all. But `check-doc-index-size.js --fix` **lowered the baseline anyway**, for any
-  slack including slack the check tolerates — so every PR that struck a backlog entry, which is
-  nearly every PR, wrote to `docs/doc-size/docs/implementation-backlog.md.size`, and two concurrent
-  PRs collided there. Verified directly: a 40-line strike leaves the plain check at **exit 0**,
-  reporting `40 lines of slack (band 546)`, and needing no edit whatsoever. Every `.size` conflict
-  this lane paid on 2026-09-23 — three on one branch inside forty minutes — was created by running
-  `--fix` out of habit, not by the committed baseline.
-  **Fixed at that source in the same PR as this note:** `--fix` now leaves a baseline alone when the
-  gap is within its band and prints what it withheld; `--tighten` lowers deliberately, which is the
-  compaction sweep's job; growth still raises, and slack **over** the band still lowers, because
-  there the check would otherwise fail. So a feature PR now touches no `.size` file at all, and the
-  only remaining conflicts are two PRs that genuinely disagree about one number.
-- **⚠ SO THE QUESTION THIS ENTRY ASKS IS NOW THE OWNER'S, AND IT IS A DIFFERENT QUESTION.**
-  Every cost argument below was a conflict cost, and that cost is gone. What CI-generation would
-  still buy is not having to carry `docs/doc-size/**` in the repo at all — weighed against the
-  ceiling it removes, which this entry itself identified as the part worth keeping, and against the
-  design question nobody has answered (how growth is still caught from a derived baseline). **Do not
-  build it on the old justification.** Re-read as a fresh proposal or strike it.
-- **Lane:** O — the owner's call now, not an implementer's; the code half that mattered has shipped.
-  Previously `A` — `scripts/check-doc-index-size.js`, `docs/doc-size/**`, the Custom Rules job.
-  **Added:** 2026-09-23 · filed out of owner decision item 5, which named this and left it
-  **unfiled**: *"generating the baselines in CI removes the conflict class entirely and remains the
-  better long-term answer, unfiled."* Per **No orphaned findings** it now exists.
-- **The conflict class, measured on this session rather than argued.** Every merging PR touches
-  `docs/doc-size/docs/implementation-backlog.md.size`, so every concurrent PR conflicts on it. Three
-  Lane A PRs needed **four, three and two** re-merges respectively on 2026-09-22/23, each costing a
-  full local gate, and one of them (#1405) reached all-six-green **four separate times** without ever
-  being mergeable at the moment it was green. Another session's commit messages that day read
-  *"Fourth re-merge on this branch"* and *"Twelfth re-merge"*, none of it from their own diffs.
-- **What the owner already decided, and why this does not reopen it.** He took the cheap option
-  knowingly — a sweep ships as ONE PR — and that convention is in CLAUDE.md. This entry is the
-  durable half he named, not a second bite: the batching convention reduces how OFTEN the files are
-  touched, it cannot stop two PRs touching them at once.
-- **Not established:** whether the ratchet can read its baseline from `origin/main` at run time
-  without losing the shrink-only property, which is the whole point of the check. That is the design
-  question to answer first, and it decides whether this is small or not.
-- **Queue position, corrected twice (2026-09-23, Lane A).** This was filed beside the entry it
-  argued with rather than at its priority, which put it at the top of READY and silently promoted a
-  change the owner had chosen to defer. The first correction moved it below the DEVICE PROBE block
-  and **changed nothing**: those entries are gated, so they never appear in READY, and LA-129 was
-  still position 1. Verified with `node scripts/next-item.js --lane A --all` rather than by reading
-  the file, which is the only way to see it. It now sits below the startable defects (DV-3, LB-128,
-  RV-82, LA-125). Reversing it is one cut-and-paste.
-- **New evidence FOR it, recorded rather than acted on (2026-09-23).** PR #1445 lost **three**
-  consecutive base races to `.size` churn in forty minutes, each costing a full local gate; one
-  drift was a real collision with a Lane B PR, the other two were the conflict class this entry
-  describes. That is a cost trend the owner should see, not a mandate to promote it back — the
-  decision to take the cheap option was his and stands until he says otherwise.
 
 ### [platform] RV-78 — `/api/next-session` serialises two independent queries, and one card fetches with no seed
 
@@ -12834,12 +12738,12 @@ resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no re
   stays one source of truth. Reversal: one enum value and one consumer, so this is cheap enough that
   deliberating it further costs more than being wrong would. Per CLAUDE.md's standing narrowing,
   structural calls are the agent's and get written down rather than asked.
-- **Gate:** owner — for ONE question now, not two: **should a degraded profile render zones at all?**
-  A quota measured against a guessed max is wrong in a way the screen cannot show, and the
-  recommendation is **render, with the degradation marked** — hiding the screen on a transient read
-  failure is the worse failure. That half is a genuine product preference and stays his. Only one
-  consumer reads the source today
-  (`app/api/hr-profile/route.ts:49`, as `workingMaxSource`), so either shape is cheap to wire.
+- **✅ GATE STRUCK 2026-09-25 — RENDER the zones, with the degradation marked.** He took the
+  recommendation. A quota measured against a guessed max is wrong in a way the screen cannot show,
+  but hiding the whole cardio hub on what may be a transient age-read failure is the worse failure —
+  so it renders, and it says so. **Both halves of this entry are now settled:** the marker goes on
+  `maxHrSource` as a new value (decided by the Orchestrator above, structural), and the render
+  question was his and is answered. Nothing is owed by him.
 
 Ship the resting half whenever; it needs no decision.
 
@@ -17643,7 +17547,10 @@ the match. `Gate: owner` when it is next picked up.
 
 
 - **Lane:** A if a server path is chosen; B for anything built on the QR payload.
-- **Gate:** owner — and the gate has MOVED. He declined the A/B/C sizing on 2026-09-20 and asked for *"a session to look into this one"*; what is owed now is one clarification, not a choice: is that a session HE attends, or one an agent runs and reports back? If the latter, the planning PR is startable today and this gate comes off. Filed with `OR-145`.
+- **✅ GATE STRUCK 2026-09-25 — an AGENT runs the session, not him.** He was asked the one
+  clarification this entry was waiting on and chose to read the result rather than sit through the
+  investigation. **So the docs-only planning PR is startable now**, and nothing further is owed by
+  him until that plan comes back with a recommendation.
 - **Planning item** — the request contains two products and they resolve differently. Needs a
   decision from the owner before implementation. **The `Gate:` field above is what makes that
   legible to `next-item.js`** (added 2026-09-02): the prose said it from the day the entry was
@@ -27508,7 +27415,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Lane:** A
 - **Branch:** `fix/detected-activity-has-no-source`
-- **Gate:** owner — a product decision, not a code change: does the card retire, or does the BLE classifier feed it? Either branch is a different feature and the repo cannot answer it.
+- **✅ ANSWERED 2026-09-25 — RETIRE THE CARD.** The owner: *"If its not being used because we don't
+  use the oura sync then get rid of it."* A conditional yes, and **the condition was checked before
+  acting: it holds.** `upsertOuraWorkouts` now has **zero** callers in the repo — Q-224 removed the
+  last one — so `oura_workouts` cannot gain a row by any path that exists. The table is frozen at 13
+  rows, newest `day = 2026-07-05`.
+- **⚠ HE SAID HE DID NOT FULLY UNDERSTAND THE QUESTION, so the distinction he was owed is recorded
+  here rather than assumed.** *"Exercise detected" is not the app's auto activity detection.* Two
+  unrelated pipelines wear similar names: this card reads `oura_workouts`, written only ever by the
+  Oura **Cloud** sync, which is gone; the live auto-detection he actually sees writes `activity_logs`
+  from the **BLE** classifier (`lib/oura-ble/step-counter-pipeline.ts`, `rollup/run.ts`) and is
+  untouched by this. **Retiring this card removes nothing he currently sees working** — that is why
+  the condition he set is the right one and why it is satisfied. `Q-222` is about the live detector's
+  false positives and stays open on its own.
+- **Scope of the retirement, so it does not over-reach.** Remove the card, its route, the
+  `app/api/day-timeline/route.ts:255` walk filter against the same table, and the Cloud-shaped
+  `OuraWorkout` in `lib/oura/types.ts`. **Do NOT drop the table or its 13 rows** — that is a
+  data-dropping migration and a separate confirm-first decision he has not been asked. Do not restore
+  `upsertOuraWorkouts`; nothing can call it.
+- **If he wants it back later, the BLE branch is still open** — feeding the classifier into this
+  review UI was the alternative, and retiring the card does not foreclose building it, only the
+  Cloud-shaped plumbing.
 - **⚠ THE FIX IS A PRODUCT DECISION, NOT A CODE CHANGE (marked 2026-09-02).** The entry's own
   Fix line asks whether detected activities should come from the BLE classifier — feeding them
   into the existing review UI and retiring the Cloud-shaped `OuraWorkout` — or whether the card
@@ -31217,12 +31144,15 @@ adopted.
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
 - **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
   pinned as it stands; **not deleted**, because removing an HTTP surface is the owner's call.
-- **Gate:** owner — added 2026-09-10, and the reason is a live demonstration of why fields beat
-  prose. This entry said the decision was the owner's in three separate sentences and carried **no
-  `Gate:` field**, so `next-item.js` printed it as READY. A session picked it up on that basis and
-  wrote itself an instruction that *"the rename half is startable"* — which this entry explicitly
-  refutes below (renaming is the WORSE option, because it keeps a second way to reach the pipeline).
-  Prose does not block. The field does.
+- **✅ GATE STRUCK 2026-09-25 — he answered: DELETE the route and its test.** The gate asked the one
+  thing the repo could not: whether anything *outside* it calls `/api/oura/hr-sync` — a curl in a
+  runbook, a Tasker profile, an old APK. It does not. Re-verified the same day at **zero live callers**
+  in `app/`, `lib/`, `components/`, `packages/`, `android/` and `scripts/`; the only hits are two
+  comments in `app/api/complete-workout/` recording that the caller was removed, plus tests.
+  **Two facts found while re-checking, which is why the recommendation was to delete rather than rename:**
+  the route is **not admin-gated** (both of its neighbours in the same test file are), and it
+  **answers `success: true` even when the pipeline throws**, deliberately. Renaming would keep a
+  second way into the pipeline that Q-122 was closing. Reversal: restore ~50 tested lines from git.
 
 Two separate things, and only the second is a decision:
 

@@ -29,6 +29,39 @@ the symptom under investigation**.
 
 Also records that the probe must be labelled recognisably. It creates a real event in a real project,
 and the reason nobody had just done it was the note that it might page someone.
+## 2026-09-25 — backlog baseline DELETED, CLAUDE.md → 1011 (LA-129)
+
+The first removal in this log rather than a raise. `docs/implementation-backlog.md` no longer has a
+baseline at all: `check-doc-index-size` prints its size on every run under `UNRATCHETED` and enforces
+nothing. Owner approved the narrow fix over the entry's original proposal of generating every baseline
+in CI, which would have removed the ceiling from `CLAUDE.md` and `projectOverview.md` too.
+
+The measurement that decided it: **54 of the last 63 `.size` changes on `main` were that one file.**
+Not diffuse churn — one document, which every agent edits and which genuinely grows, so two open PRs
+raise the same number by construction. `RV-134`'s slack band cannot help a file that grows past the
+band.
+
+`CLAUDE.md` +5 in the same PR, because the "one PR per filing sweep" rule cited the deleted `.size`
+file as what made those conflicts *guaranteed*. The rule survives on the weaker mechanism that is
+still true (N PRs editing one file), and the correction says so rather than quietly dropping the
+sentence. That is the ratchet doing its job on a file it should govern, inside the PR that removes it
+from one it should not.
+## 2026-09-25 — backlog → 32078 (the owner answered OR-145's four remaining gate questions)
+
+Four gates struck: delete `/api/oura/hr-sync`, render HR zones with the degradation marked, retire
+the "Exercise detected" card, and an agent rather than the owner runs the `BF-77` session. Gate count
+down six on the day.
+
+The growth is almost entirely **one** of the four. He answered `Q-231` conditionally — *"if its not
+being used because we don't use the oura sync then get rid of it"* — and said outright that he did
+not fully understand the question. So the entry now carries the condition-check (`upsertOuraWorkouts`
+has zero callers, so the table cannot gain a row), the distinction he was owed (this card is NOT the
+live auto-detection he sees; that writes `activity_logs` from the BLE classifier and is untouched),
+and an explicit scope boundary saying the 13 historical rows are NOT dropped, because that would be a
+separate confirm-first decision.
+
+An answer given under a stated misunderstanding costs more lines to record than a plain yes. It is
+the cheaper of the two outcomes.
 
 ## 2026-09-25 — backlog → 32046 (OR-145's gate triage reduced from seven questions to four)
 
