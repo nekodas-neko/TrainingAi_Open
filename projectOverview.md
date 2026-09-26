@@ -2620,6 +2620,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][heart-rate] ⚠️ Half of the tab-switch cost is gone; the other half is untouched and neither has been measured on the phone (OR-162, 2026-09-26)
+
+`HrDayChart` is memoised by value, removing the 30 (Home) and 80 (Health) canvas `font` writes sweep 4a counted on **every** tab switch, all while the panel is hidden. **The arrival half is a different mechanism and is NOT fixed** — 180 on arriving at Home, 320 on Health, 43 for Wear Time. The sandbox can number neither: the e2e seed has no heart-rate readings, so the chart never renders there. **Pass test:** `DV-12` — every tab tap's longest task under 50 ms; 16 of 20 were 51–104 ms after #1675.
+
 ### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
 
 Drawn SVG cats replace the collection's emoji (Home card 56 px, `/collection` 48 px), with the

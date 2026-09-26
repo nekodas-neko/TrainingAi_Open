@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.466.1",
+    date: "2026-09-26",
+    changes: [
+      "Faster: switching tabs no longer makes the day's heart-rate chart redraw itself behind the screen you just left.",
+    ],
+  },
+  {
     version: "1.466.0",
     date: "2026-09-26",
     changes: [
