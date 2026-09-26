@@ -492,8 +492,26 @@ below threshold and left in place for next time.
 - **The rule is now in CLAUDE.md: a branch has meaning only if it has an open PR**, and a draft PR is
   how you mark work worth keeping. This entry is the backlog of what the first application of that
   rule found.
-- **⚠ FOUR branches hold unmerged work for entries STILL IN THE QUEUE.** Deleting them discards a
-  head start, so each needs a yes/no before any sweep:
+- **⛔ THE "HEAD START" CLAIM BELOW IS WRONG, AND IT IS CORRECTED HERE THE SAME DAY IT WAS FILED
+  (2026-09-26).** All four branches were diffed against `main` after filing, and **not one of them
+  holds work worth keeping.** The table stays because the *method* it demonstrates is right; the
+  conclusion it reached was not.
+  | branch | what the diff actually shows |
+  |---|---|
+  | `chore/or-127-device-cdp-harness` | **Superseded.** All five harness files are on `main` already, and `main` is AHEAD — `scripts/device/README.md` is **+13 −208**, i.e. 208 lines further developed. |
+  | `lane-a/rv99-score-band-theme-tokens` | **Landed.** `score-band.ts`, its test, `accent-card-style.test.ts` and `utils.ts` are **byte-identical** to `main`. The only diffs are `changelog.ts` (−430) and `projectOverview.md` (−662), i.e. `main` moved on. |
+  | `lane-a/q44-phase3-pr1-table-rename` | **Unmergeable as-is.** It adds migrations **273** and **274**, and `main` already has both under different names (`exercise_media_review_status`). `ensureSchema` tracks by FILENAME, so this needs renumbering to 284+ before it could ever land. |
+  | `lane-a/fix-gate-pin-q305` | One test file, **+10 −10**. Trivial either way; look before keeping. |
+  **So the recommendation flips: do NOT open draft PRs for these. Sweep all four** — three are stale
+  copies of work already on `main`, and keeping them is worse than useless, because a later session
+  can "restore" older code from a branch whose name matches a live entry.
+- **The refinement this produced, which is the durable part.** Matching a live queued entry is
+  **necessary but not sufficient**. The audit stopped at *"this branch's name matches an open
+  entry"* and inferred a head start; the missing step is **diffing the content against `main`**,
+  because an entry stays open for reasons that have nothing to do with the branch — OR-127's harness
+  SHIPPED and the entry is open for the on-device run it still owes. **Check three things, in order:
+  is the file on `main` at all, is it identical, and is `main` AHEAD.**
+- **⚠ The original claim, kept so the correction above has something to correct:**
   | branch | entry | size |
   |---|---|---|
   | `chore/or-127-device-cdp-harness` | **OR-127 — rank 1 in `DV`** | 12 files, 7 commits |
@@ -748,6 +766,91 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **Do not retire the rank re-validation** (`RV-161` item 2's recommendation, now superseded). It was
   recommended on the belief that the ratings were not coming; they are not coming *from the current
   prompt*, which is a different finding with a different fix.
+- **⤷ ANSWERED 2026-09-26 by Tuning — and the answer is that it should NOT ASK.** Plan:
+  [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md).
+  Buildable halves filed as **`TN-81`** (Lane A, engine) and **`TN-82`** (Lane B, surface). The owner
+  re-stated the same design unprompted on 2026-09-26, so it is settled preference, not a suggestion.
+  Threshold: **median ±IQR over a trailing 28 nights, tuned to 4–6 prompts a month** — the rate is the
+  target, the multiplier is just how it is reached.
+- **The owner refined it past this entry's framing, 2026-09-26:** *"auto fill to normal when readings
+  dont say anything strange … But if our results say something diferent (i.e sleep was later; or short
+  or etc etc) then it can say; your values was bad; this has autofilled this category"*. So the app
+  **announces** what it filled and why, and his only interaction is **correcting it when it is wrong**.
+  No question is ever asked. A correction is a disagreement, which is worth more than any rating —
+  35 neutral 3s said nothing; three corrections would say where the model is wrong and which way.
+- **What this entry got wrong by omission, both material.** **(a)** Its premise was that the current
+  *prompt* is the problem. Measured 2026-09-26 — **82 morning sheets over three months**, and in each
+  month exactly one field collected a handful of answers and it was a *different* field each month
+  (`wake_mood` 17 in July, sleep rating 3 in August, `vs_yesterday` 2 in September), each decaying to
+  zero. `perceived_recovery` is **0 touched in 102 check-ins**. Three affordances in three positions,
+  all dead — and `morning-checkin-sheet.tsx` already carries the "place the easy question first"
+  reasoning that produced the third. So the fix is **not a fourth field on that sheet** — **asking** is
+  what failed, in every affordance and position that sheet has. **(b)** Asking only on outliers
+  **cannot validate the score**: it selects on the predictor under test, and the error that matters
+  most (a night scored *normal* that he would have called bad) is unsampled by construction. The
+  owner's announce-on-every-day design **dissolves** this rather than mitigating it — an ordinary day is
+  announced too, so a wrong "normal" is as correctable as a wrong "poor", with no extra prompts and no
+  random sampling.
+- **The new risk, and the plan carries a guard for it:** silence is ambiguous, and **zero corrections
+  reads exactly like success** — the same shape as the 35-of-36 neutral 3s. A month of near-zero
+  corrections means the instrument FAILED, not that the model is validated.
+- **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
+
+### [sleep][platform] TN-81 — the verdict, the snapshot, and the three response states
+
+- **Lane: A** — `packages/shared/src/health/**`, `lib/data/postgres/**` (migration). **Added:** 2026-09-26.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) · answers `OR-171`.
+- **Why it matters beyond one prompt:** Tuning has no validated outcome variable. `TN-73` produced the
+  only working instrument in the project and five other validation attempts failed for want of a
+  label. This is the cheapest label available, which is why the storage half is worth getting right.
+- **The measurement that sets the hard requirement:** `sleep_sessions` holds **119 rows for the last
+  120 days** — `duration_hours` on all 119, `average_hrv_ms` on 102 — and **`sleep_score` is non-null
+  on 0 of them.** The score is computed on read, never persisted. So **the verdict and the values
+  behind it must be snapshotted**: store only the outcome and a later scoring change rewrites what each
+  correction was disagreeing with, and the corrections decay into noise with no signal that it
+  happened. A correction whose paired verdict is not pinned is not evidence.
+- **Build:** **per-component** rolling median/IQR baselines (duration, onset time, efficiency) with a
+  minimum-coverage guard — 28 nights needs 28 nights, `temperature-baseline.ts` is the in-repo
+  precedent. The owner named the inputs (*"sleep was later; or short"*), so the gate reads components
+  rather than only a composite: a night of normal duration that started two hours late is strange, and
+  a composite averages that away. Verdict is `normal | poor | good` **plus which components triggered
+  it**, because the reason is what gets announced and a verdict with no stated cause cannot be argued
+  with. Persist the verdict, the component values behind it, the bands, and the response state
+  (`none | acknowledged | corrected`).
+- **Hard constraint, and it is `TN-57` verbatim:** the auto-filled value writes **`touched: false`**;
+  **only a correction writes `touched: true`** and the owner's value. That one rule is the whole
+  difference between "the app's guess" and "his answer", and every analysis downstream rests on it.
+  `sleep_quality_feel_touched` exists because `sleep_quality` was defaulted to `'ok'` for 91 days and
+  two surfaces read that default back as the owner's answer. **Never infer a label from an announcement
+  he did not respond to.** Coverage: `lib/__tests__/tn57-untouched-scales-are-not-answers.test.ts`.
+- **Migration ships its regenerated `claude_ro` twin in the same PR**, and the two TCP-`DATABASE_URL`
+  tests run before pushing (they skip under the full suite).
+
+### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
+
+- **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
+- **Needs:** TN-81
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
+  interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
+  than usual — marked this poor"), one tap to correct, and a deliberate dismissal recorded as
+  acknowledgement. The reason is load-bearing: a verdict with no stated cause cannot be argued with.
+- **This REPLACES the two scales rather than joining them.** **Asking** is the intervention that has
+  failed three times (see `OR-171`'s amendment for the month-by-month decay); 82 consecutive saves have
+  trained a reflex of hitting **Save** without reading, and a fourth field inherits it.
+- **Also covers scores that feel wrong** (owner: *"I think the above structure would work for this
+  too"*) — and under this design they are **the same feature**, because a correction *is* the report
+  that the score felt wrong. He never has to remember to report anything, which was the original
+  problem (*"If I remember; I will let you know"*).
+- **The failure mode to watch is him not reading it** — see `OR-171`'s guard. That is why the quiet line
+  stays quiet and the loud one stays rare: announce loudly twice a week and it becomes wallpaper.
+- **Ask:** owner — the announcement copy, and the copy only. The whole design rests on an announcement
+  he will actually read. A rare prompt lives or dies on its framing, and
+  it is cheap to review now and expensive to re-do after it has trained another reflex. Show it at
+  384 px dark. Deliberately **not** `Gate: owner`: gating parks the entry, and the build does not
+  need the copy settled to start — `Needs: TN-81` is the only real block here.
+- **Device:** the morning sheet is the canonical daily surface and the local store is on the write
+  path, so the pass needs the APK, not `pnpm dev`.
 
 ### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
@@ -2369,6 +2472,129 @@ which is the right shape for something that can only be validated by living with
   - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
   - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
 
+### [app-shell] RV-207 — design quick wins: wrong initials, "1 exercises", a dropped supplement tick, taps with no response, and bars that animate width
+- **Lane: B.** One PR, because every item is small and code-certain.
+- **Added:** 2026-09-26 · Review sweep 63 ([`docs/reviews/2026-09-26-sweep-63-design-review.md`](reviews/2026-09-26-sweep-63-design-review.md)). The source is a web-build screenshot pass at 412 px plus a static audit. Every line below was read at source.
+1. **Initials take the first two letters, not the initials.** "Test User" becomes **TE** and "Zero Data" becomes **ZE**.
+   - Sites: `components/more/profile-tab.tsx:177`, `app/session-select/session-select-content.tsx:1099`, and `app/admin/admin-content.tsx:358`.
+   - Fix: one shared `initialsOf(name)` that takes the first letter of the first and last words, falling back to two letters for a single word.
+2. **"3 sets · 1 exercises"** (`components/home-day-timeline.tsx:94`). Pluralise.
+3. **A second supplement tick is silently dropped.** `supplements-section.tsx:48` returns early while **any** supplement is toggling, so ticking B while A's write runs does nothing.
+   - Fix: track in-flight ids in a `Set` and guard per id.
+4. **Taps with no pressed state on the daily screens.** The WebView leaves `hover:` stuck after a tap, and nothing shows on the press itself. Sites:
+   - the tab bar (`bottom-nav.tsx:100/109/125`, and swap `transition-all` for `transition-[transform,background-color]`);
+   - More rows (`more-row.tsx:38`);
+   - Nutrition's date chevrons and settings (`nutrition-content.tsx:502/512/526`);
+   - pre-workout back (`pre-workout-screen.tsx:174`);
+   - the Home avatar (`session-select-content.tsx:1099`);
+   - Health's Log pills (`health-sections.tsx:204/408`);
+   - the supplement row (`supplements-section.tsx:180`).
+
+   Fix: `active:` feedback, or `<Button variant="ghost" size="icon-lg">`, which has it.
+   About 354 of 502 interactives lack feedback app-wide. These are the daily ones.
+5. **Progress bars animate `width`,** which re-lays-out every frame, although `components/ui/progress-fill.tsx` (scaleX) exists. Sites:
+   - `warmup-screen.tsx:97-99` (ticks every second, `width 1s linear`);
+   - `body-battery-card.tsx:153`, `metric-tiles-card.tsx:108`;
+   - `health-sections.tsx:473`, `goal-progress-bar.tsx:7`, `weekly-muscle-sets-card.tsx:133`.
+
+   Also the `height: auto` animations at `meal-card.tsx:113-115` (every food insert), `body-battery-card.tsx:164` and `achievements-section.tsx:55`. Use opacity/y, or the `collapsible-down` keyframes.
+6. **Home's Log tiles draw the "Log" pill on top of the icon** (`metric-tiles-card.tsx`), and the tiles size to their content: three narrow tiles leave a third of the row empty, and a different width when empty.
+   - Fix: put the label beside or below the icon, and use a fixed three-column grid.
+7. **"13.0T" volume on More** reads as trillions. Write `13.0 t`, or `13,000 kg` to match Health's `4,320 kg`.
+- **Done when:** each is fixed, and **RV-205's P24 re-run on the tab bar and More rows shows a first-frame change under 100 ms.**
+
+### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
+- **Lane: B.** One PR. **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.
+- **Added:** 2026-09-26 · Review sweep 63.
+- **Colour, on ONE screen.** Health → Training's calendar and load legend colour **Push orange, Pull green, Legs purple**. Two cards down, Movement balance colours **Push cyan, Pull purple, Legs green**.
+  - The same three words get two colour maps within a thumb's scroll.
+  - The session colours follow the session (per the no-hardcoded-sessions rule). Movement categories need their own palette, one that does not reuse the session hues.
+- **Time of day:** Home's timeline reads **6:40 AM**, and Health's activity list reads **6:40am**.
+  - `formatTimeOfDay` (`packages/shared/src/date-utils.ts:84`) is meant to be the one place that decides.
+  - Find which site bypasses it, and pick one casing app-wide.
+- **Dates:** "25 Sept", "26 Sept", "Saturday 26 September" and "September 2026" all appear. Settle short and long forms.
+- **Numbers:**
+  - `11900` steps (Home tile) against `1,660`/`2,000`/`4,320` elsewhere: use thousands separators everywhere;
+  - `7 × 68kg` against `98 kg`: one unit spacing;
+  - `55m` against `55 min`: one duration form.
+- **Brand in food names:** "Uncle Tobys — Rolled oats" (Log Food) against "Rolled oats / Uncle Tobys · …" (diary). Pick one.
+
+### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 63 (static audit).
+- **What:** there are 13 named sizes plus 29 arbitrary ones (`text-[10.5px]`, `[11.5px]`, `[12.5px]`, `[13.5px]`, `[14.5px]`…), from 7 px to 34 px.
+  - **1,035 uses are under 12 px:** 583 at 10 px, 287 at 11 px, 128 at 9 px, down to 7 px.
+  - 26 of those also sit at 40–70% opacity.
+  - No small-type token exists in `@theme`.
+- **Fix, in this order:**
+  1. Add `--text-2xs: 11px` to the `@theme` block.
+  2. Move **the workout screens' body text** (read at arm's length, mid-set) to it or to `text-xs`: `set-card.tsx:81/94/95/166`, `active-workout-screen.tsx:283/306/402`, `workout-clocks.tsx:202/213`.
+  3. Then the Home cards, then the rest, collapsing the half-pixel sizes onto the scale.
+- **Uppercase eyebrow labels (273) may stay at 10–11 px.** Chart axis text is separate and is P36's.
+- **This is a restyle, not a rearrangement,** so it needs no mockup. **Before and after captures come from RV-205's gallery,** P41.
+
+### [app-shell] RV-210 — the keyboard: nothing tells the WebView to resize, sheets are sized in `vh`, and no field says what its Enter key does
+- **Lane: B** — `app/layout.tsx:117` (the viewport), sheets under `components/**`.
+- **Added:** 2026-09-26 · Review sweep 63 (static audit). **The device check is RV-205's P26, so run it before and after this.**
+- **What:**
+  - No `interactiveWidget` is set, and nothing uses `visualViewport`. About 30 sheets use `max-h-[85–92vh]`, which does not shrink when the keyboard opens.
+  - Edge-to-edge is enforced (targetSdk 36).
+  - **0 of 135 inputs set `enterKeyHint`.**
+- **Fix:**
+  1. `interactiveWidget: "resizes-content"` in the viewport export.
+  2. `vh` → `dvh` on sheet heights.
+  3. `enterKeyHint="next"`/`"done"` on the numeric fields in food review (`review-step.tsx:175/251/273`), profile goals, and the metric-log sheets.
+- **Done when:** P26 shows no input or submit button covered, on food review and the weigh-in sheet.
+
+### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
+- **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.
+- **Added:** 2026-09-26 · Review sweep 63. **Items 4 and 5 are from the web build, so RV-205's gallery confirms them on the device first.**
+1. **"Your week in review is ready"** shows for an account with **no data at all**. Gate the banner on the week having at least one logged item.
+2. **Body Battery reads "Good · 50"** with no data behind it. The "Limited data" chip is beside it, but the headline still says Good. With no inputs, show the no-data state instead of a band.
+3. **The week strip labels every unprogrammed past day "rest".** With no program, nothing was a rest day; show a dash.
+4. **An empty rounded pill sits beside the date** in both accounts, probably the temperature chip (BF-96) rendering with no value. Render nothing until it has one.
+5. **Stray marks:** a dot between the Resting HR and Sleep rings, and a "·" glyph inside the "Limited data" chip.
+6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it, so "58" reads as a score. Add "bpm", or style it differently from the scores.
+- **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
+
+### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 63.
+1. **"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.
+   - A partial day is not a fault (the partial-day rule), and red reads as an error.
+   - Use neutral while the day is open, and reserve the warning colour for the End-of-Day review.
+2. **A taken supplement is struck through,** which reads as cancelled or deleted. Use the tick and a muted row.
+3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
+4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
+5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
+   - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
+   - **The definition is the owner's call. The copy is not.**
+
+### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **Lane: B**
+- **Gate: owner** — this visibly rearranges a daily screen. **Owed: a before/after mockup at 384 px.**
+- **Added:** 2026-09-26 · Review sweep 63.
+- **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
+- **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
+
+### [workouts] RV-214 — the session card leads with the equipment, not the session; the recovery chips slide under their label
+- **Lane: B** — `app/workout/**` session card.
+- **Added:** 2026-09-26 · Review sweep 63.
+1. **"Dumbbell" is set at about twice the size of "Push".** The largest text on the card is not the thing being chosen. Make the session name the title, and the equipment or program a subtitle.
+2. **The "Recommended today" pill wraps onto two lines** at 412 px. Shorten it to "Today", or let it sit on its own line.
+3. **"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous. Write "Last done yesterday".
+4. **The recovery chips scroll under the "RECOVERY" label,** so the first chip shows clipped at the label's edge. Start the scroller after the label, or give it a fading mask.
+5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. Use the same variant.
+
+### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
+1. **Weekly stats shows its skeleton forever on a failed fetch.** `health-sections.tsx:688` passes `loading={weeklyStats === null}`, and a failure leaves it null. That breaks the self-fetching-card failure rule.
+2. **12 components render `null` while loading or empty,** so the card vanishes rather than saying why. Among them: `observed-hr-card.tsx:37`, `workout-density-card.tsx:36`, `nutrition-activity-trends-card.tsx:37`.
+3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
+   - Convert the daily-screen ones first.
+   - **RV-206's P32 (the bad-network timeline) is the before and after.**
+
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
 - **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
@@ -3525,6 +3751,17 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - keep to about 60 images a sitting;
   - use `rawTap`/`rawSwipe` rather than script focus or scroll.
   **A sitting that only finishes Tier 1 is a success. Record how far it got.**
+- **Targets from Review sweep 63 (web build at 412 px), to confirm on the device in Tier 1.**
+  Each one names the entry it confirms:
+  - Home's Log tiles: the "Log" pill drawn over the icon (RV-207 item 6).
+  - The empty pill beside Home's date, and the stray dots (RV-211 items 4–5).
+  - Which way Body Battery's bar fills (RV-211).
+  - Movement balance reading **0% Pull, 0% Legs over 60 days** while the calendar shows Pull and
+    Legs sessions. This was seed data on the web build, so check it against real data before
+    anyone files it.
+  - Nutrition's Adherence 0% against logged days (RV-212 item 5).
+  - The warmup bar's per-second width animation, in P25/P28 (RV-207 item 5).
+  - Keyboard occlusion on food review and the weigh-in sheet (RV-210).
 - **Result:** _(DV: Artifact URL, date, build, navigation mode, tiers completed)_
 
 ### [app-shell][platform] RV-206 — DEVICE: stress the design — large text, display size, slow phone, bad network, one hand, keyboards, launch, charts, overscroll, long values, a words-and-numbers census, back-position
@@ -4119,7 +4356,9 @@ drift.
 
 ### [workouts] BF-196 — "~51 min" is WORKING minutes and reads as whole-session minutes, so a full session looks nine short
 
-- **Gate:** device — the 384 dp look on two rows; the strings are shipped.
+- **Verify: device** — the 384 dp look on two rows; the strings are shipped. **Was `Gate: device`
+  until 2026-09-26**, which PARKED shipped work beside work that genuinely cannot start — the thing
+  BF-90 measured, and `check-backlog-pointers.js` had been advising on it every run.
 - **Lane: B** — shipped; only the width check is owed.
 - **✅ SHIPPED 2026-09-25** (LB-146, #…). Both strings, as this entry required:
   `ai-prescription-card.tsx` now reads `~51 min of work`, and `done-screen.tsx`'s tile is labelled

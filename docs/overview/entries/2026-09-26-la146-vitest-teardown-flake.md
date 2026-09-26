@@ -6,7 +6,7 @@
 
 A full run exits 1 while reporting **zero failing tests**, with one line:
 `EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`.
-Nine sightings, nine clean re-runs on identical code. It was free until 2026-09-25, when `Tests`
+Ten sightings, ten clean re-runs on identical code — and two of them landed on one day, which is the rate change that moved this to rank 1. It was free until 2026-09-25, when `Tests`
 became a **required** check — so it stopped costing a re-run and started blocking the merge button.
 
 ## It is upstream's bug, and that is now evidenced rather than assumed

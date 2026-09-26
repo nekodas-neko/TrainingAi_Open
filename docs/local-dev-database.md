@@ -117,6 +117,16 @@ Instead, a local Postgres 16 instance is set up automatically:
     full 1,076-file suite locally, green. The identical tree re-run clean, **seven for seven** —
     and note what that costs in CI rather than locally: the re-run is a push, so it cancels and
     restarts the 34-minute E2E alongside it.
+  - **TENTH SIGHTING, 2026-09-26 (#1687), and the RATE is what changed.** Another docs-only PR,
+    shard 1, `2496 passed | 14 skipped`, **`Errors 2`** — two unhandled errors in one run, which
+    also happened at sighting four and is not itself new. Re-ran clean: **ten for ten.** The honest
+    framing, because a first attempt at it overstated the case: this is **2 of the 3 PRs opened
+    that day** (#1679 yes, #1684 **no**, #1687 yes), *not* two consecutive. Against sightings 1–8
+    spread over several days, two in one day is still a step up — the claim is "more often than it
+    was", not "every run". That rate is what took it from a re-run tax to rank 1, and it is the
+    number to watch: if it keeps climbing, `disableConsoleIntercept` starts to look cheap despite
+    the log volume measured above.
+
   - **The run log cannot settle it, and this is the trap worth knowing.** The natural move is to grep the failing log for whatever logged last — e.g. `[pg pool] idle client error`, the one console writer that fires asynchronously outside any test's control. Its absence proves nothing: **the pending `onUserConsoleLog` IS the log that never got delivered**, so the message you are looking for is the one the failure destroys. Absence is guaranteed under every hypothesis. File-based tracing (append in a `console.*` wrapper, never through the RPC) is the only way to see it — that harness worked, it simply had nothing to catch.
   **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too.
 
@@ -168,6 +178,11 @@ Instead, a local Postgres 16 instance is set up automatically:
     and restarts the 34-minute E2E alongside it"*. `mcp__github__actions_run_trigger` with
     `rerun_failed_jobs` re-runs **only the failed job**, leaves every green job's result in place, and
     pushes nothing — measured here at one shard re-run, ~2 minutes, E2E untouched. Use that.
+  - **TENTH, 2026-09-26 (#1687).** Docs-only again, shard 1, `2496 passed`, **`Errors 2`**. Re-ran
+    clean — **ten for ten**. Two sightings in one day (#1679 and #1687; **#1684 in between was
+    clean**), which is a step up from the earlier spread but is **not** the "every run" a same-day
+    reading first suggested — worth stating, because over-reading the rate is how a bounded tax gets
+    treated as an emergency. `rerun_failed_jobs` turned each into ~2 minutes, no push, E2E untouched.
 
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:
   1. **Fixture rows.** DB tests clean up in `afterEach`/`afterAll`, which a killed run never reaches. `program-session-tombstone.test.ts` left its `LB-66 Program` row behind, and the next full run failed with `UserFacingError: A program named "LB-66 Program" already exists` — an error that reads like a bug in the program-name guard and is really a corpse from the run you killed. It then **self-heals**, because that run's own `afterEach` clears the row, so it fails exactly once and looks like a flake.

@@ -1,20 +1,20 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-161 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-162 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677); eighteen more on
-2026-09-25 — the journal entries are the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161**;
+eighteen more on 2026-09-25 — the journal entries are the list.
 
 ## Next
 
 **`node scripts/next-item.js --lane B` — run it, do not trust this line.** READY was **0** at
 2026-09-26 04:00, with nothing left to convert. The bottleneck is not this lane's: **~116 device
 checks owed** (`--sittings`) and the owner questions. **Do not invent work — if READY is 0, say so
-and stop.** Before saying it, check the parks are real: `BF-94` on `BF-61` LOOKS stale (BF-61
-shipped) and is not — BF-61 is `Verify: device` with a pass owed, and BF-94 puts that same swipe
-tray on the workout screen. Re-gating the queue is the ORCHESTRATOR's, not a lane's.
+and stop.** Before saying it, check the parks are real — `BF-94` on `BF-61` LOOKS stale and is not
+(BF-61 owes a device pass on the same swipe tray). Verifying that is what found LB-161: the two
+`check-backlog-pointers` advisories, one of which was arguing against a correct entry.
 
 ## Blocked / owed
 

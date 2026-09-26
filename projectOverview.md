@@ -2867,7 +2867,7 @@ reading was a red herring and the entry says where to resume. Reversal is one li
 [vitest#11153](https://github.com/vitest-dev/vitest/issues/11153) is open and unfixed: a worker's
 RPC closes with a `console.*` forward in flight, so a run exits 1 reporting **zero failing tests**.
 Present in 4.1.11 **and** 5.0.0 alike (upstream measured 3/10 each; 3.2.4 is clean), so upgrading
-is not the way out. Nine sightings. Since `Tests` became required it blocks the merge button, so
+is not the way out. Ten sightings, two of them in one day. Since `Tests` became required it blocks the merge button, so
 `scripts/ci/vitest-retry-teardown-flake.js` re-runs a shard once on that exact signature — a real
 failure still fails, and a second occurrence in the same job fails it. **Owed: delete the wrapper
 when upstream closes the issue.** Locally the response is unchanged — just re-run.
