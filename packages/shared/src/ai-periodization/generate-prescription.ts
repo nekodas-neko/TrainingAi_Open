@@ -129,6 +129,109 @@ function buildWholeSessionDeloadPrescription(
   }
 }
 
+/**
+ * The program's own numbers, fitted to today's time budget — what to prescribe when the model
+ * call fails (RV-202).
+ *
+ * **Deliberately NOT `buildWholeSessionDeloadPrescription`.** That builder was the only
+ * deterministic plan this layer had, and reaching for it on a model failure would prescribe a
+ * DELOAD to everyone whose Gemini call timed out: a training decision, made by an outage. This
+ * one prescribes what the lifter's own program already says, which is the honest degraded
+ * answer — the same numbers they would get with the AI turned off.
+ *
+ * What the model would have added and this cannot: phase transitions, RPE autoregulation, and
+ * per-exercise deloads. So `phaseAction` stays `'stay'`, `deload` is false, and `confidence` is
+ * deliberately low rather than 1.0 — the plan is sound but uninformed, and the card's
+ * low-confidence path should treat it that way.
+ *
+ * An exercise with no `baseSets` (no style, or an empty one) is SKIPPED rather than given an
+ * invented number. A prescription that quietly fabricates a load is worse than a shorter one.
+ */
+export function buildRulesPrescription(
+  signals: PrescriptionSignals,
+  reasoning: string,
+): AiPrescription | null {
+  const withBase = signals.exercises.filter(ex => ex.baseSets.length > 0)
+  // Nothing to build from: every exercise is style-less. The caller keeps its error path.
+  if (withBase.length === 0) return null
+
+  // One row per exercise, from its own style. `pct`/`reps`/`restSec` come from the FIRST set —
+  // the prescription shape is one triple per exercise, not per set, so a style whose sets differ
+  // is represented by its opening set, which is the one the lifter warms into.
+  const planned = withBase.map(ex => ({
+    ex,
+    sets: ex.baseSets.length,
+    reps: ex.baseSets[0].reps,
+    pct: ex.baseSets[0].pct,
+    restSec: ex.baseSets[0].restSec,
+  }))
+
+  const fitted = new Map(
+    fitToBudget(
+      planned.map(p => ({
+        sessionExerciseId: p.ex.sessionExerciseId,
+        role: p.ex.role,
+        sets: p.sets,
+        reps: p.reps,
+        restSec: p.restSec,
+        transitionSec: p.ex.transitionSec,
+        measuredSecPerRep: p.ex.timeProfile?.secPerRep ?? null,
+        measuredRestSec: p.ex.timeProfile ? resolveMeasuredRestSec(p.ex.timeProfile, p.pct) : null,
+      })),
+      signals.effectiveTimeBudgetMin,
+    ).map(f => [f.sessionExerciseId, f.sets]),
+  )
+
+  const exercises: AiPrescriptionExercise[] = planned.map(p => ({
+    sessionExerciseId: p.ex.sessionExerciseId,
+    name: p.ex.name,
+    sets: fitted.get(p.ex.sessionExerciseId) ?? p.sets,
+    reps: p.reps,
+    pct: p.pct,
+    restSec: p.restSec,
+  }))
+
+  const plannedById = new Map(planned.map(p => [p.ex.sessionExerciseId, p]))
+  const estimatedSessionDurationMin = estimateSessionDurationMin(
+    exercises.map(ex => {
+      const p = plannedById.get(ex.sessionExerciseId)
+      return {
+        sets: ex.sets, reps: ex.reps, restSec: ex.restSec,
+        transitionSec: p?.ex.transitionSec ?? 240,
+        measuredSecPerRep: p?.ex.timeProfile?.secPerRep ?? null,
+        measuredRestSec: p?.ex.timeProfile ? resolveMeasuredRestSec(p.ex.timeProfile, ex.pct) : null,
+      }
+    }),
+  )
+
+  const weeklyVolumeContribution: Record<string, number> = {}
+  for (const ex of exercises) {
+    const p = plannedById.get(ex.sessionExerciseId)
+    if (!p) continue
+    for (const ma of p.ex.muscleAssignments) {
+      const weight = ma.role === 'main' ? 1.0 : 0.5
+      const muscle = ma.muscle.toLowerCase()
+      weeklyVolumeContribution[muscle] = (weeklyVolumeContribution[muscle] ?? 0) + ex.sets * weight
+    }
+  }
+
+  return {
+    // The stored phase, unchanged: a rules plan never moves the lifter through periodization.
+    // `signals.phase` is the persisted string, narrowed the same way the model's echo is at the
+    // two sites below — periodization state is written by this engine, so the value is ours.
+    phase: signals.phase as PeriodizationPhase,
+    phaseAction: 'stay',
+    exercises,
+    estimatedSessionDurationMin,
+    weeklyVolumeContribution,
+    deload: false,
+    reasoning,
+    confidence: 0.3,
+    confidenceReasons: ['Built from your program\u2019s own sets — the AI coach could not be reached.'],
+    source: 'rules',
+  }
+}
+
 // Core of the AI-periodization prescription generation, extracted from
 // app/api/ai-periodization/session/[sessionId]/prescribe/route.ts so it can run
 // in-process from two callers: the /prescribe route (client trigger / manual refresh)
@@ -312,6 +415,31 @@ async function runPrescriptionGeneration(
     parsed = result.object
   } catch (err) {
     console.error('Gemini prescription generation failed:', err)
+    // RV-202 — answer with the program's own numbers rather than 502.
+    //
+    // The 502 was not a quiet failure: the client ignores the non-ok response and polls
+    // `PRESCRIPTION_POLL_MAX = 10` times at 3 s, so the lifter watched "Preparing your AI
+    // workout…" for about thirty seconds and then got the base program anyway. This arrives at
+    // the same numbers immediately.
+    //
+    // **Deliberately NOT persisted.** `storePrescription` would hold this for seven days and the
+    // model would get no further attempt until it expired — one provider blip becoming a week of
+    // uninformed plans, which is the shape RV-69 fixed for the digests. Leaving the slot empty
+    // means the next open re-runs the model, and this plan is only what today's caller is handed.
+    const rules = buildRulesPrescription(
+      signals,
+      'Your AI coach could not be reached, so this is your program as written.',
+    )
+    if (rules) {
+      return {
+        ok: true,
+        prescription: rules,
+        prescriptionStatus: 'pending',
+        estimatedSessionDurationMin: rules.estimatedSessionDurationMin,
+      }
+    }
+    // No exercise in the session carries a progression style, so there are no numbers to fall
+    // back to. The old error is still the honest answer here.
     return { ok: false, error: 'AI generation failed', status: 502 }
   }
 

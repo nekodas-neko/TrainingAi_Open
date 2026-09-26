@@ -59,6 +59,21 @@ export interface AiPrescription {
   // Plain-English factors limiting the engine's confidence (empty/absent when it has full
   // data). Surfaced in the prescription card and the low-confidence confirm step.
   confidenceReasons?: string[]
+  /**
+   * Where this plan's numbers came from. Absent or `'model'` on everything generated before
+   * RV-202 and on every successful generation since.
+   *
+   * `'rules'` means the model call failed and the plan was built from the lifter's own
+   * progression style instead — sound numbers, but with no phase transition, no RPE
+   * autoregulation and no per-exercise deload, because those are the parts only the model does.
+   * It answers 200 rather than the old 502: the client polled that ten times at 3 s and then
+   * fell back to the base program anyway, so the lifter waited ~30 s to arrive where this
+   * arrives immediately.
+   *
+   * **Nothing in the UI reads this yet** — labelling the source is RV-202 item 3, Lane B's.
+   * Until then the numbers are unlabelled, exactly as the offline fallback already is.
+   */
+  source?: 'model' | 'rules'
   // Set only when the engine APPLIED a phase transition automatically (auto-apply on, the
   // model earned it). Built deterministically in transition-rationale.ts from the same
   // thresholds the engine gates on — the lifter's load changed without them pressing

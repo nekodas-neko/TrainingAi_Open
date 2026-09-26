@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.472.0",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: when the AI coach cannot be reached, your workout now comes up straight away with your program's own sets and reps. It used to sit on \"Preparing your AI workout…\" for about half a minute and then show you those same numbers anyway.",
+    ],
+  },
+  {
     version: "1.471.0",
     date: "2026-09-26",
     changes: [
