@@ -17931,7 +17931,3 @@ later reader would otherwise "tidy" into a handler-level guard.
 started). RV-177's nine-gap entry left the queue whole and the one finding inside it that
 had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files against 9 — became LA-145,
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
-
-**2026-09-25 · `docs/implementation-backlog.md` · Review sweep 62, `review/sweep-62-dv-design-capture`.**
- →  (+0; rebased). One DV entry, RV-205, that points at the new Part D of the probe checklist
-rather than restating it. That is why the entry is short.
