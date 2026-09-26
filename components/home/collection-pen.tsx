@@ -11,45 +11,52 @@ import type { FaucetKey } from '@/components/home/collection-summary'
  * The collection as a pen of cats wandering about, for the Home card.
  *
  * Every held cat is drawn, highest tiers first, up to `MAX_SHOWN` (`collection-pen-cats.ts`), over a
- * backdrop scene. Each cat wanders between two points anywhere on the ground, shrinking a little as it
- * moves back; bigger tiers are bigger. The sprites animate themselves (tail, paws, blink) inside
- * their SVGs. The motion is CSS only (`ta-pen-*` in globals.css), so nothing here re-renders
- * on a timer. It pauses when the card is off screen, when its tab is idle and when the app is
- * backgrounded, and stops entirely under reduced motion.
+ * backdrop scene, each with its name on a tag. **Depth follows tier**, the owner's layout: T1s are
+ * small and at the front, each tier up stands further back and higher, and T5–T6 fly above the
+ * ground with a shadow beneath. So the rare cats are the ones that stand out, never the ones hidden
+ * behind a crowd. The sprites animate themselves (tail, paws, blink) inside their SVGs; the walk
+ * is CSS only (`ta-pen-*` in globals.css), so nothing here re-renders on a timer. It pauses when
+ * the card is off screen, when its tab is idle and when the app is backgrounded, and stops under
+ * reduced motion.
  *
  * Positions are seeded from each cat's identity rather than `Math.random`, so a re-render (or a
  * revalidation that returns the same stock) does not reshuffle the pen.
  */
 
-const PEN_HEIGHT = 150
-/** How far up the pen a cat may walk — the scenes' ground is the lower third. */
-const GROUND = 46
+const PEN_HEIGHT = 176
 export type PenScene = 'meadow' | 'forest' | 'house' | 'castle'
 /** Sprite size per engine tier, T1 first. */
 const SIZE = [34, 42, 50, 58, 64, 72]
+/** Lowest and highest walking line per tier, in px up from the pen's floor. T5 and T6 are in the air;
+ *  the front row starts 14px up so its name tags stay inside the pen. */
+const BAND: [number, number][] = [[14, 24], [22, 34], [32, 44], [42, 54], [70, 86], [80, 94]]
+const FLYING_FROM_TIER = 4
+
+const sizeOf = (tier: number) => SIZE[Math.min(tier, SIZE.length - 1)]
 
 function catStyle(cat: PenCat, slot: number, slots: number): CSSProperties {
-  const size = SIZE[Math.min(cat.tier, SIZE.length - 1)]
+  const size = sizeOf(cat.tier)
+  const [lo, hi] = BAND[Math.min(cat.tier, BAND.length - 1)]
   // Each cat starts in its own slice of the width, so the pen fills edge to edge instead of piling up
   // where the hash happens to cluster, then wanders up to a third of the pen either way.
   const from = (slot + seeded(cat.id, 1)) / slots
   const to = Math.min(1, Math.max(0, from + (seeded(cat.id, 2) - 0.5) * 0.66))
   const dur = 10 + seeded(cat.id, 3) * 9
-  const y0 = Math.round(seeded(cat.id, 4) * GROUND)
-  const y1 = Math.round(seeded(cat.id, 7) * GROUND)
-  // Stacking follows the nearer end of the walk; a cat crossing depth mid-walk is rare enough to live with.
-  const near = Math.min(y0, y1)
+  const y0 = Math.round(lo + seeded(cat.id, 4) * (hi - lo))
+  const y1 = Math.round(lo + seeded(cat.id, 7) * (hi - lo))
   return {
     position: 'absolute',
     left: 0,
     bottom: 0,
-    zIndex: 100 - near,
+    width: size,
+    // Smaller tiers are nearer, so they draw over the ones behind; tier is the depth.
+    zIndex: 100 - cat.tier * 10,
     ['--pen-x0' as string]: `calc((var(--pen-w, 300px) - ${size}px) * ${from.toFixed(3)})`,
     ['--pen-x1' as string]: `calc((var(--pen-w, 300px) - ${size}px) * ${to.toFixed(3)})`,
     ['--pen-y0' as string]: `${-y0}px`,
     ['--pen-y1' as string]: `${-y1}px`,
-    ['--pen-s0' as string]: (1 - y0 / 230).toFixed(3),
-    ['--pen-s1' as string]: (1 - y1 / 230).toFixed(3),
+    ['--pen-s0' as string]: '1',
+    ['--pen-s1' as string]: '1',
     ['--pen-dur' as string]: `${dur.toFixed(1)}s`,
     ['--pen-delay' as string]: `${(-seeded(cat.id, 5) * dur).toFixed(1)}s`,
   }
@@ -86,13 +93,29 @@ export const CollectionPen = memo(function CollectionPen({ collections, scene = 
       style={{ height: PEN_HEIGHT, backgroundImage: `url(/cats/scene-${scene}.svg)` }}
       aria-hidden="true"
     >
-      {shown.map((cat, i) => (
-        <div key={cat.id} className="pen-cat" style={catStyle(cat, slotOf(i, shown.length), shown.length)}>
-          <div className="pen-cat-face">
-            <CatSprite faucet={cat.faucet} tier={cat.tier} size={SIZE[Math.min(cat.tier, SIZE.length - 1)]} />
+      {shown.map((cat, i) => {
+        const size = sizeOf(cat.tier)
+        const flying = cat.tier >= FLYING_FROM_TIER
+        return (
+          <div key={cat.id} className="pen-cat" style={catStyle(cat, slotOf(i, shown.length), shown.length)}>
+            {/* Ground shadow: under the feet for walkers, far below and fainter for flyers. */}
+            <span
+              className="pen-shadow absolute left-1/2 -translate-x-1/2 rounded-full bg-black"
+              style={{ width: size * 0.7, height: size * 0.14, bottom: flying ? -34 : -2, opacity: flying ? 0.22 : 0.4 }}
+            />
+            <div className={flying ? 'pen-fly' : undefined}>
+              <div className="pen-cat-face">
+                <CatSprite faucet={cat.faucet} tier={cat.tier} size={size} />
+              </div>
+            </div>
+            {cat.name && (
+              <span className="absolute left-1/2 top-full -translate-x-1/2 whitespace-nowrap rounded bg-background/80 px-1 text-[9px] font-semibold leading-tight text-foreground">
+                {cat.name}
+              </span>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
       {total > shown.length && (
         <span className="absolute right-2 top-1.5 rounded-full bg-background/70 px-1.5 text-[10px] font-semibold text-muted-foreground">+{total - shown.length} more</span>
       )}

@@ -99,6 +99,19 @@ and deliberately not built.
 - **Unmeasured:** the pen's frame rate with a dozen filtered, animated sprites on Samsung's WebView.
   If it stutters, drop the rim filter from the animated group first.
 
+## Third pass, same session: named cats (v1.468.0)
+
+- **`replayCollection` now holds real, named cats** (`names.ts` + the lineage fold in
+  `ladder.ts`). The rules are the same and the counts are derived, so all prior tests pass. Merges
+  blend names; decay breaks a big cat back into the same named cats. The state gains `cats`,
+  `restless` and `lastLost`. **This touched Lane A's `ladder.ts` at the owner's request**; PS-49 is
+  told to keep the fold.
+- **Pen:** name tags, depth by tier (small in front, big further back and higher), and flying
+  T5–T6. **Card:** named restless warning and named "wandered off". **`/collection`:** a roster
+  with arrival day and parents.
+- **PS-52 (Lane O):** attachment ideas for the owner to pick from; the recommended three are a named
+  nudge notification, merge moments and anniversaries.
+
 ## Open questions / blockers
 
 - **PS-48 (Lane O, #1 in O's READY list):** ② the Rogue's cardio unit and drain, and ④ re-scoring
@@ -110,17 +123,17 @@ and deliberately not built.
 
 ```
 You are picking up the cat collection work after the art session of 2026-09-26. Everything from
-that session is merged to main (PR #1694 v1.466.0, and the pen PR v1.467.0).
+that session is merged to main (#1694 v1.466.0, #1706 v1.467.0, and the named-cats PR v1.468.0).
 
 Read in order:
   1. projectOverview.md — the "collection cats are drawn now" Known-Issues row
   2. docs/domains/app-shell/README.md
   3. docs/handoff-2026-09-26-app-shell-cat-collection-art.md
   4. docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md
-  5. docs/implementation-backlog.md — PS-48, PS-49, PS-50, PS-51, BF-126 (grep for them)
+  5. docs/implementation-backlog.md — PS-48, PS-49, PS-50, PS-51, PS-52, BF-126 (grep for them)
 
 If you are the Orchestrator: first action is PS-48 — put its two remaining questions (Rogue cardio
-rate, re-score history) to the owner, plus PS-51's title→scene mapping, in the "Decisions That Come Back To Me" shape, and
+rate, re-score history) to the owner, plus PS-51's title→scene mapping and PS-52's pick, in the "Decisions That Come Back To Me" shape, and
 record the answers in PS-48 and the plan. Also route BF-126's owner look into his next S25 sitting.
 
 If you are Lane A: PS-49's steps, workout and Health-cat halves can start now; only the cardio
