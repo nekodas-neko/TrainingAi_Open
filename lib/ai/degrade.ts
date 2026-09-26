@@ -8,10 +8,14 @@
  * deterministic, already computed, and was being discarded because the sentence *about* it could
  * not be written.
  *
- * `app/api/running-plan/explain/route.ts` is the reference: it answers 200 with the deterministic
- * rationale it was handed and `degraded: true`. `ai/health-insight` is the second precedent, and
- * the more exact one — it already returns a hand-written deterministic sentence when nothing was
- * measured, rather than paying for a model call whose only honest output is that.
+ * `ai/health-insight` is the reference: it returns a hand-written deterministic sentence when
+ * nothing was measured, rather than paying for a model call whose only honest output is that.
+ *
+ * `running-plan/explain` used to be named here first, and **RV-200 deleted it.** Its degraded
+ * answer was the rationale it had been handed — which the card was already rendering, so the model
+ * was only rewording text the user could see. The pattern below is for a route whose facts would
+ * otherwise be thrown away; a route whose "degraded" answer is its own input did not need the
+ * model at all.
  *
  * **Why a sentence and not the raw block.** The entry proposed returning the assembled lines. Two
  * of the three cards render the string into a plain `<p>` with no `whitespace-pre-line`, so

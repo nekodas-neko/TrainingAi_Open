@@ -29,7 +29,6 @@ const PROSE_ROUTES = [
   'app/api/weekly-digest/route.ts',
   'app/api/workout-sessions/[id]/recap/route.ts',
   'app/api/session-explain/insight/route.ts',
-  'app/api/running-plan/explain/route.ts',
 ]
 
 // Routes that return structured data with a user-facing text field in it, and whose numbers are
@@ -141,7 +140,11 @@ describe('every route that writes prose can reach the guards (RV-173)', () => {
   const prose = routeFiles('app/api').filter(f => PROSE_CALL.test(stripComments(read(f))))
 
   it('finds the prose routes at all — a scan that matches nothing would pass silently', () => {
-    expect(prose.length).toBeGreaterThanOrEqual(7)
+    // A floor, not a target: it exists so a scan that silently matches nothing cannot pass. It was
+    // 7 until RV-200 deleted `running-plan/explain`, whose model call only reworded a rationale
+    // the card was already rendering. Lower it when a prose route genuinely goes; never raise it to
+    // paper over one that stopped matching.
+    expect(prose.length).toBeGreaterThanOrEqual(6)
   })
 
   it.each(prose)('%s reaches PROSE_GUARDS or PROSE_FIELD_GUARDS', rel => {

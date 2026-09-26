@@ -6,9 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Footprints, TrendingUp, Info, Check } from 'lucide-react'
 import type { RunType } from '@trainingai/shared/running/types'
 import { readCacheSync, setCached } from '@/lib/sqlite/cache'
-import { RUNNING_PLAN_EXPLAIN_TTL } from '@trainingai/shared/cache-ttl'
 import { todayInTz } from '@trainingai/shared/date-utils'
-import { runningPlanExplainCacheKey } from './prescribed-run-explain-key'
 
 export interface RunPrescription {
   type: RunType
@@ -39,49 +37,6 @@ function PrescribedRunCardImpl({ prescription, gateAction, gateReasons, isPushSe
   const tz = useUserTimezone();
   const { type, durationMin, distanceKm, targets, rationale } = prescription
 
-  // Warmer one-sentence AI restatement of the deterministic rationale (running-plan/explain).
-  // Never load-bearing: `rationale` renders immediately and the AI copy only swaps in once it lands;
-  // any failure/degraded response keeps the deterministic text. gateReasons is joined to a stable
-  // string for the effect dep so a new array ref each render doesn't re-fire the fetch.
-  const [aiMessage, setAiMessage] = useState<string | null>(null)
-  const gateKey = gateReasons.join('|')
-
-  // Cached on everything that can change the sentence — the local date plus the prescription
-  // fingerprint — so a remount reuses the answer instead of re-asking (Q-469). The effect dep list
-  // already guarded against a new array ref re-firing it; **mount was the remaining trigger**, and
-  // every navigation back to this screen is a mount. Measured at 31 redundant calls across 9
-  // distinct runs.
-  //
-  // The point is not the cost — the call is cheap and explicitly never load-bearing. It is that the
-  // model rewords the same run each time, so the same prescribed session was described differently
-  // on every visit. A cache makes the copy stable, which is what a user actually notices.
-  //
-  // Seeded in an effect rather than a `useState` initializer: a cache read in an initializer caused
-  // hydration mismatches (CLAUDE.md, Instant paint).
-  const cacheKey = runningPlanExplainCacheKey({ date: todayInTz(tz), type, durationMin, gateKey, rationale })
-
-  useEffect(() => {
-    const cached = readCacheSync<string>(cacheKey)
-    if (cached) { setAiMessage(cached); return }
-
-    let cancelled = false
-    fetch('/api/running-plan/explain', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, durationMin, rationale, gateReasons: gateKey ? gateKey.split('|') : [] }),
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (cancelled || !d?.message || d.degraded) return
-        const message = String(d.message)
-        setAiMessage(message)
-        // Only a real answer is cached. A degraded response is the deterministic text coming back
-        // dressed as an AI one, and caching that would pin the fallback for the whole TTL.
-        void setCached(cacheKey, message, RUNNING_PLAN_EXPLAIN_TTL)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [cacheKey, type, durationMin, rationale, gateKey])
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-4 shadow-sm">
@@ -110,7 +65,7 @@ function PrescribedRunCardImpl({ prescription, gateAction, gateReasons, isPushSe
         </span>
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-[color:var(--foreground)]">{aiMessage ?? rationale}</p>
+      <p className="mt-3 text-sm leading-relaxed text-[color:var(--foreground)]">{rationale}</p>
 
       {gateAction !== 'proceed' && gateReasons.length > 0 && (
         <div
