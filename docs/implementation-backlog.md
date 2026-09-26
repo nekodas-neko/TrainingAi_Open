@@ -3686,6 +3686,11 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [app-shell][platform] RV-205 — DEVICE: the design and feel pass — a screen gallery Review can see, plus tap latency, scroll, keyboard, token and motion numbers
 - **Lane: DV**
+- **Result (sitting 4b):** same Artifact, version 3 — **75 captures**: the pushed screens (Sleep,
+  Day, Week, Heart rate, Readiness, Cardio, Coach), three write-free sheets (Log Food, Water, weigh-in),
+  Home and Nutrition with `/api` blocked, and P32's slow-network sequence. **P25 passes** (p95 8.4 ms on
+  all four long lists, 120 Hz). Not yet: cold and error states per card family, admin pages.
+
 - **Result (sitting 4a):** private Artifact **https://claude.ai/artifact/6chic4wxSBEC6maezNXdGS** —
   2026-09-26, web v1.465.66, APK 1.465.52, **gesture nav**, portrait, dark. Channel proven (published, read
   back). Tier 1 done: P23 warm, full length, all five tab roots (22 images); P24 (Add food sheet 118 ms is
@@ -3731,6 +3736,15 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [app-shell][platform] RV-206 — DEVICE: stress the design — large text, display size, slow phone, bad network, one hand, keyboards, launch, charts, overscroll, long values, a words-and-numbers census, back-position
 - **Lane: DV**
+- **Result (sitting 4b, S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26; settings probes P29/P30/P31 NOT run — they wait for the owner's
+  OK):** P39 — mixed thousands separators (1534 vs 1,534 on four tabs), "—" vs "0" for missing values,
+  "Saturday 26 September" vs "26 Sept", headings in both Title Case and sentence case. P33 — seven
+  primary controls sit in the top 30% (Health's segment tabs and More's Profile/Friends at 16%, Nutrition's
+  day arrows at 10%). P34 — weigh-in and food quantity are `type=number` with no `inputmode=decimal`;
+  no field sets `enterkeyhint`. P32 — pushed screens show full content at 0.5 s on a 400 ms-RTT link
+  (cache-seeded; SW fetches may not be throttled). **P40 passes** (back keeps tab, segment and scroll).
+  P35–P38 not run.
+
 - **Added:** 2026-09-26 · Review sweep 62, owner follow-up: *"do what you can and send to DV — can be excessive."*
 - **The probes are P29–P41,** Part E of [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
   They use the same private-Artifact gallery channel and file naming as RV-205.
@@ -5204,52 +5218,6 @@ drift.
 - **⚠ Production writes on the owner's real data** — get his go-ahead per write type, prefer the
   reversible rows (log then delete a food), and record a refused row as COULD NOT CHECK.
 
-### [platform][app-shell] RV-125 — DEVICE PROBE: which fetch-once effects never re-run inside the persistent shell?
-
-- **📱 The write half, sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** Walk Home→Nutrition→Health→Workout→More twice, plus a
-  final Home; writes: a food log (r1 Nutrition), a weigh-in at today's own 69.8 kg (r1 Health), the food
-  delete (r2 Nutrition). **Every reader of the food write refetched** (energy-balance 10×, food-logs 5,
-  weekly-summary 5, adherence 5, day-timeline 5 on Home). **The weigh-in's readers `weights-summary` and
-  `health-trends` were fetched only once** across the two Health visits that bracket it — candidates
-  for this entry's fetch-once class. Also once on a revisited tab: Health's activity-logs,
-  program-overview, calendar-data, hr-recovery-profile, muscle-sets, training-load, injuries,
-  sleep-performance-correlation; Nutrition's targets, meal-plans, saved-meals; Home's body-battery,
-  oura/workouts, user/profile (none of which the writes change). **Caveat:** per-visit attribution was
-  lost to a script bug (the recorder's `t` is relative); the tab map came from a separate read-only
-  pass. Re-run with attribution before naming a component.
-
-- **Lane: DV** — assigned 2026-09-23 (OR-135), and it is the whole of what this entry needs.
-  The entry states it has **no build half** and names its own method: the measurement IS the
-  deliverable, and the phone answers it objectively. That is the owner's line for this lane —
-  *"only device testing that can be done by DV goes to DV"* — as against a looks-or-design
-  judgement, which stays with the Orchestrator for him.
-
-- **📱 BASELINE ON THE S25, 2026-09-23 — the write half is still owed.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `census.js`, two
-  and three rounds, **no writes**: 41 `/api` endpoints. Without a write between visits a well-built
-  shell *should not* refetch, so "fetched on one visit of two" is not a defect here and the census's
-  `neverReRuns` flag is not a verdict. What it does show: `body-metadata` (6×) and
-  `workout-data` (5×) refetch on every tab visit. The P2 answer needs one write per tab during the
-  walk — next sitting, with the owner's approved write types.
-
-- **The measurement, and it is the deliverable rather than a look owed —** no build half; the measurement is the work. Method: **P2**.
-- **The falsifiable claim:** over a fixed 5-minute walk (Home → Nutrition → Health → Workout → More,
-  twice round, one write per tab), every `/api/*` endpoint belonging to a revisited tab shows a
-  request count **greater than one**. FAILED for any endpoint fetched exactly once on a tab visited
-  four times — name the component.
-- **⚠ Corrected 2026-09-23 — this entry's original figures were wrong, inherited from a CLAUDE.md
-  line that had been stale since 2026-08-19.** It said the script freezes 36 sites with 19 that
-  "can bite". The script's own baseline says **11 sites across 9 files, and the can-bite group is
-  EMPTY** — the over-counting was corrected in the script on 2026-08-19 (25 across 16 were really
-  15 across 12), the can-bite group was two sites rather than eight, and both were converted.
-- **The premise survives the correction, and that is why the entry stays.** The script skips any
-  non-empty dep array by design (`:164` — *"a different (and usually correct) shape"*), so it
-  cannot see `useEffect(…, [userId])` inside a shell where `userId` never changes. Its baseline
-  confirms this from the other side: `workout-screen`'s two sites were dropped from the count for
-  being `[userId]`-deps. That is how four of sweep 53's findings got past it, and it is unaffected
-  by the count being 11 rather than 36.
-- Needs a `window.fetch` wrapper installed at app start; that is a harness change under
-  `scripts/device/**`, which the role owns.
-
 ### [app-shell][platform] RV-146 — two fonts only the meal-label printer uses are preloaded on every page
 
 - **📱 Sweep 4a (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): the label faces are fixed; one question remains.** Font preloads are down
@@ -5813,48 +5781,6 @@ drift.
   (`lib/reminders/__tests__/lb148-reminders-use-the-users-zone.test.ts`). So the widening no longer
   has to fix and detect at once: it baselines against a `lib/` that is already correct here.
 
-### [app-shell][platform] RV-127 — DEVICE PROBE: computed-style sweep at the real viewport
-
-- **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the inputs are labelled, but the ink is 21 px
-  and the vertical touch area measures **~33 px**, under the 44 px floor.
-
-- **Lane: DV** — was `O` (OR-135, for filing its findings); re-laned 2026-09-24 once that filing was
-  done. The probe has been RUN and its result is recorded below, so the device was not what it
-  needed — but the **clearance half could not be answered** on three-button navigation, and that is
-  now the only thing left. See the sweep-4 note at the foot of this entry.
-
-- **📱 MEASURED ON THE S25, 2026-09-23 — every claim, including clearance.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. `sweep.js` over
-  13 routes (tab roots + cardio, health/day, health/readiness, more/details, more/settings,
-  more/about, more/devices, program). **Clearance:** the only bottom-anchored control on any route is
-  the tab bar; its computed `padding-bottom` equals the inset (15px, gap 0) — it clears exactly.
-  **`truncate` on flex: 0. Nested interactives: 0.** **Under 44px, counting the invisible
-  `.tap-target-44`/`-dot` touch boxes:** the `tap-target-dot` session dots on Workout (24×44, by
-  design per `globals.css`) and three **318×21 inputs on `/more/details`** (display name, birth year,
-  height) — not judged; whether their row or label widens the target is the next question.
-  **Horizontal overflow:** content spilling with `overflow-x: visible` exists (`/program` card
-  text runs 70px past its column into the empty space under the action icons; Home's week strip 8px
-  into the gutter, aligned with the cards) — **looked at on screen: neither overlaps anything**.
-  Clipped overflow (`hidden`, working `truncate`) is by design. Found alongside it: **DV-4**
-  (a sleep-stage colour used as text) and **DV-6** (no status-bar backing).
-
-- **Its shipped-look field was removed 2026-09-24 (device sweep handover) — it FAILED, and a
-  FAILED is work.** The field said *"device — no build half. Method: P4"*, which files an entry under *shipped, a look is
-  owed*. Sweep 2 ran it and the inputs came back at **21 px of ink**, so there is a build half after
-  all and it is not verification debt. Leaving `Verify:` on a failed probe is the exact shape
-  CLAUDE.md warns about: it reads as finished to everyone who scans the queue.
-- **The falsifiable claims:** no element overflows horizontally at 384 px (`scrollWidth >
-  clientWidth`); no interactive element renders under 44 × 44 px; no element carrying `truncate`
-  computes to `display: flex` (the class does nothing there — RV-92 is one, the question is whether
-  the source grep missed others applied conditionally); no `button`/`a` contains another.
-- **⚠ The clearance half is BLOCKED and must not be reported as passing.** The baton records the
-  phone on **three-button navigation**, where the inset is generous and a broken floored utility
-  passes anyway. Until the owner switches to gesture nav, clearance is COULD NOT CHECK; the four
-  claims above are unaffected and can run today.
-- **Sweep 4 — what is actually left.** The filing work this entry was held in `O` for is **done**: its one actionable finding shipped as `RV-144`, the session
-  dots are by design, the horizontal overflow was looked at and overlaps nothing, and `DV-4`/`DV-6`
-  were already filed. **What remains is only the clearance half**, which needs the owner on gesture
-  navigation — the same group as `RV-37`, deferred to sweep 4 for the same reason.
-
 ### [platform][app-shell] RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording
 
 - **Lane: DV** — re-laned from `O` 2026-09-24 by Review. The walk half's two findings are now
@@ -5945,29 +5871,82 @@ drift.
 
 ### [workouts][platform] DV-8 — heal the rows already stranded pending with an empty outbox
 
-- **✅ CAUSE FOUND AND FIXED 2026-09-26** (`fix/dv8-strand-on-confirm-throw`, Lane A). It was not a
-  missing per-domain confirm arm — `pushMutations` deleted the **whole batch's** outbox entries
-  *before* running a hundred-line, **unguarded** per-domain mark-synced loop. One arm throwing on a
-  local read left every remaining row `pending` with its outbox entry already gone; nothing retries
-  a mutation that is no longer queued, and `applyDelta` only overwrites `synced` rows. The confirm
-  now runs first, per row, guarded, and the outbox is cleared only for rows that actually confirmed.
-  **Proven by a test that reproduces the strand against the old order**, not inferred from the
-  symptom.
-- **That fix stops NEW strands and heals nothing.** The rows already in this state have no outbox
-  entry to retry, so they need a sweep — this entry is now that sweep and nothing else.
-- **Lane: A** · **Keep:** the heal.
-- **Measured on the phone (sweep 4b, #1701):** **36** local `food_logs` rows `pending` with both
-  `mutations_outbox` and `sync_outbox` empty, **every one a delete tombstone**, spread over 14 days
-  (2026-08-19 → 2026-09-26). Plus the original `set_logs` row (`86314832`, pending since
-  2026-09-19). Other domains clean: injuries, supplement_logs, plan_meal_answers, activity, body,
-  mood all 0.
-- **Re-queue, do NOT mark synced.** A stranded tombstone is indistinguishable from one whose
-  mutation never got queued at all (the double-failure case `getStrandedPendingWorkouts` already
-  sweeps for). Marking it synced on the assumption the server has it would drop a delete that never
-  landed. Re-pushing is idempotent — a delete of an already-deleted row is a no-op — so the safe
-  sweep queues the mutation again and lets the normal confirm path settle it.
-- **`getStrandedPendingWorkouts` is the shape to copy**, including its grace period so the sweep
-  cannot race a push that is still in flight.
+- **✅ CAUSE OF THE TOMBSTONE STRAND FOUND AND FIXED 2026-09-26**
+  (`fix/dv8-strand-on-confirm-throw`, Lane A). Not a missing confirm arm: `pushMutations` deleted
+  the **whole batch's** outbox entries and *then* ran a hundred-line per-domain mark-synced loop
+  with **no error handling anywhere in it**. One arm throwing on a local read left every row after
+  it `pending` with its outbox entry already gone — nothing retries a mutation that is no longer
+  queued, and `applyDelta` only overwrites `synced` rows. The confirm now runs first, per row,
+  guarded, and the outbox is cleared only for rows that actually confirmed. **Reproduced by a test
+  against the old order**, not inferred from the symptom.
+- **⚠ THAT FIX DOES NOT EXPLAIN THE `set_logs` ROW, and must not be read as closing it.** The
+  id-reconciliation hypothesis below stands on its own evidence and is untouched by this change:
+  an orphaned `workout_session_id` is not something a confirm-ordering bug produces. Two causes,
+  one symptom.
+- **⚠ IT ALSO HEALS NOTHING.** The rows already stranded have no outbox entry to retry, so they
+  need a sweep — **that sweep is what keeps this entry open.**
+  - **Re-queue, do NOT mark synced.** A stranded tombstone is indistinguishable from one whose
+    mutation never got queued at all (the double-failure case `getStrandedPendingWorkouts` already
+    sweeps for), so marking it synced would silently drop a delete that never landed. Re-pushing is
+    idempotent — deleting an already-deleted row is a no-op — so the safe sweep re-queues and lets
+    the normal confirm path settle it. Copy `getStrandedPendingWorkouts`, grace period included, so
+    the sweep cannot race a push still in flight.
+- **Keep:** the heal above, and the `set_logs` id-reconciliation question.
+
+- **📱 It is common, not a one-off (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Local `food_logs` holds **36 rows stuck `pending` with
+  both outboxes empty — every one a delete tombstone** (`deleted_at` set), spread over 14 days from
+  2026-08-19 to today. So a food delete's push confirmation often fails to flip the tombstone to
+  `synced`. Other tables are clean (injuries, supplement_logs, plan_meal_answers, activity, body,
+  mood: 0). `supplements` holds one `pending` row, *DV test supplement C*, a sweep-1 throwaway (DV-10's
+  leftover), not shown in the app.
+
+- **📱 A second instance, on a food delete (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Delete #3 of DV-15's five went `DEL/pending`
+  and never flipped to `synced` (still pending 35 s+ later), while **`mutations_outbox` and
+  `sync_outbox` were both empty** and the server had applied the delete (the day's list no longer held
+  the row; "kcal left" moved back). 1 of 5. Same shape as the `set_logs` row: a local row left
+  `pending` after its mutation was confirmed. The set row is also still pending (re-read this sitting).
+
+- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24):** unchanged — set_logs `86314832` is still `pending` (since
+  2026-09-19T22:41:16Z) against an **empty** outbox. Its `exercise_logs.workout_session_id`
+  (`a1847680…`) **does** resolve to a local `workout_sessions` row.
+
+- **⚠ CORRECTED by sweep 1 — two claims above were my misreading.** The set's session **is** in local
+  `workout_sessions` (`a1847680…`, started 2026-09-19T22:06:01.141Z, completed, synced); the
+  sitting-1 query that "found nothing" had failed silently. And `0a2afbf9…` is **not** a server
+  workout id: `/api/workout-sessions/day` returns the **program** session ("Upper") as `sessionId`.
+  **What remains true:** the set is still `pending` locally, and the server has it — the same
+  bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
+
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Second independent reproduction in sweep 4a** — a food delete left pending with **both outboxes
+  empty**, which is the sync write path rather than anything the phone can answer next. Two
+  reproductions is enough; further device time on it is the trap where a probe already run gets
+  re-run. Lane A.
+- **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
+  is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
+  PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
+  gate name the same actor there is nothing to wait for, and the entry is simply that actor's
+  work. Filed by the device agent itself, which is how easily the shape hides.
+- **Added:** 2026-09-23 · Lane A, carved out of DV-5 when the rest of it shipped. The confirm-arm
+  half of DV-5 is fixed and merged; **this half was never explained**, and DV-5 itself said so
+  (*"Not established: ... Read the confirm path before assuming the cause"*).
+- **What Device Verification measured on the S25.** One `set_logs` row (set 4, Chest-Supported
+  Dumbbell Row, 10 kg × 12, 2026-09-20) has been `sync_status='pending'` since 2026-09-19 22:41
+  UTC, against an **empty** outbox. Its local `exercise_logs.workout_session_id` is `a1847680…`,
+  which **is not a row in the local `workout_sessions` table**, while the server's session for that
+  day is `0a2afbf9…`. The server has the set (`/api/exercise-history` lists it) — nothing was lost.
+- **Why the DV-5 fix does not cover it.** That fix was four confirm arms whose read-back getter
+  filters `deleted_at IS NULL`. `workout_log` is not one of them: its arm calls
+  `markWorkoutSynced(wsId, exerciseLogId)`, which is a keyed `UPDATE` and reads nothing back, so a
+  filtered getter cannot be the cause here. Read at source 2026-09-23 — the arm is correct as
+  written, which is what makes the orphaned session id the thing to chase.
+- **The hypothesis to test first, not to assume:** the session was written locally under one id and
+  the server assigned another, so `markWorkoutSynced` updated `set_logs WHERE exercise_log_id=?`
+  for an exercise log that hangs off a session id the local store no longer has. That is an
+  id-reconciliation question, not a confirm question.
+- **Pass test:** on the device, after a workout push drains the outbox, every `set_logs` row the
+  push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
+  the local `workout_sessions` table.
 
 ### [platform] LB-130 — the doc-size HISTORY file is now the guaranteed-conflict line that `.size` used to be
 
@@ -5998,6 +5977,9 @@ drift.
   every existing entry.
 
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
+
+- **📱 Seen in sweep 4b (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26):** on the pushed `/health/sleep` page, cards scroll under the
+  status-bar clock with no backing — the scrim lives in the tab shell, so pushed routes have none.
 
 - **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23): the controller works on the device** — the scrim is in the DOM
   (43 px), opacity **0 at rest → 1 at scrollTop 600 → 0 back at the top**. **The look is the
@@ -6198,6 +6180,15 @@ drift.
 - **Verify: device**
 
 ### [platform][app-shell] RV-155 — about 60 shipped changes owe a device look that no queue shows DV: run them as six stations
+
+- **📱 Sweep 4b ran part of it (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Station A: WAL ✓, user_version 40 ✓, oura_daily
+  `sync_status` ✓, saved_meals servings ✓, caches current + previous ✓; **36 pending food tombstones**
+  (→ DV-8); **no `health-alerts` notification channel** (only `oura-ble-v2`) — row 11584 fails;
+  getPending() holds only id 9300 (no supplement reminders, 8000 absent on a trained day); 0 local
+  `supplement_vials`. Station B: viewport meta and scale ✓ (11343), Cardio Hub gradient and landing ✓
+  (8267), a random session id shows the "link is out of date" screen ✓ (11657). Station D: day-detail
+  swipes ✓ (8223), edit/delete dialogs open and cancel ✓ (5121), Sleep contributors include HR and
+  schedule ✓ (10715). Not run: station C (the throwaway-supplement writes), most of B/D/E, and F.
 
 - **Lane: DV**
 - **Added:** 2026-09-24 · Review sweep 55. The station list is §1 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
@@ -9973,415 +9964,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Verification:** on device, open a session whose prescription has any `deloaded: true` exercise and
   confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
   session and confirm the labels are unchanged from today.
-
-### [activity][cardio] BF-165 — "Other activity" is a dead tap on device, and the whole source path reads correct
-
-- **Lane:** B — `components/workout/log-activity-sheet.tsx`,
-  `components/activity/activity-type-grid.tsx`, `components/activity/activity-screen.tsx`,
-  `lib/view-transition.ts`. **Start from the device console, not from these files** — see the
-  elimination list.
-- **Added:** 2026-09-15 (BugFix intake). Owner: *"when I try click the treadmill; or any 'Other
-  activity' nothing actually happens."* Reported on the APK.
-- **Batch:** `back-gesture-sitting` — now with **DV-2** only: BF-166, LB-107, LA-109 and BF-100 were
-  verified on the S25 on 2026-09-23 and left the queue. DV-2 (*Leave* on the leave-workout prompt
-  does not leave) is the same mechanism in a dialog, so one fix covers both. Added by OR-122 in
-  place of the gate below.
-- **Verification:** device. The Android system back gesture arrives over a Capacitor channel
-  Playwright cannot fire, so the look is owed on the S25 — but the fix is written first.
-- **⚠ This entry carried `Gate: device` from 2026-09-17 until OR-122, and the gate was CIRCULAR.**
-  It said *"Ungate it the moment the fix lands in a branch needing only the S25 look"* — but a gated
-  entry never prints as READY, so nobody starts the fix, so the condition for lifting the gate can
-  never arrive. Two days of that had already been noticed and written off as correct
-  (*"the distinction is why it was absent for two days"*); five days of it parked a **live
-  owner-reported bug** whose root cause is fully measured below and whose design constraints are
-  written out. The general rule this is the worst instance of: **`Gate: device` means SHIPPED and
-  awaiting a look. Unbuilt work gets a Verification line**, however certain it is that the device
-  will be needed at the end.
-- **This blocks a path the owner was told to use yesterday.** BF-160 established that a fitness test
-  earns no calories, and "Other activity → Treadmill" is the recommended way to log a steady
-  treadmill walk (the guided walk is interval-only, minimum 1 fast + 1 slow block). That
-  recommendation currently leads to a dead button.
-- **⚠ The source path is correct end to end and UNCHANGED. Do not re-read these — they were traced
-  and cleared on 2026-09-15:**
-
-  | checked | verdict |
-  |---|---|
-  | `log-activity-sheet.tsx` → `selectType` | correct: `startActivity(...)` → `onOpenChange(false)` → `router.push('/activity')`, with a prefetch on open |
-  | `activity-type-grid.tsx` | correct: `onClick={() => onSelect(type)}` on a real `<button>` |
-  | `activity-store.startActivity` | sets `mode: 'pre'` + type/label/icon; `reconcileRehydratedActivity` only demotes `done` or a stale `active`, so it cannot wipe a fresh selection |
-  | `activity-screen.tsx` | correct: `pre` + a type → `PreActivityScreen` |
-  | `app/activity/page.tsx` | auth guard only |
-  | `pre-activity-screen.tsx` | no mount-time fetch, no throw candidate (59 lines) |
-  | `getActivityIcon` | has a `?? DotsThreeCircle` fallback, so a bad icon cannot throw |
-  | `tabKeyForHref('/activity')` | returns **null** → treated as a real navigation, not a shell flip |
-  | `/api/activity-types` | exists; production returns all **10** types including `treadmill` |
-  | `git log --since=2026-09-10` on every file above | **no changes** |
-
-- **So the defect is at runtime, and the entry's job is to say where to look.** Three candidates, in
-  the order they are cheap to test on device:
-  1. **The view transition never commits.** `useTransitionRouter` freezes the outgoing screen and
-     polls for route commit against a **300 ms** cap. Its own comments record this path misbehaving
-     twice before. A navigation that fails to commit leaves the old screen up — exactly "nothing
-     happens". Test by checking whether the URL changes while the screen does not.
-  2. **The `/activity` route fails to load in the WebView** (chunk/network), which is invisible
-     without the console.
-  3. **The sheet's close animation cancels the push** — `onOpenChange(false)` runs immediately
-     before `router.push` in the same tick.
-- **⚑ SYMPTOM NARROWED BY THE OWNER, 2026-09-15 — this confirms candidate 1 and demotes the other
-  two.** Asked whether the sheet closes, he answered: *"When i tap any activity from other activity
-  it just scrolls to the top of cardio hub."* So the sheet **does** close, the screen **stays** on
-  `/cardio`, and the hub's scroll position **resets to the top**. A tap that did nothing would not
-  move the scroll; a chunk-load failure would not either.
-- **The scroll reset has a mechanism, and it is consistent with a view transition that completes on
-  the same page.** `cardio-content.tsx:87` scrolls in a **nested `overflow-y-auto` div**, not the
-  document scroller. `use-scroll-restoration.ts` says in its own opening lines that it works on the
-  *"window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`"* —
-  and `/cardio` does not call it in any case (only `pull-to-sync` and `nutrition-content` do). A view
-  transition snapshots and re-lays-out the page; the root scroller survives that, a nested one is not
-  covered. So `startViewTransition` running to completion **without a navigation** would leave the
-  hub exactly where he is seeing it: same screen, scrolled to top.
-  **Not verified on device** — stated as the mechanism that fits, not as a measurement. Proving it is
-  one console line: log `location.href` inside the commit poll and see whether it ever changes.
-- **What this means for the fix.** The question is no longer "does the tap fire" but **"why does
-  `router.push('/activity')` not commit within the 300 ms cap"** — the sheet's `onOpenChange(false)`
-  runs in the same tick immediately before it, and Radix unmounts the portal on close. A fix that
-  merely lengthens `NAVIGATION_TIMEOUT_MS` would turn a dead tap into a slow dead tap; the cap is a
-  safety net, not the bug.
-- **`error_events` holds nothing for this**, checked over three days: no `/activity` or `/cardio` row
-  at all. Absence is not evidence here — a navigation that silently does not happen throws nothing —
-  but it does rule out an uncaught exception being reported.
-- **Verification:** on device with the WebView console attached, tap Cardio → Other activity →
-  Treadmill and record whether (a) the sheet closes, (b) the URL becomes `/activity`, (c) anything is
-  logged. Those three answers pick between the candidates above.
-
-- **✅ REPRODUCED IN THE PLAYWRIGHT HARNESS, 2026-09-15 — this is NOT device-only, and the entry's
-  "start from the device console" instruction is wrong.** Driving `/cardio` → *Other activity* →
-  *Treadmill* in a browser: the URL stays **`/cardio`**. No device, no WebView, no console needed.
-- **Two of the three candidates are now REFUTED by experiment, not by reading:**
-  - **Candidate 2 (the `/activity` route fails to load) is dead.** A direct `goto('/activity')`
-    returns **200**, renders *"Log Activity — What are you doing?"*, and logs **zero** page errors.
-  - **Candidate 3 (the close cancels the push) is dead, and so is the sharper version of it.** The
-    obvious mechanism — `SheetContent` renders `BackDismiss`, so an open sheet holds a pushed history
-    entry, and `closeSurface` fires **`history.back()`** when it closes — looked decisive and is not.
-    Reordering `selectType` to push first and deferring `onOpenChange(false)` by **1200 ms**, so no
-    pop is anywhere near the navigation, leaves it **still on `/cardio`**. The popstate moves to
-    ~1.5 s after the tap and changes nothing.
-- **Candidate 1 is the survivor: `router.push('/activity')` never commits.** `push()` routes
-  `/activity` through `animate()` (it is not a tab href and not the current URL), which runs the
-  push inside `document.startViewTransition` and polls for the URL against the **300 ms** cap.
-  Sampled every **10 ms for 4 s**, the URL never becomes `/activity` — not even transiently.
-- **⚠ A trap for the next session, because it cost a wrong conclusion here.** *"The URL never showed
-  `/activity`"* does **not** prove the push never started: Next updates the URL at **commit**, so an
-  aborted commit and a never-started push look identical from `location`. The deferred-close
-  experiment above is what separates them, and it is the one worth repeating — a sampler alone
-  cannot.
-- **The next experiment, stated so it is not re-derived:** drive the same
-  `useTransitionRouter.push('/activity')` from a control on `/cardio` that is **not inside a sheet**.
-  If it navigates, the sheet/portal context is the variable; if it does not, `animate()` itself is
-  the defect, which is app-wide navigation and must not be changed on a hypothesis.
-  **Do not lengthen `NAVIGATION_TIMEOUT_MS`** — the entry's own warning stands: that turns a dead tap
-  into a slow dead tap.
-
-- **✅ THAT EXPERIMENT WAS RUN, 2026-09-15, AND IT NARROWS THE BUG SHARPLY. `animate()` is NOT the
-  defect, and the sheet is NOT the variable.** `modality-picker.tsx` already provides the control the
-  experiment needed — two buttons on `/cardio`, same `useTransitionRouter`, same `animate()` path,
-  non-tab hrefs, **neither inside a sheet**:
-
-  | tap | destination | result |
-  |---|---|---|
-  | **Running** | `/running` | **navigates** ✓ |
-  | **Guided walk** | `/activity/guided-walk` | **stays on `/cardio`** ✗ |
-  | Other activity → Treadmill | `/activity` | stays on `/cardio` ✗ |
-
-  **Both failures share the `/activity` prefix and the success does not.** `animate()` commits fine
-  for `/running` through the identical code path, so the view-transition machinery works; and Guided
-  walk fails with no sheet anywhere near it, so the portal context is not it either.
-- **⚠ THIS IS A SECOND, UNREPORTED DEAD BUTTON: *Guided walk* on the Cardio hub does not navigate
-  either.** The owner reported only "Other activity". The entry's scope is therefore wider than
-  filed — anything reaching an `/activity*` route from a client-side push.
-- **It fails SILENTLY, which is why nothing was ever logged.** During the failing tap: **no console
-  errors, no `pageerror`, no failed requests, and no response ≥ 400.** That is consistent with
-  `error_events` holding nothing for this across three days, and it rules out a chunk-load failure.
-- **The two routes are structurally identical**, checked rather than assumed: `app/activity/page.tsx`
-  and `app/running/page.tsx` are both plain pages, **neither has a `layout.tsx`**, and `middleware.ts`
-  mentions neither. So the difference is not in routing configuration.
-- **The next experiment, narrowed accordingly:** bisect what `app/activity/page.tsx` (and the tree it
-  pulls in — `activity-screen.tsx`, `activity-store`, `reconcileRehydratedActivity`) does on a
-  CLIENT-side commit that `app/running/page.tsx` does not. A direct `goto('/activity')` renders fine,
-  so whatever it is only bites on the push path.
-
----
-
-#### ⛔ RETRACTION, 2026-09-15 — EVERYTHING ABOVE FROM "REPRODUCED IN THE PLAYWRIGHT HARNESS" IS WRONG
-
-**BF-165 does NOT reproduce in the harness. It was `next dev` compiling the route on demand.**
-
-Warm the destination first — `goto('/activity/guided-walk')`, then `goto('/activity')`, then back to
-`/cardio` — and the tap **works**: the URL becomes `/activity/guided-walk` and the RSC request returns
-**200**. Every "dead tap" measured here was a **cold route**.
-
-**What this retracts, specifically:**
-
-| claim | status |
-|---|---|
-| "Reproduced in the harness — not device-only" | **WRONG.** It does not reproduce. The entry's original device gate was right. |
-| "Guided walk is a SECOND dead button the owner has not reported" | **WRONG.** Guided walk is fine. Do not chase it. |
-| "Both failures share the `/activity` prefix" | **WRONG.** `/running` merely compiled faster than `ActivityScreen`'s tree inside the same wait. |
-| "The sheet's `history.back()` is not the cause" | **UNPROVEN.** That experiment also ran against a cold route, so it established nothing either way. |
-| "`/activity` serves 200 and renders on a direct visit" | **Still true** — a direct `goto` is unaffected. |
-
-**The mechanism, and it is the part worth keeping.** `next dev` compiles a route the first time it is
-requested. A client-side `router.push` issues an RSC fetch (`/activity/guided-walk?_rsc=…`) which then
-**hangs until compilation finishes** — measured here as unresolved after 8 s while two sibling `/api/*`
-calls on the same page returned 200. Nothing throws, nothing 4xx/5xx, no console error. **It is
-indistinguishable from a dead tap**, and no wait you pick is long enough to be safe, because the
-compile time depends on the size of the tree behind the route.
-
-**⚠ THE RULE FOR ANY NAVIGATION PROBE IN THIS HARNESS: warm the destination with a direct `goto`
-BEFORE measuring a client-side push to it.** Without that, "the navigation did not happen" means
-nothing. This cost three rounds of confident, wrong conclusions here, including a fabricated second
-defect.
-
-**BF-165 is back to what it was:** device-gated, cause unknown, three candidates open. The `Lane:` and
-the source-path elimination table at the top of this entry are unaffected — those came from reading,
-not from the harness.
-
----
-
-#### ✅ ROOT CAUSE FOUND, 2026-09-17 (Lane B) — CANDIDATE 3, and the retraction above was right to leave it UNPROVEN rather than refuted
-
-**It IS reproducible in the harness.** Two conditions have to hold at once, and every previous
-attempt — including the retraction's — had one of them wrong:
-
-1. **Warm the destination** with a direct `goto` first (the retraction's rule, and it stands).
-2. **Make the tap actually land.** This is the new one, and it is what produced three rounds of
-   wrong answers. `tapCentre` does **no scrolling**: it reads a bounding box and calls
-   `page.touchscreen.tap(x, y)`, which is a raw coordinate dispatch with **no actionability check**.
-   On `/cardio` at a 412×915 viewport the three modality controls sit at **y=852, 924 and 997** — so
-   *Run* is on screen and *Guided walk* and *Other activity* are **below the fold**, and their taps
-   hit nothing at all. `document.elementFromPoint` returns **null** for both, which is exactly what a
-   tap outside the viewport does.
-   **That manufactured a perfect false differential**: Run "worked" and the two `/activity*` controls
-   "did nothing", which reads as *"both failures share the `/activity` prefix"* — the very claim the
-   retraction struck. It is a coordinate artifact, not an href one. **Scroll with
-   `scrollIntoView({ block: 'center' })` and assert `elementFromPoint` hit-tests to the control
-   before dispatching**; `tapInView` does not help here, it filters on **x** only.
-
-**With both conditions met, measured 2026-09-17:**
-
-| tap | result |
-|---|---|
-| **Run** → `/running` | navigates ✓ |
-| **Guided walk** → `/activity/guided-walk` | **navigates ✓** — the retraction is confirmed, this is NOT a second dead button |
-| **Other activity → Treadmill** → `/activity` | **pushes, then comes back to `/cardio`** ✗ |
-
-**The push is not the thing that fails — it happens, and is then undone.** Instrumented trace,
-`history` patched from the page (times from the start of the run):
-
-```
-+6301ms startViewTransition          ← the tap: push('/activity') begins
-+6729ms history.back()               ← 428 ms later
-+6745ms replaceState(/cardio)
-+6745ms popstate -> /cardio          ← back where it started
-```
-
-**The `history.back()` is `closeSurface`'s** (`lib/hooks/sheet-back-stack.ts:50-59`): a sheet that
-pushed its own entry pops it on close. Correct in isolation. But `selectType`
-(`components/workout/log-activity-sheet.tsx:27-31`) runs
-
-```ts
-startActivity(...)        // store
-onOpenChange(false)       // → closeSurface → history.back()
-router.push('/activity')  // → animate() → startViewTransition → push
-```
-
-so the sheet's undo-pop is in flight across the navigation and **eats the entry the push just
-added**. That is candidate 3 in the entry above, whose earlier "refuted" verdict rested on a
-deferred-close experiment run against a **cold** route — which is why the retraction downgraded it to
-UNPROVEN rather than striking it. It is now the survivor, on evidence.
-
-**Why this matches the owner's report exactly.** He said *"it just scrolls to the top of cardio
-hub"*. The sheet closes, the view transition completes, the navigation is popped, and `/cardio`
-re-renders — and `cardio-content.tsx:87` scrolls in a **nested** `overflow-y-auto` div that no
-scroll-restoration covers, so it lands at the top. Sheet closed, same screen, scrolled to top.
-
-**Guided walk is unaffected because no sheet is involved** — it is a direct `router.push` from
-`modality-picker.tsx` with nothing to pop. That is the cleanest confirmation that the sheet is the
-variable, and it is the opposite of what the pre-retraction table claimed.
-
-- **Scope correction:** the defect is **any navigation issued from inside a closing sheet**, not
-  anything `/activity`-prefixed. Other `onOpenChange(false)` + `router.push` call sites need the same
-  sweep before a fix is called complete.
-- **⛔ Still do NOT lengthen `NAVIGATION_TIMEOUT_MS`** and do not touch `animate()`: the push is
-  fine, and app-wide navigation must not change for a call-site ordering bug.
-- **❌ REPRODUCED ON THE S25, 2026-09-23 (Device Verification Agent)** — the harness finding holds on
-  the APK, and the device is **faster** than the harness at undoing it. v1.465.4 web / APK 1.460.4,
-  portrait, three-button nav. Workout → Cardio → *Other activity* (sheet opens, `pushState()` of its
-  own entry) → *Treadmill*, `history` instrumented in the page:
-  ```
-  1741ms startViewTransition @/cardio
-  1754ms pushState(/activity) @/cardio
-  1761ms back() @/activity        ← 7 ms later on the S25, vs 415–428 ms in the harness
-  1764ms replaceState(/cardio) @/cardio
-  1779ms popstate @/cardio
-  ```
-  Screen stays on `/cardio` with the sheet closed, sampled for 2 s. So a fix that relies on any
-  timing window is refuted on the canonical runtime before it is written.
-- **Scope sweep (the correction above asked for it):** the only other close-then-push site is
-  `components/cardio/time-picker-sheet.tsx` `start()` — `onOpenChange(false)` then
-  `router.push('/running' | '/activity/guided-walk')`, the identical shape. **COULD NOT CHECK on
-  the device:** its trigger ("How much time do you have?") renders only `!hasRunningPlan`, and the
-  owner has a running plan. Fix it with this one. (`nutrition-content.tsx` navigates, but not from
-  inside a sheet.)
-- **Residue of every failed tap:** `selectType` runs `startActivity` *before* the push, so each dead
-  tap leaves `localStorage.ta_activity_state` at `mode: "pre"`, `activityType: "treadmill"` with a
-  fresh `activitySessionId`. Nothing reaches the server in `pre`, but the fix should decide whether a
-  navigation that never lands should leave the selection behind.
-
-- **⛔ THE OBVIOUS FIX DOES NOT WORK, and this was measured rather than reasoned (2026-09-17).
-  Do not spend the attempt again.** The natural reading of the trace is *"a self-pop is in flight
-when we navigate, so wait for it to drain"* — the module already tracks exactly that
-(`pendingSelfPops`, module-level since BF-34). It was built (an `afterSelfPops(navigate)` that parks
-the push until `handlePop` drains) and it **does not fix it**, because its premise is false:
-
-```
-+3973 startViewTransition        ← the Treadmill tap
-+4388 history.back()             ← the sheet's close, 415 ms LATER
-+4392 popstate -> /cardio
-```
-
-**`pendingSelfPops` is still 0 at the moment the navigation is issued**, so the parked callback runs
-inline and is then eaten by a pop that had not happened yet. Waiting for a pending pop cannot help
-when the pop is not yet pending.
-
-**Why the close is 415 ms late, which is the part that makes this hard.** `closeSurface` runs in the
-`useSheetBackDismiss` effect **cleanup** (`lib/hooks/use-sheet-back-dismiss.ts:44`), so it needs a
-React commit. `router.push` runs inside `document.startViewTransition`, which **suspends frame
-production and holds the commit** until the transition settles. So the navigation itself is what
-delays the sheet's close past it. The two are not independent, which is why reordering the three
-statements in `selectType` does not help either — any order still has the push inside a transition
-that defers the close behind it.
-
-**What a real fix has to do:** make the sheet's entry not be popped at all once a navigation has
-superseded it, tied to **the surface's identity** rather than to a flag. A bare module-level "a
-navigation is happening" flag is the known-bad pattern here — `sheet-back-stack.ts:27-32` records
-BF-34, where *"a state that is not mine is indistinguishable from a real back gesture"*. The surface
-handle lives in the hook, not at the call site, so the mechanism probably belongs on
-`useSheetBackDismiss`/`SheetContent` (e.g. the close is told it was superseded) rather than in a
-helper the call site calls.
-  Worth checking as part of that design: `router.replace` in place of `push` would overwrite the
-  sheet's own entry rather than stacking on it, which keeps back from the destination a single
-  press — but it is only correct **together** with suppressing the pop, never on its own.
-- **A reproduction spec is deliberately NOT shipped with this finding.** It would be a test asserting
-  a behaviour the app does not have, and marking it skipped to keep CI green is the shape this repo
-  forbids. Its recipe is written above and is the whole of what it needs: warm the destinations, then
-  `scrollIntoView({ block: 'center' })` and assert `elementFromPoint` hit-tests to the control before
-  each `touchscreen.tap`, then poll `location.pathname` for `/activity`. Ship it with the fix.
-- **Keep the `Guided walk` control in that spec as the discriminator.** It navigates correctly today
-  (no sheet is involved), so a fix that broke navigation generally would otherwise pass.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the line *"Start from the device console, not from these files"* is stale.** The root cause is in the body (`log-activity-sheet.tsx:27-31` closes, then pushes, with no superseded signal in `sheet-back-stack.ts`). Build that, with DV-2. Do not redo the harness work or the timing/wait-for-pop fix this entry already measured as failing.
-- **Verify: device**
-- **✅ FIXED 2026-09-25 (v1.465.61), with DV-2, one mechanism.** `releaseTopSurfaceEntry()` in
-  `lib/hooks/sheet-back-stack.ts`: the call site hands the top surface's history entry to the
-  navigation **synchronously, before it starts**, so the surface's close pops nothing and there is no
-  window left to mistime. Tied to the surface OBJECT, not a module flag — the distinction BF-34
-  established.
-- **It is TWO halves and the second is not optional.** Suppressing the pop alone strands the sheet's
-  entry underneath `/activity` at `/cardio`'s own URL, so backing out takes two presses with the first
-  visibly doing nothing. `selectType` therefore uses **`router.replace`** when the entry was the
-  sheet's — overwriting it — and `push` when it was not (a surface that opened during one of our own
-  pops skips its push, so the `false` branch is real, not padding).
-- **✅ REPRODUCED AND CONTROL-RUN IN THE HARNESS**, with the two conditions this entry spent three
-  rounds establishing: warm both destinations with a direct `goto`, and hit-test the tap.
-  `e2e/bf165-dv2-navigation-survives-surface-close.spec.ts`. Against the unfixed source: *Other
-  activity → Treadmill* **fails** ("the navigation was undone after it landed"), one-back **fails**,
-  and *Guided walk* — the discriminator, no sheet involved — **passes**. Exactly the split this entry
-  predicted.
-- **`tapHitTested` is now in `e2e/fixtures.ts`**, because the coordinate artifact that produced this
-  entry's fabricated second defect is a trap for any spec below the fold: `touchscreen.tap` dispatches
-  at a coordinate with no scrolling and no actionability check, and `tapInView` filters on **x** only.
-  It scrolls `block: 'center'` and asserts `elementFromPoint` resolves to the control, naming what it
-  would have hit instead.
-- **Sibling swept:** `components/cardio/time-picker-sheet.tsx` `start()`, the identical shape. Its
-  `onLogActivity` arm deliberately does **not** release — it opens another sheet rather than
-  navigating, so the entry stays useful for the surface that replaces this one. **Still COULD NOT
-  CHECK on device:** its trigger renders only `!hasRunningPlan` and the owner has one.
-- **The residue question is answered by the fix, not separately:** `startActivity` still runs before
-  the navigation, and the navigation now lands, so the selection it leaves in
-  `localStorage.ta_activity_state` is correct rather than orphaned.
-- **⚠ THIS ENTRY WAS INVISIBLE TO THE QUEUE TOOL PAST ITS OWN RETRACTION NOTICE, and that is why it
-  kept printing as READY after the batch shipped.** Its retraction and root-cause sections were
-  written as `## ` headings, which END an entry — so the `Verify: device` and `Keep:` below them
-  belonged to no entry at all. Both are `#### ` now, and `check-backlog-pointers.js` fails on the
-  shape (`scripts/lib/mid-entry-heading.js`), telling a real section boundary from a mis-levelled
-  sub-heading by whether a FIELD bullet follows it. Measured across the queue: seven mid-entry `## `
-  headings, six genuine, this one orphaning two fields.
-- **Keep: the device pass.** On the S25: Cardio → *Other activity* → *Treadmill* lands on the
-  activity screen and stays; one back returns to the Cardio hub. The harness cannot fire the Android
-  back gesture, and the device undoes the navigation **60× faster** than the harness (7 ms vs 415 ms),
-  so the canonical runtime is where the timing claim is actually tested.
-
-### [app-shell] DV-2 — *Leave* on "Leave workout?" does not leave: the dialog's own history entry absorbs `onLeave`'s back
-
-- **Batch:** `back-gesture-sitting` — with **BF-165**. Same mechanism, so one fix should cover both:
-  a navigation issued while a surface closes is eaten by that surface's own history entry.
-- **Lane:** B — `components/mobile-auth-handler.tsx` (the three `onLeave` handlers), and whatever
-  mechanism BF-165's fix puts on `useSheetBackDismiss`/the surface stack.
-- **Added:** 2026-09-23 · Device Verification, found while verifying BF-166's mid-workout half.
-- **❌ FAILED ON THE S25, 2026-09-23.** Web v1.465.4 / APK 1.460.4, portrait, **gesture navigation**,
-  system back via `adb shell input keyevent 4`. Workout → *Start Workout* → session screen → *Start
-  Workout* → countdown → store `mode: "warmup"` → back → *"Leave workout?"* → **Leave**. The store resets
-  (`mode: "pre"`, new id) but the screen **stays on `/workout?session=…`**, the pre-workout screen of
-  the session just abandoned. `history` instrumented in the page:
-  ```
-  3229ms pushState()                              ← the dialog opens and pushes its surface entry
-  5055ms back()                                   ← ONE back for the Leave tap
-  5073ms replaceState(/workout?session=…)
-  5073ms popstate @/workout?session=…             ← popped the dialog's entry; nothing left for onLeave
-  ```
-  `onLeave` is `setConfirmLeaveOpen(false); resetSession(); window.history.back();` — closing the
-  dialog runs `closeSurface`'s pop, and only one pop happens, so the back meant to leave the screen is
-  spent on the dialog's own entry. Reproduced twice.
-- **The same shape, not device-checked:** `LeaveWalkDialog` and `LeaveActivityDialog` in the same
-  file carry an identical `onLeave` (`reset…(); window.history.back();`). Fix all three together.
-- **What BF-166 did and did not do:** BF-166 made back *raise and keep* this prompt, and that is
-  verified. This is the prompt's *Leave* button, which BF-166 never touched.
-- **Do not "fix" by calling `history.back()` twice** — the same timing trap BF-165 measured: the
-  surface's pop is not reliably pending when `onLeave` runs (7 ms vs 415 ms between harness and
-  device). The surface has to be told the close was superseded by a navigation.
-- **Pass test (device):** start a workout, back, *Leave* → the screen leaves
-  `/workout?session=…` for wherever back would have gone before the workout, and one more back
-  does not return to the abandoned session.
-- **Production data:** nothing was written. The only non-GET the page sent was the
-  `…/prescribe` POST that opening a session screen always sends; `/api/workout-sessions/day`
-  for 2026-09-23 returned `sessions: []` afterwards.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** cite `mobile-auth-handler.tsx:178/187/196`; ships as one fix with BF-165.
-- **Verify: device**
-- **✅ FIXED 2026-09-25 (v1.465.61), same mechanism as BF-165.** All three `onLeave` handlers now call
-  a shared `leaveScreen()`: release the dialog's entry, then **one** `history.go(-2)`. One call and
-  not two `back()`s, because the surface's pop is not reliably pending when this runs — 7 ms on the
-  device against 415 ms in the harness, which is the trap this entry warned about. Releasing first is
-  what makes the single call cross both entries.
-- **⚠ `go(-2)` was WRONG on a reachable path, found by re-reading the diff rather than by a test, and
-  corrected before merge.** The back handler checks the three session guards **before**
-  `hasOpenSurface()` — deliberately, so a mid-workout back press answers this prompt rather than
-  closing whatever is open — so with a sheet already up (the 1RM calculator, an exercise-stats sheet)
-  the dialog opens **on top of it**. History is then `[…, /workout, sheet, dialog]`, and `go(-2)` from
-  the dialog lands on `/workout`: the screen *Leave* exists to leave. **Releasing an entry does not
-  remove it** — it only stops the surface popping it — so the travel distance is
-  `1 + releaseAllSurfaceEntries()`, counted rather than assumed.
-- **The count, not the stack depth.** `openSurface` skips its push while one of our own pops is in
-  flight, so a surface genuinely can have no entry and going one too far would leave a screen the user
-  never asked to leave. Both mutations of that — returning `stack.length`, and taking only the top —
-  fail a different assertion.
-- **NOT covered by the e2e spec, deliberately and unavoidably.** Reaching this dialog needs the
-  Android system back gesture over a Capacitor channel Playwright cannot fire. What IS covered is the
-  mechanism: `lib/hooks/__tests__/sheet-back-stack.test.ts` drives both releases directly and was
-  mutation-tested five ways (leaking a self-pop, releasing the bottom surface, always returning true,
-  counting the stack depth, counting only the top) — each fails a different assertion. **That is the
-  whole safety net for this half**, which is why the nested case above was worth a pre-merge fix
-  rather than a follow-up entry.
-- **Keep: the device pass test above, unchanged.** It is the only thing that can confirm this half.
 
 ### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
 
@@ -14282,6 +13864,10 @@ present.
 
 ### [app-shell] PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip
 
+- **📱 Sweep 4b (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26): the launch half PASSES** — force-stop, then the launcher intent: lands on
+  `/` with navigation `redirectCount` 0. The boot still fetches `sync/pull` twice (and RV-186 row 1 lists
+  six doubled endpoints); whether ②'s doubled fetch is fully gone is for Lane B to judge against that list.
+
 - **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** the chip resolves (18°). The failure state **could not be checked** —
   with the request blocked, the cached value painted instead.
 
@@ -14609,48 +14195,6 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   on it.
   ③ the device check on the S25.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **THE CARD FIX SHIPPED** (`body-battery-card.tsx:103` `lowData = conf != null && !conf.sufficient`), and #1345 closed the last hour-dependent hole. Only residue remains: ② the owner's "—" or badge decision (Lane O `Ask:`); ③ a DV device look; ① point at LA-134/TN-2 for the number, not "Tuning".
-
-### [app-shell][platform] RV-37 — `/health/day` scrolls with no bottom padding (structural; NOT observed)
-
-- **📱 Sweep 2: COULD NOT CHECK** — the phone was on **three-button** navigation
-  (`navigation_mode` 0), so the gesture-bar inset this needs does not exist.
-
-- **Lane:** B — `app/health/day/day-detail-content.tsx:226`
-- **Added:** 2026-09-03, Review sweep 41 —
-  [`write-up §4`](reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md)
-- The container is `flex-1 space-y-4 overflow-y-auto scrollbar-hide px-4 pt-4` — no `pb-*` at all. It
-  is a sub-route, so no bottom nav and nothing anchored below it; the last card ends flush with the
-  viewport bottom, which on the S25's gesture navigation is the gesture bar.
-- **⚠ This was NOT observed and must not be closed as if it were.** The seeded fixture renders
-  *"Nothing logged on this day"*, so the container never became scrollable. The control on `/more`
-  measured `padding-bottom: 68px` (`pb-nav-safe`), which is what a covered scroller looks like.
-- **Why no CI rule caught it.** All four safe-area rules in the *Custom Rules* job fire on a **wrong**
-  utility (hand-rolled inset, `pt-safe` stacking, `pb-safe*` stacking, raw `bottom-N` on a fixed
-  element). None fires on an **absent** one. Worth considering a fifth rule, but only after the device
-  confirms the symptom — a check for "full-height scroller with no bottom pad" would need an
-  allow-list for the sheets and navless full-screens that legitimately have none.
-- **The `Gate: device` was removed 2026-09-10 (OR-106), and the fifth-CI-rule question is what it
-  really guarded.** Two questions were being answered as one. *"Should a fifth safe-area rule exist?"*
-  genuinely needs evidence — it would need an allow-list for the sheets and navless full-screens that
-  legitimately carry no bottom pad, and that stays gated below. *"Should this one container have
-  bottom padding?"* does not: the absence is read from source, and a full-height scroller ending flush
-  with the gesture bar is a defect by CLAUDE.md's own rule, which treats even bare `pb-safe` as too
-  little. The control on `/more` measures `padding-bottom: 68px` (`pb-nav-safe`) and is the shape to
-  match. Fix it, then look — a device check belongs after this one, not in front of it.
-- **✅ VERIFIED ON THE S25, 2026-09-13** (owner's app-shell pass): `/health/day` clears the gesture bar.
-  whether the symptom was ever visible needs a day with enough logged to make it scroll, which the
-  seeded fixture cannot produce (it renders *"Nothing logged on this day"*).
-- **✅ SHIPPED 2026-09-11** (`fix/rv-36-nutrition-scroll-restoration`, same PR as RV-36 — one device
-  pass covers both). [Journal](overview/history-2026-09-14-folded-1.md#2026-09-11-fix-nutrition-scroll-and-day-padding).
-- **Keep: the fifth-CI-rule question, which is the part that genuinely needed evidence.** No existing
-  safe-area rule fires on an **absent** utility, only on a wrong one. A check for "full-height
-  scroller with no bottom pad" still wants an allow-list for the sheets and navless full-screens that
-  legitimately carry none, and that list should be drawn after the device says whether this class is
-  worth a rule at all.
-- **On completion, the device check is:** open `/health/day` on the S25 on a day with enough logged to
-  make the container scroll, and confirm the last card clears the gesture bar.
-- **Still open, and still needing evidence first:** whether to add a fifth Custom Rules check for
-  "full-height scroller with no bottom pad". Do not add it off the back of this one fix.
 
 ### [nutrition] BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
 
@@ -21264,6 +20808,11 @@ Do not implement it; the labels alone fix what the owner asked about.
 
 
 ### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **📱 Narrowed again (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Listener and node counts through a write walk (food log, weigh-in
+  and its sheet, the Log Food sheet, food delete, two rounds of every tab): 748 at Home → 1,472 once every
+  tab has mounted (Workout adds ~500), then **flat at ~1,473 through round 2**. Writes, sheets and revisits
+  do not accumulate. Left to try: an active workout, offline toggling, long idle with sync.
 
 - **📱 Narrowed in sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): plain tab switching does not leak.** 40 warm visits
   (10 rounds of Health/Nutrition/More/Home, GC forced before each read): listeners **1,804 → 1,804**
@@ -28672,6 +28221,9 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
+
+- **📱 Sweep 4b (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26), look half:** `/coach`'s last control ends at 768 px, above the gesture bar
+  (817) ✓. `/coach/confirm/[id]` was not reached (it needs a pending AI proposal); nothing was applied.
 
 - **⛔ Asked again 2026-09-25; the answer has not moved (Orchestrator).** The device agent proposed
   once more that only the screen look here is its own. The note below already answers it: the *What is

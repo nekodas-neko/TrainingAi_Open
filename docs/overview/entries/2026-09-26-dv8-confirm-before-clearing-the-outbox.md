@@ -1,6 +1,7 @@
 # 2026-09-26 — DV-8: the outbox was cleared before the rows were confirmed
 
-**Branch:** `fix/dv8-strand-on-confirm-throw` · **Lane A** · cause found and fixed; the heal is still owed
+**Branch:** `fix/dv8-strand-on-confirm-throw` · **Lane A** · one cause found and fixed; the heal and
+the `set_logs` row are still owed
 
 ## The signature
 
@@ -17,8 +18,8 @@ means the local row was never confirmed. Nothing retries a mutation that is no l
 ## The cause was not a missing arm
 
 The obvious reading — a domain whose delete has no confirm arm — is what DV-5 already fixed, and
-the food delete arm is present and correct. Two things ruled it out: `markFoodLogSynced` has no
-`deleted_at` filter, and the same strand had happened to `set_logs`, a different domain entirely.
+the food delete arm is present and correct: `markFoodLogSynced` is a keyed `UPDATE` with no
+`deleted_at` filter, so the row it needs is never filtered away.
 
 `pushMutations` deleted the **whole batch's** outbox entries and *then* ran a hundred-line
 per-domain mark-synced loop with **no error handling anywhere in it**. Any arm throwing on a local
@@ -49,6 +50,20 @@ One survived the first round: swallowing the confirm error silently. That was a 
 than a nitpick — this path does not dead-letter, so the log is the only way a repeating confirm
 failure is ever noticed, and silence is exactly what let 36 rows accumulate over 14 days unseen.
 The test now asserts it.
+
+## What this does NOT explain, and I nearly claimed it did
+
+The entry also carries a `set_logs` row pending since 2026-09-19, and my first draft of this note
+used it as evidence — *"the same strand hit a different domain, so it cannot be a food-specific
+arm"*. A merge conflict with the device agent's own update to DV-8 is what caught it: their side
+records a separate, better-evidenced hypothesis for that row. `workout_log`'s confirm arm is
+`markWorkoutSynced(wsId, exerciseLogId)`, a keyed `UPDATE` that reads nothing back, and the row's
+`exercise_logs.workout_session_id` does not resolve to a local `workout_sessions` row. An orphaned
+id is not something a confirm-ordering bug produces.
+
+So: two causes, one symptom. The ordering fix closes the tombstone class and leaves that row open,
+and the entry now says so in both directions. Keeping both sides of that conflict was worth more
+than either alone.
 
 ## Still owed, and it is the reason DV-8 stays in the queue
 
