@@ -4005,6 +4005,57 @@ drift.
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
 
+### [nutrition] BF-203 — meal-plan tracking: estimated meals when a window passes, and a weight-corrected estimator
+- **Lane:** A — `plan_meal_answers` + a migration, `lib/health/energy-balance-service.ts`, the corrector; **Lane B** takes the resolve sheet once the data lands.
+- **Added:** 2026-09-26 · BugFix intake, from the owner's design session. Owner: *"There is a meal plan tracking feature i wanna explain and have it added."*
+- **Needs:** — nothing. **Wants an implementation plan before the build**, per the backlog-driven protocol; the design is agreed and written.
+- **The design:** [`docs/superpowers/specs/2026-09-26-meal-plan-tracking-design.md`](superpowers/specs/2026-09-26-meal-plan-tracking-design.md) — read it before planning. It carries the measurements, and they are what cut the scope.
+
+- **⚑ MOST OF THIS FEATURE ALREADY SHIPS, which is why the entry is small.** Measured before
+  designing: the target is already goal-derived (`goal-recommendation`), meal windows already exist
+  (`meal_types.timeStartHour/timeEndHour`), reminders already fire with a skip action
+  (`lib/meal-reminders.ts`), plan meals already carry per-slot target macros, **`plan_meal_answers`
+  already tracks whether a planned meal was eaten**, adherence already computes, and **carbs are
+  already skewed around training** (`meal-split.ts`, with a `timingRole` per slot). The request
+  reduced from "build meal-plan tracking" to **three** additions.
+- **The three:** ① an `estimated` answer state filled when a window passes unanswered, materialised
+  on read (there is no cron layer); ② a resolve surface — confirm / swap / skip / add extras, also
+  reachable from the reminder's actions; ③ a rolling corrector that learns how far the estimates run
+  from the truth and shifts FUTURE ones.
+- **⭐ The architecture call, recorded so it is not revisited.** The estimate is an **answer against
+  the plan meal**, never a `food_logs` row. A flagged `food_logs` row is genuinely better at one
+  thing — every existing surface would work untouched — and loses because invented calories would sit
+  in the table the maintenance estimator and adaptive TDEE read, leaving correctness to every
+  consumer remembering a filter. `BF-137` and `BF-138` are both live energy-model defects already.
+  Approach A makes the feedback loop **impossible by construction**. Owner picked it 2026-09-26.
+- **⚠ The corrector is a 14-day window, NOT a next-day adjustment, and that is measured rather than
+  cautious.** The owner's original ask was to infer a missed meal from the next weigh-in. On his own
+  data: a 500 kcal meal is **65 g** of tissue against a median daily weight swing of **200 g** — 1:3.
+  Re-tested on his directional framing over **61 day-pairs**: r = **+0.175**, direction agreed
+  **57%** of the time. The sign is right; applied per-day the correction would be **wrong 4 times in
+  10**. The same edge over a fortnight is reliable, so this is his mechanism at the resolution where
+  it works.
+- **Fat mass is the primary corrector input, weight the agreement check** (his suggestion, tested):
+  fat mass is **28% quieter** (median |Δ| 0.179 vs 0.250 kg) and correlates better (r = +0.217 vs
+  +0.175). It is **not** a clean separation — the scale infers fat from impedance and impedance
+  tracks hydration, so body fat % carries an sd of **2.26 pp** across his history. Hence: robust
+  (median/trimmed) estimator, never a mean; days where the two signals disagree are dropped as
+  hydration events.
+- **Verification that gates the ship:** replay the corrector over ~120 days of his history and state
+  **how many days it would have moved** — the standing bar for anything that changes numbers he reads
+  daily, and the honest test of whether it works. Plus a test asserting estimated answers never reach
+  the TDEE/maintenance inputs.
+- **Blocked on nothing, but one thing must be settled in planning:** `plan_meal_answers.answer`
+  already defaults to `'no'`, so "unanswered" is currently the absence of a row rather than a value.
+  Reconcile that before adding the `estimated` state beside it — the spec says why.
+- **The calibration constants are the owner's**, not an implementer's: window length, bias cap, and
+  the fat-mass/weight agreement threshold. They ship as their own `Lane: O` entry with
+  recommendations once the build shape is fixed, in the shape `BF-201` used. **The build is not
+  blocked on them.**
+- **Verification:** the three items above are built; estimated entries count toward the day's ring and
+  render distinctly; a resolved estimate leaves no estimated row behind; the corrector moves only
+  future estimates; and the replay figure is recorded here. **Device pass owed** on the resolve sheet.
+
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
 - **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
 - **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
