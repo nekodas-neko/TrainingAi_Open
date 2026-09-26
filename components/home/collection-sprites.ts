@@ -23,9 +23,10 @@ const GLYPHS: Record<FaucetKey, string[]> = {
   sleep: ['🐱', '🐈', '🔮'],
 }
 
-/** The four drawn classes. `rogue` (cardio) has art and no ladder yet. */
+/** The four drawn classes. `rogue` (cardio) has art and no ladder yet; `cleric` is drawn for the Health cat. */
 export type CatClass = 'tank' | 'ranger' | 'rogue' | 'cleric'
-export const ART_TIERS = 5
+/** Six drawn tiers per class, each with a rare `-shiny` recolour. */
+export const ART_TIERS = 6
 
 /** Which class each existing ladder is drawn as. Sleep stands in for the Cleric's tracking faucet. */
 export const LADDER_CLASS: Record<FaucetKey, CatClass> = {
@@ -43,7 +44,7 @@ export function ladderGlyphs(faucet: FaucetKey): readonly string[] {
 }
 
 /** Path to the drawn sprite for a ladder tier, or null past the top of the drawn set. */
-export function tierArt(faucet: FaucetKey, tier: number): string | null {
+export function tierArt(faucet: FaucetKey, tier: number, shiny = false): string | null {
   if (tier < 0 || tier >= ART_TIERS) return null
-  return `/cats/${LADDER_CLASS[faucet]}-${tier + 1}.svg`
+  return `/cats/${LADDER_CLASS[faucet]}-${tier + 1}${shiny ? '-shiny' : ''}.svg`
 }

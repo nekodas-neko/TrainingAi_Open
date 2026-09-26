@@ -8,10 +8,10 @@ import type { FaucetKey } from '@/components/home/collection-summary'
  * One collection tier: the drawn cat, or its glyph if the art cannot load. Decorative — every render
  * site names the tier in text beside it.
  */
-export function CatSprite({ faucet, tier, size }: { faucet: FaucetKey; tier: number; size: number }) {
+export function CatSprite({ faucet, tier, size, shiny = false }: { faucet: FaucetKey; tier: number; size: number; shiny?: boolean }) {
   const [failed, setFailed] = useState(false)
   const img = useRef<HTMLImageElement>(null)
-  const src = tierArt(faucet, tier)
+  const src = tierArt(faucet, tier, shiny)
 
   // A server-rendered <img> starts loading before hydration, so a load that fails first fires its
   // `error` event before React has attached `onError`, and the tier shows a broken-image box instead
