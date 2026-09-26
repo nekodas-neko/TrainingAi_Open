@@ -272,7 +272,35 @@ if (failures.length) {
   process.exit(1);
 }
 
+// LA-129: the backlog is REPORTED, never ratcheted — printed on every run, failing on nothing.
+//
+// It is not one of "the documents every session reads before it can start", which is the membership
+// rule in this file's own first line: CLAUDE.md sends an implementer to `node scripts/next-item.js`,
+// and nobody reads 32,000 lines to orient. Its size is already governed by the protocol that removes
+// a finished entry and by the compaction sweep.
+//
+// What a baseline on it actually bought was collisions. Measured 2026-09-25: **54 of the last 63
+// `.size` changes on `main` were this one file**, against 7 for projectOverview.md and 1 each for
+// three others — because every agent edits the backlog and it genuinely grows, so two open PRs raise
+// the same number and conflict by construction. RV-134's slack band did not end that; a band cannot
+// help a file that really does grow past it. One session hit this single line in four separate merge
+// conflicts in one evening.
+//
+// Reporting keeps the number visible in every CI log, which is what anyone watching the trend
+// actually wanted, without a committed integer for two branches to disagree about. Deliberately NOT
+// generalised to the other nine: a derived or absent baseline removes the CEILING, and the ceiling is
+// the point — projectOverview.md once reached 9,647 lines while its own opening line called it a lean
+// index. Owner approved 2026-09-25, on the narrow fix over generating all baselines in CI.
+const REPORT_ONLY = ['docs/implementation-backlog.md'];
+
 const sizes = Object.keys(BASELINE)
   .map((r) => `${r} ${fs.readFileSync(path.join(root, r), 'utf8').split('\n').length}`)
   .join(' · ');
 console.log(`check-doc-index-size: OK — ${sizes}`);
+
+for (const rel of REPORT_ONLY) {
+  const abs = path.join(root, rel);
+  if (!fs.existsSync(abs)) continue;
+  const lines = fs.readFileSync(abs, 'utf8').split('\n').length;
+  console.log(`check-doc-index-size: UNRATCHETED — ${rel} ${lines} lines (reported, not enforced; LA-129).`);
+}
