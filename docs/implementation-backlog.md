@@ -718,37 +718,6 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   recommended on the belief that the ratings were not coming; they are not coming *from the current
   prompt*, which is a different finding with a different fix.
 
-### [platform] OR-168 — nothing confirms a Railway deploy landed; notify when it does not
-
-- **Lane: A** — `app/api/version/route.ts` plus a workflow step. **Added:** 2026-09-25 · Orchestrator,
-  from the CI review. **Owner decided the posture 2026-09-25: NOTIFY ONLY, no automatic rollback.**
-- **The gap.** Merging to `main` auto-deploys to Railway and **nothing checks the result.** The
-  2026-08-17 outage — a database-free route unreachable for ~8 minutes — was found by the owner
-  noticing, not by anything telling him. `railway.json` does not exist and no healthcheck is
-  configured.
-- **Why notify-only and not rollback** (his call, and the reasoning is worth keeping): an automatic
-  revert across a migration can leave production worse than the bad deploy did. A check that tells
-  you is strictly better than no check; a check that *acts* is a mechanism that can itself fail.
-- **⚠ TWO FINDINGS THAT KILL THE OBVIOUS IMPLEMENTATION — read these before writing the poller.**
-  **(a) `/api/version` cannot identify a deploy today.** Its `version` is `CHANGELOG[0].version`, so
-  it only moves when a PR bumps the changelog — most merges do not, and a docs PR never does. Polling
-  it for "has my commit landed" would sit green against the *previous* deploy. **`nativeBuildSha` is
-  the APK's sha, not the web deploy's.**
-  **(b) The route is `Cache-Control: public, max-age=300`** — deliberately, and it is the single
-  written exemption in `scripts/check-api-no-store.js`. A poll can therefore read a **five-minute-old
-  answer** and report a deploy that has not happened. **Do not remove the header** to fix this; bust
-  it from the caller with a query param.
-- **What makes it work:** `process.env.RAILWAY_GIT_COMMIT_SHA` **is** available at runtime and is
-  already used — `app/sw.js/route.ts:12` keys the service-worker cache on it. Expose it as
-  `webBuildSha` on `/api/version`, then poll until it equals the merged commit, with a timeout.
-- **Shape:** a post-merge workflow step on `push` to `main`. Poll with a cache-busting param, fail the
-  step (which notifies) if the sha does not match within the timeout. It must **not** be a required
-  check — it runs after the merge, so gating on it would be circular.
-- **Not established:** how long a Railway deploy actually takes end to end, which sets the timeout.
-  `DV-14` measured that production was still serving 1.465.10 while `main` was at 1.465.16, so the lag
-  is real and unquantified. **Measure it before choosing a number**, or the first false alarm teaches
-  everyone to ignore the alarm.
-
 ### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
 - **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency audit.
@@ -15313,7 +15282,27 @@ one. A swipe on the single Start button adds an affordance that does not current
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
-- **Ask:** owner — one-line consent: may a deliberate client-side error be thrown in PRODUCTION to prove Sentry receives it? That is the whole remaining gate. It creates one real Sentry event; the earlier note that it "may page someone" is why nobody has just done it. Say yes and this becomes a DV check with an objective pass/fail.
+- **✅ CONSENT GIVEN 2026-09-25 — the owner approved throwing a deliberate client-side error in
+  PRODUCTION.** That was the whole remaining gate, and it is now struck.
+- **Lane: DV** — this is a device check with an objective pass/fail, and only the device agent can run
+  it: the error has to originate in a real signed-in browser, because the tunnel at `/monitoring`
+  sits **behind** the auth gate (decided 2026-09-03, above) and no sandboxed agent holds a session.
+- **The pass test, stated so it cannot be run ambiguously.** On the S25, in the APK, signed in: throw
+  one client-side error, then confirm it **arrives in the Sentry project**. Record the Sentry event
+  id and the timestamp.
+  - **VERIFIED** — the event appears. This entry then leaves the queue: 13 days of client-side
+    silence had a cause and it is fixed.
+  - **FAILED** — the event does not appear. That is NOT verification debt; it is live work, and it
+    goes back to Lane A with what was thrown and what the network tab showed for the POST to
+    `/monitoring`.
+  - **COULD NOT CHECK** is a real answer here — say so rather than inferring from the absence of an
+    event, because absence is exactly the symptom under investigation.
+- **⚠ It creates ONE real Sentry event, and that is the point.** The earlier note that it *"may page
+  someone"* is why nobody had just done it; the owner has now weighed that and said yes. Throw one,
+  not a loop, and label it recognisably (an error message naming BF-92) so whoever sees it in Sentry
+  knows within a second that it is a deliberate probe and not an incident.
+- **This does not test the sign-in path**, which stays uncaptured by design — see the cost stated
+  below. A pass here means "errors from a signed-in session reach Sentry", nothing wider.
 
 > **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
 > whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
@@ -15370,7 +15359,9 @@ one. A swipe on the single Start button adds an affordance that does not current
 > the `Gate: device` below, unchanged, and it is still the only thing that proves this.
 > [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
 
-- **Lane:** O — was `A` (`lib/security/csp.ts` and the Railway environment) until that half shipped.
+  Routing before 2026-09-25 was the queue's, while the consent above was outstanding; the
+  code half it refers to shipped 2026-09-03. Superseded by the device routing at the top of
+  this entry — one field of a kind per entry, per `Q-529`.
 - **Ungated 2026-09-24 (OR-143).** A deliberate client-side throw in **production** may page someone, so it is still asked before it is fired — but that ask is one sentence and it is the Orchestrator's to make. `Gate:` parked it instead, which is why thirteen days of silence went thirteen more.
   Once he says yes it is a measurement with one objective answer and goes straight to `DV`.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
