@@ -95,6 +95,30 @@ export interface ActivityType {
   sortOrder: number
 }
 
+/**
+ * TN-81 — the app's announced verdict on a night, with the evidence frozen beside it.
+ *
+ * `components` and `bands` are a snapshot, not a convenience: `sleep_score` is computed on read
+ * and stored nowhere, so an outcome-only record would let a later scoring change rewrite what a
+ * correction was disagreeing with. A correction whose paired verdict is not pinned is not evidence.
+ */
+export interface SleepVerdictRecord {
+  date: string
+  verdict: 'normal' | 'poor' | 'good'
+  /** Which components were outside their band. Empty on a `normal` verdict. */
+  triggered: string[]
+  components: { durationHours: number | null; onsetMinutes: number | null; efficiency: number | null }
+  bands: {
+    durationLow: number | null; durationHigh: number | null
+    onsetLow: number | null; onsetHigh: number | null
+    efficiencyLow: number | null; efficiencyHigh: number | null
+  }
+  baselineNights: number
+  modelVersion: number
+  /** Silence stays `none` — never promoted to agreement (TN-57). */
+  responseState: 'none' | 'acknowledged' | 'corrected'
+}
+
 export interface SleepSession {
   id: string
   userId: string

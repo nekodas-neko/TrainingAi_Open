@@ -70,7 +70,7 @@ import type {
   User, Program, ProgramSession, SessionExercise, Schedule, ScheduleDay,
   ProgressionStyle, StyleSet,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, NextSessionRecommendation,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, NextSessionRecommendation,
   ActivityLevel, FitnessGoal, MoodLog, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -2756,6 +2756,95 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       awakHours:        session.awakHours        ?? null,
       sleepPhase5Min:   session.sleepPhase5Min   ?? null,
     }], source)
+  }
+
+  // ── TN-81: the announced sleep verdict ────────────────────────────────────────────────
+  // The component values and the bands are columns rather than a jsonb blob so Tuning can
+  // correlate corrections against them in SQL — reading the label without the evidence is the
+  // failure this table exists to prevent.
+
+  async getSleepVerdict(userId: string, date: string): Promise<SleepVerdictRecord | null> {
+    const [r] = await this.db.select().from(s.sleepVerdicts)
+      .where(and(eq(s.sleepVerdicts.userId, userId), eq(s.sleepVerdicts.date, date)))
+      .limit(1)
+    if (!r) return null
+    return {
+      date: r.date,
+      verdict: r.verdict as SleepVerdictRecord['verdict'],
+      triggered: r.triggered ?? [],
+      components: {
+        durationHours: r.durationHours,
+        onsetMinutes: r.onsetMinutes,
+        efficiency: r.efficiency,
+      },
+      bands: {
+        durationLow: r.durationLow, durationHigh: r.durationHigh,
+        onsetLow: r.onsetLow, onsetHigh: r.onsetHigh,
+        efficiencyLow: r.efficiencyLow, efficiencyHigh: r.efficiencyHigh,
+      },
+      baselineNights: r.baselineNights,
+      modelVersion: r.modelVersion,
+      responseState: r.responseState as SleepVerdictRecord['responseState'],
+    }
+  }
+
+  async upsertSleepVerdict(
+    userId: string,
+    record: Omit<SleepVerdictRecord, 'responseState'>,
+  ): Promise<void> {
+    await this.db.insert(s.sleepVerdicts)
+      .values({
+        userId,
+        date: record.date,
+        verdict: record.verdict,
+        triggered: record.triggered,
+        durationHours: record.components.durationHours,
+        onsetMinutes: record.components.onsetMinutes,
+        efficiency: record.components.efficiency,
+        durationLow: record.bands.durationLow,
+        durationHigh: record.bands.durationHigh,
+        onsetLow: record.bands.onsetLow,
+        onsetHigh: record.bands.onsetHigh,
+        efficiencyLow: record.bands.efficiencyLow,
+        efficiencyHigh: record.bands.efficiencyHigh,
+        baselineNights: record.baselineNights,
+        modelVersion: record.modelVersion,
+      })
+      .onConflictDoUpdate({
+        target: [s.sleepVerdicts.userId, s.sleepVerdicts.date],
+        set: {
+          verdict: sql`EXCLUDED.verdict`,
+          triggered: sql`EXCLUDED.triggered`,
+          durationHours: sql`EXCLUDED.duration_hours`,
+          onsetMinutes: sql`EXCLUDED.onset_minutes`,
+          efficiency: sql`EXCLUDED.efficiency`,
+          durationLow: sql`EXCLUDED.duration_low`,
+          durationHigh: sql`EXCLUDED.duration_high`,
+          onsetLow: sql`EXCLUDED.onset_low`,
+          onsetHigh: sql`EXCLUDED.onset_high`,
+          efficiencyLow: sql`EXCLUDED.efficiency_low`,
+          efficiencyHigh: sql`EXCLUDED.efficiency_high`,
+          baselineNights: sql`EXCLUDED.baseline_nights`,
+          modelVersion: sql`EXCLUDED.model_version`,
+          updatedAt: sql`now()`,
+          // `response_state` is deliberately ABSENT. Re-announcing a night must never erase the
+          // fact that he already answered it — that would silently turn an answer back into
+          // silence, which is the one direction this dataset cannot recover from.
+        },
+      })
+  }
+
+  /** Returns false when there is no announced verdict for that day to respond to. */
+  async setSleepVerdictResponse(
+    userId: string,
+    date: string,
+    state: 'acknowledged' | 'corrected',
+  ): Promise<boolean> {
+    const updated = await this.db.update(s.sleepVerdicts)
+      .set({ responseState: state, updatedAt: new Date() })
+      .where(and(eq(s.sleepVerdicts.userId, userId), eq(s.sleepVerdicts.date, date)))
+      .returning({ id: s.sleepVerdicts.id })
+    return updated.length > 0
   }
 
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {

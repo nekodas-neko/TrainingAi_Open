@@ -27,6 +27,23 @@ export function median(values: number[]): number | null {
   return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2
 }
 
+/**
+ * Linear-interpolated quantile, or null when empty. `q` is 0..1.
+ *
+ * Here beside `median` because this file is where the health domain keeps its order statistics,
+ * and because there was no exported quantile anywhere in the repo — `time-audit.ts` carries a
+ * private `quantileSorted` with this same definition, so the two agree by construction rather
+ * than by coincidence. Consolidating them (and the four separate `median`s) is LA-148.
+ */
+export function quantile(values: number[], q: number): number | null {
+  if (values.length === 0) return null
+  const s = [...values].sort((a, b) => a - b)
+  const idx = (s.length - 1) * q
+  const lo = Math.floor(idx)
+  const hi = Math.ceil(idx)
+  return s[lo] + (s[hi] - s[lo]) * (idx - lo)
+}
+
 const inAnyWindow = (ds: number, windows: ExclusionWindow[]): boolean =>
   windows.some(w => ds >= w.startDs && ds <= w.endDs)
 
