@@ -692,113 +692,6 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [sleep] TN-83 — the sleep verdict bypasses `nightSessions()`, so it judges naps as nights
-
-- **Lane: A** — the verdict's read path (`packages/shared/src/health/sleep-verdict.ts` is correct; what
-  feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped thresholds against real
-  nights before anything announces them. **The work is one import, not a new rule — see the correction
-  below before starting.**
-- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
-- **✅ THE IMPORT LANDED 2026-09-26, in `LA-149`'s wiring** (`feat/la149-announce-sleep-verdict`).
-  The route reads `nightSessions(rows, tz)` rather than raw `sleep_sessions`, so it is the
-  sixteenth consumer and no selection rule was written beside the helper. Guarded by a route test
-  that lists the nap FIRST — **a first draft listed the real night first and passed with and
-  without the fix**, which is the shape of a test that proves nothing.
-- **✅ RE-MEASURED 2026-09-26 over the corrected population, and the result INVERTS the
-  expectation: the fix made the rate WORSE, not better.** Run with the shipped
-  `nightSessions()` → `toVerdictNights()` → `sleepVerdictForNight()` over the owner's real 125
-  rows (106 dates, 200-day pull):
-
-  | population | judged | poor | good | normal | prominent / 30 nights |
-  |---|---:|---:|---:|---:|---:|
-  | raw rows (this entry's original sweep) | 96 | 25 | 9 | 62 | **10.6** |
-  | `nightSessions()` — what ships | 67 | 22 | 13 | 32 | **15.7** |
-
-  **Why it went up is the point:** the 0 h fragments were *widening* the bands. Removing them
-  tightens `p25`/`p75`, so nights that were being absorbed as normal now correctly read as
-  unusual. That is the "desensitised bands" half of this entry arriving as a visible number — the
-  population is right now, and at `VERDICT_IQR_MULTIPLIER = 0.5` it is three times the 4–6 target.
-- **Multiplier sweep over the CORRECT population** (replica cross-checked against the real
-  function at ×0.5 — identical counts, so these carry):
-
-  | × | poor | good | normal | per 30 |
-  |---:|---:|---:|---:|---:|
-  | 0.50 *(shipped)* | 22 | 13 | 32 | 15.7 |
-  | 0.75 | 16 | 5 | 46 | 9.4 |
-  | **1.00** | **10** | **3** | **54** | **5.8** |
-  | 1.25 | 9 | 2 | 56 | 4.9 |
-  | 1.50 | 5 | **0** | 62 | 2.2 |
-  | 2.00+ | 4 | 0 | 63 | 1.8 |
-
-- **⚑ PROPOSAL, OWNER'S CALL — `VERDICT_IQR_MULTIPLIER` 0.5 → 1.00.** It is the only value that
-  lands inside the 4–6 target *and* keeps the "unusually good night" half alive; 1.25 is also in
-  band but halves `good` to 2 for nothing. **This entry's ⛔ against 1.5 survives the
-  re-measurement** — on the corrected population it still takes `good` to **zero**, so the warning
-  was right for a reason that outlived the wrong numbers.
-- **How many days it moves, which a proposal is incomplete without:** of 67 judged nights, **22
-  change verdict** — 12 poor→normal and 10 good→normal. Nothing moves in the other direction.
-- **Scoring calibration is the owner's** (CLAUDE.md), so the constant is NOT changed here. Lane A
-  implements on a yes; the measurement above is what the decision needs.
-- **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
-  cross-checked against the real function: identical counts, so the sweep below is sound):
-  **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
-  nights**, against the plan's stated target of **4–6**. So it fires at roughly twice the intended
-  rate — but that is the symptom, not the defect.
-- **The defect: `sleep_sessions` holds more than one row per date, and the verdict treats every row as
-  a night.** 125 rows across **106 distinct dates** (last 120 days: **120 rows, 102 dates, 30 rows
-  under 3 h, 6 at exactly 0 h with efficiency 0**). On every duplicate date the shape is **one real
-  night plus one fragment**: `7.92 / 0.00` · `8.25 / 0.00` · `8.50 / 0.00` · `7.17 / 0.08` ·
-  `8.58 / 0.00` · `7.00 / 0.00` · `8.17 / 1.42` · `7.42 / 4.75`.
-- **And several are plainly naps, judged as nights.** Onset minutes from local midnight on flagged
-  rows: **644 (10:44)**, **997 (16:37)**, **1055 (17:35)**, **1064 (17:44)**. An afternoon nap is
-  being announced as a bad night.
-- **It fails twice, in opposite directions, which is why the rate alone understates it.**
-  **(a) False alarms** — the fragment is judged as the night, so a 7.9 h night is announced poor.
-  **(b) Desensitised bands** — those same fragments sit in the trailing-28 window, so a 0 h and a
-  0.08 h value drag `p25` down, widen the "normal" band, and make a genuinely short night read as
-  acceptable. The verdict is simultaneously too loud on artifacts and too quiet on real nights.
-- **⛔ DO NOT fix this by raising `VERDICT_IQR_MULTIPLIER`.** The sweep makes that tempting and it is
-  the trap: `0.25 → 16.6` · **`0.5 → 10.9` (shipped)** · `0.75 → 9.1` · `1.0 → 8.1` ·
-  `1.5 → 6.6` · `2.0 → 6.6`. Multiplier **1.5** lands inside the 4–6 target and would be *wrong* — it
-  hits the rate by suppressing real signal while still announcing on fragments, and it takes `good`
-  to **zero**, so the whole "unusually good night" half of the feature disappears. The rate target is
-  a check on a correct population, never a knob to reach it.
-- **⤷ THE FIX IS ONE IMPORT, AND THIS ENTRY'S FIRST ANSWER WAS WRONG — corrected 2026-09-26, same day.**
-  `nightSessions()` (`packages/shared/src/health/sleep-night.ts`) **already does exactly this**:
-  circadian nap/night classification first, then fragment merging inside the night band. **15 sites
-  route through it; the verdict path is the one that does not.** The fix is to become the sixteenth
-  consumer, in `LA-149`'s wiring — not to write a selection rule.
-- **⛔ The first recommendation here — "longest row per date" — would have been a SECOND implementation
-  of a solved problem, and wrong on its own terms.** That helper's header carries the measurement: the
-  one genuine fragmented night in this history is **2.53 h + 4.02 h across a 105-minute gap**, and a
-  longest-row rule scores it as a 4.02 h night instead of merging it to 6.55 h. Three nap→night
-  transitions have *smaller* gaps than that real fragmented night, so no gap threshold separates them
-  either — which is why the helper classifies by circadian position first
-  (`NIGHT_BAND_START_HOUR` 21 → `NIGHT_BAND_END_HOUR` 10, with `ALWAYS_NIGHT_MIN_HOURS` 4 as the
-  shift-work escape). This is the **One Formula, One Place** trap, and this entry walked into it before
-  checking whether the formula already existed.
-- **⚠ SEVERITY IS HIGHER THAN "a new bug" — this is a DOCUMENTED, ALREADY-FIXED CLASS RECURRING.**
-  `Q-76` (shipped 2026-08-05) found every consumer answering *"which row is the night?"* for itself and
-  **all of them answering it the same wrong way** — sort by `sleepEnd` descending, take the first — and
-  routed eleven read sites through the one helper rather than adding a rule beside it. That helper's own
-  header records what it prevented: *"a Sleep Score of 5 on a 7.86 h night, and — because the rollup
-  folds its pick into the checkpointed EMA baselines — it poisoned every later z-score too."* **That is
-  the same two-directional failure this entry re-measured independently** — a false verdict on a real
-  night, plus poisoned baselines. Known, named, fixed and documented; `TN-81` reintroduced it by not
-  reaching for the helper.
-- **Still true, and still what to do after the fix:** re-measure the announcement rate, then consider
-  the multiplier. **The sweep above measured the WRONG population, so none of its numbers carry over** —
-  re-run it against nights.
-- **A correction to Tuning's own plan, made here rather than quietly:** the plan's §5 cites *"119 rows
-  for the last 120 days — `duration_hours` on all 119"* as evidence the inputs are complete. **That
-  count included fragments.** It is 102 dates, with 30 of 120 rows under 3 h. The conclusion that
-  inputs are sufficient still holds; the completeness figure was inflated by exactly the artifact this
-  entry is about.
-- **What `TN-81` got right, and should not be touched:** components rather than a composite, signed
-  onset minutes so 23:50 and 00:10 are 20 minutes apart, per-component baseline readiness, a
-  `modelVersion` stamp on each snapshot, and `null` below 28 nights rather than a guess. The rule is
-  sound; it is being fed the wrong rows.
-
 ### [platform] LA-148 — four `median` implementations, and one of them disagrees
 
 - **Lane: A** — `packages/shared/src/health/**`, `packages/shared/src/workout/time-audit.ts`.
@@ -870,8 +763,12 @@ below threshold and left in place for next time.
   what failed three times.
 - **What he might reasonably want instead, and the cost of each.** Softer (*"looks like a rough
   night"*) reads better and makes disagreement feel less pointed, at the price of being easier to skim
-  past. Blunter (*"bad night"*) is unmissable and will annoy him on the days it is wrong — which, until
-  `TN-83` lands, is often. Neither is wrong; both are his taste, and the draft above sits between them.
+  past. Blunter (*"bad night"*) is unmissable and will annoy him on the days it is wrong — which used
+  to be often, and is no longer: `TN-83` landed 2026-09-26, and at the owner-approved multiplier of
+  1.00 the verdict announces **5.8 times per 30 nights** over his real history rather than 15.7. That
+  weakens the case for hedging the copy, because a blunt string he sees twice a week is a different
+  proposition from one he sees every other day. Neither is wrong; both are his taste, and the draft
+  above sits between them.
 - **Reversal cost: near zero.** It is two strings on one surface, no schema and no stored data. If the
   wording is wrong he says so and it changes in a one-line PR — which is the argument for shipping the
   draft rather than waiting on it.
