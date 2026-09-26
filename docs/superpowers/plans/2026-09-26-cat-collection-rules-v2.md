@@ -21,7 +21,7 @@ immutable day series.
 | Tank | workouts | tank, "strong, getting bulkier" | `tank-1..5.svg` |
 | Ranger | steps | ranged DPS, "fast" | `ranger-1..5.svg` |
 | Rogue | cardio (runs/walks, Cardio hub) | melee DPS, "fast as well" | `rogue-1..5.svg` |
-| Cleric | tracking consistency | healer, "kept up to date with tracking" | `cleric-1..5.svg` |
+| **Health cat** (Cleric art) | health logging: sleep, nutrition, weight | healer, *"so you are more inclined to track/sleep well"* | `cleric-1..5.svg` |
 
 Steps and cardio stay **separate** (owner, 2026-09-26). Steps are passive and all-day, while cardio
 is a deliberate session. Combined, ~5,600 background steps a day would drown out the runs.
@@ -52,7 +52,16 @@ test"*):
 | Ranger | 5,000 steps | 1,000 steps | owner, 2026-09-26 |
 | Tank | 1 workout | 1 / rest target (owner's is 3 days, so ⅓ of a workout a day) | owner: *"every 3 days = 1 t1 workout loss"* |
 | Rogue | **open (PS-48)** | **open** | proposal: 1 session = 1 T1, drain ⅕/day |
-| Cleric | **open (PS-48)** | **open** | proposal: 1 fully tracked day = 1 T1, drain ½/day |
+| Health cat | 3 points | 1 point | owner set the faucet 2026-09-26; the numbers are this plan's proposal |
+
+**The Health cat's points** (owner: *"it should give points for either sleep/nutrition/weight
+logged etc."*). Each day scores one point per category that has data: sleep recorded, at least one
+food log, and a weight entry. More categories can be added (mood, supplements), and every one
+added makes a T1 cheaper, so add them deliberately. A fully logged day is 3 points = 1 T1, and the
+drain is 1 point a day, so logging two of the three each day keeps it level. *"Sleep well"*, as
+opposed to sleep recorded, would mean a bonus point for sleep inside the user's usual window.
+That is left out until the owner asks: it scores sleep quality, which is Tuning's territory, not a
+logging count. All three reads are one column wide, per RV-63.
 
 The Tank's rest target comes from `maxCompliantRestGap(program)`, which the route already reads.
 Fractional drain means the bank is fractional, so keep it in exact units (thirds of a workout,

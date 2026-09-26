@@ -336,6 +336,8 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
+
 - **[`2026-08-30-apk-banner-tap-target`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-apk-banner-tap-target)**
   — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
   do not raise an undersized `<a>` by adding `a` to `globals.css`'s `button, [role="button"]` floor**

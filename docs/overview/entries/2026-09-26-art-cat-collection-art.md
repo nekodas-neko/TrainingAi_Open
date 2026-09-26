@@ -20,6 +20,9 @@ owner, he took it and then widened it.
 - **Four MMO classes.** Tank (workouts, "strong, getting bulkier"), Ranger (steps), Rogue (cardio)
   and Cleric (tracking consistency, *"a 'you have kept up to date with tracking'"*). Steps and
   cardio stay separate.
+- **The healer is the "Health cat"**, which earns points for any health logging (sleep, nutrition,
+  weight): *"So you are more inclined to track/sleep well"*. That answered PS-48 ①; the points
+  numbers in the plan are provisional.
 - **v2 mechanic.** Three-to-one merges and a **constant daily drain that movement counteracts**:
   *"if I make 5000 steps in the day its an effective 4000 profit"*. Recorded in the plan and filed as
   PS-49. His numbers are provisional by his own account.

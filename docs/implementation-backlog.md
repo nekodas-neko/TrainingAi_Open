@@ -485,18 +485,18 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [app-shell] PS-48 — four owner questions that finish the collection v2 rules
+### [app-shell] PS-48 — three owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
   these answered is the work. PS-49's steps and workout halves do not wait on them.
 - **Context:** the owner set the v2 shape in the art session: four MMO classes, three-to-one
   merges, and a constant daily drain that movement counteracts. Plan:
   [`2026-09-26-cat-collection-rules-v2.md`](superpowers/plans/2026-09-26-cat-collection-rules-v2.md).
-- **① What earns a Cleric (healer) cat?** His words: *"tracking all day/sleeping at expected
-  times"*. **Recommendation: a day counts when sleep was recorded AND the ring was worn for most of
-  the waking day.** Both are recorded automatically, so the Cleric rewards wearing the ring, not
-  data entry. Alternative: add "a meal logged". That rewards logging food, but it makes the healer
-  a nutrition chore and couples two pillars. Starting rate: 1 day = 1 T1, drain ½/day.
+- **① ANSWERED 2026-09-26: the healer is the "Health cat", fed by any health logging.** Owner:
+  *"it should give points for either sleep/nutrition/weight logged etc. So you are more inclined
+  to track/sleep well"*. That overrode the ring-wear recommendation first put here. The points
+  scheme is in the plan (one point per category logged that day, three points per T1, one point
+  drained a day), and the owner has not seen those numbers, so they are provisional.
 - **② The Rogue's (cardio) unit and drain.** **Recommendation: 1 cardio session = 1 T1, drain ⅕ of
   a session a day.** Two sessions a week then holds steady and three grows. Alternative: per 20
   minutes of cardio. That is fairer to long runs, but a short walk earns nothing.
@@ -13735,8 +13735,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 - **Plan:** [`docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md`](superpowers/plans/2026-09-26-cat-collection-rules-v2.md).
 - **The steps and workout halves can start now.** Ranger: 5,000 steps per T1, 1,000 drained every
   day. Tank: 1 workout per T1, drained one workout per rest-target days. Both are the owner's
-  numbers (2026-09-26), marked provisional by him. The cardio (Rogue) and tracking (Cleric) faucets
-  wait on PS-48's answers, and the route returns `null` for them until then.
+  numbers (2026-09-26), marked provisional by him. The Health cat (Cleric art) faucet is defined — see the
+  plan — and can be built with them. The cardio (Rogue) faucet waits on PS-48, and the route returns `null` for them until then.
 - **No migration.** The collection is replayed, so bumping `COLLECTION_RULES_VERSION` to 2 re-scores
   all history. That rewrite is the owner's intent, not an accident. PS-48 asks whether v1-era cats
   should be preserved instead (recommendation: no).
