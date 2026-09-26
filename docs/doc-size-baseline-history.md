@@ -17976,3 +17976,13 @@ re-show, screens refetch because of it, and the charts redraw. **The update is l
 has to make a correct update cheaper or later rather than suppress it — a trade-off against Q-402's
 staleness rule. Three candidates are listed with what each costs, none yet measured, so the next session
 picks with evidence instead of starting where this one did.
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-201 and BF-202 (routing owner decisions)
+
+Two entries the owner's instruction required. BF-201 carries the two calibration decisions that were
+buried inside BF-197 and BF-199, and it costs lines because each needs a recommendation, alternatives
+and a reversal cost to be answerable without reading the parent. BF-202 records that 70 entries across
+the queue share that shape, with the caveat that the number is a keyword upper bound rather than a
+finding — that caveat is the part worth the lines, since acting on 70 as if it were 70 real decisions
+would waste the sweep.
