@@ -506,6 +506,25 @@ below threshold and left in place for next time.
   weeks, and preserving v1-era cats means versioning the rules per date span, a real piece of work
   for little. The cost: the counts he has seen change on the day PS-49 deploys.
 
+### [app-shell] PS-53 — review the finished cat-collection designs, and decide what awards what
+
+- **Lane: O** · **Added:** 2026-09-26 · the design session's close-out. The owner: *"it can be
+  picked up by ORC or tuning to do further reviews/editing"*. Ungated on purpose.
+- **Everything is designed and committed:** 7 classes (Tank, Ranger, Rogue, Health cat, Mage,
+  Alchemist, Monk), 6 tiers, 4 coats (base, shiny, frost, ember) and 12 scenes, all animated and
+  named. The inventory, with a proposed trophy for every scene, is
+  [`cat-collection-design-catalog.md`](domains/app-shell/cat-collection-design-catalog.md);
+  `node scripts/collection-art/preview.mjs` renders it all.
+- **Owner decisions this carries (Orchestrator to put):** ① which categories get their own ladder:
+  cardio (Rogue) and logging (Health cat) are planned in PS-49; nutrition (Alchemist) and mood &
+  recovery (Monk) are designed but unplanned. ② The scene → trophy mapping in the catalogue.
+  ③ What awards the frost and ember skins.
+- **Tuning's part:** review the proposed rates before PS-49 ships them: steps 5,000 per T1 with a
+  1,000/day drain, the Health cat's 3 points per T1 with a 1/day drain, shiny 1/12, lucky 1/25. Each
+  proposal must state how many past days it moves, per the Tuning rule.
+- **Design edits welcome:** everything regenerates from `scripts/collection-art/`; the drift test
+  keeps `public/cats/` honest.
+
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — needs the owner's call on the four, then it is a sweep anyone can run.

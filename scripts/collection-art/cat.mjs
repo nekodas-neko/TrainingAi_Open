@@ -9,7 +9,10 @@ export const FURS = {
   tank:   { label: 'Tank · workouts',   fur: '#6f7079', shade: '#5a5b64', light: '#9a9ba3', eye: '#f2a52b', C: '#e04848', D: '#a32f35' },
   ranger: { label: 'Ranger · steps',    fur: '#e3914a', shade: '#c26f2c', light: '#f8e3c8', eye: '#7ccf5a', C: '#4f9d4c', D: '#2f6b33' },
   rogue:  { label: 'Rogue · cardio',    fur: '#4a4558', shade: '#35313f', light: '#76708c', eye: '#f5d547', C: '#8d55e0', D: '#5a3399' },
-  cleric: { label: 'Cleric · tracking', fur: '#f3f0ec', shade: '#d9d3cc', light: '#ffffff', eye: '#6ab8f0', C: '#f2c14e', D: '#c28f2a' },
+  cleric: { label: 'Health cat · logging', fur: '#f3f0ec', shade: '#d9d3cc', light: '#ffffff', eye: '#6ab8f0', C: '#f2c14e', D: '#c28f2a' },
+  mage:      { label: 'Mage · sleep',            fur: '#7f8db0', shade: '#66739a', light: '#b8c3dc', eye: '#ffd36e', C: '#4b5fc9', D: '#2e3b8f' },
+  alchemist: { label: 'Alchemist · nutrition',   fur: '#efd9b4', shade: '#d4b98e', light: '#fff4e0', eye: '#58c48a', C: '#3aa37a', D: '#23704f' },
+  monk:      { label: 'Monk · mood & recovery',  fur: '#b8703f', shade: '#96582d', light: '#f0cfa8', eye: '#8ad4ff', C: '#f28c28', D: '#b85e12' },
 }
 // The rare "shiny" recolour of each class: same cat, same gear, different coat and accent.
 export const SHINY = {
@@ -17,6 +20,18 @@ export const SHINY = {
   ranger: { fur: '#dfe6f0', shade: '#b7c2d3', light: '#ffffff', eye: '#ff8fc8', C: '#3fb8c9', D: '#23707d' },
   rogue:  { fur: '#35568c', shade: '#253e66', light: '#6688bf', eye: '#7fffd4', C: '#2fd1c1', D: '#1a7f76' },
   cleric: { fur: '#f6c9dc', shade: '#e0a6c0', light: '#fff0f6', eye: '#b388ff', C: '#bfefff', D: '#7fbad0' },
+  mage:      { fur: '#2d2f4a', shade: '#1f2036', light: '#565a86', eye: '#9dfff0', C: '#b04bd9', D: '#6d2a8f' },
+  alchemist: { fur: '#9bd8c0', shade: '#72b89e', light: '#e4fbf2', eye: '#ff7fb0', C: '#e0a33a', D: '#9a6a18' },
+  monk:      { fur: '#e9e4f5', shade: '#c9c1e0', light: '#ffffff', eye: '#ffb35a', C: '#5a8dee', D: '#2f5bb8' },
+}
+
+/**
+ * Skins: whole-coat recolours any class can wear at any tier. The class accent and gear stay, so the
+ * class still reads. Designed now so achievements can award them later; nothing awards them yet.
+ */
+export const SKINS = {
+  frost: { fur: '#cfe3f0', shade: '#a9c3d6', light: '#f4fbff', eye: '#6fd3ff' },
+  ember: { fur: '#8c3b2e', shade: '#6a2a21', light: '#c9745e', eye: '#ffcf4a' },
 }
 const o = `stroke="${INK}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"`
 
@@ -43,10 +58,8 @@ export function cat(p, { gearBack = '', gearFront = '', gearHead = '' } = {}) {
   <path d="M86 100 C84 108 82 113 78 116" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>
   <g class="pl"><ellipse cx="54" cy="117" rx="9" ry="6" fill="${p.light}" ${o}/><path d="M51 115 v4 M57 115 v4" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/></g>
   <g class="pr"><ellipse cx="74" cy="117" rx="9" ry="6" fill="${p.light}" ${o}/><path d="M71 115 v4 M77 115 v4" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/></g>
-  <g ${o}>
-    <path d="M33 48 L35 14 L60 31 Z" fill="${p.fur}"/><path d="M95 48 L93 14 L68 31 Z" fill="${p.fur}"/>
-  </g>
-  <path d="M39 40 L40 23 L53 32 Z" fill="#f2a3b3"/><path d="M89 40 L88 23 L75 32 Z" fill="#f2a3b3"/>
+  <g class="earl"><path d="M33 48 L35 14 L60 31 Z" fill="${p.fur}" ${o}/><path d="M39 40 L40 23 L53 32 Z" fill="#f2a3b3"/></g>
+  <path d="M95 48 L93 14 L68 31 Z" fill="${p.fur}" ${o}/><path d="M89 40 L88 23 L75 32 Z" fill="#f2a3b3"/>
   <path d="M29 60 C27 38 43 26 64 26 C85 26 101 38 99 60 C99 66 96 71 92 74 L96 78 L86 78 C80 82 72 83 64 83 C56 83 48 82 42 78 L32 78 L36 74 C32 71 29 66 29 60 Z" fill="${p.fur}" ${o}/>
   <path d="M58 30 l1.5 9 M64 29 v10 M70 30 l-1.5 9" stroke="${p.shade}" stroke-width="3" stroke-linecap="round"/>
   ${defaultEyes(p)}
@@ -73,6 +86,8 @@ const MOTION = `<style>
 @keyframes paw{0%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .eyes{transform-origin:64px 58px;animation:blink 4.3s step-end infinite;animation-delay:var(--d)}
 @keyframes blink{0%{transform:none}93%{transform:scaleY(.12)}97%{transform:none}}
+.earl{transform-origin:46px 40px;animation:ear 5.2s step-end infinite;animation-delay:var(--d)}
+@keyframes ear{0%{transform:none}70%{transform:rotate(-14deg)}74%{transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>`
 /** `delay` desyncs the loops between sprites, so a pen of cats does not swish in unison. */
