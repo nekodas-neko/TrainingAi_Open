@@ -5648,8 +5648,35 @@ drift.
 
 - **Lane: O** — `projectOverview.md` and the archive are the Orchestrator's.
 - **Added:** 2026-09-24 · Review sweep 55, §§3–4 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
-- **Move to `known-issues-resolved.md`:** the §4 list. Each carries its evidence (a commit, a sweep
-  result or a production read). Five were settled by production reads this sweep:
+- **⛔ THE §4 MOVE LIST IS WRONG AND MUST NOT BE APPLIED AS WRITTEN — tested row by row, 2026-09-26
+  (OR-180).** Eleven of its rows were checked against the archive rule (*move only when nothing is
+  still owed*) and **all eleven failed it.** Not one is safe to archive:
+  | row | why it stays |
+  |---|---|
+  | `LB-107` | the back gesture is still owed on the S25 — the sweep says *"verified in sweep 1"* and **no journal, entry or sweep record corroborates it** |
+  | `BF-65` | *"nobody has seen it move"*; the clips 404 through the sandbox proxy, so the animation has never been rendered anywhere |
+  | `Q-546` | *"neither checked on the device"* |
+  | `Q-556` | describes a LIVE defect — `DELETE /api/activity-logs` answers `200 {"success":true}` for another user's row — plus one probe that still fails validation |
+  | `Q-485` | not device-verified |
+  | `Q-481` | 🟠 open: the water quick-add still triple-counts on outbox replay |
+  | `Q-473`/`Q-474` | the row says outright *"Q-474 is still open, so this row stays here"* |
+  | `Q-464`/`Q-465` | two schema gaps, open |
+  | `Q-463` | 🟠 open, with an unverified probe |
+  | `Q-460`…`Q-462` | **`Q-461` IS STILL IN THE QUEUE** — archiving this row would bury live work |
+  | `Q-213` | *"production has now confirmed them, the device has not"* |
+  **The lesson, which is worth more than the list:** a sweep that reads 30 rows fast will judge
+  *"answered somewhere"* and the archive rule asks a different question — *is anything still owed*.
+  A row can be entirely correct about a shipped fix and still owe a device check, and eleven of
+  eleven here do. **Re-derive the movers from the rows themselves; do not trust the §4 list.**
+- **✓ The §4 AMEND list is sound, and two of it are done (OR-180, 2026-09-26).** `LB-4` was recorded
+  as 🟠 open in the calorie-surface row although it had shipped, and **the same paragraph was pasted
+  into the `LB-1` row**, where it was describing a different heading's work entirely. The paste is
+  deleted and the surviving bullet says shipped. **Still to amend:** the two *"ALL QUEUED (fixes not
+  yet shipped)"* headings, `gps-watchdog`'s *"until it ships"*, the sheet that no longer renders the
+  list, the APK claim, the pulls-never-revert claim that DV-15 disproved, and the route that moved
+  out of Admin.
+- **Original §4 text, kept because the amend half is still the work:** the list carried its evidence
+  (a commit, a sweep result or a production read). Five were settled by production reads that sweep:
   - bodyweight `planned_pct` is null on 0 of 38 sets;
   - bodyweight volume is positive on 19 of 19 exercise logs;
   - `activity_score` is present on 31 of 31 days;
