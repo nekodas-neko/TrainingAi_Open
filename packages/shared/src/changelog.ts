@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.469.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: your sleep cats are now Mages, with wizard hats, moon staffs and star robes as they grow.",
+      "Cats flick an ear every so often, as well as swishing their tails and blinking.",
+    ],
+  },
+  {
+    version: "1.468.1",
+    date: "2026-09-26",
+    changes: [
+      "Faster: switching tabs no longer makes the day's heart-rate chart redraw itself behind the screen you just left.",
+    ],
+  },
+  {
     version: "1.468.0",
     date: "2026-09-26",
     changes: [

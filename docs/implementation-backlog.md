@@ -506,6 +506,25 @@ below threshold and left in place for next time.
   weeks, and preserving v1-era cats means versioning the rules per date span, a real piece of work
   for little. The cost: the counts he has seen change on the day PS-49 deploys.
 
+### [app-shell] PS-53 — review the finished cat-collection designs, and decide what awards what
+
+- **Lane: O** · **Added:** 2026-09-26 · the design session's close-out. The owner: *"it can be
+  picked up by ORC or tuning to do further reviews/editing"*. Ungated on purpose.
+- **Everything is designed and committed:** 7 classes (Tank, Ranger, Rogue, Health cat, Mage,
+  Alchemist, Monk), 6 tiers, 4 coats (base, shiny, frost, ember) and 12 scenes, all animated and
+  named. The inventory, with a proposed trophy for every scene, is
+  [`cat-collection-design-catalog.md`](domains/app-shell/cat-collection-design-catalog.md);
+  `node scripts/collection-art/preview.mjs` renders it all.
+- **Owner decisions this carries (Orchestrator to put):** ① which categories get their own ladder:
+  cardio (Rogue) and logging (Health cat) are planned in PS-49; nutrition (Alchemist) and mood &
+  recovery (Monk) are designed but unplanned. ② The scene → trophy mapping in the catalogue.
+  ③ What awards the frost and ember skins.
+- **Tuning's part:** review the proposed rates before PS-49 ships them: steps 5,000 per T1 with a
+  1,000/day drain, the Health cat's 3 points per T1 with a 1/day drain, shiny 1/12, lucky 1/25. Each
+  proposal must state how many past days it moves, per the Tuning rule.
+- **Design edits welcome:** everything regenerates from `scripts/collection-art/`; the drift test
+  keeps `public/cats/` honest.
+
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — needs the owner's call on the four, then it is a sweep anyone can run.
@@ -704,11 +723,41 @@ below threshold and left in place for next time.
   sixteenth consumer and no selection rule was written beside the helper. Guarded by a route test
   that lists the nap FIRST — **a first draft listed the real night first and passed with and
   without the fix**, which is the shape of a test that proves nothing.
-- **⚠ WHAT REMAINS IS THE RE-MEASURE, AND IT IS NOT OPTIONAL.** This entry's sweep measured the
-  wrong population, so **none of its numbers carry over**: 10.9 announcements per 30 nights was
-  counted over rows, not nights. Re-run it over `nightSessions()` output before touching
-  `VERDICT_IQR_MULTIPLIER` — and the ⛔ below still stands, because the rate target is a check on a
-  correct population and never a knob to reach it.
+- **✅ RE-MEASURED 2026-09-26 over the corrected population, and the result INVERTS the
+  expectation: the fix made the rate WORSE, not better.** Run with the shipped
+  `nightSessions()` → `toVerdictNights()` → `sleepVerdictForNight()` over the owner's real 125
+  rows (106 dates, 200-day pull):
+
+  | population | judged | poor | good | normal | prominent / 30 nights |
+  |---|---:|---:|---:|---:|---:|
+  | raw rows (this entry's original sweep) | 96 | 25 | 9 | 62 | **10.6** |
+  | `nightSessions()` — what ships | 67 | 22 | 13 | 32 | **15.7** |
+
+  **Why it went up is the point:** the 0 h fragments were *widening* the bands. Removing them
+  tightens `p25`/`p75`, so nights that were being absorbed as normal now correctly read as
+  unusual. That is the "desensitised bands" half of this entry arriving as a visible number — the
+  population is right now, and at `VERDICT_IQR_MULTIPLIER = 0.5` it is three times the 4–6 target.
+- **Multiplier sweep over the CORRECT population** (replica cross-checked against the real
+  function at ×0.5 — identical counts, so these carry):
+
+  | × | poor | good | normal | per 30 |
+  |---:|---:|---:|---:|---:|
+  | 0.50 *(shipped)* | 22 | 13 | 32 | 15.7 |
+  | 0.75 | 16 | 5 | 46 | 9.4 |
+  | **1.00** | **10** | **3** | **54** | **5.8** |
+  | 1.25 | 9 | 2 | 56 | 4.9 |
+  | 1.50 | 5 | **0** | 62 | 2.2 |
+  | 2.00+ | 4 | 0 | 63 | 1.8 |
+
+- **⚑ PROPOSAL, OWNER'S CALL — `VERDICT_IQR_MULTIPLIER` 0.5 → 1.00.** It is the only value that
+  lands inside the 4–6 target *and* keeps the "unusually good night" half alive; 1.25 is also in
+  band but halves `good` to 2 for nothing. **This entry's ⛔ against 1.5 survives the
+  re-measurement** — on the corrected population it still takes `good` to **zero**, so the warning
+  was right for a reason that outlived the wrong numbers.
+- **How many days it moves, which a proposal is incomplete without:** of 67 judged nights, **22
+  change verdict** — 12 poor→normal and 10 good→normal. Nothing moves in the other direction.
+- **Scoring calibration is the owner's** (CLAUDE.md), so the constant is NOT changed here. Lane A
+  implements on a yes; the measurement above is what the decision needs.
 - **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
   cross-checked against the real function: identical counts, so the sweep below is sound):
   **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
@@ -1490,6 +1539,31 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   `/health/readiness`.
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
+
+- **✅ SHIPPED the per-switch half — `HrDayChart` is memoised by value (#1716, 2026-09-26).** Sweep 4a's
+  two numbers split cleanly and the split is the finding: **30/switch on Home and 80/switch on Health
+  are a RE-RENDER, not a resize** — `e2e/dv12-tab-switch-does-not-redraw-charts.spec.ts` already
+  established that instrumenting `ResizeObserver` gives 5 callbacks during load and **zero** on a tab
+  switch, so `content-visibility` never triggers one. What fires is `TabVisibilityProvider`'s `epoch`:
+  both call sites refetch on it and hand `setState` a value-identical NEW array, which defeats the
+  default shallow `memo`. That is the same defect `TrendSparkline` had, fixed the same way in #1675
+  (578 → 0), and `HrDayChart` never got the treatment because nothing pointed at it until 4a counted
+  per canvas. `components/health/hr-day-chart-equal.ts` + `memo`, with every "must redraw" case
+  pinned (readings, `source` — it draws the sleep shading — date rollover, sleep window, workout
+  bands, stress overlay and zone) and a source guard that now covers **both** charts, since
+  `TrendSparkline` has had none since #1675.
+- **Keep:** ① the **arrival** half, which is a different mechanism and is NOT fixed — 180 font writes
+  on arriving at Home, 320 on arriving at Health, and Wear Time's **43 on arrival only** (it is an
+  already-memoised `TrendSparkline`, so its per-switch cost is already zero and what is left cannot
+  be a re-render). Choosing between (a), (b) and (c) below still needs the device. ② the device
+  re-measure, which is `DV-12`'s pass test.
+- **⚠ The sandbox CANNOT put a number on this one, and that is measured rather than assumed.** The
+  e2e seed renders **no** `HrDayChart` at all — the account has no heart-rate readings, so both call
+  sites take their empty branch, and a probe at 384 px found zero canvases on Home. The existing
+  DV-12 spec passes at **0 font writes per switch to Health** both before and after this change,
+  because the five canvases it does find are the sparklines #1675 already fixed. Seeding a day of HR
+  into the shared e2e database was rejected: every spec shares that user, and today's HR would move
+  other specs' expectations. **So the after-number is the device's to take, against 4a's before.**
 
 - **📱 ANSWERED (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26) — a canvas `font`-setter hook, counted per canvas per switch.** Canvases per
   panel: Home 1, Workout 0, Nutrition 1, Health 5, More 0. On **every** switch the two **"HEART RATE ·

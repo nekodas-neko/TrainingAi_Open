@@ -23,16 +23,24 @@ const GLYPHS: Record<FaucetKey, string[]> = {
   sleep: ['🐱', '🐈', '🔮'],
 }
 
-/** The four drawn classes. `rogue` (cardio) has art and no ladder yet; `cleric` is drawn for the Health cat. */
-export type CatClass = 'tank' | 'ranger' | 'rogue' | 'cleric'
-/** Six drawn tiers per class, each with a rare `-shiny` recolour. */
+/**
+ * The seven drawn classes, one per category the collection can track. The full catalogue — which
+ * category each class is for, and which are wired to a ladder — is
+ * `docs/domains/app-shell/cat-collection-design-catalog.md`.
+ */
+export type CatClass = 'tank' | 'ranger' | 'rogue' | 'cleric' | 'mage' | 'alchemist' | 'monk'
+export const CAT_CLASSES: readonly CatClass[] = ['tank', 'ranger', 'rogue', 'cleric', 'mage', 'alchemist', 'monk']
+/** Six drawn tiers per class. */
 export const ART_TIERS = 6
+/** Every tier of every class also exists in these coats: a rare `shiny` and two award skins. */
+export type CatVariant = 'shiny' | 'frost' | 'ember'
+export const CAT_VARIANTS: readonly CatVariant[] = ['shiny', 'frost', 'ember']
 
-/** Which class each existing ladder is drawn as. Sleep stands in for the Cleric's tracking faucet. */
+/** Which class each existing ladder is drawn as. Sleep is the Mage's; the Health cat waits for its logging ladder. */
 export const LADDER_CLASS: Record<FaucetKey, CatClass> = {
   workout: 'tank',
   steps: 'ranger',
-  sleep: 'cleric',
+  sleep: 'mage',
 }
 
 export function tierGlyph(faucet: FaucetKey, tier: number): string {
@@ -43,8 +51,13 @@ export function ladderGlyphs(faucet: FaucetKey): readonly string[] {
   return GLYPHS[faucet]
 }
 
-/** Path to the drawn sprite for a ladder tier, or null past the top of the drawn set. */
-export function tierArt(faucet: FaucetKey, tier: number, shiny = false): string | null {
+/** Path to any class's sprite, or null past the top of the drawn set. */
+export function classArt(cls: CatClass, tier: number, variant?: CatVariant): string | null {
   if (tier < 0 || tier >= ART_TIERS) return null
-  return `/cats/${LADDER_CLASS[faucet]}-${tier + 1}${shiny ? '-shiny' : ''}.svg`
+  return `/cats/${cls}-${tier + 1}${variant ? `-${variant}` : ''}.svg`
+}
+
+/** Path to the drawn sprite for a ladder tier, or null past the top of the drawn set. */
+export function tierArt(faucet: FaucetKey, tier: number, variant?: CatVariant): string | null {
+  return classArt(LADDER_CLASS[faucet], tier, variant)
 }

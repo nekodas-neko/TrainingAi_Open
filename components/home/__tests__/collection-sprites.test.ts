@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { LADDERS } from '@trainingai/shared/collection/ladder'
-import { tierArt, tierGlyph, ART_TIERS, LADDER_CLASS } from '../collection-sprites'
+import { tierArt, classArt, tierGlyph, ART_TIERS, LADDER_CLASS, CAT_CLASSES, CAT_VARIANTS } from '../collection-sprites'
 import { penCats } from '../collection-pen-cats'
 import { renderAll } from '../../../scripts/collection-art/build.mjs'
 
@@ -13,8 +13,8 @@ const state = (stock: number[]) => ({ stock, duplicateDays: 0, decayEvents: 0 })
 describe('the drawn cats (BF-126)', () => {
   it('are the generator output — an edit to the art source without a rebuild fails here', () => {
     const files = renderAll() as Record<string, string>
-    // Four classes × six tiers, each with a shiny recolour, plus the pen's four backdrop scenes.
-    expect(Object.keys(files)).toHaveLength(4 * ART_TIERS * 2 + 4)
+    // Seven classes × six tiers × (plain + three variants), plus the pen's twelve backdrop scenes.
+    expect(Object.keys(files)).toHaveLength(CAT_CLASSES.length * ART_TIERS * (1 + CAT_VARIANTS.length) + 12)
     for (const [name, body] of Object.entries(files)) {
       expect(fs.readFileSync(path.join(CATS, name), 'utf8'), `${name} is stale — run node scripts/collection-art/build.mjs`).toBe(body)
     }
@@ -23,12 +23,23 @@ describe('the drawn cats (BF-126)', () => {
   it('cover every tier of every ladder, plain and shiny, with a file behind each path', () => {
     for (const [faucet, ladder] of Object.entries(LADDERS)) {
       ladder.tiers.forEach((_, i) => {
-        for (const shiny of [false, true]) {
-          const src = tierArt(faucet as Faucet, i, shiny)
+        for (const variant of [undefined, ...CAT_VARIANTS]) {
+          const src = tierArt(faucet as Faucet, i, variant)
           expect(src, `${faucet}[${i}]`).toBeTruthy()
           expect(fs.existsSync(path.join(CATS, path.basename(src!))), src!).toBe(true)
         }
       })
+    }
+  })
+
+  it('exist for every class, tier and variant in the catalogue, including classes with no ladder yet', () => {
+    for (const cls of CAT_CLASSES) {
+      for (let t = 0; t < ART_TIERS; t++) {
+        for (const variant of [undefined, ...CAT_VARIANTS]) {
+          const src = classArt(cls, t, variant)!
+          expect(fs.existsSync(path.join(CATS, path.basename(src))), src).toBe(true)
+        }
+      }
     }
   })
 

@@ -151,6 +151,74 @@ const smoke = p => `<g fill="${p.C}" opacity=".35"><ellipse cx="30" cy="120" rx=
 const bigWing = `<g transform="translate(-4 -8) scale(1.07)">${wing}</g>`
 const starOrbStaff = p => staff(p, true) + star(106, 26, 13, GOLD) + `<circle cx="106" cy="26" r="5" fill="#fff"/>`
 
+
+// ---------- Mage · sleep ----------
+const wizardHat = (p, gold) => `
+  <path d="M40 38 C48 20 60 6 86 2 C76 12 80 26 88 38 Z" fill="${p.C}" ${o()}/>
+  <ellipse cx="64" cy="38" rx="34" ry="7" fill="${p.D}" ${o()}/>
+  ${gold ? `<path d="M42 33 C56 29 74 29 86 33" fill="none" stroke="${GOLD}" stroke-width="4"/>` : ''}
+  ${star(62, 22, 5, GOLD)}${star(74, 12, 3, '#fff')}${star(52, 30, 2.5, '#fff')}`
+const moonStaff = (p, tall) => {
+  const top = tall ? 26 : 40
+  return `${line(`M106 ${top + 8} L106 122`, WOOD, 5)}
+  <path d="M106 ${top - 12} A12 12 0 1 0 116 ${top + 4} A9 9 0 1 1 106 ${top - 12} Z" fill="#f3ecd2" ${o(2.5)}/>
+  ${paw(p, 106, 98)}`
+}
+const starRobe = p => `
+  <path d="M44 84 C52 81 76 81 84 84 L86 106 C78 113 50 113 42 106 Z" fill="${p.C}" ${o()}/>
+  ${star(54, 92, 3, GOLD)}${star(72, 98, 2.5, GOLD)}${star(64, 88, 2, '#fff')}${star(58, 104, 2, '#fff')}
+  <path d="M44 104 C52 110 76 110 84 104" fill="none" stroke="${GOLD}" stroke-width="2.5"/>`
+const floatingMoon = `<circle cx="20" cy="34" r="14" fill="#f3ecd2" opacity=".15"/><path d="M20 22 A12 12 0 1 0 30 38 A9 9 0 1 1 20 22 Z" fill="#f3ecd2" ${o(2.5)}/>`
+const nightCape = p => cape(p.D) + `${star(20, 108, 3, '#fff')}${star(108, 112, 3, GOLD)}${star(14, 120, 2, GOLD)}${star(116, 98, 2, '#fff')}`
+
+// ---------- Alchemist · nutrition ----------
+const goggles = gold => `
+  <path d="M30 38 C44 32 84 32 98 38" fill="none" stroke="${INK}" stroke-width="8" stroke-linecap="round"/>
+  <path d="M30 38 C44 32 84 32 98 38" fill="none" stroke="${LEATHER}" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="52" cy="35" r="8" fill="#9fe3ff" stroke="${gold ? GOLD : '#b08a4a'}" stroke-width="3.5"/>
+  <circle cx="76" cy="35" r="8" fill="#9fe3ff" stroke="${gold ? GOLD : '#b08a4a'}" stroke-width="3.5"/>
+  <circle cx="49" cy="32" r="2.2" fill="#fff"/><circle cx="73" cy="32" r="2.2" fill="#fff"/>`
+const flask = (p, big) => {
+  const r = big ? 13 : 10, cy = big ? 96 : 100
+  return `<rect x="101" y="${cy - r - 14}" width="8" height="14" fill="#dff4ff" ${o(2.5)}/>
+  <rect x="100" y="${cy - r - 19}" width="10" height="6" rx="2" fill="${WOOD}" ${o(2)}/>
+  <circle cx="105" cy="${cy}" r="${r}" fill="#dff4ff" ${o(3)}/>
+  <path d="M${105 - r + 2} ${cy + 2} A${r - 2} ${r - 2} 0 0 0 ${105 + r - 2} ${cy + 2} Z" fill="${p.C}"/>
+  <circle cx="101" cy="${cy - 3}" r="2" fill="#fff" opacity=".8"/>
+  ${big ? `<circle cx="105" cy="${cy}" r="${r + 7}" fill="${p.C}" opacity=".2"/>` : ''}
+  ${paw(p, 92, 104)}`
+}
+const apron = p => `
+  <path d="M46 84 C54 81 74 81 82 84 L84 108 C76 113 52 113 44 108 Z" fill="#ece5d2" ${o()}/>
+  <rect x="54" y="94" width="20" height="10" rx="2" fill="#d8ceb4" ${o(2)}/>
+  <rect x="58" y="88" width="4" height="9" rx="1" fill="${p.C}" ${o(1.5)}/><rect x="65" y="90" width="4" height="7" rx="1" fill="#e04848" ${o(1.5)}/>
+  <path d="M46 86 L40 80 M82 86 L88 80" stroke="${p.D}" stroke-width="3" stroke-linecap="round"/>`
+const potionPack = `
+  <rect x="84" y="46" width="30" height="36" rx="5" fill="${LEATHER}" ${o()}/>
+  ${[[90, '#e04848'], [99, '#4f9d4c'], [108, '#8d55e0']].map(([x, c]) => `<rect x="${x - 3}" y="34" width="7" height="14" rx="2" fill="${c}" ${o(2)}/>`).join('')}`
+const philosopherStone = `<circle cx="22" cy="40" r="15" fill="#ff5a6e" opacity=".18"/><path d="M22 28 L32 40 L22 52 L12 40 Z" fill="#ff5a6e" ${o(2.5)}/><path d="M18 36 L22 31" stroke="#fff" stroke-width="2" stroke-linecap="round"/>`
+
+// ---------- Monk · mood & recovery ----------
+const headband = p => `
+  <path d="M30 44 C44 38 84 38 98 44 L98 51 C84 45 44 45 30 51 Z" fill="${p.C}" ${o(3)}/>
+  <path d="M31 47 C20 50 14 58 12 66 C20 62 26 58 32 52 Z" fill="${p.C}" ${o(2.5)}/>
+  <path d="M33 49 C24 56 22 66 24 74 C30 68 32 60 35 53 Z" fill="${p.D}" ${o(2.5)}/>`
+const beads = (p, glow) => `<g>${Array.from({ length: 9 }, (_, i) => {
+  const t = i / 8, x = 46 + t * 36, y = 84 + Math.sin(t * Math.PI) * 13
+  return `${glow ? `<circle cx="${x}" cy="${y}" r="5.5" fill="${p.C}" opacity=".3"/>` : ''}<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.3" fill="${i === 4 ? p.C : WOOD}" ${o(1.8)}/>`
+}).join('')}</g>`
+const handWraps = `<path d="M47 114 h14 M47 118 h14 M67 114 h14 M67 118 h14" stroke="#f4f1ea" stroke-width="2.5" stroke-linecap="round"/>`
+const monkRobe = p => `
+  <path d="M44 84 C52 81 76 81 84 84 L86 106 C78 113 50 113 42 106 Z" fill="${p.C}" ${o()}/>
+  <path d="M46 84 L82 108" stroke="${p.D}" stroke-width="7" stroke-linecap="round"/>`
+const thirdEye = p => `<circle cx="64" cy="37" r="4.5" fill="${p.C}" ${o(2)}/><circle cx="64" cy="37" r="8" fill="${p.C}" opacity=".25"/>`
+const lotus = `<g ${o(2.5)}>
+  <path d="M64 124 C44 124 26 116 20 106 C34 108 46 114 64 124 Z" fill="#f7a8c8"/>
+  <path d="M64 124 C84 124 102 116 108 106 C94 108 82 114 64 124 Z" fill="#f7a8c8"/>
+  <path d="M64 124 C50 116 42 104 44 94 C54 102 60 112 64 124 Z" fill="#fbc6dc"/>
+  <path d="M64 124 C78 116 86 104 84 94 C74 102 68 112 64 124 Z" fill="#fbc6dc"/></g>`
+const orbs = p => `${[[18, 60], [110, 50], [24, 96]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="${p.C}" opacity=".25"/><circle cx="${x}" cy="${y}" r="3.5" fill="#fff4e0"/>`).join('')}`
+
 // tier -> { gearBack, gearHead, gearFront }
 export const GEAR = {
   tank: [
@@ -184,5 +252,29 @@ export const GEAR = {
     p => ({ gearBack: wing + mirror(wing), gearHead: clericHalo(p), gearFront: robe(p) + staff(p, true) }),
     p => ({ gearBack: aura('cleric', '#ffd86a') + wing + mirror(wing), gearHead: radiantHalo(p), gearFront: robe(p) + staff(p, true) }),
     p => ({ gearBack: mythicAura('cleric', '#fff1b0', '#ffd86a') + bigWing + mirror(bigWing), gearHead: radiantHalo(p), gearFront: robe(p) + starOrbStaff(p) }),
+  ],
+  mage: [
+    p => ({ gearHead: wizardHat(p) }),
+    p => ({ gearHead: wizardHat(p), gearFront: moonStaff(p) }),
+    p => ({ gearHead: wizardHat(p), gearFront: starRobe(p) + moonStaff(p) }),
+    p => ({ gearBack: nightCape(p) + floatingMoon, gearHead: wizardHat(p), gearFront: starRobe(p) + moonStaff(p, true) }),
+    p => ({ gearBack: aura('mage', '#9fb4ff') + nightCape(p) + floatingMoon, gearHead: wizardHat(p, true), gearFront: starRobe(p) + moonStaff(p, true) }),
+    p => ({ gearBack: mythicAura('mage', '#c3ccff', '#6d5ae0') + nightCape(p) + floatingMoon, gearHead: wizardHat(p, true) + star(96, 20, 6, GOLD) + star(30, 18, 5, GOLD), gearFront: starRobe(p) + moonStaff(p, true) }),
+  ],
+  alchemist: [
+    p => ({ gearHead: goggles() }),
+    p => ({ gearHead: goggles(), gearFront: flask(p) }),
+    p => ({ gearHead: goggles(), gearFront: apron(p) + flask(p) }),
+    p => ({ gearBack: cape(p.D) + potionPack, gearHead: goggles(), gearFront: apron(p) + flask(p, true) }),
+    p => ({ gearBack: aura('alchemist', '#8ef0c0') + cape(p.D) + potionPack, gearHead: goggles(true), gearFront: apron(p) + flask(p, true) }),
+    p => ({ gearBack: mythicAura('alchemist', '#b4ffd9', '#f2c14e') + cape(p.D) + potionPack + philosopherStone, gearHead: goggles(true) + tankCrown(p), gearFront: apron(p) + flask(p, true) }),
+  ],
+  monk: [
+    p => ({ gearHead: headband(p) }),
+    p => ({ gearHead: headband(p), gearFront: beads(p) + handWraps }),
+    p => ({ gearHead: headband(p), gearFront: monkRobe(p) + beads(p) + handWraps }),
+    p => ({ gearBack: cape(p.D), gearHead: headband(p), gearFront: monkRobe(p) + beads(p, true) + handWraps }),
+    p => ({ gearBack: aura('monk', '#ffc27a') + cape(p.D), gearHead: headband(p) + thirdEye(p), gearFront: monkRobe(p) + beads(p, true) + handWraps }),
+    p => ({ gearBack: mythicAura('monk', '#ffd9a0', '#f28c28') + orbs(p), gearHead: headband(p) + thirdEye(p), gearFront: monkRobe(p) + beads(p, true) + handWraps + lotus }),
   ],
 }

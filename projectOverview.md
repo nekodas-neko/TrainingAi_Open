@@ -2620,6 +2620,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][heart-rate] ⚠️ Half of the tab-switch cost is gone; the other half is untouched and neither has been measured on the phone (OR-162, 2026-09-26)
+
+`HrDayChart` is memoised by value, removing the 30 (Home) and 80 (Health) canvas `font` writes sweep 4a counted on **every** tab switch, all while the panel is hidden. **The arrival half is a different mechanism and is NOT fixed** — 180 on arriving at Home, 320 on Health, 43 for Wear Time. The sandbox can number neither: the e2e seed has no heart-rate readings, so the chart never renders there. **Pass test:** `DV-12` — every tab tap's longest task under 50 ms; 16 of 20 were 51–104 ms after #1675.
+
 ### [platform][app-shell] ⚠️ Health alerts and workout reminders posted to channels that did not exist — created, NOT seen on the phone (DV-21, 2026-09-26)
 
 Android drops a notification posted to a channel it has never been told about, silently, so illness/high-stress/low-readiness alerts and the daily workout reminder have never been able to appear. Both channels are created now (`health-alerts` importance 4, `workout-reminders` importance 3) and a source guard fails on any `channelId:` with no `createChannel`. **No APK needed** — it is WebView TypeScript. **Pass test:** on the S25 after a Railway deploy, both channels appear in the app's notification settings; force one health alert and it posts and opens `/health/readiness`. Still unknown: whether an alert was ever *attempted*, since a dropped post leaves nothing behind.
@@ -2627,7 +2631,9 @@ Android drops a notification posted to a channel it has never been told about, s
 ### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
 
 Drawn SVG cats replace the collection's emoji, with the emoji as fallback. The Home card is now an
-animated pen of every held, named cat over a backdrop scene (v1.468.0), and `/collection` lists them. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
+animated pen of every held, named cat over a backdrop scene (v1.468.0), and `/collection` lists them.
+The full design set (7 classes, 4 coats, 12 scenes) is catalogued in
+`docs/domains/app-shell/cat-collection-design-catalog.md`; review is PS-53. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
 **Pass test:** on the S25, turn on the Collection card. It shows a drawn cat, and `/collection`
 shows three drawn tiers per ladder. The owner's judgement is owed in BF-126 (`Verify: owner`).
 
