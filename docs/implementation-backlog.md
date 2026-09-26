@@ -5926,7 +5926,29 @@ drift.
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
   and mark the fresh half COULD NOT CHECK.
 
-### [workouts][nutrition][platform] DV-8 — local rows stick at `pending` after the server has applied the mutation: 36 food-delete tombstones, and one older `set_logs` row
+### [workouts][nutrition][platform] DV-8 — heal the rows already stuck at `pending`, and the one `set_logs` row that is a different bug
+
+- **✅ CAUSE OF THE TOMBSTONE STRAND FOUND AND FIXED 2026-09-26**
+  (`fix/dv8-strand-on-confirm-throw`, Lane A). Not a missing confirm arm: `pushMutations` deleted
+  the **whole batch's** outbox entries and *then* ran a hundred-line per-domain mark-synced loop
+  with **no error handling anywhere in it**. One arm throwing on a local read left every row after
+  it `pending` with its outbox entry already gone — nothing retries a mutation that is no longer
+  queued, and `applyDelta` only overwrites `synced` rows. The confirm now runs first, per row,
+  guarded, and the outbox is cleared only for rows that actually confirmed. **Reproduced by a test
+  against the old order**, not inferred from the symptom.
+- **⚠ THAT FIX DOES NOT EXPLAIN THE `set_logs` ROW, and must not be read as closing it.** The
+  id-reconciliation hypothesis below stands on its own evidence and is untouched by this change:
+  an orphaned `workout_session_id` is not something a confirm-ordering bug produces. Two causes,
+  one symptom.
+- **⚠ IT ALSO HEALS NOTHING.** The rows already stranded have no outbox entry to retry, so they
+  need a sweep — **that sweep is what keeps this entry open.**
+  - **Re-queue, do NOT mark synced.** A stranded tombstone is indistinguishable from one whose
+    mutation never got queued at all (the double-failure case `getStrandedPendingWorkouts` already
+    sweeps for), so marking it synced would silently drop a delete that never landed. Re-pushing is
+    idempotent — deleting an already-deleted row is a no-op — so the safe sweep re-queues and lets
+    the normal confirm path settle it. Copy `getStrandedPendingWorkouts`, grace period included, so
+    the sweep cannot race a push still in flight.
+- **Keep:** the heal above, and the `set_logs` id-reconciliation question.
 
 - **📱 It is common, not a one-off (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Local `food_logs` holds **36 rows stuck `pending` with
   both outboxes empty — every one a delete tombstone** (`deleted_at` set), spread over 14 days from

@@ -961,10 +961,21 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
 
   if (confirmed.length === 0) return anyRequestOk ? { pushed: 0 } : null;
 
-  await store.deleteMutations(confirmed.map(m => m.id));
+  // DV-8: the outbox is cleared AFTER each row is confirmed locally, never before. The loop
+  // below is a hundred lines of per-domain arms, any of which can throw on a local read or
+  // write; with the delete up front, one throw left every remaining row `pending` with its
+  // outbox entry already gone. Nothing retries a mutation that is no longer queued and
+  // `applyDelta` only overwrites `synced` rows, so those rows were stranded permanently — 36
+  // food tombstones over 14 days plus a set_logs row, measured on the phone.
+  //
+  // This is the same rule the Oura history cursor already follows: only advance past what is
+  // durably recorded. A re-push is free (every domain's handler is idempotent); a lost
+  // confirmation is not.
+  const confirmedIds: string[] = [];
 
   // Mark confirmed local records as synced
   for (const m of confirmed) {
+    try {
     if (m.domain === 'body_metrics') {
       const recs = await store.getBodyMetrics(m.date);
       const rec = recs.find(r => r.date === m.date);
@@ -1068,7 +1079,18 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
     } else if (m.domain === 'oura_daily_derived') {
       await store.markOuraDailyDerivedSynced(m.date);
     }
+      confirmedIds.push(m.id);
+    } catch (err) {
+      // Deliberately NOT recorded as a mutation failure: the server applied this one, so
+      // counting it toward the dead-letter budget would present a successful write as failed.
+      // The entry stays queued and the next push retries it, which self-heals as soon as the
+      // local write works. The cost is that a permanently-throwing arm retries forever — loud
+      // in the log, and strictly better than the silent permanent strand it replaces.
+      console.error('[sync] confirm failed, leaving mutation queued:', m.domain, err);
+    }
   }
+
+  await store.deleteMutations(confirmedIds);
 
   return { pushed: confirmed.length };
 }
