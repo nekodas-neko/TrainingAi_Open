@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-09-26 — CLAUDE.md → 1042 (a branch has meaning only if it has an open PR)
+## 2026-09-26 — CLAUDE.md → 1046 (branch-meaning rule, and auto-merge confirmed working)
 
 The owner asked that every branch have a reason. The rule that answers it is one line — **a branch
 has meaning only if it has an open PR, and a draft PR is how you mark work worth keeping** — and the
@@ -32,6 +32,12 @@ and no field at all. A draft PR is a fact GitHub maintains and cannot drift.
 **And why the sweep is not simply "no open PR → delete":** of 38 survivors, four held unmerged work
 for entries still in the queue, one of them rank 1 in `DV`. That is the sentence that stops the next
 session writing a one-line cleanup script and losing live work.
+
+**+4 more in the same PR: `enable_pr_auto_merge` was tested and it works**, so the passage that has
+now been wrong in both directions three times finally says something measured. It was enabled on this
+very PR while its checks were pending. The gotcha is recorded with it — the call refuses on an
+already-green PR, which is the tool declining rather than anything being broken, so enable it right
+after opening.
 
 ## 2026-09-26 — CLAUDE.md → 1028 (two repository settings that were wrong, and the squash-merge trap)
 

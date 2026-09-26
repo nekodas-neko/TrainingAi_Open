@@ -183,14 +183,18 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   one is not. **Measured 2026-09-20:** `main` took a commit roughly every
   8 minutes against a ~6-minute CI run, and Q-1a needed **five rebases and four refused merges** to
   land. This is a convention, not a code change, and it does not apply to implementer PRs — those
-  are already one change per PR for a reason. **⚠ The claim that `enable_pr_auto_merge` does NOT work
-  here is now STALE and is probably wrong (2026-09-26).** It failed with *"Protected branch rules not
-  configured for this branch"* — which was almost certainly the `ProtectMain` ruleset sitting at
-  Enforcement `Disabled`, the same root cause as OR-164. The ruleset is Active now and **Allow
-  auto-merge is enabled on the repository** (owner, 2026-09-26). **It has NOT been tested since**, so
-  do not record it as working either — try it, and correct this line with what happens. It is worth
-  trying: one session hand-merged five PRs and hit seven conflicts against a moving base, all of
-  which auto-merge would have absorbed.
+  are already one change per PR for a reason. **✅ `enable_pr_auto_merge` WORKS — tested 2026-09-26 on PR #1684 and it
+  enabled first try.** This line said it did **not** work, citing *"Protected branch rules not
+  configured for this branch"*; that was the `ProtectMain` ruleset sitting at Enforcement `Disabled`,
+  the same root cause as OR-164. The owner set the ruleset Active and ticked **Allow auto-merge** on
+  2026-09-26, and it has been exercised since rather than assumed.
+  **USE IT instead of hand-merging.** One session hand-merged five PRs and hit **seven** conflicts
+  against a moving base, every one of which auto-merge would have absorbed — it waits for the
+  required checks and merges the moment they pass, which is exactly the window a hand-merge loses to.
+  **One gotcha worth knowing:** `enable_pr_auto_merge` refuses on a PR that is ALREADY green —
+  *"already in clean status … auto-merge only applies when checks are pending"*. That is the tool
+  declining, not GitHub, and it is not evidence of anything being broken. Enable it **right after
+  opening the PR**, while checks are still running; on an already-green PR just merge directly.
 - **`Needs:` / `Gate:` / `Reference:` are fields, not prose.** `Needs:` names another entry and clears
   when that entry leaves the queue — **an absent target counts as shipped**, because the protocol
   removes completed entries. `Gate:` takes only `owner` or `device`. **`Reference:` marks an entry other

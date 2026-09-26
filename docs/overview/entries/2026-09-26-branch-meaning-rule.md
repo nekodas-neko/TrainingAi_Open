@@ -74,8 +74,9 @@ a re-run as restarting a 34-minute job.
 `remote:` line — a ruleset rejection would say `GH013`), and the four live-work branches need the
 owner's call first.
 
-**Auto-merge is still untested.** `enable_pr_auto_merge` on #1679 returned *"already in clean status
-… auto-merge only applies when checks are pending"* — that is the **tool** declining, not GitHub
-refusing, and it is a different error from the `"Protected branch rules not configured"` the claim
-rests on. It neither confirms nor refutes. A real test needs a PR with pending checks, attempted on
-this one.
+**Auto-merge was untested; it is now tested and it WORKS.** The first attempt, on #1679, returned
+*"already in clean status … auto-merge only applies when checks are pending"* — the **tool**
+declining, not GitHub refusing, and a different error from the `"Protected branch rules not
+configured"` the stale claim rested on. So it proved nothing either way. Re-attempted on **this PR
+while its checks were pending: enabled first try.** CLAUDE.md now says it works, with the gotcha
+that it must be enabled *before* the PR goes green.
