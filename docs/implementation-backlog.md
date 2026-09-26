@@ -793,6 +793,70 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **Do not retire the rank re-validation** (`RV-161` item 2's recommendation, now superseded). It was
   recommended on the belief that the ratings were not coming; they are not coming *from the current
   prompt*, which is a different finding with a different fix.
+- **⤷ ANSWERED 2026-09-26 by Tuning — the threshold, and two things this entry did not know.** Plan:
+  [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md).
+  Buildable halves filed as **`TN-81`** (Lane A, engine) and **`TN-82`** (Lane B, surface). The owner
+  re-stated the same design unprompted on 2026-09-26, so it is settled preference, not a suggestion.
+  Threshold: **median ±IQR over a trailing 28 nights, tuned to 4–6 prompts a month** — the rate is the
+  target, the multiplier is just how it is reached.
+- **What this entry got wrong by omission, both material.** **(a)** Its premise was that the current
+  *prompt* is the problem. Measured 2026-09-26 — **82 morning sheets over three months**, and in each
+  month exactly one field collected a handful of answers and it was a *different* field each month
+  (`wake_mood` 17 in July, sleep rating 3 in August, `vs_yesterday` 2 in September), each decaying to
+  zero. `perceived_recovery` is **0 touched in 102 check-ins**. Three affordances in three positions,
+  all dead — and `morning-checkin-sheet.tsx` already carries the "place the easy question first"
+  reasoning that produced the third. So the fix is **not a fourth field on that sheet**; on a gated
+  day the sheet asks one question and on an ordinary day it asks none. **(b)** A tails-only sample
+  **cannot validate the score** — it selects on the predictor under test, and the error that matters
+  most (a night scored *normal* that he would have called bad) is unsampled by construction. A random
+  **1 in 5** of ordinary nights, presented identically, fixes it for under two extra prompts a month.
+- **Keep:** the copy for the prompt is the owner's to approve — it rides with `TN-82`.
+
+### [sleep][platform] TN-81 — the outlier gate, and the score it gates on is stored nowhere
+
+- **Lane: A** — `packages/shared/src/health/**`, `lib/data/postgres/**` (migration). **Added:** 2026-09-26.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) · answers `OR-171`.
+- **Why it matters beyond one prompt:** Tuning has no validated outcome variable. `TN-73` produced the
+  only working instrument in the project and five other validation attempts failed for want of a
+  label. This is the cheapest label available, which is why the storage half is worth getting right.
+- **The measurement that sets the hard requirement:** `sleep_sessions` holds **119 rows for the last
+  120 days** — `duration_hours` on all 119, `average_hrv_ms` on 102 — and **`sleep_score` is non-null
+  on 0 of them.** The score is computed on read, never persisted. So **the score as shown must be
+  snapshotted beside the rating**: store only the rating and a later scoring change rewrites the
+  number the rating was given against, and every pairing decays into noise without a signal that it
+  happened. A rating whose paired score is not pinned is not evidence.
+- **Build:** rolling median/IQR baseline over stored inputs with a minimum-coverage guard (28 nights
+  needs 28 nights — `temperature-baseline.ts` is the in-repo precedent); a gate returning
+  `null | outlier_high | outlier_low | sampled`, **deterministic per date** so a re-render cannot
+  re-roll the 1-in-5 sample and flip the prompt away mid-morning; persist score-as-shown, the band,
+  and the prompt reason.
+- **Hard constraint, and it is `TN-57` verbatim:** an auto-filled or unprompted day writes
+  **`touched: false`**. `sleep_quality_feel_touched` exists because `sleep_quality` was defaulted to
+  `'ok'` for 91 days and two surfaces read that default back as the owner's answer. An auto-fill that
+  sets `touched: true` recreates that on purpose and destroys the variable this entry exists to create.
+  Coverage: `lib/__tests__/tn57-untouched-scales-are-not-answers.test.ts`.
+- **Migration ships its regenerated `claude_ro` twin in the same PR**, and the two TCP-`DATABASE_URL`
+  tests run before pushing (they skip under the full suite).
+
+### [sleep][app-shell] TN-82 — one question on a gated day, none on an ordinary one
+
+- **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
+- **Needs:** TN-81
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **This REPLACES the scales on gated days rather than joining them.** Adding a question to this sheet
+  is the intervention that has failed three times (see `OR-171`'s amendment for the month-by-month
+  decay); 82 consecutive saves have trained a reflex of hitting **Save** without reading, and a new
+  field inherits it. On an ordinary day the sheet asks nothing.
+- **Outlier and sampled prompts must render identically** — a distinguishable "routine check" invites
+  a different answering style and reintroduces the sampling bias by another route.
+- **Also covers scores that feel wrong** (owner, 2026-09-26: *"I think the above structure would work
+  for this too"*) — the same prompt with a one-tap *does this match?* against the displayed score.
+- **Ask:** owner — the prompt copy, and the copy only. A rare prompt lives or dies on its framing, and
+  it is cheap to review now and expensive to re-do after it has trained another reflex. Show it at
+  384 px dark. Deliberately **not** `Gate: owner`: gating parks the entry, and the build does not
+  need the copy settled to start — `Needs: TN-81` is the only real block here.
+- **Device:** the morning sheet is the canonical daily surface and the local store is on the write
+  path, so the pass needs the APK, not `pnpm dev`.
 
 ### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
