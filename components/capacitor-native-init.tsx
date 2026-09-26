@@ -8,6 +8,8 @@ import { WORKOUT_TIMERS_CHANNEL, ACTIVITY_DETECTION_CHANNEL } from '@/lib/notifi
 import { MEAL_REMINDERS_CHANNEL } from '@/lib/meal-reminders';
 import { SUPPLEMENT_REMINDERS_CHANNEL } from '@/lib/supplement-reminders';
 import { DAY_REVIEW_CHANNEL } from '@/lib/day-review-reminders';
+import { HEALTH_ALERTS_CHANNEL } from '@/lib/health-alerts';
+import { WORKOUT_REMINDERS_CHANNEL } from '@/lib/workout-reminders';
 import type { ScaleBlePlugin } from '@/lib/scale-ble/plugin';
 import { formatKg } from '@trainingai/shared/format/units'
 
@@ -191,6 +193,35 @@ export function CapacitorNativeInit() {
           id: ACTIVITY_DETECTION_CHANNEL,
           name: 'Activity detection',
           description: 'Alerts when a walk or run is detected and recording',
+          importance: 3,
+          visibility: 1,
+          vibration: false,
+        });
+        // DV-21: this one was missing for the whole life of the feature, and Android drops a post
+        // to a channel that does not exist without a word — every layer above it looked healthy.
+        //
+        // Importance 4 (heads-up) rather than the 3 the reminders use, because these three alerts
+        // (possible fever, sustained high stress, low readiness) are things to know BEFORE the day
+        // starts, they fire at most once per type per day, and a silent tray entry missed for a day
+        // is worth nothing. **An importance cannot be changed once Android has created the channel**
+        // — the Kotlin services carry `-v2` ids for exactly that reason — so raising it later would
+        // need a new id and a delete of this one on every installed device.
+        await LocalNotifications.createChannel({
+          id: HEALTH_ALERTS_CHANNEL,
+          name: 'Health alerts',
+          description: 'Possible illness, sustained high stress and low readiness',
+          importance: 4,
+          visibility: 1,
+          vibration: true,
+        });
+        // The same defect, found by the guard DV-21's fix came with rather than by a second
+        // sighting: `reconcileWorkoutReminder` runs from `sync-provider.tsx` and has been
+        // scheduling to `workout-reminders` with nothing creating it. Importance 3 like the other
+        // reminders — it is a time the owner asked for, not an anomaly.
+        await LocalNotifications.createChannel({
+          id: WORKOUT_REMINDERS_CHANNEL,
+          name: 'Workout reminders',
+          description: "Reminders that today's session is due",
           importance: 3,
           visibility: 1,
           vibration: false,
