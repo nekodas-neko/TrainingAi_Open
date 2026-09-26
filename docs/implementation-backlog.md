@@ -750,20 +750,40 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [platform] LA-148 — four `median` implementations, and one of them disagrees
+### [platform] LA-151 — eight more `median` copies, outside the shared health/workout core
 
-- **Lane: A** — `packages/shared/src/health/**`, `packages/shared/src/workout/time-audit.ts`.
-- **Added:** 2026-09-26, found while building TN-81's baselines.
-- **Measured:** `median` exists four times — `health/energy-balance.ts` (`medianOf`),
-  `health/daily-medians.ts`, `health/hr-smoothing.ts`, `workout/time-audit.ts`. Three agree
-  (average the two middles on an even count, `null` on empty). **`hr-smoothing.median` does not:
-  it returns the UPPER middle, and `0` on empty.** A zero bpm is a plausible-looking value, which
-  is what makes that the dangerous one.
-- `quantile` is now exported once (`daily-medians.ts`, added by TN-81) and `time-audit.ts` still
-  carries a private `quantileSorted` with the same definition — two copies that agree today.
-- **Not urgent and not free:** `hr-smoothing` is on a live display path, so changing its
-  empty-list answer from `0` to `null` needs its callers checked rather than a blind swap. That is
-  the whole of the work; the other three can move to one import.
+- **Lane: A** — `lib/activity/**`, `lib/health/daytime-stress.ts`, `lib/oura-ble/decode.ts`,
+  `app/api/oura-ble/step-counter-export/route.ts`, `packages/shared/src/health/sleep-staging.ts`,
+  `packages/shared/src/health/hrv-5min.ts`, `packages/shared/src/health/hr-recovery-by-exercise.ts`,
+  `packages/shared/src/health/sleep-score.ts`, `packages/shared/src/ai-periodization/acwr.ts`,
+  `packages/shared/src/workout/hrr-trend.ts`.
+- **Added:** 2026-09-26 by `LA-148`, which consolidated six copies into
+  `packages/shared/src/stats.ts` and found the population was larger than it had measured.
+  **`LA-148` said four; the real count was fourteen.** It had scoped its grep to
+  `packages/shared/src/health/**` plus one workout file, so everything in `lib/` and `app/api/`
+  was invisible to it — and four copies inside its own declared scope were missed as well.
+- **Measured 2026-09-26, after `LA-148` landed.** One implementation is now canonical
+  (`stats.ts`: average of the two middles, `null` on empty). These still have their own:
+
+  | where | even count | empty | note |
+  |---|---|---|---|
+  | `health/sleep-staging.ts` | **nearest-rank** | null | its own `quantile` too — rounds `q*(n-1)` instead of interpolating, so it is a genuinely DIFFERENT definition, not a copy |
+  | `health/hrv-5min.ts` | average | **NaN** | linear-interp at q=0.5, so equal to canonical; pinned to a `torch.quantile` source, and that citation is a reason to leave it |
+  | `health/hr-recovery-by-exercise.ts` | average | **NaN** | no empty guard at all |
+  | `health/sleep-score.ts` | average | **NaN** | inline arrow inside one function |
+  | `workout/hrr-trend.ts` | average | — | inline |
+  | `ai-periodization/acwr.ts` | **upper** | **0** | the same shape as the bug `LA-148` fixed |
+  | `lib/activity/cadence-tracker.ts` · `auto-detection-service.ts` · `lib/health/daytime-stress.ts` | avg | varies | three separate private copies |
+  | `lib/oura-ble/decode.ts` · `app/api/oura-ble/step-counter-export/route.ts` | avg / **lower** | — | the export route takes `sorted[floor((n-1)/2)]`, a THIRD tie-break |
+- **⛔ Not a mechanical sweep, and `LA-148`'s experience is the evidence.** Swapping the divergent
+  one there changed live-HR values on real fixtures and needed a display-boundary rounding decision;
+  five tests encoded the old tie-break deliberately, with comments. Each site here needs its empty
+  case and its tie-break checked against its callers before it moves.
+- **Take `acwr.ts` first** — upper-middle plus `0`-on-empty is exactly the pair that made
+  `hr-smoothing` the dangerous one, and ACWR feeds training-load advice.
+- **Leave `hrv-5min.ts` alone unless its citation is re-checked**: it mirrors an external model's
+  quantile and is equivalent at q=0.5 anyway, so consolidating it trades a real cross-reference
+  for no behavioural gain.
 
 ### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
 

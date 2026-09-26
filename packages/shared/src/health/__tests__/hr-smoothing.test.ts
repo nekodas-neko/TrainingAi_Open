@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { bucketAverage, rollingMedian, isPlausibleHrSample, median } from '../hr-smoothing'
+import { bucketAverage, rollingMedian, isPlausibleHrSample } from '../hr-smoothing'
+import { median } from '@trainingai/shared/stats'
 
 describe('bucketAverage', () => {
   it('groups points into buckets and rounds the mean', () => {
@@ -43,9 +44,11 @@ describe('rollingMedian', () => {
   })
 
   it('handles short input shorter than the window', () => {
-    // Window clamps to the available slice; both points share the same 2-element
-    // window here, so the upper-median tie-break yields 80 for both.
-    expect(rollingMedian([70, 80], 5)).toEqual([80, 80])
+    // Window clamps to the available slice; both points share the same 2-element window, so
+    // both take its median. 75, not 80 — the old private median returned the upper of the two
+    // middles (LA-148). Fractions are fine here: this feeds chart y-values and recovery-index,
+    // never a displayed bpm (the live readout rounds at its own boundary).
+    expect(rollingMedian([70, 80], 5)).toEqual([75, 75])
   })
 })
 
@@ -53,8 +56,8 @@ describe('median', () => {
   it('returns the middle value', () => {
     expect(median([60, 100, 80])).toBe(80)
   })
-  it('returns 0 for empty', () => {
-    expect(median([])).toBe(0)
+  it('returns null for empty — never 0, which reads as a real heart rate', () => {
+    expect(median([])).toBe(null)
   })
 })
 

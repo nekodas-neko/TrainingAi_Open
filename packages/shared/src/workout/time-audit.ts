@@ -34,20 +34,8 @@ export interface TimingSessionRow {
   warmupEndedAt: number | null // epoch ms
 }
 
-export function median(values: number[]): number | null {
-  if (values.length === 0) return null
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
-}
-
-function quantileSorted(sorted: number[], q: number): number | null {
-  if (sorted.length === 0) return null
-  const idx = (sorted.length - 1) * q
-  const lo = Math.floor(idx)
-  const hi = Math.ceil(idx)
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo)
-}
+import { median, quantile } from '@trainingai/shared/stats'
+export { median } from '@trainingai/shared/stats'
 
 // Below this many kept samples, a median is a guess, not a signal — the UI dims
 // the number rather than hiding it (a thin sample is still worth seeing, just not
@@ -102,8 +90,8 @@ export function robustStats(values: number[]): RobustStats {
     count: kept.length,
     outlierCount: values.length - kept.length,
     median: median(kept),
-    p25: quantileSorted(sorted, 0.25),
-    p75: quantileSorted(sorted, 0.75),
+    p25: quantile(sorted, 0.25),
+    p75: quantile(sorted, 0.75),
   }
 }
 
