@@ -989,6 +989,28 @@ below threshold and left in place for next time.
 
 ### [platform] LA-151 — eight more `median` copies, outside the shared health/workout core
 
+- **✅ `acwr.ts` DONE 2026-09-26** (`refactor/la151-acwr-median`) — **and this entry's reason for
+  taking it first was wrong.** It said the copy "feeds training-load advice". It does not:
+  `typicalSessionVolumeKg` is declared on `ActivityScoreInput` and **never read**, because
+  `Q-190` replaced the volume lane's denominator with the absolute `sessionVolumeGoalKg`
+  precisely so the target would stop chasing the user's own median. So the upper-middle bias
+  reached a **display** and nothing that computes.
+- **Measured before assuming, over the owner's real 119 sessions (180 days):** across the rolling
+  28-day windows the two tie-breaks differ on **39% of days**, always upward, median **1.85%**,
+  max **21%**. That is what the audit row has been showing; no score moved, so no owner gate.
+- **Two findings that came with it, neither in this entry:**
+  1. **`typicalSessionVolumeKg` is a dead input** on `ActivityScoreInput`, threaded from
+     `computeVolumeAcwr` through `readiness-payload.ts`, `build-day-audit.ts` and the
+     health-insight route into a function that ignores it. Removing it touches ~6 files and is
+     cleanup, not this fix — left here rather than widened into it.
+  2. **The score audit displayed a contradiction, now fixed.** Its `typicalSessionVolumeKg` row
+     read *"the volume-lane denominator"* directly beneath a `sessionVolumeGoalKg` row reading
+     *"deliberately NOT the median of your own sessions"*. Q-190 changed the first and left the
+     second's note behind.
+- **The lesson for the remaining seven:** this entry named the wrong consumer, and the measurement
+  that mattered took ten minutes. **Establish what actually reads the number before deciding how
+  risky its tie-break is** — the one that looked most dangerous was inert.
+
 - **Lane: A** — `lib/activity/**`, `lib/health/daytime-stress.ts`, `lib/oura-ble/decode.ts`,
   `app/api/oura-ble/step-counter-export/route.ts`, `packages/shared/src/health/sleep-staging.ts`,
   `packages/shared/src/health/hrv-5min.ts`, `packages/shared/src/health/hr-recovery-by-exercise.ts`,
