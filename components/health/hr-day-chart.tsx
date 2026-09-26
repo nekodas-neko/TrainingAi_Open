@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useMemo } from 'react'
+import { memo, useRef, useMemo } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -14,46 +14,21 @@ import {
   type Plugin,
 } from 'chart.js'
 import { useHeroColorScheme } from './detail-hero'
-import type { HrSleepWindow } from '@trainingai/shared/health/hr-sleep-band'
 import { stressOverlay } from './hr-stress-overlay'
-import type { StressBucket } from '@/components/body-battery/stress-day'
 import { bucketAverage } from '@trainingai/shared/health/hr-smoothing'
 import { withGapBreaks, interpolateGaps } from './hr-day-chart-gaps'
+import {
+  hrDayChartPropsEqual,
+  type HrDayChartProps as Props,
+  type HrDayReading as Reading,
+  type HrDayWorkoutSession as WorkoutSession,
+} from './hr-day-chart-equal'
 
 export { withGapBreaks }
 
 ChartJS.register(LineElement, PointElement, LinearScale, Filler, Tooltip)
 
-interface Reading {
-  timestamp: string
-  bpm: number
-  source: string | null
-}
-
 interface TimeWindow { start: number; end: number }
-
-interface WorkoutSession { sessionName: string; startedAt: string; completedAt: string | null }
-
-interface Props {
-  readings: Reading[]
-  date: string  // YYYY-MM-DD in user's tz
-  workoutSessions?: WorkoutSession[]
-  compact?: boolean
-  showLegend?: boolean
-  lineColor?: string
-  sleepWindow?: HrSleepWindow | null  // primary sleep interval (minutes-of-day); overrides the source heuristic
-  /**
-   * TN-3b — the day's stress buckets, drawn against the same clock as the heart rate so the
-   * owner can read one against the other. Omitted by callers that do not fetch it; an empty
-   * array draws nothing rather than an empty axis.
-   */
-  stressSeries?: StressBucket[]
-  /** The zone the buckets are placed in. Required with `stressSeries`; device-local would
-   *  put a Brisbane morning in the afternoon on a travelling phone. */
-  stressTimezone?: string
-  bucketMinutes?: number  // bucket width for smoothing; larger = smoother/less granular line
-  showBackfill?: boolean  // opt-in: draw a dashed, clearly-labeled estimated line across real coverage gaps
-}
 
 function toMinutes(timestamp: string, midnightMs: number): number {
   return (new Date(timestamp).getTime() - midnightMs) / 60_000
@@ -108,7 +83,7 @@ const HOUR_LABELS: Record<number, string> = {
 
 interface WindowDef { window: TimeWindow; fill: string; stroke: string; label: string; name: string }
 
-export function HrDayChart({ readings, date, workoutSessions = [], compact = false, showLegend, lineColor, sleepWindow, bucketMinutes, showBackfill, stressSeries, stressTimezone }: Props) {
+function HrDayChartBase({ readings, date, workoutSessions = [], compact = false, showLegend, lineColor, sleepWindow, bucketMinutes, showBackfill, stressSeries, stressTimezone }: Props) {
   const scheme = useHeroColorScheme()
   const isLight = scheme === 'light'
   const windowDefsRef = useRef<WindowDef[]>([])
@@ -296,3 +271,10 @@ export function HrDayChart({ readings, date, workoutSessions = [], compact = fal
     </div>
   )
 }
+
+/**
+ * Memoised by value (OR-162). Both call sites refetch on the tab-switch epoch and hand back a
+ * fresh array holding the same day, so the default identity compare would never skip a render —
+ * see `hrDayChartPropsEqual` for what that costs on the device.
+ */
+export const HrDayChart = memo(HrDayChartBase, hrDayChartPropsEqual)
