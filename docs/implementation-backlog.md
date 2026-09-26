@@ -805,6 +805,91 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 - **Do not retire the rank re-validation** (`RV-161` item 2's recommendation, now superseded). It was
   recommended on the belief that the ratings were not coming; they are not coming *from the current
   prompt*, which is a different finding with a different fix.
+- **⤷ ANSWERED 2026-09-26 by Tuning — and the answer is that it should NOT ASK.** Plan:
+  [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md).
+  Buildable halves filed as **`TN-81`** (Lane A, engine) and **`TN-82`** (Lane B, surface). The owner
+  re-stated the same design unprompted on 2026-09-26, so it is settled preference, not a suggestion.
+  Threshold: **median ±IQR over a trailing 28 nights, tuned to 4–6 prompts a month** — the rate is the
+  target, the multiplier is just how it is reached.
+- **The owner refined it past this entry's framing, 2026-09-26:** *"auto fill to normal when readings
+  dont say anything strange … But if our results say something diferent (i.e sleep was later; or short
+  or etc etc) then it can say; your values was bad; this has autofilled this category"*. So the app
+  **announces** what it filled and why, and his only interaction is **correcting it when it is wrong**.
+  No question is ever asked. A correction is a disagreement, which is worth more than any rating —
+  35 neutral 3s said nothing; three corrections would say where the model is wrong and which way.
+- **What this entry got wrong by omission, both material.** **(a)** Its premise was that the current
+  *prompt* is the problem. Measured 2026-09-26 — **82 morning sheets over three months**, and in each
+  month exactly one field collected a handful of answers and it was a *different* field each month
+  (`wake_mood` 17 in July, sleep rating 3 in August, `vs_yesterday` 2 in September), each decaying to
+  zero. `perceived_recovery` is **0 touched in 102 check-ins**. Three affordances in three positions,
+  all dead — and `morning-checkin-sheet.tsx` already carries the "place the easy question first"
+  reasoning that produced the third. So the fix is **not a fourth field on that sheet** — **asking** is
+  what failed, in every affordance and position that sheet has. **(b)** Asking only on outliers
+  **cannot validate the score**: it selects on the predictor under test, and the error that matters
+  most (a night scored *normal* that he would have called bad) is unsampled by construction. The
+  owner's announce-on-every-day design **dissolves** this rather than mitigating it — an ordinary day is
+  announced too, so a wrong "normal" is as correctable as a wrong "poor", with no extra prompts and no
+  random sampling.
+- **The new risk, and the plan carries a guard for it:** silence is ambiguous, and **zero corrections
+  reads exactly like success** — the same shape as the 35-of-36 neutral 3s. A month of near-zero
+  corrections means the instrument FAILED, not that the model is validated.
+- **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
+
+### [sleep][platform] TN-81 — the verdict, the snapshot, and the three response states
+
+- **Lane: A** — `packages/shared/src/health/**`, `lib/data/postgres/**` (migration). **Added:** 2026-09-26.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) · answers `OR-171`.
+- **Why it matters beyond one prompt:** Tuning has no validated outcome variable. `TN-73` produced the
+  only working instrument in the project and five other validation attempts failed for want of a
+  label. This is the cheapest label available, which is why the storage half is worth getting right.
+- **The measurement that sets the hard requirement:** `sleep_sessions` holds **119 rows for the last
+  120 days** — `duration_hours` on all 119, `average_hrv_ms` on 102 — and **`sleep_score` is non-null
+  on 0 of them.** The score is computed on read, never persisted. So **the verdict and the values
+  behind it must be snapshotted**: store only the outcome and a later scoring change rewrites what each
+  correction was disagreeing with, and the corrections decay into noise with no signal that it
+  happened. A correction whose paired verdict is not pinned is not evidence.
+- **Build:** **per-component** rolling median/IQR baselines (duration, onset time, efficiency) with a
+  minimum-coverage guard — 28 nights needs 28 nights, `temperature-baseline.ts` is the in-repo
+  precedent. The owner named the inputs (*"sleep was later; or short"*), so the gate reads components
+  rather than only a composite: a night of normal duration that started two hours late is strange, and
+  a composite averages that away. Verdict is `normal | poor | good` **plus which components triggered
+  it**, because the reason is what gets announced and a verdict with no stated cause cannot be argued
+  with. Persist the verdict, the component values behind it, the bands, and the response state
+  (`none | acknowledged | corrected`).
+- **Hard constraint, and it is `TN-57` verbatim:** the auto-filled value writes **`touched: false`**;
+  **only a correction writes `touched: true`** and the owner's value. That one rule is the whole
+  difference between "the app's guess" and "his answer", and every analysis downstream rests on it.
+  `sleep_quality_feel_touched` exists because `sleep_quality` was defaulted to `'ok'` for 91 days and
+  two surfaces read that default back as the owner's answer. **Never infer a label from an announcement
+  he did not respond to.** Coverage: `lib/__tests__/tn57-untouched-scales-are-not-answers.test.ts`.
+- **Migration ships its regenerated `claude_ro` twin in the same PR**, and the two TCP-`DATABASE_URL`
+  tests run before pushing (they skip under the full suite).
+
+### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
+
+- **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
+- **Needs:** TN-81
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
+  interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
+  than usual — marked this poor"), one tap to correct, and a deliberate dismissal recorded as
+  acknowledgement. The reason is load-bearing: a verdict with no stated cause cannot be argued with.
+- **This REPLACES the two scales rather than joining them.** **Asking** is the intervention that has
+  failed three times (see `OR-171`'s amendment for the month-by-month decay); 82 consecutive saves have
+  trained a reflex of hitting **Save** without reading, and a fourth field inherits it.
+- **Also covers scores that feel wrong** (owner: *"I think the above structure would work for this
+  too"*) — and under this design they are **the same feature**, because a correction *is* the report
+  that the score felt wrong. He never has to remember to report anything, which was the original
+  problem (*"If I remember; I will let you know"*).
+- **The failure mode to watch is him not reading it** — see `OR-171`'s guard. That is why the quiet line
+  stays quiet and the loud one stays rare: announce loudly twice a week and it becomes wallpaper.
+- **Ask:** owner — the announcement copy, and the copy only. The whole design rests on an announcement
+  he will actually read. A rare prompt lives or dies on its framing, and
+  it is cheap to review now and expensive to re-do after it has trained another reflex. Show it at
+  384 px dark. Deliberately **not** `Gate: owner`: gating parks the entry, and the build does not
+  need the copy settled to start — `Needs: TN-81` is the only real block here.
+- **Device:** the morning sheet is the canonical daily surface and the local store is on the write
+  path, so the pass needs the APK, not `pnpm dev`.
 
 ### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
