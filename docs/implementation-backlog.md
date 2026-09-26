@@ -581,6 +581,102 @@ below threshold and left in place for next time.
 - **Reversal cost:** none — three constants and one selection function, no stored state. The
   collection is a replay, so nothing here can corrupt history.
 
+### [app-shell] BF-205 — the home "Reorder sections" button cannot reorder anything; every part of the feature exists except the gesture
+
+- **Lane:** B — `components/home-sortable-section.tsx`, `app/session-select/session-select-content.tsx`.
+- **Added:** 2026-09-26 · owner: *"when I click the grid button on the home screen I cannot move
+  widgets and re-arrange them."*
+- **Needs:** — nothing.
+- **This is not a broken drag; there is NO drag.** `HomeSortableSection` is named *Sortable*, takes
+  an `id`, and is 30 lines containing one **hide** button and nothing else — no `useSortable`, no
+  `DndContext`, no pointer or touch handler, no drag handle. `@dnd-kit` is a repo dependency and is
+  used by `components/config/sortable-row.tsx`; the home surface never imports it.
+- **Everything around the gesture is already built, which is why it reads as broken rather than
+  absent.** The header button sets `sectionEditMode` and is labelled `aria-label="Reorder sections"`
+  with `aria-pressed`. State is `sectionOrder`, persisted through `loadSectionOrder` /
+  `saveSectionOrder`. There is a `sectionOrderRef` kept in sync by a `useLayoutEffect` whose comment
+  reads *"so drag/sync handlers can read it synchronously"*. **Only the `/sync` half of that comment
+  was ever written.**
+- **Verified by enumeration, not by reading around:** `setSectionOrder` has exactly **four** call
+  sites (`session-select-content.tsx:162, 193, 231, 972`) — the initial state, two loads from
+  storage, and the reconciliation that runs when a card widget is toggled on or off in More. **No
+  code path anywhere responds to user input by changing the order.**
+- **So edit mode's only real capability is HIDE**, which the eye-off button does, plus the hidden-
+  sections restore panel below the list. That half works.
+- **Recommendation: implement the drag with `@dnd-kit`, and follow `sortable-row.tsx`** rather than
+  hand-rolling pointer handling — the repo already made this call once, CLAUDE.md says prefer the
+  installed library, and the persistence layer it needs to write into is already there. **Second,
+  smaller option if that is too much for one pass: up/down arrow buttons in edit mode.** It is worse
+  to use and strictly easier to build, and it would make the button honest today. Do **not** ship
+  the label without one of them.
+- **Reversal cost:** low. The storage format and the order state already exist and are unchanged by
+  either option; only the input method is new.
+- **Verify on the device.** Drag on a Samsung WebView inside a vertically scrolling container is
+  exactly where a direction-lock bug appears, per the touch/gesture rules in
+  `docs/mobile-ui-and-performance.md`. Pass/fail: a section can be moved, the new order survives
+  leaving and re-entering Home, and a plain vertical scroll in edit mode does not pick anything up.
+
+### [app-shell] BF-206 — the Coach button covers 56 px of Home that nothing reserves, and nothing on screen says what it is
+
+- **Lane:** B — `components/coach/coach-fab.tsx`, `app/session-select/session-select-content.tsx`,
+  `app/globals.css`.
+- **Added:** 2026-09-26 · owner, on the Home screenshot: *"there is that button on the widget the
+  white circle."* Two problems in one control.
+- **Needs:** — nothing.
+- **① The reserved space is one control short, and the arithmetic is exact.** Home's scroll
+  container uses `pb-nav-safe` = `3.5rem + inset + 0.75rem` — the **nav bar only**. The FAB is
+  `bottom-fab-safe` (`3.5rem + 0.75rem + inset`) and `h-14`, so its top edge sits **56 px above the
+  padding that was reserved**. The bottom 56 px of the scroll, on the right-hand side, can never be
+  scrolled clear of it. On the owner's screenshot that is the day-timeline's "Upper · 43 min · 11
+  sets · 5 exercises" row, partly behind the button.
+  **Fix: a `pb-fab-safe` utility** (`nav + gutter + 3.5rem + inset`) applied to Home's
+  `scrollClassName`, beside the existing `pb-nav-safe` in `globals.css`. Home is the only screen
+  mounting `CoachFab`, so nothing else changes.
+- **② Nothing identifies it.** The control is a `SparklesIcon` in a filled circle with **no visible
+  text**; the only thing naming it is `aria-label="Open AI Coach"`. A sparkle is the app's generic
+  "AI" mark — it is also on the weekly-recap banner, the meal-source row and the profile tab — so it
+  names a *category*, not this destination.
+  **Recommendation: an extended FAB — the icon with a short "Coach" label beside it**, which is the
+  standard treatment for a primary action whose icon is not self-evident and costs one span.
+  Alternative: leave it iconic and teach it with a one-time tooltip; cheaper, but it only works once
+  and is invisible to anyone who dismisses it.
+- **Checked and NOT a finding: the colour.** `bg-foreground text-background` reads as a stark white
+  circle in the dark theme, but it is the repo's standard filled-control treatment — segmented tabs,
+  coach messages, macro targets, the goal and personal-detail toggles and the calendar's today cell
+  all use it. It is consistent, so it is not what to change.
+- **Reversal cost:** none. One CSS utility and one label.
+- **Verify on the device**, three-button nav *and* gesture nav: scroll Home to the very bottom and
+  confirm the last row clears the button. Per the device rule, an inset read of `0` under
+  three-button navigation makes a broken clearance look correct, so both modes are required.
+
+### [app-shell] BF-207 — the collection's explanation is 177 words of 12 px grey prose for a mechanic that is entirely visual
+
+- **Lane: O** · **Added:** 2026-09-26 · owner: *"the info page isnt TOO well designed."* Ungated on
+  purpose: this is a judgement about looks, so it waits for him rather than going to a lane.
+- **Ask:** owner — approve a direction for the `/collection` explanation, or name your own.
+- **What is there now, measured:** `Rules()` in `app/collection/collection-content.tsx` is a single
+  card holding **four paragraphs, 177 words**, all at `text-xs` (12 px) in `text-muted-foreground`,
+  with one bolded lead-in per paragraph and no other structure. It sits below three ladder cards
+  that already draw the cats.
+- **The prose itself is good and should not be rewritten.** It reads plainly, and every number in it
+  is interpolated from the engine's own constants rather than typed, so it cannot drift from the
+  fold — that property is worth keeping through any redesign.
+- **The mismatch is form, not content.** The four things it explains — one a day, three merge
+  upward, a gap costs the smallest one, your own rest days are free — are each a picture: three
+  small cats becoming one big one says the second paragraph without words.
+- **Recommendation: keep the four rules and give each one a small diagram, with the sentence as its
+  caption.** The sprites and the merge costs are already imported into this file, so the diagrams
+  can be drawn from the live ladder rather than as fixed art, and they keep the no-drift property.
+  It is the durable option: it stays correct when PS-49 changes the costs to 3→1 and adds six tiers.
+  **Alternative ① — leave the prose, fix only the typography** (body at 14 px, normal foreground,
+  more space). An hour's work and genuinely better to read; it does not make the page explain
+  anything faster.
+  **Alternative ② — make it interactive**: a worked example stepping through a fortnight of the
+  owner's own days. Best at teaching, and the most to build and maintain.
+- **Sequencing: this is worth doing AFTER PS-49**, not before. v2 changes every number on the page
+  and adds three tiers, so a redesign now is a redesign twice. Nothing breaks by waiting.
+- **Reversal cost:** low — one component, no state, no stored data.
+
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — ~~needs the owner's call on the four, then~~ **RUNNABLE NOW.** This entry's own
