@@ -31500,25 +31500,6 @@ indefinitely.
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
 
-### [heart-rate][workouts] LA-150 — the per-set HR backfill work list can never drain, and reads as broken
-
-- **Lane: A** — `lib/data/postgres/slices/oura.ts:1390` (`listSessionsMissingSetHrStats`).
-- **Added:** 2026-09-26, on discharging Q-11.
-- **What.** The work list selects sessions whose `MAX(readings_count) = 0`, which is right — a
-  completion-time compute can run before the ring has drained, and its empty rows must not remove
-  the session from the list permanently (that was Q-11's Defect B). But **33 sessions can never
-  acquire a reading**, because they finished before `oura_heartrate` holds anything. They match the
-  predicate forever, so every future run reports the same *33 remaining, 0 filled*.
-- **Why it matters more than it sounds:** that output is indistinguishable from a broken backfill.
-  The device agent ran it on 2026-09-24 and reasonably asked whether the raw samples had been
-  pruned. Anyone who runs it next will ask the same question.
-- **Fix:** bound the scan at the earliest `oura_heartrate.timestamp` rather than a flat 180 days —
-  the retention constant is the wrong floor while the table is younger than its own window. A row
-  the compute cannot fill is not pending work.
-- **Do NOT "fix" it by writing a sentinel `set_hr_stats` row** for those sessions: the coverage-aware
-  predicate exists precisely because empty rows used to hide real gaps, and re-introducing one under
-  another name walks back into Defect B.
-
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
 - **Reference:** don't build — the entry's own verdict, made a field 2026-09-24 by RV-189 so it stops
