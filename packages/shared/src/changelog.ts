@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.63",
+    date: "2026-09-26",
+    changes: [
+      "Switching to the Health tab no longer redraws its five trend charts from scratch each time. They only redraw when their numbers have actually changed, which takes work off the tab switch itself.",
+    ],
+  },
+  {
     version: "1.465.62",
     date: "2026-09-25",
     changes: [
