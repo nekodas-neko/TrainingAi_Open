@@ -525,6 +525,158 @@ below threshold and left in place for next time.
 - **Design edits welcome:** everything regenerates from `scripts/collection-art/`; the drift test
   keeps `public/cats/` honest.
 
+### [app-shell] BF-204 — the pen always draws its TWELVE LARGEST cats on one line, so it is crowded by construction
+
+- **Lane:** B — `components/home/collection-pen.tsx`, `components/home/collection-pen-cats.ts`.
+- **Added:** 2026-09-26 · owner's first real use of the collection, on the S25: *"Its a bit cramped
+  in there. Might be too many at once. We should probably do sime more tuning."*
+- **Needs:** — nothing. This is a layout defect, not a rules question; it reproduces identically
+  under PS-49's v2 constants, so it does **not** wait on them.
+- **This is NOT "the hash clustered them".** Three separate mechanisms each guarantee crowding, and
+  they compound. All three are read off the code, not inferred from the screenshot.
+  **① The shown set is sorted into the worst case.** `penCats` does
+  `all.sort((a, b) => b.tier - a.tier)` then `.slice(0, MAX_SHOWN)`, so the twelve drawn are always
+  the twelve **largest**. The pen never draws a 34 px slime while a 50 px Tank exists. Twelve T2s is
+  **600 px of sprite in a 348 px pen — 1.72×.** (Pen width = 412 dp − 32 page − 32 card padding.)
+  **② Same tier means same vertical band, so they land on one line.** `BAND` gives tier 2 the
+  interval `[32, 44]`, a **12 px** spread. The depth-by-tier design that is supposed to separate
+  them does nothing once the shown set is one tier, which ① makes the normal case.
+  **③ The slots are narrower than the sprites.** `348 / 12 = 29 px` per slot against 34–50 px
+  sprites, so neighbours overlap by ~13 px at T1 **before any wander** — and the wander is
+  `±0.33 × pen width = ±115 px`, which is **±4 slots**.
+- **The pen is 176 px tall and v1 can only reach the bottom 44 px of it.** `SIZE` and `BAND` carry
+  six entries and `FLYING_FROM_TIER = 4`, but every v1 ladder in `LADDERS` has **three** tiers, so
+  bands 3–5 and the whole flying mechanic are unreachable. **17 % of the pen's height is in use and
+  ~75 % is empty sky** — which is exactly the shape of the owner's screenshot: a large empty night
+  sky above one jammed row. The vertical room the design allocated for spreading cats out exists
+  and cannot be reached.
+- **Name tags collide worse than the sprites do, and they are the part that reads as broken.** Each
+  tag is `whitespace-nowrap` at `text-[9px]` plus `px-1`, centred on its cat, so a 34 px slime
+  carries a ~38 px tag. Twelve six-character names ≈ **456 px against 348 px (1.31×)**; eight
+  characters is **1.66×**. On the owner's screenshot "Beaso" is occluded and "Har", "P" and "Xecom"
+  are each clipped mid-word by a neighbour.
+- **Why he has enough cats for this to bite, measured on production 2026-09-26:** 106 workout days,
+  149 step days, 106 sleep days. Replayed against the v1 costs that is ≈ 22 cats, of which ≈ 13 are
+  **top-tier** — so by ① the twelve drawn are essentially all Tanks, Archers and Clerics at 50 px.
+  His card reports 12 shown + "+12 more" = **24**, consistent with that to within the decay events
+  the estimate does not model.
+- **Four fixes, cheapest first. ①–③ are one file each and independent; the recommendation is all of
+  ① ② ③ and NOT ④.**
+  ① **Stop sorting into the worst case** — take a spread across tiers rather than the top N (e.g.
+  fill by tier round-robin, rarest-first but never more than k per tier). One function in
+  `collection-pen-cats.ts`, no layout change, and it fixes ② for free because a mixed set occupies
+  mixed bands.
+  ② **Make `MAX_SHOWN` fit the measured width** rather than a constant 12 — at 348 px and 50 px
+  sprites, ~6 fit without overlap. The pen already measures itself (`--pen-w` via the
+  `ResizeObserver`), so the number can come from the observer instead of being guessed.
+  ③ **Tags on demand, not on all twelve** — show the name for the rarest few, or on tap, or none
+  below a size threshold. The clipped-name effect is the loudest symptom and this is the cheapest
+  thing that removes it.
+  ④ **Do NOT stretch the bands to fill the empty sky.** Tempting and wrong: PS-49 brings six tiers,
+  at which point bands 3–5 and the flyers become reachable and the sky is spoken for. Widening them
+  now is work that v2 undoes.
+- **Verify on the device, not in the sandbox.** This is a Samsung WebView layout at a real width
+  with real names; a desktop viewport at 384 px will not reproduce the tag collisions faithfully.
+  Owner-visible pass/fail: no name clipped by a neighbour, and no cat fully hidden behind another.
+- **Reversal cost:** none — three constants and one selection function, no stored state. The
+  collection is a replay, so nothing here can corrupt history.
+
+### [app-shell] BF-205 — the home "Reorder sections" button cannot reorder anything; every part of the feature exists except the gesture
+
+- **Lane:** B — `components/home-sortable-section.tsx`, `app/session-select/session-select-content.tsx`.
+- **Added:** 2026-09-26 · owner: *"when I click the grid button on the home screen I cannot move
+  widgets and re-arrange them."*
+- **Needs:** — nothing.
+- **This is not a broken drag; there is NO drag.** `HomeSortableSection` is named *Sortable*, takes
+  an `id`, and is 30 lines containing one **hide** button and nothing else — no `useSortable`, no
+  `DndContext`, no pointer or touch handler, no drag handle. `@dnd-kit` is a repo dependency and is
+  used by `components/config/sortable-row.tsx`; the home surface never imports it.
+- **Everything around the gesture is already built, which is why it reads as broken rather than
+  absent.** The header button sets `sectionEditMode` and is labelled `aria-label="Reorder sections"`
+  with `aria-pressed`. State is `sectionOrder`, persisted through `loadSectionOrder` /
+  `saveSectionOrder`. There is a `sectionOrderRef` kept in sync by a `useLayoutEffect` whose comment
+  reads *"so drag/sync handlers can read it synchronously"*. **Only the `/sync` half of that comment
+  was ever written.**
+- **Verified by enumeration, not by reading around:** `setSectionOrder` has exactly **four** call
+  sites (`session-select-content.tsx:162, 193, 231, 972`) — the initial state, two loads from
+  storage, and the reconciliation that runs when a card widget is toggled on or off in More. **No
+  code path anywhere responds to user input by changing the order.**
+- **So edit mode's only real capability is HIDE**, which the eye-off button does, plus the hidden-
+  sections restore panel below the list. That half works.
+- **Recommendation: implement the drag with `@dnd-kit`, and follow `sortable-row.tsx`** rather than
+  hand-rolling pointer handling — the repo already made this call once, CLAUDE.md says prefer the
+  installed library, and the persistence layer it needs to write into is already there. **Second,
+  smaller option if that is too much for one pass: up/down arrow buttons in edit mode.** It is worse
+  to use and strictly easier to build, and it would make the button honest today. Do **not** ship
+  the label without one of them.
+- **Reversal cost:** low. The storage format and the order state already exist and are unchanged by
+  either option; only the input method is new.
+- **Verify on the device.** Drag on a Samsung WebView inside a vertically scrolling container is
+  exactly where a direction-lock bug appears, per the touch/gesture rules in
+  `docs/mobile-ui-and-performance.md`. Pass/fail: a section can be moved, the new order survives
+  leaving and re-entering Home, and a plain vertical scroll in edit mode does not pick anything up.
+
+### [app-shell] BF-206 — the Coach button covers 56 px of Home that nothing reserves, and nothing on screen says what it is
+
+- **Lane:** B — `components/coach/coach-fab.tsx`, `app/session-select/session-select-content.tsx`,
+  `app/globals.css`.
+- **Added:** 2026-09-26 · owner, on the Home screenshot: *"there is that button on the widget the
+  white circle."* Two problems in one control.
+- **Needs:** — nothing.
+- **① The reserved space is one control short, and the arithmetic is exact.** Home's scroll
+  container uses `pb-nav-safe` = `3.5rem + inset + 0.75rem` — the **nav bar only**. The FAB is
+  `bottom-fab-safe` (`3.5rem + 0.75rem + inset`) and `h-14`, so its top edge sits **56 px above the
+  padding that was reserved**. The bottom 56 px of the scroll, on the right-hand side, can never be
+  scrolled clear of it. On the owner's screenshot that is the day-timeline's "Upper · 43 min · 11
+  sets · 5 exercises" row, partly behind the button.
+  **Fix: a `pb-fab-safe` utility** (`nav + gutter + 3.5rem + inset`) applied to Home's
+  `scrollClassName`, beside the existing `pb-nav-safe` in `globals.css`. Home is the only screen
+  mounting `CoachFab`, so nothing else changes.
+- **② Nothing identifies it.** The control is a `SparklesIcon` in a filled circle with **no visible
+  text**; the only thing naming it is `aria-label="Open AI Coach"`. A sparkle is the app's generic
+  "AI" mark — it is also on the weekly-recap banner, the meal-source row and the profile tab — so it
+  names a *category*, not this destination.
+  **Recommendation: an extended FAB — the icon with a short "Coach" label beside it**, which is the
+  standard treatment for a primary action whose icon is not self-evident and costs one span.
+  Alternative: leave it iconic and teach it with a one-time tooltip; cheaper, but it only works once
+  and is invisible to anyone who dismisses it.
+- **Checked and NOT a finding: the colour.** `bg-foreground text-background` reads as a stark white
+  circle in the dark theme, but it is the repo's standard filled-control treatment — segmented tabs,
+  coach messages, macro targets, the goal and personal-detail toggles and the calendar's today cell
+  all use it. It is consistent, so it is not what to change.
+- **Reversal cost:** none. One CSS utility and one label.
+- **Verify on the device**, three-button nav *and* gesture nav: scroll Home to the very bottom and
+  confirm the last row clears the button. Per the device rule, an inset read of `0` under
+  three-button navigation makes a broken clearance look correct, so both modes are required.
+
+### [app-shell] BF-207 — the collection's explanation is 177 words of 12 px grey prose for a mechanic that is entirely visual
+
+- **Lane: O** · **Added:** 2026-09-26 · owner: *"the info page isnt TOO well designed."* Ungated on
+  purpose: this is a judgement about looks, so it waits for him rather than going to a lane.
+- **Ask:** owner — approve a direction for the `/collection` explanation, or name your own.
+- **What is there now, measured:** `Rules()` in `app/collection/collection-content.tsx` is a single
+  card holding **four paragraphs, 177 words**, all at `text-xs` (12 px) in `text-muted-foreground`,
+  with one bolded lead-in per paragraph and no other structure. It sits below three ladder cards
+  that already draw the cats.
+- **The prose itself is good and should not be rewritten.** It reads plainly, and every number in it
+  is interpolated from the engine's own constants rather than typed, so it cannot drift from the
+  fold — that property is worth keeping through any redesign.
+- **The mismatch is form, not content.** The four things it explains — one a day, three merge
+  upward, a gap costs the smallest one, your own rest days are free — are each a picture: three
+  small cats becoming one big one says the second paragraph without words.
+- **Recommendation: keep the four rules and give each one a small diagram, with the sentence as its
+  caption.** The sprites and the merge costs are already imported into this file, so the diagrams
+  can be drawn from the live ladder rather than as fixed art, and they keep the no-drift property.
+  It is the durable option: it stays correct when PS-49 changes the costs to 3→1 and adds six tiers.
+  **Alternative ① — leave the prose, fix only the typography** (body at 14 px, normal foreground,
+  more space). An hour's work and genuinely better to read; it does not make the page explain
+  anything faster.
+  **Alternative ② — make it interactive**: a worked example stepping through a fortnight of the
+  owner's own days. Best at teaching, and the most to build and maintain.
+- **Sequencing: this is worth doing AFTER PS-49**, not before. v2 changes every number on the page
+  and adds three tiers, so a redesign now is a redesign twice. Nothing breaks by waiting.
+- **Reversal cost:** low — one component, no state, no stored data.
+
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — ~~needs the owner's call on the four, then~~ **RUNNABLE NOW.** This entry's own
@@ -5683,8 +5835,35 @@ drift.
 
 - **Lane: O** — `projectOverview.md` and the archive are the Orchestrator's.
 - **Added:** 2026-09-24 · Review sweep 55, §§3–4 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
-- **Move to `known-issues-resolved.md`:** the §4 list. Each carries its evidence (a commit, a sweep
-  result or a production read). Five were settled by production reads this sweep:
+- **⛔ THE §4 MOVE LIST IS WRONG AND MUST NOT BE APPLIED AS WRITTEN — tested row by row, 2026-09-26
+  (OR-180).** Eleven of its rows were checked against the archive rule (*move only when nothing is
+  still owed*) and **all eleven failed it.** Not one is safe to archive:
+  | row | why it stays |
+  |---|---|
+  | `LB-107` | the back gesture is still owed on the S25 — the sweep says *"verified in sweep 1"* and **no journal, entry or sweep record corroborates it** |
+  | `BF-65` | *"nobody has seen it move"*; the clips 404 through the sandbox proxy, so the animation has never been rendered anywhere |
+  | `Q-546` | *"neither checked on the device"* |
+  | `Q-556` | describes a LIVE defect — `DELETE /api/activity-logs` answers `200 {"success":true}` for another user's row — plus one probe that still fails validation |
+  | `Q-485` | not device-verified |
+  | `Q-481` | 🟠 open: the water quick-add still triple-counts on outbox replay |
+  | `Q-473`/`Q-474` | the row says outright *"Q-474 is still open, so this row stays here"* |
+  | `Q-464`/`Q-465` | two schema gaps, open |
+  | `Q-463` | 🟠 open, with an unverified probe |
+  | `Q-460`…`Q-462` | **`Q-461` IS STILL IN THE QUEUE** — archiving this row would bury live work |
+  | `Q-213` | *"production has now confirmed them, the device has not"* |
+  **The lesson, which is worth more than the list:** a sweep that reads 30 rows fast will judge
+  *"answered somewhere"* and the archive rule asks a different question — *is anything still owed*.
+  A row can be entirely correct about a shipped fix and still owe a device check, and eleven of
+  eleven here do. **Re-derive the movers from the rows themselves; do not trust the §4 list.**
+- **✓ The §4 AMEND list is sound, and two of it are done (OR-180, 2026-09-26).** `LB-4` was recorded
+  as 🟠 open in the calorie-surface row although it had shipped, and **the same paragraph was pasted
+  into the `LB-1` row**, where it was describing a different heading's work entirely. The paste is
+  deleted and the surviving bullet says shipped. **Still to amend:** the two *"ALL QUEUED (fixes not
+  yet shipped)"* headings, `gps-watchdog`'s *"until it ships"*, the sheet that no longer renders the
+  list, the APK claim, the pulls-never-revert claim that DV-15 disproved, and the route that moved
+  out of Admin.
+- **Original §4 text, kept because the amend half is still the work:** the list carried its evidence
+  (a commit, a sweep result or a production read). Five were settled by production reads that sweep:
   - bodyweight `planned_pct` is null on 0 of 38 sets;
   - bodyweight volume is positive on 19 of 19 exercise logs;
   - `activity_score` is present on 31 of 31 days;
