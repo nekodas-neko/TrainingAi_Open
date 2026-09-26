@@ -17,7 +17,13 @@ const roQuery = vi.fn(async () => ({ rows: [{ n: 1 }], fields: [{ name: 'n' }] }
 let configured = true
 vi.mock('@/lib/data/postgres/readonly-client', () => ({
   isReadonlyDbConfigured: () => configured,
-  getReadonlyPool: () => ({ query: roQuery }),
+  // RV-190: the pool deliberately has NO `query`. Every read on it goes through `runScoped`, which
+  // reasserts the role's protections per query — and a route that went back to `pool.query` would
+  // fail here with "query is not a function" rather than passing quietly. The wrapper's own
+  // behaviour is exercised against a real database in `claude-ro-readonly-role.test.ts`; these
+  // cases are about the route's logic, so it is a spy.
+  getReadonlyPool: () => ({}),
+  runScoped: (_pool: unknown, sql: string) => roQuery(sql),
   describeReadonlyConnection: () => ({ configured, user: 'claude_readonly', host: 'db', port: '5432', database: 'railway' }),
 }))
 

@@ -1403,6 +1403,12 @@ the Orchestrator's to do.
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+- **Batch:** `native-credential-surface` — assigned 2026-09-26 when this entry was next touched, per
+  the batching rule. The other member is **RV-196** (the ring key readable by any script in the
+  app's origin): both are `android/**`, both are about a stored credential's exposure, and each
+  would otherwise cost its own APK cycle. They stay separate decisions — this one excludes the
+  session cookie from backup, and the ring key's handling is still OR-160's, so building this must
+  not settle it by implication.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **✅ ALL SEVEN ANSWERED as of 2026-09-25.** Items 1, 2, 3 and 6 were put to him and answered (delete hr-sync; render zones with the degradation marked; retire the Exercise-detected card; an agent runs the BF-77 session). Items 5 and 7 resolved without asking, and item 2's structural half was decided by the Orchestrator. **What remains is NOT a question: the twelve-entry admin sitting is a scheduling ask, not a decision** — it stays below until those entries are picked up. Each answer is recorded on its own entry; this one leaves the queue when the gates it tracked are all struck.
@@ -1928,37 +1934,6 @@ which is the right shape for something that can only be validated by living with
   3. **Existing rows:** the `claude_ro` view omits `screenshot_data`, so this sweep could not check
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
-
-### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
-
-- **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
-  `lib/data/postgres/readonly-client.ts`, `lib/data/postgres/claude-ro-owner.ts`.
-- **⚠ AUTH/SECURITY — the owner confirms before this merges.** The fix is small; the carve-out applies anyway.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **What:** the route's comment says read-only is enforced by the `claude_readonly` role. The role
-  only sets **session defaults**: the owner scope (`app.claude_ro_owner`), `default_transaction_read_only`
-  and `statement_timeout`. A caller can override all three, and they persist, because each query runs
-  in autocommit on a 2-connection pool that is never reset. **Reproduced on the local database only.
-  Nothing was probed on production.**
-- **Who can reach it:** only a holder of `CLAUDE_DB_QUERY_SECRET` or an admin session. In practice
-  that is the owner and every agent session with the secret in its environment, including one steered
-  by prompt injection from fetched content. What it gets:
-  - other users' rows through the `claude_ro` views;
-  - writes the role was meant to refuse, including writes large enough to recreate the 2026-08-17
-    `disk_full` outage;
-  - queries with no time limit.
-  **Because the pool reuses connections, a later honest query can silently read another user's rows.**
-- **Fix shape:**
-  1. Wrap every db-query and db-snapshot query as `BEGIN TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` →
-     `SET LOCAL app.claude_ro_owner` → query → `ROLLBACK`. The final `ROLLBACK` reverts any session-level
-     setting made inside the transaction; this was verified locally.
-  2. Second layer: `RESET ALL` (or `DISCARD ALL`) when a client is released.
-  3. Regression test: run a query that changes a setting, then assert that the next query on the same
-     pool sees the defaults.
-- **Interaction with OR-138:** OR-138 widens the owner scope on purpose, using `SET LOCAL`. Build this
-  first, or together with it. OR-138 without the transaction wrapper is the same hole with a legitimate
-  entry point.
-- **Reversal cost:** low. No migration is needed, and the views do not change.
 
 ### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
 - **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
@@ -3583,9 +3558,14 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
-- **⚠ Build RV-190 first or with this (Review sweep 60).** The owner scope is a setting any caller
-  can change, and it persists on the pooled connection. A `SET LOCAL` without RV-190's transaction
-  wrapper leaves that hole open.
+- **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
+  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  first because the owner scope is a setting any caller can change and it persisted on the pooled
+  connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
+  the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
+  is also the entry point this entry wants: it takes an optional `ownerId` and applies it with
+  `SET LOCAL` inside the read-only transaction, so widening the scope is a parameter rather than a
+  new mechanism.
 - **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
   `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
   views do not change at all. What is fixed is **where that setting comes from**:

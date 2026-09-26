@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
-import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
+import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection, runScoped } from '@/lib/data/postgres/readonly-client'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
@@ -131,7 +131,8 @@ export async function GET(req: NextRequest) {
         const rowCounts: Record<string, number | null> = {}
         for (const table of toExport) {
           try {
-            const { rows } = await pool.query(`SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
+            // RV-190: same wrapper as db-query — the protections are per-query, not per-session.
+            const { rows } = await runScoped(pool, `SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
             rowCounts[table] = rows[0]?.n ?? null
           } catch {
             rowCounts[table] = null
