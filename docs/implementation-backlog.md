@@ -2187,6 +2187,21 @@ which is the right shape for something that can only be validated by living with
 - **Keep:** items **1, 2 and 4** — daily-digest, session-explain insight, and nutrition-goals-recommend.
   Item 3 shipped on its own because the four are independent and it was the only one that is a pure
   deletion; the other three each replace a model call with a builder and want their own verification.
+- **✅ All three RE-VERIFIED against `main` 2026-09-26** (read, not built — the work is still owed):
+  - **Item 2's sharpest sub-claim holds exactly.** `app/session-explain/components/ai-insight-card.tsx`
+    has `try` at :27 and `finally` at :45 with **no `catch`**, and the effect calls `fetchInsight()`
+    with no `.catch()` — so offline the `fetch` rejection really is unhandled. Note the path: it is
+    **not** `components/health/ai-insight-card.tsx`, which is health-insight and a different card
+    with the same filename.
+  - **Item 4's 500 holds**, at `app/api/nutrition-goals/recommend/route.ts:377` —
+    `{ error: 'recommendation_failed' }, { status: 500 }`, discarding the `calculateBaseline`
+    numbers already computed. **The route path in this entry is wrong**: it is
+    `nutrition-goals/recommend`, not `nutrition/goals-recommend`, and the line numbers are a few off.
+  - **Item 4's "stale header" holds but NOT as a literal string.** This entry quotes *"AI adjusts
+    this baseline"*; the file says *"The AI pass still exists — it \*adjusts\* this baseline"*
+    (`components/profile/goal-baseline.ts:12`). A grep for the quoted phrase finds nothing, which
+    reads as "already fixed" and is not.
+  - Item 1's card is `components/nutrition/end-of-day/day-digest-card.tsx`.
   **None of the three has been re-verified against `main`.**
 - **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
 
@@ -2212,9 +2227,28 @@ which is the right shape for something that can only be validated by living with
   1. **Model failure → 502** (`generate-prescription.ts:316`).
      - The client ignores the non-ok response and polls `PRESCRIPTION_POLL_MAX = 10` times at 3 s.
      - The user watches "Preparing your AI workout…" for about 30 s, then gets the base program.
-     - **The deterministic path already exists:** the whole-session deload builds a full prescription with no model (`:59`), and `fitToBudget`/autoregulation run after the model anyway.
-     - **Fix:** on failure, return the deterministic prescription flagged `source: 'rules'` instead of 502.
+     - **⚠ RE-VERIFIED 2026-09-26, and this bullet is MISLEADING — read it before building.** The
+       502 is real (`generate-prescription.ts:316`, confirmed). But "the deterministic path already
+       exists" is true only of a **deload**: `buildWholeSessionDeloadPrescription` (`:59`) fills
+       every number from `DELOAD_SETS`/`DELOAD_REPS`/`DELOAD_LOWER_PCT`. Wiring it in as the
+       failure fallback would **prescribe a deload to everyone whose model call failed**, which is
+       a training decision, not a degraded answer.
+     - **What a non-deload fallback actually needs, and why it is not small.**
+       `PrescriptionSignals.exercises` (`signals.ts:25-49`) carries no base `sets`/`reps`/`pct` at
+       all — only identity, 1RM history, time profile and autoregulation inputs. So the base
+       program's own numbers are not available at this layer and would have to be threaded into
+       the signals first. That is server-side gathering, so it is NOT the local-store work this
+       entry puts out of scope, but it is a bigger change than "return the deterministic
+       prescription instead of 502" suggests.
+     - **Fix:** thread the base sets/reps/pct into the signals, build a rules prescription from
+       them through the existing `fitToBudget`, and return it flagged `source: 'rules'` instead of
+       502. Do NOT reuse the deload builder.
   2. **A duration preset change re-runs the whole model call** (`use-duration-preset.ts:52`, `mood-checkin-sheet.tsx:148`), although the budget fit is pure code.
+     - **Re-verified 2026-09-26:** confirmed. `components/workout/use-duration-preset.ts:48-58`
+       POSTs `{ durationPreset }` to `/api/ai-periodization/session/[sessionId]/prescribe`, whose
+       route (86 lines) passes it straight to `generatePrescriptionForSession` — the full model
+       call. **This item is the tractable half of the entry** and is independent of item 1: the
+       re-fit happens in that route, against the stored prescription.
      - **Fix:** re-fit the stored prescription with `fitToBudget`, with no model call. That also works offline.
   3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
      - The pending flag only comes from a server response (`workout-screen.tsx:446`).
