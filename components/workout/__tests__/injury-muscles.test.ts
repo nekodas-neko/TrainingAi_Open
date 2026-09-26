@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { injuredMusclesFor, injuryChipLabel, injuryLabel } from '../injury-muscles'
 import type { Injury } from '@trainingai/shared/types/injury'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const injury = (muscleName: string, resolvedDate?: string): Injury => ({
   id: `i-${muscleName}-${resolvedDate ?? 'open'}`,
@@ -72,7 +73,7 @@ describe('injuryLabel', () => {
 const ROOT = path.resolve(__dirname, '../../..')
 const raw = readFileSync(path.join(ROOT, 'components/workout/active-workout-screen.tsx'), 'utf8')
 /** The comments explain the removed banner by quoting it, so a raw match would pass on prose. */
-const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+const code = stripComments(raw)
 
 describe('the active-exercise header cannot squeeze the set list', () => {
   it('caps and scrolls instead of growing without bound', () => {

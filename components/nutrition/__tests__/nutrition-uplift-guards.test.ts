@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = path.resolve(__dirname, '../../..')
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
@@ -55,7 +56,7 @@ describe('nutrition uplift', () => {
     // And the claim the dialog rests on stays true: no saveToGallery on the camera CALL. Comments
     // are stripped first — the component explains this bug in prose and names the option, so a raw
     // match reports the explanation as the thing it warns against. (Measured: it did.)
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    const code = stripComments(src)
     expect(code, 'a saveToGallery here would make the dialog\'s message false').not.toMatch(/saveToGallery/)
   })
 

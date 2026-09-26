@@ -2247,36 +2247,6 @@ which is the right shape for something that can only be validated by living with
   way, so a wrong answer is visible on the next plan and undone in the next PR. This is cheap
   enough that "try it for a month" is a legitimate answer.
 
-### [platform] LB-160 — 34 source-scan tests hand-roll a comment stripper that eats string literals
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, found when RV-203's own
-  comments changed which half of a file a guard could see.
-- **What:** **37 `.test.ts` files** copy the same regex pair to strip comments before matching
-  source. It has the defect `scripts/lib/strip-comments.js` was written to fix (LA-64): a `/` + `*`
-  inside a STRING opens a comment for it, and it then deletes everything to the next closer.
-  `accept="image/*"` is the common trigger.
-- **Measured 2026-09-26.** 11 source files carry the trigger; **4 test→file pairs read one**, and
-  the loss is not marginal:
-
-  | test | reads | naive stripper keeps |
-  |---|---|---:|
-  | `food-image-write-paths` | `capture-actions.tsx` | 11,900 of 27,245 |
-  | `food-image-write-paths` | `meal-photo-tile.tsx` | 7,025 of 14,411 |
-  | `header-meta-row-overflow` | `session-select-content.tsx` | 57,665 of 77,106 |
-  | `bf5-week-in-review-page` | `session-select-content.tsx` | 57,665 of 77,106 |
-
-  **`food-image-write-paths` held two `.not.toMatch` assertions over a source with 56% of its bytes
-  gone** — the vacuous direction, and the one a guard cannot report. Re-run against the correct
-  stripper they still pass, so nothing was hiding behind it; what was missing was any reason to
-  believe that.
-- **Already done (RV-203's PR):** those three files plus `rv111-scanner-back-dismiss` and
-  `rv203-local-first-capture` now `require('scripts/lib/strip-comments.js')`. **34 copies remain**,
-  none of which reads a trigger file today — which is exactly how this one waited, since whether a
-  test is affected depends on the file it reads rather than on the test.
-- **Shape:** swap the remaining 34, then consider a Custom Rules step — *a test file does not
-  hand-roll a comment stripper* — since prose did not hold this and the population regrew to 37.
-  `check-comment-blindness.test.ts` is the precedent for measuring rather than judging it.
-- **Done when:** no `.test.ts` carries its own `/\*[\s\S]*?\*/` strip.
-
 ### [workouts] RV-204 — workout-review and the recap have code that already does their job; neither ran in 30 days
 - **Lane: A.** Low priority: zero calls in 30 days.
 - **Added:** 2026-09-25 · Review sweep 61.

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { formatDateDisplay } from '@trainingai/shared/date-utils'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** RV-91. Two activity surfaces rendered `{log.date}` — the raw `2026-09-15` — on the line
  *  directly above a correctly formatted `formatTime12h()`, so the same day read
@@ -15,7 +16,7 @@ import { formatDateDisplay } from '@trainingai/shared/date-utils'
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 const code = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(src)
 
 describe('RV-91 — a date string reaches the screen through the shared formatter', () => {
   const SITES = [

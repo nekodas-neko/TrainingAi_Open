@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { calendarMonthInTz, previousCalendarMonth } from '../calendar-month'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 
@@ -21,9 +22,7 @@ function clientFiles(): string[] {
 
 /** Comments quote the retired patterns on purpose — a scanner that reads them flags the fix. */
 function code(rel: string): string {
-  return readFileSync(path.join(ROOT, rel), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+  return stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 }
 
 describe('RV-176 — the calendar month comes from the user, not the phone', () => {

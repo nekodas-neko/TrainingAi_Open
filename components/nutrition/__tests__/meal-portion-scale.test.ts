@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { MEAL_SCALES, scaleToNumber, type MealScale } from '../meal-portion-scale'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-104 — logging a saved meal at ½× / 1× / 1½×.
@@ -13,8 +14,7 @@ import { MEAL_SCALES, scaleToNumber, type MealScale } from '../meal-portion-scal
  */
 
 const ROOT = path.resolve(__dirname, '../../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('the scales themselves', () => {
   it('are the three the owner named, and nothing else', () => {

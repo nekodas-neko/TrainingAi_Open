@@ -461,8 +461,9 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       provisional: sleepProvisional,
       // After `provisional`, not before it: `sleep-provisional-surfaces.test.ts` pins
       // `href: "/health/sleep"` and `provisional: sleepProvisional` inside one 120-character window,
-      // deliberately, so a cell cannot read the flag and then not use it. A line inserted between
-      // them breaks that guard without breaking anything it guards.
+      // deliberately, so a cell cannot read the flag and then not use it. A line of CODE inserted
+      // between them breaks that guard without breaking anything it guards — a comment no longer
+      // does, since LB-160 made the guard collapse whitespace before measuring.
       gapReason: scoreGapText(readiness.availability, "sleep"),
     },
     {

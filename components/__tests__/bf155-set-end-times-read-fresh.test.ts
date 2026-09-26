@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { useWorkoutStore } from '@/lib/stores/workout-store'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-155 (b) — the root cause, as opposed to the card that displayed it.
@@ -30,7 +31,7 @@ import { useWorkoutStore } from '@/lib/stores/workout-store'
 const root = join(__dirname, '..', '..')
 const src = readFileSync(join(root, 'components/workout-screen.tsx'), 'utf8')
 // Comments quote the broken form while explaining it, so a raw-source match would pass on prose.
-const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const code = stripComments(src)
 
 describe('the timing arrays are snapshotted from the live store', () => {
   it('reads setEndMsArray fresh, not from the reactive pick', () => {

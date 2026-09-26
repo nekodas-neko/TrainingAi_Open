@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { mealFooter } from '@/components/nutrition/meal-card-footer';
+import { stripComments } from '../../../scripts/lib/strip-comments.js';
 
 describe('mealFooter — the gate is a kind, not a count (BF-120 / OR-101)', () => {
   it('gives one loose food its macro breakdown', () => {
@@ -36,7 +37,7 @@ describe('mealFooter — the gate is a kind, not a count (BF-120 / OR-101)', () 
 });
 
 const code = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  stripComments(s);
 const src = (rel: string) => code(readFileSync(path.resolve(__dirname, '../../..', rel), 'utf8'));
 
 describe('the premise the old gate rested on', () => {

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { groupDiaryEntries, sumLogs } from '../diary-groups'
 import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * Grouping a logged meal's rows into one diary entry (BF-39).
@@ -183,8 +184,7 @@ describe('BF-98 — how many rows the card actually draws', () => {
  * and recorded on the entry; until it is known, this guard is what holds the change.
  */
 describe('BF-98 — the card counts rendered entries', () => {
-  const card = readFileSync(join(__dirname, '..', 'meal-card.tsx'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+  const card = stripComments(readFileSync(join(__dirname, '..', 'meal-card.tsx'), 'utf8'))
     .replace(/\/\/.*/g, '')
 
   it('gates the totals footer on rendered entries, never on the flat log count', () => {

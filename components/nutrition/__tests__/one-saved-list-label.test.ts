@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -38,10 +39,9 @@ function userVisibleStrings(): { file: string; line: number; text: string }[] {
     // Strip comments file-wide, keeping the newlines so line numbers survive. Per-line stripping was
     // the first version and it cannot see a block comment, so the guard reported 33 hits that were
     // all its own documentation — the two files explaining this history quote the old name on
-    // purpose, and they have to.
-    const code = src
-      .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-      .replace(/\/\/[^\n]*/g, '')
+    // purpose, and they have to. The shared walker preserves line numbers for the same reason,
+    // and unlike the hand-rolled pair it does not mistake a `/` `*` inside a string for a comment.
+    const code = stripComments(src)
     code.split('\n').forEach((line, i) => {
       if (/My Meals/.test(line)) out.push({ file, line: i + 1, text: src.split('\n')[i].trim() })
     })

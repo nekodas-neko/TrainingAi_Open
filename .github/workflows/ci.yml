@@ -479,6 +479,9 @@ jobs:
       - name: memo() call sites pass stable props
         run: node scripts/check-memo-prop-stability.js
 
+      - name: No test file hand-rolls a comment stripper
+        run: node scripts/check-test-comment-strippers.js
+
       - name: No new fetch-once effects
         run: node scripts/check-fetch-once-effects.js
 

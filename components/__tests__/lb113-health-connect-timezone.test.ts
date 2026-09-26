@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** Both files explain the defaulting bug in prose, so a raw match would pass on the comment. */
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 /**
  * LB-113 — the Health Connect sync takes the user's timezone and nothing passed it.

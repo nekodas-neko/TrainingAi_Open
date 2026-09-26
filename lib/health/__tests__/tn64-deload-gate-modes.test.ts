@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * TN-64(b) — the gate the owner approved widening, and the two properties that must survive it.
@@ -18,7 +19,7 @@ import { join } from 'node:path'
 const root = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
 /** Comments here discuss the very strings under test — strip them, or the file matches itself. */
-const code = (src: string) => src.replace(/^\s*\/\/.*$/gm, '')
+const code = (src: string) => stripComments(src)
 
 const payload = code(read('lib/health/readiness-payload.ts'))
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { isOpenedOnValid, openedOnBounds, openedOnProblem, MAX_OPENED_DAYS_BACK } from '../vial-date'
+import { stripComments } from '../../../../scripts/lib/strip-comments.js'
 
 /** The day the owner reported it, and the day his vial was wrongly stamped. */
 const TODAY = '2026-09-10'
@@ -79,7 +80,7 @@ describe('the sheet sends the date the user chose', () => {
   const ROOT = path.resolve(__dirname, '../../../..')
   const raw = readFileSync(path.join(ROOT, 'components/nutrition/reta/vial-sheet.tsx'), 'utf8')
   /** Comments quote the old call while explaining the bug, so a raw match would pass on prose. */
-  const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  const code = stripComments(raw)
 
   it('does not hardcode openedOn to today in the request body', () => {
     expect(code).not.toMatch(/openedOn:\s*todayInTz\(/)

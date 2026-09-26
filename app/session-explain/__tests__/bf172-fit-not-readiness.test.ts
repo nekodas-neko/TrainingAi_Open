@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { scoreBand, SCORE_BAND_COLOR } from '@trainingai/shared/health/score-band'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** Both files explain the bug in prose and quote the caption they replaced. */
 const code = (rel: string) =>
-  read(rel).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 /**
  * BF-172 — the explain screen called the session-FIT score "readiness".

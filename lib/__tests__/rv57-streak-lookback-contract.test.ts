@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { STREAK_LOOKBACK_DAYS } from '@trainingai/shared/workout/streak-window'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * RV-57. `STREAK_LOOKBACK_DAYS` calls itself a contract between two files, and only one of them
@@ -30,10 +31,7 @@ const ROOT = path.resolve(__dirname, '../..')
 const CONSUMER = 'app/session-select/compute-streak.ts'
 
 /** Comments quote the retired literal while explaining the fix, so a raw match would pass on prose. */
-const source = readFileSync(path.join(ROOT, CONSUMER), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-  .replace(/^\s*\/\/.*$/gm, '')
+const source = stripComments(readFileSync(path.join(ROOT, CONSUMER), 'utf8'))
 
 describe('RV-57 — the streak consumer is bound by the constant it is contracted to', () => {
   it('imports the shared constant', () => {

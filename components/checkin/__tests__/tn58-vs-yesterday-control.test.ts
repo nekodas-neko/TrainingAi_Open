@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** TN-58. The absolute 1–5 produced **two distinct values across 96 check-ins**, sd 0.29, none of
  *  them touched. This is the comparative control that asks the question we actually want answered,
@@ -20,7 +21,7 @@ import { DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 const code = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(src)
 
 describe('TN-58 — a skipped comparative answer stores nothing', () => {
   it('the control has no default and no pre-selection', () => {

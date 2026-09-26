@@ -9,6 +9,7 @@ import {
   durationDirection,
   requestedBudgetMin,
 } from '@trainingai/shared/workout/duration-model'
+import { stripComments } from '../../../../../scripts/lib/strip-comments.js'
 
 describe('budgetForPreset', () => {
   it('leaves the session budget alone for standard (and when unset)', () => {
@@ -180,7 +181,7 @@ describe('the prescription branches on direction, not on the label (BF-7)', () =
       new URL('../../ai-periodization/generate-prescription.ts', import.meta.url), 'utf8')
     // Comments stripped first: the change's own note names the labels it replaced, and a substring
     // check that reads prose fails on the explanation rather than on the code.
-    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const code = stripComments(raw)
 
     expect(code).toContain('durationDirection(')
     expect(code).not.toMatch(/durationPreset\s*===\s*'short'/)

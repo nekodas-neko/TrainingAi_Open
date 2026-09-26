@@ -4,6 +4,7 @@ import path from 'node:path'
 import {
   sixMwtVo2max, cooperVo2max, distanceCanBeScored, MIN_SCOREABLE_DISTANCE_M,
 } from '../fitness-tests'
+import { stripComments } from '../../../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-158. The owner asked for a pre-flight check before running the Cooper test for the first
@@ -104,7 +105,7 @@ describe('the result screen applies the guard and withholds the method with the 
   const root = path.resolve(__dirname, '../../../../..')
   const src = readFileSync(path.join(root, 'components/fitness-tests/test-result.tsx'), 'utf8')
   // Comments quote the broken values while explaining them, so a raw-source match would pass on prose.
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '')
+  const code = stripComments(src)
 
   it('gates the equations on the distance as well as the duration', () => {
     expect(code).toMatch(/distanceCanBeScored\(protocol\.vo2Equation,\s*capture\.distanceM\)/)
