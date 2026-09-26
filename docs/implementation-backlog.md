@@ -527,8 +527,47 @@ below threshold and left in place for next time.
 
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
-- **Lane: O** — needs the owner's call on the four, then it is a sweep anyone can run.
+- **Lane: O** — ~~needs the owner's call on the four, then~~ **RUNNABLE NOW.** This entry's own
+  correction (below) resolved the four it was waiting on — *"do NOT open draft PRs for these. Sweep
+  all four"* — so nothing here is blocked on the owner any more. It is a sweep anyone can run.
 - **Added:** 2026-09-26 · Orchestrator, after the 1,562 → 45 cleanup (#1679).
+- **⤷ RE-MEASURED 2026-09-26 by Tuning, with the exact lists so the sweep needs no re-derivation.**
+  The owner asked for branch deletion to be routed here rather than done in a Tuning session.
+  **45 remote branches, 6 with an open PR, so 39 sweepable** — one more than this entry's title says,
+  because more PRs merged the same day.
+  **Do not delete these 6 — they carry an open PR** (`list_pull_requests` state `open`, 2026-09-26):
+  `lane-a/rv190-db-query-session-state` (#1672) · `fix/rv191-feedback-screenshot-validation` (#1671) ·
+  `health-sample-storage` (#1608) · `native-token-exchange` (#1607) ·
+  `lane-a/or138-pivot-readonly-scope` (#1499) · `chore/or-137-device-routing-batch-1` (#1465).
+  **Delete the other 39:**
+  `chore/fold-journal-entries` · `chore/fold-journal-entries-2026-09-24` · `chore/fold-journal-window` ·
+  `chore/lane-a-handoff` · `chore/nutrition-to-the-top` · `chore/or-127-device-cdp-harness` ·
+  `chore/or-128-device-agent-coordination` · `chore/or-178-clear-o-lane` ·
+  `claude/implementation-agent-b-s1m4qs` · `claude/implementation-agent-lane-a-ztkb3m` ·
+  `debug/share-code-ink-probe` · `docs/session-handoff-e2e-harness` ·
+  `docs/session-handoff-public-repo-migration` · `feat/capture-one-screen` ·
+  `feat/household-scale-and-dosing` · `feat/nutrition-q395c-startable` · `fix/keep-gate-snapshot-q317` ·
+  `fix/meal-label-repaint-race` · `fix/meal-label-style-repaint` ·
+  `fix/offline-tab-tap-native-fallback` · `fix/supplement-reminder-gap` · `lane-a/coach-plan-widget` ·
+  `lane-a/fix-cardio-week-span-hour-dependence` · `lane-a/fix-gate-pin-q305` ·
+  `lane-a/la128-strict-checkin` · `lane-a/la128-strict-checkin-body` ·
+  `lane-a/q44-phase3-pr1-table-rename` · `lane-a/rv105-fetch-once-stable-deps` ·
+  `lane-a/rv105-stable-deps-clean` · `lane-a/rv99-score-band-theme-tokens` ·
+  `lane-a/tn46-baseline-already-retained` · `lane-b/rv207-design-quick-wins` · `sync/docs-catchup` ·
+  `test/day-timeline-export-routes` · `test/next-lane-a` · `tuning/hrv-tile-question` ·
+  `tuning/step-goal-provenance` · `tuning/temp-alert-ungated` · `tuning/walk-intensity-calibration`
+- **Re-derive rather than trust that list if time has passed** — it is a snapshot, and merges move it
+  daily. The reproducible form is: every `origin/*` ref minus `main`, minus the `head.ref` of every
+  **open** PR. Do **not** substitute `git branch --merged` (it reported 3 of 1,562 — squash-merge
+  rewrites every commit) and do not substitute the backlog's `Branch:` field (it records a plan and is
+  already wrong on three entries).
+- **⚠ LOCAL branches are NOT this work, and the stop-hook will invite that mistake.** Each agent's
+  container carries its own clone, and the container is ephemeral — a Tuning session here had **38
+  stale local branches** and a stop-hook warning about *"unpushed commits"* on one of them, all of
+  which vanish when the container is reclaimed. The durable object is the **remote**. The one local
+  thing worth knowing: `git reset --hard origin/main` while a feature branch is checked out moves
+  **that branch** onto `main`, which is what produced the false "unpushed commits" warning — use
+  `git checkout main && git merge --ff-only origin/main` instead.
 - **The rule is now in CLAUDE.md: a branch has meaning only if it has an open PR**, and a draft PR is
   how you mark work worth keeping. This entry is the backlog of what the first application of that
   rule found.
