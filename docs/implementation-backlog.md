@@ -2518,6 +2518,10 @@ which is the right shape for something that can only be validated by living with
   - `11900` steps (Home tile) against `1,660`/`2,000`/`4,320` elsewhere: use thousands separators everywhere;
   - `7 × 68kg` against `98 kg`: one unit spacing;
   - `55m` against `55 min`: one duration form.
+- **🔎 Confirmed on the device (sweep 64, DV gallery):**
+  - "7:35am → 8:17am" (Health → Day) against "7:35 AM" (Home timeline);
+  - "0 / 1534 kcal" beside "1,534 left" on one Home card;
+  - "2815 XP total" beside "2,815 XP" on one More card.
 - **Brand in food names:** "Uncle Tobys — Rolled oats" (Log Food) against "Rolled oats / Uncle Tobys · …" (diary). Pick one.
 
 ### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
@@ -2554,6 +2558,7 @@ which is the right shape for something that can only be validated by living with
 2. **Body Battery reads "Good · 50"** with no data behind it. The "Limited data" chip is beside it, but the headline still says Good. With no inputs, show the no-data state instead of a band.
 3. **The week strip labels every unprogrammed past day "rest".** With no program, nothing was a rest day; show a dash.
 4. **An empty rounded pill sits beside the date** in both accounts, probably the temperature chip (BF-96) rendering with no value. Render nothing until it has one.
+   - **🔎 On the device (Review sweep 64, `p23-home-warm-01`):** the pills are populated there (weather, UV and battery), and **they squeeze the date to "S…"**. The header row cannot hold the date and both pills at 384 px. Give the date its own line, or let the pills wrap below the greeting. That is the real defect; the empty pill was the web build without data.
 5. **Stray marks:** a dot between the Resting HR and Sleep rings, and a "·" glyph inside the "Limited data" chip.
 6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it, so "58" reads as a score. Add "bpm", or style it differently from the scores.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
@@ -2566,6 +2571,7 @@ which is the right shape for something that can only be validated by living with
    - Use neutral while the day is open, and reserve the warning colour for the End-of-Day review.
 2. **A taken supplement is struck through,** which reads as cancelled or deleted. Use the tick and a muted row.
 3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
+   - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
 4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
 5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
    - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
@@ -2582,6 +2588,7 @@ which is the right shape for something that can only be validated by living with
 - **Lane: B** — `app/workout/**` session card.
 - **Added:** 2026-09-26 · Review sweep 63.
 1. **"Dumbbell" is set at about twice the size of "Push".** The largest text on the card is not the thing being chosen. Make the session name the title, and the equipment or program a subtitle.
+   - **🔎 On the device (sweep 64, `p23-workout-warm-01`):** the slot holds an **icon** (a red triangle) beside "Upper", not a word. So the web build's "Dumbbell" is most likely **an icon name rendered as text** when the icon does not resolve. Check the session-icon map's fallback; that is the fix, not a hierarchy change. **Item 4 (recovery chips clipped under their label) is confirmed on the device.**
 2. **The "Recommended today" pill wraps onto two lines** at 412 px. Shorten it to "Today", or let it sit on its own line.
 3. **"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous. Write "Last done yesterday".
 4. **The recovery chips scroll under the "RECOVERY" label,** so the first chip shows clipped at the label's edge. Start the scroller after the label, or give it a fading mask.
@@ -2595,6 +2602,78 @@ which is the right shape for something that can only be validated by living with
 3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
+
+### [workouts][app-shell] RV-216 — Home says a 111-day streak and More says the best streak is 49: two `computeStreak` functions disagree
+- **Lane: A** (the formula), then **B** (Home's call site).
+- **Added:** 2026-09-26 · Review sweep 64, from DV's gallery (`p23-home-warm-01`: "STREAK 111 days"; `p23-more-warm-01`: "Best streak 49").
+- **What:** a best streak lower than the current one is impossible, and both numbers sit on screens the owner opens daily. There are two implementations with the same name:
+  - `app/session-select/compute-streak.ts` (Home, fed by `/api/streak-data`'s trained days);
+  - `lib/achievements.ts:32` (More's `lifetimeStats.bestStreak`, which applies `maxCompliantRestGapFor` the schedule).
+
+  This is exactly the *one formula, one place* class.
+- **Fix:**
+  1. Move one definition into `packages/shared/src/workout/`, and have both screens import it.
+  2. Decide which rest-gap rule is right, recording why in the entry. That is a structural call, not the owner's.
+  3. Add a test that best ≥ current for the same input.
+- **Reversal cost:** low. Both are derived at read time; nothing is stored.
+
+### [sleep] RV-217 — the Sleep contributors list shows three raw keys: "hrv", "hr", "schedule"
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts:506` (`CONTRIBUTOR_KEYS`), plus the label table behind `labelFor` (`lib/oura/contributors`).
+- **Added:** 2026-09-26 · Review sweep 64 (`t2-sleep-01`, on the device).
+- **What:** of the ten contributors:
+  - seven carry a label and a chevron ("Deep sleep ›", "REM sleep ›"…);
+  - **three render the internal key, lowercase, with no chevron**: `hrv`, `hr`, `schedule`.
+
+  The vertical spacing is also uneven: there are larger gaps before Timing and Efficiency, which look like empty rows.
+- **Fix:**
+  1. **Code-certain cause:** `CONTRIBUTOR_KEYS` maps seven component keys to the Oura vocabulary and passes anything else through (`CONTRIBUTOR_KEYS[k] ?? k`). The sleep model's `hrv`, `hr` and `schedule` components have no entry, and `labelFor` has no label for the raw keys. Add all three to both tables ("HRV", "Heart rate", "Sleep schedule"), plus a `contributor-guide.ts` entry if each should get a chevron. A test should assert every component key the model emits has a label.
+  2. Give them chevrons if they have explanations, or mark them non-tappable consistently.
+  3. Find what renders the empty gaps.
+- **Sibling sweep:** check Readiness's "What goes into this score" list for the same fall-through.
+
+### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
+- **Lane: B.** If the numbers come from different routes, the reconciliation half goes to **A**.
+- **Added:** 2026-09-26 · Review sweep 64 (`p23-nutrition-warm-01/02`, `t2-day-01`, `home-nutri` crop).
+- **What the owner sees on one day:**
+  - the Nutrition ring: **"0 OF 1,534"** (1,297 resting + 237 movement);
+  - the "Why two numbers" card: **goal 1,660, budget 1,356, a 304 gap**;
+  - the 7-day chart: **"Target: 1660 kcal/day"**;
+  - Health → Day's Energy row: **"burned 1,694", "deficit -1,694"**.
+
+  So the ring's 1,534 is neither the goal nor the budget the explainer names. It is a third target the screen never explains, and "burned" is a fourth number on the next screen.
+- **Copy bugs (code-certain once found):**
+  - "**+237 earned from movement (205 workouts · 32 steps)**" on both Home and Nutrition: 205 is kcal, and without the unit it reads as 205 workouts. Write "205 kcal workouts · 32 kcal steps".
+  - "**deficit -1,694**" is a double negative.
+  - "**0 / 1534 kcal**" beside "**1,534 left**" on the same Home card (RV-208's separator item).
+- **The 7-day chart shows 5 bars (Sun–Thu)** on a Saturday. Days with no log disappear instead of drawing as zero, so a "7-day" chart has five days.
+- **Fix:**
+  1. Settle which number the ring's denominator is, and make the explainer name that one.
+  2. Make "burned" on Day and Nutrition come from the same function.
+  3. Fix the three copy bugs.
+  4. Draw zero days.
+- **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
+
+### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 64 (`t2-day-01`).
+1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load), not zero.
+2. **"Chest-Supported Dumbb…"** truncates the part that distinguishes it. Let the name wrap to two lines, or shrink the edit and delete icons, which take about 25% of the row twice over.
+3. The times read "7:35am → 8:17am" here and "7:35 AM" on Home. That is RV-208's item; noted here as the second device sighting.
+
+### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
+- **Lane: DV** — `scripts/device/**`, then re-capture.
+- **Added:** 2026-09-26 · Review sweep 64, reading RV-205's gallery.
+- **What:**
+  1. **Health warm 01–04 are black, and 05 is the phone's launcher.** The app was not in the foreground when those five were taken.
+     - **05 shows the owner's home screen:** apps, notification counts, a location name and a media widget. It sits in a private Artifact, so this is not a leak.
+     - But **republish the gallery without it**, and have the capture helper refuse to shoot when the app is not the foreground activity. `back()` already has that guard.
+  2. **Scroll did not move on several pushed screens.**
+     - Sleep 01–04, Readiness 01–04 and Week 01–03 are byte-identical, and so are Health 06–09 and Heart rate 01/02 and 03/04.
+     - The helper scrolls the window, but these screens scroll an inner container.
+     - Scroll the element that actually has `scrollHeight > clientHeight`, and **assert that consecutive captures differ** before labelling them `scrolled`.
+  3. **P32's five timepoints are identical on every screen.** That is consistent with "painted from cache", but it measures nothing about loading states. Re-run once with the cache cleared for those routes, which is what P32 is for.
+- **Also for the record:** P34's concern is moot on this keyboard. Samsung shows the numeric pad for `type=number` (`t2-sheet-weigh-in-01`), so the finding is only the missing `enterkeyhint` ("Go" where "Done" belongs), which RV-210 covers.
+- **Then:** re-capture Health (full length) and the pushed screens' lower sections, and append them to the same Artifact.
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
@@ -3778,6 +3857,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - keep to about 60 images a sitting;
   - use `rawTap`/`rawSwipe` rather than script focus or scroll.
   **A sitting that only finishes Tier 1 is a success. Record how far it got.**
+- **🔎 Review read the gallery (sweep 64):** findings are filed as RV-216 to RV-219, with amendments to RV-208, RV-211, RV-212 and RV-214. **Two capture faults are RV-220:** a Health set of the launcher, and scrolls that did not move. Fix those before trusting the lower sections of any pushed screen.
 - **Targets from Review sweep 63 (web build at 412 px), to confirm on the device in Tier 1.**
   Each one names the entry it confirms:
   - Home's Log tiles: the "Log" pill drawn over the icon (RV-207 item 6).
