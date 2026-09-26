@@ -1,53 +1,54 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-158 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-161 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-**READY is 0** — everything is parked, owner-gated or owed a device look. Shipped 2026-09-25: LB-148,
-RV-178, RV-122, RV-101, LB-149, RV-102, RV-67, RV-79, RV-68, LB-155, RV-74, BF-177, RV-99's 2nd defect,
-LB-154, BF-165 + DV-2, LB-157 (filed), the mid-entry-heading check, BF-61. Six owe only device looks.
+Shipped 2026-09-26: **DV-12** (#1675) and **RV-203 ① ③** (#1676). 2026-09-25 shipped eighteen more —
+see the journal entries rather than a list here.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** With READY at 0 the
-bottleneck is elsewhere: **116 device checks owed** (`--sittings` groups them) and three owner questions.
-Do not invent work — if READY is still 0, say so and stop. **`DV-12` is the owner's stated #1 and is the
-one to argue out of its gate**; the 2026-09-25 source measurement and the reason a chart-only fix may not
-move his number are ON THAT ENTRY, not here. **RV-117/118/119 are `Lane: O` — leave them.**
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Expect READY 0: it was 0
+for most of 2026-09-25 and RV-203 was the only entry on it. The bottleneck is **~116 device checks
+owed** (`--sittings`) and the owner questions. Do not invent work — if READY is 0, say so and stop.
+**`LB-160`** (34 test files hand-roll a broken comment stripper) is safe Lane B work if you want it.
 
 ## Blocked / owed
 
-- **PARKED:** `LB-155` on **`LB-156`** (Lane A: five cache keys need group entries); `header-row-width`
-  (BF-139 + BF-96) on **`LB-157`** — the row is 224.0 px and the date gets **7.4 px** in daylight, so no
-  shrink-only fix exists. **Owner:** `LB-157`, `LB-152` (which RV-99 shrank from ~113 sites to **14**),
-  `LB-153` — all `Lane: O`, ungated, inline `Ask:`. **Claimed paths: none.**
+- **PARKED:** `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width`
+  (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated, inline `Ask:`):** `LB-157`,
+  `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`. **Claimed paths: none.**
 
 ## Lessons that cost real time
 
-- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.** Twenty-two
-  running: wrong defect, wrong hook, wrong count, wrong lane, a fix with nowhere to go. **A change that
-  alters what renders without fixing a disagreement is the OWNER'S:** `Lane: O` + `Ask: owner`, never
-  `Gate: owner` (it parks). A stale `Gate: device` is the mirror — argue it out, do not work around it.
-- **A REGRESSION TEST CAN BE GREEN ON THE BUG IT GUARDS.** BF-61 shipped with a mechanism and a spec and
-  failed on the device twice — the spec tapped after the row had rested open, the half already fixed.
-  **Control-run the EXISTING tests against unfixed source too** (stash SOURCE, keep the spec), and where
-  the real window is under one CDP round-trip assert the PROPERTY rather than racing it.
-- **CONVERTING A READ TO `cachedFetch` IS NOT MECHANICAL; THREE SHAPES MUST NOT BE:** a read-after-write,
-  an offline-first hydration read feeding `applyDelta`, and a delta BASELINE. A new key also needs a group
-  entry in LANE A's `cache-groups.ts` — which parks most of LB-155.
-- **RE-READ YOUR OWN DIFF AGAINST THE CODE IT TALKS TO.** DV-2's `go(-2)` was wrong on a path no test here
-  can reach: **releasing a history entry does not REMOVE it**. Two nav probes that read as dead controls —
-  a `touchscreen.tap` below the fold (`tapHitTested`), and a `next dev` cold route's hung RSC.
-- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (WARNINGS vs base: 811) · `pnpm test`
-  (with `DATABASE_URL`, or ~211 skip — never hand-pick) · `pnpm build` · `tsc` · `check-test-typecheck`.
-  **`/tmp/claude-0/resolve-docsize.sh`** resolves the two files that conflict on nearly every PR (history
-  is append-only → keep BOTH, main's first; `.size` → `--fix`) and refuses anything else. A doc-size-only
+- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
+  Twenty-four running. RV-203 ② asked to look a barcode up in a table that **has no barcode column**;
+  the answer was a Lane A entry, not an implementation. **A change that alters what renders without
+  fixing a disagreement is the OWNER'S:** `Lane: O` + `Ask: owner`, never `Gate: owner` (it parks).
+- **A REGRESSION TEST CAN BE GREEN ON THE BUG IT GUARDS — CONTROL-RUN IT.** Stash the SOURCE, keep
+  the spec, confirm it FAILS. Done for BF-61, DV-12 and RV-203; DV-12 also had me publish two wrong
+  causes (a ResizeObserver that never fires on a tab switch, a "0 cost" that was a 1500 ms probe).
+  **A guard can also read a MANGLED file:** 37 tests copy a regex stripper that treats the `/` `*`
+  inside `accept="image/*"` as a comment opener — measured, it deleted 56% of `capture-actions.tsx`
+  under two `.not.toMatch` assertions. Use `scripts/lib/strip-comments.js` (ESM import; `require` is
+  an eslint error in `components/**`, and a `@ts-expect-error` for it is UNUSED and fails).
+- **MEASURE A COUNT, NOT A TIME, IN `next dev`** — unminified + on-demand compile made a `resizeDelay`
+  A/B unreadable; canvas `font`-setter calls gave 578 → 0. `pnpm start` cannot boot here (creds).
+- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (WARNINGS vs base: 811) ·
+  `pnpm test` (with `DATABASE_URL`, or ~211 skip) · `pnpm build` · `tsc` · `check-test-typecheck` ·
+  `check-doc-index-size` · `check-backlog-pointers` · `check-doc-links`. Two files conflict on nearly
+  every PR: `doc-size-baseline-history.md` is append-only → keep BOTH, main's first; a `.size` →
+  `--fix`. `docs/implementation-backlog.md` is UNRATCHETED (LA-129) — no `.size`. A doc-size-only
   remerge is NOT re-gated; one bringing source IS. **REBUILD `changelog.ts`/`package.json` FROM
   `origin/main`, NEVER SPLICE.**
-- **CI: `curl -sS api.github.com/…/commits/<sha>/check-runs` WORKS UNAUTHENTICATED here**, the cheapest and
-  least-laggy read. `get_check_runs` does not exist; `list_workflow_runs` IGNORES `branch`. Five required
-  checks; **wait for advisory E2E only when the PR touches an e2e spec** (~34 min).
-- **Read a gate's exit code DIRECTLY, never through a pipe** — a piped grep read as "clean" let `--fix`
-  RAISE this shrink-only file's baseline. COMMIT before `stash`/`checkout`; `git checkout -- <f>` restores
-  from the INDEX. vitest has NO DOM project. **ASSERT EVERY SCRIPTED `replace`, on LINE STARTS.**
+- **CI: `curl -sS api.github.com/…/commits/<sha>/check-runs` WORKS UNAUTHENTICATED here**, the
+  cheapest and least-laggy read. `get_check_runs` does not exist; `list_workflow_runs` IGNORES
+  `branch`. Five required checks; **wait for advisory E2E only when the PR touches an e2e spec**
+  (~34 min). Run a new spec locally first — `npx playwright test <file>` starts its own `pnpm dev`,
+  which is also the dev-server pass.
+- **Read a gate's exit code DIRECTLY, never through a pipe** — a piped grep read as "clean" let
+  `--fix` RAISE this shrink-only file's baseline, and again read a FAILING `check-test-typecheck` as
+  0. COMMIT before `stash`/`checkout`. vitest has NO DOM project, so component work is source scans.
+  **ASSERT EVERY SCRIPTED `replace`, on LINE STARTS.** An unanchored regex alternation matches
+  SHORTEST-first: `cup` before `cups` left `"s of oats"`.

@@ -98,6 +98,13 @@ Instead, a local Postgres 16 instance is set up automatically:
     suite's fire-and-forget write is weaker again rather than stronger. The operational rule is
     unchanged and is all you need: a red run reporting **zero** failing tests is this, and a re-run
     settles it. What the run costs is ~4.5 minutes, which is the whole price of not guessing.
+  - **Seventh sighting, 2026-09-26 (Lane B, RV-203, PR #1676) — IN CI, not locally, which is new.**
+    `lib/__tests__/nutrition-goals-recommend-route.test.ts`, a FOURTH distinct file; `Tests shard 1`
+    reported **269 files / 2,498 tests passed, zero failed**, one unhandled error, exit 1. Every
+    entry above was measured against the shared local Postgres, and the shared-DB contention
+    theories were built on that; **CI gives each shard a fresh containerised database**, so this
+    sighting rules contention out rather than merely weakening it. The same tree had just run the
+    full 1,076-file suite locally, green.
   - **The run log cannot settle it, and this is the trap worth knowing.** The natural move is to grep the failing log for whatever logged last — e.g. `[pg pool] idle client error`, the one console writer that fires asynchronously outside any test's control. Its absence proves nothing: **the pending `onUserConsoleLog` IS the log that never got delivered**, so the message you are looking for is the one the failure destroys. Absence is guaranteed under every hypothesis. File-based tracing (append in a `console.*` wrapper, never through the RPC) is the only way to see it — that harness worked, it simply had nothing to catch.
   **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too. `disableConsoleIntercept: true` would make `onUserConsoleLog` structurally impossible, and is the one candidate worth considering *if this ever becomes frequent* — it costs per-file log attribution for everyone, which is too high a price for a fault nobody can currently reproduce.
   - **Seventh, same day: `lib/__tests__/user-account-routes.test.ts`** — a FOURTH distinct file.
