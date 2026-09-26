@@ -54,6 +54,17 @@ What remains is the long-standing OR-100 one — 34 `Keep:` residues that read a
 rather than a check. That is a real backlog of mis-filed entries and is the Orchestrator's, not a
 checker bug.
 
+## One drive-by, stated because it is unrelated to the entry
+
+Merging `main` brought RV-200 (#1674), which deleted the run card's explain fetch and left six dead
+imports behind in `components/running/prescribed-run-card.tsx` — `useEffect`, `useState`,
+`readCacheSync`, `setCached`, `todayInTz`, and a `tz` local. The repo's lint floor went 811 → 817.
+
+Removed here rather than filed. It is a Lane B file, the deletion is six lines and carries no
+behaviour, and a drifted floor costs every other session the same minute it just cost me: I had to
+prove the six were not mine before I could trust the gate. `run-chip-text.test.ts` — the only suite
+that reaches this card — passes, and the card's own render is unchanged.
+
 ## Not exercised
 
 No product code changed, so there is nothing to see on the device and no version bump. Full suite
