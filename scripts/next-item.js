@@ -76,7 +76,7 @@ const owesDeviceCheck = (e) => {
   return /\bdevice\b|\bS25\b|\bAPK\b|on-device/i.test(e.keep?.text ?? '');
 };
 
-const ASSIGNED_ONLY = new Set(['O', 'DV']);
+const ASSIGNED_ONLY = new Set(['O', 'DV', 'T']);
 const wantLane = (e) => {
   if (!laneArg) return true;
   if (e.lane === laneArg) return true;
