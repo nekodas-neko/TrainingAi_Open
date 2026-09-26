@@ -525,6 +525,62 @@ below threshold and left in place for next time.
 - **Design edits welcome:** everything regenerates from `scripts/collection-art/`; the drift test
   keeps `public/cats/` honest.
 
+### [app-shell] BF-204 — the pen always draws its TWELVE LARGEST cats on one line, so it is crowded by construction
+
+- **Lane:** B — `components/home/collection-pen.tsx`, `components/home/collection-pen-cats.ts`.
+- **Added:** 2026-09-26 · owner's first real use of the collection, on the S25: *"Its a bit cramped
+  in there. Might be too many at once. We should probably do sime more tuning."*
+- **Needs:** — nothing. This is a layout defect, not a rules question; it reproduces identically
+  under PS-49's v2 constants, so it does **not** wait on them.
+- **This is NOT "the hash clustered them".** Three separate mechanisms each guarantee crowding, and
+  they compound. All three are read off the code, not inferred from the screenshot.
+  **① The shown set is sorted into the worst case.** `penCats` does
+  `all.sort((a, b) => b.tier - a.tier)` then `.slice(0, MAX_SHOWN)`, so the twelve drawn are always
+  the twelve **largest**. The pen never draws a 34 px slime while a 50 px Tank exists. Twelve T2s is
+  **600 px of sprite in a 348 px pen — 1.72×.** (Pen width = 412 dp − 32 page − 32 card padding.)
+  **② Same tier means same vertical band, so they land on one line.** `BAND` gives tier 2 the
+  interval `[32, 44]`, a **12 px** spread. The depth-by-tier design that is supposed to separate
+  them does nothing once the shown set is one tier, which ① makes the normal case.
+  **③ The slots are narrower than the sprites.** `348 / 12 = 29 px` per slot against 34–50 px
+  sprites, so neighbours overlap by ~13 px at T1 **before any wander** — and the wander is
+  `±0.33 × pen width = ±115 px`, which is **±4 slots**.
+- **The pen is 176 px tall and v1 can only reach the bottom 44 px of it.** `SIZE` and `BAND` carry
+  six entries and `FLYING_FROM_TIER = 4`, but every v1 ladder in `LADDERS` has **three** tiers, so
+  bands 3–5 and the whole flying mechanic are unreachable. **17 % of the pen's height is in use and
+  ~75 % is empty sky** — which is exactly the shape of the owner's screenshot: a large empty night
+  sky above one jammed row. The vertical room the design allocated for spreading cats out exists
+  and cannot be reached.
+- **Name tags collide worse than the sprites do, and they are the part that reads as broken.** Each
+  tag is `whitespace-nowrap` at `text-[9px]` plus `px-1`, centred on its cat, so a 34 px slime
+  carries a ~38 px tag. Twelve six-character names ≈ **456 px against 348 px (1.31×)**; eight
+  characters is **1.66×**. On the owner's screenshot "Beaso" is occluded and "Har", "P" and "Xecom"
+  are each clipped mid-word by a neighbour.
+- **Why he has enough cats for this to bite, measured on production 2026-09-26:** 106 workout days,
+  149 step days, 106 sleep days. Replayed against the v1 costs that is ≈ 22 cats, of which ≈ 13 are
+  **top-tier** — so by ① the twelve drawn are essentially all Tanks, Archers and Clerics at 50 px.
+  His card reports 12 shown + "+12 more" = **24**, consistent with that to within the decay events
+  the estimate does not model.
+- **Four fixes, cheapest first. ①–③ are one file each and independent; the recommendation is all of
+  ① ② ③ and NOT ④.**
+  ① **Stop sorting into the worst case** — take a spread across tiers rather than the top N (e.g.
+  fill by tier round-robin, rarest-first but never more than k per tier). One function in
+  `collection-pen-cats.ts`, no layout change, and it fixes ② for free because a mixed set occupies
+  mixed bands.
+  ② **Make `MAX_SHOWN` fit the measured width** rather than a constant 12 — at 348 px and 50 px
+  sprites, ~6 fit without overlap. The pen already measures itself (`--pen-w` via the
+  `ResizeObserver`), so the number can come from the observer instead of being guessed.
+  ③ **Tags on demand, not on all twelve** — show the name for the rarest few, or on tap, or none
+  below a size threshold. The clipped-name effect is the loudest symptom and this is the cheapest
+  thing that removes it.
+  ④ **Do NOT stretch the bands to fill the empty sky.** Tempting and wrong: PS-49 brings six tiers,
+  at which point bands 3–5 and the flyers become reachable and the sky is spoken for. Widening them
+  now is work that v2 undoes.
+- **Verify on the device, not in the sandbox.** This is a Samsung WebView layout at a real width
+  with real names; a desktop viewport at 384 px will not reproduce the tag collisions faithfully.
+  Owner-visible pass/fail: no name clipped by a neighbour, and no cat fully hidden behind another.
+- **Reversal cost:** none — three constants and one selection function, no stored state. The
+  collection is a replay, so nothing here can corrupt history.
+
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — ~~needs the owner's call on the four, then~~ **RUNNABLE NOW.** This entry's own
