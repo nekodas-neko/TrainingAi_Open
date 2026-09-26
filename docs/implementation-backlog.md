@@ -15,7 +15,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 | Pointer | Value | Source of truth |
 |---|---|---|
 | Next free Postgres migration | **286** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v40** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Local SQLite schema version | **v41** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -2857,8 +2857,6 @@ which is the right shape for something that can only be validated by living with
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
 - **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
-- **Needs: LB-158** — the only remaining half is ②, and it cannot be built until the barcode reaches
-  the device. See that entry.
 - **Added:** 2026-09-25 · Review sweep 61. nutrition-scan is the second-largest AI user, with 29 calls in 30 days.
 - **Photo and recipe-link scans stay on the model;** they genuinely need it. Everything below is logic-first, with the model kept as the fallback:
 - **① SHIPPED 2026-09-26** (`lane-b/rv203-food-capture-local-first`). Describe went straight to the
@@ -2878,13 +2876,14 @@ which is the right shape for something that can only be validated by living with
     (a two-food description must offer nothing), so a list that never rendered cannot pass it. The
     control run against a stubbed phrase extractor fails. **It reaches the seeded-cache fallback
     only**: `getLocalStore` is null on the web, so the source that matters is untested here.
-- **② Barcode always calls Open Food Facts** (`capture-actions.tsx:250`), so a product scanned
-  before still fails offline. **BLOCKED, and the reason is not in this entry.** The fix as written
-  — "look up the user's saved foods by barcode first" — has nothing to look it up *in*: the local
-  `food_items` table has **no `barcode` column** (`lib/sqlite/migrations.ts` `CREATE_FOOD_ITEMS`),
-  `LocalFoodItem` has no such field, and the pull delta therefore never carries one. The server has
-  it (`schema.ts:691`). That is a local SQLite version bump, which is **Lane A's alone** — filed as
-  **LB-158**. The Lane B half is then three lines at `handleBarcode`.
+- **② SHIPPED 2026-09-26** (`feat/lb158-local-barcode`, with LB-158). Barcode always called Open
+  Food Facts, so a product scanned before still failed offline. Both scanners now go through one
+  shared `lookupBarcode(code, userId)` that asks the user's saved foods first.
+  - **The block this entry described was real and its premise was not.** It said the server "has
+    it (`schema.ts:691`)", implying the pull delta was dropping data that existed. Measured in
+    production on 2026-09-26: **341 food items, ZERO barcodes**, including all **42** whose
+    `source` is literally `'barcode'`. Nothing was being dropped because nothing was ever written
+    — so mirroring the column would have mirrored nulls. See LB-158's journal entry.
 - **③ SHIPPED 2026-09-26**, same branch. "Refine" with a portion correction posted the whole
   estimate back to `/api/nutrition/scan` and asked the model to redo it; *"it was 300g"* now
   rescales through the serving-size editor's own base snapshot, on the device, and clears the box.
@@ -2903,30 +2902,11 @@ which is the right shape for something that can only be validated by living with
   `Lane: O`.
 - **Done when:** a repeat barcode for a known food works offline with no `nutrition-scan` row
   logged. (The Describe half of that test passes now.)
-- **Keep:** ② above, and the device look at the new suggestion list — it renders inside the Log
+- **Keep:** the device look at the new suggestion list — it renders inside the Log
   Food sheet on the owner's daily path and the sandbox has no local store, so the offline half of
   ① is unexercised here. **Pass test:** on the S25 in airplane mode, Log Food → Describe → type the
   name of a food logged before → it appears under *"You already have"* and tapping it reaches the
   assign step.
-
-### [nutrition][platform] LB-158 — the barcode never reaches the device, so an offline re-scan cannot work
-- **Lane: A** — `lib/sqlite/migrations.ts` (a local SQLite version), `lib/local-store/**`,
-  `lib/data/postgres/slices/nutrition.ts` if the pull delta needs widening.
-- **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-203 ② after finding the
-  column missing.
-- **What:** `food_items.barcode` exists on the server (`schema.ts:691`) and **nowhere on the
-  device** — not in `CREATE_FOOD_ITEMS`, not on `LocalFoodItem`, not in `foodItemRowToItem`, so the
-  pull delta drops it silently. RV-203 ② asks for "look up the user's saved foods by barcode
-  first", and there is nothing local to look up.
-- **Why it matters beyond RV-203:** a barcode is the one identifier a food row has that is exact.
-  Without it the device cannot recognise a product it has already stored, so every re-scan of the
-  same tin is an Open Food Facts round trip that fails outright with no network.
-- **Shape:** a column + local version bump, the field on `LocalFoodItem` and both mappers, the
-  server's food-item payload carrying it, and `getFoodItemByBarcode(code)` on the store. **Not a
-  Postgres migration** — the column is already there.
-- **Then Lane B:** three lines at `capture-actions.tsx` `handleBarcode` — ask the store before
-  `fetch('/api/nutrition/barcode')`, and hand a hit to `onSelectFood`.
-- **Done when:** scanning a barcode already in the user's foods resolves with no network.
 
 ### [nutrition] LB-159 — should a meal plan reuse your own meals by default?
 - **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, split out of RV-203 ④.

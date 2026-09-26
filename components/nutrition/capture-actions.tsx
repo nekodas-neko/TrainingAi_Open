@@ -13,6 +13,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import type { FoodItem, NutritionScanResult, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelScan, type SharedMeal } from '@trainingai/shared/nutrition/label-payload'
+import { lookupBarcode } from '@trainingai/shared/nutrition/barcode-lookup'
 import { downscaleToJpegDataUrl, downscaleToThumbDataUrl, dataUrlToBlob, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
 import { rejectMealImage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 
@@ -316,14 +317,14 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
     setError(null)
     setBarcodeOutcome(null)
     try {
-      const res = await fetch(`/api/nutrition/barcode?code=${encodeURIComponent(code)}`)
-      const data = await res.json()
-      if (data.unavailable) { setLoading(false); setBarcodeOutcome('unavailable'); return }
-      if (!res.ok) { setError('Barcode lookup failed.'); return }
-      if (data.notFound) { setLoading(false); setBarcodeOutcome('missing'); return }
-      onScanResult(data as NutritionScanResult)
-    } catch {
-      setError('Network error looking up barcode.')
+      // LB-158. Sibling surface to the same swap in `ingredient-picker.tsx`. The user's own saved
+      // foods answer first, so a re-scan costs no round trip and works with no signal at all —
+      // which is the whole premise of a screen that logs food offline.
+      const found = await lookupBarcode(code, userId)
+      if (found.kind === 'unavailable') { setLoading(false); setBarcodeOutcome('unavailable'); return }
+      if (found.kind === 'error') { setError('Network error looking up barcode.'); return }
+      if (found.kind === 'notFound') { setLoading(false); setBarcodeOutcome('missing'); return }
+      onScanResult(found.result)
     } finally {
       setLoading(false)
     }
