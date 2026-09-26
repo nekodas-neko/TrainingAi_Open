@@ -102,9 +102,44 @@ describe('POST /api/feedback', () => {
     expect(await res.json()).toEqual({ error: 'Screenshot too large' })
     expect(createFeedback).not.toHaveBeenCalled()
 
-    // Just under, and it is stored.
-    await feedback({ type: 'bug', title: 'x', screenshotData: 'd'.repeat(400_000) })
-    expect((createFeedback.mock.calls[0][1] as Row).screenshotData).toBe('d'.repeat(400_000))
+    // Just under, and it is stored. The payload is a REAL PNG now (RV-191): the route validates the
+    // leading bytes, so a run of 'd' is no longer an image — while the size rule above is still
+    // measured on the stored string, which is why that half of this case is unchanged.
+    const png = `data:image/png;base64,iVBORw0KGgoAAAAN${'A'.repeat(400_000)}`
+    await feedback({ type: 'bug', title: 'x', screenshotData: png })
+    expect((createFeedback.mock.calls[0][1] as Row).screenshotData).toBe(png)
+  })
+
+  /**
+   * RV-191. The column is rendered by the admin panel as an image, and nothing checked that it was
+   * one — any 500 KB string was stored. The declared type is not the check: it is written by
+   * whoever sends the data URI.
+   *
+   * **The entry called this a HIGH-severity admin-RCE and that part did not reproduce.** Executed
+   * on Chromium 2026-09-25: `window.open` to a `data:` URI does not navigate, and SVG inside
+   * `<img>` is script-inert. These cases pin the boundary doing its own job.
+   */
+  it('refuses a screenshot that is not really an image', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>').toString('base64')
+    for (const screenshotData of [
+      'just a string',                                   // not a data URI at all
+      `data:image/svg+xml;base64,${svg}`,                // a type outside the allowlist
+      `data:image/png;base64,${svg}`,                    // SVG wearing a PNG label
+      'data:image/png;base64,/9j/4AAQSkY=',              // a real JPEG declared as a PNG
+    ]) {
+      createFeedback.mockClear()
+      const res = await feedback({ type: 'bug', title: 'x', screenshotData })
+      expect(res.status, screenshotData.slice(0, 40)).toBe(400)
+      expect(await res.json()).toEqual({ error: 'Screenshot must be a PNG, JPEG or WebP image' })
+      expect(createFeedback).not.toHaveBeenCalled()
+    }
+  })
+
+  // The control for the case above: a report with no screenshot at all is still filed.
+  it('still files a report that carries no screenshot', async () => {
+    createFeedback.mockClear()
+    expect((await feedback({ type: 'bug', title: 'x' })).status).toBe(201)
+    expect(createFeedback).toHaveBeenCalledTimes(1)
   })
 
   it('refuses a report it could not file, one rule at a time', async () => {

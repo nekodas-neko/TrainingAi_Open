@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { readJsonLimited, parseImageDataUri } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
 
 const MAX_SCREENSHOT_BYTES = 500_000
@@ -27,8 +27,19 @@ export async function POST(req: NextRequest) {
   if (typeof title !== 'string' || !title.trim()) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 })
   }
-  if (screenshotData != null && (typeof screenshotData !== 'string' || screenshotData.length > MAX_SCREENSHOT_BYTES)) {
-    return NextResponse.json({ error: 'Screenshot too large' }, { status: 400 })
+  // RV-191. The old check was `typeof string` and a length cap, so any 500 KB string reached the
+  // column the admin panel renders as an image. It is validated by its BYTES now — a data URI's
+  // declared type is written by whoever sends it, so `data:image/png;base64,<SVG>` passes a check
+  // on the declaration alone.
+  if (screenshotData != null) {
+    // The size rule is unchanged and deliberately still measured on the STORED STRING, not the
+    // decoded bytes: that is what goes in the column and what `MAX_BODY_BYTES` keeps headroom over.
+    if (typeof screenshotData !== 'string' || screenshotData.length > MAX_SCREENSHOT_BYTES) {
+      return NextResponse.json({ error: 'Screenshot too large' }, { status: 400 })
+    }
+    if (!parseImageDataUri(screenshotData, MAX_SCREENSHOT_BYTES).ok) {
+      return NextResponse.json({ error: 'Screenshot must be a PNG, JPEG or WebP image' }, { status: 400 })
+    }
   }
 
   const repo = await getRepository()

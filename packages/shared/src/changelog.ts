@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.63",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: a profile picture that is not really an image — a file that says PNG but is not one — is now refused when you upload it, instead of being saved and then showing as a broken picture.",
+    ],
+  },
+  {
     version: "1.465.62",
     date: "2026-09-25",
     changes: [

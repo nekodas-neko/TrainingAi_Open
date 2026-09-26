@@ -24,6 +24,9 @@ export default function AdminContent() {
   const [inviteInput, setInviteInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  // RV-191. The screenshot used to zoom by `window.open(storedValue)` — navigating the browser to
+  // a value a signed-in user supplied. It zooms in place instead; nothing navigates to it.
+  const [zoomedShot, setZoomedShot] = useState<string | null>(null)
   const [feedbackSubmissions, setFeedbackSubmissions] = useState<{
     id: string; type: string; title: string; description: string | null;
     screenshotData: string | null; createdAt: string; userEmail: string; userName: string | null
@@ -289,13 +292,23 @@ export default function AdminContent() {
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">{sub.description}</p>
                       )}
                       {sub.screenshotData && (
-                        // eslint-disable-next-line @next/next/no-img-element -- base64 screenshot, variable size
-                        <img
-                          src={sub.screenshotData}
-                          alt="Screenshot"
-                          className="rounded-xl max-w-full border border-border cursor-zoom-in"
-                          onClick={() => window.open(sub.screenshotData!, '_blank')}
-                        />
+                        <button
+                          type="button"
+                          aria-pressed={zoomedShot === sub.id}
+                          aria-label={zoomedShot === sub.id ? 'Shrink screenshot' : 'Enlarge screenshot'}
+                          onClick={() => setZoomedShot(zoomedShot === sub.id ? null : sub.id)}
+                          className="block w-full text-left"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- base64 screenshot, variable size */}
+                          <img
+                            src={sub.screenshotData}
+                            alt="Screenshot"
+                            className={cn(
+                              'rounded-xl border border-border',
+                              zoomedShot === sub.id ? 'w-full cursor-zoom-out' : 'max-w-full cursor-zoom-in',
+                            )}
+                          />
+                        </button>
                       )}
                       <div className="flex justify-end">
                         {isConfirming ? (

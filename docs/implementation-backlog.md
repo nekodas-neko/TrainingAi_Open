@@ -1909,7 +1909,30 @@ which is the right shape for something that can only be validated by living with
 
 ### [platform][app-shell] RV-191 — the feedback screenshot is stored unchecked and the admin panel opens it as a URL
 - **Lane: A** first (validation), then **B** (render). One PR covers both halves.
-- **⚠ SECURITY, HIGH — the owner confirms before this merges.**
+- **⚠ SEVERITY CORRECTED, 2026-09-25 — the stated exploit was EXECUTED and did not reproduce.** The
+  entry said "reasoned from source and not executed"; it has now been executed, on Chromium 1194.
+  **`window.open` to a `data:` URI does not navigate** (the opened window stayed `about:blank` and
+  the script never ran), and **SVG inside `<img>` is script-inert** (`<img src="data:image/svg+xml,
+  …<script>">` did not execute). So the admin-RCE path — "an admin who clicks the thumbnail then
+  runs code with the admin's session" — is blocked by the browser at both legs, and this is not the
+  script-execution precondition for RV-193/RV-196 that its priority line claims. **Not measured on
+  the Samsung WebView**, which is the canonical runtime; it follows the same Blink policy, but that
+  is inference rather than a measurement.
+- **Still worth the fix, as boundary validation rather than an exploit**, and the validation half
+  SHIPPED 2026-09-25 ([entry](overview/entries/2026-09-25-rv191-image-data-uri-validation.md)).
+- **⚠ The fix shape in this entry was WEAKER than the codebase already knew.** It says to reuse the
+  avatar route's check — but that route validated the **declared** MIME, which whoever sends the
+  data URI writes, so `data:image/png;base64,<SVG>` passed it. `sniffImageMime` already existed for
+  exactly this ("the bytes are the only thing worth asking", DV-18). The shared
+  `parseImageDataUri` reads the leading bytes and requires them to AGREE with the declaration, and
+  **`/api/user/avatar` was fixed in the same PR** under the sibling-surface rule — it had the same
+  weakness the entry proposed copying.
+- **⚠ `claude_ro` has NO `feedback` view at all**, so the entry's "the view omits `screenshot_data`"
+  understates it: the whole table is default-denied and unreadable through `/api/admin/db-query`.
+  Checked 2026-09-25 against `information_schema`.
+- **Keep:** the existing rows, which remain **unchecked** — there is no read path to them from this
+  container, and any delete of a production row is the owner's call. Whoever has DB access runs the
+  check; nothing in the shipped diff touches a stored row.
 - **Added:** 2026-09-24 · Review sweep 60. **Ahead of RV-190 because any signed-in user can reach it, and it is the script-execution precondition for RV-193 and RV-196.**
 - **What:**
   - `POST /api/feedback` checks only that `screenshotData` is a string of 500 KB or less. The avatar

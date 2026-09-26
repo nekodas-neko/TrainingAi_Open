@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sniffImageMime, ALLOWED_IMAGE_MIME, isAllowedImageMime } from '../request-guards'
+import { sniffImageMime, ALLOWED_IMAGE_MIME, isAllowedImageMime, parseImageDataUri } from '../request-guards'
 
 // Headers built from the format specs rather than captured from a file, so a wrong byte is a
 // wrong byte rather than a blessed regression.
@@ -62,5 +62,74 @@ describe('sniffImageMime', () => {
       expect(isAllowedImageMime(got)).toBe(true)
       expect(ALLOWED_IMAGE_MIME).toContain(got)
     }
+  })
+})
+
+/**
+ * RV-191 — a data URI is validated by its bytes, because its declared type is written by whoever
+ * sends it.
+ *
+ * The entry called this a HIGH-severity admin-RCE: the admin panel rendered the stored value as an
+ * `<img src>` and opened it with `window.open`. **That path was executed on Chromium 2026-09-25 and
+ * did not reproduce** — `window.open` to a `data:` URI does not navigate, and SVG inside `<img>`
+ * is script-inert. So these cases pin boundary validation and data hygiene, not an exploit: what
+ * reaches the column is an image, rather than 500 KB of anything at all.
+ */
+describe('parseImageDataUri (RV-191)', () => {
+  const b64 = (...bytes: number[]) => Buffer.from(bytes).toString('base64')
+  const PNG = b64(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13)
+  const JPEG = b64(0xff, 0xd8, 0xff, 0xe0, 0, 16)
+  const WEBP = Buffer.concat([
+    Buffer.from('RIFF'), Buffer.from([4, 0, 0, 0]), Buffer.from('WEBP'),
+  ]).toString('base64')
+  const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>x=1</script></svg>').toString('base64')
+  const CAP = 500_000
+
+  it('accepts each allowed type when the bytes agree with the declaration', () => {
+    for (const [mime, payload] of [['image/png', PNG], ['image/jpeg', JPEG], ['image/webp', WEBP]] as const) {
+      const r = parseImageDataUri(`data:${mime};base64,${payload}`, CAP)
+      expect(r.ok, `${mime}: ${JSON.stringify(r)}`).toBe(true)
+      if (r.ok) expect(r.mime).toBe(mime)
+    }
+  })
+
+  // The case the whole function exists for, and the one a declared-MIME check passes.
+  it('rejects SVG wearing an image/png label', () => {
+    const r = parseImageDataUri(`data:image/png;base64,${SVG}`, CAP)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('bytes_are_not_an_image')
+  })
+
+  // Both halves are individually allowed, and it is still a lie — the admin UI renders the
+  // DECLARED type, so the two disagreeing is itself the defect.
+  it('rejects a real JPEG declared as a PNG', () => {
+    const r = parseImageDataUri(`data:image/png;base64,${JPEG}`, CAP)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('declared_type_does_not_match_bytes')
+  })
+
+  it('rejects a type outside the allowlist, and a non-data-uri, and a non-string', () => {
+    expect(parseImageDataUri(`data:image/gif;base64,${PNG}`, CAP)).toMatchObject({ reason: 'declared_type_not_allowed' })
+    expect(parseImageDataUri(`data:image/svg+xml;base64,${SVG}`, CAP)).toMatchObject({ reason: 'declared_type_not_allowed' })
+    expect(parseImageDataUri('https://example.com/a.png', CAP)).toMatchObject({ reason: 'not_a_data_uri' })
+    expect(parseImageDataUri(null, CAP)).toMatchObject({ reason: 'not_a_string' })
+  })
+
+  // `Buffer.from(…, 'base64')` does not throw on junk — it skips what it cannot decode — so an
+  // empty decode is the only signal that nothing usable arrived.
+  it('rejects a payload that decodes to nothing', () => {
+    expect(parseImageDataUri('data:image/png;base64,!!!!', CAP)).toMatchObject({ reason: 'not_base64' })
+    expect(parseImageDataUri('data:image/png;base64,', CAP)).toMatchObject({ reason: 'not_base64' })
+  })
+
+  it('rejects an oversized payload before it is decoded', () => {
+    const big = `data:image/png;base64,${'A'.repeat(1_000_000)}`
+    expect(parseImageDataUri(big, CAP)).toMatchObject({ reason: 'too_large' })
+  })
+
+  // The control: the cap is about size, not about the type, and a payload at the boundary passes.
+  it('accepts a payload just under the cap', () => {
+    const payload = PNG + 'A'.repeat(100)
+    expect(parseImageDataUri(`data:image/png;base64,${payload}`, CAP).ok).toBe(true)
   })
 })
