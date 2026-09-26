@@ -699,10 +699,16 @@ below threshold and left in place for next time.
   nights before anything announces them. **The work is one import, not a new rule — see the correction
   below before starting.**
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
-- **⚠ THIS BLOCKS `LA-149`.** Wire the announcement as it stands and the first thing the owner is told
-  is that his sleep was bad on a night he slept 7.9 hours. The whole design rests on an announcement
-  he trusts enough to correct; a false one on week one trains the opposite, and that is the failure
-  mode `OR-171`'s guard is about.
+- **✅ THE IMPORT LANDED 2026-09-26, in `LA-149`'s wiring** (`feat/la149-announce-sleep-verdict`).
+  The route reads `nightSessions(rows, tz)` rather than raw `sleep_sessions`, so it is the
+  sixteenth consumer and no selection rule was written beside the helper. Guarded by a route test
+  that lists the nap FIRST — **a first draft listed the real night first and passed with and
+  without the fix**, which is the shape of a test that proves nothing.
+- **⚠ WHAT REMAINS IS THE RE-MEASURE, AND IT IS NOT OPTIONAL.** This entry's sweep measured the
+  wrong population, so **none of its numbers carry over**: 10.9 announcements per 30 nights was
+  counted over rows, not nights. Re-run it over `nightSessions()` output before touching
+  `VERDICT_IQR_MULTIPLIER` — and the ⛔ below still stands, because the rate target is a check on a
+  correct population and never a knob to reach it.
 - **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
   cross-checked against the real function: identical counts, so the sweep below is sound):
   **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
@@ -762,25 +768,6 @@ below threshold and left in place for next time.
   onset minutes so 23:50 and 00:10 are 20 minutes apart, per-component baseline readiness, a
   `modelVersion` stamp on each snapshot, and `null` below 28 nights rather than a guess. The rule is
   sound; it is being fed the wrong rows.
-
-### [sleep][platform] LA-149 — the sleep verdict is stored but nothing announces it yet
-
-- **Lane: A** — `app/api/**`, the morning check-in read path. **Added:** 2026-09-26, shipping TN-81.
-- **Needs:** TN-83 — the verdict currently fires on naps and zero-hour fragments; wiring it first
-  announces a false "your sleep was bad" on nights he slept 7.9 h.
-- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
-- TN-81 landed the computation (`sleep-verdict.ts`), the table (`sleep_verdicts`, migration 284) and
-  the repository methods. **Nothing calls them**, deliberately — the plan ships the engine half
-  first, and the announcement's integration point depends on the surface TN-82 builds.
-- **What is owed:** compute the verdict for the night on the morning check-in's read, persist it
-  through `upsertSleepVerdict` (which is idempotent per `(user, date)` and never touches
-  `response_state`), expose it to the sheet, and accept a response through
-  `setSleepVerdictResponse`.
-- **The rule that must survive the wiring:** the auto-filled value writes `touched: false`; only a
-  correction writes `touched: true` (TN-57). An announcement is not his answer, and nothing on this
-  path may make an un-corrected day look like one.
-- **`sleepVerdictForNight` returns `null` below 28 nights per component** — that is not an error
-  state to paper over, it is "say nothing today".
 
 ### [platform] LA-148 — four `median` implementations, and one of them disagrees
 
@@ -863,9 +850,12 @@ below threshold and left in place for next time.
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
-- **Needs:** LA-149 — **repointed 2026-09-26.** TN-81 shipped the verdict, the table and the
-  repository methods, but nothing calls them yet, so a surface built now would have no data to
-  announce. LA-149 is the wiring.
+- **Needs:** — cleared 2026-09-26. LA-149 shipped the announce path: `GET /api/sleep-verdict`
+  returns the night's verdict (computed and frozen on first read, `null` with
+  `baselineNightsRequired` when there is nothing honest to say) and `POST` records
+  `acknowledged`/`corrected`. It reads through `nightSessions()`, so TN-83's nap problem does not
+  reach the surface. **Startable.** The route never writes a `touched` flag — the correction's
+  VALUE is the check-in save path's to write (TN-57).
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
   interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
