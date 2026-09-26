@@ -18036,3 +18036,19 @@ saying what would verify it never leaves.
 It also carries the correction the finding needed: the barcode half cannot work offline for a
 different reason than the one Review gave, so the row points at `LB-158` instead of implying the
 work is merely unstarted.
+
+## 2026-09-26 — projectOverview.md 12902 → 12906 (`feat/duration-refit-without-the-model`)
+
+Four lines onto the BF-7 known-issue row, correcting the premise it argued from. It said the
+future duration control "must commit on release rather than per detent" *because* a prescription
+averages 2,445 ms — and RV-202 ② removed the model call from that path entirely (~0.4 s, 0
+`ai_call_log` rows over three switches).
+
+The conclusion survives, which is why this is four lines rather than a deletion: per-detent is
+still wrong, because each re-fit runs a full `aggregateSignals` and spends the route's 20/hour
+`prescribe:` budget. Leaving the old number would have been worse than leaving nothing — a Lane B
+session reading it would either build the control against a cost that no longer exists, or notice
+the number was stale and discard the conclusion with it.
+
+It was first written at 7 lines and cut to 4 against this ratchet; the pointer to LA-147 is what
+lets the short version stay honest about what replaced the old reason.

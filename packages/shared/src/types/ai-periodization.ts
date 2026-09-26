@@ -78,6 +78,26 @@ export interface AiPrescription {
   // WERE STORED — 10 of 10 production prescriptions carried one on 2026-09-21. `DurationPreset`
   // resolves both in one place (`requestedBudgetMin`), so nothing that reads this needs to care.
   durationPreset?: import('@trainingai/shared/workout/duration-model').DurationPreset
+  // What a no-model duration re-fit starts from (RV-202 ②). Changing the time budget used to
+  // re-run the whole model call for work that is pure arithmetic — the budget stage is
+  // deterministic — but it cannot re-run against the STORED plan, because the budget passes
+  // only ever remove sets and a return to the session's own length runs neither drop nor
+  // expand. Re-fitting a trimmed plan would keep the trimmed sets and relabel them, so the
+  // pre-budget shape is kept here instead, the same way `preDeload` keeps a revertible
+  // snapshot per exercise. Absent on every prescription generated before this shipped, and on
+  // whole-session deloads (which are returned unchanged while they are pending) — both fall
+  // back to a full generation.
+  refitBaseline?: {
+    /** Set count per sessionExerciseId BEFORE the budget stage. The only lossy field: the
+     *  stage never touches reps/pct/restSec, so those are read off the exercise itself. */
+    sets: Record<string, number>
+    /** The reasoning before the stage appended its dropped/overrun note, so a re-fit replaces
+     *  that note rather than stacking a second one on top of it. */
+    reasoning: string
+    /** Exercises that earned a set through RPE autoregulation — trimmed last, so the re-fit
+     *  protects them exactly as the generation that produced them did. */
+    earnedSetIds?: string[]
+  }
   // Fingerprint of the inputs consumption-day re-evaluation
   // (lib/ai-periodization/reevaluate.ts) last ran against — see reevaluationKey(). Lets
   // workout-data skip re-running it on every fetch while still re-running the moment the
