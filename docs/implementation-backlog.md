@@ -1191,6 +1191,41 @@ the Orchestrator's to do.
   **So the remaining discriminators are:** instrument chart.js's resize path and count callbacks per tap
   (answers the MECHANISM without needing the timing to move, and works in dev), or take it to the phone.
   The second is why a device pass is owed on merge — but it is verification, not a reason to park.
+
+#### ✅ THE MECHANISM IS SETTLED, 2026-09-25 — and the suspect this entry named is WRONG
+
+**Use this metric, not the timing.** Patch the `font` setter on `CanvasRenderingContext2D.prototype` and
+count calls per tab tap. It is the exact top self-time item the device profile named, it needs no
+chart.js internals, and it is immune to the dev-mode noise that made the `resizeDelay` A/B unreadable.
+
+| tap | canvas `font` setter calls |
+|---|---|
+| → Health (5 canvases) | **578**, then **578** again — identical, twice |
+| → More, → Home (no charts) | **0** |
+| → Health, later in the same run | **0** |
+
+**⛔ It is NOT a resize, so `content-visibility` is not the trigger and `resizeDelay` cannot help.**
+Instrumenting `ResizeObserver` with a control: during load, **11 observers constructed, 6 callbacks, 5 of
+them on chart containers** — so the instrument works and chart.js does observe its container. On a tab
+switch: **0 callbacks, chart or otherwise.** The entry's *"suspect is a responsive resize when a panel
+leaves `content-visibility: hidden`"* is falsified. That also explains the dead `resizeDelay` A/B above:
+it was debouncing an event that never fires.
+
+**What it actually is: `epoch`.** `TabVisibilityProvider` increments `epoch` every time the shell
+re-shows a tab, and the screens thread it into their effects' dependency arrays **on purpose** — all five
+tabs stay mounted, so without it a `useEffect(…, [])` fetch would run once per app launch and the screen
+would show that snapshot forever. So a tab switch refetches, the data objects are new, the charts
+re-render and `chart.update()` re-measures every axis label. **The update is legitimate**, which is why
+the third Health switch cost 0: that refetch returned nothing the charts had to redraw.
+- **So the fix is to make a CORRECT update cheaper or later, not to suppress it** — and that is a real
+  trade-off against Q-402's staleness rule, not a free win. Three candidates, none yet measured:
+  ① compare fetched data by VALUE before handing it to the chart, so an unchanged refetch updates
+  nothing (per-chart work, and the strongest fit — two of the three Health switches changed nothing);
+  ② take the update off the tap's critical task (an idle callback), which moves the cost without
+  removing it; ③ refetch less eagerly on show, which is the one that fights Q-402 and should be last.
+- **What this does NOT establish:** all of it is `next dev` in the harness with the seeded user. The
+  device profile is the authority on the APK, and it agrees on the symptom (the canvas `font` setter
+  dominating every tap). The pass test is unchanged and stays a device measurement.
 - **So the fix has no obvious home yet, and that is a real finding:** there is no shared chart-options
   module (`packages/shared/src/chart-colors.ts` is colours only), so `resizeDelay` is either 20 call sites
   or a new shared helper — and a helper under `components/` is Lane B's while one under `packages/shared/`
