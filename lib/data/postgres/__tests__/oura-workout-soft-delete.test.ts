@@ -38,11 +38,22 @@ describe.skipIf(!canRun)('oura slice, workout queries — soft-delete filters', 
 
   afterAll(async () => {
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [USER])
+    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
   })
 
   beforeEach(async () => {
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [USER])
+    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1`, [USER])
+
+    // LA-150: both work lists now skip a session that ENDED before the first heart-rate reading,
+    // because no compute could ever fill it. These cases are about the soft-delete filters, so
+    // they need a reading old enough that the fixture session stays fillable — without one every
+    // case here would pass for the wrong reason (an empty list, not a working filter).
+    await pool.query(
+      `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source)
+       VALUES ($1, now() - interval '3 hours', 60, 'test')
+       ON CONFLICT DO NOTHING`, [USER])
 
     // Everything derives from the clock — never a fixed date. A window fixture pinned to a literal
     // timestamp passes until the day it silently falls outside the window (the rule in CLAUDE.md's

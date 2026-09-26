@@ -6283,7 +6283,7 @@ drift.
 - **The headline SURVIVED re-measurement on 2026-09-25**, against a moving window three weeks on:
   **565 s of 1,117 s of all database time (50.6%)**, 12,591 calls, 44.84 ms mean, 16,843 rows a
   call. The 90-day window is 134,425 raw rows, **133,041** after the chest-strap merge.
-- **SHIPPED 2026-09-25** ([entry](overview/entries/2026-09-25-rv181-observed-hr-sql-aggregate.md)):
+- **SHIPPED 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv181-observed-hr-sql-aggregate)):
   `repo.getObservedHrProfile` computes the profile in SQL, one row instead of the window. The seven
   `resolveHrProfile` callers fetch no rows; `/api/cardio-week` reads its two 30-day windows as
   aggregates too, so `resolveHrProfileWithWindow` (RV-73) is gone with its boundary caveat.
@@ -6308,14 +6308,14 @@ drift.
 
 - **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/clock.ts`, `lib/oura-ble/rollup/run.ts`.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **SHIPPED 2026-09-25, part ① of three** ([entry](overview/entries/2026-09-25-rv182-noop-backfill.md)):
+- **SHIPPED 2026-09-25, part ① of three** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-noop-backfill)):
   the backfill `UPDATE` is deleted. Re-measured that day before removing it — **4,932 calls, 90 s,
   8.0% of all database time, 0 rows updated**, and `measured_at` has **0 nulls**. Safe because a NULL
   can no longer be written: one insert path, a non-null anchor by construction, and
   `oura-raw-sample-measured-at.test.ts` now pins that across the first-ever batch, an epoch open and
   a history re-drain. **The column is NOT dropped** — that is a data-dropping migration and the
   owner's.
-- **SHIPPED ② 2026-09-25** ([entry](overview/entries/2026-09-25-rv182-clock-offset-sql.md)):
+- **SHIPPED ② 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-clock-offset-sql)):
   `getOuraClockOffsets` returns each epoch's robust offset as one row. Five adapter read paths that
   only convert timestamps now take it; the rollup and three others keep the series, which they
   genuinely need. **19–27 ms warm against the series read's ~48 ms.**
@@ -6327,7 +6327,7 @@ drift.
   series because a single newest anchor was the wrong offset. **And the obvious aggregate is a
   REGRESSION** — `row_number() OVER (PARTITION BY epoch …)` measured **53–67 ms**, worse than the
   read it replaces, because it sorts all 12,591 rows. Only the count-then-top-N shape wins.
-- **SHIPPED ③ 2026-09-25** ([entry](overview/entries/2026-09-25-rv182-hr-rollup-churn.md)): the
+- **SHIPPED ③ 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-hr-rollup-churn)): the
   rollup upserts the HR window first, then deletes only the timestamps that left it. Re-measured
   before the change — **628,197 inserts and 574,974 deletes against 140,181 live rows, 95 updates**
   (the entry's 535k/137k, grown).
@@ -31499,25 +31499,6 @@ indefinitely.
   rows, and the admin backfill can recompute on request. **Still open, separately:** whether 15 bpm is
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
-
-### [heart-rate][workouts] LA-150 — the per-set HR backfill work list can never drain, and reads as broken
-
-- **Lane: A** — `lib/data/postgres/slices/oura.ts:1390` (`listSessionsMissingSetHrStats`).
-- **Added:** 2026-09-26, on discharging Q-11.
-- **What.** The work list selects sessions whose `MAX(readings_count) = 0`, which is right — a
-  completion-time compute can run before the ring has drained, and its empty rows must not remove
-  the session from the list permanently (that was Q-11's Defect B). But **33 sessions can never
-  acquire a reading**, because they finished before `oura_heartrate` holds anything. They match the
-  predicate forever, so every future run reports the same *33 remaining, 0 filled*.
-- **Why it matters more than it sounds:** that output is indistinguishable from a broken backfill.
-  The device agent ran it on 2026-09-24 and reasonably asked whether the raw samples had been
-  pruned. Anyone who runs it next will ask the same question.
-- **Fix:** bound the scan at the earliest `oura_heartrate.timestamp` rather than a flat 180 days —
-  the retention constant is the wrong floor while the table is younger than its own window. A row
-  the compute cannot fill is not pending work.
-- **Do NOT "fix" it by writing a sentinel `set_hr_stats` row** for those sessions: the coverage-aware
-  predicate exists precisely because empty rows used to hide real gaps, and re-introducing one under
-  another name walks back into Defect B.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
