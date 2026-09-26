@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.473.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the grid button on Home actually rearranges your widgets now. Tap it and each section grows a grip on its left — drag that to move the section, and the new order is kept.",
+    ],
+  },
+  {
     version: "1.472.0",
     date: "2026-09-26",
     changes: [

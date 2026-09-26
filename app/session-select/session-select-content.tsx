@@ -18,6 +18,8 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { toast } from "sonner";
 import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
+import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
+import { useHomeSectionDrag } from "@/lib/hooks/use-home-section-drag";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import dynamic from "next/dynamic";
 import { CoachFab } from "@/components/coach/coach-fab";
@@ -446,6 +448,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // morning check-in's sleep scale (TN-57 owns writing it). `useCallback` because `HomeCardWidget`
   // is memoised and an inline arrow would defeat it on every render of the section list.
   const handleCorrectSleepVerdict = useCallback(() => setMorningCheckinOpen(true), []);
+
+  // BF-205 — the drag that the "Reorder sections" button was always missing.
+  const sectionDrag = useHomeSectionDrag(sectionOrderRef, setSectionOrder);
   const hrData = useMemo(
     () => (ouraHrReadings.length > 0 ? { readings: ouraHrReadings, workoutSessions: ouraWorkoutSessions, sleep: ouraSleepWindow } : null),
     [ouraHrReadings, ouraWorkoutSessions, ouraSleepWindow],
@@ -1182,6 +1187,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">
+          <DragDropProvider sensors={[PointerSensor]} onDragOver={sectionDrag.onDragOver} onDragEnd={sectionDrag.onDragEnd}>
           {sectionOrder.filter(key => !hiddenSections.has(key)).map((key, idx) => {
             const content = (() => {
               // Every `card_*` key routes to the one component, which no-ops on a key the user has
@@ -1319,11 +1325,12 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             })();
             if (content === null) return null;
             return (
-              <HomeSortableSection key={key} id={key} editMode={sectionEditMode} onHide={handleHideSection}>
+              <HomeSortableSection key={key} id={key} index={idx} editMode={sectionEditMode} onHide={handleHideSection}>
                 {content}
               </HomeSortableSection>
             );
           })}
+          </DragDropProvider>
         </div>}
 
         {/* ── Hidden sections restore panel (edit mode only) ── */}
