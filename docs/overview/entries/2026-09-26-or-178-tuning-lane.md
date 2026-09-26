@@ -60,3 +60,27 @@ which is the cheapest possible proof the convention works.
 44 ready, 16 waiting on the owner — from 47 and 16. The reduction is small on purpose: most of what
 is left is genuine Orchestrator work (docs reconciliation sweeps), not mis-routing. The routing was
 already close to right; what was wrong was that Tuning had nowhere to be sent.
+
+## Four owner decisions taken the same day
+
+Put to him as one prompt, with a recommendation each. All four answered; entries re-laned and out of
+`O`.
+
+| entry | answer | now |
+|---|---|---|
+| `LB-141` walk exits | **Prompt on both** — he overrode the recommended silent save | Lane B |
+| `LB-152` colour tokens | **Retune the token to today's hex first, then migrate** | Lane B |
+| `LB-157` Home header | **Date on its own line**; battery chips stay, deliberately | Lane B |
+| `BF-191` phantom rows | **DV may soft-delete the three named ids** next sitting | Lane DV |
+
+Two are worth recording in more than a table. **`LB-141` went against the recommendation** — the
+brief argued for a silent save on the ground that a wrong save costs one tap and a wrong discard is
+permanent; he took the prompt anyway, so the entry says build the prompt and not to re-derive the
+asymmetry argument. **`LB-157` closed an alternative as well as choosing one:** moving the battery
+chips off Home was offered and declined, because he added them on purpose (Q-111), so that option is
+struck rather than left open for the next reader to re-propose.
+
+`BF-191`'s authorisation is for **three named row ids and nothing else** — a one-off, not a widening
+of the device agent's standing write permissions.
+
+Lane O's owner queue: **16 → 12**.
