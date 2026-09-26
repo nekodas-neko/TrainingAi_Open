@@ -186,7 +186,7 @@ export interface ReadinessScoreResponse {
     // Zone-minutes / move-every-hour — null (not zero) when there's no intraday HR series to derive
     // them from today (e.g. no baseline resting HR yet); zero is a real "no elevated HR today" result.
     zoneMinutes: number | null; moveHours: number | null
-    sessions7d: number; volume7dKg: number; typicalSessionVolumeKg: number
+    sessions7d: number; volume7dKg: number
   } | null
   // True when the over-exertion taper (ACWR above the optimal band) pulled the displayed score
   // below the pre-taper goal-completion score.
@@ -405,7 +405,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     todayMid,
   )
   const todayWorkoutVolumeKg = load.todayVolumeKg
-  const typicalSessionVolumeKg = load.typicalSessionVolumeKg
 
   // Skip ACWR for the first 28 days of a new program — chronic load baseline not yet valid.
   // Resolved here (ahead of the activity score) so the over-exertion taper can read it.
@@ -458,7 +457,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     strengthSessionToday,
     sessions7d,
     volume7dKg,
-    typicalSessionVolumeKg,
     goals,
     acwr,
   })
@@ -476,7 +474,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
     sessions7d: prevWindow.sessions7d,
     volume7dKg: prevWindow.volume7dKg,
-    typicalSessionVolumeKg,
     goals,
   })?.preTaperScore ?? null) : null
 
@@ -895,7 +892,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       ? {
           steps: todayMetrics?.steps ?? null, activeCalories: todayMetrics?.activeCalories ?? null,
           zoneMinutes: zoneMinutesToday, moveHours: movedHoursToday,
-          sessions7d, volume7dKg, typicalSessionVolumeKg,
+          sessions7d, volume7dKg,
         }
       : null,
     activityTaperApplied:    activityResult?.taperApplied ?? false,

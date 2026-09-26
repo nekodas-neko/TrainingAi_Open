@@ -11,7 +11,6 @@ import { scoreBand } from '@trainingai/shared/health/score-band'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { computeActivityScore } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
-import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { metric, splitMeasured, type MetricLine } from './metrics'
 import { buildInsightText, type RecentComparison } from './insight-text'
@@ -71,7 +70,15 @@ export async function POST(req: Request) {
   // deterministic reads below on every request. They are cheap next to the model call they avoid.
 
   // The health metrics below are a 7-day read; the workout list is 28 (see Q-512 at the fetch).
-  const ACWR_WINDOW_DAYS = 28
+  // 28 days, and it is still load-bearing although this route no longer computes ACWR.
+  // **Q-512 widened it for `computeVolumeAcwr`, which LA-154 removed from here** along with the
+  // last dead input it fed — but the width must stay: the 7-day filter below is anchored on the
+  // REQUESTED `date`, which the body may set to any past day, while this fetch counts back from
+  // now. A 7-day fetch would silently drop sessions for any date older than today.
+  // (Q-512's own finding still governs `readiness-payload.ts`, where ACWR really is computed:
+  // the helper measures its span from the earliest session handed to it, so a short list can
+  // never clear its 21-day gate, and the gate must not be lowered to rescue a mis-wired caller.)
+  const SESSION_FETCH_WINDOW_DAYS = 28
   const since7 = formatInTimeZone(subDays(new Date(), 7), tz, 'yyyy-MM-dd')
   const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile] = await Promise.all([
     repo.getOuraDaily(userId, since7, date),
@@ -79,11 +86,7 @@ export async function POST(req: Request) {
     repo.listBodyMetrics(userId, since7, date),
     repo.getOuraDailyDerived(userId, since7, date),
     repo.getOuraDailySummary(userId, since7, date),
-    // Q-512: 28 days, not 7 — matching `readiness-payload.ts`. `computeVolumeAcwr` measures its
-    // span from the EARLIEST session in the list it is handed, so a 7-day list can never clear the
-    // helper's 21-day gate: ACWR was structurally null here on 110 of 110 days. The gate is right
-    // and must not be lowered to rescue one mis-wired caller — the window was wrong.
-    repo.getWorkoutSessionsFrom(userId, subDays(new Date(), ACWR_WINDOW_DAYS)),
+    repo.getWorkoutSessionsFrom(userId, subDays(new Date(), SESSION_FETCH_WINDOW_DAYS)),
     repo.getUserById(userId),
   ])
 
@@ -184,24 +187,17 @@ export async function POST(req: Request) {
       sex: userProfile?.sex ?? null,
       activityLevel: userProfile?.activityLevel ?? null,
     })
-    // `recentSessions` spans 28 days for the ACWR helper (Q-512), so these two — which are read by
-    // the model as "this week" and feed the activity score's 7-day lanes — filter back down rather
-    // than silently becoming 28-day figures. Widening the fetch without this would have turned a
-    // structurally-null ACWR into a wrong session count, which is the worse failure.
+    // `recentSessions` spans 28 days (see the fetch), so these two — which feed the activity
+    // score's 7-day lanes — filter back down rather than silently becoming 28-day figures.
     const from7dMs = new Date(`${date}T00:00:00.000Z`).getTime() - 7 * 86_400_000
     const sessions7dRows = recentSessions.filter(ws => ws.startedAt.getTime() >= from7dMs)
     const sessions7d = sessions7dRows.length
     const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
-    const load = computeVolumeAcwr(
-      recentSessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0) })),
-      new Date(`${date}T00:00:00.000Z`),
-    )
     const activityResult = computeActivityScore({
       steps: todayBmForActivity?.steps ?? null,
       activeCalories: todayBmForActivity?.activeCalories ?? null,
       sessions7d,
       volume7dKg,
-      typicalSessionVolumeKg: load.typicalSessionVolumeKg,
       goals,
     })
     if (activityResult?.score != null) {

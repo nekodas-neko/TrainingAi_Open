@@ -1017,9 +1017,10 @@ below threshold and left in place for next time.
 
 ### [platform] LA-151 — Reference: one `median`, one `lowerMedian`, and the four that stay private
 
+- **Reference:** the four copies below stay private on purpose, and each reason is the whole
+  content of this entry — a later sweep that re-finds them needs to read why before deciding they
+  are debt. Nothing is built from here.
 - **✅ DONE 2026-09-26** (`refactor/la151-remaining-medians`, after `refactor/la151-acwr-median`).
-  **Reference** — kept so the next reader of these files does not re-open a decision; there is no
-  work left here.
 - **Lane: A.** **Added:** 2026-09-26 by `LA-148`. Its count was four; this entry's was eight; the
   real number of hand-rolled copies was **eleven**, and the census that found them is one grep:
   `grep -rn "length % 2" packages/shared/src lib app` plus a scan for
@@ -1070,26 +1071,13 @@ below threshold and left in place for next time.
   owner gate. **Establish what actually reads a number before deciding how risky its tie-break
   is** — the one that looked most dangerous was inert.
 
-- **Still owed, and deliberately not widened into this:** `typicalSessionVolumeKg` is a dead input
-  threaded from `computeVolumeAcwr` through `readiness-payload.ts`, `build-day-audit.ts` and the
-  health-insight route into a function that ignores it. Removing it touches ~6 files and is a
-  type-surface change, not a math one — `LA-154`.
-
-### [platform] LA-154 — remove the dead `typicalSessionVolumeKg` input
-
-- **Lane: A** — `packages/shared/src/ai-periodization/acwr.ts`, the `ActivityScoreInput` type,
-  `readiness-payload.ts`, `build-day-audit.ts`, `app/api/ai/health-insight/**`.
-- **Added:** 2026-09-26 by `LA-151`, which found it and declined to widen a median consolidation
-  into a type-surface change.
-- `computeVolumeAcwr` computes it, three call sites thread it, and the scoring function **never
-  reads it** — `Q-190` replaced the volume lane's denominator with the absolute
-  `sessionVolumeGoalKg` so the target would stop chasing the user's own median, and left the
-  input behind.
-- **Not a rename or a behaviour change:** nothing consumes the value, so removing it cannot move
-  a score. The care needed is only that the day-audit row and the readiness payload shape are
-  read by tests and by the admin console.
-- **Done when:** no file outside a test mentions `typicalSessionVolumeKg`, and the score audit
-  no longer prints a row for it.
+- **✅ The dead input went in `LA-154`** (same day, `fix/la154-dead-typical-session-volume`), and
+  **the scope this entry described for it was wrong.** It said to remove `typicalSessionVolumeKg`
+  everywhere. Two of its three surfaces were dead — the field on `ActivityScoreInput`, which the
+  scoring function never read, and `activitySignals` in the readiness payload, which no UI reads —
+  but the **score-audit row is rendered and deliberate**, and the field's own docstring said so
+  (*"Kept because the audit view displays it"*). Removing it there would have deleted a correctly
+  labelled context row on the owner's audit screen.
 
 ### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
 
@@ -2749,8 +2737,9 @@ which is the right shape for something that can only be validated by living with
 
 ### [readiness][platform] LA-152 — Reference: two contributor shapes, one reader, and `[object Object]` in production
 
-- **Lane: A.** **Added:** 2026-09-26 by `RV-201`, which fixed it. **Reference** — recorded so the
-  next reader of these columns does not rediscover it; there is no work left here.
+- **Reference:** the two shapes these columns can hold, and which reader prefers which — read
+  before touching `readiness_contributors`, never built. Nothing is left to do.
+- **Lane: A.** **Added:** 2026-09-26 by `RV-201`, which fixed it.
 - **What was live.** `oura_daily.readiness_contributors` stores `{ hrv_balance: 90 }` — Oura's
   numbers. `oura_daily_derived.readiness_contributors`, which the app writes and which every
   reader PREFERS when present, stores `{ hrvBalance: { score, input, gap, provisional } }`.
