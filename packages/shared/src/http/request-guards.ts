@@ -89,3 +89,62 @@ export function sniffImageMime(bytes: Uint8Array): AllowedImageMime | null {
   if (bytes.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'image/webp'
   return null
 }
+
+export type ImageDataUriRejection =
+  | 'not_a_string'
+  | 'not_a_data_uri'
+  | 'declared_type_not_allowed'
+  | 'not_base64'
+  | 'too_large'
+  | 'bytes_are_not_an_image'
+  | 'declared_type_does_not_match_bytes'
+
+export type ParsedImageDataUri =
+  | { ok: true; mime: AllowedImageMime; bytes: number }
+  | { ok: false; reason: ImageDataUriRejection }
+
+/**
+ * Validate a `data:image/…;base64,…` string as an image, by its BYTES (RV-191).
+ *
+ * **Why the declared type is not enough, and this is the whole point of the function.** The MIME in
+ * a data URI is written by whoever sends it. `data:image/png;base64,<SVG>` declares PNG and carries
+ * SVG, so a check on the declaration alone passes it — which is what `/api/user/avatar` did, and
+ * what `/api/feedback` did not check at all. `sniffImageMime` reads the leading bytes, and this
+ * requires the two to AGREE: a file that lies about itself is rejected even when both halves are
+ * individually allowed (a JPEG declared as PNG is still a lie, and the admin UI renders the
+ * declared type).
+ *
+ * **What it is not.** It does not make a stored data URI safe to navigate to — nothing here can,
+ * because that is the reader's decision. Measured 2026-09-25 on Chromium: `window.open` to a
+ * `data:` URI does not navigate, and SVG inside `<img>` is script-inert, so RV-191's stated
+ * admin-RCE path did not reproduce. This is the boundary doing its own job: what reaches the
+ * column is an image, rather than 500 KB of anything at all.
+ */
+export function parseImageDataUri(value: unknown, maxDecodedBytes: number): ParsedImageDataUri {
+  if (typeof value !== 'string') return { ok: false, reason: 'not_a_string' }
+  // `[\s\S]*` rather than `.` with the `s` flag: the shared package targets a lower ES level and
+  // the flag does not compile there. A base64 payload can contain newlines.
+  const m = /^data:([^;,]+);base64,([\s\S]*)$/.exec(value)
+  if (!m) return { ok: false, reason: 'not_a_data_uri' }
+  const [, declared, b64] = m
+  if (!isAllowedImageMime(declared)) return { ok: false, reason: 'declared_type_not_allowed' }
+
+  // Cheap reject before decoding, so an oversized payload is not materialised to be measured.
+  if (Math.ceil(b64.length * 0.75) > maxDecodedBytes) return { ok: false, reason: 'too_large' }
+
+  let bytes: Buffer
+  try {
+    bytes = Buffer.from(b64, 'base64')
+  } catch {
+    return { ok: false, reason: 'not_base64' }
+  }
+  // `Buffer.from(…, 'base64')` does not throw on junk — it skips what it cannot decode and can
+  // return an empty buffer, so emptiness is the real signal that nothing decodable arrived.
+  if (bytes.length === 0) return { ok: false, reason: 'not_base64' }
+  if (bytes.length > maxDecodedBytes) return { ok: false, reason: 'too_large' }
+
+  const sniffed = sniffImageMime(bytes)
+  if (!sniffed) return { ok: false, reason: 'bytes_are_not_an_image' }
+  if (sniffed !== declared) return { ok: false, reason: 'declared_type_does_not_match_bytes' }
+  return { ok: true, mime: sniffed, bytes: bytes.length }
+}

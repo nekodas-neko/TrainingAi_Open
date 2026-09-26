@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
-import { readJsonLimited, isAllowedImageMime } from '@trainingai/shared/http/request-guards'
+import { readJsonLimited, parseImageDataUri } from '@trainingai/shared/http/request-guards'
 
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB decoded image
 // The data URL is base64 (~1.33×) plus JSON envelope — cap the raw body a bit above
@@ -30,15 +30,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing avatar' }, { status: 400 })
   }
 
-  // data:image/png;base64,.... → validate the declared MIME against the whitelist.
-  const mimeMatch = /^data:([^;,]+)[;,]/.exec(body.avatar)
-  if (!mimeMatch || !isAllowedImageMime(mimeMatch[1])) {
-    return NextResponse.json({ error: 'Unsupported image type (use JPEG, PNG or WebP)' }, { status: 400 })
-  }
-  const base64Data = body.avatar.split(',')[1] ?? ''
-  const approxBytes = Math.ceil(base64Data.length * 0.75)
-  if (approxBytes > MAX_SIZE) {
-    return NextResponse.json({ error: 'Image too large (max 5MB)' }, { status: 400 })
+  // RV-191's sibling sweep. This checked the DECLARED type, which whoever sends the data URI
+  // writes: `data:image/png;base64,<SVG>` passed it. `parseImageDataUri` reads the leading bytes
+  // and requires them to agree with the declaration, and folds in the size check on the decoded
+  // length rather than an estimate from the base64.
+  const parsed = parseImageDataUri(body.avatar, MAX_SIZE)
+  if (!parsed.ok) {
+    return parsed.reason === 'too_large'
+      ? NextResponse.json({ error: 'Image too large (max 5MB)' }, { status: 400 })
+      : NextResponse.json({ error: 'Unsupported image type (use JPEG, PNG or WebP)' }, { status: 400 })
   }
 
   const repo = await getRepository()

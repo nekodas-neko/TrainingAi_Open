@@ -274,7 +274,9 @@ describe('/api/user/preferences', () => {
 })
 
 describe('POST /api/user/avatar', () => {
-  const PNG = 'data:image/png;base64,' + 'A'.repeat(100)
+  // A real PNG header followed by padding — RV-191 validates the leading bytes, so an all-'A'
+  // payload is no longer an image as far as the route is concerned.
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAAN' + 'A'.repeat(100)
 
   it('refuses without a session', async () => {
     sessionUser = null
@@ -304,11 +306,33 @@ describe('POST /api/user/avatar', () => {
     expect(updateUserAvatar).not.toHaveBeenCalled()
   })
 
+  // RV-191: the fixtures carry REAL leading bytes now. They used to be `AAAA` under every declared
+  // type, which the route accepted because it only read the declaration — the defect that sweep
+  // closed. A payload that is not the type it claims is rejected, so a placeholder no longer works.
+  const REAL_HEADER: Record<string, string> = {
+    'image/png': 'iVBORw0KGgoAAAAN',
+    'image/jpeg': '/9j/4AAQSkY=',
+    'image/webp': 'UklGRgQAAABXRUJQ',
+  }
+
   it('accepts the three whitelisted types', async () => {
     for (const mime of ['image/png', 'image/jpeg', 'image/webp']) {
-      expect((await avatar({ avatar: `data:${mime};base64,AAAA` })).status).toBe(200)
+      expect((await avatar({ avatar: `data:${mime};base64,${REAL_HEADER[mime]}` })).status).toBe(200)
     }
     expect(updateUserAvatar).toHaveBeenCalledTimes(3)
+  })
+
+  it('rejects bytes that are not the type the data URI declares', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>').toString('base64')
+    const res = await avatar({ avatar: `data:image/png;base64,${svg}` })
+    expect(res.status).toBe(400)
+    expect(updateUserAvatar).not.toHaveBeenCalled()
+  })
+
+  it('rejects a real image whose declared type is a different real image type', async () => {
+    const res = await avatar({ avatar: `data:image/png;base64,${REAL_HEADER['image/jpeg']}` })
+    expect(res.status).toBe(400)
+    expect(updateUserAvatar).not.toHaveBeenCalled()
   })
 
   it('rejects a decoded image over the size cap', async () => {
