@@ -2400,30 +2400,30 @@ which is the right shape for something that can only be validated by living with
   - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
   - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
 
-### [app-shell] LB-162 — RV-207's three remaining bars and the height animations, none of which is mechanical
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑤ after
-  converting the three that were safe.
-- **RV-207 ⑤ named six `width` bars and called them all quick wins. Three were; three are not**, and
-  each fails for a different reason — which is why they want their own look rather than a sweep:
-  - **`warmup-screen.tsx:95`** — a gradient fill carrying a `boxShadow` glow, ticking every second
-    under `width 1s linear`, so it is the highest-value one. **`scaleX` scales a box-shadow with the
-    element**, so the glow's horizontal spread shrinks with the bar. Either move the glow to the
-    track (it then stops following the bar's end, which is a look change) or accept the scaling.
-    Needs an eye on it, not a refactor.
-  - **`weekly-muscle-sets-card.tsx:133`** — the track is `overflow-visible` **on purpose**: an
-    absolutely-positioned `h-3` target marker deliberately overflows an `h-2` track.
-    `ProgressFill`'s own docstring says an unclipped `rounded-full` fill goes visibly oval under
-    `scaleX`, and clipping the track would clip the marker.
-  - **`body-battery-card.tsx:153`** — the track is `flex justify-end` so the tank empties from the
-    LEFT. `ProgressFill` is hard-coded `origin-left`, and passing `origin-right` through
-    `className` is a same-specificity collision decided by stylesheet order, not by the call site.
-    Wants an `origin` prop on the primitive.
-- **The `height: auto` half is also unstarted** — `meal-card.tsx:113-115` (fires on every food
+### [app-shell] LB-162 — the three `height: auto` collapses; the three bars are done
+- **Lane: B** · **Branch:** `lane-b/lb162-remaining-bars` · **Added:** 2026-09-26.
+- **✅ The three `width` bars SHIPPED 2026-09-26**, each needing the thing that kept it out of
+  RV-207:
+  - `ProgressFill` gained **`origin`** (a prop, not a `className` — both spellings are
+    `transform-origin` utilities of equal specificity, so which won would be Tailwind's emit order)
+    and an optional **`boxShadow`**.
+  - `body-battery-card` passes `origin="right"`; its tank empties from the left.
+  - `warmup-screen` keeps its gradient and glow, at `durationMs={1000}` with `ease-linear`.
+  - `weekly-muscle-sets-card` clips the FILL in a wrapper, leaving the track `overflow-visible` so
+    the two `h-3` target markers still escape an `h-2` track.
+- **Still open: the `height: auto` animations** — `meal-card.tsx:113-115` (fires on every food
   insert), `body-battery-card.tsx:164`, `achievements-section.tsx:55`. Each is a collapse whose
-  replacement (opacity/y, or the `collapsible-down` keyframes) changes how the open reads.
-- **Two of RV-207 ⑤'s six paths were wrong** and are corrected above: `goal-progress-bar.tsx` and
-  `weekly-muscle-sets-card.tsx` are under `components/health/`, not `components/`.
-- **Done when:** the three bars composite without changing how they look, judged on the S25.
+  replacement (opacity/y, or the `collapsible-down` keyframes) changes how the open reads, so it is
+  a look decision per site rather than a sweep.
+- **Keep:** the device look at the three shipped bars. **Two render attempts in the Playwright
+  harness did NOT produce evidence** and the reasons are worth knowing: Home came up on the
+  **zero-data** account (Body Battery is absent there, so the bar could not be compared), and the
+  Health capture stopped above the muscle-sets card even at `fullPage: true`, while scrolling to it
+  by text timed out at 180 s against `next dev`. So the conversions are sound by construction and
+  mutation-tested at source, and **unseen**.
+- **Pass test:** on the S25, Body Battery drains from the LEFT; the warmup bar still glows and
+  still ticks once a second; each muscle-sets row shows its target marker standing proud of the
+  bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
 - **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.

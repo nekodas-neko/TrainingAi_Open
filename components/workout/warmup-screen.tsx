@@ -10,6 +10,7 @@ import { formatTime } from "./utils";
 import { useElapsedSec } from "./session-clock";
 import { useExerciseMedia } from "@/lib/hooks/use-exercise-media";
 import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 // Fallback only — used until the session's budget is known (`workout-data` has not landed yet).
 // The real goal is computed from the session budget by `warmupGoalSecFor` in workout-screen.tsx,
@@ -92,16 +93,16 @@ export function WarmupScreen({ sessionType, exercises, workoutStartMs, warmupGoa
           </span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: "color-mix(in oklch, var(--color-brand) 10%, transparent)" }}>
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${warmupProgress * 100}%`,
-              transition: "width 1s linear",
-              background: warmupDone
-                ? "var(--accent-green)"
-                : "linear-gradient(90deg, var(--color-brand), color-mix(in oklch, var(--color-brand) 60%, #00d4ff))",
-              boxShadow: warmupDone ? "0 0 8px color-mix(in oklch, var(--accent-green) 53%, transparent)" : "0 0 8px color-mix(in oklch, var(--color-brand) 60%, transparent)",
-            }}
+          <ProgressFill
+            pct={warmupProgress * 100}
+            durationMs={1000}
+            className="ease-linear"
+            color={warmupDone
+              ? "var(--accent-green)"
+              : "linear-gradient(90deg, var(--color-brand), color-mix(in oklch, var(--color-brand) 60%, #00d4ff))"}
+            boxShadow={warmupDone
+              ? "0 0 8px color-mix(in oklch, var(--accent-green) 53%, transparent)"
+              : "0 0 8px color-mix(in oklch, var(--color-brand) 60%, transparent)"}
           />
         </div>
       </div>
