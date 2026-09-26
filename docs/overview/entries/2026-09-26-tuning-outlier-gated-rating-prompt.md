@@ -1,4 +1,4 @@
-# Tuning — the outlier-gated rating prompt, and why three previous attempts decayed to zero
+# Tuning — the app announces and the owner corrects, and why three attempts at ASKING decayed to zero
 
 **Branch:** `tuning/outlier-gated-rating-prompt` · **2026-09-26**
 **Filed:** `TN-81` (Lane A, engine) · `TN-82` (Lane B, surface) · amendment to `OR-171`
@@ -10,11 +10,20 @@ Asked what Tuning needed to keep going, the answer was an **outcome variable**, 
 TN entries in the queue, and only `TN-73` ever produced a validated instrument. The cheapest missing
 label is a daily subjective sleep rating, which had stopped.
 
-The owner agreed to rate, with a design constraint: *"I'd like it to auto fill if the within the
-normal range; and only ask/require input when its outside the median range - as in high or low"* —
-and the same structure for reporting scores that feel wrong. He had said the same thing unprompted on
-2026-09-25 answering `Q-72`, which `OR-171` already recorded. Saying it twice makes it settled
-preference rather than a suggestion, and that is worth having on the record.
+The owner agreed to rate, then refined the design twice in one exchange. First: *"I'd like it to auto
+fill if the within the normal range; and only ask/require input when its outside the median range"* —
+which he had also said unprompted on 2026-09-25 answering `Q-72`, recorded in `OR-171`. Then, asked to
+confirm, he moved past it:
+
+> *"auto fill to normal when readings dont say anything strange … But if our results say something
+> diferent (i.e sleep was later; or short or etc etc) then it can say; your values was bad; this has
+> autofilled this category"*
+
+**That third version is the one built against, and it is materially better.** The app never asks. It
+fills the category itself and **announces** what it filled and why; the owner's only interaction is
+**correcting it when it is wrong**. A correction is a disagreement, and a disagreement is worth more
+than any rating — 35 neutral 3s said nothing, while three corrections would say where the model is
+wrong and in which direction.
 
 ## What the measurement changed
 
@@ -41,13 +50,24 @@ the owner skips inherits their fate"* — and then placed the new question on th
 collected 2 of 82. So **a fourth field is the intervention that has failed three times**, and the fix
 is that a gated day asks one question while an ordinary day asks none.
 
-## The one place the proposal departs from what was asked
+## An objection raised, then dissolved by his own refinement
 
-A tails-only sample cannot validate the score. It selects on the predictor under test, which biases
-agreement *upward*, and the error that matters most — a night scored **normal** that he would have
-called bad — is unsampled by construction. A random **1 in 5** of ordinary nights, rendered
-identically so the two are indistinguishable, fixes it for under two extra prompts a month. That is
-the only departure, and it is on a point he could not have been expected to anticipate.
+Against the *ask-only-on-outliers* version, the objection was that a tails-only sample cannot validate
+the score: it selects on the predictor under test, which biases agreement upward, and the error that
+matters most — a night scored **normal** that he would have called bad — is unsampled by construction.
+The proposed fix was a random 1-in-5 of ordinary nights.
+
+**His announce-on-every-day version removes the problem instead of mitigating it.** An ordinary day is
+announced too, so a wrong "normal" is exactly as correctable as a wrong "poor" — the middle of the
+distribution is covered, with no random sampling and no extra prompts. The mitigation was dropped.
+
+**One new risk replaces it, and it needed a written guard.** Under correction-only feedback, silence is
+ambiguous: no correction could mean the app was right, or that he did not look. That matters because
+**zero corrections reads exactly like success** — the same shape as the 35-of-36 neutral 3s that
+started this. So the plan records three states rather than two (`none | acknowledged | corrected`),
+and states outright that a month of near-zero corrections means the **instrument failed**, not that
+the model is validated. Writing that down now is the point; in six months the temptation runs the
+other way.
 
 ## Two things found while checking feasibility
 
@@ -57,11 +77,12 @@ the only departure, and it is on a point he could not have been expected to anti
 later scoring change silently rewrites the number each rating was given against and every pairing
 decays into noise. That is now `TN-81`'s hard requirement.
 
-**The honest-auto-fill machinery already exists.** `sleep_quality_feel_touched` was added by `TN-57`
-because `sleep_quality` had been defaulted to `'ok'` for 91 days and two surfaces read that default
-back as the owner's answer. An auto-fill writing `touched: true` would recreate that deliberately, so
-the constraint is stated as a hard one in both the plan and the entry.
-`suggestedSoreMuscles` is the in-repo precedent for the pre-fill-and-override shape.
+**The honest-auto-fill machinery already exists, and under this design it carries more weight.**
+`sleep_quality_feel_touched` was added by `TN-57` because `sleep_quality` had been defaulted to `'ok'`
+for 91 days and two surfaces read that default back as the owner's answer. The rule is now: the
+auto-filled value writes `touched: false`, and **only a correction writes `touched: true`** — which is
+the entire difference between "the app's guess" and "his answer". `suggestedSoreMuscles` is the in-repo
+precedent for the pre-fill-and-override shape.
 
 ## Two field mis-filings caught before they shipped
 
@@ -85,7 +106,7 @@ duplicates, all tagged. Docs-only: no runtime surface touched, so no device pass
 
 ## Not done
 
-Nothing is implemented — this is the planning half, per the backlog-driven two-PR rule. The
-thresholds (28-night median/IQR, 4–6 prompts a month, 1-in-5 sampling) are starting values to be
-re-measured once real prompts have fired: a gate firing twice a week is a daily field wearing a gate
-and will decay the same way.
+Nothing is implemented — this is the planning half, per the backlog-driven two-PR rule. The thresholds
+(28-night per-component median/IQR, 4–6 prominent announcements a month) are starting values to be
+re-measured once real ones have fired: announce loudly twice a week and it becomes wallpaper, which is
+the decay pattern from the table above arriving in a new costume.
