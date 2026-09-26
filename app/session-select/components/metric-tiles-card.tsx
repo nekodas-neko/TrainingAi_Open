@@ -4,6 +4,7 @@ import { memo } from "react";
 import type { LucideIcon } from "lucide-react";
 import { accentCardStyle } from "@trainingai/shared/utils";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake";
 
@@ -104,10 +105,7 @@ function MetricTilesCardComponent({
               <span className="text-[10px] text-muted-foreground">{def.unit || def.label}</span>
               {waterWeeklyPct !== null && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-foreground/10">
-                  <div
-                    className="h-full transition-all"
-                    style={{ width: `${waterWeeklyPct}%`, background: tileColor }}
-                  />
+                  <ProgressFill pct={waterWeeklyPct} color={tileColor} />
                 </div>
               )}
             </div>
