@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-25 — backlog → 32078 (the owner answered OR-145's four remaining gate questions)
+
+Four gates struck: delete `/api/oura/hr-sync`, render HR zones with the degradation marked, retire
+the "Exercise detected" card, and an agent rather than the owner runs the `BF-77` session. Gate count
+down six on the day.
+
+The growth is almost entirely **one** of the four. He answered `Q-231` conditionally — *"if its not
+being used because we don't use the oura sync then get rid of it"* — and said outright that he did
+not fully understand the question. So the entry now carries the condition-check (`upsertOuraWorkouts`
+has zero callers, so the table cannot gain a row), the distinction he was owed (this card is NOT the
+live auto-detection he sees; that writes `activity_logs` from the BLE classifier and is untouched),
+and an explicit scope boundary saying the 13 historical rows are NOT dropped, because that would be a
+separate confirm-first decision.
+
+An answer given under a stated misunderstanding costs more lines to record than a plain yes. It is
+the cheaper of the two outcomes.
+
 ## 2026-09-25 — backlog → 32046 (OR-145's gate triage reduced from seven questions to four)
 
 Net +2 lines, and the reason it is only +2 is the point: three of the seven items were **removed**
@@ -17899,5 +17916,5 @@ had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files again
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
 
 **2026-09-25 · `docs/implementation-backlog.md` · Review sweep 62, `review/sweep-62-dv-design-capture`.**
-32015 → 32036 (+21). One DV entry, RV-205, that points at the new Part D of the probe checklist
+32042 → 32063 (+21; rebased). One DV entry, RV-205, that points at the new Part D of the probe checklist
 rather than restating it. That is why the entry is short.
