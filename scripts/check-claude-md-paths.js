@@ -33,6 +33,7 @@ const DELIBERATE = new Map([
   ['docs/overview/history-*.md', 'a glob, not a path'],
   ['app/__x/page.tsx', 'an illustrative example of a path Next would 404'],
   ['android/app/build/outputs/apk/debug/app-debug.apk', 'a build artifact — absent until Gradle runs'],
+  ['docs/doc-size/docs/implementation-backlog.md.size', 'named as DELETED: LA-129 unratcheted the backlog, and CLAUDE.md names the file to explain why the guaranteed-conflict mechanism it used to cite is gone'],
 ])
 
 /** Filename templates rather than paths: `<pillar>`, `YYYY-MM-DD`, and similar. */
