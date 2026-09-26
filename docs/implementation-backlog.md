@@ -704,11 +704,41 @@ below threshold and left in place for next time.
   sixteenth consumer and no selection rule was written beside the helper. Guarded by a route test
   that lists the nap FIRST — **a first draft listed the real night first and passed with and
   without the fix**, which is the shape of a test that proves nothing.
-- **⚠ WHAT REMAINS IS THE RE-MEASURE, AND IT IS NOT OPTIONAL.** This entry's sweep measured the
-  wrong population, so **none of its numbers carry over**: 10.9 announcements per 30 nights was
-  counted over rows, not nights. Re-run it over `nightSessions()` output before touching
-  `VERDICT_IQR_MULTIPLIER` — and the ⛔ below still stands, because the rate target is a check on a
-  correct population and never a knob to reach it.
+- **✅ RE-MEASURED 2026-09-26 over the corrected population, and the result INVERTS the
+  expectation: the fix made the rate WORSE, not better.** Run with the shipped
+  `nightSessions()` → `toVerdictNights()` → `sleepVerdictForNight()` over the owner's real 125
+  rows (106 dates, 200-day pull):
+
+  | population | judged | poor | good | normal | prominent / 30 nights |
+  |---|---:|---:|---:|---:|---:|
+  | raw rows (this entry's original sweep) | 96 | 25 | 9 | 62 | **10.6** |
+  | `nightSessions()` — what ships | 67 | 22 | 13 | 32 | **15.7** |
+
+  **Why it went up is the point:** the 0 h fragments were *widening* the bands. Removing them
+  tightens `p25`/`p75`, so nights that were being absorbed as normal now correctly read as
+  unusual. That is the "desensitised bands" half of this entry arriving as a visible number — the
+  population is right now, and at `VERDICT_IQR_MULTIPLIER = 0.5` it is three times the 4–6 target.
+- **Multiplier sweep over the CORRECT population** (replica cross-checked against the real
+  function at ×0.5 — identical counts, so these carry):
+
+  | × | poor | good | normal | per 30 |
+  |---:|---:|---:|---:|---:|
+  | 0.50 *(shipped)* | 22 | 13 | 32 | 15.7 |
+  | 0.75 | 16 | 5 | 46 | 9.4 |
+  | **1.00** | **10** | **3** | **54** | **5.8** |
+  | 1.25 | 9 | 2 | 56 | 4.9 |
+  | 1.50 | 5 | **0** | 62 | 2.2 |
+  | 2.00+ | 4 | 0 | 63 | 1.8 |
+
+- **⚑ PROPOSAL, OWNER'S CALL — `VERDICT_IQR_MULTIPLIER` 0.5 → 1.00.** It is the only value that
+  lands inside the 4–6 target *and* keeps the "unusually good night" half alive; 1.25 is also in
+  band but halves `good` to 2 for nothing. **This entry's ⛔ against 1.5 survives the
+  re-measurement** — on the corrected population it still takes `good` to **zero**, so the warning
+  was right for a reason that outlived the wrong numbers.
+- **How many days it moves, which a proposal is incomplete without:** of 67 judged nights, **22
+  change verdict** — 12 poor→normal and 10 good→normal. Nothing moves in the other direction.
+- **Scoring calibration is the owner's** (CLAUDE.md), so the constant is NOT changed here. Lane A
+  implements on a yes; the measurement above is what the decision needs.
 - **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
   cross-checked against the real function: identical counts, so the sweep below is sound):
   **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
