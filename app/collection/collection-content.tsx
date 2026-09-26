@@ -7,7 +7,7 @@ import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
 import { LADDERS, STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP, type CollectionState, type Ladder } from '@trainingai/shared/collection/ladder'
 import { nextMerge, mergeLine, totalHeld, restGapSentence, FAUCET_TITLE, type FaucetKey } from '@/components/home/collection-summary'
-import { tierGlyph } from '@/components/home/collection-sprites'
+import { CatSprite } from '@/components/home/cat-sprite'
 import type { CollectionResponse } from '@/components/home/collection-card'
 
 /**
@@ -73,10 +73,10 @@ function LadderCard({ faucet, ladder, state }: { faucet: FaucetKey; ladder: Ladd
         <p className="text-xs text-muted-foreground">{held === 1 ? '1 held' : `${held} held`}</p>
       </div>
 
-      <ul className="mt-3 flex items-center gap-4">
+      <ul className="mt-3 flex items-end justify-around gap-2">
         {ladder.tiers.map((tier, i) => (
-          <li key={tier.name} className="flex items-center gap-1.5">
-            <span className="text-2xl leading-none" aria-hidden="true">{tierGlyph(faucet, i)}</span>
+          <li key={tier.name} className="flex flex-col items-center gap-1 text-center">
+            <CatSprite faucet={faucet} tier={i} size={48} />
             <span className="text-xs">
               <span className="font-semibold tabular-nums">{state.stock[i] ?? 0}</span>
               {/* `first-letter:uppercase`, not `capitalize`: the engine capitalises only the top

@@ -2620,6 +2620,13 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
+
+Drawn SVG cats replace the collection's emoji (Home card 56 px, `/collection` 48 px), with the
+emoji as fallback. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
+**Pass test:** on the S25, turn on the Collection card. It shows a drawn cat, and `/collection`
+shows three drawn tiers per ladder. The owner's judgement is owed in BF-126 (`Verify: owner`).
+
 ### [app-shell] ⚠️ The daily controls answer a press now, and none of it has been seen on the phone (RV-207, 2026-09-26)
 
 The tab bar, More rows, Nutrition's date arrows and settings, pre-workout back, the Home avatar,

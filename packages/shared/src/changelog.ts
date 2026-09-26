@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.466.0",
+    date: "2026-09-26",
+    changes: [
+      "New: your collection cats are drawn now. Workouts raise an armoured Tank, steps a hooded Ranger and sleep a haloed Cleric, and each tier adds gear. If a picture ever fails to load, the old emoji stands in.",
+    ],
+  },
+  {
     version: "1.465.67",
     date: "2026-09-26",
     changes: [
