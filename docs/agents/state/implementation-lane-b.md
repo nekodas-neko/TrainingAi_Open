@@ -4,11 +4,11 @@
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel**; eighteen more on 2026-09-25 — the journal is the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV**; eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Sweeps 4a/4b and review sweep 63 refilled the queue on 2026-09-26: **BF-61** (batch `nutrition-ui-uplift`; reopened as work — a tap on Delete is swallowed at 0/100/200/300 ms and works at 500), then **RV-208**…**RV-215**. Before that it sat at 0 for a day and a half, so expect it to empty again; when it does, say so and stop rather than inventing work.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Sweeps 4a/4b and review sweep 63 refilled the queue on 2026-09-26: **RV-208**…**RV-215**. Before that it sat at 0 for a day and a half, so expect it to empty again; when it does, say so and stop rather than inventing work.
 
 ## Blocked / owed
 
@@ -34,6 +34,7 @@ Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#
   the spec, confirm it FAILS. A literal is the wrong thing to pin — `rv68`'s `setToggling(null)`
   broke on a sound refactor while the property it guards held (RV-207). Pin the property.
 - **A `memo` WITHOUT A COMPARATOR SKIPS NOTHING HERE.** Every tab re-show bumps `epoch`, the screens refetch, and `setState` gets a value-identical NEW array. It is not a resize: `ResizeObserver` gives 5 callbacks during load and ZERO on a switch (OR-162, DV-12's spec).
+- **WHEN A DEVICE DEFECT DOES NOT REPRODUCE HERE, THAT IS THE FINDING — DON'T SHIP A THIRD GUESS.** BF-61's window turned out to be wider than a CDP round-trip and the web passed 4 of 4; a CDP tap enters the renderer directly while a real tap goes through the compositor's hit test, so the harness cannot see what is left. Re-laned to `DV` with a three-step instrumented probe.
 - **WRITE THE SOURCE GUARD, NOT JUST THE FIX — DV-21's found a SECOND dead notification channel the same minute.** A one-line fix would have left `workout-reminders` silently dropping posts. Where a defect is invisible from every layer above it, the scan IS the sibling-surface sweep.
 - **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (WARNINGS vs base: 817) ·
   `pnpm test` (with `DATABASE_URL`, or ~211 skip) · `pnpm build` · `tsc` · `check-test-typecheck` ·
