@@ -2620,6 +2620,13 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
+
+Drawn SVG cats replace the collection's emoji (Home card 56 px, `/collection` 48 px), with the
+emoji as fallback. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
+**Pass test:** on the S25, turn on the Collection card. It shows a drawn cat, and `/collection`
+shows three drawn tiers per ladder. The owner's judgement is owed in BF-126 (`Verify: owner`).
+
 ### [app-shell] ⚠️ The daily controls answer a press now, and none of it has been seen on the phone (RV-207, 2026-09-26)
 
 The tab bar, More rows, Nutrition's date arrows and settings, pre-workout back, the Home avatar,
@@ -11180,8 +11187,18 @@ is a false-positive health signal.
 Same audit. Of 550 `set_hr_stats` rows, **436 (79%) have `coverage_ok = false`** and **370 (67%) have
 a NULL `peak_bpm`**, so v1.197.0's "Heart & Recovery" card trends over roughly one set in five;
 `workout_hr_stats` holds 0 rows. Likely cause (strap disconnection / ring power-gating during
-lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.** Queued
-as backlog Q-11.
+lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.**
+
+**⚠ The backfill half is DISCHARGED, and not by being filled (2026-09-26).** The owner-authorised
+run processed 33 sessions and filled **0**; Q-11 left the queue in #1698, which asked Lane A to
+confirm why. Confirmed here, and **the cause it guessed at was wrong: not pruned raw samples —
+the data never existed.** Measured against production — those 33 span **2026-04-30 → 2026-06-21** and `oura_heartrate`'s
+oldest row is **2026-06-22**, so not one of them has a single HR reading inside its own window.
+Pruning is ruled out: the table is 96 days old against a 180-day retention and has never reclaimed
+a row. **Zero pending sessions start on or after 2026-06-22**, so every session that *could* be
+filled already is, and no button will ever fill the rest. The set-level physiology analysis this
+was blocking has to come from sessions after that date. What survives is LA-150: the work list
+keeps re-selecting those 33, so every future run reports the same *33 remaining, 0 filled*.
 
 ### [sleep] ⚠️ Only 12 of 57 nights have a persisted derived score — tooling shipped, **not yet run on prod** (v1.222.0, 2026-07-27)
 `oura_daily_derived` scores are written as a side effect of loading `/api/readiness-score`, which only

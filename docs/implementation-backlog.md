@@ -485,6 +485,28 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [app-shell] PS-48 — three owner questions that finish the collection v2 rules
+
+- **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
+  these answered is the work. PS-49's steps and workout halves do not wait on them.
+- **Context:** the owner set the v2 shape in the art session: four MMO classes, three-to-one
+  merges, and a constant daily drain that movement counteracts. Plan:
+  [`2026-09-26-cat-collection-rules-v2.md`](superpowers/plans/2026-09-26-cat-collection-rules-v2.md).
+- **① ANSWERED 2026-09-26: the healer is the "Health cat", fed by any health logging.** Owner:
+  *"it should give points for either sleep/nutrition/weight logged etc. So you are more inclined
+  to track/sleep well"*. That overrode the ring-wear recommendation first put here. The points
+  scheme is in the plan (one point per category logged that day, three points per T1, one point
+  drained a day), and the owner has not seen those numbers, so they are provisional.
+- **② The Rogue's (cardio) unit and drain.** **Recommendation: 1 cardio session = 1 T1, drain ⅕ of
+  a session a day.** Two sessions a week then holds steady and three grows. Alternative: per 20
+  minutes of cardio. That is fairer to long runs, but a short walk earns nothing.
+- **③ Cap the ladder at tier 5?** **Recommendation: yes.** T5 = 81 T1s and extra T5s show as ×2.
+  Five tiers are drawn, and uncapped base-3 needs a T6 at 243 with no art. Reversal cost: none;
+  raising the cap later is one constant, plus art.
+- **④ Re-score history from scratch under v2?** **Recommendation: yes.** v1 has been live about two
+  weeks, and preserving v1-era cats means versioning the rules per date span, a real piece of work
+  for little. The cost: the counts he has seen change on the day PS-49 deploys.
+
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — needs the owner's call on the four, then it is a sweep anyone can run.
@@ -13417,38 +13439,69 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 - **Reversal cost:** nil. Queue fields only.
 
-### [app-shell] BF-126 — the cat collection's drawn art, once the mechanic has been lived with
+### [app-shell] BF-126 — the cat collection's drawn art: shipped, the owner's look at 56 px is owed
 
-- **✅ DECIDED ON THE S25, 2026-09-14** (owner's app-shell pass): *"Yes we need to create artwork for
-  these."* The gate is discharged — the drawn set is wanted, and the glyphs were judged good enough to
-  keep the mechanic but not to be the finished thing.
-- **Lane:** B — `components/home/collection-sprites.ts` and whatever it points at.
-- **Added:** 2026-09-07 · Lane B, deferred out of BF-122b rather than dropped.
-- **⚠ Two things the answer did NOT settle, and the build has to decide them before spending on art.**
-  ① **The brief.** The owner said yes to artwork, not to a scope — one cat silhouette with props by
-  tier (~12 assets) is what this entry proposed, and nine glyphs currently cover the three ladders.
-  Put the count in front of them before commissioning, because it is the whole cost.
-  ② **The 32 px constraint stands and is a real risk to the answer.** An emoji is drawn to read at that
-  size and a detailed sprite is not, so it is entirely possible the drawn set looks *worse* on the
-  widget. **Ship one tier's asset first and compare it against its glyph on the device** rather than
-  commissioning twelve and finding out.
-- **Keep the glyph map as the fallback.** `collection-sprites.ts` should end up with art *and* glyphs,
-  not art instead of them — an asset that fails to load must not leave an empty tier.
-- **BF-122b shipped every code deliverable and glyphs in place of sprites.** The widget, the
-  collection screen and the information surface are live; `collection-sprites.ts` maps tier → emoji
-  and is the only file that would change. That was deliberate: the entry called the art *"the only
-  unrecoverable spend"*, and spending it before the owner has seen the mechanic working is the
-  wrong order.
-- **Gate:** owner — **re-applied 2026-09-15 (OR-116) after a day at the head of Lane B's READY list
-  with nothing startable in it.** The gate was removed on 2026-09-14 because the *decision* had been
-  made, which was right about the decision and wrong about the entry: **the blocker moved rather than
-  cleared.** Nothing can start until the artwork exists, this session cannot draw it, and Lane B
-  picking this up would find an afternoon's wiring and no assets to wire. The gate now names the
-  asset, not the decision.
-- **The code change is small and it is not the blocker — the asset files are.** Swapping a tier's
-  emoji for an `<img>`/inline SVG in `collection-sprites.ts` is an afternoon. **What unparks this is
-  one tier's asset landing in the repo**, at which point the gate comes off for good.
-- **Reversal cost:** none while it is glyphs. Once assets exist, reverting means deleting them.
+- **Lane:** O · a looks judgement, so it waits for the owner rather than going to DV (CLAUDE.md,
+  `Lane:` rule).
+- **Added:** 2026-09-07 · Lane B, deferred out of BF-122b. **Art shipped 2026-09-26** (PS session,
+  branch `art/cat-collection-art`).
+- **Verify:** owner. On the S25, dark theme: the Home collection card (sprite at 56 px) and
+  `/collection` (48 px). Question: does the drawn cat read better than the glyph it replaced?
+  BF-126 always warned it might not. If it reads worse, the fix is **size, not detail**: the art was
+  drawn to read at ~56 px, and an emoji is designed for 32 px.
+- **What shipped.** 20 hand-authored flat-vector SVGs in `public/cats/`: four MMO classes (Tank,
+  Ranger, Rogue, Cleric) × five tiers, with gear added per tier (weapon → armour → cape → crown and
+  glow). They are generated by `scripts/collection-art/build.mjs` from `cat.mjs` + `gear.mjs`, so
+  they diff and edit like code, and `collection-sprites.test.ts` fails if a committed file drifts
+  from its source. `components/home/cat-sprite.tsx` renders them, and the **glyph map stays as the
+  fallback** for a file that fails to load, per this entry's original requirement.
+- **Style was chosen by the owner in-session** after a pixel-art draft was rejected as too small and
+  low-detail. His references: a flat bold-outline grey cat, and a hand-drawn sticker cat.
+- **Mapping until PS-49 lands:** workout → Tank, steps → Ranger, sleep → Cleric, tiers 1–3 of 5.
+  The Rogue has art and no ladder. The bottom rung is now drawn **per class**, which retires the
+  "one shared slime" rule for the art only. The glyphs and the engine's `cat slime` name keep it
+  until the v2 rules rename the tiers.
+- **Not exercised:** the signed-in card on `pnpm dev`. This machine has no local Postgres. The real
+  `CatSprite` was rendered on the dev server through a temporary public page, which proved the
+  fallback path (an unauthenticated `/cats/*.svg` 307s to sign-in, and the tier showed its glyph)
+  and that the served SVGs decode. That same run caught and fixed a hydration race that left
+  broken-image boxes. Not exercised either: Samsung WebView rendering, and offline before the
+  service worker has cached `/cats/`.
+- **Reversal cost:** delete `public/cats/` and point `CatSprite` back at the glyph.
+
+### [app-shell] PS-49 — collection rules v2: four classes, 3→1 merges, a daily drain that movement counteracts
+
+- **Lane:** A (engine: `packages/shared/src/collection/ladder.ts`, `app/api/collection/route.ts`,
+  a new one-column step-totals read), then B for the surface copy. **Added:** 2026-09-26 · PS
+  session, from the owner's brief.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md`](superpowers/plans/2026-09-26-cat-collection-rules-v2.md).
+- **The steps and workout halves can start now.** Ranger: 5,000 steps per T1, 1,000 drained every
+  day. Tank: 1 workout per T1, drained one workout per rest-target days. Both are the owner's
+  numbers (2026-09-26), marked provisional by him. The Health cat (Cleric art) faucet is defined — see the
+  plan — and can be built with them. The cardio (Rogue) faucet waits on PS-48, and the route returns `null` for them until then.
+- **No migration.** The collection is replayed, so bumping `COLLECTION_RULES_VERSION` to 2 re-scores
+  all history. That rewrite is the owner's intent, not an accident. PS-48 asks whether v1-era cats
+  should be preserved instead (recommendation: no).
+- **Measure the owner's own result on production before merging, and put it in the PR.** He asked
+  for exactly this. The PS session could not: the query secret was unavailable on that machine.
+- **Reversal cost:** low as code (the version constant and one fold); visible as behaviour, because
+  every cat count the owner has seen changes on deploy.
+
+### [app-shell][devices] PS-50 — the collection as an Android home-screen widget
+
+- **Lane:** A (`android/**`: a Kotlin `AppWidgetProvider` + layout).
+- **Needs:** PS-49
+- **Added:** 2026-09-26 · owner: *"ideally outside the app it can be a widget too on the android home screen"*.
+- **Needs a new APK** (CI builds it; see CLAUDE.md, Canonical Runtime). It is on-device-verified
+  only.
+- **Two facts a builder would otherwise rediscover.** (1) The art is SVG, and an AppWidget renders
+  neither SVG nor filters. Convert `public/cats/*.svg` to VectorDrawables or pre-rendered PNGs at
+  build time. Drop the rim filter, which exists only for the dark in-app card. (2) `/cats/*.svg` sits
+  behind `middleware.ts`'s auth matcher, so a native fetch without the session cookie gets a 307.
+  Bundle the art in the APK rather than fetching it.
+- **Data:** the widget needs the replayed collection. Either the app pushes it into
+  `SharedPreferences` when `/api/collection` resolves, or the widget calls the route itself. That is
+  a structural call for the builder; the push is simpler and works offline.
 
 ### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
 
@@ -31125,6 +31178,25 @@ indefinitely.
   rows, and the admin backfill can recompute on request. **Still open, separately:** whether 15 bpm is
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
+
+### [heart-rate][workouts] LA-150 — the per-set HR backfill work list can never drain, and reads as broken
+
+- **Lane: A** — `lib/data/postgres/slices/oura.ts:1390` (`listSessionsMissingSetHrStats`).
+- **Added:** 2026-09-26, on discharging Q-11.
+- **What.** The work list selects sessions whose `MAX(readings_count) = 0`, which is right — a
+  completion-time compute can run before the ring has drained, and its empty rows must not remove
+  the session from the list permanently (that was Q-11's Defect B). But **33 sessions can never
+  acquire a reading**, because they finished before `oura_heartrate` holds anything. They match the
+  predicate forever, so every future run reports the same *33 remaining, 0 filled*.
+- **Why it matters more than it sounds:** that output is indistinguishable from a broken backfill.
+  The device agent ran it on 2026-09-24 and reasonably asked whether the raw samples had been
+  pruned. Anyone who runs it next will ask the same question.
+- **Fix:** bound the scan at the earliest `oura_heartrate.timestamp` rather than a flat 180 days —
+  the retention constant is the wrong floor while the table is younger than its own window. A row
+  the compute cannot fill is not pending work.
+- **Do NOT "fix" it by writing a sentinel `set_hr_stats` row** for those sessions: the coverage-aware
+  predicate exists precisely because empty rows used to hide real gaps, and re-introducing one under
+  another name walks back into Defect B.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
