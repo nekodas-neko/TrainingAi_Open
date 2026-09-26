@@ -11180,8 +11180,17 @@ is a false-positive health signal.
 Same audit. Of 550 `set_hr_stats` rows, **436 (79%) have `coverage_ok = false`** and **370 (67%) have
 a NULL `peak_bpm`**, so v1.197.0's "Heart & Recovery" card trends over roughly one set in five;
 `workout_hr_stats` holds 0 rows. Likely cause (strap disconnection / ring power-gating during
-lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.** Queued
-as backlog Q-11.
+lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.**
+
+**⚠ The backfill half is DISCHARGED, and not by being filled (2026-09-26).** The owner-authorised
+run happened on 2026-09-24: 33 sessions processed, **0 filled**. Measured against production, that
+is correct rather than broken — those 33 span **2026-04-30 → 2026-06-21** and `oura_heartrate`'s
+oldest row is **2026-06-22**, so not one of them has a single HR reading inside its own window.
+Pruning is ruled out: the table is 96 days old against a 180-day retention and has never reclaimed
+a row. **Zero pending sessions start on or after 2026-06-22**, so every session that *could* be
+filled already is, and no button will ever fill the rest. The set-level physiology analysis this
+was blocking has to come from sessions after that date. What survives is LA-150: the work list
+keeps re-selecting those 33, so every future run reports the same *33 remaining, 0 filled*.
 
 ### [sleep] ⚠️ Only 12 of 57 nights have a persisted derived score — tooling shipped, **not yet run on prod** (v1.222.0, 2026-07-27)
 `oura_daily_derived` scores are written as a side effect of loading `/api/readiness-score`, which only

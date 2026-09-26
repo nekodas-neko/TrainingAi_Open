@@ -31096,119 +31096,24 @@ indefinitely.
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
 
-### [heart-rate][workouts] 🟡 Q-11 — 22 of 78 completed sessions still hold no per-set HR attribution, and only the owner can backfill them
-- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
-- **📱 RAN 2026-09-26, owner-approved (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** More → Settings → Developer → *Backfill per-set HR
-  stats*: one POST, 200 in 9.1 s → **"Done — 33 sessions processed, 0 had HR data."** Production stayed under
-  0.55 s throughout. **Nothing was filled** — none of those sessions has HR data left to attribute (likely
-  pruned raw samples). This entry's "fills 22" is not achievable from current data; Lane A to confirm why.
+### [heart-rate][workouts] LA-150 — the per-set HR backfill work list can never drain, and reads as broken
 
-- **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
-
-- **Lane:** DV
-- **Keep:** the one-off backfill over pre-fix sessions. Measured 2026-08-20: **56 of 78 completed
-  workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
-  has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
-  old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
-- **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). Its own note already said to fold this into the next batch of owner actions rather than re-ask it; this is that batch.
-- **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
-  they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
-  refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the
-  next batch of owner actions so it costs one decision rather than a nag.
-
-> **⚑ 2026-08-05 — this now BLOCKS an analysis, which raises its value.** The
-> [data-analysis review](reviews/2026-08-05-data-analysis-opportunities.md) §4 B2 went looking for
-> the most interesting unbuilt question in the dataset — *does how physiologically recovered you
-> were at the end of rest predict the next set?* — and could not answer it. Field-level coverage of
-> `set_hr_stats` (582 rows): `peak_bpm` 210, `drop_60s` 160, `pct_hrr_at_rest_end` **122**,
-> `sec_to_hrr50` 74, `coverage_ok` 138. Only **92** rows join to a following set. That is not enough
-> to test anything. Fixing Q-11 unlocks a genuinely new class of set-level physiology analysis, so
-> it is a prerequisite, not an independent cleanup.
->
-> **✅ Re-measured against production 2026-08-08 (615 rows).** The side-check is answered and split
-> out as **Q-149** — `rest_adequate` is not stuck, it is *degenerate*: 278 non-null, 278 true, and
-> **271 of them (97.5%) come from the `bpmAtLog < 120 → true` shortcut**. Do not build a view on it.
-> The B2 blocker has eased but not cleared: rows joining to a following set went **92 → 108**, and
-> `pct_hrr_at_rest_end` is accruing at ~10–13 per training day, so it is a matter of waiting rather
-> than re-engineering.
-
-> **⚑ Half of this shipped as v1.257.2; the other half is now precisely stated.** Two separate
-> defects were hiding behind one entry, and neither was the device-side cause this entry originally
-> guessed at. (The earlier "~20% of sets" / device-gate framing on this entry is superseded by
-> Defect A/B below — dropped here rather than kept as a third, redundant annotation.)
-
-**Defect A — `workout_hr_stats` at 0 rows. FIXED (v1.257.2), root cause proven.** Not a missing
-producer: `upsertWorkoutHrStats` was called on every recap, sitting three lines above the
-`upsertSetHrStats` call that reached 582 rows. It threw every single time.
-`workout_hr_stats.workout_hrv_ms` is the **only integer HRV column in the schema** — every sibling
-(`sleep_sessions.average_hrv_ms`, `oura_daily_derived.hrv_rmssd_ms`, …) is `doublePrecision` — and
-its producer `rmssdFromRr` returns `Math.sqrt(mean)`. node-postgres sends the float as text and
-Postgres rejects the whole insert:
-
-```
-invalid input syntax for type integer: "38.42156862745098"
-```
-
-Reproduced against the local DB, and the new regression test fails with that exact message when the
-`Math.round` is removed. The caller's fire-and-forget `.catch(err => console.error(…))` swallowed
-it, and the recap renders either way, so there was no user-facing symptom for months. Both persist
-calls now go through `reportServerError`, and the previously button-less
-`/api/oura-ble/backfill-hr-stats` has an Admin → Tools card.
-
-**Defect B — four recent sessions have ZERO `set_hr_stats` rows. FIXED 2026-08-05, v1.266.1.** See
-[`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
-`POST /api/complete-workout` now fires a best-effort fire-and-forget HR compute/upsert at completion
-(closes the gap outright for a live chest strap already in `oura_heartrate`), and
-`listSessionsMissingSetHrStats`/`listSessionsMissingHrStats` are now coverage-aware — a session whose
-only attempt produced `readings_count = 0` rows stays on the backfill work-list instead of being
-permanently marked done, so a delayed Oura-ring drain still gets picked up by a later backfill pass.
-**Did not** fold `coverage_ok = false` into the coverage-aware check, only `readings_count = 0` — the
-two are different questions (see "Also still open" below) and conflating them risked the work-list
-permanently re-listing genuine-dropout sessions that can never improve on reprocessing.
-
-Measured per session against production before the fix, kept for the record:
-
-| day | session | sets | set_hr_stats rows | computed_at |
-|---|---|---|---|---|
-| 2026-08-02 | Pull | 15 | **0** | — |
-| 2026-08-01 | Lower | 18 | 18 | 2026-08-04 (3 days later) |
-| 2026-07-30 | Upper | 18 | **0** | — |
-| 2026-07-30 | Legs | 18 | **0** | — |
-| 2026-07-27 | Push | 14 | 14 | 2026-07-28 |
-| 2026-07-26 | Pull | 15 | **0** | — |
-| 2026-07-20 | Push | 14 | 14 | 2026-07-29 (9 days later) |
-
-**Zero rows, not rows-with-null-metrics** — so attribution never ran, rather than running and
-finding nothing. And every `computed_at` lags its workout by days. The cause is structural: the
-only trigger is `GET /api/oura/hr-data`, which is the **recap fetch**. Finish a workout and never
-open its recap and that session is never attributed, permanently. Everything before 2026-07-22 has
-rows because the backfill was run once that day; the four gaps are all sessions after it.
-
-- Admin → Tools → "Backfill per-set HR stats" still exists and still works for any pre-fix gaps
-  already in production — running it once is on the owner checklist, since this fix only prevents
-  *new* gaps, it doesn't retroactively attribute old sessions.
-
-**✅ ANSWERED 2026-08-08 — it was the artefact, not device dropout.** The open question was whether
-the 79% `coverage_ok=false` / 67% NULL `peak_bpm` figures meant real strap dropout during lifting or
-were contaminated by days-late computes. Re-measured against production by `computed_at` day, which
-separates the two cleanly:
-
-| computed_at | rows | coverage_ok | peak_bpm | readings_count = 0 |
-|---|---|---|---|---|
-| **2026-07-22** (the one-off backfill) | **508** | 74 | 138 | **334** |
-| 2026-07-23 → 08-04 (recap-triggered) | 74 | 64 | 71 | 0 |
-| 2026-08-06 (post-fix, same-day) | 24 | 18 | 23 | 0 |
-| 2026-08-08 (post-fix, same-day) | 9 | 3 | 9 | 1 |
-
-**508 of 615 rows are that single backfill batch**, run over old sessions whose HR series was thin
-or absent — 334 of them have zero readings. Every aggregate that treated the table as one population
-was measuring that batch. Same-day computes since the Defect B fix carry near-complete `peak_bpm`
-and no zero-reading rows. So: no evidence of systematic device dropout; nothing further to fix here.
-
-Two things confirmed while measuring, recorded so they are not re-investigated: `source` is populated
-only from 2026-08-06 onward (23/24 then 8/9), which is exactly when v1.260.0 shipped it — not a gap;
-and the whole dataset's **maximum `bpm_at_end` is 128**, which is what makes Q-149's threshold
-degenerate.
+- **Lane: A** — `lib/data/postgres/slices/oura.ts:1390` (`listSessionsMissingSetHrStats`).
+- **Added:** 2026-09-26, on discharging Q-11.
+- **What.** The work list selects sessions whose `MAX(readings_count) = 0`, which is right — a
+  completion-time compute can run before the ring has drained, and its empty rows must not remove
+  the session from the list permanently (that was Q-11's Defect B). But **33 sessions can never
+  acquire a reading**, because they finished before `oura_heartrate` holds anything. They match the
+  predicate forever, so every future run reports the same *33 remaining, 0 filled*.
+- **Why it matters more than it sounds:** that output is indistinguishable from a broken backfill.
+  The device agent ran it on 2026-09-24 and reasonably asked whether the raw samples had been
+  pruned. Anyone who runs it next will ask the same question.
+- **Fix:** bound the scan at the earliest `oura_heartrate.timestamp` rather than a flat 180 days —
+  the retention constant is the wrong floor while the table is younger than its own window. A row
+  the compute cannot fill is not pending work.
+- **Do NOT "fix" it by writing a sentinel `set_hr_stats` row** for those sessions: the coverage-aware
+  predicate exists precisely because empty rows used to hide real gaps, and re-introducing one under
+  another name walks back into Defect B.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
