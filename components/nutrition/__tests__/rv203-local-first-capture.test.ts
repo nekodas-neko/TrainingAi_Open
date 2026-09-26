@@ -36,13 +36,17 @@ describe('RV-203 ① — the describe panel looks in the user\'s own foods first
   });
 
   it('adds no network read of its own — every source is already on the device or in memory', () => {
-    // Two `/api/` calls in this file, both of which were already here: the scan POST and the
-    // barcode GET. A third would also break `scripts/check-bare-api-fetch.js`, which baselines
-    // this file's bare GETs at 1.
+    // ONE `/api/` call in this file now: the scan POST. It was two until LB-158 moved the barcode
+    // GET into `@trainingai/shared/nutrition/barcode-lookup`, which asks the user's saved foods
+    // before the network — so the file went further local-first than this entry asked for, rather
+    // than losing a read. A second bare GET here would also break
+    // `scripts/check-bare-api-fetch.js`, which no longer baselines this file at all.
     const apiFetches = capture.match(/fetch\(\s*`?['"`]?\/api\//g) ?? [];
-    expect(apiFetches).toHaveLength(2);
-    expect(capture).toMatch(/\/api\/nutrition\/barcode\?code=/);
+    expect(apiFetches).toHaveLength(1);
     expect(capture).toMatch(/fetch\('\/api\/nutrition\/scan'/);
+    // The barcode path still exists — it just goes through the shared, library-first helper.
+    expect(capture).toMatch(/lookupBarcode\(code, userId\)/);
+    expect(capture).not.toMatch(/\/api\/nutrition\/barcode\?code=/);
   });
 
   it('the suggestions come before the action row, not after it', () => {

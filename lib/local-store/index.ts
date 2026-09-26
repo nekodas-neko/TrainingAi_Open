@@ -37,6 +37,9 @@ export interface LocalStore {
   // Local-first food-library search: matches previously-logged/created items in the
   // local food_items table by name/brand. Empty query returns the most recent items.
   searchFoodItems(query: string): Promise<FoodItem[]>;
+  /** LB-158. The user's own saved food for this scanned code, or null. The one exact identifier a
+   *  food row has, so a re-scan of a product already in the library resolves with no network. */
+  getFoodItemByBarcode(barcode: string): Promise<FoodItem | null>;
   /** BF-38. Every local row at this exact calorie count — the candidate set the create-time
    *  duplicate check runs over, mirroring the server's prefilter so the two agree. */
   findFoodItemsByCalories(calories: number): Promise<FoodItem[]>;

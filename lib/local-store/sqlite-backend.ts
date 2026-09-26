@@ -60,6 +60,7 @@ function foodItemRowToItem(r: Record<string, unknown>): FoodItem {
     sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
     satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
     source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
+    barcode: r.barcode ? String(r.barcode) : undefined,
     // `image_data_uri` is deliberately NOT read here — see LA-36. It is stored locally and the
     // server's own searchFoodItems returns it, so the device's local-first read is the one surface
     // that loses the picture. Fixing that is a visible change on two Lane B screens and wants its
@@ -2285,19 +2286,26 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(
       `INSERT INTO food_items
          (id, name, brand, serving_size_g, calories, protein_g, carbs_g, fat_g,
-          fiber_g, sugar_g, sodium_mg, sat_fat_g, source, image_data_uri, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          fiber_g, sugar_g, sodium_mg, sat_fat_g, source, barcode, image_data_uri, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, brand=excluded.brand, serving_size_g=excluded.serving_size_g,
          calories=excluded.calories, protein_g=excluded.protein_g, carbs_g=excluded.carbs_g,
          fat_g=excluded.fat_g, fiber_g=excluded.fiber_g, sugar_g=excluded.sugar_g,
          sodium_mg=excluded.sodium_mg, sat_fat_g=excluded.sat_fat_g, source=excluded.source,
+         -- LB-158. COALESCE rather than excluded.barcode, and it is the one column here that
+         -- differs. A barcode is known ONLY at the scan; every other write path -- logging the
+         -- same food again from Recent, a saved meal, a pull for a row the server has no code
+         -- for -- offers null, and letting excluded win would let any of them erase it. A
+         -- product's code does not change, so there is no update this drops.
+         barcode=COALESCE(excluded.barcode, food_items.barcode),
          image_data_uri=excluded.image_data_uri,
          updated_at=excluded.updated_at`,
       [
         record.id, record.name, record.brand, record.servingSizeG, record.calories,
         record.proteinG, record.carbsG, record.fatG, record.fiberG, record.sugarG,
-        record.sodiumMg, record.satFatG, record.source, record.imageDataUri, record.updatedAt,
+        record.sodiumMg, record.satFatG, record.source, record.barcode, record.imageDataUri,
+        record.updatedAt,
       ],
     );
   }
@@ -2365,6 +2373,21 @@ export class SQLiteLocalStore implements LocalStore {
           [],
         );
     return rows.map(foodItemRowToItem);
+  }
+
+  /**
+   * LB-158. The saved food carrying this exact code, newest first so a later re-scan that created
+   * a second row wins. Trimmed rather than normalised: a code is digits, and the two writers of
+   * this column (the scan call sites) both hand over what the scanner read.
+   */
+  async getFoodItemByBarcode(barcode: string): Promise<FoodItem | null> {
+    const code = barcode.trim();
+    if (!code) return null;
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT * FROM food_items WHERE barcode = ? ORDER BY updated_at DESC LIMIT 1`,
+      [code],
+    );
+    return rows.length ? foodItemRowToItem(rows[0]) : null;
   }
 
   // BF-38. Every row the user already has at this exact calorie count — the candidate set the

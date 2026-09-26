@@ -26,8 +26,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.471.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.473.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-26.
+
+**The barcode column existed everywhere and held nothing (LB-158, v1.473.0).** `food_items.barcode`
+had a column, a Zod schema, a server read mapper, a route that passes it through and a push branch
+that Q-131 fixed *specifically* so an offline save would keep it — and production held **341 food
+items with zero barcodes, 42 of them `source: 'barcode'`**, because no client ever set the field.
+The entry was filed as a mirroring problem ("the server has it, the device does not"), which is
+true about the device and wrong about the cause: mirroring would have mirrored nulls. The code now
+travels on `NutritionScanResult` / `NewFoodItem` / `NewFoodEntry`, the device holds it at local
+SQLite **v41**, and one shared `lookupBarcode(code, userId)` asks the user's saved foods before the
+network — so a re-scan of a tin you already have resolves with no signal. That closes **RV-203 ②**,
+which was blocked on this. The local upsert **COALESCEs** that one column: a code is known only at
+the scan, so `excluded` winning would erase it the next time the food is logged from Recent.
+⚠️ **The library-first read is unexercised end to end** — `getLocalStore` is null in the sandbox, so
+the local hit is covered by unit tests and a mutation, never by a device. Open Food Facts is also
+unreachable from the container, so the route's echo of the code is proved by its test rather than a
+live scan. Detail: `docs/overview/entries/2026-09-26-lb158-local-barcode.md`.
 
 **The weekly recap stopped calling a model, and became a cacheable GET (RV-201 ②, v1.471.0).**
 `/api/weekly-digest` is now `GET`-only — every number it reports was already computed before the

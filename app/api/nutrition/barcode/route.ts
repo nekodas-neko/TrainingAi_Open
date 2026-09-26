@@ -71,6 +71,10 @@ export async function GET(req: Request) {
   // BF-70. What makes the stored row say it came from a barcode. `confidence` cannot: the shared
   // OFF mapper sets it to 'high' for the text-search route too, and the photo scan sets one as well.
   result.origin = 'barcode'
+  // LB-158. The code the lookup was given, echoed so the row this becomes can record WHICH
+  // product it is. Nothing downstream can recover it: the scan result carries name and macros,
+  // and two tins of the same thing differ by exactly this.
+  result.barcode = validCode
 
   // BF-35. The thumbnail URL rode the lookup above for free; turning it into something this app can
   // store costs one fetch, here, once per scan — never per render. Bytes rather than the URL because

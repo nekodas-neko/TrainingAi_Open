@@ -69,10 +69,16 @@ const BASELINE = {
   // the cache for no benefit. These are the weakest candidates, listed first so nobody starts here.
   'app/coach/coach-content.tsx': 1,                               // threads?threadId=
   'app/session-explain/components/ai-insight-card.tsx': 1,        // insight?sessionId=
-  'components/nutrition/capture-actions.tsx': 1,                  // barcode?code=
   'components/nutrition/food-list.tsx': 1,                        // food-items?q=
-  'components/nutrition/ingredient-picker.tsx': 2,                // food-items?q= + barcode?code=
+  'components/nutrition/ingredient-picker.tsx': 1,                // food-items?q=
   'lib/hooks/use-food-database-search.ts': 1,                     // food-search?q=
+  // LB-158 moved the barcode lookup out of `capture-actions.tsx` (was 1, now 0) and out of
+  // `ingredient-picker.tsx` (was 2, now 1) into one shared helper, so this is the same call once
+  // instead of twice — a net −1, NOT −2. It stays baselined rather than exempt: a barcode→product
+  // mapping is stable and genuinely cacheable, so there is no "must not be cached" claim to make.
+  // What this PR does add is the read that matters more — the user's own saved foods are asked
+  // first, and answer with no network at all.
+  'packages/shared/src/nutrition/barcode-lookup.ts': 1,           // barcode?code=
 
   // DUPLICATED ENDPOINTS — the strongest candidates. The same route is read from several places, so
   // one cache key would serve all of them and in some cases a key for it already exists elsewhere.
