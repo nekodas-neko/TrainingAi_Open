@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-26 — CLAUDE.md +8 (the branch audit needed one more step, and it is cheaper than the mistake)
+
+`OR-174` was filed and corrected the same day. It claimed four surviving branches held a head start
+on live queued work; diffed afterwards, **not one did** — `OR-127`'s harness is on `main` with `main`
+208 lines ahead, `RV-99`'s files are byte-identical, and `Q-44` adds migrations `main` already uses
+for something else.
+
+The lines buy the direction-of-evidence point, which is the transferable part: **the queue records
+what is WANTED, only the diff records what EXISTS.** An entry stays open for reasons unrelated to
+its branch — OR-127's harness shipped, and the entry is open for the on-device run it still owes.
+Matching a live entry is necessary, not sufficient; the check is three questions against `main` — is
+the file there, is it identical, is `main` ahead.
+
+Caught because the device agent was about to start a sitting with `OR-127` at rank 1, which is the
+one case where the wrong answer costs real time.
+
 ## 2026-09-26 — CLAUDE.md → 1046 (branch-meaning rule, and auto-merge confirmed working)
 
 The owner asked that every branch have a reason. The rule that answers it is one line — **a branch
