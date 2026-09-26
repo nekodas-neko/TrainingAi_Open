@@ -1,11 +1,11 @@
-// Writes public/cats/<class>-<tier>.svg, <class>-<tier>-shiny.svg and scene-<name>.svg
+// Writes public/cats/<class>-<tier>.svg, <class>-<tier>-<shiny|skin>.svg and scene-<name>.svg
 // from cat.mjs + gear.mjs + scenes.mjs.
 //   node scripts/collection-art/build.mjs           write the files
 //   node scripts/collection-art/build.mjs --check   exit 1 if the committed files are stale
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { cat, svg, FURS, SHINY } from './cat.mjs'
+import { cat, svg, FURS, SHINY, SKINS } from './cat.mjs'
 import { GEAR } from './gear.mjs'
 import { SCENES } from './scenes.mjs'
 
@@ -26,6 +26,10 @@ export function renderAll() {
       files[`${cls}-${i + 1}.svg`] = flat(svg(cat(p, gear(p)), undefined, delay))
       const g = gear(shiny)
       files[`${cls}-${i + 1}-shiny.svg`] = flat(svg(cat(shiny, { ...g, gearFront: (g.gearFront ?? '') + SPARKLES }), undefined, delay - 0.5))
+      for (const [skin, coat] of Object.entries(SKINS)) {
+        const q = { ...p, ...coat }
+        files[`${cls}-${i + 1}-${skin}.svg`] = flat(svg(cat(q, gear(q)), undefined, delay - 0.25))
+      }
     })
   }
   for (const [name, body] of Object.entries(SCENES)) files[`scene-${name}.svg`] = flat(body)

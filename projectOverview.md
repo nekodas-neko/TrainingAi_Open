@@ -2627,7 +2627,9 @@ Last swept **2026-09-03**.
 ### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
 
 Drawn SVG cats replace the collection's emoji, with the emoji as fallback. The Home card is now an
-animated pen of every held, named cat over a backdrop scene (v1.468.0), and `/collection` lists them. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
+animated pen of every held, named cat over a backdrop scene (v1.468.0), and `/collection` lists them.
+The full design set (7 classes, 4 coats, 12 scenes) is catalogued in
+`docs/domains/app-shell/cat-collection-design-catalog.md`; review is PS-53. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
 **Pass test:** on the S25, turn on the Collection card. It shows a drawn cat, and `/collection`
 shows three drawn tiers per ladder. The owner's judgement is owed in BF-126 (`Verify: owner`).
 

@@ -184,6 +184,13 @@ confirmed: forest ← first Ranger T4, house ← first Health-cat T3, castle ←
 "100-session" tier). A title must be derived from the replayed collection, never stored, so it
 cannot drift from the cats that earned it.
 
+## Design catalogue
+
+The complete set of designed assets (7 classes, 6 tiers, 4 coats, 12 scenes, the animation spec)
+is [`cat-collection-design-catalog.md`](../../domains/app-shell/cat-collection-design-catalog.md).
+The sleep ladder is drawn as the **Mage** from v1.469.0; the Health cat keeps its art for the
+logging ladder this plan adds.
+
 ## Not in scope here
 
 - The Android home-screen widget: PS-50, Kotlin, needs an APK.
