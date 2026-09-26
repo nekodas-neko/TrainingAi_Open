@@ -1051,7 +1051,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       <PullToSync
         onSync={handlePullSync}
         scrollKey="home"  // RV-112 — Home and More shared one scroll slot; see more-content.tsx.
-        scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-nav-safe"
+        // BF-206: `pb-fab-safe`, not `pb-nav-safe` — this screen mounts `CoachFab`, whose 56 px sits
+        // above everything pb-nav-safe reserves, so the last row of the scroll could never clear it.
+        scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-fab-safe"
         className="flex-1 flex flex-col overflow-hidden"
       >
         <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-30"><Meteors number={10} /></div>

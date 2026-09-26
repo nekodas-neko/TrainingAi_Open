@@ -1,17 +1,17 @@
 'use client'
 
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { CollectionState } from '@trainingai/shared/collection/ladder'
 import { CatSprite } from '@/components/home/cat-sprite'
-import { penCats, seeded, type PenCat } from '@/components/home/collection-pen-cats'
+import { penCats, seeded, shownForWidth, tagsForWidth, type PenCat } from '@/components/home/collection-pen-cats'
 import type { FaucetKey } from '@/components/home/collection-summary'
 
 /**
  * The collection as a pen of cats wandering about, for the Home card.
  *
- * Every held cat is drawn, highest tiers first, up to `MAX_SHOWN` (`collection-pen-cats.ts`), over a
- * backdrop scene, each with its name on a tag. **Depth follows tier**, the owner's layout: T1s are
+ * Cats are drawn over a backdrop scene, as many as the pen's measured width fits and spread across
+ * tiers rather than taken from the top (`collection-pen-cats.ts`), with a name tag on the rarest few. **Depth follows tier**, the owner's layout: T1s are
  * small and at the front, each tier up stands further back and higher, and T5–T6 fly above the
  * ground with a shadow beneath. So the rare cats are the ones that stand out, never the ones hidden
  * behind a crowd. The sprites animate themselves (tail, paws, blink) inside their SVGs; the walk
@@ -24,6 +24,14 @@ import type { FaucetKey } from '@/components/home/collection-summary'
  */
 
 const PEN_HEIGHT = 176
+/**
+ * The pen's width before the observer has measured it: 412 dp less the page's 32 and the card's 32.
+ *
+ * A guess rather than a render-nothing gate, because the alternative is the card popping in — and
+ * on the canonical runtime this guess is the answer, so the observer's first callback is normally
+ * a no-op rather than a reflow.
+ */
+const ASSUMED_PEN_W = 348
 /** Backdrops, all drawn; which trophy unlocks which is PS-51. */
 export type PenScene = 'meadow' | 'forest' | 'house' | 'castle' | 'gym' | 'park' | 'bedroom' | 'kitchen' | 'beach' | 'snow' | 'space' | 'sakura'
 /** Sprite size per engine tier, T1 first. */
@@ -72,13 +80,23 @@ function slotOf(i: number, n: number): number {
 
 export const CollectionPen = memo(function CollectionPen({ collections, scene = 'meadow' }: { collections: Partial<Record<FaucetKey, CollectionState>>; scene?: PenScene }) {
   const pen = useRef<HTMLDivElement>(null)
-  const { shown, total } = useMemo(() => penCats(collections), [collections])
+  // BF-204: how many cats and how many name tags fit is a function of the width, not a constant —
+  // twelve into 348 px was 1.72× in sprite and 1.31× in tags, i.e. crowded by construction.
+  const [penW, setPenW] = useState(ASSUMED_PEN_W)
+  const { shown, total } = useMemo(() => penCats(collections, shownForWidth(penW)), [collections, penW])
+  const tags = tagsForWidth(penW)
 
   useEffect(() => {
     const el = pen.current
     if (!el) return
     // The walk distance is in px, and a transform cannot use the parent's width as a percentage.
-    const size = new ResizeObserver(([entry]) => el.style.setProperty('--pen-w', `${Math.round(entry.contentRect.width)}px`))
+    const size = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width)
+      el.style.setProperty('--pen-w', `${w}px`)
+      // Guarded: the observer fires on every scroll-driven relayout, and an unconditional setState
+      // here would re-run `penCats` and reseed nothing but still re-render the whole pen.
+      setPenW(prev => (prev === w || w === 0 ? prev : w))
+    })
     const seen = new IntersectionObserver(([entry]) => { el.dataset.paused = entry.isIntersecting ? 'false' : 'true' })
     size.observe(el)
     seen.observe(el)
@@ -109,7 +127,10 @@ export const CollectionPen = memo(function CollectionPen({ collections, scene = 
                 <CatSprite faucet={cat.faucet} tier={cat.tier} size={size} />
               </div>
             </div>
-            {cat.name && (
+            {/* Tags for the rarest few only (BF-204). `shown` is round-robin from the top tier
+                down, so taking the first `tags` of it IS rarest-first. Twelve tags at 348 px
+                clipped each other mid-word, which was the loudest half of the defect. */}
+            {cat.name && i < tags && (
               <span className="absolute left-1/2 top-full -translate-x-1/2 whitespace-nowrap rounded bg-background/80 px-1 text-[9px] font-semibold leading-tight text-foreground">
                 {cat.name}
               </span>

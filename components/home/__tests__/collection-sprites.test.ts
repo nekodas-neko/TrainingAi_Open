@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { LADDERS } from '@trainingai/shared/collection/ladder'
 import { tierArt, classArt, tierGlyph, ART_TIERS, LADDER_CLASS, CAT_CLASSES, CAT_VARIANTS } from '../collection-sprites'
-import { penCats } from '../collection-pen-cats'
+import { penCats, shownForWidth, tagsForWidth } from '../collection-pen-cats'
 import { renderAll } from '../../../scripts/collection-art/build.mjs'
 
 const CATS = path.join(__dirname, '../../../public/cats')
@@ -77,5 +77,54 @@ describe('the pen', () => {
 
   it('draws nothing for an empty collection', () => {
     expect(penCats({}).total).toBe(0)
+  })
+})
+
+/**
+ * BF-204 — the pen was crowded by construction, and it took three mechanisms compounding.
+ *
+ * The owner, on his first real use: *"Its a bit cramped in there. Might be too many at once."* His
+ * collection is ≈ 22 cats of which ≈ 13 are top-tier, so sorting biggest-first and slicing twelve
+ * drew twelve cats of ONE tier — and a tier is a 12 px vertical band, so the depth-by-tier design
+ * that is meant to separate them did nothing and they all landed on one line.
+ */
+describe('BF-204 — the pen is sized to the pen', () => {
+  it('spreads the drawn set across tiers instead of taking the top of one', () => {
+    // 13 at tier 2 and 9 below it — the owner's shape. The old sort-and-slice drew tier 2 twelve
+    // times over; every drawn cat then shared a 12 px band.
+    const { shown } = penCats({ workout: state([5, 4, 13]) }, 6)
+    expect(shown).toHaveLength(6)
+    expect(new Set(shown.map(c => c.tier)).size, 'every drawn cat came from one band').toBeGreaterThan(1)
+  })
+
+  it('still leads with the rarest, which is what the sort was for', () => {
+    expect(penCats({ workout: state([5, 4, 13]) }, 6).shown[0].tier).toBe(2)
+  })
+
+  it('drains a tier without stalling when the rare ones run out', () => {
+    const { shown, total } = penCats({ workout: state([4, 0, 1]) }, 12)
+    expect(total).toBe(5)
+    expect(shown.map(c => c.tier)).toEqual([2, 0, 0, 0, 0])
+  })
+
+  it('keeps the pen stable across renders, which the round-robin must not break', () => {
+    const a = penCats({ workout: state([3, 2, 1]) }, 4).shown.map(c => c.id)
+    const b = penCats({ workout: state([3, 2, 1]) }, 4).shown.map(c => c.id)
+    expect(a).toEqual(b)
+    expect(new Set(a).size).toBe(4)
+  })
+
+  it('fits the count to the width, and never empties the pen on a narrow one', () => {
+    // 348 px is Home at 412 dp less the page and card padding: six 56 px slots, not twelve 29 px.
+    expect(shownForWidth(348)).toBe(6)
+    expect(shownForWidth(120)).toBe(3)
+    expect(shownForWidth(0)).toBe(3)
+    expect(shownForWidth(4000)).toBe(12)
+  })
+
+  it('tags only the few that fit, because the tags collided worse than the sprites', () => {
+    expect(tagsForWidth(348)).toBe(3)
+    expect(tagsForWidth(100)).toBe(1)
+    expect(tagsForWidth(4000)).toBe(4)
   })
 })
