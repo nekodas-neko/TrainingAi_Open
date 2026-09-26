@@ -10,10 +10,16 @@ const getUserById = vi.fn(async () => ({ id: 'admin-1', isAdmin: true }))
 vi.mock('@/lib/data', () => ({ getRepository: vi.fn(async () => ({ getUserById })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
 
-const auditInsert = vi.fn(async () => ({ rows: [] }))
+// Same reason as `roQuery` below: the cases read `calls[0][1]` (the bind parameters), which is a
+// type error while the mock declares no arguments.
+const auditInsert = vi.fn(async (_sql?: string, _params?: unknown[]) => ({ rows: [] }))
 vi.mock('@/lib/data/postgres/client', () => ({ getPool: () => ({ query: auditInsert }) }))
 
-const roQuery = vi.fn(async () => ({ rows: [{ n: 1 }], fields: [{ name: 'n' }] }) as { rows: unknown[]; fields: { name: string }[] })
+// Typed with the sql it receives (RV-190). It was declared taking no arguments, so every
+// `roQuery.mock.calls[0][0]` below was a type error against an empty tuple — three of them, carried
+// in the test-typecheck baseline. Naming the parameter fixes those as well as the call through
+// `runScoped`.
+const roQuery = vi.fn(async (_sql?: string) => ({ rows: [{ n: 1 }], fields: [{ name: 'n' }] }) as { rows: unknown[]; fields: { name: string }[] })
 let configured = true
 vi.mock('@/lib/data/postgres/readonly-client', () => ({
   isReadonlyDbConfigured: () => configured,

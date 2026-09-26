@@ -1,5 +1,4 @@
 {
-  "app/api/__tests__/admin-db-query.test.ts": 3,
   "app/api/__tests__/dexa-scans-route.test.ts": 3,
   "app/api/__tests__/hr-ingest-poison-pill.test.ts": 6,
   "app/api/__tests__/log-rest-day-route.test.ts": 2,
