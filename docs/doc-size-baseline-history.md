@@ -17951,3 +17951,38 @@ dropped `docs/implementation-backlog.md` from the ratchet entirely and deleted i
 the lowering is moot and the deletion was taken rather than fought. The queue-side fact still
 holds: OR-168 shipped, and the "not established" figure it asked for — how long a Railway deploy
 actually takes — was **measured at 205s** rather than guessed.
+## 2026-09-26 — `docs/implementation-backlog.md` is UNRATCHETED now; this entry records the content, not a raise
+
+**⚠ This note was written as a `32015 → 32050 (+35)` raise and is corrected here.** `LA-129` landed
+while the PR was in flight: the backlog is reported by `check-doc-index-size` and enforced by nothing,
+so `docs/doc-size/docs/implementation-backlog.md.size` is **deleted** rather than raised, and a test now
+fails if a `--fix` run re-creates it. This PR deletes it — the file had been carried and raised all
+session. `--fix` no longer re-creates it, so a conflict resolver that calls `--fix` is safe.
+The +35 lines are still worth saying why:
+
+The owner's highest-priority entry had a named suspect — *"a responsive resize when a panel leaves
+`content-visibility: hidden`"* — and it is **wrong**. Instrumenting `ResizeObserver` with a control (11
+observers, 6 callbacks, 5 on chart containers during load) shows **zero callbacks on a tab switch**. That
+also explains the dead `resizeDelay` A/B recorded above it: the experiment was debouncing an event that
+never fires.
+
+What these lines buy is a **metric that works**: patch the `font` setter on
+`CanvasRenderingContext2D.prototype` and count calls per tap — the exact item the device profile named,
+immune to the dev-mode timing noise that made the A/B unreadable. Switching to Health costs **578** calls,
+reproduced identically twice; to a chart-free tab, **0**.
+
+And the real cause, which changes what a fix may do: `TabVisibilityProvider` bumps `epoch` on every
+re-show, screens refetch because of it, and the charts redraw. **The update is legitimate**, so the fix
+has to make a correct update cheaper or later rather than suppress it — a trade-off against Q-402's
+staleness rule. Three candidates are listed with what each costs, none yet measured, so the next session
+picks with evidence instead of starting where this one did.
+
+
+## 2026-09-26 — `docs/implementation-backlog.md` → BF-201 and BF-202 (routing owner decisions)
+
+Two entries the owner's instruction required. BF-201 carries the two calibration decisions that were
+buried inside BF-197 and BF-199, and it costs lines because each needs a recommendation, alternatives
+and a reversal cost to be answerable without reading the parent. BF-202 records that 70 entries across
+the queue share that shape, with the caveat that the number is a keyword upper bound rather than a
+finding — that caveat is the part worth the lines, since acting on 70 as if it were 70 real decisions
+would waste the sweep.
