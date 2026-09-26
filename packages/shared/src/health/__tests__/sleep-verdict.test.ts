@@ -10,6 +10,7 @@ import {
   sleepVerdictForNight,
   onsetMinutesForNight,
   VERDICT_BASELINE_NIGHTS,
+  VERDICT_IQR_MULTIPLIER,
   SLEEP_VERDICT_MODEL_VERSION,
   type VerdictNight,
 } from '@trainingai/shared/health/sleep-verdict'
@@ -30,6 +31,20 @@ function ordinaryNights(n = VERDICT_BASELINE_NIGHTS): VerdictNight[] {
 
 const night = (over: Partial<VerdictNight> = {}): VerdictNight => ({
   date: TARGET, durationHours: 7.8, onsetMinutes: -45, efficiency: 89, ...over,
+})
+
+// The calibration is the owner's, not an implementation detail, and the behavioural tests below
+// deliberately use extreme values so they pass at any sane multiplier — which means nothing else
+// in this file would notice it being changed. This is the guard.
+describe('the approved calibration', () => {
+  it('is the value measured and signed off, with a model version that moved with it', () => {
+    // 1.00 (TN-83, 2026-09-26): 5.8 prominent announcements per 30 nights over the owner's real
+    // nights, against a 4–6 target, and the only value in that band that keeps `good` non-zero.
+    expect(VERDICT_IQR_MULTIPLIER).toBe(1.0)
+    // Changing the rule without moving this leaves two incompatible rules sharing one version,
+    // and a stored correction can no longer be paired with the rule it disagreed with.
+    expect(SLEEP_VERDICT_MODEL_VERSION).toBe(2)
+  })
 })
 
 describe('sleepVerdictForNight', () => {

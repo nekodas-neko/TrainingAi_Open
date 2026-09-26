@@ -14,7 +14,8 @@ or the ring/strap hardware that measures it ([`devices`](../devices/README.md)).
 |---|---|
 | Night selection, merging, sensing span | `lib/sleep/` — `primary-sleep.ts`, `merge-sessions.ts`, `actual-window.ts`, `sensing-span.ts` |
 | Score & derived metrics | `packages/shared/src/health/` — `sleep-score.ts`, `sleep-night.ts`, `sleep-staging.ts`, `sleep-trend.ts`, `sleep-consistency.ts`, `sleep-feel-calibration.ts`, `hypnogram.ts`, `sleepnet-preprocess.ts`, `breathing-rate.ts`, `hrv-frequency.ts`, `spo2-variability.ts`, `hr-sleep-band.ts`, `night-vitals.ts` (**not** `lib/health/` — several plan docs still point there and are wrong) |
-| Tables | `sleep_sessions` (+ Oura columns), `oura_daily` — see the Data Model in [`CLAUDE.md`](../../../CLAUDE.md) |
+| The app's verdict on last night | `packages/shared/src/health/sleep-verdict.ts` — per-component median/IQR over a trailing 28 nights, returning `normal \| poor \| good` **plus the bands and values it judged against**, so a later correction stays paired with the rule that produced it. Read by `GET /api/sleep-verdict` and stored in `sleep_verdicts` (migration 284). `VERDICT_IQR_MULTIPLIER` is **the owner's calibration**, currently 1.00 (TN-83) — see the Gotchas below before changing it. No UI renders it yet (TN-82). |
+| Tables | `sleep_sessions` (+ Oura columns), `oura_daily`, `sleep_verdicts` — see the Data Model in [`CLAUDE.md`](../../../CLAUDE.md) |
 | UI | `app/health/`, `components/health/` |
 
 Shared formulas and their single home: [`docs/module-map.md`](../../module-map.md) §6 (and its
@@ -229,6 +230,17 @@ curve). **Before writing anything that treats one row as one night, call the hel
 - Journal: `grep -rl 'sleep' docs/overview/entries/`
 
 ## Gotchas specific to this domain
+
+- **The verdict's `VERDICT_IQR_MULTIPLIER` is a calibration the owner signs off, and the
+  announcement rate is a CHECK on it, never a knob to turn.** It sits at **1.00** (TN-83,
+  2026-09-26), giving 5.8 prominent announcements per 30 of his real nights against a 4–6 target.
+  1.5 also lands in that band and is wrong: it reaches the rate by suppressing signal and takes
+  `good` to **zero**, deleting half the feature. Two rules follow. **(a)** Sweep over
+  `nightSessions()` output, never raw `sleep_sessions` rows — the original 0.5 was fitted over rows
+  including naps and 0 h fragments, and those fragments *widened* the bands, so fixing the
+  population made the rate go **up** (15.7), not down. **(b)** Move
+  `SLEEP_VERDICT_MODEL_VERSION` in the same commit, or two incompatible rules share one version and
+  every stored correction becomes unattributable to what it was disagreeing with.
 
 - **A ring re-pair can silently re-time every night in history.** `aggregateOuraRawSamples`'s
   `toDate` resolves each `ds` against `currentEpoch(anchors)`, so whichever clock epoch is newest

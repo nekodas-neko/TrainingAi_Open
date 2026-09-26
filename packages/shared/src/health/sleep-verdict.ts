@@ -52,13 +52,28 @@ export const VERDICT_BASELINE_NIGHTS = 28
  * the IQR. Median and IQR rather than mean and sd because these distributions are bounded and
  * skewed, and because one bad night must not widen the band that judges the next one.
  *
- * A STARTING value, tuned toward 4–6 prominent announcements a month. The rate is the target and
- * this multiplier is only how it is reached — re-measure once real announcements have fired.
+ * **1.00, owner-approved 2026-09-26 (TN-83), measured rather than guessed.** Swept over his real
+ * 125 rows reduced to nights by `nightSessions()`: ×0.5 (the original starting value) fires 15.7
+ * prominent announcements per 30 nights against a 4–6 target, ×0.75 → 9.4, **×1.00 → 5.8**,
+ * ×1.25 → 4.9, ×1.5 → 2.2.
+ *
+ * ×1.00 is the only value inside the target that keeps the "unusually good night" half alive
+ * (poor 10, good 3). **×1.5 and above take `good` to ZERO** — half the feature disappears while
+ * the rate looks right, which is why the rate is a check on a correct population and never a knob
+ * to reach on its own.
+ *
+ * ⚠ The 0.5 was not merely untuned: it was measured over `sleep_sessions` ROWS, which include naps
+ * and 0 h fragments. Those fragments widened the bands, so the original sweep understated how
+ * loud the rule was. Re-measure over `nightSessions()` output, never raw rows.
  */
-export const VERDICT_IQR_MULTIPLIER = 0.5
+export const VERDICT_IQR_MULTIPLIER = 1.0
 
-/** Bumped whenever the verdict rule changes, so a stored snapshot says which rule produced it. */
-export const SLEEP_VERDICT_MODEL_VERSION = 1
+/** Bumped whenever the verdict rule changes, so a stored snapshot says which rule produced it.
+ *  v2: `VERDICT_IQR_MULTIPLIER` 0.5 → 1.0 (TN-83, owner-approved 2026-09-26). Changing the
+ *  calibration without moving this would leave two incompatible rules sharing one version, and a
+ *  correction could no longer be paired with the rule it disagreed with — which is the whole
+ *  reason the snapshot exists. */
+export const SLEEP_VERDICT_MODEL_VERSION = 2
 
 export type SleepVerdict = 'normal' | 'poor' | 'good'
 export type SleepComponent = 'duration' | 'onset' | 'efficiency'
