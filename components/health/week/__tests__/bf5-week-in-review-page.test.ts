@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../../..')
+/** The shared stripper, not the regex pair the other source-scan tests copy: that pair reads the
+ *  `/*` inside an `accept="image/*"` string as a comment opener and deletes everything to the
+ *  next closer. Measured on this file's own inputs, it discarded more than half of them, which
+ *  makes a `.not.toMatch` pass over source it never saw (LB-160). */
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-const code = (rel: string) =>
-  read(rel)
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+const code = (rel: string) => stripComments(read(rel))
 
 /**
  * BF-5 PR 2b — the week in review is a page, not a banner that expands.

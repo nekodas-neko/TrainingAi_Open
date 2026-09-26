@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.64",
+    version: "1.465.65",
     date: "2026-09-26",
     changes: [
       "Changed: the prescribed run card now shows its reason straight away and keeps it, instead of replacing it a moment later with an AI rewording of the same thing. One less thing to load, and it works with no signal.",
+    ],
+  },
+  {
+    version: "1.465.64",
+    date: "2026-09-26",
+    changes: [
+      "Describing a food now shows the foods and meals you have already saved before asking the AI to estimate it — so a food you log often comes back with its real macros, instantly, and works with no signal.",
+      "Correcting only the portion in the review sheet — \"it was 300g\" — now rescales on the phone instead of asking the AI to redo the whole estimate. Anything else you type still goes to the AI.",
     ],
   },
   {
