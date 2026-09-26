@@ -3133,7 +3133,7 @@ the harness for the sheet half; **the dialog half cannot be — it needs the And
 a Capacitor channel Playwright cannot fire.** Pass tests: on the S25, Cardio → *Other activity* →
 *Treadmill* lands and stays, one back returns to the hub; and start a workout, back, *Leave* → the
 screen leaves `/workout?session=…`. Detail:
-[`2026-09-25-lane-b-back-gesture-sitting`](docs/overview/entries/2026-09-25-lane-b-back-gesture-sitting.md).
+[`2026-09-25-lane-b-back-gesture-sitting`](docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lane-b-back-gesture-sitting).
 
 ### [nutrition][platform] ⚠️ "kcal left" now subscribes to the post-push invalidation — NOT device-verified, and the device is where it failed three times (BF-177, 2026-09-25, v1.465.57) · needs: device
 
@@ -3149,7 +3149,7 @@ subscription is live before the hook's first fetch. **Exercised against `pnpm de
 the gate only: native SQLite, the outbox push and Samsung's WebView are the whole mechanism here and
 none was run.** Pass test: log a food on the S25, "kcal left" changes within 3 s without leaving the
 tab. Detail:
-[`2026-09-25-lane-b-bf177-balance-subscribes`](docs/overview/entries/2026-09-25-lane-b-bf177-balance-subscribes.md).
+[`2026-09-25-lane-b-bf177-balance-subscribes`](docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lane-b-bf177-balance-subscribes).
 
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 

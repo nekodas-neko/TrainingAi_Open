@@ -722,7 +722,7 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
 
 - **Lane: A** — `app/api/log-calendar-event/route.ts`. **Added:** 2026-09-25 · OR-165's dependency audit.
 - **Verify:** owner
-- **SHIPPED 2026-09-25** ([entry](overview/entries/2026-09-25-or166-scoped-calendar-client.md)):
+- **SHIPPED 2026-09-25** ([entry](overview/history-2026-09-26-folded-1.md#2026-09-25-or166-scoped-calendar-client)):
   `@googleapis/calendar` at **884 kB** replaces `googleapis` at **203 MB** — the same generated
   Calendar v3 client without the other ~380 APIs. The saving the entry called unestablished, cold
   `pnpm build`: **6m16s before → 5m09s and 4m54s after**, the two after-runs 15 s apart, so the
