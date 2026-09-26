@@ -5225,8 +5225,8 @@ drift.
 
 ### [activity] BF-191 — the walk-end fix shipped; three phantom rows are still in the history
 
-- **Ask:** owner — three phantom walk rows to soft-delete from the activity list by hand: `b8083d04` (09-24), `ea77ce16` (07-30), `a85568a4` (09-14). The code fix shipped; these three predate it and no migration should touch them.
-- **Lane: O** — what is left needs the owner's hand and a phone, not code. **Added:** 2026-09-24 ·
+- **✅ ANSWERED BY THE OWNER, 2026-09-26: DEVICE VERIFICATION MAY DELETE THEM.** He authorised the device agent to soft-delete the three phantom rows in its next sitting — `b8083d04` (09-24), `ea77ce16` (07-30), `a85568a4` (09-14). **These three ids and no others**; this is a one-off authorisation for named rows, not an extension of the standing write permissions.
+- **Lane: DV** — re-laned 2026-09-26 (OR-178) on his authorisation: the three deletes and the short-walk device check below are one visit to the same screen, so they are one sitting. It was `O` only because the action needed his say-so. **Added:** 2026-09-24 ·
   BugFix intake. **Code shipped 2026-09-24 (Lane B)** together with BF-190: the elapsed seconds now
   travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and
   below `MIN_WALK_SEC` (60s) the existing end-walk dialog becomes a discard confirm instead of being
@@ -5254,9 +5254,17 @@ drift.
 
 ### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
 
-- **Ask:** owner — leaving a guided walk by the back gesture or the tab bar DISCARDS it; only the End button saves. A 39-minute walk vanishes with no row. What should the other two exits do — save, prompt, or keep discarding? A product decision with no single right answer.
+- **✅ ANSWERED BY THE OWNER, 2026-09-26: PROMPT ON BOTH.** The back gesture and the tab bar each raise a
+  save-or-discard dialog rather than silently keeping or dropping the walk. **He chose the prompt over
+  the recommended silent save**, so build the prompt — do not re-argue it from the asymmetry argument
+  the recommendation used.
+- **Two things the build must get right, because the prompt is the whole change:** the End button
+  already raises its own dialog, so **the two must not both fire** on any single exit; and a walk
+  under `MIN_WALK_SEC` (60s) already turns End's dialog into a discard confirm (BF-190/BF-191), so
+  the new exits need the same short-walk behaviour rather than a second, differently-worded prompt.
 
-- **Lane: O** — a product decision about what happens to a walk, not a defect with one right answer.
+- **Lane: B** — re-laned 2026-09-26 (OR-178) now the decision exists; the three `LeaveWalkDialog` callers are
+  Lane B's by the path rule. It was `O` for a product decision, which has been made.
   **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
   written per call site, which is what surfaced it).
 - **Measured in source, three callers of `LeaveWalkDialog`:**
@@ -7046,7 +7054,13 @@ drift.
 
 ### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
 
-- **Lane: O** — the owner's call, not a structural one. Split out of `RV-99`, which has the code detail.
+- **✅ ANSWERED BY THE OWNER, 2026-09-26: RETUNE THE TOKEN FIRST, THEN MIGRATE — option (b).** Set the token
+  to today's `#22c55e` / `#ef4444`, land that, then move the literal sites onto it. **The app's
+  appearance must not change at any point**, which is the test for this work: a screenshot before and
+  after the whole sequence should be identical. The brighter values were the library's default, never
+  a choice made here.
+- **Lane: B** — re-laned 2026-09-26 (OR-178). `app/globals.css` for the token, then `app/**` + `components/**`
+  for the sites. **This unblocks `RV-99`'s Lane B half**, which was waiting on the same answer.
 - **Added:** 2026-09-25 · Lane B, after measuring rather than migrating.
 - **The question, in one line:** RV-99 wants ~113 hard-coded greens and reds replaced by the design
   tokens. Doing it **changes what you see** on screens you read daily. Which do you want to keep?
@@ -7070,7 +7084,7 @@ drift.
 - **What is NOT in this question:** the one real defect was shipped separately (see RV-99), amber is
   imperceptible and can go either way, and identity colours (rarity, HR zones, macro colours, the
   per-metric Home tints) keep their hex regardless.
-- **Ask:** owner — migrating ~113 hard-coded greens and reds to the design tokens makes them all visibly brighter (green `rgb(34,197,94)`→`rgb(86,238,102)`). Keep today's look, or take the token's? Retuning the token to today's hex first gets the same one-source benefit with no visual change.
+- **The question that was asked (ANSWERED 2026-09-26, see above):** — migrating ~113 hard-coded greens and reds to the design tokens makes them all visibly brighter (green `rgb(34,197,94)`→`rgb(86,238,102)`). Keep today's look, or take the token's? Retuning the token to today's hex first gets the same one-source benefit with no visual change.
 - **The three answers, any of which unblocks it:** (a) migrate to the token and accept the brighter
   green and red; (b) retune the token to today's `#22c55e`/`#ef4444` first, then migrate — same
   one-source benefit, appearance unchanged; (c) leave it, and close RV-99's Lane B half.
@@ -11366,9 +11380,17 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 ### [app-shell] LB-157 — Home's header row cannot hold a date AND three chips at 412 dp: which reading moves?
 
-- **Lane: O** — measured by Lane B on 2026-09-25 and handed over, because every remaining option
+- **✅ ANSWERED BY THE OWNER, 2026-09-26: THE DATE GOES ON ITS OWN LINE.** The weather and battery chips
+  keep the header row; the date moves below it. **He kept the battery chips on Home deliberately**
+  (they were added as Q-111), so do not revisit moving them — that alternative was offered and
+  declined.
+- **This costs one row of Home's vertical space, and that is the accepted trade.** The point of
+  choosing it over another few pixels is that the row stops being 8 px from breaking: two
+  previous fixes each shipped and each re-broke on a sunny day. **A fix that leaves the row
+  width-critical is not this decision** — it must stop depending on the weather chip's width.
+- **Lane: B** — re-laned 2026-09-26 (OR-178); Home's header is `components/**`.
   changes what Home shows rather than how it is built. `BF-139` and `BF-96` both park on this.
-- **Ask:** owner — Home's date row is 8 px short of fitting *"Wed 30"* beside the weather and battery
+- **The question that was asked (ANSWERED 2026-09-26, see above):** — Home's date row is 8 px short of fitting *"Wed 30"* beside the weather and battery
   chips on a sunny day, and there is no smaller format that fits. Two fixes have each shipped and each
   re-broken it. Which do you want: the date on its own line, the battery readings moved off Home's
   header, or no date in the header at all?
