@@ -17932,7 +17932,14 @@ started). RV-177's nine-gap entry left the queue whole and the one finding insid
 had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files against 9 — became LA-145,
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
 
-## 2026-09-25 — `docs/implementation-backlog.md` 32015 → 32050 (+35, DV-12's mechanism)
+## 2026-09-26 — `docs/implementation-backlog.md` is UNRATCHETED now; this entry records the content, not a raise
+
+**⚠ This note was written as a `32015 → 32050 (+35)` raise and is corrected here.** `LA-129` landed
+while the PR was in flight: the backlog is reported by `check-doc-index-size` and enforced by nothing,
+so `docs/doc-size/docs/implementation-backlog.md.size` is **deleted** rather than raised, and a test now
+fails if a `--fix` run re-creates it. This PR deletes it — the file had been carried and raised all
+session. `--fix` no longer re-creates it, so a conflict resolver that calls `--fix` is safe.
+The +35 lines are still worth saying why:
 
 The owner's highest-priority entry had a named suspect — *"a responsive resize when a panel leaves
 `content-visibility: hidden`"* — and it is **wrong**. Instrumenting `ResizeObserver` with a control (11
