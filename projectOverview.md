@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-23.
+**Version:** v1.471.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-26.
+
+**The weekly recap stopped calling a model, and became a cacheable GET (RV-201 ②, v1.471.0).**
+`/api/weekly-digest` is now `GET`-only — every number it reports was already computed before the
+model was ever reached, so `buildWeeklyDigestText` writes the sentences from the same
+`WeeklyDigestMetrics`. The method is the change that matters: `cachedFetch` caches only GETs, so as
+a POST the week page's charts had no stored copy and the screen fell to its error state offline.
+Home's banner and `/health/week` now share one `weekly-digest:<week>` entry, cleared by four write
+groups; the cached row, the rate limit and the degrade path went with the model. **Three defects
+came out of the work rather than the entry:** the banner's own `ta_weekly_recap_v1_` entry was a
+second cache nothing invalidated; a hook cannot be skipped, so moving the fetch into one would have
+made a *dismissed* banner fetch on every Home mount; and the recap said "first week of data"
+whenever the prior week logged no tonnage, so a deload read as no history. ⚠️ **The offline
+*navigation* is not demonstrated** — it needs the service worker, which `pnpm dev` does not run, so
+it is owed a device check. Detail: `docs/overview/entries/2026-09-26-rv201-weekly-digest-offline.md`.
 
 **Four sync confirm arms could never mark a pushed row synced (DV-5).** `pushMutations` confirms a
 drained mutation by re-reading the row through the **UI-facing getter**, and every one of those
@@ -712,7 +726,9 @@ owner is stale — **it merged 2026-08-23**, verified against `main`, so BF-9 ha
 and is blocked only on the owner's word to merge.
 
 **The weekly digest returns its numbers now, so the week in review can be drawn rather than
-described (BF-5 PR 2a — no version bump, nothing user-visible changed).** `/api/weekly-digest`
+described (BF-5 PR 2a — no version bump, nothing user-visible changed). ⚠️ The prompt this
+paragraph freezes no longer exists — RV-201 removed the model on 2026-09-26, and the byte-identical
+golden is now over the digest the user reads. The rest of the paragraph still holds.** `/api/weekly-digest`
 computed every figure the Home banner talks about, flattened them into the model's prompt and threw
 the values away; it now builds `WeeklyDigestMetrics`, formats the prompt **from** that, and returns
 it — on the cached path too, which is the one the banner almost always takes. The prompt is

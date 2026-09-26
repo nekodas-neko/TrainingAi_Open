@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.471.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: your week in review is written by the app now rather than by the AI, so it opens straight away instead of waiting on a model, and once you have looked at it once it still opens with no signal.",
+      "Fixed: the recap called a week your \"first week of data\" whenever the week before it logged no weight — a deload or a run-only week read as if you had no history.",
+    ],
+  },
+  {
     version: "1.470.1",
     date: "2026-09-26",
     changes: [

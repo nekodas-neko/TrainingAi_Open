@@ -29,7 +29,6 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8')
 // this list when its model call goes, never because the guards became inconvenient.
 const PROSE_ROUTES = [
   'app/api/daily-digest/route.ts',
-  'app/api/weekly-digest/route.ts',
   'app/api/workout-sessions/[id]/recap/route.ts',
   'app/api/session-explain/insight/route.ts',
 ]
@@ -144,11 +143,11 @@ describe('every route that writes prose can reach the guards (RV-173)', () => {
 
   it('finds the prose routes at all — a scan that matches nothing would pass silently', () => {
     // A floor, not a target: it exists so a scan that silently matches nothing cannot pass. It was
-    // 7 until RV-200 deleted `running-plan/explain`, whose model call only reworded a rationale
-    // the card was already rendering, and 6 until RV-201 did the same to `ai/health-insight` —
-    // the most-called prose route, whose every fact the handler had already computed. Lower it
-    // when a prose route genuinely goes; never raise it to paper over one that stopped matching.
-    expect(prose.length).toBeGreaterThanOrEqual(5)
+    // 7 until RV-200 deleted `running-plan/explain`, 6 until RV-201 did the same to
+    // `ai/health-insight`, and 5 until RV-201's second half took `weekly-digest` — each one a
+    // model rewording facts its own handler had already computed. Lower it when a prose route
+    // genuinely goes; never raise it to paper over one that stopped matching.
+    expect(prose.length).toBeGreaterThanOrEqual(4)
   })
 
   it.each(prose)('%s reaches PROSE_GUARDS or PROSE_FIELD_GUARDS', rel => {

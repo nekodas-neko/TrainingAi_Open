@@ -1,21 +1,22 @@
 /**
- * BF-5 — the route returns the numbers, and the prompt it builds from them is UNCHANGED.
+ * BF-5 — the route returns the numbers, and the text it builds from them is UNCHANGED.
  *
- * The change this file guards is a refactor with a user-visible blast radius: the context block fed
- * to the model used to be assembled from raw rows inline, and is now formatted from the structured
- * `WeeklyDigestMetrics` the route returns. If a single template drifted, the model would be told
- * something different and the user would read something different — silently, because every
- * assertion you would naturally write about "does it still return a digest" still passes.
+ * The change this file guards is a refactor with a user-visible blast radius: the recap's prose
+ * used to be assembled from raw rows inline, and is now formatted from the structured
+ * `WeeklyDigestMetrics` the route returns. If a single template drifted the user would read
+ * something different — silently, because every assertion you would naturally write about "does
+ * it still return a digest" still passes.
  *
- * So the first test freezes the whole prompt, not a substring of it. The frozen string was not
- * transcribed by hand: it was captured by running THIS fixture against `origin/main`'s route and
- * again against the rewritten one, and diffing. Anything that changes the wording fails here.
+ * So the first test freezes the whole digest, not a substring of it. The frozen string was not
+ * transcribed by hand: it was captured by running THIS fixture against the route and diffing.
+ * Anything that changes the wording fails here.
  *
- * **The frozen string was updated once, deliberately, on 2026-09-20 (BF-178).** One line moved
- * from "Oura readiness" to "Readiness": the number is the app's own ble-derived composite and
- * crediting it to Oura in the text fed to the model was the defect. That is the only sanctioned
- * reason to touch this string — it exists to catch the change nobody meant to make, so a diff
- * here should be argued for, never absorbed.
+ * **It was updated twice, deliberately.** On 2026-09-20 (BF-178) one line moved from "Oura
+ * readiness" to "Readiness": the number is the app's own ble-derived composite and crediting it
+ * to Oura was the defect. On 2026-09-26 (RV-201) the model went away — the golden was a prompt
+ * fed to Gemini, and is now the digest the user actually reads, rendered from the same numbers by
+ * `buildWeeklyDigestText`. Those are the only sanctioned reasons to touch this string: it exists
+ * to catch the change nobody meant to make, so a diff here should be argued for, never absorbed.
  *
  * Runs in a NON-default timezone deliberately — in Brisbane a window assertion passes against a
  * route that hardcodes DEFAULT_TZ and proves nothing.
@@ -59,23 +60,14 @@ vi.mock('@/lib/ai/insight-cache', () => ({
   readFreshInsight: (...a: unknown[]) => readFreshInsight(...a),
 }))
 
-import { POST } from '@/app/api/weekly-digest/route'
-import type { WeeklyDigestMetrics } from '@trainingai/shared/health/weekly-digest-metrics'
+import { GET } from '@/app/api/weekly-digest/route'
+import { buildWeeklyDigestText, type WeeklyDigestMetrics } from '@trainingai/shared/health/weekly-digest-metrics'
 
-const post = (body?: unknown) =>
-  POST(new Request('http://localhost/api/weekly-digest', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  }) as never)
+// A GET since RV-201 — it always was a read, and only a POST because it ran a model.
+const post = () => GET()
 
 const bodyOf = async (r: Response) =>
-  r.json() as Promise<{ weekStart: string; cached: boolean; digest: string; metrics: WeeklyDigestMetrics }>
-
-/** The data block the prompt carries — everything after the guards. */
-const contextOf = () => {
-  const prompt = (generateText.mock.calls[0][0] as { prompt: string }).prompt
-  return prompt.slice(prompt.lastIndexOf('\n\n') + 2)
-}
+  r.json() as Promise<{ weekStart: string; digest: string; metrics: WeeklyDigestMetrics }>
 
 const loadFixture = () => {
   getWorkoutSessionsFrom.mockResolvedValue(fx.sessions as never)
@@ -108,11 +100,11 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers() })
 
-describe('the prompt is byte-identical to the pre-refactor route', () => {
-  it('builds exactly this context block', async () => {
+describe('the digest is byte-identical to the text this fixture has always produced', () => {
+  it('builds exactly this digest', async () => {
     loadFixture()
-    await post()
-    expect(contextOf()).toBe(CONTEXT_BEFORE_REFACTOR)
+    const json = await bodyOf(await post())
+    expect(json.digest).toBe(DIGEST_TEXT)
   })
 })
 
@@ -127,16 +119,21 @@ describe('the route returns the metrics it used to throw away', () => {
     expect(json.metrics.training.priorVolumeKg).toBe(5000)
   })
 
-  it('returns them on the CACHED path too — the path the banner almost always takes', async () => {
+  it('returns them on every call — there is no longer a cached path to miss', async () => {
+    // Before RV-201 the digest came from a stored row keyed on (user, week, context hash), and
+    // the metrics rode along only when that row was rebuilt. A page fed only by cache misses was
+    // blank almost every time. The row is gone; a stale one left over must not be read back.
     loadFixture()
     readFreshInsight.mockResolvedValue('a digest from earlier this week')
-    const json = await bodyOf(await post())
 
-    expect(json.cached).toBe(true)
-    expect(json.digest).toBe('a digest from earlier this week')
-    // The whole point: a page fed only by cache misses would be blank almost every time.
-    expect(json.metrics.training.volumeKg).toBe(7000)
-    expect(generateText).not.toHaveBeenCalled()
+    const first = await bodyOf(await post())
+    const second = await bodyOf(await post())
+
+    expect(first.digest).not.toBe('a digest from earlier this week')
+    expect(readFreshInsight).not.toHaveBeenCalled()
+    expect(first.metrics.training.volumeKg).toBe(7000)
+    expect(second.digest).toBe(first.digest)
+    expect(second.metrics).toEqual(first.metrics)
   })
 
   it('buckets each day by the USER\'s local day, not UTC', async () => {
@@ -200,7 +197,7 @@ describe('the route returns the metrics it used to throw away', () => {
 
     expect(json.metrics.training.priorVolumeKg).toBe(0)
     expect(json.metrics.training.volumeChangePct).toBeNull()
-    expect(contextOf()).toContain('first week of data')
+    expect(json.digest).toContain('first week of data')
   })
 
   it('carries the PR description, not just the number — a bodyweight PR is not a weight', async () => {
@@ -212,68 +209,58 @@ describe('the route returns the metrics it used to throw away', () => {
 })
 
 // Captured, not transcribed — see the file header.
-const CONTEXT_BEFORE_REFACTOR = `Last week (the completed Mon–Sun week being reviewed): 2 sessions, 7000 kg volume (+40% vs the week before)
-The week before that: 1 sessions, 5000 kg volume
-Sets per muscle that week (weighted): chest 1.5, triceps 1.5, quads 1.0
-PRs that week: Bench 103kg est. 1RM, Squat 142kg est. 1RM
-Overnight HRV: 60 ms avg that week (week before 52 ms)
-Readiness: 66/100 avg that week (week before 71/100)
-Illness radar (vs personal baseline): watch — tempC z +1.8, rhr z -0.6
-Daytime stress: high for ~51 min/day avg that week (week before ~44 min/day)
-Stress resilience: adequate (level 3/5, as of 2026-09-01)
-Training stress (own OTS model): avg 4.8 that week, with high-load day(s)
-Body weight change: -1.3 kg over 2 weeks
-7.3h avg sleep
-Sleep quality: 67/100 avg nightly sleep score that week (week before 55/100)
-Friends training that week: 3 friends connected`
+const DIGEST_TEXT = `• 2 sessions, 7,000 kg total (+40% vs the week before, which had 1)
+• Most-worked muscles by weighted sets: chest 1.5, triceps 1.5, quads 1.0
+• Personal records: Bench 103kg est. 1RM; Squat 142kg est. 1RM
+• Recovery — overnight HRV up 8 ms to 60 ms, readiness down 5 to 66, sleep quality up 12 to 67/100, sleep averaging 7.3 h a night
+• High daytime stress ~51 min/day (week before ~44)
+• Training stress averaged 4.8, with at least one high-load day
+• Illness radar: watch
+• Resilience: adequate (as of 2026-09-01)
+• Weight down 1.3 kg over the fortnight`
 
 /**
- * RV-69 — the model's failure must not discard the week.
+ * RV-69 — the model's failure must not discard the week. RV-201 removed the failure mode.
  *
- * Every number in the recap is computed by this route before the model is ever called; the model
- * only writes the sentences about them. Answering 502 threw away a complete `WeeklyDigestMetrics`
- * and the whole context block built from it. `running-plan/explain` had already established the
- * shape: 200, the deterministic content, `degraded: true`.
+ * Every number in the recap was computed by this route before the model was ever called; the
+ * model only wrote the sentences about them, and answering 502 threw away a complete
+ * `WeeklyDigestMetrics`. The degrade path — 200, the facts, `degraded: true` — was that fix.
+ *
+ * Rendering the sentences from the same numbers in code retires the class rather than handling
+ * it: there is no provider to fail, no limiter to refuse, and no stored row to serve one blip's
+ * fallback from for the rest of the week. What follows pins that the guarantee RV-69 argued for
+ * is now held by the route's shape instead of by a catch block — which is the only thing that
+ * makes deleting the catch block's tests safe rather than a quiet loss of coverage.
  */
-describe('a failed model call degrades to the facts (RV-69)', () => {
-  const fail = () => generateText.mockRejectedValue(new Error('provider exploded'))
+describe('the week can no longer be lost to something outside this route (RV-69, RV-201)', () => {
+  it('reaches no model, no insight cache and no stored row on any path', async () => {
+    loadFixture()
+    const json = await bodyOf(await post())
 
-  it('answers 200 with the week as recorded, not 502', async () => {
-    loadFixture(); fail()
-    const res = await post()
-    expect(res.status).toBe(200)
-    const json = await bodyOf(res) as { digest: string; degraded?: boolean }
-    expect(json.degraded).toBe(true)
-    expect(json.digest).toContain('2 sessions, 7000 kg volume')
+    expect(json.digest).toContain('2 sessions, 7,000 kg total')
+    expect(generateText).not.toHaveBeenCalled()
+    expect(readFreshInsight).not.toHaveBeenCalled()
+    expect(upsertAiHealthInsight).not.toHaveBeenCalled()
   })
 
-  it('still returns the metrics, which the banner renders regardless of the prose', async () => {
-    loadFixture(); fail()
-    const json = await bodyOf(await post())
+  it('answers 200 with the week as recorded even when the provider would have exploded', async () => {
+    loadFixture()
+    generateText.mockRejectedValue(new Error('provider exploded'))
+    const res = await post()
+
+    expect(res.status).toBe(200)
+    const json = await bodyOf(res)
     expect(json.metrics.training.volumeKg).toBe(7000)
     expect(json.weekStart).toBe('2026-08-31')
   })
 
   /**
-   * The load-bearing half. The insight cache is keyed on (user, week, context hash) and none of the
-   * three moves for the rest of the week — so a stored fallback would be served ahead of every
-   * later attempt, turning one provider blip into a week of no recap.
+   * Not a tautology: the route could narrow or re-derive either side. This pins that the metrics
+   * the charts render are the same object the prose was written from, so the two cannot disagree.
    */
-  it('does not persist the fallback as the week\'s digest', async () => {
-    loadFixture(); fail()
-    await post()
-    expect(upsertAiHealthInsight).not.toHaveBeenCalled()
-  })
-
-  it('carries the same lines the model was given', async () => {
+  it('renders its prose from the very metrics it returns', async () => {
     loadFixture()
-    const withModel = await bodyOf(await post())
-    const context = contextOf()
-    generateText.mockClear()
-    sessionUser = { id: `u-${++seq}`, timezone: fx.TZ }
-    fail()
-    const degraded = await bodyOf(await post()) as { digest: string }
-    for (const line of context.split('\n')) expect(degraded.digest).toContain(line)
-    expect(withModel.digest).toBe('the recap')
+    const json = await bodyOf(await post())
+    expect(json.digest).toBe(buildWeeklyDigestText(json.metrics))
   })
 })

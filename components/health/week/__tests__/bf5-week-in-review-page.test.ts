@@ -85,11 +85,22 @@ describe('BF-5 — the banner becomes the entry point', () => {
     expect(banner).not.toMatch(/href=/)
   })
 
-  it('keeps the once-per-week fetch and the dismissal, which are what make it a banner', () => {
-    expect(banner).toContain('hasFetched')
+  it('keeps the dismissal, and asks nothing at all once dismissed', () => {
     expect(banner).toContain('localStorage.setItem(dismissKey')
-    // `tabs-instant-paint.spec.ts` records that this POST fires on every Home mount.
     expect(banner).toContain('/api/weekly-digest')
+
+    // RV-201 replaced the `hasFetched` ref and the bespoke `ta_weekly_recap_v1_` localStorage
+    // entry with the shared cache. A hook cannot be skipped, so the fetch had to move into a
+    // child the dismissed branch never mounts — without that split, dismissing the banner would
+    // have turned "no request per week" into a request on every Home mount.
+    expect(banner).not.toContain('hasFetched')
+    expect(banner).not.toContain('ta_weekly_recap_v1_')
+    // The dismissed branch returns before the child exists; the fetch is inside the child. Stated
+    // as positions against the child's own declaration rather than against the import above it.
+    const split = banner.indexOf('function WeeklyRecapBannerContent')
+    expect(split).toBeGreaterThan(-1)
+    expect(banner.indexOf('if (dismissed) return null')).toBeLessThan(split)
+    expect(banner.indexOf('useCachedValue<')).toBeGreaterThan(split)
   })
 
   it('and still says so when it fails, rather than vanishing', () => {
