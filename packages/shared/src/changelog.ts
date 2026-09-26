@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.467.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the Collection card on Home is now a little meadow where every cat you hold wanders about, swishing its tail and blinking. Bigger cats are bigger, and anything past twelve shows as \"+N more\".",
+      "New art: every class now has a sixth, mythic tier, and each tier has a rare shiny colouring, ready for when the collection rules add them.",
+    ],
+  },
+  {
     version: "1.466.0",
     date: "2026-09-26",
     changes: [

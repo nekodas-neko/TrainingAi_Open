@@ -485,7 +485,7 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [app-shell] PS-48 — three owner questions that finish the collection v2 rules
+### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
   these answered is the work. PS-49's steps and workout halves do not wait on them.
@@ -500,9 +500,8 @@ below threshold and left in place for next time.
 - **② The Rogue's (cardio) unit and drain.** **Recommendation: 1 cardio session = 1 T1, drain ⅕ of
   a session a day.** Two sessions a week then holds steady and three grows. Alternative: per 20
   minutes of cardio. That is fairer to long runs, but a short walk earns nothing.
-- **③ Cap the ladder at tier 5?** **Recommendation: yes.** T5 = 81 T1s and extra T5s show as ×2.
-  Five tiers are drawn, and uncapped base-3 needs a T6 at 243 with no art. Reversal cost: none;
-  raising the cap later is one constant, plus art.
+- **③ ANSWERED 2026-09-26: six tiers.** The owner set the workout targets as 100 sessions, then
+  300 (yearly), then 900. The costs and the per-user decay rule are in the plan.
 - **④ Re-score history from scratch under v2?** **Recommendation: yes.** v1 has been live about two
   weeks, and preserving v1-era cats means versioning the rules per date span, a real piece of work
   for little. The cost: the counts he has seen change on the day PS-49 deploys.
@@ -12993,7 +12992,11 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   fallback** for a file that fails to load, per this entry's original requirement.
 - **Style was chosen by the owner in-session** after a pixel-art draft was rejected as too small and
   low-detail. His references: a flat bold-outline grey cat, and a hand-drawn sticker cat.
-- **Mapping until PS-49 lands:** workout → Tank, steps → Ranger, sleep → Cleric, tiers 1–3 of 5.
+- **Second pass, same day (v1.467.0):** the Home card became an animated pen of every held cat
+  (`collection-pen.tsx`) over a backdrop scene. The art grew to six tiers with a shiny recolour of
+  each, the sprites animate themselves (tail, paws, blink), and four scenes exist. The same
+  `Verify: owner` covers it: on the S25, does the pen read as cats wandering, and is it smooth?
+- **Mapping until PS-49 lands:** workout → Tank, steps → Ranger, sleep → Cleric, tiers 1–3 of 6.
   The Rogue has art and no ladder. The bottom rung is now drawn **per class**, which retires the
   "one shared slime" rule for the art only. The glyphs and the engine's `cat slime` name keep it
   until the v2 rules rename the tiers.
@@ -13022,6 +13025,24 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   for exactly this. The PS session could not: the query secret was unavailable on that machine.
 - **Reversal cost:** low as code (the version constant and one fold); visible as behaviour, because
   every cat count the owner has seen changes on deploy.
+
+### [app-shell] PS-51 — titles that unlock the collection pen's backdrop scenes
+
+- **Lane:** A for the titles (derived in `packages/shared/src/collection/`, returned by
+  `/api/collection`), then B for a scene picker on `/collection`.
+- **Needs:** PS-49
+- **Added:** 2026-09-26 · owner: *"some like a house/forest etc. These could be linked and achieved
+  through titles"*.
+- **What exists:** four scenes in `public/cats/scene-*.svg` (meadow, forest, house, castle), and
+  `CollectionPen`'s `scene` prop. Meadow is the fixed default.
+- **Titles must be derived from the replay, never stored.** A title is a fact about the collection
+  ("first Tank T4"); storing it adds the game-state table `ladder.ts` exists to avoid, and a
+  decay that un-merges the cat would leave a title standing on nothing. Derive: *has this ladder
+  ever reached tier N*, which the replay can report as a high-water mark.
+- **The mapping is the owner's call and is not set.** Proposed: forest ← first Ranger T4, house ←
+  first Health-cat T3, castle ← first Tank T4. The owner confirms or replaces it when this is
+  picked up; it is a preference, not an engineering question.
+- **The chosen scene is a per-user preference** (`home-prefs`), not collection state.
 
 ### [app-shell][devices] PS-50 — the collection as an Android home-screen widget
 

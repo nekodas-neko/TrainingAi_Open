@@ -5,7 +5,7 @@ import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
 import { LADDERS, type CollectionState } from '@trainingai/shared/collection/ladder'
 import { nearestMerge, mergeCountLine, totalHeld, type FaucetKey } from '@/components/home/collection-summary'
-import { CatSprite } from '@/components/home/cat-sprite'
+import { CollectionPen } from '@/components/home/collection-pen'
 
 export interface CollectionResponse {
   collections: Record<FaucetKey, CollectionState>
@@ -14,7 +14,8 @@ export interface CollectionResponse {
 }
 
 /**
- * BF-122b — one line of the collection, on Home.
+ * BF-122b — the collection on Home: a pen of every cat you hold, wandering (`CollectionPen`), over
+ * one line about the next merge.
  *
  * Three ladders do not fit a card that sits under the nutrition donut, so this shows **the ladder
  * whose next merge is fewest faucet days away** and rotates itself as that changes. It answers
@@ -57,7 +58,8 @@ export function CollectionCard() {
     return (
       <div className="p-4">
         <Heading />
-        <p className="text-sm text-muted-foreground">
+        <CollectionPen collections={data.collections} />
+        <p className="mt-2 text-sm text-muted-foreground">
           {held > 0 ? `${held} in your collection.` : 'Train, walk or sleep and your first cat turns up.'}
         </p>
       </div>
@@ -73,8 +75,8 @@ export function CollectionCard() {
   return (
     <div className="p-4">
       <Heading />
-      <div className="flex items-center gap-3">
-        <CatSprite faucet={next.faucet} tier={next.fromTier + 1} size={56} />
+      <CollectionPen collections={data.collections} />
+      <div className="mt-2 flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold first-letter:uppercase truncate">{next.towardName}</p>
           <p className="text-xs text-muted-foreground">{mergeCountLine(next)}</p>
