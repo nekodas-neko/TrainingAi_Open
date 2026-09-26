@@ -23,12 +23,16 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`docs/reviews/2026-09-23-sweep-54-reading-the-instruments.md`](../../reviews/2026-09-23-sweep-54-reading-the-instruments.md) — **sweep 54, 2026-09-23: what the instruments already recorded**, rather than what the source implies. Two findings of one shape — an instrument answered and the doc that directs people still states the question. **BF-110's reading is in** (25 `recheck stuck`, **0** `resized`, **0** `dom-lost` across 62 reported resumes) so the fix is native by the module's own criterion, but its `Keep:` still says the reading is owed, which parks it in KEEP as *"not new work"* (RV-135); the blank resume has tripled since sweep 50. **CLAUDE.md's fetch-once rule was 19 wrong** — it claimed 19 can-bite sites where the script's baseline has said **0 since 2026-08-19**; corrected in place, and it had propagated into RV-125. Measured healthy: DB **232 MB / 1.53 MB per day**, on trend; no fault of the owner's in 7 days that is not `bf110`.
 - [`docs/device-agent-probe-checklist.md`](../../device-agent-probe-checklist.md) — **what the device-verification agent should instrument, and what to send back (2026-09-22).** Ten probes for the things only CDP can answer, which is exactly what every Review sweep ends on (*nothing was rendered or reproduced*): counting requests after a write to decide the Q-402 shape mechanically (P1), a `window.fetch` census over a fixed walk to find which effects never re-run inside the persistent shell (P2), the local-store write path that `getLocalStore` returning null makes untestable in the sandbox (P3), computed-style enumeration at 384 px (P4), transition frame capture for RV-113/114/115 (P5), and an offline pass (P8). **Its contract is that every probe returns a number, a list or an artifact** — "looks fine" cannot be filed as an entry. Complements the owner's tap-list in `device-verification-queue.md` rather than repeating it.
 - [`docs/superpowers/plans/2026-09-15-week-in-review-page.md`](../../superpowers/plans/2026-09-15-week-in-review-page.md)
-  — **BF-5, the week in review as a page.** The engine half shipped 2026-09-15:
-  `/api/weekly-digest` now returns `WeeklyDigestMetrics` alongside the prose instead of flattening
-  every number into the prompt and discarding it. The surface half — a week page alongside the
-  existing `app/health/day/`, its permanent Health entry point, the banner becoming navigation,
-  the notification retarget — does not exist yet; it is Lane B's and still owed. Read §1 before
-  touching it, because three of the backlog entry's own claims about the current code were stale.
+  — **BF-5, the week in review as a page. Both halves shipped; the plan is history now.** The
+  engine half landed 2026-09-15 (`/api/weekly-digest` returning `WeeklyDigestMetrics` alongside
+  the prose rather than flattening every number into the prompt and discarding it) and the surface
+  half followed: `app/health/week/`, its Health entry point, the banner as navigation, the
+  notification retarget. **RV-201 then removed the model entirely (2026-09-26)** — the route is a
+  `GET`, the prose comes from `buildWeeklyDigestText`, and Home's banner and the week page share
+  one cached `weekly-digest:<week>` entry, which is what lets the page paint without a network.
+  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md).
+  Read §1 before touching the plan, because three of the original backlog entry's claims about the
+  code were stale even then.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
   — **Q-112, the unified day review.** Relevant here for the entry points: Home's day-review banner,
   the two local reminders in `lib/day-review-reminders.ts`, and the argument for `/health/day` being

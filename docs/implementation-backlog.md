@@ -2756,28 +2756,6 @@ which is the right shape for something that can only be validated by living with
   is an assertion that nothing verifies. Where two writers put different shapes in one column,
   the reader takes `unknown` and narrows.
 
-### [platform][app-shell] RV-201 — weekly-digest: show computed text first, and let the week page work offline
-- **Lane: A**, then **B**. **Supersedes PS-31(b) for `weekly-digest`**; update PS-31 when this lands.
-- **✅ THE `health-insight` HALF SHIPPED 2026-09-26** (`feat/rv201-computed-health-insight`). The
-  model call is gone; `app/api/ai/health-insight/insight-text.ts` renders the headline and band,
-  the weakest contributor, today against the recent values, and an explicit absence sentence —
-  the same four things the prompt had been asking the model for. `PS-31(a)` is settled with it.
-- **⚠ SPLIT FROM ITS "one PR", deliberately.** The two halves share no code, no route and no
-  component, and the done-when is per-surface. `main` merged five times during the first half
-  alone, and a single PR spanning two routes plus three components would have carried that
-  conflict risk for no review benefit. This entry carries no `Batch:` field, which is the
-  enforced mechanism, so nothing was overridden.
-- **What the first half found, which is not in the measurements below:** running the route
-  against the dev server — not reading it — showed **every readiness insight in production was
-  built on `[object Object]`**. Filed and fixed as `LA-152`; read it before touching the
-  contributor lines here.
-- **Added:** 2026-09-25 · Review sweep 61.
-- **weekly-digest** runs automatically on **every Home visit** until the week's result is cached (`weekly-recap-banner.tsx:53`), and when `/health/week` opens.
-  - **The week page's charts ride on the AI POST**, so offline the whole page shows its error state.
-  - The rate-limit exit (`route.ts:277-279`) returns 429 **without** the metrics it has already computed.
-  - **Fix:** serve `WeeklyDigestMetrics` from a GET through `cachedFetch`, so the charts paint offline, and template the bullets from the week-over-week deltas.
-- **Done when:** the week page renders with the network off, and shows no superlative and no imperial unit. (The health-insight surface already does, as of the first half.)
-
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
 - **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
 - **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
@@ -14612,7 +14590,16 @@ neighbours. Until then `excludeLowWearDays` drops all 22 from the HRV/RHR baseli
 nulling the column is data-dropping, and a Redecode restores real numbers.
 
 ### [platform] PS-31 — AI calls with no data gate, a missing maxRetries, and a blind fingerprint
-- **🔎 2026-09-25 (Review sweep 61):** (a) and (b) are still open. For `health-insight` and `weekly-digest`, **RV-201 supersedes them**: it replaces the prose with computed templates, so the gate and the fingerprint stop mattering there. (c), `running-plan/explain`'s retries, becomes moot under **RV-200**, which deletes that route.
+- **✅ 2026-09-26: (a) and (b) are CLOSED by RV-201, both halves shipped.** Neither route calls a
+  model any more — `health-insight` renders from `insight-text.ts`, `weekly-digest` from
+  `buildWeeklyDigestText` — so there is no prose for a data gate to withhold and no fingerprint to
+  be blind. (b)'s live symptom, a Gemini recap of "0 sessions … 0 kg", now renders as exactly that
+  sentence and nothing more, which is the right answer rather than a suppressed one. **What
+  remains in this entry is (d) and (e).** (c), `running-plan/explain`'s retries, becomes moot under
+  **RV-200**, which deletes that route.
+- **⚠ Its `Lane:` line below still names the two retired routes.** Left as written because it is
+  the record of what the entry was filed against; the work is (d) `nutrition/scan`'s fingerprint
+  and (e) the owner's confidence-bar call.
 
 - **Lane:** A — `app/api/ai/health-insight/route.ts`, `app/api/weekly-digest/route.ts`,
   `app/api/running-plan/explain/route.ts`, `app/api/nutrition/scan/route.ts:184`.

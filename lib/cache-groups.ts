@@ -37,6 +37,10 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
     // a lifting session's HR feeds the same whole-day zone series as any cardio activity
     invalidateCache('cardio-week'),
     invalidateCache('calendar-data:'),
@@ -167,6 +171,9 @@ export async function invalidateBiometrics(): Promise<void> {
     invalidateCache('energy-balance:'),
     invalidateCache('body-metadata'),
     invalidateCache('sleep-sessions'),
+    // RV-201 — the weekly recap reads sleep hours, sleep score and overnight HRV, and a pull-delta
+    // is how those rows arrive on a device that did not sync them itself.
+    invalidateCache('weekly-digest:'),
     invalidateCache('readiness-score'),
     invalidateCache('weekly-stats'),
     invalidateCache('progress-summary'),
@@ -216,6 +223,10 @@ export async function invalidateOuraSync(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
@@ -359,6 +370,10 @@ export async function invalidateBodyMetricWrite(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
   ])
 }
 

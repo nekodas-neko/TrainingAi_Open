@@ -23,20 +23,19 @@ const TABS = [
 /**
  * Routes that answer 5xx in CI for a configured reason rather than a broken one.
  *
- * `weekly-recap-banner.tsx` POSTs `/api/weekly-digest` on every Home mount, and that route returns
- * **502 by design** when the model call fails — which it always does here, because the E2E job sets
- * no `GOOGLE_GENERATIVE_AI_API_KEY`. The banner already treats that as "no content" and renders
- * nothing, so the page is not broken; only this assertion thought it was.
+ * **Empty since RV-201, and deliberately kept as a list.** It held `/api/weekly-digest`, which
+ * returned 502 by design whenever its model call failed — which was always here, because the E2E
+ * job sets no `GOOGLE_GENERATIVE_AI_API_KEY`. That surfaced as a coin flip rather than a hard
+ * failure, the worst shape to leave it in: the assertion runs as soon as the tab bar is visible
+ * and no skeleton is showing, so whether the request had come back yet was a race, and two runs
+ * eleven minutes apart on identical code went one each way.
  *
- * It surfaced as a coin-flip rather than a hard failure, which is the worst shape to leave it in:
- * the assertion runs as soon as the tab bar is visible and no skeleton is showing, so whether the
- * POST has come back yet is a race. Two runs eleven minutes apart on identical code went one each
- * way (TrainingAi_Open #1 passed, #2 failed), and every future PR would have kept paying that toll.
- *
- * Deliberately a named list rather than "ignore 502" — a 502 from any other route is still a real
- * finding, and so is a 500 from this one.
+ * The route no longer calls a model, so it answers 200 here like any other — meaning Home's recap
+ * request is now actually covered by this assertion instead of excused from it. The list stays
+ * because the next route to need an exemption should have to name itself: "ignore 502" would hide
+ * a real one.
  */
-const EXPECTED_5XX = ['/api/weekly-digest']
+const EXPECTED_5XX: string[] = []
 
 test.describe('the five tabs paint without a skeleton on a repeat visit', () => {
   for (const tab of TABS) {
