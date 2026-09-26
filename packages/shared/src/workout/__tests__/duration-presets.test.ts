@@ -175,16 +175,24 @@ describe('requestedBudgetMin (BF-7)', () => {
 // source because `runPrescriptionGeneration` is unreachable without standing up a repository and an
 // AI client — a weaker test than the ones above, and here because the alternative is none.
 describe('the prescription branches on direction, not on the label (BF-7)', () => {
+  // Both halves of the generation path: the budget stage holds the branch itself (RV-202 ②
+  // extracted it so a duration change can re-run it without the model), and the generator still
+  // resolves the preset for the dedup key and the budget override. Scanning the pair rather than
+  // naming one file keeps the guard honest if the branch moves again — what must not come back is
+  // a label comparison, in either of them.
+  const sources = ['../../ai-periodization/budget-stage.ts', '../../ai-periodization/generate-prescription.ts']
+
   it('selects its algorithms from durationDirection', async () => {
     const { readFile } = await import('node:fs/promises')
-    const raw = await readFile(
-      new URL('../../ai-periodization/generate-prescription.ts', import.meta.url), 'utf8')
     // Comments stripped first: the change's own note names the labels it replaced, and a substring
     // check that reads prose fails on the explanation rather than on the code.
-    const code = stripComments(raw)
+    const code = await Promise.all(sources.map(async rel =>
+      stripComments(await readFile(new URL(rel, import.meta.url), 'utf8'))))
 
-    expect(code).toContain('durationDirection(')
-    expect(code).not.toMatch(/durationPreset\s*===\s*'short'/)
-    expect(code).not.toMatch(/durationPreset\s*===\s*'long'/)
+    expect(code.join('\n')).toContain('durationDirection(')
+    for (const file of code) {
+      expect(file).not.toMatch(/durationPreset\s*===\s*'short'/)
+      expect(file).not.toMatch(/durationPreset\s*===\s*'long'/)
+    }
   })
 })

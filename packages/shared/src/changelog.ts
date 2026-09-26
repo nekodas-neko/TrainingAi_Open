@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.66",
+    date: "2026-09-26",
+    changes: [
+      "Faster: changing a session's length no longer rebuilds the plan from scratch. Picking a shorter or longer workout used to wait about 30 seconds while the AI was asked again; it now re-fits the plan you already have, which is instant and gives back exactly the sets it took away when you switch back.",
+    ],
+  },
+  {
     version: "1.465.65",
     date: "2026-09-26",
     changes: [
