@@ -693,10 +693,59 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
+### [sleep] TN-83 — the sleep verdict fires on naps and broken captures, and they poison its own baselines
+
+- **Lane: A** — the verdict's read path / night selection (`packages/shared/src/health/sleep-verdict.ts`
+  is correct; what feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped
+  thresholds against real nights before anything announces them.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **⚠ THIS BLOCKS `LA-149`.** Wire the announcement as it stands and the first thing the owner is told
+  is that his sleep was bad on a night he slept 7.9 hours. The whole design rests on an announcement
+  he trusts enough to correct; a false one on week one trains the opposite, and that is the failure
+  mode `OR-171`'s guard is about.
+- **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
+  cross-checked against the real function: identical counts, so the sweep below is sound):
+  **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
+  nights**, against the plan's stated target of **4–6**. So it fires at roughly twice the intended
+  rate — but that is the symptom, not the defect.
+- **The defect: `sleep_sessions` holds more than one row per date, and the verdict treats every row as
+  a night.** 125 rows across **106 distinct dates** (last 120 days: **120 rows, 102 dates, 30 rows
+  under 3 h, 6 at exactly 0 h with efficiency 0**). On every duplicate date the shape is **one real
+  night plus one fragment**: `7.92 / 0.00` · `8.25 / 0.00` · `8.50 / 0.00` · `7.17 / 0.08` ·
+  `8.58 / 0.00` · `7.00 / 0.00` · `8.17 / 1.42` · `7.42 / 4.75`.
+- **And several are plainly naps, judged as nights.** Onset minutes from local midnight on flagged
+  rows: **644 (10:44)**, **997 (16:37)**, **1055 (17:35)**, **1064 (17:44)**. An afternoon nap is
+  being announced as a bad night.
+- **It fails twice, in opposite directions, which is why the rate alone understates it.**
+  **(a) False alarms** — the fragment is judged as the night, so a 7.9 h night is announced poor.
+  **(b) Desensitised bands** — those same fragments sit in the trailing-28 window, so a 0 h and a
+  0.08 h value drag `p25` down, widen the "normal" band, and make a genuinely short night read as
+  acceptable. The verdict is simultaneously too loud on artifacts and too quiet on real nights.
+- **⛔ DO NOT fix this by raising `VERDICT_IQR_MULTIPLIER`.** The sweep makes that tempting and it is
+  the trap: `0.25 → 16.6` · **`0.5 → 10.9` (shipped)** · `0.75 → 9.1` · `1.0 → 8.1` ·
+  `1.5 → 6.6` · `2.0 → 6.6`. Multiplier **1.5** lands inside the 4–6 target and would be *wrong* — it
+  hits the rate by suppressing real signal while still announcing on fragments, and it takes `good`
+  to **zero**, so the whole "unusually good night" half of the feature disappears. The rate target is
+  a check on a correct population, never a knob to reach it.
+- **The fix, and it is not a threshold change:** select **one night per date** before judging (longest
+  row, or a main-sleep flag if one can be derived), and exclude sub-threshold fragments from **both**
+  the target night **and** the baselines. Then re-measure the rate, and only then consider tuning the
+  multiplier — on a population that is nights.
+- **A correction to Tuning's own plan, made here rather than quietly:** the plan's §5 cites *"119 rows
+  for the last 120 days — `duration_hours` on all 119"* as evidence the inputs are complete. **That
+  count included fragments.** It is 102 dates, with 30 of 120 rows under 3 h. The conclusion that
+  inputs are sufficient still holds; the completeness figure was inflated by exactly the artifact this
+  entry is about.
+- **What `TN-81` got right, and should not be touched:** components rather than a composite, signed
+  onset minutes so 23:50 and 00:10 are 20 minutes apart, per-component baseline readiness, a
+  `modelVersion` stamp on each snapshot, and `null` below 28 nights rather than a guess. The rule is
+  sound; it is being fed the wrong rows.
+
 ### [sleep][platform] LA-149 — the sleep verdict is stored but nothing announces it yet
 
 - **Lane: A** — `app/api/**`, the morning check-in read path. **Added:** 2026-09-26, shipping TN-81.
-- **Needs:** — (TN-81 shipped; this is its other half)
+- **Needs:** TN-83 — the verdict currently fires on naps and zero-hour fragments; wiring it first
+  announces a false "your sleep was bad" on nights he slept 7.9 h.
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - TN-81 landed the computation (`sleep-verdict.ts`), the table (`sleep_verdicts`, migration 284) and
   the repository methods. **Nothing calls them**, deliberately — the plan ships the engine half

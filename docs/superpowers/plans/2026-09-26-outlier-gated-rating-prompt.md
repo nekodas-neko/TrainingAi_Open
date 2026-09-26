@@ -126,7 +126,14 @@ normal duration that started two hours late is strange, and a composite can aver
 
 Measured 2026-09-26: `sleep_sessions` holds **119 rows for the last 120 days** — `duration_hours` on
 all 119, `average_hrv_ms` on 102 — and **`sleep_score` is non-null on 0 of them.** The score is
-computed on read, never persisted. Two consequences:
+computed on read, never persisted.
+
+**⚠ That row count is not a night count, and the difference matters — corrected 2026-09-26 (`TN-83`).**
+Re-measured: **120 rows across 102 distinct dates**, with **30 rows under 3 hours** and 6 at exactly
+0 h. `sleep_sessions` carries naps and broken captures alongside the real night, so 19 dates hold two
+rows (`7.92 / 0.00`, `8.50 / 0.00`, …). The conclusion here — that the inputs are sufficient — still
+holds, but anything reading these rows must **select one night per date first**; `TN-81`'s verdict did
+not, and announced a bad night on days he slept 7.9 hours. Two consequences:
 
 1. The gate must compute the verdict at announcement time from stored inputs. Inputs are effectively
    complete, so this is viable.
