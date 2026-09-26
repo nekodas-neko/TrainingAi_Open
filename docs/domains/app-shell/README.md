@@ -218,6 +218,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`2026-08-24-memo-call-site-stability`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-memo-call-site-stability) — **Q-357, the memo baseline emptied, 2026-08-24** (four defeated call sites cleared; the `SavedMealCard` one was inside a `.map()`, so its callbacks now take the meal and hand it back rather than being closed over per row). **Render saving not measured.**
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-472 — `coach_changes` is empty: the Coach's write capability has produced zero writes, which re-prices Q-467/Q-468 to zero production exposure). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+- [`docs/reviews/2026-09-25-sweep-62-dv-design-capture.md`](../../reviews/2026-09-25-sweep-62-dv-design-capture.md) — **sweep 62, 2026-09-25: a design and feel pass for DV.** Probes P23 to P28 cover a screen gallery sent to a private Artifact, tap latency, scroll frames, keyboard occlusion, a token census and a motion inventory. The work is RV-205.
 
 ## Open issues
 

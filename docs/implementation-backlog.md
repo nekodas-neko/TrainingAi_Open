@@ -3269,6 +3269,27 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   RV-145 (Home's second workout-data request) and BF-22 (long-session slowdown). Run them in the
   same sitting where the screen is the same.
 
+### [app-shell][platform] RV-205 — DEVICE: the design and feel pass — a screen gallery Review can see, plus tap latency, scroll, keyboard, token and motion numbers
+- **Lane: DV**
+- **Added:** 2026-09-25 · Review sweep 62 ([`docs/reviews/2026-09-25-sweep-62-dv-design-capture.md`](reviews/2026-09-25-sweep-62-dv-design-capture.md)). **Owner request, same day:** *"keep looking at reviewable actions for UI/performance/design that can be tested through DV — get it to write up a report or screenshots so you can work on them."*
+- **The probes are P23–P28** in [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md) Part D:
+  - P23: the screen gallery, full-length, across warm, cold, offline and error states, with sheets open;
+  - P24: tap-to-feedback latency on about 20 primary controls;
+  - P25: scroll frame times on the long lists;
+  - P26: whether the soft keyboard covers inputs or their submit buttons;
+  - P27: a design-token census, including contrast and sub-12 px text;
+  - P28: a motion inventory.
+- **Screenshots go to a PRIVATE Artifact, never the repo.** The owner has asked for them, and the
+  baton rule against exporting images exists because the repo is public. Part D spells out the
+  channel. **Record the Artifact URL on this entry when the sitting ends.**
+- **Read-only.** None of P23–P28 needs a write. Run P23's gesture-nav captures in the same sitting
+  as RV-127 (computed styles) and RV-152 (accessibility), where the screen is the same.
+- **Order against the rest of the lane:** after RV-186, whose value is being the "before" for
+  fixes already queued, and before the single-purpose probes.
+- **What comes back:** Review turns the gallery and numbers into a design critique and Lane B
+  entries, one per fault, each citing its image by label.
+- **Result:** _(DV: Artifact URL, date, build, navigation mode)_
+
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 
 - **Lane: DV** — the deliverable is an attribution only the running app can give.
