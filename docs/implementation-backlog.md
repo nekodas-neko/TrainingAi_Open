@@ -2494,36 +2494,49 @@ which is the right shape for something that can only be validated by living with
   - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
   - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
 
-### [app-shell] RV-207 — design quick wins: wrong initials, "1 exercises", a dropped supplement tick, taps with no response, and bars that animate width
-- **Lane: B.** One PR, because every item is small and code-certain.
-- **Added:** 2026-09-26 · Review sweep 63 ([`docs/reviews/2026-09-26-sweep-63-design-review.md`](reviews/2026-09-26-sweep-63-design-review.md)). The source is a web-build screenshot pass at 412 px plus a static audit. Every line below was read at source.
-1. **Initials take the first two letters, not the initials.** "Test User" becomes **TE** and "Zero Data" becomes **ZE**.
-   - Sites: `components/more/profile-tab.tsx:177`, `app/session-select/session-select-content.tsx:1099`, and `app/admin/admin-content.tsx:358`.
-   - Fix: one shared `initialsOf(name)` that takes the first letter of the first and last words, falling back to two letters for a single word.
-2. **"3 sets · 1 exercises"** (`components/home-day-timeline.tsx:94`). Pluralise.
-3. **A second supplement tick is silently dropped.** `supplements-section.tsx:48` returns early while **any** supplement is toggling, so ticking B while A's write runs does nothing.
-   - Fix: track in-flight ids in a `Set` and guard per id.
-4. **Taps with no pressed state on the daily screens.** The WebView leaves `hover:` stuck after a tap, and nothing shows on the press itself. Sites:
-   - the tab bar (`bottom-nav.tsx:100/109/125`, and swap `transition-all` for `transition-[transform,background-color]`);
-   - More rows (`more-row.tsx:38`);
-   - Nutrition's date chevrons and settings (`nutrition-content.tsx:502/512/526`);
-   - pre-workout back (`pre-workout-screen.tsx:174`);
-   - the Home avatar (`session-select-content.tsx:1099`);
-   - Health's Log pills (`health-sections.tsx:204/408`);
-   - the supplement row (`supplements-section.tsx:180`).
+### [app-shell] LB-162 — RV-207's three remaining bars and the height animations, none of which is mechanical
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑤ after
+  converting the three that were safe.
+- **RV-207 ⑤ named six `width` bars and called them all quick wins. Three were; three are not**, and
+  each fails for a different reason — which is why they want their own look rather than a sweep:
+  - **`warmup-screen.tsx:95`** — a gradient fill carrying a `boxShadow` glow, ticking every second
+    under `width 1s linear`, so it is the highest-value one. **`scaleX` scales a box-shadow with the
+    element**, so the glow's horizontal spread shrinks with the bar. Either move the glow to the
+    track (it then stops following the bar's end, which is a look change) or accept the scaling.
+    Needs an eye on it, not a refactor.
+  - **`weekly-muscle-sets-card.tsx:133`** — the track is `overflow-visible` **on purpose**: an
+    absolutely-positioned `h-3` target marker deliberately overflows an `h-2` track.
+    `ProgressFill`'s own docstring says an unclipped `rounded-full` fill goes visibly oval under
+    `scaleX`, and clipping the track would clip the marker.
+  - **`body-battery-card.tsx:153`** — the track is `flex justify-end` so the tank empties from the
+    LEFT. `ProgressFill` is hard-coded `origin-left`, and passing `origin-right` through
+    `className` is a same-specificity collision decided by stylesheet order, not by the call site.
+    Wants an `origin` prop on the primitive.
+- **The `height: auto` half is also unstarted** — `meal-card.tsx:113-115` (fires on every food
+  insert), `body-battery-card.tsx:164`, `achievements-section.tsx:55`. Each is a collapse whose
+  replacement (opacity/y, or the `collapsible-down` keyframes) changes how the open reads.
+- **Two of RV-207 ⑤'s six paths were wrong** and are corrected above: `goal-progress-bar.tsx` and
+  `weekly-muscle-sets-card.tsx` are under `components/health/`, not `components/`.
+- **Done when:** the three bars composite without changing how they look, judged on the S25.
 
-   Fix: `active:` feedback, or `<Button variant="ghost" size="icon-lg">`, which has it.
-   About 354 of 502 interactives lack feedback app-wide. These are the daily ones.
-5. **Progress bars animate `width`,** which re-lays-out every frame, although `components/ui/progress-fill.tsx` (scaleX) exists. Sites:
-   - `warmup-screen.tsx:97-99` (ticks every second, `width 1s linear`);
-   - `body-battery-card.tsx:153`, `metric-tiles-card.tsx:108`;
-   - `health-sections.tsx:473`, `goal-progress-bar.tsx:7`, `weekly-muscle-sets-card.tsx:133`.
-
-   Also the `height: auto` animations at `meal-card.tsx:113-115` (every food insert), `body-battery-card.tsx:164` and `achievements-section.tsx:55`. Use opacity/y, or the `collapsible-down` keyframes.
-6. **Home's Log tiles draw the "Log" pill on top of the icon** (`metric-tiles-card.tsx`), and the tiles size to their content: three narrow tiles leave a third of the row empty, and a different width when empty.
-   - Fix: put the label beside or below the icon, and use a fixed three-column grid.
-7. **"13.0T" volume on More** reads as trillions. Write `13.0 t`, or `13,000 kg` to match Health's `4,320 kg`.
-- **Done when:** each is fixed, and **RV-205's P24 re-run on the tab bar and More rows shows a first-frame change under 100 ms.**
+### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
+- **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.
+- **Deliberately NOT `Gate: owner`.** The mockup does not exist yet, so the next act is to PRODUCE
+  one and put it to him — that is work, and work is ungated `Lane: O`. A gate here would park the
+  entry and nobody would be tasked with asking. `Gate: owner` belongs on it once a mockup has been
+  shown and the answer is what is outstanding.
+- **Ask: owner — a mockup before this is built.** RV-207 ⑥ asks to move the "Log" label beside or
+  below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
+  of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
+  is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
+- **The defects behind it are real and measured** (`metric-tiles-card.tsx`): the pill overlaps the
+  icon, the tiles size to their content so three narrow ones leave a third of the row empty, and
+  the row is a different width when a tile is empty.
+- **Why not just build it:** a lane can implement the entry exactly and still produce a Home the
+  owner does not want — the failure the mockup rule exists to prevent. Three columns fixes the
+  ragged row and makes each tile narrower, which is a trade rather than a strict improvement.
+- **Cheap to reverse** (one component's classes), which is the argument for showing a picture
+  rather than a paragraph.
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Lane: B.** One PR. **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.

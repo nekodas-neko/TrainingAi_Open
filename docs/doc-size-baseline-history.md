@@ -18087,3 +18087,16 @@ points at the script.
 One Known-Issues row for the drawn collection art, which shipped without an S25 look. It is trimmed
 to seven lines, with the detail in BF-126 and the journal entry; the row itself is what CLAUDE.md
 requires for an unverified surface change.
+
+## 2026-09-26 — `projectOverview.md` +18 → RV-207's Known-Issues row
+
+One open-issue row for a change that touches eight daily controls and is entirely unverified
+visually. It costs 18 lines because three separate things have to survive a cold read: what
+changed (press states across the tab bar and the daily screens, plus four smaller defects in the
+same pass), **that none of it has been seen** — there is no DOM project in the suite, so the press
+states and the unit change are held by source assertions — and the pass test, which is RV-207's
+own and needs the device.
+
+The last third is what stops the row being deleted on the next sweep: an entry that says "not
+verified" without saying what would verify it never leaves. It also names the two splits
+(`LB-162`, `LB-163`) so the reader does not go looking for the other half in this diff.

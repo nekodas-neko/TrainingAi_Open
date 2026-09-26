@@ -13,6 +13,7 @@ import ExerciseManager from '@/components/admin/exercise-manager'
 import ActivityTypeManager from '@/components/admin/activity-type-manager'
 import { MoreRow, MoreRowGroup } from '@/components/more/more-row'
 import { useTransitionRouter } from "@/lib/view-transition";
+import { initialsOf } from '@/lib/initials';
 
 type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback' | 'devices'
 
@@ -355,7 +356,7 @@ function UserRow({
 }) {
   const isToggleLoading = loadingId === user.id
   const isDeleteLoading = loadingId === `delete-${user.id}`
-  const initials = (user.displayName || user.name || user.email).slice(0, 2).toUpperCase()
+  const initials = initialsOf(user.displayName || user.name || user.email)
 
   return (
     <div className="flex items-center gap-3 rounded-lg border px-4 py-3">
