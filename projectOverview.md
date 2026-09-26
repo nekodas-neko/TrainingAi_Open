@@ -26,10 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.473.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.474.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-26.
 
-**The barcode column existed everywhere and held nothing (LB-158, v1.473.0).** `food_items.barcode`
+**The barcode column existed everywhere and held nothing (LB-158, v1.474.0).** `food_items.barcode`
 had a column, a Zod schema, a server read mapper, a route that passes it through and a push branch
 that Q-131 fixed *specifically* so an offline save would keep it — and production held **341 food
 items with zero barcodes, 42 of them `source: 'barcode'`**, because no client ever set the field.
@@ -2651,6 +2651,10 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [app-shell] ⚠️ Home sections can be dragged now, and the scroll interaction has not been tried on the phone (BF-205, 2026-09-26)
+
+The "Reorder sections" button had no drag behind it at all — every other part of the feature existed. Sections now drag by a grip that appears in edit mode (`@dnd-kit`, the same primitive the program editor uses), and the order persists on drop. **The drag is on a handle, not the card, precisely so a vertical scroll in edit mode cannot pick a section up** — but that is the claim a CDP pointer cannot test. **Pass test:** on the S25 in edit mode, a section can be moved, the order survives leaving and re-entering Home, and a plain vertical scroll picks nothing up.
 
 ### [sleep][app-shell] ⚠️ Last night's verdict is on Home now, and nobody has seen it on the phone (TN-85, 2026-09-26)
 

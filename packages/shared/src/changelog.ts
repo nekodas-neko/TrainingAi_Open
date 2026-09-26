@@ -6,11 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.473.0",
+    version: "1.474.0",
     date: "2026-09-26",
     changes: [
       "Added: scanning the barcode of something you have scanned before now finds it in your own saved foods, instantly and with no signal at all. Every re-scan used to be a fresh lookup against the food database, which meant waiting for it and getting nothing offline.",
       "Fixed: a scanned barcode is now actually saved with the food. It never had been \u2014 the product code was read, used once and thrown away, so nothing you had scanned could be recognised again.",
+    ],
+  },
+  {
+    version: "1.473.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the grid button on Home actually rearranges your widgets now. Tap it and each section grows a grip on its left — drag that to move the section, and the new order is kept.",
     ],
   },
   {
