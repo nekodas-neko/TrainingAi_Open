@@ -54,6 +54,7 @@ vi.mock('@/lib/ai/insight-cache', () => ({
 }))
 
 import { GET } from '@/app/api/weekly-digest/route'
+import type { WeeklyDigestMetrics } from '@trainingai/shared/health/weekly-digest-metrics'
 
 let seq = 0
 const freshUser = () => { sessionUser = { id: `u-${++seq}`, timezone: TZ } }
@@ -88,7 +89,8 @@ const freezeAt = (iso: string) => { vi.useFakeTimers(); vi.setSystemTime(new Dat
  * the response is strictly better anyway: it is what the reader gets, not what a model was told.
  */
 const digestOf = async () => (await bodyOf(await post())).digest
-const bodyOf = async (r: Response) => r.json() as Promise<{ weekStart: string; digest: string }>
+const bodyOf = async (r: Response) =>
+  r.json() as Promise<{ weekStart: string; digest: string; metrics: WeeklyDigestMetrics }>
 
 describe('GET /api/weekly-digest recaps the last COMPLETED week', () => {
   it('on a Monday, recaps the week that just ended — not the empty one just begun', async () => {
