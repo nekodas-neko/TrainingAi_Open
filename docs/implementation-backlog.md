@@ -485,45 +485,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] LA-146 — the vitest teardown flake has nine sightings, zero entries, and now blocks the merge button
-
-- **Lane:** A
-- **Added:** 2026-09-26 · Orchestrator, on the ninth sighting (PR #1679).
-- **What it is.** A full run exits 1 reporting **zero failing tests**: `EnvironmentTeardownError:
-  [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`. A worker is torn down with a
-  `console.*` forward still in flight. Nine sightings, **nine clean re-runs on identical code**.
-- **Why it is filed NOW rather than at sighting one.** It was free until 2026-09-25, when `Tests`
-  became a **required** check — so a flake that used to cost a re-run now **blocks the merge**. That
-  is the cost change, not a new fault.
-- **📈 TENTH SIGHTING, 2026-09-26 (#1687), and the RATE is what changed.** Another docs-only PR,
-  shard 1, `2496 passed | 14 skipped`, **`Errors 2`** — two unhandled errors in one run, which has
-  happened once before (sighting four) and is not itself new. Re-ran clean: **ten for ten.**
-  **The honest framing of the rate, because the first attempt at it overstated the case:** this is
-  **2 of the 3 PRs opened today** (#1679 yes, #1684 **no**, #1687 yes) — *not* two consecutive, which
-  is what a same-day reading first suggested. Against sightings 1–8 spread over several days, two in
-  one day is still a step up, but the claim is "more often than it was", not "every run".
-  **What it costs now, which is the part that justifies rank 1:** each occurrence is one blocked
-  merge plus a re-run, and `rerun_failed_jobs` makes that ~2 minutes rather than a full re-push —
-  so the tax is real but bounded. Do not let that bound become an argument for leaving it: the
-  failure mode is a **required** check going red for a reason unrelated to the diff, which is the
-  most expensive kind of false signal a gate can produce.
-- **⚠ Read [`docs/local-dev-database.md`](local-dev-database.md) before starting** — it already holds
-  the full investigation, and most of the obvious moves are ruled out there: 24 controlled runs
-  reproduced nothing, the named file alone is clean over 5 solo runs, upgrading does not help, and
-  the run log **cannot** settle it (the pending `onUserConsoleLog` IS the log that never arrived, so
-  its absence is guaranteed under every hypothesis).
-- **The best available lead, from that doc:** `hr-read-routes.test.ts` is named in 5 of 9 sightings,
-  and exercises `/api/oura/hr-data`, whose durable-snapshot writes are deliberately fire-and-forget
-  (`void repo.upsertWorkoutHrStats(…).catch(…)`). A promise no test awaits, whose `.catch` calls
-  `reportServerError`, is exactly the shape of a late continuation running past teardown. **Not
-  proven** — point a file-based trace there first.
-- **⛔ Do NOT "fix" it by quieting console output or setting `dangerouslyIgnoreUnhandledErrors`** —
-  the first treats the legible symptom rather than the broken one, the second hides real unhandled
-  rejections. `disableConsoleIntercept: true` is the one candidate worth weighing if it becomes
-  frequent, and it costs per-file log attribution for everyone.
-- **Meanwhile the response is unchanged and cheap:** `rerun_failed_jobs` on the run — it re-runs only
-  the failed job, keeps every green result, and pushes nothing.
-
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
 - **Lane: O** — needs the owner's call on the four, then it is a sweep anyone can run.
