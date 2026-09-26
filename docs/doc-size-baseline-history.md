@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-25 — backlog baseline DELETED, CLAUDE.md → 1011 (LA-129)
+
+The first removal in this log rather than a raise. `docs/implementation-backlog.md` no longer has a
+baseline at all: `check-doc-index-size` prints its size on every run under `UNRATCHETED` and enforces
+nothing. Owner approved the narrow fix over the entry's original proposal of generating every baseline
+in CI, which would have removed the ceiling from `CLAUDE.md` and `projectOverview.md` too.
+
+The measurement that decided it: **54 of the last 63 `.size` changes on `main` were that one file.**
+Not diffuse churn — one document, which every agent edits and which genuinely grows, so two open PRs
+raise the same number by construction. `RV-134`'s slack band cannot help a file that grows past the
+band.
+
+`CLAUDE.md` +5 in the same PR, because the "one PR per filing sweep" rule cited the deleted `.size`
+file as what made those conflicts *guaranteed*. The rule survives on the weaker mechanism that is
+still true (N PRs editing one file), and the correction says so rather than quietly dropping the
+sentence. That is the ratchet doing its job on a file it should govern, inside the PR that removes it
+from one it should not.
 ## 2026-09-25 — backlog → 32078 (the owner answered OR-145's four remaining gate questions)
 
 Four gates struck: delete `/api/oura/hr-sync`, render HR zones with the degradation marked, retire
@@ -17916,5 +17933,5 @@ had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files again
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
 
 **2026-09-25 · `docs/implementation-backlog.md` · Review sweep 62, `review/sweep-62-dv-design-capture`.**
-32042 → 32063 (+21; rebased). One DV entry, RV-205, that points at the new Part D of the probe checklist
+ →  (+0; rebased). One DV entry, RV-205, that points at the new Part D of the probe checklist
 rather than restating it. That is why the entry is short.
