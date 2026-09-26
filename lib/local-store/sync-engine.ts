@@ -475,6 +475,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     sodiumMg:     (r.sodiumMg as number) ?? null,
     satFatG:      (r.satFatG as number) ?? null,
     source:       r.source ? String(r.source) : null,
+    barcode:      r.barcode ? String(r.barcode) : null,
     imageDataUri: r.imageDataUri ? String(r.imageDataUri) : null,
     // RV-172 — read from `createdAt`, because `food_items` HAS no `updated_at` server-side. This
     // read `toIso(r.updatedAt)`, and `toIso` is `String(v)` for a non-Date, so it stored the

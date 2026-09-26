@@ -83,7 +83,8 @@ export async function logMealItems(
           fiberG: fi.fiberG ?? null, sugarG: fi.sugarG ?? null,
           sodiumMg: fi.sodiumMg ?? null, satFatG: fi.satFatG ?? null,
           // BF-35. The saved meal's stored items carry whatever picture they were created with.
-          source: fi.source, imageDataUri: fi.imageDataUri ?? null, updatedAt: now,
+          source: fi.source, barcode: fi.barcode ?? null,
+          imageDataUri: fi.imageDataUri ?? null, updatedAt: now,
         })
         const logId = crypto.randomUUID()
         await store.upsertFoodLog({

@@ -4265,6 +4265,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       proteinG: s.foodItems.proteinG, carbsG: s.foodItems.carbsG, fatG: s.foodItems.fatG,
       fiberG: s.foodItems.fiberG, sugarG: s.foodItems.sugarG, sodiumMg: s.foodItems.sodiumMg,
       satFatG: s.foodItems.satFatG, source: s.foodItems.source,
+      // LB-158. Absent here meant the device could never recognise a product it had already
+      // stored, so every re-scan of the same tin was an Open Food Facts round trip.
+      barcode: s.foodItems.barcode,
       // BF-35. Absent here means the picture never reaches the device, which is the whole point of
       // storing bytes rather than a URL.
       imageDataUri: s.foodItems.imageDataUri,

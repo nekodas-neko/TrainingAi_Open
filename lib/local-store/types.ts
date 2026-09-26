@@ -472,6 +472,8 @@ export interface LocalFoodItem {
   sodiumMg:     number | null;
   satFatG:      number | null;
   source:       string | null;
+  /** LB-158. The scanned product code, mirrored so a re-scan resolves from the store. */
+  barcode:      string | null;
   /** BF-35. The capped thumbnail, mirrored so a food row draws its picture with no network. */
   imageDataUri: string | null;
   updatedAt:    string;

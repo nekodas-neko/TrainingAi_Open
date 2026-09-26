@@ -185,6 +185,9 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           fiberG: form.fiberG, sugarG: form.sugarG, sodiumMg: form.sodiumMg, satFatG: form.satFatG,
           source: scanOriginToSource(scanResult?.origin, scanResult?.confidence),
           quantityMultiplier: quantity,
+          // LB-158. Read off the scan result rather than the form, because the form is the
+          // editable macros and a code is not one of them. Absent on every path but a barcode.
+          barcode: scanResult?.barcode,
           imageDataUri: form.imageDataUri ?? null,
         }]
       }

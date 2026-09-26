@@ -604,6 +604,14 @@ Live at the time of writing (2026-07-30):
   `"1 glass (200 ml)"` matched the "g" of "glass" and reported a one-gram serving, dividing every
   macro by a hundred. Its macros are also not guaranteed to agree with its own calorie figure
   (Q-196).
+- **A scanned barcode is resolved from the user's own foods FIRST** — `lookupBarcode(code, userId)`
+  (`packages/shared/src/nutrition/barcode-lookup.ts`), the one path both scanners take. LB-158:
+  `food_items.barcode` had existed server-side the whole time and held **nothing** (341 rows, zero
+  codes, 42 of them `source: 'barcode'`), because no client ever set it — the column, the Zod
+  schema, the push branch and `rowToFoodItem` were all ready and the write never happened. The code
+  now travels on `NutritionScanResult` / `NewFoodItem` / `NewFoodEntry`, and the device mirrors it
+  at local SQLite v41. **The local upsert COALESCEs that one column** — a code is known only at the
+  scan, so letting `excluded` win would erase it the next time the food is logged from Recent.
 - **Text → macros already exists: `POST /api/nutrition/scan` with `{ text }`.** It returns the same
   `NutritionIngredient` shape everything else in nutrition works in. Do not add a second route for
   this; the meal-plan picker reuses it.
