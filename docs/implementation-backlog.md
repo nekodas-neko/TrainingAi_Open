@@ -2167,6 +2167,11 @@ which is the right shape for something that can only be validated by living with
     `null` for a composite — a multi-item meal is not a row in `food_items`, and a partial match
     for one would be worse than none.
   - Analyse is untouched, so a wrong phrase costs a list nobody taps.
+  - **Guarded by `e2e/rv203-describe-offers-your-own-foods.spec.ts`**, which asserts the negative —
+    the assign step is reached with **no `/api/nutrition/scan` request at all** — plus a control
+    (a two-food description must offer nothing), so a list that never rendered cannot pass it. The
+    control run against a stubbed phrase extractor fails. **It reaches the seeded-cache fallback
+    only**: `getLocalStore` is null on the web, so the source that matters is untested here.
 - **② Barcode always calls Open Food Facts** (`capture-actions.tsx:250`), so a product scanned
   before still fails offline. **BLOCKED, and the reason is not in this entry.** The fix as written
   — "look up the user's saved foods by barcode first" — has nothing to look it up *in*: the local

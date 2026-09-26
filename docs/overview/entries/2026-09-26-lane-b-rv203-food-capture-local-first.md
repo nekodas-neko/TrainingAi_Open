@@ -52,6 +52,22 @@ base to scale from, so it asks the model too.
 Mutation-tested: dropping the gram ceiling and making the unit optional each break a different
 assertion.
 
+## The e2e guard, and what it deliberately cannot see
+
+`e2e/rv203-describe-offers-your-own-foods.spec.ts` asserts the negative that is the entry's "done
+when": the panel reaches the assign step with **no `/api/nutrition/scan` request at all**, counted
+for the whole test. A second case is the control — a description naming two foods must offer
+nothing — because without it a suggestion list that never rendered would pass the first test by
+never offering anything, and "no scan" would be evidence of nothing. **Control run with
+`describeSearchPhrase` stubbed to return null: fails.**
+
+It opens the **Search** tab before Describe, and that is not stage-setting. On the web
+`getLocalStore` returns null, so the only reachable source is the `ALL_ITEMS_KEY` list that
+`FoodList` seeds — and the sheet opens on *Recent*, which does not seed it. **So the harness
+exercises the fallback and cannot touch the source that matters.** On the device the local store
+answers cold and offline; that is the `Keep:` on the entry, not something a green run here
+substitutes for.
+
 ## ② Barcode — blocked, and the entry did not know why
 
 RV-203 ② asks for "look up the user's saved foods by barcode first". There is nothing local to look
@@ -68,6 +84,21 @@ every generation returns, so it is the user's call rather than a new default"*).
 **LB-159**, `Lane: O`, with the recommendation attached — default on when the library is non-empty,
 off when it is empty — and the alternative's genuine upside stated: an invented plan is where new
 meals come from.
+
+## A guard that was reading half a file
+
+Switching `capture-actions.tsx`'s comments broke `rv111-scanner-back-dismiss.test.ts`, and the
+cause was not the change. **37 source-scan tests copy the same regex comment stripper, and it
+treats the `/` + `*` inside `accept="image/*"` as a comment opener**, deleting everything to the
+next closer — the exact LA-64 defect `scripts/lib/strip-comments.js` exists to prevent. Measured:
+11 source files carry the trigger, 4 test→file pairs read one, and the loss runs from 25% to 56%
+of the file. `food-image-write-paths.test.ts` held **two `.not.toMatch` assertions over a source
+with 56% of its bytes gone** — the vacuous direction, which a guard cannot report. Re-run against
+the correct stripper they still pass, so nothing was hiding; what was missing was any reason to
+believe that.
+
+Five files now use the shared stripper. The remaining 34 are `LB-160`, along with the question of
+whether a Custom Rules step should hold it — prose did not, and the population regrew to 37.
 
 ## Not exercised
 
