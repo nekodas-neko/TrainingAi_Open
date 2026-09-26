@@ -692,11 +692,12 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [sleep] TN-83 — the sleep verdict fires on naps and broken captures, and they poison its own baselines
+### [sleep] TN-83 — the sleep verdict bypasses `nightSessions()`, so it judges naps as nights
 
-- **Lane: A** — the verdict's read path / night selection (`packages/shared/src/health/sleep-verdict.ts`
-  is correct; what feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped
-  thresholds against real nights before anything announces them.
+- **Lane: A** — the verdict's read path (`packages/shared/src/health/sleep-verdict.ts` is correct; what
+  feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped thresholds against real
+  nights before anything announces them. **The work is one import, not a new rule — see the correction
+  below before starting.**
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **⚠ THIS BLOCKS `LA-149`.** Wire the announcement as it stands and the first thing the owner is told
   is that his sleep was bad on a night he slept 7.9 hours. The whole design rests on an announcement
@@ -726,10 +727,32 @@ below threshold and left in place for next time.
   hits the rate by suppressing real signal while still announcing on fragments, and it takes `good`
   to **zero**, so the whole "unusually good night" half of the feature disappears. The rate target is
   a check on a correct population, never a knob to reach it.
-- **The fix, and it is not a threshold change:** select **one night per date** before judging (longest
-  row, or a main-sleep flag if one can be derived), and exclude sub-threshold fragments from **both**
-  the target night **and** the baselines. Then re-measure the rate, and only then consider tuning the
-  multiplier — on a population that is nights.
+- **⤷ THE FIX IS ONE IMPORT, AND THIS ENTRY'S FIRST ANSWER WAS WRONG — corrected 2026-09-26, same day.**
+  `nightSessions()` (`packages/shared/src/health/sleep-night.ts`) **already does exactly this**:
+  circadian nap/night classification first, then fragment merging inside the night band. **15 sites
+  route through it; the verdict path is the one that does not.** The fix is to become the sixteenth
+  consumer, in `LA-149`'s wiring — not to write a selection rule.
+- **⛔ The first recommendation here — "longest row per date" — would have been a SECOND implementation
+  of a solved problem, and wrong on its own terms.** That helper's header carries the measurement: the
+  one genuine fragmented night in this history is **2.53 h + 4.02 h across a 105-minute gap**, and a
+  longest-row rule scores it as a 4.02 h night instead of merging it to 6.55 h. Three nap→night
+  transitions have *smaller* gaps than that real fragmented night, so no gap threshold separates them
+  either — which is why the helper classifies by circadian position first
+  (`NIGHT_BAND_START_HOUR` 21 → `NIGHT_BAND_END_HOUR` 10, with `ALWAYS_NIGHT_MIN_HOURS` 4 as the
+  shift-work escape). This is the **One Formula, One Place** trap, and this entry walked into it before
+  checking whether the formula already existed.
+- **⚠ SEVERITY IS HIGHER THAN "a new bug" — this is a DOCUMENTED, ALREADY-FIXED CLASS RECURRING.**
+  `Q-76` (shipped 2026-08-05) found every consumer answering *"which row is the night?"* for itself and
+  **all of them answering it the same wrong way** — sort by `sleepEnd` descending, take the first — and
+  routed eleven read sites through the one helper rather than adding a rule beside it. That helper's own
+  header records what it prevented: *"a Sleep Score of 5 on a 7.86 h night, and — because the rollup
+  folds its pick into the checkpointed EMA baselines — it poisoned every later z-score too."* **That is
+  the same two-directional failure this entry re-measured independently** — a false verdict on a real
+  night, plus poisoned baselines. Known, named, fixed and documented; `TN-81` reintroduced it by not
+  reaching for the helper.
+- **Still true, and still what to do after the fix:** re-measure the announcement rate, then consider
+  the multiplier. **The sweep above measured the WRONG population, so none of its numbers carry over** —
+  re-run it against nights.
 - **A correction to Tuning's own plan, made here rather than quietly:** the plan's §5 cites *"119 rows
   for the last 120 days — `duration_hours` on all 119"* as evidence the inputs are complete. **That
   count included fragments.** It is 102 dates, with 30 of 120 rows under 3 h. The conclusion that
@@ -774,6 +797,69 @@ below threshold and left in place for next time.
   empty-list answer from `0` to `null` needs its callers checked rather than a blind swap. That is
   the whole of the work; the other three can move to one import.
 
+### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
+
+- **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
+- **Added:** 2026-09-26 · Tuning, checking whether the announce-and-correct design can collect anything
+  at all before more effort goes into what it announces.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **This is a hard constraint on `TN-82`, not a polish item.** `TN-82` assumes the announcement is seen.
+  Measured from source, it gets **one showing per day and no second chance**:
+  - The morning sheet **auto-opens once**, from an effect in `session-select-content.tsx:791`, only when
+    no morning check-in exists for the local day.
+  - `markMorningCheckinPromptDone(tz)` is called **`onClose`** (line 1398) — so dismissing it, or saving,
+    retires it for the rest of the day.
+  - The effect lives **only on `/session-select`**. Open the app to Home and never navigate there and
+    the sheet never appears, so nothing is announced.
+- **Why that defeats the design.** The whole instrument is the owner **disagreeing** with a verdict. He
+  has saved **82** of these sheets in three months and touched a scale in **3** of them, so the
+  established behaviour on this surface is dismissal — and here dismissal is indistinguishable from
+  having read it, while also being final for the day. An announcement delivered once, into the one
+  surface with a three-month record of reflexive dismissal, produces silence that `OR-171`'s guard then
+  has to interpret. **That is the silence trap arriving by construction rather than by bad luck.**
+- **RECOMMENDATION: give the verdict a durable home as well as the modal.** Put it on a surface that
+  persists for the day — the Home sleep card is the obvious one — so a missed or dismissed modal is
+  recoverable and a correction stays possible later. The modal keeps the *prominent* outlier
+  announcement; the durable surface keeps the quiet line and the correction affordance. Cost: one card
+  state, no schema (the verdict and its response state are already persisted by `TN-81`).
+- **Alternatives, and why each loses.** *Re-open the modal until answered* — turns an announcement back
+  into a demand, which is the thing that failed three times. *Leave it modal-only* — cheapest, and it
+  makes near-zero corrections uninterpretable, which is the one outcome the plan says must not be
+  ambiguous. *Notification instead* — the S25 has no working `health-alerts` channel (`RV-155`, sweep 4b).
+- **Reversal cost: low** — a card state and where it reads from, no stored data.
+- **Not device work:** every claim here is from source, so there is nothing for the device agent to
+  reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
+
+### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
+
+- **Lane: O** · **Added:** 2026-09-26 · Tuning, split out of `TN-82` so it reaches him through the
+  Orchestrator rather than sitting inside a build entry.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **Why this one IS his, when most wording is not.** The whole design rests on an announcement he reads
+  and occasionally disagrees with. If he stops reading it, the feature produces silence that *looks*
+  like agreement — `OR-171`'s recorded guard — and the corrections that are the entire point never
+  arrive. Three in-sheet questions have already decayed to zero on this exact surface, so the framing
+  is the mechanism, not decoration. It is also cheap now and expensive after it has trained another
+  reflex.
+- **RECOMMENDATION — ship this copy; he edits it if he wants something else.** Two lines, no question
+  mark anywhere:
+  - **Ordinary day, quiet, no interaction:** `Sleep looks normal — filled in for you.`
+  - **Outlier day, prominent, reason first, one tap to disagree:**
+    `Slept 5h10, 90 min later than usual. Marked this a poor night — tap if that's wrong.`
+- **Why that shape.** The **numbers come before the verdict**, because the verdict is arguable only if
+  its evidence is visible — "your sleep was bad" invites being ignored, "5h10, 90 minutes later than
+  usual" invites either a nod or a correction. `tap if that's wrong` asks for a **disagreement**, not a
+  rating, which is the only thing this collects. And it never says *"how did you sleep?"* — asking is
+  what failed three times.
+- **What he might reasonably want instead, and the cost of each.** Softer (*"looks like a rough
+  night"*) reads better and makes disagreement feel less pointed, at the price of being easier to skim
+  past. Blunter (*"bad night"*) is unmissable and will annoy him on the days it is wrong — which, until
+  `TN-83` lands, is often. Neither is wrong; both are his taste, and the draft above sits between them.
+- **Reversal cost: near zero.** It is two strings on one surface, no schema and no stored data. If the
+  wording is wrong he says so and it changes in a one-line PR — which is the argument for shipping the
+  draft rather than waiting on it.
+- **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
+
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
@@ -794,11 +880,15 @@ below threshold and left in place for next time.
   problem (*"If I remember; I will let you know"*).
 - **The failure mode to watch is him not reading it** — see `OR-171`'s guard. That is why the quiet line
   stays quiet and the loud one stays rare: announce loudly twice a week and it becomes wallpaper.
-- **Ask:** owner — the announcement copy, and the copy only. The whole design rests on an announcement
-  he will actually read. A rare prompt lives or dies on its framing, and
-  it is cheap to review now and expensive to re-do after it has trained another reflex. Show it at
-  384 px dark. Deliberately **not** `Gate: owner`: gating parks the entry, and the build does not
-  need the copy settled to start — `Needs: TN-81` is the only real block here.
+- **⚠ READ `TN-85` BEFORE BUILDING THIS.** The sheet this entry targets auto-opens **once** a day, only
+  on `/session-select`, and is retired for the day `onClose` — so as things stand the announcement gets
+  one showing on a surface with a three-month record of reflexive dismissal. `TN-85` recommends a
+  durable second home for the verdict; building this entry modal-only makes near-zero corrections
+  uninterpretable.
+- **The announcement copy is the owner's, and it is now its own entry — `TN-84`, `Lane: O`.** Split out
+  2026-09-26 on the owner's instruction that anything needing him is routed to the Orchestrator rather
+  than asked in a Tuning session. It does **not** block this build: ship with the drafted copy in
+  `TN-84` and swap in whatever he settles on.
 - **Device:** the morning sheet is the canonical daily surface and the local store is on the write
   path, so the pass needs the APK, not `pnpm dev`.
 
@@ -1014,6 +1104,31 @@ below threshold and left in place for next time.
   than left as an intention.
 - **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
   new). `Ran 78 of 78` Custom Rules steps.
+
+### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
+- **Ask:** owner — one mockup to approve (RV-213), one product choice (RV-218's daily calorie target), and a merge-time yes on six security fixes as each PR goes green.
+
+- **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
+- **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
+- **1. RV-213: a mockup, before it is built.** Empty meal slots on Nutrition take a full card each, with two add controls. Lane B produces a before/after at 384 px, and the owner says yes or no.
+  - **Recommendation:** one compact row per empty meal, with its name and a single `+`.
+  - The same shape as RV-207 ⑥'s Log-tile mockup (the Lane O entry Lane B split out). **Show both in one sitting.**
+- **2. RV-218: which number is the day's calorie target.**
+  - The ring shows 1,534 (resting plus movement). The explainer names a goal of 1,660 and a budget of 1,356.
+  - **Recommendation:** the ring shows the budget the explainer already defends. The goal stays as the reference line, and the third number goes. The owner confirms which one he reads as "today's target".
+  - RV-218's copy bugs ("205 workouts", "-1,694 deficit", missing zero days) need no answer and can ship first.
+- **3. A merge-time yes on the security fixes.** These are needed **when each PR is green, not now**:
+  - **RV-191** (the feedback screenshot);
+  - **RV-190** (admin query session state; build it before OR-138);
+  - **RV-192** (registration). **It also carries one product option:** drop password sign-up entirely, since every current user signs in with Google. The recommendation is to keep it and verify email.
+  - **RV-193** (refresh token in the session);
+  - **RV-195** (three low auth gaps);
+  - **RV-196** (the ring-key plugin; needs an APK).
+- **Already asked elsewhere, listed so nothing is lost:**
+  - **RV-199 ②:** the GitHub "keep my email private" setting, which only the owner can flip.
+  - **RV-65:** whether the prescription keeps its model call, which is gated on the owner in Lane A.
+  - **OR-176** is answered: a standing yes for DV's three settings probes.
+- **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
@@ -2653,6 +2768,7 @@ which is the right shape for something that can only be validated by living with
    - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
 4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
 5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
+   - **🔎 Device, sweep 64 (`p23-nutrition-warm-03`):** the owner's real screen reads 14% (7 days) and 39% (28 days), with "required meal (3)". Those are sensible numbers for his configuration, so the web build's 0% was the seed's six-meal setup. **Drop this item.**
    - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
    - **The definition is the owner's call. The copy is not.**
 
@@ -2753,6 +2869,18 @@ which is the right shape for something that can only be validated by living with
   3. **P32's five timepoints are identical on every screen.** That is consistent with "painted from cache", but it measures nothing about loading states. Re-run once with the cache cleared for those routes, which is what P32 is for.
 - **Also for the record:** P34's concern is moot on this keyboard. Samsung shows the numeric pad for `type=number` (`t2-sheet-weigh-in-01`), so the finding is only the missing `enterkeyhint` ("Go" where "Done" belongs), which RV-210 covers.
 - **Then:** re-capture Health (full length) and the pushed screens' lower sections, and append them to the same Artifact.
+- **The rest of Review's device pass, in the same sitting, after the capture fixes.** This is the one DV entry Review needs worked next:
+  1. **P41, before and after on RV-207's shipped fixes**, against sitting 4a's captures:
+     - initials;
+     - "1 exercise" and "1 set";
+     - press feedback on the tab bar, More rows, Nutrition's chevrons, the Home avatar and Health's Log pills (re-run P24 on each; the target is a first-frame change under 100 ms);
+     - ticking two supplements in quick succession (both must land). **Tick then untick, per the standing write permission;**
+     - "13.0 t".
+  2. **RV-206 P29–P31**, now that OR-176 gave standing approval: font scale 1.15 and 1.3, display size, and CPU throttle plus battery saver. **Restore each before anything else if the sitting is cut short.**
+  3. **RV-206 P35–P38:** launch and bars, chart legibility, overscroll, and the longest real values.
+  4. **RV-205's remainder:** cold start, one error state per card family (via P18), and **P32 with the route's cache cleared**.
+  5. **A P28 follow-up:** the "11 background meteors on every tab". Report whether **hidden** tabs' animations keep running while another tab is shown (`document.getAnimations()` per panel, with the panel's visibility). Running while hidden is a defect Lane B can fix without asking anyone. Whether the visible ones stay is a matter of taste, so not a finding.
+- **Result:** _(DV: Artifact URL and version, date, build, navigation mode, which of 1–5 ran)_
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
@@ -13258,6 +13386,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   day. Tank: 1 workout per T1, drained one workout per rest-target days. Both are the owner's
   numbers (2026-09-26), marked provisional by him. The Health cat (Cleric art) faucet is defined — see the
   plan — and can be built with them. The cardio (Rogue) faucet waits on PS-48, and the route returns `null` for them until then.
+- **Keep the lineage fold (third collection PR).** `replayCollection` now tracks named cats; new
+  constants are compatible, a replacement fold is not. Rares attach as `shiny` on a merged cat.
 - **No migration.** The collection is replayed, so bumping `COLLECTION_RULES_VERSION` to 2 re-scores
   all history. That rewrite is the owner's intent, not an accident. PS-48 asks whether v1-era cats
   should be preserved instead (recommendation: no).
@@ -13265,6 +13395,28 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   for exactly this. The PS session could not: the query secret was unavailable on that machine.
 - **Reversal cost:** low as code (the version constant and one fold); visible as behaviour, because
   every cat count the owner has seen changes on deploy.
+
+### [app-shell] PS-52 — make people attached to their cats: pick which of these to build next
+
+- **Lane: O** · **Added:** 2026-09-26 · owner: *"any other ideas you can think that would make people
+  get attached to them and want to stay consistent"*. Ungated on purpose: the owner picks.
+- **Shipped already:** unique names, merged names, breakdown returning the same named cats, a
+  named "is getting restless" warning, and a named "wandered off" line (third collection PR,
+  v1.468.0).
+- **Candidates, cheapest first; the recommendation is the first three:**
+  ① **A named nudge notification** when a ladder is restless ("Onyx is getting restless") through
+  the existing notification path. Cheapest, and aimed straight at consistency.
+  ② **Merge moments:** a one-off celebration the first time a merge is seen ("Puffle was born from
+  Pudding and Waffle"), keyed on the cat's stable id, so it shows once per cat.
+  ③ **Cat anniversaries:** "Mochi has been with you 30 days" on the card; it needs only `born`.
+  ④ **Petting:** tap a cat in the pen for hearts and a haptic. The pen then needs its own tap target
+  apart from the card's navigate.
+  ⑤ **Moods:** sprite expressions (happy on a faucet day, sleepy at night, sad when restless). Art
+  plus one prop.
+  ⑥ **A grace window:** a cat that wandered off comes back if the faucet fires within 24 h. This is a
+  RULE change (Lane A, owner sign-off, and it moves history).
+  ⑦ **User nicknames:** needs storage keyed on cat id, so a Lane A migration. Cosmetic only; it
+  must never feed the replay.
 
 ### [app-shell] PS-51 — titles that unlock the collection pen's backdrop scenes
 

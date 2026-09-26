@@ -144,3 +144,36 @@ export function restGapSentence(stepsGap: number, sleepGap: number): string {
   const days = (n: number) => `${n} missed ${n === 1 ? 'day' : 'days'}`
   return stepsGap === sleepGap ? days(stepsGap) : `${days(stepsGap)} for steps and ${days(sleepGap)} for sleep`
 }
+
+/** What keeps a restless ladder whole today, in the user's words. */
+const KEEP_TODAY: Record<FaucetKey, string> = {
+  workout: 'train today to keep everyone',
+  steps: 'a walk today keeps everyone',
+  sleep: "log tonight's sleep to keep everyone",
+}
+
+/**
+ * The first ladder where skipping today would cost a cat, named after the cat that would leave: the
+ * newest of the smallest tier (the fold takes that one first). A named cat at risk is a reason to
+ * show up; a number that might shrink is not.
+ */
+export function restlessLine(collections: Partial<Record<FaucetKey, CollectionState>>): string | null {
+  for (const faucet of ['workout', 'steps', 'sleep'] as FaucetKey[]) {
+    const s = collections[faucet]
+    if (!s?.restless || !s.cats?.length) continue
+    const smallest = Math.min(...s.cats.map(c => c.tier))
+    const leaving = s.cats.filter(c => c.tier === smallest).at(-1)!
+    return `${leaving.name} is getting restless — ${KEEP_TODAY[faucet]}.`
+  }
+  return null
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "Pip wandered off on 12 Sep." Read from the day string itself: it is already the user's calendar day. */
+export function lostLine(state: CollectionState | undefined): string | null {
+  const lost = state?.lastLost
+  if (!lost) return null
+  const [, m, d] = lost.day.split('-').map(Number)
+  return `${lost.name} wandered off on ${d} ${MONTHS[m - 1]} — the days underneath still count.`
+}

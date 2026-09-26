@@ -156,6 +156,24 @@ paws and blink inside its SVG, in three held poses like a short GIF. It reads to
 it shows three tiers per ladder until PS-49 lands; the art already covers six tiers and every
 shiny.
 
+## Named cats and lineage — SHIPPED (third PR, 2026-09-26)
+
+The owner: *"cute generated names for each one so they are unique … when they merge the name
+changes to their merge … if a t2 for example decays it breaks down into smaller T1's"*.
+
+`replayCollection` now holds **real cats instead of counts**, with the same rules in the same
+order. `stock` is derived from the lists, so there is still one rule set. Each spawned cat is named
+from its identity (`names.ts`, deterministic). A merge takes the **oldest** cats of a tier and the
+new cat's name blends its oldest and newest parts ("Pudding" + "Waffle" → "Puffle"). Decay takes the
+**newest** loose cat and breaks the smallest big cat back into **the same cats that made it**, names
+intact. The state now also carries `cats` (top level, with `from`), `restless` (skipping today
+would cost a cat) and `lastLost` (name and day). The route needed no change; it already returns the
+whole state.
+
+**PS-49 must keep this.** Changing the ladder constants is compatible; replacing the fold is not.
+Rares and lucky procs attach to cats here: `shiny` on the merged cat, and a second spawn on a lucky
+day.
+
 ## Scenes and titles (PS-51)
 
 The owner: *"we might need some options for 'background' some like a house/forest etc. These could

@@ -3,98 +3,85 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-09-09 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-30`
-(⚠ stale — real next free is **TN-81**; everything below "Now" predates the TN-55…TN-80 run and is
-history, not state. A full rewrite is owed.)
+**Updated:** 2026-09-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-86`
+
+Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
+stay valid. **Rewritten in full, never appended** — narrative lives in the journal and the reviews.
 
 **⚑ SCOPE — owner, 2026-09-25: only ask him about tuning.** *"The only questions asked from me in this
 agent should be about tuning in general for our pillars or workouts etc — nothing to do with other
 avenues."* Ask about scores, contributors, thresholds, weights, goals, prescription and progression.
 **Do not ask about** PR approvals, CI or branch protection, device-check routing, lane assignment,
-backlog process, or another agent's queue — **file those `Lane: O` and let the Orchestrator put them
-to him.** Filing cross-domain findings is correct (`Lane:` is the channel between agents); briefing
-him on them *here* is not. This session did exactly that on 2026-09-25 — three PR approvals, branch
-protection, a routing sweep — and the findings were sound while the routing was wrong, which is the
-harder failure to notice. **Test before asking: if the answer changes a score, threshold, goal or
-prescription, ask it here; otherwise file it.**
-Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
-stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
+backlog process, or another agent's queue. This session did exactly that on 2026-09-25 — three PR
+approvals, branch protection, a routing sweep — and the findings were sound while the routing was
+wrong, which is the harder failure to notice.
 
-**Compacted 2026-08-24 from 582 lines** (the PS-4 outlier). Everything cut is in the reviews below.
+**⚑ AND SINCE 2026-09-26, NOTHING IS ASKED HERE AT ALL — owner:** *"nothing should need to be answered
+here; and if anything requires me for building; mark it for ORC."* So even a genuine tuning question
+is **filed as its own `Lane: O` entry**, ungated, with the decision brief inside it (recommendation
+first, alternatives with why each lost, reversal cost). `TN-84` is the worked example: the sleep
+announcement's copy is genuinely his, so it left `TN-82` and went to `O` as its own entry with drafted
+copy to approve or edit. **Never `Gate: owner` on a question** — gating parks it and nobody is tasked
+with asking.
 
 ## Now
 
-**Nothing is blocked on the owner.** Every decision the queue needed has been asked and answered —
-2026-08-24 (TN-5/TN-6/TN-6a, history policy), 2026-08-26 (TN-9's intent, TN-15's redesign),
-2026-08-31 (the step goal: **manual wins**), and **2026-09-09** twice — *"make all the changes you
-recommend"* (TN-29 then TN-27 option 3) and the three cardio decisions (**TN-30's pinned 178**,
-TN-25's varied prescribed walk, TN-31's move to Run). **Nothing carries an open owner question.**
+**Nothing is waiting on the owner in this session.** Everything owner-facing is filed: `TN-84`
+(announcement copy, `Lane: O`, ORC's to put to him) and `OR-171`'s already-answered design.
 
-**The Cooper test is DONE — do not ask for it again.** It yielded **175**; the owner's instruction is
-to treat that as the low end of a band topped by the age-estimate and pick between. The "pinned 178"
-this baton described was never live — all 101 cached days use **187**. **Owed now are ACTIONS:** repeat
-the HRR test (`hrr1_bpm` null on the one run), a second DEXA for TN-48, and one strap night *after*
-TN-51/TN-54 ship. Hold the Q-506 re-derive until `FEVER_TEMP_Z` is rescaled — it fires six false fevers.
+**The live thread is the sleep verdict, and it shipped with a defect.** `TN-81` (#1697) landed the
+computation, `sleep_verdicts` and migration 284 the same day the plan merged (#1690). Measured against
+125 real nights before anything announces it:
 
-**The owner's standing verdict, 2026-08-26:** *"Overall the pillars are not working great and not
-very useful. Requires tuning."* The queue is long because the pillars were measured.
+- It fires **10.9 prominent announcements per 30 nights** against the plan's 4–6 target, **and the rate
+  is the symptom.** It reads `sleep_sessions` rows as if one row were one night. 125 rows sit across
+  106 dates; every duplicate date is one real night plus a fragment (`7.92 / 0.00`, `8.50 / 0.00`),
+  and flagged "poor" nights include onsets of 10:44, 16:37 and 17:35 — **naps announced as bad nights**.
+- **`TN-83` is the fix and it is one import.** `nightSessions()`
+  (`packages/shared/src/health/sleep-night.ts`) already does circadian nap/night classification then
+  in-band fragment merging; **15 sites route through it and the verdict is the one that does not.**
+  This is `Q-76`'s bug class recurring — that helper's header records the outcome it prevented, *"a
+  Sleep Score of 5 on a 7.86 h night … it poisoned every later z-score too"*, which is the same
+  two-directional failure re-measured independently here.
+- **`LA-149` is parked on `TN-83`** (`Needs:`). Wiring first means the owner's first experience of the
+  feature is a false verdict, and the design depends on him trusting it enough to correct it.
+- **⛔ Do NOT reach for `VERDICT_IQR_MULTIPLIER`.** The sweep (0.25→16.6 · 0.5→10.9 · 1.0→8.1 ·
+  1.5→6.6) makes 1.5 look right and it is not: it hits the rate by muting real signal while still
+  firing on naps, and takes `good` to zero. **Those numbers measured the wrong population and are void
+  — re-run the sweep after `TN-83`.**
 
-**⚠ The battery chain has still shipped nothing** and the owner has reported it twice. TN-15/18/6a/6/2
-all carry sign-off and all sit unbuilt. That is a prioritisation question only the owner can answer —
-say so plainly rather than re-measuring the pillar a fourth time.
+**And the announcement may not reach him at all — `TN-85`.** The morning sheet auto-opens **once** a
+day, only on `/session-select`, and is retired for the day `onClose`. So the verdict gets one showing on
+the one surface with a three-month record of reflexive dismissal (82 saves, 3 touched scales), and
+dismissal is indistinguishable from having read it. Recommended fix: a durable second home for the
+verdict (the Home sleep card), so a missed modal is recoverable and a correction stays possible.
+**`TN-82` must not be built modal-only** or near-zero corrections become uninterpretable.
 
-**Filed 2026-09-08/09, the nutrition and cardio batches:**
-
-| ID | What | State |
-|---|---|---|
-| **TN-24** | Zone 1 spans **52–132** bpm, so Zone 2 is unreachable on foot and the walk's zone bar carries nothing | supplies **Q-523's** mechanism; boundary corrected 2026-09-09 |
-| **TN-25** | the walk's fast target (≥133 bpm) met **0 of 44 times**; fast blocks average the slow target | **✅ decided** — varied prescribed patterns, 105–118 bpm band |
-| **TN-26** | cadence and speed mean different things per surface; prescribe heart rate, demote the controls | rewritten after the owner declined treadmill tuning |
-| **TN-27** | maintenance rejects its 28-day window and falls back to the noisy 14-day one → **2,245 kcal** | **owner chose option 3**, after TN-29 |
-| **TN-28** | the one card that writes the calorie goal hides the `low confidence` its siblings show | Lane B, independent |
-| **TN-29** | two independent maintenance estimates computed per request, never compared; gate on the activity factor | **owner-approved, build first** |
-| **TN-30** | one zone model, **four** max-HR resolvers; three live and 19 bpm apart, agreeing only by coincidence | **✅ decided** — pin a 50/50 blend at **178**, `Needs: TN-25` |
-| **TN-31** | split the interval jog into Run as an assigned run type; interval jog → `tempo` | **✅ decided** — routing, `recommendRunType` already exists |
-| **TN-32** | three surfaces describe zones in a model the engine does not use | Lane B, not gated |
-
-**Earlier batches, all still queued and none blocked:** TN-2 (battery charge window, offset unfitted)
-· TN-5 (`SCORE_CALIBRATION` 8-fold gain) · TN-6/6a/8/18 (the temperature baseline and its four
-consumers) · TN-9 (readiness final at first open — **two fixes, not one**) · TN-11/12/13 (move-hours,
-the HR tile's smoothing) · TN-15/19 (Body Battery drain and recharge) · TN-17 (Activity pacing,
-`Needs: Q-524`) · TN-20/21/22 (the stress and recompute persistence defects) · TN-23 (sleep's `hrv`
-and `hr` are one signal scored twice).
-
-Reviews: [maintenance 2,245](../../reviews/2026-09-09-maintenance-2245-is-too-high.md) ·
-[walk intensity](../../reviews/2026-09-08-walk-intensity-calibration.md) ·
-[why a good night scored 63](../../reviews/2026-09-03-why-a-good-night-scored-63.md) ·
-[stress sign explained](../../reviews/2026-09-01-stress-sign-explained.md) ·
-[recompute wipes completed days](../../reviews/2026-09-01-recompute-wipes-completed-days.md) ·
-[four tiles at 55](../../reviews/2026-08-31-four-tiles-at-55.md) ·
-[HRV as a tile metric](../../reviews/2026-08-31-hrv-as-a-tile-metric.md) ·
-[measured stride](../../reviews/2026-08-31-measured-stride-from-cadence.md) ·
-[HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) ·
-[pillar review](../../reviews/2026-08-26-pillar-review.md) ·
-[check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) ·
-[threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) ·
-[battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
-[sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
-[temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
-[handoff](../../handoff-2026-08-24-readiness-scores-owner-batch.md).
+**The outcome variable is why this thread matters.** Tuning has one validated instrument (`TN-73`, RPE
+residual, sensitivity ~0.25 points) and five other validation attempts failed for want of a label. The
+verdict's **corrections** are the label — and a correction is a disagreement, which is worth more per
+point than any rating. 82 morning sheets over three months produced 3 touched sleep ratings and **0**
+touched recovery ratings, across three affordances in three positions: **asking has failed three times
+on that surface**, which is why the design announces instead.
 
 ## Next
 
-1. **Re-measure after Lane A lands anything.** Every entry carries its own pass test; that is the work,
-   not finding a new pillar.
-2. **TN-25 needs the owner's pick** before the walk batch can go further. Ask once, do not re-measure.
-3. **The threshold sweep and the check-in lookback are DONE** — see the do-not-re-litigate list.
-4. **Activity volatility at n ≥ 20** — read 7.2 → 12.2 day-to-day on six deltas, which cannot tell a
-   change of character from a run of unusual days. Deliberately not filed.
+1. **Re-measure the announcement rate once `TN-83` lands**, on nights rather than rows. That is the
+   next concrete Tuning action and the sweep above has to be redone for it.
+2. **Then, and only then, tune the multiplier** toward 4–6 prominent announcements a month.
+3. **Watch for the silence trap after `LA-149`/`TN-82` ship.** Near-zero corrections in the first month
+   means the **instrument failed**, not that the model is validated — it is the same shape as 35
+   neutral 3s. Recorded as `OR-171`'s guard; do not publish a validation off silence.
+4. **Re-measure after Lane A lands anything else.** Every entry carries its own pass test; that is the
+   work, not finding a new pillar.
 5. **Earlier open findings, none built:** illness radar cannot fire (Q-506) · resilience has emitted
    one value ever (Q-508/510) · BLE input drift (Q-509) · battery anchor flip (Q-511) · ACWR call-site
    windows (Q-512/513) · 64% of back-off cuts are a clamp artefact (Q-514) · rest/active boundary
-   shrinks with fitness (Q-515) · `PEAK_BANDS` unreachable (Q-516) · **adaptive-TDEE below BMR
-   (Q-517 — TN-29 is its other half)** · model stamp erased (Q-518) · manual bedtime (Q-519) ·
-   partial-night flag (Q-520) · battery drain model (Q-527) · chronic stress (Q-525, TN-1).
+   shrinks with fitness (Q-515) · `PEAK_BANDS` unreachable (Q-516) · adaptive-TDEE below BMR (Q-517) ·
+   model stamp erased (Q-518) · manual bedtime (Q-519) · partial-night flag (Q-520) · battery drain
+   model (Q-527) · chronic stress (Q-525, TN-1).
+6. **`TN-64`'s deload gate cannot be judged yet** — ACWR only fills forward from 2026-09-25, so there
+   is no history to test the thresholds against. Prompts on ordinary days would be Tuning's proposal.
 
 ## Pillar coverage
 
@@ -102,6 +89,10 @@ Every pillar with a scoring surface is measured except **cardio**, deliberately 
 run/treadmill sessions, newest 2026-07-24 — too thin to fit five boundaries to).
 sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workouts ✅ · heart-rate 🟡 · nutrition ✅.
 **So do not go looking for a pillar to measure.** The useful work is re-measuring after a fix lands.
+
+**Before writing any new helper, grep for it first.** `TN-83` is this agent's own cautionary tale: it
+recommended a night-selection rule for a problem the repo had already solved once, and would have
+shipped a sixteenth divergent implementation had the existing helper not been checked.
 
 ## Method — three traps, and the third is the expensive one
 
