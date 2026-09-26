@@ -306,3 +306,9 @@ curve). **Before writing anything that treats one row as one night, call the hel
   beat looks like a plausible record low. Both gate on the *same* MET windows. Never re-derive
   these — call the module.
   ([`2026-08-03-night-vitals-extraction.md`](../../overview/history-2026-07-30.md))
+
+- **[`docs/overview/entries/2026-09-26-tn85-sleep-verdict-on-home.md`](../../overview/entries/2026-09-26-tn85-sleep-verdict-on-home.md)**
+  — TN-85. Last night's verdict is stated on the Home Sleep card, quietly for an ordinary night and
+  with the numbers first for an outlier, with a correction one tap away. The morning modal is not a
+  home for it: it opens once a day on one screen and retires on dismissal, and the owner has saved
+  82 of those sheets while touching a scale in 3.
