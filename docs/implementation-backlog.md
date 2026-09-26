@@ -2398,9 +2398,12 @@ which is the right shape for something that can only be validated by living with
   below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
   of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
   is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
-- **The defects behind it are real and measured** (`metric-tiles-card.tsx`): the pill overlaps the
-  icon, the tiles size to their content so three narrow ones leave a third of the row empty, and
-  the row is a different width when a tile is empty.
+- **The defects behind it are real, and REPRODUCED rather than read** (`metric-tiles-card.tsx`).
+  Rendered in the Playwright harness at the 412 px dark viewport, 2026-09-26: the word **"Log" is
+  drawn directly over each tile's icon** and is barely readable against it, and the three tiles
+  occupy roughly **58% of the row**, leaving the right third empty. The row is a different width
+  again when a tile is empty. Screenshot method: `page.goto('/')` after `suppressMorningCheckin`,
+  2.5 s settle — Health times out at 45 s in `next dev` and needs a longer budget.
 - **Why not just build it:** a lane can implement the entry exactly and still produce a Home the
   owner does not want — the failure the mockup rule exists to prevent. Three columns fixes the
   ragged row and makes each tile narrower, which is a trade rather than a strict improvement.
