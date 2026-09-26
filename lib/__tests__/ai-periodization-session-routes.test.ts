@@ -239,6 +239,66 @@ describe('POST …/session/[sessionId]/prescribe', () => {
   })
 })
 
+/**
+ * LA-147 — two buckets, because two very different things arrive at this route.
+ *
+ * RV-202 ② stopped a duration change from calling the model but left it spending the model's
+ * allowance, so twenty preset switches in an hour produced "Too many requests" for work the AI
+ * never saw. The limit's own comment cited preset-switching as the reason it was 20 rather than
+ * 10 — the justification had outlived the behaviour.
+ */
+describe('a re-fit does not spend the model\'s budget (LA-147)', () => {
+  const refittedOk = () => ({
+    ok: true,
+    prescription: { ...generated().prescription as Row, durationPreset: 'short' },
+    prescriptionStatus: 'pending',
+    estimatedSessionDurationMin: 25,
+  }) as Row
+
+  it('allows more re-fits than the model\'s limit would', async () => {
+    // THE case. Twenty-one preset switches used to 429 on the twenty-first; none of them reaches
+    // the model, so none of them should be charged to it.
+    refitPrescriptionToBudget.mockResolvedValue(refittedOk())
+    for (let i = 0; i < 25; i++) {
+      expect((await prescribePost({ durationPreset: 'short' })).status, `switch ${i + 1}`).toBe(200)
+    }
+    expect(generatePrescriptionForSession).not.toHaveBeenCalled()
+  })
+
+  it('still bounds them — the re-fit runs ~30 repository reads, so it is not free', async () => {
+    refitPrescriptionToBudget.mockResolvedValue(refittedOk())
+    for (let i = 0; i < 60; i++) expect((await prescribePost({ durationPreset: 'short' })).status).toBe(200)
+    expect((await prescribePost({ durationPreset: 'short' })).status).toBe(429)
+  })
+
+  it('leaves the model\'s own budget intact after a run of re-fits', async () => {
+    // The two buckets are independent: spending the cheap one must not consume the model's.
+    refitPrescriptionToBudget.mockResolvedValue(refittedOk())
+    for (let i = 0; i < 25; i++) await prescribePost({ durationPreset: 'short' })
+
+    refitPrescriptionToBudget.mockResolvedValue({ ok: false, reason: 'no_baseline' } as Row)
+    expect((await prescribePost()).status).toBe(200)
+    expect(generatePrescriptionForSession).toHaveBeenCalled()
+  })
+
+  it('CHARGES the model bucket when a preset request falls through to a real generation', async () => {
+    // A preset with no stored plan to re-fit reaches the generator, so it is about to spend
+    // tokens and must be charged like any other generation.
+    refitPrescriptionToBudget.mockResolvedValue({ ok: false, reason: 'no_baseline' } as Row)
+    for (let i = 0; i < 20; i++) {
+      expect((await prescribePost({ durationPreset: 'long' })).status).toBe(200)
+    }
+    expect((await prescribePost({ durationPreset: 'long' })).status).toBe(429)
+  })
+
+  it('refuses before reading the body, so an unparsed request cannot be free', async () => {
+    // The outer ceiling is checked first precisely so the branch-deciding field cannot be omitted
+    // to get a free parse. Past it, even a malformed body is refused by the limiter, not the schema.
+    for (let i = 0; i < 60; i++) await prescribePost({ durationPreset: 'short' })
+    expect((await prescribePost({ durationPreset: 'nonsense-not-a-preset' })).status).toBe(429)
+  })
+})
+
 describe('a duration change re-fits instead of re-generating (RV-202 ②)', () => {
   const refitted = () => ({
     ok: true,
