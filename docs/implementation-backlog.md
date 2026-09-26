@@ -939,6 +939,26 @@ below threshold and left in place for next time.
 
 ### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
 
+- **✅ SHIPPED the durable home (#1727, 2026-09-26).** `components/home/sleep-verdict-note.tsx` sits
+  under the Home Sleep card and states last night's verdict: quiet for `normal`, prominent with the
+  numbers first for `poor`/`good`, and a **That's wrong** control that records the disagreement and
+  opens the morning check-in, where the value the correction sets actually lives (TN-57 owns
+  writing it). Copy in `components/health/sleep/sleep-verdict-copy.ts` so **TN-82's modal reuses it
+  rather than growing a second wording**. It renders NOTHING when there is no verdict — a daily
+  "not enough data" is a card that gets tuned out, and this one must not be.
+  Rendered at 412 px dark and pinned by `e2e/tn85-sleep-verdict-on-home.spec.ts` (3 tests, control
+  run: breaking the correction callback fails the wiring test).
+- **The note is a SIBLING of the card, not inside it.** The Sleep card is itself a `role="button"`
+  that navigates, so a control within it is a button inside a button — invalid, and what
+  `check-nested-buttons.js` fails on. It is also hidden in section-edit mode: the editor is about
+  layout, and a live control does not belong in a rearranging surface.
+- **Keep:** ① the device look, with `TN-82`'s APK pass — the note is new furniture on the owner's
+  daily screen and no sandbox drives a Samsung WebView. ② `TN-82` itself, which is now the MODAL
+  half only: its removal of the two scales is an information-architecture change to a daily screen,
+  so per CLAUDE.md it owes a mockup and a yes before any code. This entry deliberately removed
+  nothing. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
+
+
 - **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
 - **Added:** 2026-09-26 · Tuning, checking whether the announce-and-correct design can collect anything
   at all before more effort goes into what it announces.
@@ -971,6 +991,21 @@ below threshold and left in place for next time.
   reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
 
 ### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
+
+- **⚑ TWO DEVIATIONS FROM THE DRAFT, MADE WHILE BUILDING `TN-85` — both are here to be overruled.**
+  ① **`— tap if that's wrong` is a separate control labelled `That's wrong`, not a phrase inside the
+  sentence.** A phrase in a paragraph is not a tap target on a touch-only product, and the Sleep
+  card is already a `role="button"` that navigates, so the affordance has to be a real button
+  outside it. The sentence therefore ends at *"Marked this a poor night."*
+  ② **"90 min later than usual" cannot be said from a stored verdict.** `sleep_verdicts` snapshots
+  the band's `low`/`high` and drops `ComponentBand.median`, so there is no middle to measure from
+  without re-deriving one the verdict never saw. The shipped line measures to the **edge** of the
+  band — *"65 min later than usual"* means 65 minutes past the late end of your usual range. It is
+  the smallest true claim and it is the one the verdict actually acted on. Saying "than usual"
+  against a median would need TN-81 to snapshot it, which is Lane A and a migration.
+  **Live wording, as shipped:** `Sleep looks normal — filled in for you.` /
+  `Slept 5h10, 65 min later than usual. Marked this a poor night.`
+
 
 - **Lane: O** · **Added:** 2026-09-26 · Tuning, split out of `TN-82` so it reaches him through the
   Orchestrator rather than sitting inside a build entry.

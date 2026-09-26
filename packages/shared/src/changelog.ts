@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.470.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the Home sleep card now tells you what the app filled in for last night — quietly when it was an ordinary night, and with the numbers first when it was not. If it has it wrong, \"That's wrong\" takes you straight to the check-in.",
+    ],
+  },
+  {
     version: "1.469.1",
     date: "2026-09-26",
     changes: [

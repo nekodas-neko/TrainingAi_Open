@@ -4,11 +4,11 @@
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV**; eighteen more on 2026-09-25 — the journal is the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85**; eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Sweeps 4a/4b and review sweep 63 refilled the queue on 2026-09-26: **RV-208**…**RV-215**. Before that it sat at 0 for a day and a half, so expect it to empty again; when it does, say so and stop rather than inventing work.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Sweeps 4a/4b and review sweep 63 refilled the queue on 2026-09-26: **RV-208**…**RV-215**. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. Before that it sat at 0 for a day and a half, so expect it to empty again; when it does, say so and stop rather than inventing work.
 
 ## Blocked / owed
 
