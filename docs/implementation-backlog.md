@@ -1241,6 +1241,23 @@ below threshold and left in place for next time.
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
 
+- **⚑ A CORRECTION TO #1675's CLAIM, from the session that made it (Lane B, 2026-09-26) — sweep 4a
+  had already falsified it.** #1675 measured 578 canvas `font` writes → **0** on Health's five
+  sparklines and was written up as though the tab switch were fixed. **It was a real per-canvas
+  measurement generalised into a claim about the whole tap**, and 4a was right to still read 16 of
+  20 taps at 51–104 ms. The number was never wrong; the scope of the conclusion was. `OR-162`
+  deliberately does not repeat the shape — it states outright that the sandbox cannot number it,
+  because the e2e seed has no heart-rate readings and `HrDayChart` never renders in the harness.
+- **⚙ ONE QUESTION FOR THE NEXT SWEEP, and it decides `OR-162`'s remaining half.** Can the harness
+  separate, **for a single canvas**, the writes that happen **on arriving** at a tab from those
+  that happen **while it is hidden**? 4a reports both for the two HR charts (30/180 Home, 80/320
+  Health) but only an arrival figure for Wear Time (43). **Wear Time is the control worth using:**
+  it is an already-memoised `TrendSparkline`, so its per-switch cost is already zero and whatever
+  is left on arrival cannot be a re-render. If arrival cost survives with re-renders ruled out, the
+  remaining half is the reveal resize and `OR-162`'s (a)/(b)/(c) can finally be chosen between; if
+  it does not, there is nothing left to fix. **This is being written here rather than sent because
+  a cloud session cannot message another session — the queue is the channel.**
+
 - **⚑ CAUSE NAMED 2026-09-26 (OR-175, from sweep 4a).** `OR-162` carries it: the two
   *HEART RATE · TODAY* charts **re-measure on every tab switch while hidden**, and sweep 4a
   measured **16 of 20 taps** with one 51–104 ms task. `RV-153` is a second candidate on the same
@@ -2629,6 +2646,35 @@ which is the right shape for something that can only be validated by living with
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
 
+- **⚑ THE WEB PATH PASSES AT EVERY DELAY, SO THE CAUSE IS NOT IN THE SHARED JS — LANE B, #PR,
+  2026-09-26. Re-laned `B` → `DV`: the next action is a measurement, not a change.** Sweep 4a's
+  window (0–300 ms swallowed, 500 ms works) is **far wider than a CDP round-trip**, unlike sweep
+  3's, so for the first time this was reachable in the harness. Probed at **0, 100, 300 and 500 ms**
+  after a real released swipe with the natural 220 ms transition, tapping Delete's own rect: **the
+  confirmation appeared 4 of 4**, and the row's transform read `matrix(1,0,0,1,0,0)` every time —
+  the click landed, `close()` ran. Kept as `e2e/food-log-swipe-delete.spec.ts` → *"a tap the instant
+  the swipe ends opens the confirmation"*.
+- **What that rules out, and what it leaves.** The gesture maths, the `offset < 0` raise, the
+  `aria-hidden`/`tabIndex` flag and the wiring all behave; the tray is a later-painting `z-10`
+  sibling and hit-testing resolves to it. Read the component again for this: **the tray does
+  nothing else during the slide** — no timer, no guard, nothing with a ~500 ms lifetime anywhere in
+  `swipe-actions.tsx`, `swipe-actions-math.ts`, `meal-card.tsx` or the nutrition day-swipe.
+  `app/layout.tsx` sets `userScalable: false, maximumScale: 1`, so **the WebView's 300 ms
+  double-tap click delay is already off** and that tempting explanation is excluded too.
+- **⚠ And the harness STRUCTURALLY cannot see what is left.** `page.touchscreen.tap()` is a CDP
+  dispatch into the renderer; a real Android tap travels through the compositor's hit test first.
+  A third source fix would be a third guess — two have shipped and both failed on the device, and
+  `BF-94` has sat behind them.
+- **⚙ So the next step is an INSTRUMENTED device probe, not a change (`Lane: DV`).** On the S25,
+  from a verified-closed tray, swipe and tap Delete's centre at ~150 ms, with the page carrying a
+  temporary listener. Answer three things, in order — each one halves what is left:
+  ① does `document.elementFromPoint(x, y)` at Delete's centre return the **button** during the
+  window, or the row? ② does a `pointerdown`/`touchstart` listener on the **button** fire at all?
+  ③ if it fires, does `click` follow? ① says hit-testing; ② with no ① says the press never reached
+  the renderer; ③ alone says the click is being suppressed after the gesture. **Whichever answers,
+  say which — the fix differs completely between them**, and this entry should not be touched again
+  until one of the three is named.
+
 - **📱 Sweep 4a, after the v1.465.62 fix (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** ③ **PASSES 3/3**: a right swipe on the row
   closes the tray and the day stays Today. ① **still FAILS, and now has a threshold**: swipe (300 ms) then
   a tap on Delete's own rect after **0 / 100 / 200 / 300 ms → no confirmation (8 of 8, tray left open)**;
@@ -2666,7 +2712,7 @@ which is the right shape for something that can only be validated by living with
   and neither did a raw tap on the row), then swipe and `input tap` at **Delete's own rect** in one
   `adb shell` call. Note the tray is `aria-hidden` while closed, so a visibility filter hides it.
 
-- **Lane:** B
+- **Lane:** DV — see the instrumented probe at the top. The FIX stays Lane B's; hand it back the moment the probe names one of the three.
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-30 · owner, confirmed on device the same day: *"if I wait a second it works."*
 - **Shipped 2026-08-31** — the tray stacks above the row while open. Hit-testing follows the
