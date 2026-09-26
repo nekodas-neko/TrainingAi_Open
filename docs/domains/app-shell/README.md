@@ -467,6 +467,12 @@ Live at the time of writing (2026-07-30):
   — DV-21. Android drops a notification posted to a channel that was never created, silently.
   `health-alerts` and `workout-reminders` had both been posting to nothing; a source guard now
   fails on any `channelId:` with no `createChannel`.
+- **[`docs/overview/entries/2026-09-26-bf204-bf206-home-crowding.md`](../../overview/entries/2026-09-26-bf204-bf206-home-crowding.md)**
+  — BF-204/BF-206. The cat pen drew its twelve LARGEST cats, so every drawn cat shared one 12 px
+  band and they landed on one line; it round-robins across tiers now and sizes itself from its own
+  `ResizeObserver`. And `pb-nav-safe` reserves the nav and nothing else, so a `bottom-fab-safe`
+  `h-14` FAB covers the bottom 56 px of a scroll — `pb-fab-safe` is the fix, with a scan that
+  every screen mounting a FAB uses it.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)

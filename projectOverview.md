@@ -2620,6 +2620,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Home's cat pen and Coach button are fixed on paper, not on the phone (BF-204, BF-206, 2026-09-26)
+
+The pen drew its twelve largest cats into 348 px — one tier, so one 12 px band, so one crowded line with clipped name tags. It now round-robins across tiers and takes its count and its tag count from its own measured width (six cats, three tags at 348 px). The Coach button is an extended pill saying **Coach**, and Home reserves its height with a new `pb-fab-safe` so the last row of the scroll can clear it. **Both rendered at 412 px dark, neither seen on the S25.** **Pass test:** on the S25, no cat name clipped by a neighbour and no cat fully hidden behind another (the cats wander, so this is a look, not a screenshot); and the bottom of Home scrolls clear of the Coach pill.
+
 ### [app-shell][heart-rate] ⚠️ Half of the tab-switch cost is gone; the other half is untouched and neither has been measured on the phone (OR-162, 2026-09-26)
 
 `HrDayChart` is memoised by value, removing the 30 (Home) and 80 (Health) canvas `font` writes sweep 4a counted on **every** tab switch, all while the panel is hidden. **The arrival half is a different mechanism and is NOT fixed** — 180 on arriving at Home, 320 on Health, 43 for Wear Time. The sandbox can number neither: the e2e seed has no heart-rate readings, so the chart never renders there. **Pass test:** `DV-12` — every tab tap's longest task under 50 ms; 16 of 20 were 51–104 ms after #1675.

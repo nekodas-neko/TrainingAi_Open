@@ -433,6 +433,14 @@ body {
   .bottom-fab-safe {
     bottom: calc(3.5rem + 0.75rem + var(--safe-bottom));
   }
+  /* Scrollable page content on a screen that ALSO mounts a FAB. pb-nav-safe reserves the nav and
+     nothing else, so a `bottom-fab-safe` h-14 button covers the bottom 56px of the scroll on the
+     right — BF-206, where the day timeline's last row sat behind the Coach button and no amount
+     of scrolling could clear it. This is pb-nav-safe plus the FAB's own height. Use it on the
+     scroll container of any screen that mounts one; Home is currently the only one. */
+  .pb-fab-safe {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.75rem + 3.5rem);
+  }
 }
 
 /* RV-74: the health hero's ring, eased to match its own number. `useCountUp` animates the digits

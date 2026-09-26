@@ -527,6 +527,21 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-204 — the pen always draws its TWELVE LARGEST cats on one line, so it is crowded by construction
 
+- **✅ SHIPPED ① ② ③ — and NOT ④, which the entry was right to warn off (#PR, 2026-09-26).**
+  ① `penCats` round-robins from the rarest tier down instead of sorting biggest-first and slicing,
+  so the drawn set spans several `BAND` intervals rather than sharing one 12 px band — and the
+  rare cats are still led with, which is what the sort was for. ② `MAX_SHOWN` is a **ceiling**
+  now; the count comes from the pen's own `ResizeObserver` via `shownForWidth` — **six at 348 px**,
+  from 56 px slots against 34–50 px sprites. ③ `tagsForWidth` draws **three** tags at that width,
+  rarest first, rather than twelve. ④ untouched: PS-49's six tiers are what should fill the sky.
+  Rendered at 412 px dark with a stubbed 22-cat collection of the owner's shape (13 top-tier) —
+  six cats across three sizes, no sprite occluded, no name clipped.
+- **Keep:** the device pass. The owner's pass/fail is explicitly a Samsung WebView one — *no name
+  clipped by a neighbour, and no cat fully hidden behind another* — and the cats wander, so a
+  single screenshot at one instant is weaker evidence than a look. The sandbox render is the
+  before/after, not the verdict.
+
+
 - **Lane:** B — `components/home/collection-pen.tsx`, `components/home/collection-pen-cats.ts`.
 - **Added:** 2026-09-26 · owner's first real use of the collection, on the S25: *"Its a bit cramped
   in there. Might be too many at once. We should probably do sime more tuning."*
@@ -617,6 +632,19 @@ below threshold and left in place for next time.
   leaving and re-entering Home, and a plain vertical scroll in edit mode does not pick anything up.
 
 ### [app-shell] BF-206 — the Coach button covers 56 px of Home that nothing reserves, and nothing on screen says what it is
+
+- **✅ SHIPPED BOTH HALVES (#PR, 2026-09-26).** ① `.pb-fab-safe` is in `globals.css` beside
+  `pb-nav-safe` — the same nav + inset + gutter, **plus the button's own 3.5rem** — and Home's
+  scroll container uses it. ② The FAB is **extended**: the sparkle with a `Coach` label beside it,
+  which is the standard treatment for a primary action whose icon is not self-evident. The
+  one-time tooltip alternative teaches only the person who does not dismiss it.
+- **`components/coach/__tests__/bf206-fab-clearance.test.ts` holds both**, and the first is the one
+  that matters: **every file rendering `<CoachFab` must also carry `pb-fab-safe`.** The failure
+  arrives by omission — the next screen to mount a FAB will reach for `pb-nav-safe` like every
+  other screen, and nothing looks wrong until something lands under the button. Control-run: the
+  scan fails with Home reverted to `pb-nav-safe`.
+- **Keep:** the device look at the extended pill against the nav bar, folded into BF-204's pass.
+
 
 - **Lane:** B — `components/coach/coach-fab.tsx`, `app/session-select/session-select-content.tsx`,
   `app/globals.css`.
