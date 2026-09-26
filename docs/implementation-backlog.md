@@ -519,8 +519,26 @@ below threshold and left in place for next time.
 - **The rule is now in CLAUDE.md: a branch has meaning only if it has an open PR**, and a draft PR is
   how you mark work worth keeping. This entry is the backlog of what the first application of that
   rule found.
-- **⚠ FOUR branches hold unmerged work for entries STILL IN THE QUEUE.** Deleting them discards a
-  head start, so each needs a yes/no before any sweep:
+- **⛔ THE "HEAD START" CLAIM BELOW IS WRONG, AND IT IS CORRECTED HERE THE SAME DAY IT WAS FILED
+  (2026-09-26).** All four branches were diffed against `main` after filing, and **not one of them
+  holds work worth keeping.** The table stays because the *method* it demonstrates is right; the
+  conclusion it reached was not.
+  | branch | what the diff actually shows |
+  |---|---|
+  | `chore/or-127-device-cdp-harness` | **Superseded.** All five harness files are on `main` already, and `main` is AHEAD — `scripts/device/README.md` is **+13 −208**, i.e. 208 lines further developed. |
+  | `lane-a/rv99-score-band-theme-tokens` | **Landed.** `score-band.ts`, its test, `accent-card-style.test.ts` and `utils.ts` are **byte-identical** to `main`. The only diffs are `changelog.ts` (−430) and `projectOverview.md` (−662), i.e. `main` moved on. |
+  | `lane-a/q44-phase3-pr1-table-rename` | **Unmergeable as-is.** It adds migrations **273** and **274**, and `main` already has both under different names (`exercise_media_review_status`). `ensureSchema` tracks by FILENAME, so this needs renumbering to 284+ before it could ever land. |
+  | `lane-a/fix-gate-pin-q305` | One test file, **+10 −10**. Trivial either way; look before keeping. |
+  **So the recommendation flips: do NOT open draft PRs for these. Sweep all four** — three are stale
+  copies of work already on `main`, and keeping them is worse than useless, because a later session
+  can "restore" older code from a branch whose name matches a live entry.
+- **The refinement this produced, which is the durable part.** Matching a live queued entry is
+  **necessary but not sufficient**. The audit stopped at *"this branch's name matches an open
+  entry"* and inferred a head start; the missing step is **diffing the content against `main`**,
+  because an entry stays open for reasons that have nothing to do with the branch — OR-127's harness
+  SHIPPED and the entry is open for the on-device run it still owes. **Check three things, in order:
+  is the file on `main` at all, is it identical, and is `main` AHEAD.**
+- **⚠ The original claim, kept so the correction above has something to correct:**
   | branch | entry | size |
   |---|---|---|
   | `chore/or-127-device-cdp-harness` | **OR-127 — rank 1 in `DV`** | 12 files, 7 commits |

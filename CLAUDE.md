@@ -794,10 +794,18 @@ said nothing, because both had skipped inside it.
   `refactor/de-oura-identifiers` while its live branch is `lane-a/q44-phase3-pr1-table-rename`, and
   `OR-127` and `RV-99` have live branches and no field at all. A draft PR is a fact GitHub maintains
   and cannot go stale; a prose field is one more thing to keep in sync and it already is not.
-  **⚠ The sweep is NOT "no open PR → delete", and the audit is why.** Of 38 survivors, **four held
-  unmerged work for entries STILL IN THE QUEUE** — `OR-127` (rank 1 in `DV`), `Q-44`, `RV-99`,
-  `Q-305`. A blanket sweep discards a head start on live work. Check the branch list against queued
-  entry IDs before deleting, and open draft PRs for the matches.
+  **⚠ Before sweeping, check the branch list against queued entry IDs — but MATCHING AN ENTRY IS NOT
+  ENOUGH, and assuming it was wrong the first time this rule was applied (corrected 2026-09-26,
+  `OR-174`).** Four of 38 survivors matched still-queued entries and were called a head start on
+  live work. Diffed afterwards, **not one held anything worth keeping**: `OR-127`'s harness is on
+  `main` with `main` **208 lines ahead**, `RV-99`'s source files are **byte-identical** to `main`,
+  and `Q-44` adds migrations **273/274** that `main` already uses for something else, so it cannot
+  land without renumbering. **An entry stays open for reasons unrelated to its branch** — OR-127's
+  harness shipped; the entry is open for the on-device run it still owes.
+  **So the check is three questions against `main`, in order: is the file there at all, is it
+  identical, is `main` AHEAD.** A branch whose name matches a live entry and whose content `main`
+  has moved past is the worst kind to keep, because a later session can "restore" older code from
+  it.
   Squash-merge + auto-delete-head-branch means stale local refs break things silently — CI has failed to trigger entirely off a stale base (sessions 167, 171–173). Ritual: `git fetch origin main && git remote prune origin && git checkout -B <branch> origin/main`. If CI doesn't start, suspect a stale base and rebase before anything else. Expect `package.json`/`packages/shared/src/changelog.ts` conflicts when PRs land in parallel — resolve by re-bumping on the fresh base.
 - **Commit before you switch branches, and never `git add -A` straight after a checkout that carried changes.** `git checkout <other-branch>` with a dirty tree silently *carries the modified files across*, and the next `git add -A` sweeps them into a commit on the wrong branch. This happened **twice in one session (2026-08-08)** while working several items in parallel: Q-127's two-file change rode into Q-119's PR (#1140) and shipped under its name, so `git log` attributes it to a change it has nothing to do with. Nothing unsound merged — both files were CI-green either way — but the history is wrong and it took a revert commit plus a correction note in three documents to make honest. The habit that prevents it: **commit (or stash) before every `git checkout`**, and if a checkout prints modified paths you did not expect, run `git status` before staging anything. Prefer `git add <paths>` over `git add -A` when several items are in flight.
 - **An entry ID cannot collide across agents any more, but it still can within one role.** Each agent counts up from its own letter, so Lane A and Review cannot take the same number by construction. What no allocation scheme prevents is two sessions of the *same* role running at once and not seeing each other's unmerged PR — that has happened, and once cost a whole PR's work when two sessions ran the same compaction chore. `scripts/check-backlog-pointers.js` fails CI on a duplicate ID, so it surfaces at review rather than living in the queue; resolve one by appending a letter (the second `RV-14` becomes `RV-14a`).
