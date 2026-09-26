@@ -6663,15 +6663,25 @@ drift.
   id-reconciliation hypothesis below stands on its own evidence and is untouched by this change:
   an orphaned `workout_session_id` is not something a confirm-ordering bug produces. Two causes,
   one symptom.
-- **⚠ IT ALSO HEALS NOTHING.** The rows already stranded have no outbox entry to retry, so they
-  need a sweep — **that sweep is what keeps this entry open.**
-  - **Re-queue, do NOT mark synced.** A stranded tombstone is indistinguishable from one whose
-    mutation never got queued at all (the double-failure case `getStrandedPendingWorkouts` already
-    sweeps for), so marking it synced would silently drop a delete that never landed. Re-pushing is
-    idempotent — deleting an already-deleted row is a no-op — so the safe sweep re-queues and lets
-    the normal confirm path settle it. Copy `getStrandedPendingWorkouts`, grace period included, so
-    the sweep cannot race a push still in flight.
-- **Keep:** the heal above, and the `set_logs` id-reconciliation question.
+- **✅ THE HEAL SHIPPED 2026-09-26** (`fix/dv8-requeue-stranded-tombstones`, Lane A).
+  `requeueStrandedFoodTombstones(userId, cutoffIso)` runs in `pushMutations` beside the two
+  existing sweeps: `food_logs` rows that are `pending`, carry a `deleted_at`, are older than the
+  grace period, and have no `food_logs` outbox entry get a fresh `{id, deleted: true}` mutation.
+  It **re-queues and never marks synced** — a stranded tombstone is indistinguishable from one
+  whose mutation was never queued at all, so flipping it to `synced` would drop a delete the
+  server may never have seen. Re-pushing is free: the server arm soft-deletes by id. It shares
+  **one** cutoff variable with the workout sweep rather than computing a second, because two
+  cutoffs drift and the later one can re-sweep what the earlier one just queued.
+- **⚠ `food_logs` ONLY, deliberately.** The confirm-throw cause was generic across all 17 domain
+  arms, but the measured population was 36 food tombstones and **zero** rows in every other table,
+  and the cause is now fixed — so a general sweep would be per-domain SQL maintained for a
+  population that should never grow. If another domain is ever found stranded, it needs its own
+  arm; this one will not reach it.
+- **Keep:** ① the device pass test — zero `pending` rows in local `food_logs` against an empty
+  outbox, on the S25. **The heal cannot be verified anywhere else**: both vitest projects run in
+  `node`, where `getLocalStore` returns null, so the sweep's SQL has never executed. What is
+  tested is source-level plus the call contract. ② the `set_logs` id-reconciliation question,
+  which is a different bug and untouched by any of this.
 
 - **📱 It is common, not a one-off (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Local `food_logs` holds **36 rows stuck `pending` with
   both outboxes empty — every one a delete tombstone** (`deleted_at` set), spread over 14 days from

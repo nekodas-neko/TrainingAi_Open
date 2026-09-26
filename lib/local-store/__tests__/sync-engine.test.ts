@@ -18,6 +18,7 @@ const { fakeStore } = vi.hoisted(() => ({
     upsertFoodLog:          vi.fn().mockResolvedValue(undefined),
     getStrandedPendingWorkouts: vi.fn().mockResolvedValue([]), // added in Task 9; harmless before
     requeueStrandedFoodItems: vi.fn().mockResolvedValue(0),
+    requeueStrandedFoodTombstones: vi.fn().mockResolvedValue(0),
     queueMutation:          vi.fn().mockResolvedValue(undefined),
     getLastSyncAt:          vi.fn().mockResolvedValue(new Date('2026-07-01T00:00:00.000Z')),
     setLastSyncAt:          vi.fn().mockResolvedValue(undefined),
@@ -192,6 +193,27 @@ describe('pushMutations', () => {
     fakeStore.getPendingMutations.mockResolvedValue([])
     await pushMutations('u1')
     expect(fakeStore.requeueStrandedFoodItems).toHaveBeenCalledWith('u1')
+  })
+
+  it('sweeps stranded food tombstones on the SAME grace period as the workout sweep (DV-8)', async () => {
+    // Both sweeps look for a row with no outbox entry, and a push still in flight looks exactly
+    // like that. Two different cutoffs would mean one of them queues a duplicate.
+    fakeStore.getPendingMutations.mockResolvedValue([])
+    await pushMutations('u1')
+
+    expect(fakeStore.requeueStrandedFoodTombstones).toHaveBeenCalledTimes(1)
+    const [userId, cutoff] = fakeStore.requeueStrandedFoodTombstones.mock.calls[0]
+    expect(userId).toBe('u1')
+    expect(cutoff).toBe(fakeStore.getStrandedPendingWorkouts.mock.calls[0][0])
+    // Five minutes back, not "now" — a zero grace period is the duplicate-queue bug.
+    expect(Date.now() - Date.parse(cutoff as string)).toBeGreaterThanOrEqual(5 * 60_000)
+  })
+
+  it('still drains the outbox when the tombstone sweep throws', async () => {
+    // Every sweep in this block is best-effort: the queue must drain even if a heal fails.
+    fakeStore.requeueStrandedFoodTombstones.mockRejectedValueOnce(new Error('local read failed'))
+    fakeStore.getPendingMutations.mockResolvedValue([])
+    await expect(pushMutations('u1')).resolves.toEqual({ pushed: 0 })
   })
 
   it('records no per-item failure on a transport-level 5xx, and backs off the whole queue', async () => {

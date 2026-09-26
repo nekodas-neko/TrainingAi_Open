@@ -3268,6 +3268,46 @@ export class SQLiteLocalStore implements LocalStore {
     return healed;
   }
 
+  /**
+   * DV-8 heal: food-log DELETE tombstones left `pending` with no outbox entry.
+   *
+   * The cause is fixed — `pushMutations` now confirms each row before clearing its outbox entry —
+   * but 36 rows spanning 14 days were already stranded on the phone when it was found, and a row
+   * with no outbox entry is retried by nothing. `applyDelta` cannot correct them either: it only
+   * overwrites `synced` rows, so a `pending` tombstone is invisible to every other repair path.
+   *
+   * **Re-queue, never mark synced.** A stranded tombstone looks exactly like one whose mutation
+   * was never queued at all, and marking that synced drops a delete the server never saw — the
+   * food comes back on the next device and the calories with it. Re-pushing costs nothing: the
+   * server arm soft-deletes by id, so a second delete of an already-deleted row is a no-op.
+   *
+   * The cutoff is the same grace period `getStrandedPendingWorkouts` uses, and for the same
+   * reason: a row whose push is still in flight has no outbox entry either for that moment, and
+   * sweeping it would queue a duplicate.
+   */
+  async requeueStrandedFoodTombstones(userId: string, cutoffIso: string): Promise<number> {
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT id, date FROM food_logs fl
+        WHERE fl.sync_status='pending' AND fl.deleted_at IS NOT NULL
+          AND fl.updated_at < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM mutations_outbox mo
+             WHERE mo.user_id = ? AND mo.domain='food_logs'
+               AND mo.payload LIKE '%' || fl.id || '%'
+          )`,
+      [cutoffIso, userId],
+    );
+    for (const r of rows) {
+      await runSQL(
+        `INSERT INTO mutations_outbox (id, user_id, domain, date, payload, created_at, attempts, last_error, status, next_retry_at)
+         VALUES (?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),0,NULL,'pending',NULL)`,
+        [crypto.randomUUID(), userId, 'food_logs', String(r.date),
+         JSON.stringify({ id: String(r.id), deleted: true })],
+      );
+    }
+    return rows.length;
+  }
+
   async deleteMutations(ids: string[]): Promise<void> {
     if (!ids.length) return;
     const placeholders = ids.map(() => '?').join(',');
