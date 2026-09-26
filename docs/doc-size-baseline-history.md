@@ -17897,3 +17897,22 @@ later reader would otherwise "tidy" into a handler-level guard.
 started). RV-177's nine-gap entry left the queue whole and the one finding inside it that
 had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files against 9 — became LA-145,
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
+
+## 2026-09-25 — `docs/implementation-backlog.md` 32015 → 32050 (+35, DV-12's mechanism)
+
+The owner's highest-priority entry had a named suspect — *"a responsive resize when a panel leaves
+`content-visibility: hidden`"* — and it is **wrong**. Instrumenting `ResizeObserver` with a control (11
+observers, 6 callbacks, 5 on chart containers during load) shows **zero callbacks on a tab switch**. That
+also explains the dead `resizeDelay` A/B recorded above it: the experiment was debouncing an event that
+never fires.
+
+What these lines buy is a **metric that works**: patch the `font` setter on
+`CanvasRenderingContext2D.prototype` and count calls per tap — the exact item the device profile named,
+immune to the dev-mode timing noise that made the A/B unreadable. Switching to Health costs **578** calls,
+reproduced identically twice; to a chart-free tab, **0**.
+
+And the real cause, which changes what a fix may do: `TabVisibilityProvider` bumps `epoch` on every
+re-show, screens refetch because of it, and the charts redraw. **The update is legitimate**, so the fix
+has to make a correct update cheaper or later rather than suppress it — a trade-off against Q-402's
+staleness rule. Three candidates are listed with what each costs, none yet measured, so the next session
+picks with evidence instead of starting where this one did.
