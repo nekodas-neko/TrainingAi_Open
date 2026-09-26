@@ -175,7 +175,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     steps: activityInput.steps, activeCalories: activityInput.activeCalories,
     zoneMinutes, moveHours, moveHoursGoal: moveHours != null ? moveHoursGoal() : null,
     strengthSessionToday: activityInput.strengthSessionToday,
-    sessions7d: activityInput.sessions7d, volume7dKg, typicalSessionVolumeKg: load.typicalSessionVolumeKg,
+    sessions7d: activityInput.sessions7d, volume7dKg,
     goals, acwr,
   })?.preTaperScore ?? null
 
@@ -186,8 +186,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     ? computeActivityScore({
         steps: yesterdayMetrics?.steps ?? null,
         activeCalories: yesterdayMetrics?.activeCalories ?? null,
-        sessions7d: prevWindow.sessions7d, volume7dKg: prevWindow.volume7dKg,
-        typicalSessionVolumeKg: load.typicalSessionVolumeKg, goals,
+        sessions7d: prevWindow.sessions7d, volume7dKg: prevWindow.volume7dKg, goals,
       })?.preTaperScore ?? null
     : null
 

@@ -39,7 +39,7 @@ export function buildActivityAudit(input: ActivityAuditInput): PillarAudit {
   const hoursGoal = moveHours != null ? moveHoursGoal() : null
   const result = computeActivityScore({
     steps, activeCalories, zoneMinutes, moveHours, moveHoursGoal: hoursGoal, strengthSessionToday,
-    sessions7d, volume7dKg, typicalSessionVolumeKg, goals, acwr,
+    sessions7d, volume7dKg, goals, acwr,
   })
   const components = result?.components ?? null
 
