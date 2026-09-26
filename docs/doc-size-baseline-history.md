@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-26 — CLAUDE.md → 1042 (a branch has meaning only if it has an open PR)
+
+The owner asked that every branch have a reason. The rule that answers it is one line — **a branch
+has meaning only if it has an open PR, and a draft PR is how you mark work worth keeping** — and the
+lines are spent on the two things that make it safe to apply.
+
+**Why not the backlog's `Branch:` field**, which is the obvious candidate and was rejected on
+measurement: 199 entries carry one and it records a PLAN. `Q-44`'s names `refactor/de-oura-identifiers`
+while its live branch is `lane-a/q44-phase3-pr1-table-rename`; `OR-127` and `RV-99` have live branches
+and no field at all. A draft PR is a fact GitHub maintains and cannot drift.
+
+**And why the sweep is not simply "no open PR → delete":** of 38 survivors, four held unmerged work
+for entries still in the queue, one of them rank 1 in `DV`. That is the sentence that stops the next
+session writing a one-line cleanup script and losing live work.
+
 ## 2026-09-26 — CLAUDE.md → 1028 (two repository settings that were wrong, and the squash-merge trap)
 
 Growth in the file that most needs restraint, and it buys the removal of two false premises rather
