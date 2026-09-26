@@ -4,26 +4,24 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-26 · **By:** the sweep-4a session (`device/sweep-4a`) · **Next ID:** `DV-20`
+**Updated:** 2026-09-26 · **By:** the sweep-4b session (`device/sweep-4b`) · **Next ID:** `DV-20`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
 
 - **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`.
-- **Sweep 4a ran** (journal `2026-09-26-device-sweep-4a.md`, plan `docs/device-sweep-4-plan.md`). Ten
-  entries closed; BF-177's Known-Issues row archived. **Still failing:** DV-12 (OR-162 names the two
-  HR-today charts), BF-61 ① (taps under 300 ms swallowed), RV-186 ② and ③. **New:** DV-19 (one walk,
-  three rows); DV-8 has a second instance. **Q-11 ran and filled nothing** (no HR data left).
-- **Phone is on gesture navigation now** and runs APK 1.465.52. Sitting **4b** is next; RV-206's three
-  settings probes need the owner's OK (plan decision 6). RV-205's gallery is a private Artifact (URL on RV-205).
-
+- **Sweeps 4a + 4b ran** (journals `2026-09-26-device-sweep-4a.md` / `-4b.md`). 15 entries closed.
+  **Still failing:** DV-12 (OR-162 names the two HR-today charts), BF-61 ① (taps <300 ms swallowed),
+  RV-186 ②/③. **New / widened:** DV-19 (one walk, three rows); **DV-8 is common** (36 food delete
+  tombstones stuck `pending`); no `health-alerts` channel (RV-155). Q-11 ran and filled nothing.
+- **Phone:** gesture nav, APK 1.465.52. RV-205/206 gallery: private Artifact (URL on RV-205).
 **Now:** nothing running; the phone is the owner's. I message him with 🔴 before the next sitting.
 
 ## Next
 
-Sitting 4b in the plan (E gesture checks, F RV-155 stations, G RV-125/BF-22, J RV-205 tiers 2–3 then
-RV-206). Also owed: BF-61's meal-list half, P25, DV-18's still-frame half, RV-150 cold-start. The admin
-console waits for DV-13.
+Owed: RV-206 P29–P31 (owner OK for font size, display size, battery saver) and P35–P38; RV-155 station
+C (throwaway supplement writes) and the rest of B/D/E/F; BF-61's meal-list half; DV-18's still-frame
+half; RV-150 cold start; BF-22 around an active workout. The admin console waits for DV-13.
 
 ## Rules for every message and every input
 
