@@ -1,12 +1,15 @@
-# 2026-09-26 — Q-11: the backfill filled nothing, and that was the right answer
+# 2026-09-26 — Q-11 filled nothing, and "pruned" was the wrong reason
 
 **Branch:** `docs/q11-backfill-discharged` · **Lane A** · docs-only · answers the Device Verification
 agent's sweep-4a question
 
 ## The question
 
-Device Verification ran Q-11's owner-authorised backfill on 2026-09-24: **33 sessions processed, 0
-filled**, and asked why — *"pruned raw samples?"*
+Device Verification ran Q-11's owner-authorised backfill: **33 sessions processed, 0 filled**, and
+recorded the cause as *"likely pruned raw samples … Lane A to confirm why"*. Q-11 then left the
+queue in **#1698** on the correct conclusion — no HR left to attribute — but with that cause
+unconfirmed. This is the confirmation, and **the guess was wrong in a way that matters**: nothing
+was pruned. The data never existed, so no retention change would have saved it.
 
 ## The answer: the data never existed
 
@@ -24,9 +27,8 @@ unlikely: the route's window is 180 days (back to ~2026-03-30), the table's olde
 old, and `HR_RETENTION_DAYS = 180` has never reclaimed a row.
 
 So the backfill is **fully discharged**: every session that could be filled already is, and no
-button will fill the rest. Q-11 is removed from the queue — not because it was completed in the
-sense it hoped for, but because its remaining work is impossible, which is a different thing and is
-recorded as such.
+button will fill the rest. #1698 had already removed Q-11 on that basis; what this adds is the
+measurement behind it, the corrected cause, and LA-150.
 
 ## Reproducing the 33 needed the route's real predicate
 

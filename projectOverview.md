@@ -11183,8 +11183,9 @@ a NULL `peak_bpm`**, so v1.197.0's "Heart & Recovery" card trends over roughly o
 lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.**
 
 **⚠ The backfill half is DISCHARGED, and not by being filled (2026-09-26).** The owner-authorised
-run happened on 2026-09-24: 33 sessions processed, **0 filled**. Measured against production, that
-is correct rather than broken — those 33 span **2026-04-30 → 2026-06-21** and `oura_heartrate`'s
+run processed 33 sessions and filled **0**; Q-11 left the queue in #1698, which asked Lane A to
+confirm why. Confirmed here, and **the cause it guessed at was wrong: not pruned raw samples —
+the data never existed.** Measured against production — those 33 span **2026-04-30 → 2026-06-21** and `oura_heartrate`'s
 oldest row is **2026-06-22**, so not one of them has a single HR reading inside its own window.
 Pruning is ruled out: the table is 96 days old against a 180-day retention and has never reclaimed
 a row. **Zero pending sessions start on or after 2026-06-22**, so every session that *could* be

@@ -1116,6 +1116,13 @@ the Orchestrator's to do.
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
 
+- **⚑ CAUSE NAMED 2026-09-26 (OR-175, from sweep 4a).** `OR-162` carries it: the two
+  *HEART RATE · TODAY* charts **re-measure on every tab switch while hidden**, and sweep 4a
+  measured **16 of 20 taps** with one 51–104 ms task. `RV-153` is a second candidate on the same
+  tap — **~120k characters of `localStorage` rewritten per Home tap**, friends-feed 459k.
+  **Both fixes are Lane B and are now laned there. This entry is the PASS TEST, not the fix** —
+  do not start it as work; re-measure it once OR-162 and RV-153 land.
+
 - **📱 Sweep 4a, after #1675 (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): still FAILS the pass test.** `perf.js longtasks` ×2: **16
   of 20** taps carry one long task of 51–104 ms; 4 carry none (sweep 3: every tap, 68–118 ms). The profile
   still shows chart.js `update → _tickSize → _getLabelSizes → _computeLabelSizes` on every tap, 6–45 ms.
@@ -1319,7 +1326,10 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   TIME — 14 DAYS"** (1068×330) re-measures 43× on arriving at Health. Health's other three canvases and
   Nutrition's do not. So the fix is two components, not every chart.
 
-- **Lane: DV** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 ·
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Sweep 4a named the cause**, which is what this entry was for: the two *HEART RATE · TODAY* charts
+  **re-measure on every tab switch while hidden**. That is `components/**`, so Lane B.
+  It is the mechanism behind `DV-12`'s 51–104 ms task — fix here, verify there.
 - **⚑ RE-LANED `B` → `DV` and UNGATED, 2026-09-25, on the owner's instruction** (*"Make sure anything
   that can be done by DV agent is assigned to it. I shouldn't need to do device checks are possible
   by DV"*). It carried `Lane: B` + `Gate: device`, which PARKED it into the owner's `--sittings` list —
@@ -3611,7 +3621,12 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   427–555, zone-minutes 497–610** (bar 100–150), cardio-week 512–1,116, **health/trends 1.0–1.3 s**. ⑥
   exercise-library on Workout re-shows: **0** ✓. Rows 7–9 not run (7 needs a live workout, 9 DV-13).
 
-- **Lane: DV**
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Sweep 4a answered the measurement and three items FAILED, so what is left is code, not the phone.**
+  ② **4 requests per resume**, ③ **Health switch = 24 requests**, ⑤ **`hr-profile`/`zone-minutes` 430–610 ms.**
+  ⑤ is route latency and is squarely Lane A. ②③ are client request counts and are Lane B — per the
+  path rule, an entry reaching both goes to **Lane A, engine half first**, so ⑤ ships first and ②③
+  follow in B. Do not send this back to `DV`: the numbers exist, and a FAILED is work.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **This is sweep 58's device half.** Review measured the server side (`pg_stat_statements`,
 code, `next build`); these are the numbers only the phone can give. Run it **now**, so RV-180 to
 RV-185 each ship against a recorded baseline, then re-run each row after its fix lands.
@@ -5925,8 +5940,11 @@ drift.
   **What remains true:** the set is still `pending` locally, and the server has it — the same
   bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
 
-- **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
-  SQLite file.
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Second independent reproduction in sweep 4a** — a food delete left pending with **both outboxes
+  empty**, which is the sync write path rather than anything the phone can answer next. Two
+  reproductions is enough; further device time on it is the trap where a probe already run gets
+  re-run. Lane A.
 - **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
   is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
   PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
@@ -6212,7 +6230,10 @@ drift.
   section lost, no error or "may be stale" signal, identical text. A failed refetch is invisible: every
   card keeps its cached value as if current. Not tested: a failure with no cache (cold start).
 
-- **Lane: DV**
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Answered: a failed refetch is invisible — no stale signal reaches the user.** This is the
+  `Q-499` shape (`cachedFetch`/`useCachedValue` swallow `!res.ok` unless the caller passes
+  `onError`), so the fix is at the call sites in `components/**`. Lane B.
 - **Added:** 2026-09-24 · Review. Method: **P18**.
 - **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
   `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
@@ -6247,7 +6268,10 @@ drift.
   rewritten on every tap. **Fails the 10 kB-per-key bar** on workout-data:meta, workout-card and
   sleep-sessions. → Lane B/A to decide whether warm-tab rewrites of unchanged payloads can be skipped.
 
-- **Lane: DV**
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Answered on device: ~120k characters of `localStorage` rewritten per Home tap, and the
+  friends-feed entry is 459k.** A synchronous main-thread write of that size on every tap is a
+  plausible contributor to `DV-12`. Stores and hooks are Lane B.
 - **Added:** 2026-09-24 · Review. Method: **P21**. Feeds **DV-12**, whose profile found
   `localStorage.setItem` at 1–15 ms on every tab tap and left the caller unnamed.
 - **The suspect, from source:** `lib/sqlite/cache.ts:82` writes `JSON.stringify(entry)` of the
@@ -23880,6 +23904,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
+
+- **Lane: A** — set 2026-09-26 (OR-175). This entry had NO lane field, so it was printing as UNCLASSIFIED and no implementer could pick it up.
+  **The device question is discharged.** Sweep 4a blocked `/api/health-trends*` and the *Rest
+  discipline* card showed *"Couldn't load this trend"* — so it renders from the **server route**,
+  not `getLocalStore`. That was the one thing the entry still owed.
+  What remains is the RPE model gaining a rest term, which is domain math in `packages/shared/**`.
 
 - **📱 ANSWERED (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** With `/api/health-trends*` blocked, *Rest discipline* shows *"Couldn't
   load this trend…"* — no rows. So on the device this card renders from the server route; the
