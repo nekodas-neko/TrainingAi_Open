@@ -1189,6 +1189,31 @@ export async function getWorkoutHrStats(db: Db, userId: string, sessionId: strin
  *  later; see app/api/complete-workout/route.ts) would persist an empty snapshot and permanently
  *  remove the session from this list — the fuller-wins upsert protects the *values* from a partial
  *  write, but a plain existence check doesn't protect the *work-list* from one. */
+/**
+ * LA-150 — a session that ENDED before the first heart-rate reading exists can never acquire one,
+ * so it is not pending work.
+ *
+ * Both work lists below floored their scan at a flat retention window (180 days). `oura_heartrate`
+ * is younger than its own retention window — it starts 2026-06-22 — so every session between the
+ * retention floor and that date matched forever. Measured in production 2026-09-26: the per-set
+ * list held **33 pending, 33 of them unfillable**, and the whole-session list **36 pending, 34
+ * unfillable and 2 real**. Every run reported the same count and filled nothing, which is
+ * indistinguishable from a broken backfill — the device agent hit exactly that on 2026-09-24 and
+ * reasonably asked whether the raw samples had been pruned.
+ *
+ * `completed_at`, not `started_at`: a session that began ten minutes before the first reading but
+ * ran across it is still fillable, and flooring on the start would discard it.
+ *
+ * A NULL from this subquery — no heart-rate rows at all — makes the comparison NULL and excludes
+ * every session, which is the right answer and needs no special case.
+ *
+ * **Not fixed by writing a sentinel row** for the unfillable sessions: the coverage-aware
+ * `readings_count = 0` predicate exists because empty rows used to hide real gaps (Q-11 Defect B),
+ * and a sentinel under another name walks straight back into it.
+ */
+const completedAfterFirstHeartrateReading = (userId: string) =>
+  sql`${s.workoutSessions.completedAt} >= (SELECT MIN(${s.ouraHeartrate.timestamp}) FROM ${s.ouraHeartrate} WHERE ${s.ouraHeartrate.userId} = ${userId})`
+
 export async function listSessionsMissingHrStats(db: Db, userId: string, since: Date, limit: number) {
   return db
     .select({ id: s.workoutSessions.id, startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
@@ -1199,6 +1224,7 @@ export async function listSessionsMissingHrStats(db: Db, userId: string, since: 
       isNotNull(s.workoutSessions.completedAt),
       isNull(s.workoutSessions.deletedAt),
       gte(s.workoutSessions.startedAt, since),
+      completedAfterFirstHeartrateReading(userId),
       or(
         isNull(s.workoutHrStats.workoutSessionId),
         eq(s.workoutHrStats.readingsCount, 0),
@@ -1399,6 +1425,7 @@ export async function listSessionsMissingSetHrStats(db: Db, userId: string, sinc
       isNotNull(s.workoutSessions.completedAt),
       isNull(s.workoutSessions.deletedAt),
       gte(s.workoutSessions.startedAt, since),
+      completedAfterFirstHeartrateReading(userId),
     ))
     .groupBy(s.workoutSessions.id, s.workoutSessions.startedAt, s.workoutSessions.completedAt)
     .having(sql`COALESCE(MAX(${s.setHrStats.readingsCount}), 0) = 0`)
