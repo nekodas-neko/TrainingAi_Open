@@ -20,7 +20,7 @@
 // It computes nothing about the owner's opinion and must never be mistaken for it: an auto-filled
 // value writes `touched: false`, and only a correction writes `touched: true` (TN-57).
 
-import { median, quantile } from '@trainingai/shared/health/daily-medians'
+import { median, quantile } from '@trainingai/shared/stats'
 import { msToHHMMInTz, toAestDay, daysBetweenDateStrs, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 /**

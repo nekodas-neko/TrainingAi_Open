@@ -4,7 +4,7 @@
 // faster over the last few months." Derive-on-read, never persisted (mirrors hrr-trend.ts's rollup
 // shape). Median, not mean, per the same convention — one anomalous episode can't skew a period.
 import { formatInTimeZone } from 'date-fns-tz'
-import { median } from './daily-medians'
+import { median } from '@trainingai/shared/stats'
 import { bandForPeak, recoveryRateBpmPerMin, isLowSignalBand, type RecoveryEpisode } from './hr-recovery-profile'
 
 export interface BandTrendPoint {

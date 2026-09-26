@@ -5,7 +5,7 @@
 // lone motion/decode artifact can never become the displayed value. Reuses the
 // byte-exact decoder in @/lib/oura-ble/decode and the shared median() (One Formula).
 import { historyEventFromHex } from '@/lib/oura-ble/decode'
-import { median } from '@trainingai/shared/health/hr-smoothing'
+import { median } from '@trainingai/shared/stats'
 
 const MIN_BPM = 30
 const MAX_BPM = 220
@@ -74,5 +74,11 @@ export function smoothedBpmFromFrames(
   fresh.sort((a, b) => a.ts - b.ts)
   const beats = fresh.flatMap(f => f.bpms)
   const window = beats.slice(-windowBeats)
-  return { bpm: median(window), ringTs: maxRingTs }
+  const bpm = median(window)
+  // `fresh` is non-empty and every entry carries >=1 beat, so this cannot be null.
+  if (bpm === null) return null
+  // A bpm is presented as a whole number and every other live-HR source emits one, so the
+  // even-count half-step from the shared median is rounded away HERE, at the point the statistic
+  // becomes a displayed value — not by giving this path its own median (LA-148).
+  return { bpm: Math.round(bpm), ringTs: maxRingTs }
 }

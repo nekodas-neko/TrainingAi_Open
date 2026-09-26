@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { energyBalanceByDay, medianOf } from '@trainingai/shared/health/energy-balance'
+import { energyBalanceByDay } from '@trainingai/shared/health/energy-balance'
+import { median as medianOf } from '@trainingai/shared/stats'
 
 describe('energyBalanceByDay', () => {
   it('maps date -> (calories - activeCalories), skipping days with no food logged', () => {

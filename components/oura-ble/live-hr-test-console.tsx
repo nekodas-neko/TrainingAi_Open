@@ -4,7 +4,7 @@ import { HeartPulse, Play, Square, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
 import { allBeatsFromFrames } from '@/lib/live-hr/decode-live-hr'
-import { median } from '@trainingai/shared/health/hr-smoothing'
+import { median } from '@trainingai/shared/stats'
 import type { LiveHrCurrent, LiveHrDiagnostics } from '@/lib/live-hr/types'
 
 interface Reading {
