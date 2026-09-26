@@ -2810,9 +2810,21 @@ which is the right shape for something that can only be validated by living with
        the signals first. That is server-side gathering, so it is NOT the local-store work this
        entry puts out of scope, but it is a bigger change than "return the deterministic
        prescription instead of 502" suggests.
-     - **Fix:** thread the base sets/reps/pct into the signals, build a rules prescription from
-       them through the existing `fitToBudget`, and return it flagged `source: 'rules'` instead of
-       502. Do NOT reuse the deload builder.
+     - **✅ SHIPPED 2026-09-26** (`fix/rv202-rules-fallback`). `PrescriptionSignals.exercises` now
+       carries `baseSets` from the exercise's own progression style, and `buildRulesPrescription`
+       turns those into a plan through the same `fitToBudget` the model path uses. The catch
+       returns it flagged `source: 'rules'` with confidence 0.3; the deload builder is untouched.
+     - **The rules plan is NOT persisted, which the entry did not specify.** `storePrescription`
+       holds a plan for seven days, so storing this would give the model no further attempt until
+       it expired — one provider blip becoming a week of uninformed plans, the shape RV-69 fixed
+       for the digests. The slot stays empty and the next open re-runs the model.
+     - **Measured on the dev server with a deliberately invalid API key:** HTTP **200** (was 502),
+       `source: 'rules'`, phase unchanged, `deload: false`, and the prescribed 3×8 @ 75% rest 90
+       matching `style_sets` set for set. `prescription IS NOT NULL` read **f** afterwards, so the
+       non-persistence is observed rather than argued. With a valid key the model path still wins,
+       which is the regression half of the same run.
+     - **Returns null when NO exercise in the session has a progression style**, and the 502
+       stands there — a prescription that invents a load is worse than an error.
   2. ~~**A duration preset change re-runs the whole model call**~~ — **SHIPPED 2026-09-26**
      (`feat/duration-refit-without-the-model`). The route re-fits the stored plan through the
      extracted `budget-stage.ts` and never reaches the model. Measured on the dev server against
@@ -2836,26 +2848,12 @@ which is the right shape for something that can only be validated by living with
   3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
      - The pending flag only comes from a server response (`workout-screen.tsx:446`).
      - **Fix (B):** label the source ("Base program" or "From {date}").
+     - **⚠ Item 1 gave this a second unlabelled source and did not make it worse.** A rules plan
+       carries `source: 'rules'` and nothing renders it, so a model outage now shows the base
+       numbers immediately where it used to show them after ~30 s of "Preparing your AI workout…".
+       Same numbers, same silence, less waiting — but the field this item wants to read now
+       exists, so the label no longer has to be inferred.
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
-
-### [workouts] LA-147 — a duration change still spends the model's hourly budget, though it no longer calls the model
-
-- **Lane: A** (`app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`, `lib/rate-limit.ts`).
-- **Added:** 2026-09-26 · found while shipping RV-202 ②.
-- **What:** the prescribe route takes `rateLimit('prescribe:<user>', 20, 1h)` before it knows
-  whether the request is a generation or a re-fit. Since RV-202 ② a `durationPreset` request
-  usually re-fits the stored plan with no model call, so after 20 preset switches in an hour the
-  lifter is told *"Too many plan rebuilds this hour"* for work that cost nothing to the AI budget.
-  The limit's own comment cites preset-switching as the reason it is 20 rather than 10 — that
-  justification is now spent on the wrong thing.
-- **Not just "raise it to 60".** The re-fit runs a full `aggregateSignals` (~30 repository reads),
-  so it needs a real limit; what it does not need is the *model's* one. Two buckets, checked on the
-  branch that is actually taken.
-- **The ordering is the catch:** the branch is only knowable after `getSessionPeriodization`, and a
-  limit checked after a database read is a limit an attacker has already spent. Either check the
-  cheap generation limit first and refund/relax it on the re-fit path, or give the re-fit its own
-  bucket checked up front and let a request hold whichever it lands in.
-- **Low priority** — it needs 20 switches in an hour to bite, and the failure is a toast, not data.
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
 - **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
@@ -8145,6 +8143,7 @@ drift.
 - **The numbers he is moving to**, so nobody has to re-derive them: **1,359 kcal / 111 g protein /
   143 g carbs / 38 g fat** at the DEXA-corrected body fat — down **259 kcal** and **39 g protein**
   from the 1,660 / 150 he has been eating for three weeks. That is a real cut, not a correction.
+- **Ask: owner** — ONE TAP, not a decision — accept the post-RV-66 calorie recommendation in the app. The outcome was decided 2026-09-23; nobody may run it for him. Surfaced 2026-09-26 (OR-181): it was gated and therefore invisible, so it has been waiting on an action nobody asked him to take.
 - **Gate:** owner — the OUTCOME is decided (2026-09-23, computed numbers only); what is still owed is the WRITE, which is his one tap on a post-RV-66 recommendation. A decision recorded in a backlog entry is not a hand on his production data — do not run it for him.
 - **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
   only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
@@ -13111,6 +13110,7 @@ the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
 - **Lane:** A — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
 - **Added:** 2026-09-10 · owner, after his budget rose 651 kcal: *"I thought discussed 1650 was like the maint? with 200 minus for recomp? how did we go up?"* — he was right, and checking him is what found this.
 - **Needs:** — nothing. **Cross-reference TN-29**, which catches this *instance* through a different mechanism; the cause below is not the one TN-29 names, and will recur on every new vial.
+- **Ask: owner** — ONE DATE — when the current GLP-1 vial started. The general guard shipped (TN-29, v1.457.4) and catches this instance; the specific correction cannot run without that date. Surfaced 2026-09-26 (OR-181).
 - **Gate: owner** — added 2026-09-16, and it is a DATA correction rather than a decision. See below.
 - ⚙️ **STATUS 2026-09-16 — the general guard shipped; this entry's specific fix is blocked on one
   date the owner has to set.**
@@ -13968,6 +13968,7 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
+- **Ask: owner** — LIVED FEEDBACK after several sessions under BF-128’s five exercises: does five fit the hour in practice? **The recommendation is to change nothing until then** — the safe-looking fix reintroduces the bug he reported. Surfaced 2026-09-26 (OR-181).
 - **Gate:** owner — LIVED FEEDBACK, not a decision. The recommendation below is to change nothing until he has trained several sessions under BF-128's five exercises; the safe-looking fix reintroduces the bug he reported. What is owed is whether five fits the hour in practice.
 - **Needs:** — nothing.
 - **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
@@ -14412,8 +14413,19 @@ Not a decision for a queue pass: option 1 changes how every request in the app i
 
 - **Lane:** A — `auth.ts` signIn callback, `lib/data/postgres/adapter.ts` (`getUserByEmail`).
 - **Added:** 2026-09-06, found while fixing PS-25's rate-limit key.
-- **Gate:** owner — the recommended fix needs a schema decision (a functional index), and getting it
-  wrong loses matches on existing rows rather than gaining them.
+- **Ask: owner** — **recommendation: normalise on the way IN and add the functional index, both in one
+  migration.** This is auth, which is why it stays yours rather than being decided here. Today
+  registration stores `email.toLowerCase().trim()` while three Google-path lookups pass the raw
+  provider value, so a provider that returns `Dasa.Delan@…` finds no user and **creates a second
+  account** — silently, and the first one keeps its data. The durable fix is a `lower(email)` unique
+  functional index plus normalising at the three call sites; the index is what stops the next call
+  site reintroducing it. **What could go wrong:** if two rows already differ only by case, the unique
+  index fails to build — so the migration checks for that first and reports rather than guessing which
+  row wins. **Reversal cost: drop the index.** The alternative, normalising at the call sites only, is
+  cheaper now and leaves the same bug one new call site away. Surfaced 2026-09-26 (OR-181): it was
+  `Gate: owner` with no question written, so it had never been put to you.
+- **Gate:** owner — the schema decision above; getting it wrong loses matches on existing rows rather
+  than gaining them.
 
 Registration **writes** `email.toLowerCase().trim()`, and `getUserByEmail` compares with a plain
 `eq`, so the lookup is case- and whitespace-sensitive. Three sites on the Google path pass the raw
@@ -22816,7 +22828,12 @@ Measured against `lib/walk/segment-stats.ts`:
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
 - **Lane:** A
-- **Gate: owner — a READING, not a decision.** What is owed is the CPU/RAM baseline during a
+- **✓ THE OWNER GATE WAS REMOVED 2026-09-26 (OR-181) — the field contradicted its own sentence.** It
+  described itself as *"a READING, not a decision … do not present this to the owner as something to
+  decide"*, while the field it was written in is exactly what makes a sweep present it as his. It has counted as
+  owner debt every sweep since. **`Needs: Q-551` below is the real park** and it still holds, so
+  nothing becomes startable by removing this. Original text: a READING, not a decision. What is owed
+  is the CPU/RAM baseline during a
   genuinely quiet window; a sandbox cannot read Railway metrics and every sample so far landed on a
   shipping day. **It feeds Q-551 (the one Railway decision) rather than asking its own question** —
   do not present this to the owner as something to decide. The deploy-marker half is corroborated
@@ -27672,7 +27689,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   required list is `Lint, Tests, Build, Migration Check, Custom Rules` — **E2E is not on it**, which
   is the owner's 2026-09-24 answer now actually in force rather than merely decided. The
   `owner-branch-protection` batch is closed and `LB-52` is removed.
-- **Gate:** owner — ANSWERED 2026-09-24: **E2E stays OFF the required-check list.** He was asked it with `LB-52` as the `owner-branch-protection` batch and chose to leave it advisory until `LB-56` establishes whether it gates anything real. The gate stays only for residue 1 below, the warmed-server instant-paint budget, which is a judgement about spending CI flakiness.
+- **✓ GATE REMOVED 2026-09-26 (OR-181) — both halves are settled, one by him and one by me.**
+  **His half, ANSWERED 2026-09-24: E2E stays OFF the required-check list.** He was asked it with
+  `LB-52` as the `owner-branch-protection` batch and chose to leave it advisory until `LB-56`
+  establishes whether it gates anything real.
+  **Residue 1 — the warmed-server instant-paint budget — is a STRUCTURAL call and I am taking it:
+  build it.** The gate called it *"a judgement about spending CI flakiness"*, and that judgement has
+  an obvious answer now: **E2E is not a required check**, so a flakier E2E cannot block a merge. The
+  cost is CI minutes on a job nothing waits for; the benefit is the only measurement that can tell
+  *seeds instantly from cache* from *seeds in eight seconds off the network*, which is the difference
+  the instant-paint rule is actually about. **Reversal cost: delete the warm-up pass.** Lane A's to
+  build. If it turns out to make the advisory job so noisy nobody reads it, that is the signal to
+  drop it — not a reason to withhold it now.
 - **✅ Everything buildable in this entry has shipped**, four of the five under other numbers —
   `workout-set-loop.spec.ts` (Q-461), `food-logging-complete.spec.ts` (Q-387),
   `water-log-write-path.spec.ts`, `goal-round-trip.spec.ts` + `goal-invalidation.spec.ts` (which
@@ -28173,6 +28201,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   as test fixtures. None of this has been done; the bands today are still the plan's initial
   priors. Grepped the backlog for a tracking entry — none exists; this gap has sat as a code
   comment only.
+- **Ask: owner** — LABELLED DATA, not a decision — auto-detected activities confirmed or rejected as they happen, so the classifier has something real to fit. The classifier’s own header forbids hand-tuning without it. Surfaced 2026-09-26 (OR-181).
 - **Gate:** owner — the DATA, not a decision: every path in this entry ends at labelled activity only he can produce, and the classifier's own header forbids the one thing that looks implementable (*"do not hand-tune further without real data"*). Tightening the bands from a desk is the prohibited move, not the fallback.
 - **Why it is gated rather than READY (added 2026-09-04):** every path in this entry ends at data only
   the owner can produce, and it was heading Lane A's READY list with nothing an implementer could
@@ -28235,8 +28264,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   read — they hold each file against *its own* baseline, which rises whenever a raise is justified.
   Nothing else in the entry is disturbed by this; the plan and the "archiving the fixed ones only
   removes 17%" caveat still stand.
-- **Lane:** A
-- **Gate: owner** — added 2026-09-18, because the ⚠ at the bottom of this entry did not hold. It was
+- **Lane: O** — re-laned 2026-09-26 (OR-181). The work is a docs sweep, not engine code; it was `A`
+  only because nobody re-read it after the shape changed.
+- **✓ GATE REMOVED AND THE STRUCTURAL CALL TAKEN, 2026-09-26 (OR-181).** The gate named two blockers.
+  **The decision — where the open Known Issues live — is structural, so it is mine** (owner, 2026-09-22:
+  *"I'd like it if you could take a lot of these structural questions"*), and the scheduling half is
+  mine to pick rather than his to grant.
+  **The call: move the Known Issues & Risks tables whole into `docs/overview/known-issues.md`, and
+  leave `projectOverview.md` as the lean index it already claims to be, pointing at that file.**
+  - **Why this and not per-pillar files.** The multi-tag visibility risk this entry names is real and
+    per-pillar files are where it bites: an issue tagged `[sleep][platform]` has to live in one file
+    and go missing from the other. One file keeps `grep -n '^### .*\[sleep\]'` working exactly as the
+    standing rule requires, which is the property that must not break.
+  - **Why it is worth doing at all.** The measurement below said 8,068 lines; `projectOverview.md` is
+    **12,935 today**, so the cost this entry was filed about has grown ~60% while it sat gated. Every
+    session pays it before its first useful action.
+  - **Reversal cost: one `git mv` and one link.** Nothing is rewritten, nothing is archived, no row
+    changes shape — which is the argument for doing it now rather than bundling it with a cleanup.
+  - **Scheduling: one PR, and one conflict round is the accepted cost.** `docs/implementation-backlog.md`
+    is already the irreducible concurrent-edit file (LB-120); adding a second one for a single move is
+    a cost worth paying once. **Not to be split across PRs** — a half-moved table is worse than either
+    end state.
+- **The original gate text, kept because it records why it was gated:** added 2026-09-18, because the ⚠ at the bottom of this entry did not hold. It was
   written on 2026-09-15 *"so the next implementer does not re-derive the reasoning and defer it
   again silently"*, and three days later Lane A reached this entry again, re-derived it and would
   have deferred it again: with no field to read, `next-item.js` kept printing it at the top of
@@ -30899,7 +30948,15 @@ where the 2026-08-17 outage started.
 ### [devices][platform] ➡️ Q-31 — own resilience weights & own workout-energy MET table — RE-SCOPED by #999, gates released
 
 - **Lane:** A
-- **Gate:** owner — ONE LINE of sequencing, stated below: is Q-31's implementation startable now, or does it still follow Q-1 and Q-30? The entry header and the plan it points at disagree, and inferring an answer from either is what put this in READY by mistake.
+- **Needs:** Q-30
+- **Needs:** Q-1a
+- **✓ GATE REMOVED AND ANSWERED FROM THE REPO, 2026-09-26 (OR-181) — it was never the owner's.** The
+  gate asked *"is Q-31's implementation startable now, or does it still follow Q-1 and Q-30?"*, which
+  reads as a decision and is a **fact**: the triage plan says the implementation stays blocked behind
+  both, and **both are still in this queue**. There is nothing for him to choose — the queue already
+  answers it, and a gate meant nobody looked. The two `Needs:` above now say it in the field that
+  parks correctly, so this unparks by itself when Q-30 and Q-1a leave. **The header's claim that
+  *"the Q-1 + Q-30 gates are released"* is the stale half; the plan is right.**
 - **⚠ Gated 2026-09-11 because this entry and the plan it tells you to read disagree about whether
   it is startable, and `next-item.js` was printing it READY.** The header says *"the Q-1 + Q-30 gates
   are released"*; the triage plan's own closing section — the document this entry says to read
@@ -31007,6 +31064,7 @@ repo's production path is unaffected until then.
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
 - **Lane:** A
+- **Ask: owner** — ONE NIGHT wearing the Polar H10, not a decision — he said yes on 2026-08-04 and chose this off a list of four on 2026-09-01. Nothing here can start until that night exists. Surfaced 2026-09-26 (OR-181).
 - **Gate:** owner — SCHEDULING, not consent. He said yes on 2026-08-04 and chose it off a list of four on 2026-09-01; what is owed is one night wearing the Polar H10, and nothing else can start until that data exists.
 
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
@@ -31767,7 +31825,13 @@ answers.
 - **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39), and pinned
   there as current behaviour. **Not fixed, deliberately:** narrowing or widening an error classifier
   without a real error sample is exactly the guess the external-API rule exists to stop.
-- **Gate:** owner — needs one live failure captured from the device, below.
+- **✓ GATE REMOVED 2026-09-26 (OR-181) — the owner cannot produce this any more than an agent can.**
+  What is owed is **one live `calendar.events.insert` failure captured from the device**, and nobody
+  can make Google fail on demand. Gating it on him counted it as a decision he owes for weeks, and
+  there is no question to put. **It waits on the world, not on a person.** The right next action is
+  to capture it opportunistically: if `error_events` ever shows a calendar insert failure, that is
+  the sample — read it there rather than waiting for a report. Until then this entry is correctly
+  not fixed, for the reason its own Added line gives.
 
 The route sorts a failed `calendar.events.insert` into two answers, and the split is load-bearing in
 BOTH directions: a **403 `CALENDAR_SCOPE_MISSING`** is a consent state the user has not given, so it
