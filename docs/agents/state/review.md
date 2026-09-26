@@ -1,112 +1,97 @@
 # 📖 Review Agent — baton
 
-> **Successor sessions are titled `📖 Review Agent 🟢`** — exactly, both emoji included. The **leading**
-> emoji is the role and never changes; the **trailing light** is that session's own status (🟢 live,
-> 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
-> flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
+> **Successor sessions are titled `📖 Review Agent 🟢`**, exactly, with both emoji included. The
+> **leading** emoji is the role and never changes. The **trailing light** is that session's own
+> status: 🟢 live, 🔴 handed on. It is the only part that moves. A session titles itself 🟢 on its
+> first instruction, and flips itself to 🔴 as the last step of its handoff, after the baton and
+> every PR have landed.
 
-**Updated:** 2026-09-22 · **By:** fifty-one sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×6, 2026-09-05 ×2, 2026-09-06 ×1, 2026-09-18 ×1, 2026-09-20 ×1, 2026-09-21 ×1, 2026-09-22 ×1) · **Next ID: `RV-123`.**
+**Updated:** 2026-09-26 · **By:** the session that ran sweeps 54–64 (2026-09-23 → 26) · **Next ID:
+`RV-222`.**
 
-> **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
-> in source rather than taken from the closure note, and their `projectOverview.md` row is in
-> [`known-issues-resolved.md`](../../overview/known-issues-resolved.md). Record, with its pickup
-> prompt: [`handoff-2026-08-24-…-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md).
-
-**A baton carries state, not history** — it was 1,280 lines before sweep 40 cut it. Keep it to a
-screen: replace §Now each sweep and let the write-up hold the story. Nothing is lost by doing so —
-every sweep has its own `docs/reviews/` write-up, indexed from the eleven `docs/domains/*/README.md`
-files, and every finding is a `projectOverview.md` row or a queue entry.
+**A baton carries state, not history.** Keep it to a screen. Every sweep has its own
+`docs/reviews/` write-up, indexed from the eleven `docs/domains/*/README.md` files.
 
 ---
 
 ## IDs
 
-`RV-<n>`, counting up forever. No band, no pointer, no ledger.
-`grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
+`RV-<n>`, counting up forever. Find the next one with
+`grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | uniq | tail -1`.
 
-One trap: `docs/agents/README.md` and the backlog carry **`RV-31` as a prose example**, not an entry.
-Follow the lookup anyway — skipped numbers cost nothing. Legacy `Q-` numbers stay valid, never renumbered.
+- Ignore **`RV-999`** and **`RV-31`**: both are prose examples, not entries.
+- Legacy `Q-` numbers stay valid and are never renumbered.
 
-## Still open — do not re-file these
+## Now — idle, waiting for the owner's next review brief
 
-From sweeps 29–39
-([record](../../handoff-2026-08-20-platform-review-sweeps-29-39.md); 10 of its 13 findings shipped):
-**Q-499** (self-fetching cards vanish on a failed fetch — its ten unverified candidates are a
-*worklist*, not a defect count), **Q-555** (offline, a tab tap is a silent no-op before the service
-worker claims the page). **Q-556 was listed here and is CLOSED** — it shipped on
-`/api/activity-logs`, which now answers 404, verified live in sweep 47. From sweeps 41-42: **RV-37** and **RV-39**, both needing the device.
+**Nothing is open.** Every PR from sweeps 54–64 is merged. This session's last three: #1686 (sweep
+63), #1707 (sweep 64), and the routing PR that wrote this baton.
 
-## Now — sweep 53 filed (2026-09-22). **Next ID: `RV-123`.**
+**Handed off, so do not re-file:**
+- **Lane O, owner items: RV-221.** One mockup (RV-213), the daily calorie target (RV-218), and a
+  merge-time yes on six security fixes. It sits beside the older **RV-161 / RV-170 / RV-157**.
+- **Lane DV, one pass: RV-220.** It fixes the gallery's capture faults and then runs everything
+  still owed: P41 before/after on RV-207's shipped fixes, RV-206 P29–P38, the rest of RV-205, and
+  whether hidden tabs keep animating. **When its result lands, the next sweep is reading that
+  gallery.**
+- **Security, Lane A:** RV-190, 191, 192, 193, 195, 196, 197, 198 (partly shipped).
+  - **RV-191 first:** any user can reach it, and it is the precondition for 193 and 196.
+  - **RV-190 before OR-138.** Open PR #1499 must not merge ahead of it.
+- **AI to logic, Lane A/B:** RV-200 (partly shipped), 201, 202, 203, 204.
+- **Design, Lane B:** RV-208 to RV-219.
+  - **RV-207 shipped 5 of 7.** Its ⑤ remainder is LB-162, and ⑥ is a Lane O mockup.
+  - **RV-216** (the two streak functions) and **RV-217** (raw sleep keys) are Lane A,
+    code-certain.
 
-**Sweep 53 ran the angles the owner named** — animations/page swaps, caching (from a live report),
-and what should merge. [Write-up](../../reviews/2026-09-22-sweep-53-stale-surfaces-and-movement.md)
-· **RV-103…RV-122** · batches `nutrition-freshness` (2), `stale-surface-subscribe` (3),
-`tab-nav-shell` (2), `home-ia-merge` (2), `health-ia-merge` (2).
+**The lesson of sweeps 62–64:**
+- **A web screenshot pass is worth doing first, and the phone corrects it.** Of sweep 63's web-only
+  readings:
+  - two were wrong: the white dialog button, and "Dumbbell", which is an icon-name fallback;
+  - one moved: the "empty pill" is a populated pill that truncates the date on the device.
+- **The phone found what the web build could not:** the 111 against 49 streak, the raw sleep keys,
+  and four calorie numbers.
+- **Check a DV gallery for byte-identical captures before reading it.** Health's set turned out to
+  be the launcher.
 
-**THE LESSON OF THIS SWEEP: check whether an owner report is a RE-report before investigating it.**
-His *"macro not updating… requires page swap"* is quoted verbatim in BF-177's docblock. Finding that
-first turned a bug hunt into "why did the fix not hold", which is a much shorter path — the answer
-was `cachedFetch(...).catch(() => {})` with no `onError`, dead per RV-84. **Grep `docs/` and the
-relevant file headers for the owner's own words before opening the code.**
+## Still open from earlier — do not re-file
 
-**The other half of that lesson: BF-177 was patched SITE BY SITE.** Delete refetches the weekly
-chart, add does not, and the delete site's comment calls itself *"BF-177's third site, which that
-entry did not name"*. When a fix is a call added at a call site, ask how many call sites exist.
+**Q-499, Q-555, RV-37/39** (device), **RV-38/41/43** (owner), and **RV-65** (the prescription's
+model call, gated on the owner).
 
-**Why the fetch-once ratchet missed four findings:** it matches only `useEffect(…, [])`, and its
-comment calls a non-empty dep array *"a different (and usually correct) shape"* — true in general,
-false inside a shell where `[userId]`/`[today]` never change (RV-105).
+## Next — only when the owner asks for a review
 
-**The sharpest single number: 37 cross-tab `router.push` sites vs 5 `navigateToTab`** — a push tears
-down the whole tab shell. Home does both on adjacent lines.
+**This session awaits a brief.** The owner directs each sweep, so do not start one unprompted.
+When he does ask, these are ready:
+- **Read RV-220's gallery,** once DV posts the URL.
+- **The POST surface:** a ghost id and a malformed id each posted against every create route,
+  then the row read back.
+- **A clean clone, actually built** (settles `NOTICE`, and Q-313 is why it matters).
+- **`/api/coach/preview`**, and whether Coach proposes sane numbers.
+- **Q-452's siblings,** which need a partial-data fixture.
 
-**Clean, do not re-sweep:** mood check-in, water log, home day timeline, end-of-day read-through,
-`WeekDaySheet`, `sleep-sessions` on both tabs; the View-Transition layer, sheet timing,
-`SwipeCarousel`, `TabSwipeNavigator`, the back stack; no layout-property animation anywhere.
+## How screenshots reach this role (settled 2026-09-25, owner request)
 
-**Sweeps 47–52 closed.** **Durable rules:** a 4xx is not evidence the guard fired, so read which
-field it names; pair every refusal with a one-field control; `claude_ro` is **the owner's rows
-only**; rank visual findings by the resume telemetry (Home 22 · Nutrition 14 · Health 11 · More 7 ·
-Workout 2). **Owed:** RV-37/39 device; RV-38/41/43 owner decision.
+- **From DV:** a **private Artifact** on the owner's account, holding labelled PNGs as published
+  files. The URL is recorded on the DV entry.
+  - Read the page with `Artifact read`, then pull images with `paths`. They land in the
+    scratchpad's `artifact-files/`.
+  - **Never commit an image; the repo is public.**
+- **From here:** the web build at 412 × 915, DPR 2.625, through the repo's own Playwright
+  `setup` project against `pnpm dev`.
+  - Capture scripts live **outside the repo**.
+  - Freshen the seeded user with SQL on the **local** DB only.
+  - Slice tall captures to viewport height before reading them. Sharp is in `node_modules`, and
+    Python has no PIL here.
 
-## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
+## Security-review rule (sweep 60)
 
-- **✅ All three write-path ownership rules now have evidence.** (b) sweep 40, (c) RV-32, (a) sweep 43.
-- **A cheap contrast beats a long argument**, used nine times — *six routes say 200, three say 404*;
-  *this key is in 0 groups, its sibling in 4*. Find the surface that already does it right.
-
-## Next — in the order they are worth doing
-
-**Not this:** the status-mapping lens — sweep 47 finished it. Twelve of thirteen routes map, the
-one gap is filed, and the remaining hand-rolled catches were each checked for `try` scope. And not
-the documentation-integrity seam. Sweeps 34–37 were four consecutive passes over it and
-left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
-`check-module-map-symbols`). Pick a lens that runs the app.
-
-- ~~The workout/device FK half~~ — CLOSED clean by the checkpoint (CASCADE edge refuses cross-user).
-- **The POST surface, the only verb left.** Sweeps 47 and 48 covered `DELETE` and `PUT`/`PATCH`; no
-  sweep has asked what a `POST` answers when its body references a row that does not exist or is not
-  the caller's. Same method — a malformed-id control beside a well-formed one, then read the row back.
-- **A clean clone, actually built** — `git clone` into an empty container, `pnpm install && pnpm build
-  && pnpm test`. Settles `NOTICE`'s claim outright; Q-313 is why it is worth doing.
-- **The sync/outbox under a server that fails mid-push, on the device half.** Sweep 10 drove the
-  server half; the local SQLite outbox has never been exercised, and it needs hardware.
-- **`/api/coach/preview`, still unprobed** after three Coach sweeps — and **whether the model proposes
-  sane numbers**, untouched because every patch has been hand-written. RV-41 raises its stakes.
-- **Q-452's siblings.** The rendering half is swept (22 routes, honest bar RV-38). Untouched:
-  `weekly-digest` and the coach, which produce nothing for a zero-data account — they need a
-  **partial**-data fixture, which does not exist yet.
+**The repo is public:** security entries name the surface and the fix, never a payload or steps.
+Mechanisms are proven on the **local** DB with throwaway roles. **Never probe production.**
 
 ## Blocked
 
-Nothing. The standing ceiling is **the device**: everything this role runs is the **web** build, where
-`getLocalStore()` returns null and every offline-first domain takes its web fallback. No safe-area,
-Samsung-WebView, native-plugin or native-SQLite finding can originate here, and every write-up must say so.
-
-Production is partly open — `claude_ro` is **row-scoped to the owner**, so a second real account is out of
-reach there specifically. When the *victim* of a bug is another account, that view structurally cannot see
-it: write "no evidence in the owner's rows", never "it has not happened".
+Nothing. The ceiling is still the device, and DV now covers it: the web build has no local store,
+no insets and no Samsung WebView, so a web-only visual finding is a DV target, not a fact.
 
 ## Claimed paths
 
@@ -115,10 +100,14 @@ None. This role's PRs are docs-only.
 ## Do not re-litigate
 
 - Authority limits and the lane contract are settled in [`docs/agents/README.md`](../README.md).
-- **Queue position is priority; the ID is not.** An `RV-32` above a `Q-331` is deliberate.
-- **Before writing a surface off as unreachable, spend ten minutes trying. Five for five now** — one env
-  var, one `context.setOffline(true)`, an account the harness already had, `page.clock` for crossing
-  midnight (sweep 41), and that same zero-data account pointed at 22 routes instead of 2 (sweep 42).
+- **Queue position is priority; the ID is not.**
+- **Structural calls are this role's to make** (owner, 2026-09-22). His are data destruction,
+  money, auth and secrets, scoring calibration, and product preference. **An owner question is a
+  `Lane: O` entry with an `Ask:` line, never a chat line.**
+- **The backlog is no longer size-tracked (#1666).** Do not recreate its `.size` file or write a
+  baseline-history note for it.
+- **Merge conflicts on the backlog:** keep `main`'s deletions and both sides' additions. Read the
+  headings, because two deletions look the same as an addition.
 
 ## Method notes — do not re-derive these
 

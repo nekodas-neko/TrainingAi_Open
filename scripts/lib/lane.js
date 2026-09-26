@@ -14,8 +14,8 @@
 // `DV` is matched BEFORE the single letters. It shares no first character with them, so the order
 // is not load-bearing today — it is written this way so a future two-letter lane cannot be silently
 // shadowed by a one-letter alternative matching its prefix.
-const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|\?)/;
-const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|\?)/;
+const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|T\b|\?)/;
+const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|T\b|\?)/;
 
 /**
  * @returns `'A'` · `'B'` · `'O'` · `'DV'` · `'?'` · or `null` for "not stated".
@@ -31,6 +31,15 @@ const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|\?)/;
  * unstated entry is shown to both implementer lanes as the safe failure it was designed as, and to
  * neither `O` nor `DV`, whose work is assigned rather than derived. Showing 400 untagged entries to
  * the device agent would bury the few genuinely its.
+ *
+ * `'T'` is Tuning's, added 2026-09-26 (OR-178), and it exists because a correct triage could not act
+ * on itself. Fifteen scoring entries owe a Tuning PROPOSAL rather than the owner's signature
+ * (OR-150). Three independent sweeps reached that conclusion and none could record it: removing the
+ * wrong `Gate: owner` would have released them into Lane A's READY list, and a scoring change with
+ * no proposal is exactly what Lane A must not pick up. So the gate was wrong *and* load-bearing,
+ * because it was the only brake in reach. `T` is the brake that says the true reason. OR-150
+ * deferred this pending evidence that a standing channel was needed rather than one entry; fifteen
+ * entries across three sweeps is that evidence.
  *
  * `'O'` is the Orchestrator's own lane, added 2026-09-06 (OR-103). It exists because CI config,
  * workflow files and repository settings are in NEITHER implementer lane's paths, so §3's path rule

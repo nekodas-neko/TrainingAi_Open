@@ -692,6 +692,83 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
+### [sleep] TN-83 — the sleep verdict bypasses `nightSessions()`, so it judges naps as nights
+
+- **Lane: A** — the verdict's read path (`packages/shared/src/health/sleep-verdict.ts` is correct; what
+  feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped thresholds against real
+  nights before anything announces them. **The work is one import, not a new rule — see the correction
+  below before starting.**
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **✅ THE IMPORT LANDED 2026-09-26, in `LA-149`'s wiring** (`feat/la149-announce-sleep-verdict`).
+  The route reads `nightSessions(rows, tz)` rather than raw `sleep_sessions`, so it is the
+  sixteenth consumer and no selection rule was written beside the helper. Guarded by a route test
+  that lists the nap FIRST — **a first draft listed the real night first and passed with and
+  without the fix**, which is the shape of a test that proves nothing.
+- **⚠ WHAT REMAINS IS THE RE-MEASURE, AND IT IS NOT OPTIONAL.** This entry's sweep measured the
+  wrong population, so **none of its numbers carry over**: 10.9 announcements per 30 nights was
+  counted over rows, not nights. Re-run it over `nightSessions()` output before touching
+  `VERDICT_IQR_MULTIPLIER` — and the ⛔ below still stands, because the rate target is a check on a
+  correct population and never a knob to reach it.
+- **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
+  cross-checked against the real function: identical counts, so the sweep below is sound):
+  **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
+  nights**, against the plan's stated target of **4–6**. So it fires at roughly twice the intended
+  rate — but that is the symptom, not the defect.
+- **The defect: `sleep_sessions` holds more than one row per date, and the verdict treats every row as
+  a night.** 125 rows across **106 distinct dates** (last 120 days: **120 rows, 102 dates, 30 rows
+  under 3 h, 6 at exactly 0 h with efficiency 0**). On every duplicate date the shape is **one real
+  night plus one fragment**: `7.92 / 0.00` · `8.25 / 0.00` · `8.50 / 0.00` · `7.17 / 0.08` ·
+  `8.58 / 0.00` · `7.00 / 0.00` · `8.17 / 1.42` · `7.42 / 4.75`.
+- **And several are plainly naps, judged as nights.** Onset minutes from local midnight on flagged
+  rows: **644 (10:44)**, **997 (16:37)**, **1055 (17:35)**, **1064 (17:44)**. An afternoon nap is
+  being announced as a bad night.
+- **It fails twice, in opposite directions, which is why the rate alone understates it.**
+  **(a) False alarms** — the fragment is judged as the night, so a 7.9 h night is announced poor.
+  **(b) Desensitised bands** — those same fragments sit in the trailing-28 window, so a 0 h and a
+  0.08 h value drag `p25` down, widen the "normal" band, and make a genuinely short night read as
+  acceptable. The verdict is simultaneously too loud on artifacts and too quiet on real nights.
+- **⛔ DO NOT fix this by raising `VERDICT_IQR_MULTIPLIER`.** The sweep makes that tempting and it is
+  the trap: `0.25 → 16.6` · **`0.5 → 10.9` (shipped)** · `0.75 → 9.1` · `1.0 → 8.1` ·
+  `1.5 → 6.6` · `2.0 → 6.6`. Multiplier **1.5** lands inside the 4–6 target and would be *wrong* — it
+  hits the rate by suppressing real signal while still announcing on fragments, and it takes `good`
+  to **zero**, so the whole "unusually good night" half of the feature disappears. The rate target is
+  a check on a correct population, never a knob to reach it.
+- **⤷ THE FIX IS ONE IMPORT, AND THIS ENTRY'S FIRST ANSWER WAS WRONG — corrected 2026-09-26, same day.**
+  `nightSessions()` (`packages/shared/src/health/sleep-night.ts`) **already does exactly this**:
+  circadian nap/night classification first, then fragment merging inside the night band. **15 sites
+  route through it; the verdict path is the one that does not.** The fix is to become the sixteenth
+  consumer, in `LA-149`'s wiring — not to write a selection rule.
+- **⛔ The first recommendation here — "longest row per date" — would have been a SECOND implementation
+  of a solved problem, and wrong on its own terms.** That helper's header carries the measurement: the
+  one genuine fragmented night in this history is **2.53 h + 4.02 h across a 105-minute gap**, and a
+  longest-row rule scores it as a 4.02 h night instead of merging it to 6.55 h. Three nap→night
+  transitions have *smaller* gaps than that real fragmented night, so no gap threshold separates them
+  either — which is why the helper classifies by circadian position first
+  (`NIGHT_BAND_START_HOUR` 21 → `NIGHT_BAND_END_HOUR` 10, with `ALWAYS_NIGHT_MIN_HOURS` 4 as the
+  shift-work escape). This is the **One Formula, One Place** trap, and this entry walked into it before
+  checking whether the formula already existed.
+- **⚠ SEVERITY IS HIGHER THAN "a new bug" — this is a DOCUMENTED, ALREADY-FIXED CLASS RECURRING.**
+  `Q-76` (shipped 2026-08-05) found every consumer answering *"which row is the night?"* for itself and
+  **all of them answering it the same wrong way** — sort by `sleepEnd` descending, take the first — and
+  routed eleven read sites through the one helper rather than adding a rule beside it. That helper's own
+  header records what it prevented: *"a Sleep Score of 5 on a 7.86 h night, and — because the rollup
+  folds its pick into the checkpointed EMA baselines — it poisoned every later z-score too."* **That is
+  the same two-directional failure this entry re-measured independently** — a false verdict on a real
+  night, plus poisoned baselines. Known, named, fixed and documented; `TN-81` reintroduced it by not
+  reaching for the helper.
+- **Still true, and still what to do after the fix:** re-measure the announcement rate, then consider
+  the multiplier. **The sweep above measured the WRONG population, so none of its numbers carry over** —
+  re-run it against nights.
+- **A correction to Tuning's own plan, made here rather than quietly:** the plan's §5 cites *"119 rows
+  for the last 120 days — `duration_hours` on all 119"* as evidence the inputs are complete. **That
+  count included fragments.** It is 102 dates, with 30 of 120 rows under 3 h. The conclusion that
+  inputs are sufficient still holds; the completeness figure was inflated by exactly the artifact this
+  entry is about.
+- **What `TN-81` got right, and should not be touched:** components rather than a composite, signed
+  onset minutes so 23:50 and 00:10 are 20 minutes apart, per-component baseline readiness, a
+  `modelVersion` stamp on each snapshot, and `null` below 28 nights rather than a guess. The rule is
+  sound; it is being fed the wrong rows.
+
 ### [platform] LA-148 — four `median` implementations, and one of them disagrees
 
 - **Lane: A** — `packages/shared/src/health/**`, `packages/shared/src/workout/time-audit.ts`.
@@ -707,14 +784,78 @@ below threshold and left in place for next time.
   empty-list answer from `0` to `null` needs its callers checked rather than a blind swap. That is
   the whole of the work; the other three can move to one import.
 
+### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
+
+- **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
+- **Added:** 2026-09-26 · Tuning, checking whether the announce-and-correct design can collect anything
+  at all before more effort goes into what it announces.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **This is a hard constraint on `TN-82`, not a polish item.** `TN-82` assumes the announcement is seen.
+  Measured from source, it gets **one showing per day and no second chance**:
+  - The morning sheet **auto-opens once**, from an effect in `session-select-content.tsx:791`, only when
+    no morning check-in exists for the local day.
+  - `markMorningCheckinPromptDone(tz)` is called **`onClose`** (line 1398) — so dismissing it, or saving,
+    retires it for the rest of the day.
+  - The effect lives **only on `/session-select`**. Open the app to Home and never navigate there and
+    the sheet never appears, so nothing is announced.
+- **Why that defeats the design.** The whole instrument is the owner **disagreeing** with a verdict. He
+  has saved **82** of these sheets in three months and touched a scale in **3** of them, so the
+  established behaviour on this surface is dismissal — and here dismissal is indistinguishable from
+  having read it, while also being final for the day. An announcement delivered once, into the one
+  surface with a three-month record of reflexive dismissal, produces silence that `OR-171`'s guard then
+  has to interpret. **That is the silence trap arriving by construction rather than by bad luck.**
+- **RECOMMENDATION: give the verdict a durable home as well as the modal.** Put it on a surface that
+  persists for the day — the Home sleep card is the obvious one — so a missed or dismissed modal is
+  recoverable and a correction stays possible later. The modal keeps the *prominent* outlier
+  announcement; the durable surface keeps the quiet line and the correction affordance. Cost: one card
+  state, no schema (the verdict and its response state are already persisted by `TN-81`).
+- **Alternatives, and why each loses.** *Re-open the modal until answered* — turns an announcement back
+  into a demand, which is the thing that failed three times. *Leave it modal-only* — cheapest, and it
+  makes near-zero corrections uninterpretable, which is the one outcome the plan says must not be
+  ambiguous. *Notification instead* — the S25 has no working `health-alerts` channel (`RV-155`, sweep 4b).
+- **Reversal cost: low** — a card state and where it reads from, no stored data.
+- **Not device work:** every claim here is from source, so there is nothing for the device agent to
+  reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
+
+### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
+
+- **Lane: O** · **Added:** 2026-09-26 · Tuning, split out of `TN-82` so it reaches him through the
+  Orchestrator rather than sitting inside a build entry.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **Why this one IS his, when most wording is not.** The whole design rests on an announcement he reads
+  and occasionally disagrees with. If he stops reading it, the feature produces silence that *looks*
+  like agreement — `OR-171`'s recorded guard — and the corrections that are the entire point never
+  arrive. Three in-sheet questions have already decayed to zero on this exact surface, so the framing
+  is the mechanism, not decoration. It is also cheap now and expensive after it has trained another
+  reflex.
+- **RECOMMENDATION — ship this copy; he edits it if he wants something else.** Two lines, no question
+  mark anywhere:
+  - **Ordinary day, quiet, no interaction:** `Sleep looks normal — filled in for you.`
+  - **Outlier day, prominent, reason first, one tap to disagree:**
+    `Slept 5h10, 90 min later than usual. Marked this a poor night — tap if that's wrong.`
+- **Why that shape.** The **numbers come before the verdict**, because the verdict is arguable only if
+  its evidence is visible — "your sleep was bad" invites being ignored, "5h10, 90 minutes later than
+  usual" invites either a nod or a correction. `tap if that's wrong` asks for a **disagreement**, not a
+  rating, which is the only thing this collects. And it never says *"how did you sleep?"* — asking is
+  what failed three times.
+- **What he might reasonably want instead, and the cost of each.** Softer (*"looks like a rough
+  night"*) reads better and makes disagreement feel less pointed, at the price of being easier to skim
+  past. Blunter (*"bad night"*) is unmissable and will annoy him on the days it is wrong — which, until
+  `TN-83` lands, is often. Neither is wrong; both are his taste, and the draft above sits between them.
+- **Reversal cost: near zero.** It is two strings on one surface, no schema and no stored data. If the
+  wording is wrong he says so and it changes in a one-line PR — which is the argument for shipping the
+  draft rather than waiting on it.
+- **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
+
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
 - **Needs:** — cleared 2026-09-26. LA-149 shipped the announce path: `GET /api/sleep-verdict`
-  returns the night's verdict (computing and freezing it on first read, `null` when there is
-  nothing honest to say) and `POST` records `acknowledged`/`corrected`. **This entry is now
-  startable.** The route never writes a `touched` flag — the correction's VALUE is the check-in
-  save path's to write, and only his own correction is his answer (TN-57).
+  returns the night's verdict (computed and frozen on first read, `null` with
+  `baselineNightsRequired` when there is nothing honest to say) and `POST` records
+  `acknowledged`/`corrected`. It reads through `nightSessions()`, so TN-83's nap problem does not
+  reach the surface. **Startable.** The route never writes a `touched` flag — the correction's
+  VALUE is the check-in save path's to write (TN-57).
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
   interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
@@ -729,11 +870,15 @@ below threshold and left in place for next time.
   problem (*"If I remember; I will let you know"*).
 - **The failure mode to watch is him not reading it** — see `OR-171`'s guard. That is why the quiet line
   stays quiet and the loud one stays rare: announce loudly twice a week and it becomes wallpaper.
-- **Ask:** owner — the announcement copy, and the copy only. The whole design rests on an announcement
-  he will actually read. A rare prompt lives or dies on its framing, and
-  it is cheap to review now and expensive to re-do after it has trained another reflex. Show it at
-  384 px dark. Deliberately **not** `Gate: owner`: gating parks the entry, and the build does not
-  need the copy settled to start — `Needs: TN-81` is the only real block here.
+- **⚠ READ `TN-85` BEFORE BUILDING THIS.** The sheet this entry targets auto-opens **once** a day, only
+  on `/session-select`, and is retired for the day `onClose` — so as things stand the announcement gets
+  one showing on a surface with a three-month record of reflexive dismissal. `TN-85` recommends a
+  durable second home for the verdict; building this entry modal-only makes near-zero corrections
+  uninterpretable.
+- **The announcement copy is the owner's, and it is now its own entry — `TN-84`, `Lane: O`.** Split out
+  2026-09-26 on the owner's instruction that anything needing him is routed to the Orchestrator rather
+  than asked in a Tuning session. It does **not** block this build: ship with the drafted copy in
+  `TN-84` and swap in whatever he settles on.
 - **Device:** the morning sheet is the canonical daily surface and the local store is on the write
   path, so the pass needs the APK, not `pnpm dev`.
 
@@ -845,65 +990,10 @@ below threshold and left in place for next time.
   the two external PRs are otherwise sound: CI state, test coverage and contributor provenance are all
   unexamined here.
 
-### [platform] OR-150 — fifteen scoring entries owe a Tuning proposal, not the owner's signature
-
-- **Lane:** O — the Orchestrator's, because the missing piece is a ROUTE, not a decision and not code.
-- **Added:** 2026-09-24 · OR-150, the last slice of the `Gate: owner` triage.
-
-**What was found.** `OR-117` triaged these on 2026-09-16 and wrote the same paragraph into all seven:
-*"NOT OWNER-READY — `Gate: owner` is premature here … putting this in front of the owner asks them to
-sign a blank page — and it has been counting as owner debt in every sweep meanwhile. The next action
-is Tuning's, not theirs."* **The paragraph went in and the field did not come out.** Eight days
-later all seven still carried the gate, and every sweep since has counted them as the owner's.
-
-**The original seven, all carrying OR-117's paragraph:** `Q-275` · `Q-508` · `Q-515` · `Q-516` ·
-`Q-522` · `Q-523` · `Q-149`.
-
-**Six more, added 2026-09-24 by OR-153** after reading every remaining owner gate: `BF-174` ·
-`LA-113` · `PS-27` · `RV-43` · `Q-289` · `Q-290`. These did not carry the paragraph — their gates
-said *"a scoring change: Tuning proposes, the owner signs off, Lane A implements"* and then
-gated on the owner anyway. Same shape, arrived at independently.
-
-**`Q-279` was checked and deliberately NOT moved.** Its gate already states the number a proposal
-owes — *"moves ~20% of days at the deload boundary and turns 4 taper days"* — so it is genuinely
-ready for him. **A scoring gate is not automatically premature**; the test is whether the
-days-moved figure is there, and a sweep that skips that test would have moved a ready entry
-backwards.
-
-**Why the field survived a correct diagnosis — and this is the part worth keeping.** Removing the
-gate would have released them into Lane A's READY list, and a scoring change with no proposal is
-exactly what Lane A must not pick up. So the gate was wrong *and* load-bearing: it was the only
-brake in reach. **There is no `Lane:` value for Tuning** — the lanes are `A`, `B`, `O`, `DV` — so an
-entry that owes a Tuning proposal has no field that says so. That is the gap, and it is why a
-correct triage could not act on itself.
-
-**⚑ FIFTEEN as of 2026-09-24, not thirteen.** RV-189 added two more on the same test: **`TN-11`**
-(*"moved this hour"* redefines what counts as an active hour) and **`OR-155`** (the `activityBalance`
-half, split out of `TN-9` because a question buried inside another entry does not get routed). Both
-arrived by the independent route the six of 09-24 did — a scoring change with no proposal and no
-days-moved figure — which is now three separate sweeps reaching the same conclusion.
-
-**What this entry does about it:** each of the fifteen now carries `Needs: OR-150` in place of the
-owner gate. They stay parked, for the true reason, and they stop counting as owner debt. When the
-proposals exist this entry leaves the queue and all thirteen unpark together.
-
-**The deliverable is fifteen Tuning proposals**, each stating **how many other days the change moves**
-— which is what `CLAUDE.md` already requires of a proposal and what none of these has. Tuning reads
-the backlog, so an `O` entry naming them is the channel; writing into another agent's baton is not
-the Orchestrator's to do.
-
-- **Done when** every one of the fifteen has a proposal, or has been withdrawn with a reason. Not when
-  this has been read.
-- **Deliberately NOT done here: inventing a `Lane: T`.** Tuning picks its work from its own sweeps
-  rather than a lane queue, so a fifth lane value would be a channel nobody reads, and it would need
-  `next-item.js`, `lane.js` and `entry-id.js` changed to carry it. Revisit only if these thirteen prove
-  that a standing channel is needed rather than one entry.
-
-
 ### [readiness] OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call
 
-- **Lane: A** · **Added:** 2026-09-24 · split out of `TN-9` by RV-189, on Review sweep 59's reading.
-- **Needs: OR-150**
+- **Implementation lane once the proposal exists:** A** · **Added:** 2026-09-24 · split out of `TN-9` by RV-189, on Review sweep 59's reading.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **Why it is its own entry.** `TN-9` is two halves under one owner sign-off. The check-in half has a
   chosen mechanism (drop `checkin` from the composite and renormalise over the remaining eight) and is
   buildable. **This half has no chosen mechanism** — the entry offers *"point `activityBalance` at a
@@ -1004,6 +1094,31 @@ the Orchestrator's to do.
   than left as an intention.
 - **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
   new). `Ran 78 of 78` Custom Rules steps.
+
+### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
+- **Ask:** owner — one mockup to approve (RV-213), one product choice (RV-218's daily calorie target), and a merge-time yes on six security fixes as each PR goes green.
+
+- **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
+- **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
+- **1. RV-213: a mockup, before it is built.** Empty meal slots on Nutrition take a full card each, with two add controls. Lane B produces a before/after at 384 px, and the owner says yes or no.
+  - **Recommendation:** one compact row per empty meal, with its name and a single `+`.
+  - The same shape as RV-207 ⑥'s Log-tile mockup (the Lane O entry Lane B split out). **Show both in one sitting.**
+- **2. RV-218: which number is the day's calorie target.**
+  - The ring shows 1,534 (resting plus movement). The explainer names a goal of 1,660 and a budget of 1,356.
+  - **Recommendation:** the ring shows the budget the explainer already defends. The goal stays as the reference line, and the third number goes. The owner confirms which one he reads as "today's target".
+  - RV-218's copy bugs ("205 workouts", "-1,694 deficit", missing zero days) need no answer and can ship first.
+- **3. A merge-time yes on the security fixes.** These are needed **when each PR is green, not now**:
+  - **RV-191** (the feedback screenshot);
+  - **RV-190** (admin query session state; build it before OR-138);
+  - **RV-192** (registration). **It also carries one product option:** drop password sign-up entirely, since every current user signs in with Google. The recommendation is to keep it and verify email.
+  - **RV-193** (refresh token in the session);
+  - **RV-195** (three low auth gaps);
+  - **RV-196** (the ring-key plugin; needs an APK).
+- **Already asked elsewhere, listed so nothing is lost:**
+  - **RV-199 ②:** the GitHub "keep my email private" setting, which only the owner can flip.
+  - **RV-65:** whether the prescription keeps its model call, which is gated on the owner in Lane A.
+  - **OR-176** is answered: a standing yes for DV's three settings probes.
+- **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
@@ -2643,6 +2758,7 @@ which is the right shape for something that can only be validated by living with
    - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
 4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
 5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
+   - **🔎 Device, sweep 64 (`p23-nutrition-warm-03`):** the owner's real screen reads 14% (7 days) and 39% (28 days), with "required meal (3)". Those are sensible numbers for his configuration, so the web build's 0% was the seed's six-meal setup. **Drop this item.**
    - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
    - **The definition is the owner's call. The copy is not.**
 
@@ -2743,6 +2859,18 @@ which is the right shape for something that can only be validated by living with
   3. **P32's five timepoints are identical on every screen.** That is consistent with "painted from cache", but it measures nothing about loading states. Re-run once with the cache cleared for those routes, which is what P32 is for.
 - **Also for the record:** P34's concern is moot on this keyboard. Samsung shows the numeric pad for `type=number` (`t2-sheet-weigh-in-01`), so the finding is only the missing `enterkeyhint` ("Go" where "Done" belongs), which RV-210 covers.
 - **Then:** re-capture Health (full length) and the pushed screens' lower sections, and append them to the same Artifact.
+- **The rest of Review's device pass, in the same sitting, after the capture fixes.** This is the one DV entry Review needs worked next:
+  1. **P41, before and after on RV-207's shipped fixes**, against sitting 4a's captures:
+     - initials;
+     - "1 exercise" and "1 set";
+     - press feedback on the tab bar, More rows, Nutrition's chevrons, the Home avatar and Health's Log pills (re-run P24 on each; the target is a first-frame change under 100 ms);
+     - ticking two supplements in quick succession (both must land). **Tick then untick, per the standing write permission;**
+     - "13.0 t".
+  2. **RV-206 P29–P31**, now that OR-176 gave standing approval: font scale 1.15 and 1.3, display size, and CPU throttle plus battery saver. **Restore each before anything else if the sitting is cut short.**
+  3. **RV-206 P35–P38:** launch and bars, chart legibility, overscroll, and the longest real values.
+  4. **RV-205's remainder:** cold start, one error state per card family (via P18), and **P32 with the route's cache cleared**.
+  5. **A P28 follow-up:** the "11 background meteors on every tab". Report whether **hidden** tabs' animations keep running while another tab is shown (`document.getAnimations()` per panel, with the panel's visibility). Running while hidden is a defect Lane B can fix without asking anyone. Whether the visible ones stay is a matter of taste, so not a finding.
+- **Result:** _(DV: Artifact URL and version, date, build, navigation mode, which of 1–5 ran)_
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
@@ -5145,85 +5273,21 @@ drift.
   button uses.
 
 
-### [platform] LB-134 — a merge went through on a FAILING required check, and `main` took a red commit
-
-- **✅ CLOSED 2026-09-25 (OR-164) — and the MECHANISM recorded here was WRONG.** This entry, and the
-  CLAUDE.md passages it corrected, both blamed *"a Ruleset with no classic branch-protection rule
-  beside it"*. The real cause was one field nobody read: **the `ProtectMain` ruleset's Enforcement
-  status was `Disabled`**. It was created 2026-08-17 with all six checks already configured and sat
-  switched off for five and a half weeks, so the rules existed and did nothing. The owner set it to
-  **Active** on 2026-09-25; five checks are now genuinely required and this entry's defect cannot
-  recur.
-- **The observation was right and the explanation was a guess that read like a finding.** Worth
-  keeping, because the guess was plausible, was written down with confidence, and sent two sessions
-  looking for a classic branch-protection rule that was never the answer. **Nobody opened the ruleset
-  and read its enforcement field** — the cheapest possible check, skipped because the API error
-  (*"Protected branch rules not configured for this branch"*) was read as a statement about Rulesets
-  rather than as literally true.
-- **Its sibling `LB-52` is removed** in the same PR: auto-merge's refusal had the same single cause.
-- **✅ THE CENTRAL CLAIM IS VERIFIED, and sharpened — Orchestrator, 2026-09-24.** Re-read from the API rather than taken from this entry: PR #1467 merged at **10:18:18Z**; its `Tests` job (`107136618616`) reported **failure at 10:18:29Z**, eleven seconds LATER. So what the merge went past was a **PENDING** check, not a reported failure — which falsifies CLAUDE.md's claim *"it cannot merge a genuinely pending check"* even more directly than the entry states. (`E2E` also failed, at 10:47.) The conclusion is unchanged and the wording is now exact.
-- **✅ BOTH CLAUDE.md PASSAGES ARE CORRECTED** in this PR — the Standing Instruction that claimed branch protection *"requires a PR with all CI checks passing"*, and the CI/CD line that called the merge *"the reliable green check"*. Both now say the checks are not enforced at merge and point at `get_job_logs --failed_only` as the real read.
-- **The mechanism is confirmed and is the same one `LB-52` records.** `enable_pr_auto_merge` was re-probed on a GREEN PR at 09:15 UTC 2026-09-24 and still answers *"Protected branch rules not configured for this branch"*. `main` is protected by a Ruleset with no classic rule beside it, which is why the merge API neither enforces the checks nor offers auto-merge. **One setting causes both**, so this entry's remaining half and `LB-52` are the same fix.
-- **⚠ This reframes `owner-branch-protection` from throughput to CORRECTNESS.** It was put to the owner as a merge-race annoyance. It is also the reason no merge in this repo is gated on its tests. Say that when it is next raised.
-
-- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while running the full suite for LB-133 ·
-  **moved above the Orchestrator's print cut 2026-09-24** by Lane B, per CLAUDE.md's new rule that an
-  owner question is a task with a top queue position — it was at rank 12 against a `TOP_N` of 10, so it
-  was in the queue and in nobody's view. No content change; only its position moved.
-- **⚠ The test half of this entry was NOT fixed here — `#1472` fixed it concurrently on `main`,
-  and this entry originally claimed the fix as its own. Corrected before merge.** What this branch
-  carries is one added assertion on top of #1472's fix (below); the substantive finding is the
-  merge-gate one, which is untouched by #1472 and is why the entry stays open.
-- **What was red:** `app/api/next-session/prescription/__tests__/prescription.test.ts`, 4 of 6,
-  deterministically on `main` — reproduced in a clean worktree, confirmed byte-identical to
-  GitHub's copy so it was not a stale checkout, and unchanged with `DATABASE_URL` unset.
-- **Cause:** #1466 (RV-82) changed the route to read `recommendation.program` — `getNextSession`
-  hands back the program it already fetched — while the test still stubbed `getActiveProgram` and
-  its `getNextSession` mock had no `program`. So `program` was null and **every case fell into the
-  rest-day branch**, including the two still reporting green: the rest-day test passed trivially,
-  and *"never calls a prescription-mutating repo method"* passed **vacuously**, asserting nothing,
-  because that branch returns before any of them is reachable.
-- **This branch adds one line to #1472's fix:** `expect(getActiveProgram).not.toHaveBeenCalled()`,
-  which pins RV-82's actual point — the route must not fetch the program a second time — so the
-  stub cannot go stale in silence again. #1472 restored the mock but not the guard against a repeat.
-- **⚠ THE FINDING THAT MATTERS, and it is not about this test.** The failing `Tests` job did **not**
-  stop the merge. PR #1467 was squash-merged at 10:18 while `Tests` was failing on its head
-  (`efb8ee295e6`, run 35847259425, job 107136618616), and `merge_pull_request` returned
-  *"Pull Request successfully merged"*. **`main` took a red commit.**
-  **This falsifies a rule CLAUDE.md leans on heavily**, in the CI/CD section: *"attempting the merge
-  is the reliable green test … it cannot merge a genuinely pending check."* It can, and it did.
-  The likely reason is already recorded in the standing-agents section — `enable_pr_auto_merge`
-  fails here with *"Protected branch rules not configured for this branch"* — i.e. the required
-  checks are **not actually enforced**, which makes every *"it merged, therefore it was green"*
-  inference in this repo unsound. The same section's opening claim that branch protection *"requires
-  a PR with all CI checks passing"* is then also wrong.
-- **Second lane field, demoted to prose (TN-63)** — it agreed with the field above, and a duplicate is how a disagreeing pair gets made: **Lane: O, and it is the owner's call** — branch-protection configuration is a shared-system
-  change, not a lane's. Two things need deciding: whether to turn required checks on, and (either
-  way) correcting the two CLAUDE.md passages above, which currently instruct every agent to use an
-  unsound gate.
-- **Until it is settled, the workaround is cheap and every lane should use it:** before merging,
-  read the `Tests` job conclusion explicitly rather than trusting the merge call —
-  `get_job_logs` with `failed_only: true` returns only failed jobs, so an empty list is the green
-  signal, and it does not flood context the way `list_workflow_jobs` does (Custom Rules alone is 79
-  steps). Note the RUN stays `in_progress` for ~31 minutes because E2E is advisory; that is not a
-  failure.
-- **⚠ `main` went red a SECOND time the same day, from the same shape — found and fixed here too.**
-  `scripts/__tests__/keep-gate-set-off.test.ts` pins the queue's gate classification by id. Device
-  sweep 2 (#1471) closed Q-317's device check and removed its entry — legitimate — but did not
-  update the pinned list, so the snapshot read 16 where it expected 17 and `main` was red on every
-  branch. Fixed by dropping `Q-317:device` and naming the reason in place, which is exactly what
-  that test's own comment instructs (the Q-305 precedent, 2026-09-16).
-  **Two independent red-`main` events in one day, both snapshot-vs-change mismatches, neither
-  signalled anywhere** — that is the argument for enforcing the checks rather than for fixing two
-  tests.
-- **Blast radius was small only by luck:** `main` was already red from #1466 before #1467 went near
-  it, so nothing in #1467 caused it — but #1467 merged on top, and the next PR would have inherited
-  a red base with no signal. #1472 has since cleared it.
-
 ### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
 
 - **Lane:** O — `scripts/`, the queue tooling. **Added:** 2026-09-24 · orchestrator review of device
   sweep 3, after fixing five instances by hand.
+- **⚑ A SIXTH INSTANCE, 2026-09-26, and it is the best argument this entry has.** `BF-61` shipped a
+  fix, the fix FAILED on the device, and the entry kept `Verify: device` + `Keep:` — so it printed to
+  Lane B under *"shipped; only the stated residue is owed. **Not new work**"* while its own HEADING
+  read *"the fix FAILED on the device; open work"*. **The entry contradicted itself in the same
+  screenful and the runner believed the field**, which is exactly the shape below. Fixed by hand
+  (OR-176) and promoted to rank 3. Six hand-fixes is the evidence; a seventh should not be needed.
+- **A cheap check that would have caught all six**, cheaper than the general case: fail when an entry
+  carries `Verify:` or `Keep:` **and** its own heading or body says the device check FAILED. The
+  strings are stable here — the device agent writes VERIFIED / FAILED / COULD NOT CHECK and nothing
+  else, by protocol. It is deliberately narrow: it will not catch a failure recorded in prose that
+  avoids the word, and that is fine, because every instance so far used it.
 - **The shape.** An entry ships a fix, carries `Keep:`/`Verify: device` meaning *shipped, a look is
   owed*, the device runs that look and it **FAILS** — and nothing clears the field. The failure is
   recorded faithfully in the entry's text while the entry keeps printing to its lane under
@@ -5248,8 +5312,14 @@ drift.
 
 ### [platform] RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`
 
-- **Lane: O** — `scripts/next-item.js` (the `sittingsOnly` filter), plus a queue triage. Repo tooling
-  in neither implementer lane's paths, the OR-103 case. **Added:** 2026-09-23 · Review, answering the
+- **Lane: O** — the queue triage only; **the tooling half has SHIPPED.** Repo tooling in neither
+  implementer lane's paths, the OR-103 case.
+- **✅ THE FILTER IS FIXED — verified against the code and the output, 2026-09-26 (OR-178).**
+  `next-item.js`'s `sittingsOnly` branch now consults the device GATE as well as `Verify:`, and its
+  own comment records the inversion this entry found. `--sittings` today prints **BLOCKED ON A DEVICE
+  CHECK (10)** as its first section, ahead of the 109 owed looks — the priority the right way up.
+  **What is left is the triage below**, which is reading, not code: the ~24 entries this entry
+  grouped still want a per-group decision. **Added:** 2026-09-23 · Review, answering the
   owner's *"has everything that needs to be sent to DV agent been backlogged?"* — the answer was no.
 - **The filter, verbatim:** `if (e.verify?.value === 'device') return true;` then a regex over the
   Keep field's text. **The Gate field is never consulted.** Measured on `main` 2026-09-23:
@@ -6172,34 +6242,6 @@ drift.
 - **Pass test:** on the device, after a workout push drains the outbox, every `set_logs` row the
   push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
   the local `workout_sessions` table.
-
-### [platform] LB-130 — the doc-size HISTORY file is now the guaranteed-conflict line that `.size` used to be
-
-- **Lane: O** — queue/docs infrastructure; the fix is a convention plus a sweep, not a surface change.
-- **Added:** 2026-09-23 · Lane B, measured across five re-merges of #1449 in one hour.
-- **It is a clean natural experiment, not an impression.** LA-33 split the shared doc-size map into
-  one `docs/doc-size/<path>.size` per tracked doc; RV-134 then tolerated slack within
-  `max(25, 2%)`. Both landed. **The `.size` files duly stopped conflicting** — across the last
-  three re-merges of #1449 the backlog `.size` conflicted only when the change genuinely grew the
-  file, which is the check working. **`docs/doc-size-baseline-history.md` conflicted on all five**,
-  including the merges where nothing else did.
-- **Why it must, structurally:** every PR that moves a tracked doc appends a note to the END of one
-  shared file, so two open PRs write at the same offset. That is a conflict by construction rather
-  than a disagreement about anything. It is the same defect LA-33 fixed, in the file that records
-  LA-33's fix.
-- **Measured cost:** #1449 took five re-merges, four against docs-only PRs that landed mid-CI
-  (#1442, #1445+#1446, #1448, #1444). `main` takes a commit every ~3-5 min against a ~5m30s CI run,
-  so a feature PR cannot win the race by being quick, and every lost race costs a full CI cycle
-  rather than just the resolve.
-- **The fix the repo has already used twice:** per-entry files, exactly like
-  `docs/overview/entries/` — `docs/doc-size/history/YYYY-MM-DD-<branch-slug>.md` — folded into the
-  batched file by the same periodic compaction sweep. **No code needed:**
-  `check-doc-index-size.js` only PRINTS the reminder to write a note, it never reads the file, so
-  this is a directory plus a line in CLAUDE.md plus the sweep.
-- **Do not instead drop the note.** The number carries no reason and the note is the half that
-  does — RV-134's own history entry is the argument for keeping it.
-- **Reversal cost: near zero.** A directory and a convention line; the batched file stays and keeps
-  every existing entry.
 
 ### [app-shell] DV-6 — content scrolls under the status bar with no backing, so text runs through the clock
 
@@ -8234,6 +8276,15 @@ why the count of affected entries always understated the harm.
   so any two concurrent PRs conflict by construction.** The drift rate (~8–10 min) is faster than a
   CI cycle (~7 min for the five required), so a PR can lose the race indefinitely. What broke the
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
+- **✓ TWO OF THOSE THREE FILES ARE NOW GONE, 2026-09-26 (OR-178) — re-measure before building
+  anything further here.** `docs/doc-size/docs/implementation-backlog.md.size` no longer exists
+  (LA-129 reports the backlog rather than ratcheting it), and `docs/doc-size-baseline-history.md` is
+  no longer written by a finishing PR (LB-130 shipped the per-change note directory, the same shape
+  as `docs/overview/entries/`). **What remains is `docs/implementation-backlog.md` itself, and that
+  one is irreducible** — two agents removing two finished entries is a genuine concurrent edit, not
+  an artefact of file layout. So the six-cycle figure measured on #1333 is history, not a current
+  rate: **anything proposed here now needs a fresh measurement**, because the cause it was arguing
+  from has been removed twice over.
 ### [platform] BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake, found while resolving a real
@@ -9873,7 +9924,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Branch:** _unassigned_ · **Added:** 2026-09-16 (BugFix intake). Owner: *"there should be
   different scoring recovery for smaller muscle groups like abs vs quads. Abs and accessory muscles
   should recover quicker than the larger muscles."*
-- **Lane: A** to implement — `packages/shared/src/ai-periodization/muscle-recovery.ts:42-44`. **The
+- **Implementation lane once the proposal exists:** A** to implement — `packages/shared/src/ai-periodization/muscle-recovery.ts:42-44`. **The
   constants themselves are Tuning's to fit and the owner's to sign off**, per the standing rule that
   Tuning proposes and never ships a scoring change.
 - **He is describing something real. The current model has exactly one knob and it is not size:**
@@ -9920,7 +9971,7 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   window did for them. **The owner's two ideas pull in opposite directions on this day** — that is
   the finding, and it is the argument for fitting this properly rather than shipping a plausible
   table.
-- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **Needs: BF-173** — that entry decides whether soreness double-counts at all. Fitting recovery
   constants underneath a scorer that then overrides them with a flat 40 would be fitting the wrong
   function.
@@ -10264,9 +10315,9 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 
 ### [readiness][devices] LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep
 
-- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
+- **Implementation lane once the proposal exists:** A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation.
 - **Review:** [`the measurement`](reviews/2026-09-16-daytime-stress-imputation-vs-measured-hrv.md).
-- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **Measured**, model vs `rmssdFromRr` over the app's own 30-minute grid: **×0.30 of measured over 84
   buckets / 37 days**, ×0.32 over the 54 densest / 30 days, ×0.31 on the 14 buckets that join a scored
   stress bucket. The spread (sd of log-ratio 0.40) is far smaller than the bias, so it is a level
@@ -13303,6 +13354,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   day. Tank: 1 workout per T1, drained one workout per rest-target days. Both are the owner's
   numbers (2026-09-26), marked provisional by him. The Health cat (Cleric art) faucet is defined — see the
   plan — and can be built with them. The cardio (Rogue) faucet waits on PS-48, and the route returns `null` for them until then.
+- **Keep the lineage fold (third collection PR).** `replayCollection` now tracks named cats; new
+  constants are compatible, a replacement fold is not. Rares attach as `shiny` on a merged cat.
 - **No migration.** The collection is replayed, so bumping `COLLECTION_RULES_VERSION` to 2 re-scores
   all history. That rewrite is the owner's intent, not an accident. PS-48 asks whether v1-era cats
   should be preserved instead (recommendation: no).
@@ -13310,6 +13363,28 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   for exactly this. The PS session could not: the query secret was unavailable on that machine.
 - **Reversal cost:** low as code (the version constant and one fold); visible as behaviour, because
   every cat count the owner has seen changes on deploy.
+
+### [app-shell] PS-52 — make people attached to their cats: pick which of these to build next
+
+- **Lane: O** · **Added:** 2026-09-26 · owner: *"any other ideas you can think that would make people
+  get attached to them and want to stay consistent"*. Ungated on purpose: the owner picks.
+- **Shipped already:** unique names, merged names, breakdown returning the same named cats, a
+  named "is getting restless" warning, and a named "wandered off" line (third collection PR,
+  v1.468.0).
+- **Candidates, cheapest first; the recommendation is the first three:**
+  ① **A named nudge notification** when a ladder is restless ("Onyx is getting restless") through
+  the existing notification path. Cheapest, and aimed straight at consistency.
+  ② **Merge moments:** a one-off celebration the first time a merge is seen ("Puffle was born from
+  Pudding and Waffle"), keyed on the cat's stable id, so it shows once per cat.
+  ③ **Cat anniversaries:** "Mochi has been with you 30 days" on the card; it needs only `born`.
+  ④ **Petting:** tap a cat in the pen for hearts and a haptic. The pen then needs its own tap target
+  apart from the card's navigate.
+  ⑤ **Moods:** sprite expressions (happy on a faucet day, sleepy at night, sad when restless). Art
+  plus one prop.
+  ⑥ **A grace window:** a cat that wandered off comes back if the faucet fires within 24 h. This is a
+  RULE change (Lane A, owner sign-off, and it moves history).
+  ⑦ **User nicknames:** needs storage keyed on cat id, so a Lane A migration. Cosmetic only; it
+  must never feed the replay.
 
 ### [app-shell] PS-51 — titles that unlock the collection pen's backdrop scenes
 
@@ -13955,8 +14030,8 @@ calories or the stage mapping (PS-16, PS-19).
 
 ### [workouts] PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours
 
-- **Lane:** A — `packages/shared/src/1rm.ts`. Sibling of RV-43.
-- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
+- **Implementation lane once the proposal exists:** A — `packages/shared/src/1rm.ts`. Sibling of RV-43.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P4.
 
 All coordinator-verified through the shipped module. (a) `amrapScaleFactor`'s step table makes the
@@ -14340,8 +14415,8 @@ instead is the option that loses: a replay with no window gets one wrong answer 
 
 ### [workouts] RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent
 
-- **Lane:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
-- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
+- **Implementation lane once the proposal exists:** A — `packages/shared/src/1rm.ts` and/or `app/api/next-session/prescription/route.ts`.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **Added:** 2026-09-03, Review sweep 46 —
   [`write-up §2`](reviews/2026-09-03-progression-exact-adherence-ratchet.md)
 - **The module states this invariant and the 2026-07-10 workout review repeated it as a strength:**
@@ -19201,13 +19276,13 @@ test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again
 
 ### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
 
-- **Needs: OR-150** — added 2026-09-24 by RV-189, on Review sweep 59's reading. This changes what
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
   counts as an active hour, so it is a **scoring change**, and CLAUDE.md is explicit that Tuning
   proposes, the owner signs and Lane A implements. No proposal exists and none of the three options
   states **how many other days it moves**, which is what a proposal owes. `OR-150` is the hold for
   exactly this class; this makes it fourteen rather than thirteen. **There is no `Lane:` value for
   Tuning**, which is why the hold is a `Needs:` and not a lane change.
-- **Lane:** A — engine only: packages/shared, lib/health.
+- **Implementation lane once the proposal exists:** A — engine only: packages/shared, lib/health.
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
@@ -23774,11 +23849,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
-- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **Needs:** Q-290 — the input signal's own variance bounds what any calibration can achieve. Was
   prose (*"Depends on Q-290"*) and therefore invisible to the queue tool.
 
-- **Lane: A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
+- **Implementation lane once the proposal exists:** A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
   `autoregulation.ts` and `RPE_DEAD_BAND` all live in `packages/shared/src/ai-periodization/`, which
   the path rule assigns to Lane A. **And it is a SCORING change**, so the route is Tuning proposes →
   owner signs off → Lane A implements, per CLAUDE.md — not an implementer's to take at all. The
@@ -23849,9 +23924,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
 
-- **Needs:** OR-150 — a scoring change with no proposal. Rerouted 2026-09-24 (OR-153) for the reason OR-150 records: what is owed is a Tuning proposal stating how many other days the change moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 
-- **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
+- **Implementation lane once the proposal exists:** A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
   `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
   owner signs off, Lane A implements.
 
@@ -24331,12 +24406,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   putting this in front of the owner asks them to sign a blank page — and it has been counting as
   owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 
 - **Branch:** `feat/readiness-training-load-input`
 - **Plan:** none yet — this is a modelling change and wants a written plan before code
 - **Added:** 2026-08-15 · from the comprehensive review §1.8 (and §2.1's incumbent comparison)
-- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: readiness's composite is `packages/shared/src/health/**` and is served by `app/api/readiness-score`, so it is reached by `app/api/**`.
+- **Implementation lane once the proposal exists:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: readiness's composite is `packages/shared/src/health/**` and is served by `app/api/readiness-score`, so it is reached by `app/api/**`.
 - **The mechanism, in one line.** `lib/health/readiness-payload.ts:329`:
   ```ts
   const ownActivityScore = activityResult?.preTaperScore ?? null // pre-taper → readiness composite (no double-count)
@@ -24769,7 +24844,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   putting this in front of the owner asks them to sign a blank page — and it has been counting as
   owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). 
 
 - **Branch:** `fix/resilience-longterm-sleep-recovery`
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** Blocked on a question this repo
@@ -25437,7 +25512,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   constant with a date, so the boundary is unchanged on the switchover day and cannot drift after
   it. Its cost, stated plainly: a frozen constant goes stale silently, and there is **no cron layer**
   (`module-map.md` §0), so "re-derived quarterly" means a person remembers.
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). 
 - **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
@@ -25517,7 +25592,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   (`LOW_SIGNAL_MAX_BPM = 105`) rather than a label match, since "the low ones" is no longer one
   string. `lib/ai-chat/tools.ts` named the old labels in a tool description and was updated with it.
   [journal](overview/history-2026-09-10-folded-5.md#2026-09-02-q516-peak-bands).
-- **Lane:** B — the re-banding shipped from Lane A; what remained was rendering, in
+- **Implementation lane once the proposal exists:** B — the re-banding shipped from Lane A; what remained was rendering, in
   `components/health/hr-recovery-profile-card.tsx`.
 - **✅ THE HONESTY HALF SHIPPED 2026-09-03** (`fix/q516-hr-recovery-honesty`).
   `aggregateHrRecoveryProfile` had returned `informativeShare` since the re-banding and **nothing
@@ -25536,7 +25611,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   line is struck and the lane is a field now.
 - **Keep:** the owner's question, and only that — whether the feature is targeted correctly at all,
   given the range it wants lives in cardio rather than strength sets. Nothing to build for it.
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane B's once a proposal exists.
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
 - **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for
@@ -26424,7 +26499,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `fix/move-hours-rest-boundary`
 - **Needs:** Q-515
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). 
 - **⚠ BLOCKED IN PROSE ONLY UNTIL 2026-09-02, WHICH IS WHY IT KEPT PRESENTING AS READY.** The
   plan line has said *"Do Q-515 first — same boundary, same root cause"* since it was filed, and
   `next-item.js` reads fields, not sentences. Verified against the code: both consumers compute
@@ -26486,7 +26561,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   owner debt in every sweep meanwhile. **The next action is Tuning's, not theirs.**
 
 - **Branch:** `fix/zone-minutes-floor-and-gap-cap`
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). 
 - **⚠ ITS Q-516 PREMISE IS WRONG — CHECKED 2026-09-02, AND Q-516 HAS NOW SHIPPED.** This entry
   says the Zone 2 floor is *"Q-516 in a second consumer of the same banding — resolve them
   together or the two will drift apart"*. **They are not the same banding.** Q-516 is
@@ -30836,8 +30911,8 @@ indefinitely.
 - **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — and the answer is "fit it to me".** Owner: *"I mostly
   wear the chest strap while training. Let's have it specific to the user."* So the bar is
   **personalised, not re-picked as another constant**, and the measured `hrr1` requirement stays.
-- **Lane:** A to implement — but **Tuning proposes the fit and the owner signs the number first.**
-- **Needs:** OR-150 — replaces the `Gate: owner` this entry itself called premature on 2026-09-16. What is owed is a Tuning proposal with the number of other days it moves, not the owner's signature on a blank page.
+- **Implementation lane once the proposal exists:** A to implement — but **Tuning proposes the fit and the owner signs the number first.**
+- **Lane: T** — Tuning acts next: what is owed is a PROPOSAL stating how many other days the change moves, not the owner's signature on a blank page. Replaces the `Needs: OR-150` placeholder, which parked this for the right reason with no field that could say so (OR-178 added the lane; OR-150 has the history). Implementation is Lane A's once a proposal exists.
 - **⚠ TWO PREMISES IN THIS ENTRY WERE WRONG, and production says so. Re-measured 2026-09-01 against
   `claude_ro.set_hr_stats`.**
   - **"The ring power-gates, so end-of-set HR is never chest-strap-grade" — the strap is in fact the

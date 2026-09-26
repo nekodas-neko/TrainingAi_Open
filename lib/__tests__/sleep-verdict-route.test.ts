@@ -36,15 +36,16 @@ function ordinaryNights(n: number, endBefore = DAY) {
     const date = shiftDateStr(endBefore, -(i + 1))
     return {
       date,
-      sleepStart: `${shiftDateStr(date, -1)}T13:0${i % 4}:00Z`, // ~23:00–23:03 local
+      sleepStart: new Date(`${shiftDateStr(date, -1)}T13:0${i % 4}:00Z`), // ~23:00–23:03 local
+      sleepEnd: new Date(`${shiftDateStr(date, -1)}T21:00:00Z`),
       durationHours: 7.5 + (i % 4) * 0.25,
       efficiency: 88 + (i % 4),
     }
   })
 }
 const targetNight = (over: Row = {}) => ({
-  date: DAY, sleepStart: `${shiftDateStr(DAY, -1)}T13:00:00Z`,
-  durationHours: 7.8, efficiency: 89, ...over,
+  date: DAY, sleepStart: new Date(`${shiftDateStr(DAY, -1)}T13:00:00Z`),
+  sleepEnd: new Date(`${shiftDateStr(DAY, -1)}T20:48:00Z`), durationHours: 7.8, efficiency: 89, ...over,
 })
 
 const get = (qs = `?date=${DAY}`) => GET(new Request(`http://localhost/api/sleep-verdict${qs}`))
@@ -99,6 +100,32 @@ describe('GET /api/sleep-verdict', () => {
     expect(record.components).toEqual({ durationHours: 5.2, onsetMinutes: -60, efficiency: 89 })
     expect(bands.durationLow).toBeGreaterThan(5.2)
     expect(record).not.toHaveProperty('responseState')  // the upsert must never set it
+  })
+
+  // TN-83, and this is the case that nearly shipped wrong. `sleep_sessions` holds more than one
+  // row per date, and judged raw the verdict fails in BOTH directions: an afternoon nap is
+  // announced as a bad night, and the 0 h fragments sitting in the trailing window drag p25 down
+  // so a genuinely short night reads as acceptable. `nightSessions` is the one place that decides
+  // which rows are the night; this asserts the route is downstream of it.
+  it('judges the NIGHT, not an afternoon nap on the same date (TN-83)', async () => {
+    const nap = {
+      date: DAY,
+      sleepStart: new Date(`${DAY}T06:37:00Z`),   // 16:37 Brisbane — plainly a nap
+      sleepEnd: new Date(`${DAY}T07:37:00Z`),
+      durationHours: 1,
+      efficiency: 70,
+    }
+    // The nap is listed FIRST, which is the case that bites: `listSleepSessions` orders by date
+    // and two rows share this one, so which comes back first is not defined. Judged raw, the
+    // lookup takes whichever it sees first — and a test that happens to list the real night
+    // first passes with or without the fix, which is what a first draft of this did.
+    listSleepSessions.mockResolvedValue([nap, targetNight(), ...ordinaryNights(28)])
+
+    const body = await (await get()).json()
+
+    // The real 7.8 h night, not the 1 h nap. Judged raw this was `poor` on the nap's duration.
+    expect(body.verdict.verdict).toBe('normal')
+    expect(body.verdict.components.durationHours).toBeCloseTo(7.8, 1)
   })
 
   it('says nothing, and stores nothing, when the night has no sleep session yet', async () => {

@@ -51,6 +51,27 @@ Seeded 35 ordinary nights plus a short one, signed in, and drove both verbs:
 The seeded nights were removed afterwards and the seed's own 7 restored, so the local DB is back
 where it started.
 
+## TN-83 caught this before it shipped, and it was right
+
+Tuning filed TN-83 while this was being built: the verdict reads `sleep_sessions` raw, and that
+table holds **more than one row per date**. Measured over 125 real rows — 106 distinct dates, 30
+rows under 3 h, onsets at 10:44, 16:37, 17:35 and 17:44. Judged raw it fails in **both**
+directions: an afternoon nap is announced as a bad night, and the 0 h fragments sitting in the
+trailing window drag `p25` down so a genuinely short night reads as acceptable.
+
+Had this merged an hour earlier the owner's first announcement could have been *"your sleep was
+bad"* on a 7.9 h night — the precise thing the design cannot afford in week one.
+
+The fix is one import: `nightSessions()` already classifies nap vs night by circadian position and
+merges fragments inside the night band, and fifteen sites route through it. This is the sixteenth.
+Writing a selection rule here instead would have been the One-Formula-One-Place trap that Q-76
+already closed once.
+
+**My first test for it proved nothing.** It listed the real night before the nap, so the lookup
+found the right row either way and passed with and without the import. `listSleepSessions` orders
+by date and two rows share one, so which arrives first is undefined — the nap now goes first, and
+the test fails without the fix. Verified by reverting the import, not assumed.
+
 ## Mutation pass
 
 8 deliberate defects, all killed; 2 deliberately equivalent controls, both survived.
@@ -62,6 +83,11 @@ So it was really a third control. It did surface something real, though: `baseli
 is part of the contract TN-82 reads and nothing pinned it. It is pinned now.
 
 ## Not exercised
+
+**TN-83's re-measure is NOT done and is not this PR's.** Its 10.9-announcements-per-30-nights
+figure was counted over rows rather than nights, so it does not survive the fix; the rate has to
+be re-run over `nightSessions()` output before anyone touches `VERDICT_IQR_MULTIPLIER`. The entry
+says so.
 
 No device run, and none applicable yet — this is a server route with no UI. The surface that
 announces it is TN-82 (Lane B), which now has its `Needs:` cleared and needs the APK for its own

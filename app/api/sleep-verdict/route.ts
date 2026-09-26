@@ -10,6 +10,7 @@ import {
   toVerdictNights,
   VERDICT_BASELINE_NIGHTS,
 } from '@trainingai/shared/health/sleep-verdict'
+import { nightSessions } from '@trainingai/shared/health/sleep-night'
 
 // One date and one word.
 const MAX_BODY_BYTES = 1024
@@ -65,8 +66,20 @@ export async function GET(req: Request) {
   const stored = await repo.getSleepVerdict(userId, date)
   if (stored) return json({ verdict: stored })
 
-  const sessions = await repo.listSleepSessions(userId, shiftDateStr(date, -HISTORY_DAYS), date)
-  const nights = toVerdictNights(sessions, tz)
+  const rows = await repo.listSleepSessions(userId, shiftDateStr(date, -HISTORY_DAYS), date)
+  // TN-83: `sleep_sessions` holds more than one row per date — naps, and fragments of a broken
+  // night — and the verdict must never see them as nights. Measured over 125 real rows: 106
+  // distinct dates, 30 rows under 3 h, and onsets at 10:44, 16:37, 17:35 and 17:44. Judged raw it
+  // fails in BOTH directions: an afternoon nap is announced as a bad night, and the 0 h fragments
+  // sitting in the trailing window drag p25 down so a genuinely short night reads as acceptable.
+  //
+  // `nightSessions` is the one place that answers "which rows are the night?" — circadian
+  // classification first, then fragment merging inside the night band. Becoming its sixteenth
+  // consumer rather than writing a selection rule here is the whole fix: Q-76 already found every
+  // consumer answering this for itself, all of them the same wrong way, and a "longest row per
+  // date" rule would score this history's one genuinely fragmented night (2.53 h + 4.02 h) as a
+  // 4.02 h night instead of merging it to 6.55 h.
+  const nights = toVerdictNights(nightSessions(rows, tz), tz)
   const target = nights.find(n => n.date === date)
   // No sleep session for the night yet — the ring may not have drained. Say nothing and store
   // nothing, so the snapshot is not frozen against data that had not arrived.
