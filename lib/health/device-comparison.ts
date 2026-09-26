@@ -15,6 +15,7 @@
 //
 // Bucket to the COARSEST cadence among the devices being compared, not the finest.
 import { spearman } from '@trainingai/shared/health/correlation'
+import { median } from '@trainingai/shared/stats'
 
 export interface NamedSeries {
   device: string
@@ -152,11 +153,8 @@ function medianGapMinutes(points: { bucketStart: string }[]): number | null {
     const gap = times[i] - times[i - 1]
     if (gap > 0) gaps.push(gap)
   }
-  if (gaps.length === 0) return null
-  gaps.sort((a, b) => a - b)
-  const mid = Math.floor(gaps.length / 2)
-  const ms = gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2
-  return ms / 60_000
+  const ms = median(gaps)
+  return ms === null ? null : ms / 60_000
 }
 
 /**

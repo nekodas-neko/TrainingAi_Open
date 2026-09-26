@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { median, quantile } from '@trainingai/shared/stats'
+import { lowerMedian, median, quantile } from '@trainingai/shared/stats'
 
 describe('median', () => {
   it('averages the two middle values on an even count', () => {
@@ -54,5 +54,38 @@ describe('quantile', () => {
 
   it('returns null for empty', () => {
     expect(quantile([], 0.5)).toBe(null)
+  })
+})
+
+/**
+ * `lowerMedian` is `torch.median`'s definition, kept as a named concept rather than as three
+ * private copies (LA-151). Two of its callers port an external model whose goldens pin the lower
+ * middle; the third is a diagnostic console that must report a value the device actually produced.
+ */
+describe('lowerMedian', () => {
+  it('takes the LOWER of the two middles on an even count, where median averages them', () => {
+    expect(lowerMedian([1, 2, 3, 4])).toBe(2)
+    expect(median([1, 2, 3, 4])).toBe(2.5)
+  })
+
+  it('agrees with median on an odd count, which is why an odd fixture cannot tell them apart', () => {
+    for (const xs of [[1, 2, 3], [5], [9, 1, 7, 3, 8]]) {
+      expect(lowerMedian(xs)).toBe(median(xs))
+    }
+  })
+
+  it('returns an element of the input, never a value between two', () => {
+    // The property the step-counter console depends on: averaging [1, 2, 3, 4] into 2.5 Hz would
+    // report a stride frequency the ring never decoded.
+    const xs = [2.0, 1.0, 4.0, 3.0]
+    expect(xs).toContain(lowerMedian(xs))
+  })
+
+  it('sorts before indexing rather than trusting input order', () => {
+    expect(lowerMedian([4, 1, 3, 2])).toBe(2)
+  })
+
+  it('returns null for empty — the callers that need NaN convert it themselves', () => {
+    expect(lowerMedian([])).toBe(null)
   })
 })
