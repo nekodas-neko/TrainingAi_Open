@@ -1116,6 +1116,13 @@ the Orchestrator's to do.
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
 
+- **⚑ CAUSE NAMED 2026-09-26 (OR-175, from sweep 4a).** `OR-162` carries it: the two
+  *HEART RATE · TODAY* charts **re-measure on every tab switch while hidden**, and sweep 4a
+  measured **16 of 20 taps** with one 51–104 ms task. `RV-153` is a second candidate on the same
+  tap — **~120k characters of `localStorage` rewritten per Home tap**, friends-feed 459k.
+  **Both fixes are Lane B and are now laned there. This entry is the PASS TEST, not the fix** —
+  do not start it as work; re-measure it once OR-162 and RV-153 land.
+
 - **📱 Sweep 4a, after #1675 (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): still FAILS the pass test.** `perf.js longtasks` ×2: **16
   of 20** taps carry one long task of 51–104 ms; 4 carry none (sweep 3: every tap, 68–118 ms). The profile
   still shows chart.js `update → _tickSize → _getLabelSizes → _computeLabelSizes` on every tap, 6–45 ms.
@@ -1319,7 +1326,10 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   TIME — 14 DAYS"** (1068×330) re-measures 43× on arriving at Health. Health's other three canvases and
   Nutrition's do not. So the fix is two components, not every chart.
 
-- **Lane: DV** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 ·
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Sweep 4a named the cause**, which is what this entry was for: the two *HEART RATE · TODAY* charts
+  **re-measure on every tab switch while hidden**. That is `components/**`, so Lane B.
+  It is the mechanism behind `DV-12`'s 51–104 ms task — fix here, verify there.
 - **⚑ RE-LANED `B` → `DV` and UNGATED, 2026-09-25, on the owner's instruction** (*"Make sure anything
   that can be done by DV agent is assigned to it. I shouldn't need to do device checks are possible
   by DV"*). It carried `Lane: B` + `Gate: device`, which PARKED it into the owner's `--sittings` list —
@@ -3611,7 +3621,12 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
   427–555, zone-minutes 497–610** (bar 100–150), cardio-week 512–1,116, **health/trends 1.0–1.3 s**. ⑥
   exercise-library on Workout re-shows: **0** ✓. Rows 7–9 not run (7 needs a live workout, 9 DV-13).
 
-- **Lane: DV**
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Sweep 4a answered the measurement and three items FAILED, so what is left is code, not the phone.**
+  ② **4 requests per resume**, ③ **Health switch = 24 requests**, ⑤ **`hr-profile`/`zone-minutes` 430–610 ms.**
+  ⑤ is route latency and is squarely Lane A. ②③ are client request counts and are Lane B — per the
+  path rule, an entry reaching both goes to **Lane A, engine half first**, so ⑤ ships first and ②③
+  follow in B. Do not send this back to `DV`: the numbers exist, and a FAILED is work.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **This is sweep 58's device half.** Review measured the server side (`pg_stat_statements`,
 code, `next build`); these are the numbers only the phone can give. Run it **now**, so RV-180 to
 RV-185 each ship against a recorded baseline, then re-run each row after its fix lands.
@@ -5925,8 +5940,11 @@ drift.
   **What remains true:** the set is still `pending` locally, and the server has it — the same
   bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
 
-- **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
-  SQLite file.
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Second independent reproduction in sweep 4a** — a food delete left pending with **both outboxes
+  empty**, which is the sync write path rather than anything the phone can answer next. Two
+  reproductions is enough; further device time on it is the trap where a probe already run gets
+  re-run. Lane A.
 - **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
   is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
   PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
@@ -6212,7 +6230,10 @@ drift.
   section lost, no error or "may be stale" signal, identical text. A failed refetch is invisible: every
   card keeps its cached value as if current. Not tested: a failure with no cache (cold start).
 
-- **Lane: DV**
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Answered: a failed refetch is invisible — no stale signal reaches the user.** This is the
+  `Q-499` shape (`cachedFetch`/`useCachedValue` swallow `!res.ok` unless the caller passes
+  `onError`), so the fix is at the call sites in `components/**`. Lane B.
 - **Added:** 2026-09-24 · Review. Method: **P18**.
 - **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
   `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
@@ -6247,7 +6268,10 @@ drift.
   rewritten on every tap. **Fails the 10 kB-per-key bar** on workout-data:meta, workout-card and
   sleep-sessions. → Lane B/A to decide whether warm-tab rewrites of unchanged payloads can be skipped.
 
-- **Lane: DV**
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Answered on device: ~120k characters of `localStorage` rewritten per Home tap, and the
+  friends-feed entry is 459k.** A synchronous main-thread write of that size on every tap is a
+  plausible contributor to `DV-12`. Stores and hooks are Lane B.
 - **Added:** 2026-09-24 · Review. Method: **P21**. Feeds **DV-12**, whose profile found
   `localStorage.setItem` at 1–15 ms on every tab tap and left the caller unnamed.
 - **The suspect, from source:** `lib/sqlite/cache.ts:82` writes `JSON.stringify(entry)` of the
@@ -23881,6 +23905,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 
+- **Lane: A** — set 2026-09-26 (OR-175). This entry had NO lane field, so it was printing as UNCLASSIFIED and no implementer could pick it up.
+  **The device question is discharged.** Sweep 4a blocked `/api/health-trends*` and the *Rest
+  discipline* card showed *"Couldn't load this trend"* — so it renders from the **server route**,
+  not `getLocalStore`. That was the one thing the entry still owed.
+  What remains is the RPE model gaining a rest term, which is domain math in `packages/shared/**`.
+
 - **📱 ANSWERED (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** With `/api/health-trends*` blocked, *Rest discipline* shows *"Couldn't
   load this trend…"* — no rows. So on the device this card renders from the server route; the
   `getLocalStore` path is not what paints it.
@@ -31095,120 +31125,6 @@ indefinitely.
   rows, and the admin backfill can recompute on request. **Still open, separately:** whether 15 bpm is
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
-
-### [heart-rate][workouts] 🟡 Q-11 — 22 of 78 completed sessions still hold no per-set HR attribution, and only the owner can backfill them
-- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
-- **📱 RAN 2026-09-26, owner-approved (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** More → Settings → Developer → *Backfill per-set HR
-  stats*: one POST, 200 in 9.1 s → **"Done — 33 sessions processed, 0 had HR data."** Production stayed under
-  0.55 s throughout. **Nothing was filled** — none of those sessions has HR data left to attribute (likely
-  pruned raw samples). This entry's "fills 22" is not achievable from current data; Lane A to confirm why.
-
-- **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
-
-- **Lane:** DV
-- **Keep:** the one-off backfill over pre-fix sessions. Measured 2026-08-20: **56 of 78 completed
-  workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
-  has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
-  old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
-- **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). Its own note already said to fold this into the next batch of owner actions rather than re-ask it; this is that batch.
-- **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
-  they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
-  refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the
-  next batch of owner actions so it costs one decision rather than a nag.
-
-> **⚑ 2026-08-05 — this now BLOCKS an analysis, which raises its value.** The
-> [data-analysis review](reviews/2026-08-05-data-analysis-opportunities.md) §4 B2 went looking for
-> the most interesting unbuilt question in the dataset — *does how physiologically recovered you
-> were at the end of rest predict the next set?* — and could not answer it. Field-level coverage of
-> `set_hr_stats` (582 rows): `peak_bpm` 210, `drop_60s` 160, `pct_hrr_at_rest_end` **122**,
-> `sec_to_hrr50` 74, `coverage_ok` 138. Only **92** rows join to a following set. That is not enough
-> to test anything. Fixing Q-11 unlocks a genuinely new class of set-level physiology analysis, so
-> it is a prerequisite, not an independent cleanup.
->
-> **✅ Re-measured against production 2026-08-08 (615 rows).** The side-check is answered and split
-> out as **Q-149** — `rest_adequate` is not stuck, it is *degenerate*: 278 non-null, 278 true, and
-> **271 of them (97.5%) come from the `bpmAtLog < 120 → true` shortcut**. Do not build a view on it.
-> The B2 blocker has eased but not cleared: rows joining to a following set went **92 → 108**, and
-> `pct_hrr_at_rest_end` is accruing at ~10–13 per training day, so it is a matter of waiting rather
-> than re-engineering.
-
-> **⚑ Half of this shipped as v1.257.2; the other half is now precisely stated.** Two separate
-> defects were hiding behind one entry, and neither was the device-side cause this entry originally
-> guessed at. (The earlier "~20% of sets" / device-gate framing on this entry is superseded by
-> Defect A/B below — dropped here rather than kept as a third, redundant annotation.)
-
-**Defect A — `workout_hr_stats` at 0 rows. FIXED (v1.257.2), root cause proven.** Not a missing
-producer: `upsertWorkoutHrStats` was called on every recap, sitting three lines above the
-`upsertSetHrStats` call that reached 582 rows. It threw every single time.
-`workout_hr_stats.workout_hrv_ms` is the **only integer HRV column in the schema** — every sibling
-(`sleep_sessions.average_hrv_ms`, `oura_daily_derived.hrv_rmssd_ms`, …) is `doublePrecision` — and
-its producer `rmssdFromRr` returns `Math.sqrt(mean)`. node-postgres sends the float as text and
-Postgres rejects the whole insert:
-
-```
-invalid input syntax for type integer: "38.42156862745098"
-```
-
-Reproduced against the local DB, and the new regression test fails with that exact message when the
-`Math.round` is removed. The caller's fire-and-forget `.catch(err => console.error(…))` swallowed
-it, and the recap renders either way, so there was no user-facing symptom for months. Both persist
-calls now go through `reportServerError`, and the previously button-less
-`/api/oura-ble/backfill-hr-stats` has an Admin → Tools card.
-
-**Defect B — four recent sessions have ZERO `set_hr_stats` rows. FIXED 2026-08-05, v1.266.1.** See
-[`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
-`POST /api/complete-workout` now fires a best-effort fire-and-forget HR compute/upsert at completion
-(closes the gap outright for a live chest strap already in `oura_heartrate`), and
-`listSessionsMissingSetHrStats`/`listSessionsMissingHrStats` are now coverage-aware — a session whose
-only attempt produced `readings_count = 0` rows stays on the backfill work-list instead of being
-permanently marked done, so a delayed Oura-ring drain still gets picked up by a later backfill pass.
-**Did not** fold `coverage_ok = false` into the coverage-aware check, only `readings_count = 0` — the
-two are different questions (see "Also still open" below) and conflating them risked the work-list
-permanently re-listing genuine-dropout sessions that can never improve on reprocessing.
-
-Measured per session against production before the fix, kept for the record:
-
-| day | session | sets | set_hr_stats rows | computed_at |
-|---|---|---|---|---|
-| 2026-08-02 | Pull | 15 | **0** | — |
-| 2026-08-01 | Lower | 18 | 18 | 2026-08-04 (3 days later) |
-| 2026-07-30 | Upper | 18 | **0** | — |
-| 2026-07-30 | Legs | 18 | **0** | — |
-| 2026-07-27 | Push | 14 | 14 | 2026-07-28 |
-| 2026-07-26 | Pull | 15 | **0** | — |
-| 2026-07-20 | Push | 14 | 14 | 2026-07-29 (9 days later) |
-
-**Zero rows, not rows-with-null-metrics** — so attribution never ran, rather than running and
-finding nothing. And every `computed_at` lags its workout by days. The cause is structural: the
-only trigger is `GET /api/oura/hr-data`, which is the **recap fetch**. Finish a workout and never
-open its recap and that session is never attributed, permanently. Everything before 2026-07-22 has
-rows because the backfill was run once that day; the four gaps are all sessions after it.
-
-- Admin → Tools → "Backfill per-set HR stats" still exists and still works for any pre-fix gaps
-  already in production — running it once is on the owner checklist, since this fix only prevents
-  *new* gaps, it doesn't retroactively attribute old sessions.
-
-**✅ ANSWERED 2026-08-08 — it was the artefact, not device dropout.** The open question was whether
-the 79% `coverage_ok=false` / 67% NULL `peak_bpm` figures meant real strap dropout during lifting or
-were contaminated by days-late computes. Re-measured against production by `computed_at` day, which
-separates the two cleanly:
-
-| computed_at | rows | coverage_ok | peak_bpm | readings_count = 0 |
-|---|---|---|---|---|
-| **2026-07-22** (the one-off backfill) | **508** | 74 | 138 | **334** |
-| 2026-07-23 → 08-04 (recap-triggered) | 74 | 64 | 71 | 0 |
-| 2026-08-06 (post-fix, same-day) | 24 | 18 | 23 | 0 |
-| 2026-08-08 (post-fix, same-day) | 9 | 3 | 9 | 1 |
-
-**508 of 615 rows are that single backfill batch**, run over old sessions whose HR series was thin
-or absent — 334 of them have zero readings. Every aggregate that treated the table as one population
-was measuring that batch. Same-day computes since the Defect B fix carry near-complete `peak_bpm`
-and no zero-reading rows. So: no evidence of systematic device dropout; nothing further to fix here.
-
-Two things confirmed while measuring, recorded so they are not re-investigated: `source` is populated
-only from 2026-08-06 onward (23/24 then 8/9), which is exactly when v1.260.0 shipped it — not a gap;
-and the whole dataset's **maximum `bpm_at_end` is 128**, which is what makes Q-149's threshold
-degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
