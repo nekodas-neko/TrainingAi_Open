@@ -5,7 +5,7 @@ import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
 import { LADDERS, type CollectionState } from '@trainingai/shared/collection/ladder'
 import { nearestMerge, mergeCountLine, totalHeld, type FaucetKey } from '@/components/home/collection-summary'
-import { tierGlyph } from '@/components/home/collection-sprites'
+import { CatSprite } from '@/components/home/cat-sprite'
 
 export interface CollectionResponse {
   collections: Record<FaucetKey, CollectionState>
@@ -74,7 +74,7 @@ export function CollectionCard() {
     <div className="p-4">
       <Heading />
       <div className="flex items-center gap-3">
-        <span className="text-3xl leading-none" aria-hidden="true">{tierGlyph(next.faucet, next.fromTier + 1)}</span>
+        <CatSprite faucet={next.faucet} tier={next.fromTier + 1} size={56} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold first-letter:uppercase truncate">{next.towardName}</p>
           <p className="text-xs text-muted-foreground">{mergeCountLine(next)}</p>
