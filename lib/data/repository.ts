@@ -2,7 +2,7 @@ import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, MoodLog,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, MoodLog,
   NextSessionRecommendation, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -721,6 +721,13 @@ export interface WorkoutRepository {
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
+
+  // TN-81 — the app's announced sleep verdict. `upsertSleepVerdict` is idempotent per
+  // (user, date) and deliberately does NOT touch `response_state`: re-announcing the same night
+  // must never erase the fact that he already answered it.
+  getSleepVerdict(userId: string, date: string): Promise<SleepVerdictRecord | null>
+  upsertSleepVerdict(userId: string, record: Omit<SleepVerdictRecord, 'responseState'>): Promise<void>
+  setSleepVerdictResponse(userId: string, date: string, state: 'acknowledged' | 'corrected'): Promise<boolean>
   /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
    *  when no session for that date exists; this never creates one. Read only by the bedtime
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own

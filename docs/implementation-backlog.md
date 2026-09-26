@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **284** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **286** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v40** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -671,40 +671,45 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [sleep][platform] TN-81 — the verdict, the snapshot, and the three response states
+### [sleep][platform] LA-149 — the sleep verdict is stored but nothing announces it yet
 
-- **Lane: A** — `packages/shared/src/health/**`, `lib/data/postgres/**` (migration). **Added:** 2026-09-26.
-- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) · answers `OR-171`.
-- **Why it matters beyond one prompt:** Tuning has no validated outcome variable. `TN-73` produced the
-  only working instrument in the project and five other validation attempts failed for want of a
-  label. This is the cheapest label available, which is why the storage half is worth getting right.
-- **The measurement that sets the hard requirement:** `sleep_sessions` holds **119 rows for the last
-  120 days** — `duration_hours` on all 119, `average_hrv_ms` on 102 — and **`sleep_score` is non-null
-  on 0 of them.** The score is computed on read, never persisted. So **the verdict and the values
-  behind it must be snapshotted**: store only the outcome and a later scoring change rewrites what each
-  correction was disagreeing with, and the corrections decay into noise with no signal that it
-  happened. A correction whose paired verdict is not pinned is not evidence.
-- **Build:** **per-component** rolling median/IQR baselines (duration, onset time, efficiency) with a
-  minimum-coverage guard — 28 nights needs 28 nights, `temperature-baseline.ts` is the in-repo
-  precedent. The owner named the inputs (*"sleep was later; or short"*), so the gate reads components
-  rather than only a composite: a night of normal duration that started two hours late is strange, and
-  a composite averages that away. Verdict is `normal | poor | good` **plus which components triggered
-  it**, because the reason is what gets announced and a verdict with no stated cause cannot be argued
-  with. Persist the verdict, the component values behind it, the bands, and the response state
-  (`none | acknowledged | corrected`).
-- **Hard constraint, and it is `TN-57` verbatim:** the auto-filled value writes **`touched: false`**;
-  **only a correction writes `touched: true`** and the owner's value. That one rule is the whole
-  difference between "the app's guess" and "his answer", and every analysis downstream rests on it.
-  `sleep_quality_feel_touched` exists because `sleep_quality` was defaulted to `'ok'` for 91 days and
-  two surfaces read that default back as the owner's answer. **Never infer a label from an announcement
-  he did not respond to.** Coverage: `lib/__tests__/tn57-untouched-scales-are-not-answers.test.ts`.
-- **Migration ships its regenerated `claude_ro` twin in the same PR**, and the two TCP-`DATABASE_URL`
-  tests run before pushing (they skip under the full suite).
+- **Lane: A** — `app/api/**`, the morning check-in read path. **Added:** 2026-09-26, shipping TN-81.
+- **Needs:** — (TN-81 shipped; this is its other half)
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- TN-81 landed the computation (`sleep-verdict.ts`), the table (`sleep_verdicts`, migration 284) and
+  the repository methods. **Nothing calls them**, deliberately — the plan ships the engine half
+  first, and the announcement's integration point depends on the surface TN-82 builds.
+- **What is owed:** compute the verdict for the night on the morning check-in's read, persist it
+  through `upsertSleepVerdict` (which is idempotent per `(user, date)` and never touches
+  `response_state`), expose it to the sheet, and accept a response through
+  `setSleepVerdictResponse`.
+- **The rule that must survive the wiring:** the auto-filled value writes `touched: false`; only a
+  correction writes `touched: true` (TN-57). An announcement is not his answer, and nothing on this
+  path may make an un-corrected day look like one.
+- **`sleepVerdictForNight` returns `null` below 28 nights per component** — that is not an error
+  state to paper over, it is "say nothing today".
+
+### [platform] LA-148 — four `median` implementations, and one of them disagrees
+
+- **Lane: A** — `packages/shared/src/health/**`, `packages/shared/src/workout/time-audit.ts`.
+- **Added:** 2026-09-26, found while building TN-81's baselines.
+- **Measured:** `median` exists four times — `health/energy-balance.ts` (`medianOf`),
+  `health/daily-medians.ts`, `health/hr-smoothing.ts`, `workout/time-audit.ts`. Three agree
+  (average the two middles on an even count, `null` on empty). **`hr-smoothing.median` does not:
+  it returns the UPPER middle, and `0` on empty.** A zero bpm is a plausible-looking value, which
+  is what makes that the dangerous one.
+- `quantile` is now exported once (`daily-medians.ts`, added by TN-81) and `time-audit.ts` still
+  carries a private `quantileSorted` with the same definition — two copies that agree today.
+- **Not urgent and not free:** `hr-smoothing` is on a live display path, so changing its
+  empty-list answer from `0` to `null` needs its callers checked rather than a blind swap. That is
+  the whole of the work; the other three can move to one import.
 
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
-- **Needs:** TN-81
+- **Needs:** LA-149 — **repointed 2026-09-26.** TN-81 shipped the verdict, the table and the
+  repository methods, but nothing calls them yet, so a surface built now would have no data to
+  announce. LA-149 is the wiring.
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
   interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
