@@ -850,8 +850,9 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
   // Re-queue workouts stranded by a double failure (POST threw AND queueMutation
   // threw): pending locally, absent from the outbox. Grace period avoids racing
   // a direct POST that is still in flight.
+  const strandedCutoff = new Date(Date.now() - 5 * 60_000).toISOString();
   try {
-    const cutoff = new Date(Date.now() - 5 * 60_000).toISOString();
+    const cutoff = strandedCutoff;
     const stranded = await store.getStrandedPendingWorkouts(cutoff);
     for (const h of stranded) {
       for (const el of h.exerciseLogs) {
@@ -866,6 +867,18 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
   // One-shot per row — a healed log leaves the 'failed' set, so this can't loop.
   try {
     await store.requeueStrandedFoodItems(userId);
+  } catch { /* best-effort; the normal queue still drains */ }
+
+  // DV-8 heal: food-log DELETE tombstones left `pending` with their outbox entry already gone,
+  // by the confirm-ordering bug fixed below. The fix stops new ones; it cannot reach the 36 that
+  // were already stranded, because nothing retries a mutation that is no longer queued and
+  // `applyDelta` only overwrites `synced` rows. Re-queued, never marked synced — see the backend
+  // method for why that distinction is the whole point.
+  //
+  // Self-limiting rather than one-shot: a re-queued tombstone has an outbox entry, so the next
+  // sweep does not see it. If its push fails the entry stays and it still is not re-swept.
+  try {
+    await store.requeueStrandedFoodTombstones(userId, strandedCutoff);
   } catch { /* best-effort; the normal queue still drains */ }
 
   const pending = await store.getPendingMutations(userId);

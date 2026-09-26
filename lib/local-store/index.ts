@@ -190,6 +190,15 @@ export interface LocalStore {
   // food_item (from the local row) ordered before the log, then reset the log to
   // pending. Idempotent and bounded. Returns the number of logs healed.
   requeueStrandedFoodItems(userId: string): Promise<number>;
+  /**
+   * DV-8 heal: re-queue food-log DELETE tombstones left `pending` with no outbox entry.
+   *
+   * Re-queues rather than marking synced. A stranded tombstone is indistinguishable from one
+   * whose mutation never got queued at all, so flipping it to `synced` would silently drop a
+   * delete that never reached the server. Re-pushing is idempotent — the server arm soft-deletes
+   * by id — so the safe move is to re-queue and let the normal confirm path settle it.
+   */
+  requeueStrandedFoodTombstones(userId: string, cutoffIso: string): Promise<number>;
   deleteMutations(ids: string[]): Promise<void>;
 
   // Sync meta
