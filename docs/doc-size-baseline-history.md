@@ -17942,3 +17942,12 @@ later reader would otherwise "tidy" into a handler-level guard.
 started). RV-177's nine-gap entry left the queue whole and the one finding inside it that
 had never been filed — the date SHAPE/VALIDITY gap, measured at 25 files against 9 — became LA-145,
 which is a third the length. Lowered rather than left as slack because this PR is editing the file.
+
+## 2026-09-25 — `docs/implementation-backlog.md` (OR-168 ships)
+
+**Superseded before it landed, and kept as the record of why.** This branch lowered the backlog
+baseline 32042 → 32011 (−31) when OR-168's entry left the queue. While it was in flight, #1666
+dropped `docs/implementation-backlog.md` from the ratchet entirely and deleted its `.size` file, so
+the lowering is moot and the deletion was taken rather than fought. The queue-side fact still
+holds: OR-168 shipped, and the "not established" figure it asked for — how long a Railway deploy
+actually takes — was **measured at 205s** rather than guessed.
