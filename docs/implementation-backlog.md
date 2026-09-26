@@ -13368,6 +13368,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   day. Tank: 1 workout per T1, drained one workout per rest-target days. Both are the owner's
   numbers (2026-09-26), marked provisional by him. The Health cat (Cleric art) faucet is defined — see the
   plan — and can be built with them. The cardio (Rogue) faucet waits on PS-48, and the route returns `null` for them until then.
+- **Keep the lineage fold (third collection PR).** `replayCollection` now tracks named cats; new
+  constants are compatible, a replacement fold is not. Rares attach as `shiny` on a merged cat.
 - **No migration.** The collection is replayed, so bumping `COLLECTION_RULES_VERSION` to 2 re-scores
   all history. That rewrite is the owner's intent, not an accident. PS-48 asks whether v1-era cats
   should be preserved instead (recommendation: no).
@@ -13375,6 +13377,28 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   for exactly this. The PS session could not: the query secret was unavailable on that machine.
 - **Reversal cost:** low as code (the version constant and one fold); visible as behaviour, because
   every cat count the owner has seen changes on deploy.
+
+### [app-shell] PS-52 — make people attached to their cats: pick which of these to build next
+
+- **Lane: O** · **Added:** 2026-09-26 · owner: *"any other ideas you can think that would make people
+  get attached to them and want to stay consistent"*. Ungated on purpose: the owner picks.
+- **Shipped already:** unique names, merged names, breakdown returning the same named cats, a
+  named "is getting restless" warning, and a named "wandered off" line (third collection PR,
+  v1.468.0).
+- **Candidates, cheapest first; the recommendation is the first three:**
+  ① **A named nudge notification** when a ladder is restless ("Onyx is getting restless") through
+  the existing notification path. Cheapest, and aimed straight at consistency.
+  ② **Merge moments:** a one-off celebration the first time a merge is seen ("Puffle was born from
+  Pudding and Waffle"), keyed on the cat's stable id, so it shows once per cat.
+  ③ **Cat anniversaries:** "Mochi has been with you 30 days" on the card; it needs only `born`.
+  ④ **Petting:** tap a cat in the pen for hearts and a haptic. The pen then needs its own tap target
+  apart from the card's navigate.
+  ⑤ **Moods:** sprite expressions (happy on a faucet day, sleepy at night, sad when restless). Art
+  plus one prop.
+  ⑥ **A grace window:** a cat that wandered off comes back if the faucet fires within 24 h. This is a
+  RULE change (Lane A, owner sign-off, and it moves history).
+  ⑦ **User nicknames:** needs storage keyed on cat id, so a Lane A migration. Cosmetic only; it
+  must never feed the replay.
 
 ### [app-shell] PS-51 — titles that unlock the collection pen's backdrop scenes
 

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
 import { LADDERS, type CollectionState } from '@trainingai/shared/collection/ladder'
-import { nearestMerge, mergeCountLine, totalHeld, type FaucetKey } from '@/components/home/collection-summary'
+import { nearestMerge, mergeCountLine, totalHeld, restlessLine, lostLine, type FaucetKey } from '@/components/home/collection-summary'
 import { CollectionPen } from '@/components/home/collection-pen'
 
 export interface CollectionResponse {
@@ -59,6 +59,7 @@ export function CollectionCard() {
       <div className="p-4">
         <Heading />
         <CollectionPen collections={data.collections} />
+        {restlessLine(data.collections) && <p className="mt-2 text-xs font-semibold text-brand">{restlessLine(data.collections)}</p>}
         <p className="mt-2 text-sm text-muted-foreground">
           {held > 0 ? `${held} in your collection.` : 'Train, walk or sleep and your first cat turns up.'}
         </p>
@@ -71,11 +72,14 @@ export function CollectionCard() {
   // all history and carries no recency — so the wording says "have" rather than implying it just
   // happened, which would be a claim the engine cannot support.
   const decayed = data.collections[next.faucet]?.decayEvents ?? 0
+  const restless = restlessLine(data.collections)
+  const lost = lostLine(data.collections[next.faucet])
 
   return (
     <div className="p-4">
       <Heading />
       <CollectionPen collections={data.collections} />
+      {restless && <p className="mt-2 text-xs font-semibold text-brand">{restless}</p>}
       <div className="mt-2 flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold first-letter:uppercase truncate">{next.towardName}</p>
@@ -83,7 +87,9 @@ export function CollectionCard() {
         </div>
         <Pips have={next.have} need={next.need} />
       </div>
-      {decayed > 0 && (
+      {lost ? (
+        <p className="mt-2 text-[11px] text-muted-foreground">{lost}</p>
+      ) : decayed > 0 && (
         // Stated rather than left to be inferred from a smaller number, which reads as a bug — the
         // reason `decayEvents` is on the state at all.
         <p className="mt-2 text-[11px] text-muted-foreground">
