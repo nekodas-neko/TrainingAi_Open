@@ -2829,25 +2829,6 @@ which is the right shape for something that can only be validated by living with
        exists, so the label no longer has to be inferred.
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
 
-### [workouts] LA-147 — a duration change still spends the model's hourly budget, though it no longer calls the model
-
-- **Lane: A** (`app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`, `lib/rate-limit.ts`).
-- **Added:** 2026-09-26 · found while shipping RV-202 ②.
-- **What:** the prescribe route takes `rateLimit('prescribe:<user>', 20, 1h)` before it knows
-  whether the request is a generation or a re-fit. Since RV-202 ② a `durationPreset` request
-  usually re-fits the stored plan with no model call, so after 20 preset switches in an hour the
-  lifter is told *"Too many plan rebuilds this hour"* for work that cost nothing to the AI budget.
-  The limit's own comment cites preset-switching as the reason it is 20 rather than 10 — that
-  justification is now spent on the wrong thing.
-- **Not just "raise it to 60".** The re-fit runs a full `aggregateSignals` (~30 repository reads),
-  so it needs a real limit; what it does not need is the *model's* one. Two buckets, checked on the
-  branch that is actually taken.
-- **The ordering is the catch:** the branch is only knowable after `getSessionPeriodization`, and a
-  limit checked after a database read is a limit an attacker has already spent. Either check the
-  cheap generation limit first and refund/relax it on the re-fit path, or give the re-fit its own
-  bucket checked up front and let a request hold whichever it lands in.
-- **Low priority** — it needs 20 switches in an hour to bite, and the failure is a toast, not data.
-
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
 - **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
 - **Needs: LB-158** — the only remaining half is ②, and it cannot be built until the barcode reaches
