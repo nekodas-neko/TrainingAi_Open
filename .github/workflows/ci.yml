@@ -135,7 +135,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply all migrations
         run: node scripts/local-db/migrate.js
-      - run: pnpm vitest run --shard=${{ matrix.shard }}/4
+      # Not `pnpm vitest run` directly: the wrapper re-runs this shard ONCE, and only when the
+      # run failed with vitest's own worker-teardown race (vitest#11153 — open, and present in
+      # 4.1.11 and 5.0.0 alike) while every test passed. `Tests` became a required check on
+      # 2026-09-25, so that flake stopped costing a re-run and started blocking the merge. Any
+      # real failure, and any second occurrence in the same job, still fails here — see the
+      # script's header for what else was measured and rejected (LA-146).
+      - run: node scripts/ci/vitest-retry-teardown-flake.js --shard=${{ matrix.shard }}/4
 
   # The name the ruleset requires. Publishes one pass/fail for the four shards above; it installs
   # nothing and runs in seconds.

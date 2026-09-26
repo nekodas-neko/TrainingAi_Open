@@ -18052,3 +18052,16 @@ the number was stale and discard the conclusion with it.
 
 It was first written at 7 lines and cut to 4 against this ratchet; the pointer to LA-147 is what
 lets the short version stay honest about what replaced the old reason.
+
+## 2026-09-26 — projectOverview.md 12906 → 12916 (`fix/vitest-teardown-flake-retry`)
+
+Ten lines for one Known-Issues row: a vitest bug that fails a green test run, now absorbed by a CI
+retry. It earns a row rather than living only in a journal entry because of the last line — the
+wrapper has to be **deleted** when upstream closes vitest#11153, and a removal condition that only
+exists in an archived journal file is a removal that never happens.
+
+The rest of what was learned went where it belongs instead of here: the upstream measurements and
+the corrected `disableConsoleIntercept` costing are in `docs/local-dev-database.md` beside the
+nine-sighting investigation, and the mechanism plus the "do not generalise this into a blanket CI
+retry" warning are a `docs/module-map.md` row. This row is deliberately the short version and
+points at the script.
