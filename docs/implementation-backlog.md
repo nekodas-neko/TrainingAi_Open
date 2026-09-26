@@ -1117,10 +1117,11 @@ the Orchestrator's to do.
   Component names are minified, so **which** chart(s) and why is not established — the suspect is a
   responsive resize when a panel leaves `content-visibility: hidden`.
 
-- **Device check owed on merge:** `perf.js longtasks`, every tab tap's longest task under 50 ms.
-  **⚠ Deliberately prose and NOT a field — the gate was REMOVED 2026-09-25, see below.** `Gate: device`
-  parks an entry as unstartable and `Verify: device` reads as shipped; startable work that will need a
-  device check at the end carries neither, which is the shape CLAUDE.md's protocol section names.
+- **Verify: device**
+  **⚠ This was prose (`Device check owed on merge:`) between the gate's removal and the fix, which is
+  the shape for STARTABLE work that will need a device look.** It is a field now because the fix has
+  shipped, which is what `Verify:` means. `Gate: device` — the original, removed 2026-09-25 — would
+  park it as unstartable, and that is what it wrongly did for days.
 - **Lane: B** · **Batch: tab-switch-speed** — **re-laned from `DV` on 2026-09-24,
   because the measurement it was parked for HAS BEEN TAKEN.**
   **⚠ `Gate: device` added 2026-09-24 (LB-145) after this entry headed Lane B's READY list while
@@ -1215,14 +1216,37 @@ it was debouncing an event that never fires.
 re-shows a tab, and the screens thread it into their effects' dependency arrays **on purpose** — all five
 tabs stay mounted, so without it a `useEffect(…, [])` fetch would run once per app launch and the screen
 would show that snapshot forever. So a tab switch refetches, the data objects are new, the charts
-re-render and `chart.update()` re-measures every axis label. **The update is legitimate**, which is why
-the third Health switch cost 0: that refetch returned nothing the charts had to redraw.
-- **So the fix is to make a CORRECT update cheaper or later, not to suppress it** — and that is a real
-  trade-off against Q-402's staleness rule, not a free win. Three candidates, none yet measured:
-  ① compare fetched data by VALUE before handing it to the chart, so an unchanged refetch updates
-  nothing (per-chart work, and the strongest fit — two of the three Health switches changed nothing);
-  ② take the update off the tap's critical task (an idle callback), which moves the cost without
-  removing it; ③ refetch less eagerly on show, which is the one that fights Q-402 and should be last.
+re-render and `chart.update()` re-measures every axis label.
+**⚠ Correction to the line this replaces: I wrote that the third Health switch cost 0 because "that
+refetch returned nothing the charts had to redraw". Wrong — it cost 0 because the probe waited only
+1500 ms.** At 2000 ms it is **578 on every single switch to Health**, six for six. The redraw is
+deterministic, not data-dependent — and the update is **redundant**, not merely legitimate.
+- **✅ FIXED 2026-09-26 (v1.465.63) — and it takes 578 to 0.** All five canvases on Health are the same
+  component, `TrendSparkline`, rendered five times for different metrics. It is already wrapped in
+  `memo`, and the wrapper was doing nothing: the refetch hands it a **new `trends` array with the same
+  contents**, so the default shallow compare sees a different reference every time. That is the repo's
+  own standing rule one level up — *"`React.memo` only works with stable props"* — where the prop is not
+  an inline literal but an equal-valued array.
+  `trendSparklinePropsEqual` compares what the component actually READS: `date` and `day[field]`, plus
+  the four presentational props. **Measured after: 0 font-setter calls on every switch, six for six,
+  with all five canvases still mounted.**
+- **Extracted to `components/health/trend-sparkline-equal.ts` and unit-tested, because the failure mode
+  is silence.** A comparator that returns `true` too eagerly does not crash — it leaves a stale chart,
+  invisible until someone notices the numbers are old. Eight cases, five of them *must-redraw* (the
+  drawn field changes, a day added or removed, the dates roll, any presentational prop, a value becoming
+  null); mutation-tested three ways, each caught by a different assertion.
+  **It deliberately ignores a field this sparkline does not draw** — five sit on Health pointed at five
+  metrics, so a refetch that moves protein should redraw one, not five. That is the saving.
+- **`e2e/dv12-tab-switch-does-not-redraw-charts.spec.ts` pins it**, counting the setter rather than
+  timing the tap, with two controls so a zero cannot be vacuous: the instrument must fire during load,
+  and the five canvases must still be mounted at the end. Control run against the unfixed component:
+  **fails**, *"a tab switch re-measured the chart axes"*.
+- **The other two candidates stay UNSPENT and are not needed:** ② moving the update off the tap's
+  critical task, ③ refetching less eagerly on show (which fights Q-402). The update removed here was
+  redundant, so neither trade-off had to be made.
+- **Keep: the device pass** — `perf.js longtasks`, every tab tap's longest task under 50 ms on the S25.
+  This removes five chart redraws per tap; whether that alone clears 50 ms on the phone is unmeasured,
+  and the harness cannot say (its timings are dominated by dev-mode work the APK never does).
 - **What this does NOT establish:** all of it is `next dev` in the harness with the seeded user. The
   device profile is the authority on the APK, and it agrees on the symptom (the canvas `font` setter
   dominating every tap). The pass test is unchanged and stays a device measurement.

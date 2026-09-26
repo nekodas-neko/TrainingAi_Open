@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.465.63",
+    version: "1.465.64",
     date: "2026-09-26",
     changes: [
       "Changed: the prescribed run card now shows its reason straight away and keeps it, instead of replacing it a moment later with an AI rewording of the same thing. One less thing to load, and it works with no signal.",
+    ],
+  },
+  {
+    version: "1.465.63",
+    date: "2026-09-26",
+    changes: [
+      "Switching to the Health tab no longer redraws its five trend charts from scratch each time. They only redraw when their numbers have actually changed, which takes work off the tab switch itself.",
     ],
   },
   {
