@@ -1480,7 +1480,7 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
 
-- **✅ SHIPPED the per-switch half — `HrDayChart` is memoised by value (#PR, 2026-09-26).** Sweep 4a's
+- **✅ SHIPPED the per-switch half — `HrDayChart` is memoised by value (#1716, 2026-09-26).** Sweep 4a's
   two numbers split cleanly and the split is the finding: **30/switch on Home and 80/switch on Health
   are a RE-RENDER, not a resize** — `e2e/dv12-tab-switch-does-not-redraw-charts.spec.ts` already
   established that instrumenting `ResizeObserver` gives 5 callbacks during load and **zero** on a tab
