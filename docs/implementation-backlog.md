@@ -3416,6 +3416,22 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   **A sitting that only finishes Tier 1 is a success. Record how far it got.**
 - **Result:** _(DV: Artifact URL, date, build, navigation mode, tiers completed)_
 
+### [app-shell][platform] RV-206 — DEVICE: stress the design — large text, display size, slow phone, bad network, one hand, keyboards, launch, charts, overscroll, long values, a words-and-numbers census, back-position
+- **Lane: DV**
+- **Added:** 2026-09-26 · Review sweep 62, owner follow-up: *"do what you can and send to DV — can be excessive."*
+- **The probes are P29–P41,** Part E of [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
+  They use the same private-Artifact gallery channel and file naming as RV-205.
+- **Runs after RV-205's Tier 1.** P41 keeps that tier as the "before" for every design fix.
+- **Three probes change phone settings:** P29 font scale, P30 display size, and P31's battery-saver
+  half. **Ask the owner once for all three**, restore each in the same sitting, and record the
+  before and after values. The rest is read-only.
+- **Priority inside this entry:**
+  - P39 (words and numbers) and P33 (reach) need no capture and are quick, so run them first.
+  - Then P29, P32 and P34, which are the likeliest to find faults a user hits daily.
+  - The rest as time allows. **Record how far the sitting got.**
+- **What comes back:** Review files one Lane B entry per fault, each citing its image by file name.
+- **Result:** _(DV: Artifact URL, date, build, navigation mode, probes completed)_
+
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 
 - **Lane: DV** — the deliverable is an attribution only the running app can give.
