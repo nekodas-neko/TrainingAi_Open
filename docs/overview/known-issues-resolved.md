@@ -2358,3 +2358,21 @@ change when the source is edited later, which is the accepted cost of not paying
 `food_item_id` and recursive macro computation.
 
 - **📱 Device-verified 2026-09-24 (sweep 3, S25, APK 1.460.4, web v1.465.17): PASS.** Build a Meal → Your meals → Protein Granola (1 row, 45 g, 163 kcal) + Nachos (3 rows, 175 g, 488 kcal, matching its source) → header *"651 kcal each"* = 163 + 488. The builder shows no macro total, so there was none to compare. Moved here by the Device Verification agent.
+
+### [nutrition][platform] ⚠️ "kcal left" now subscribes to the post-push invalidation — NOT device-verified, and the device is where it failed three times (BF-177, 2026-09-25, v1.465.57) · needs: device
+
+The card's refetch fired at the **local** write and reached the server ~60–70 ms before
+`POST /api/sync/push` did, so it re-cached the pre-log figure and the number sat wrong until the
+user left the tab and came back — the owner's report, traced on the S25 with response bodies
+(857 · push · 846, the correct answer belonging to somebody else's request). Three fixes each added
+another one-shot refetch and the device failed each time; the web path awaits its POST, which is why
+the e2e spec stayed green throughout. `log-food.ts` was already invalidating a second time *after*
+the push — nothing was listening. `use-energy-balance-refetch.ts` now subscribes to
+`energy-balance:` and refetches the day on screen, and takes that date as a required argument so the
+subscription is live before the hook's first fetch. **Exercised against `pnpm dev`, the suite and
+the gate only: native SQLite, the outbox push and Samsung's WebView are the whole mechanism here and
+none was run.** Pass test: log a food on the S25, "kcal left" changes within 3 s without leaving the
+tab. Detail:
+[`2026-09-25-lane-b-bf177-balance-subscribes`](history-2026-09-26-folded-1.md#2026-09-25-lane-b-bf177-balance-subscribes).
+
+- **📱 Device-verified 2026-09-26 (sweep 4a, S25, APK 1.465.52, web v1.465.66, gesture nav): PASS, 5 of 5.** A Full cream milk log moved "kcal left" 643–1,296 ms after *Log Food*, without leaving the tab. Moved here by the Device Verification agent; a Retry-path follow-on is recorded on RV-103.
