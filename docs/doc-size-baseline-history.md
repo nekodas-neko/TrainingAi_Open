@@ -18081,3 +18081,9 @@ the corrected `disableConsoleIntercept` costing are in `docs/local-dev-database.
 nine-sighting investigation, and the mechanism plus the "do not generalise this into a blanket CI
 retry" warning are a `docs/module-map.md` row. This row is deliberately the short version and
 points at the script.
+
+## 2026-09-26 — projectOverview.md +7 (BF-126 cat art, not device-verified)
+
+One Known-Issues row for the drawn collection art, which shipped without an S25 look. It is trimmed
+to seven lines, with the detail in BF-126 and the journal entry; the row itself is what CLAUDE.md
+requires for an unverified surface change.
