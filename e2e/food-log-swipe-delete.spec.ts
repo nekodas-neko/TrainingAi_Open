@@ -200,6 +200,45 @@ test('the first tap on Delete opens the confirmation, even mid-animation', async
 })
 
 /**
+ * BF-61, sweep 4a — the delayed tap the DEVICE fails, which the web passes at every delay.
+ *
+ * Sweep 4a put a number on the remaining defect: from a verified-closed tray, a real `adb input
+ * tap` on Delete's own rect at **0 / 100 / 200 / 300 ms after the swipe is swallowed, 8 of 8**, and
+ * at **500 ms it works, 2 of 2**. That window is far wider than a CDP round-trip, so unlike sweep
+ * 3's it is reachable here — and **it does not reproduce**: probed at 0, 100, 300 and 500 ms with
+ * the natural 220 ms transition, the confirmation appeared every single time.
+ *
+ * **That is the finding, and it is why this test is here rather than a third fix.** The cause is
+ * not in the shared JS: the gesture maths, the `z-10` raise, the `aria-hidden` flag and the wiring
+ * all behave. Whatever swallows the press lives below them, in the Samsung WebView — and
+ * structurally this harness cannot see it, because `page.touchscreen.tap()` is a CDP dispatch into
+ * the renderer, not a real touch travelling through the compositor's hit test.
+ *
+ * So this pins the half that IS ours: a tap immediately after the release, no stretched transition,
+ * must open the confirmation. It would fail if a future change put a JS-level cause back.
+ */
+test('a tap the instant the swipe ends opens the confirmation', async ({ page }) => {
+  await withDb(db => seedLog(db, 1))
+  await openYesterday(page)
+
+  const row = diaryRow(page)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  const box = await stableBox(row)
+  // The tray's own centre, computed from the row's box rather than measured off the button: a
+  // measurement is a round-trip, and spending one is the opposite of what this test is timing.
+  // One action, `ACTION_WIDTH` = 64, pinned right — see `swipe-actions-math.ts`.
+  await swipeRowLeft(page, row, { distance: 200, releaseWithPoint: true })
+  await page.touchscreen.tap(box.x + box.width - 32, box.y + box.height / 2)
+
+  await expect(
+    page.getByRole('heading', { name: 'Delete food log?' }),
+    'the press right after the release was swallowed on the web path too — the cause is now ours',
+  ).toBeVisible({ timeout: 5_000 })
+  expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
+})
+
+/**
  * BF-61, sweep 3 — the invariant, rather than a timing window.
  *
  * The test above stretches the transition and taps after the row has rested open, which is the shape

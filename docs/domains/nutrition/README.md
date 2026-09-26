@@ -512,6 +512,10 @@ Live at the time of writing (2026-07-30):
   product" — collapsing them told the owner their food was not in the database; and local SQLite
   **v25 has never run on a phone** —
   if Saved Meals comes up blank after an update, revert rather than debug forward.
+- **[`docs/overview/entries/2026-09-26-bf61-web-path-clears.md`](../../overview/entries/2026-09-26-bf61-web-path-clears.md)**
+  — BF-61. The swipe tray's Delete works on the web at 0/100/300/500 ms after the release, so the
+  cause of the device's swallowed press is not in the shared JS. Re-laned to Device Verification
+  with a three-step instrumented probe instead of a third speculative fix.
 - Handoffs: `ls docs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
 
