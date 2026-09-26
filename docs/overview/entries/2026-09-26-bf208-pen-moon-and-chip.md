@@ -26,6 +26,18 @@ behind it ranges from a night sky to a kitchen wall.
 the link to `/collection`, so a button inside it is a second tap target for the same destination —
 the nested-interactive shape the repo's own Custom Rules check exists to catch.
 
+## The scenes are generated, and a guard caught me editing the output
+
+The first pass hand-edited `public/cats/scene-*.svg`, and
+`collection-sprites.test.ts` failed with *"an edit to the art source without a rebuild fails
+here"* — the twelve backdrops come out of `scripts/collection-art/scenes.mjs` via
+`build.mjs`, and the test compares every file on disk against the generator's output. It was
+right and the fix went into the generator. Worth knowing before touching this art again:
+`public/cats/` is build output, not source.
+
+(Space's disc turned out to be a *ringed* planet, so the `<ellipse>` had to travel with it. The
+hand edit would have left the ring behind in the corner.)
+
 ## The sweep found a different set than the entry predicted
 
 The entry expected `space`, `snow` and `bedroom` to have their own bright disc in the same corner.

@@ -770,8 +770,11 @@ below threshold and left in place for next time.
   it fails the corner test; and `kitchen`'s is a moon inside a drawn window frame, which the
   entry had no reason to expect. Measured, not read.
   Each is softened and moved: meadow `cx 300 → 72, opacity 1 → .55`; space `cx 300 → 82,
-  opacity 1 → .8`; kitchen `cx 290 → 232` **within its window frame**, `opacity 1 → .6`. That
-  breaks ① and ③ of the four, which is what the entry asked for.
+  opacity 1 → .8` **with its ring**; kitchen `cx 290 → 232` **within its window frame**,
+  `opacity 1 → .6`. That breaks ① and ③ of the four, which is what the entry asked for.
+- **⚠ The scenes are GENERATED — edit `scripts/collection-art/scenes.mjs`, not the SVGs.**
+  The first pass hand-edited the output and `collection-sprites.test.ts` caught it: *"an edit
+  to the art source without a rebuild fails here."* `public/cats/` is build output.
 - **④ the chip is a caption now**, not `rounded-full bg-background/70 px-1.5`. It keeps a text
   shadow instead of the background plate, because the scene behind it is anything from a night sky
   to a kitchen wall. The alternative — making it a real button — is still the wrong call: the whole
