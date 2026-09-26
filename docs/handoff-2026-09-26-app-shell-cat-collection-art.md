@@ -112,6 +112,18 @@ and deliberately not built.
 - **PS-52 (Lane O):** attachment ideas for the owner to pick from; the recommended three are a named
   nudge notification, merge moments and anniversaries.
 
+## Fourth pass, same session: the design set is complete (v1.469.0)
+
+- **7 classes** (+ Mage/sleep, Alchemist/nutrition, Monk/mood & recovery), **4 coats** (base, shiny,
+  frost, ember), **12 scenes**, ear flick added, and every animation loop verified frame by frame.
+  Sleep now draws the Mage. That is 180 generated files, all covered by the drift test.
+- **The inventory and proposed trophies** are in
+  [`docs/domains/app-shell/cat-collection-design-catalog.md`](domains/app-shell/cat-collection-design-catalog.md);
+  `node scripts/collection-art/preview.mjs` renders an animated gallery of everything.
+- **PS-53 (Lane O)** hands review to the Orchestrator (which categories get ladders, and what
+  awards each scene and skin) and to Tuning (the proposed rates).
+- **The owner closed the session on this pass.** Designs are done; wiring is for the lanes.
+
 ## Open questions / blockers
 
 - **PS-48 (Lane O, #1 in O's READY list):** ② the Rogue's cardio unit and drain, and ④ re-scoring
@@ -123,18 +135,22 @@ and deliberately not built.
 
 ```
 You are picking up the cat collection work after the art session of 2026-09-26. Everything from
-that session is merged to main (#1694 v1.466.0, #1706 v1.467.0, and the named-cats PR v1.468.0).
+that session is merged to main (#1694 v1.466.0, #1706 v1.467.0, #1710 v1.468.0, and the design-catalogue PR v1.469.0).
 
 Read in order:
   1. projectOverview.md — the "collection cats are drawn now" Known-Issues row
   2. docs/domains/app-shell/README.md
   3. docs/handoff-2026-09-26-app-shell-cat-collection-art.md
   4. docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md
-  5. docs/implementation-backlog.md — PS-48, PS-49, PS-50, PS-51, PS-52, BF-126 (grep for them)
+  5. docs/domains/app-shell/cat-collection-design-catalog.md — every designed asset
+  6. docs/implementation-backlog.md — PS-48, PS-49, PS-50, PS-51, PS-52, PS-53, BF-126 (grep for them)
 
-If you are the Orchestrator: first action is PS-48 — put its two remaining questions (Rogue cardio
+If you are the Orchestrator: first action is PS-53 then PS-48 — put its two remaining questions (Rogue cardio
 rate, re-score history) to the owner, plus PS-51's title→scene mapping and PS-52's pick, in the "Decisions That Come Back To Me" shape, and
 record the answers in PS-48 and the plan. Also route BF-126's owner look into his next S25 sitting.
+
+If you are Tuning: review PS-53's proposed rates (steps, Health cat, shiny, lucky) and state how many
+past days each one moves before PS-49 ships them.
 
 If you are Lane A: PS-49's steps, workout and Health-cat halves can start now; only the cardio
 faucet waits on PS-48. The workout ladder needs only new LADDERS constants (six tiers, costs

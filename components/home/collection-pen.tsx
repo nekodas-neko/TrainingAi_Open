@@ -24,7 +24,8 @@ import type { FaucetKey } from '@/components/home/collection-summary'
  */
 
 const PEN_HEIGHT = 176
-export type PenScene = 'meadow' | 'forest' | 'house' | 'castle'
+/** Backdrops, all drawn; which trophy unlocks which is PS-51. */
+export type PenScene = 'meadow' | 'forest' | 'house' | 'castle' | 'gym' | 'park' | 'bedroom' | 'kitchen' | 'beach' | 'snow' | 'space' | 'sakura'
 /** Sprite size per engine tier, T1 first. */
 const SIZE = [34, 42, 50, 58, 64, 72]
 /** Lowest and highest walking line per tier, in px up from the pen's floor. T5 and T6 are in the air;
