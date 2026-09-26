@@ -138,6 +138,11 @@ Instead, a local Postgres 16 instance is set up automatically:
     and restarts the 34-minute E2E alongside it"*. `mcp__github__actions_run_trigger` with
     `rerun_failed_jobs` re-runs **only the failed job**, leaves every green job's result in place, and
     pushes nothing — measured here at one shard re-run, ~2 minutes, E2E untouched. Use that.
+  - **TENTH, 2026-09-26 (#1687).** Docs-only again, shard 1, `2496 passed`, **`Errors 2`**. Re-ran
+    clean — **ten for ten**. Two sightings in one day (#1679 and #1687; **#1684 in between was
+    clean**), which is a step up from the earlier spread but is **not** the "every run" a same-day
+    reading first suggested — worth stating, because over-reading the rate is how a bounded tax gets
+    treated as an emergency. `rerun_failed_jobs` turned each into ~2 minutes, no push, E2E untouched.
 
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:
   1. **Fixture rows.** DB tests clean up in `afterEach`/`afterAll`, which a killed run never reaches. `program-session-tombstone.test.ts` left its `LB-66 Program` row behind, and the next full run failed with `UserFacingError: A program named "LB-66 Program" already exists` — an error that reads like a bug in the program-name guard and is really a corpse from the run you killed. It then **self-heals**, because that run's own `afterEach` clears the row, so it fails exactly once and looks like a flake.
