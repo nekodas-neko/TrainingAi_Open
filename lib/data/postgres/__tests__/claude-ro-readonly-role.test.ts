@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client, Pool } from 'pg'
 import { migrationTestLock } from './migration-test-lock'
+import { runScoped } from '../readonly-client'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
@@ -297,5 +298,103 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     // Two tables are deliberately denied (invited_emails, rate_limits). Any OTHER mismatch means
     // the generator needs re-running after a schema change.
     expect(views.rows[0].n).toBe(tables.rows[0].n - 2)
+  })
+
+  /**
+   * RV-190 — the role's three protections are session DEFAULTS, and a caller can overwrite all
+   * three. The endpoint runs each query in autocommit on a pool of 2 that is never reset, so an
+   * override does not end with the request: it rides the pooled connection into whatever query
+   * comes next, and a later honest query can read another user's rows.
+   *
+   * These drive a real `pg.Pool` as `claude_readonly`, the same shape `getReadonlyPool()` has, and
+   * assert the property the route needs rather than the wrapper it happens to use: **a setting
+   * changed by one query must not be visible to the next one on the same pool.**
+   */
+  describe('session state must not survive a query (RV-190)', () => {
+    let roPool: Pool
+
+    beforeAll(() => { roPool = new Pool({ connectionString: roUrl(), max: 1 }) })
+    afterAll(async () => { await roPool.end() })
+
+    // `max: 1` forces every query onto the same backend, which is the pooled-reuse case. With
+    // `max: 2` a second query can land on a fresh connection and the leak hides.
+    const run = (sql: string) => runScoped(roPool, sql)
+
+    it('does not carry a changed owner scope into the next query', async () => {
+      await run(`SET app.claude_ro_owner = '${OTHER_ID}'`)
+      const { rows } = await run(`SELECT current_setting('app.claude_ro_owner', true) AS owner`)
+      expect(rows[0].owner, 'the next query saw the previous query\'s owner scope').toBe(OWNER_ID)
+    })
+
+    it('does not carry a relaxed read-only flag into the next query', async () => {
+      await run('SET default_transaction_read_only = off')
+      const { rows } = await run(`SELECT current_setting('default_transaction_read_only') AS ro`)
+      expect(rows[0].ro, 'the next query ran with writes enabled').toBe('on')
+    })
+
+    it('does not carry a lifted statement timeout into the next query', async () => {
+      await run(`SET statement_timeout = 0`)
+      const { rows } = await run(`SELECT current_setting('statement_timeout') AS t`)
+      expect(rows[0].t, 'the next query ran with no time limit').not.toBe('0')
+    })
+
+    // The control: the wrapper must not break the endpoint's actual job, which is reading a
+    // `claude_ro` view scoped to the owner.
+    it('still answers a scoped read', async () => {
+      const { rows } = await run(`SELECT current_setting('app.claude_ro_owner', true) AS owner`)
+      expect(rows[0].owner).toBe(OWNER_ID)
+    })
+
+    /**
+     * `RESET ALL` on the way in handles what the PREVIOUS query left behind. The read-only
+     * transaction is what handles the query in front of you: `SET default_transaction_read_only`
+     * changes the SESSION default and does not lift the read-only state of a transaction already
+     * in progress, so a submitted statement cannot write its way out mid-query.
+     *
+     * Without this case the transaction is untested — the mutation pass showed `BEGIN` in place of
+     * `BEGIN TRANSACTION READ ONLY` surviving every other assertion in this file.
+     */
+    it('refuses a write even when the query turns the read-only flag off first', async () => {
+      await expect(
+        run('SET default_transaction_read_only = off; CREATE TEMP TABLE rv190_probe(i int)'),
+      ).rejects.toThrow(/read-only transaction/i)
+    })
+
+    // The control for it: the same statement is not refused for some unrelated reason — outside a
+    // read-only transaction this role really can create a temp table.
+    it('can create that temp table when nothing is holding it read-only', async () => {
+      const bare = new Pool({ connectionString: roUrl(), max: 1 })
+      try {
+        await bare.query('SET default_transaction_read_only = off')
+        await expect(bare.query('CREATE TEMP TABLE rv190_control(i int)')).resolves.toBeTruthy()
+      } finally {
+        await bare.end()
+      }
+    })
+
+    /**
+     * **The defect itself, pinned — without this the three cases above prove nothing.** They only
+     * exercise `runScoped`, which did not exist before the fix, so they could never have run
+     * against the broken path and could not have failed. This one drives the OLD shape — a plain
+     * `pool.query` in autocommit, which is exactly what the route did — and shows the override
+     * surviving into the next query on the same connection.
+     *
+     * It asserts the leak on purpose. If Postgres ever stops behaving this way the test fails
+     * loudly, which is the right outcome: the wrapper's justification would have changed.
+     */
+    it('leaks without the wrapper — which is why the wrapper exists', async () => {
+      const bare = new Pool({ connectionString: roUrl(), max: 1 })
+      try {
+        await bare.query(`SET app.claude_ro_owner = '${OTHER_ID}'`)
+        const leaked = await bare.query(`SELECT current_setting('app.claude_ro_owner', true) AS owner`)
+        expect(leaked.rows[0].owner, 'expected the unwrapped path to leak the override').toBe(OTHER_ID)
+
+        // And the same connection, driven through `runScoped`, is back to the role's own scope.
+        const scoped = await runScoped(bare, `SELECT current_setting('app.claude_ro_owner', true) AS owner`)
+        expect(scoped.rows[0].owner).toBe(OWNER_ID)
+      } finally {
+        await bare.end()
+      }
+    })
   })
 })
