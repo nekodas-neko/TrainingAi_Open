@@ -2636,6 +2636,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Home sections can be dragged now, and the scroll interaction has not been tried on the phone (BF-205, 2026-09-26)
+
+The "Reorder sections" button had no drag behind it at all — every other part of the feature existed. Sections now drag by a grip that appears in edit mode (`@dnd-kit`, the same primitive the program editor uses), and the order persists on drop. **The drag is on a handle, not the card, precisely so a vertical scroll in edit mode cannot pick a section up** — but that is the claim a CDP pointer cannot test. **Pass test:** on the S25 in edit mode, a section can be moved, the order survives leaving and re-entering Home, and a plain vertical scroll picks nothing up.
+
 ### [sleep][app-shell] ⚠️ Last night's verdict is on Home now, and nobody has seen it on the phone (TN-85, 2026-09-26)
 
 The Home Sleep card carries a line stating what the app filled in — quiet for an ordinary night, prominent with the numbers first for an outlier — and a **That's wrong** control that records the disagreement and opens the morning check-in. It exists because the modal is a bad home: it opens once a day on one screen and retires on dismissal, and the owner has saved 82 of those sheets while touching a scale in 3. Rendered at 412 px dark; **not seen on the S25**. `TN-82` is untouched and is now the modal half only — its removal of the two scales owes a mockup first. **Pass test:** on the S25, Home shows the line for last night and **That's wrong** opens the check-in with the sleep scale reachable.

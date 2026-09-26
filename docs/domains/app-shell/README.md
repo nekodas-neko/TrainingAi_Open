@@ -477,6 +477,12 @@ Live at the time of writing (2026-07-30):
   `ResizeObserver`. And `pb-nav-safe` reserves the nav and nothing else, so a `bottom-fab-safe`
   `h-14` FAB covers the bottom 56 px of a scroll — `pb-fab-safe` is the fix, with a scan that
   every screen mounting a FAB uses it.
+- **[`docs/overview/entries/2026-09-26-bf205-home-section-drag.md`](../../overview/entries/2026-09-26-bf205-home-section-drag.md)**
+  — BF-205. Home's "Reorder sections" button had no drag behind it; `@dnd-kit` on a grip handle,
+  reordering by KEY because the rendered list is a filtered subset. Two gotchas worth reading
+  before writing another drag here: `savePreference` PATCHes the server, so it belongs on
+  `dragend`; and `PointerSensor` only activates without a delay when the press lands on the handle
+  itself, which made the e2e flaky in a way that looked exactly like the defect.
 - **[`docs/overview/entries/2026-09-26-bf208-pen-moon-and-chip.md`](../../overview/entries/2026-09-26-bf208-pen-moon-and-chip.md)**
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
