@@ -5943,55 +5943,31 @@ drift.
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
   and mark the fresh half COULD NOT CHECK.
 
-### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
+### [workouts][platform] DV-8 — heal the rows already stranded pending with an empty outbox
 
-- **📱 A second instance, on a food delete (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Delete #3 of DV-15's five went `DEL/pending`
-  and never flipped to `synced` (still pending 35 s+ later), while **`mutations_outbox` and
-  `sync_outbox` were both empty** and the server had applied the delete (the day's list no longer held
-  the row; "kcal left" moved back). 1 of 5. Same shape as the `set_logs` row: a local row left
-  `pending` after its mutation was confirmed. The set row is also still pending (re-read this sitting).
-
-- **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24):** unchanged — set_logs `86314832` is still `pending` (since
-  2026-09-19T22:41:16Z) against an **empty** outbox. Its `exercise_logs.workout_session_id`
-  (`a1847680…`) **does** resolve to a local `workout_sessions` row.
-
-- **⚠ CORRECTED by sweep 1 — two claims above were my misreading.** The set's session **is** in local
-  `workout_sessions` (`a1847680…`, started 2026-09-19T22:06:01.141Z, completed, synced); the
-  sitting-1 query that "found nothing" had failed silently. And `0a2afbf9…` is **not** a server
-  workout id: `/api/workout-sessions/day` returns the **program** session ("Upper") as `sessionId`.
-  **What remains true:** the set is still `pending` locally, and the server has it — the same
-  bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
-
-- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
-  **Second independent reproduction in sweep 4a** — a food delete left pending with **both outboxes
-  empty**, which is the sync write path rather than anything the phone can answer next. Two
-  reproductions is enough; further device time on it is the trap where a probe already run gets
-  re-run. Lane A.
-- **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
-  is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
-  PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
-  gate name the same actor there is nothing to wait for, and the entry is simply that actor's
-  work. Filed by the device agent itself, which is how easily the shape hides.
-- **Added:** 2026-09-23 · Lane A, carved out of DV-5 when the rest of it shipped. The confirm-arm
-  half of DV-5 is fixed and merged; **this half was never explained**, and DV-5 itself said so
-  (*"Not established: ... Read the confirm path before assuming the cause"*).
-- **What Device Verification measured on the S25.** One `set_logs` row (set 4, Chest-Supported
-  Dumbbell Row, 10 kg × 12, 2026-09-20) has been `sync_status='pending'` since 2026-09-19 22:41
-  UTC, against an **empty** outbox. Its local `exercise_logs.workout_session_id` is `a1847680…`,
-  which **is not a row in the local `workout_sessions` table**, while the server's session for that
-  day is `0a2afbf9…`. The server has the set (`/api/exercise-history` lists it) — nothing was lost.
-- **Why the DV-5 fix does not cover it.** That fix was four confirm arms whose read-back getter
-  filters `deleted_at IS NULL`. `workout_log` is not one of them: its arm calls
-  `markWorkoutSynced(wsId, exerciseLogId)`, which is a keyed `UPDATE` and reads nothing back, so a
-  filtered getter cannot be the cause here. Read at source 2026-09-23 — the arm is correct as
-  written, which is what makes the orphaned session id the thing to chase.
-- **The hypothesis to test first, not to assume:** the session was written locally under one id and
-  the server assigned another, so `markWorkoutSynced` updated `set_logs WHERE exercise_log_id=?`
-  for an exercise log that hangs off a session id the local store no longer has. That is an
-  id-reconciliation question, not a confirm question.
-- **Pass test:** on the device, after a workout push drains the outbox, every `set_logs` row the
-  push carried reads `synced`, and every `exercise_logs.workout_session_id` resolves to a row in
-  the local `workout_sessions` table.
+- **✅ CAUSE FOUND AND FIXED 2026-09-26** (`fix/dv8-strand-on-confirm-throw`, Lane A). It was not a
+  missing per-domain confirm arm — `pushMutations` deleted the **whole batch's** outbox entries
+  *before* running a hundred-line, **unguarded** per-domain mark-synced loop. One arm throwing on a
+  local read left every remaining row `pending` with its outbox entry already gone; nothing retries
+  a mutation that is no longer queued, and `applyDelta` only overwrites `synced` rows. The confirm
+  now runs first, per row, guarded, and the outbox is cleared only for rows that actually confirmed.
+  **Proven by a test that reproduces the strand against the old order**, not inferred from the
+  symptom.
+- **That fix stops NEW strands and heals nothing.** The rows already in this state have no outbox
+  entry to retry, so they need a sweep — this entry is now that sweep and nothing else.
+- **Lane: A** · **Keep:** the heal.
+- **Measured on the phone (sweep 4b, #1701):** **36** local `food_logs` rows `pending` with both
+  `mutations_outbox` and `sync_outbox` empty, **every one a delete tombstone**, spread over 14 days
+  (2026-08-19 → 2026-09-26). Plus the original `set_logs` row (`86314832`, pending since
+  2026-09-19). Other domains clean: injuries, supplement_logs, plan_meal_answers, activity, body,
+  mood all 0.
+- **Re-queue, do NOT mark synced.** A stranded tombstone is indistinguishable from one whose
+  mutation never got queued at all (the double-failure case `getStrandedPendingWorkouts` already
+  sweeps for). Marking it synced on the assumption the server has it would drop a delete that never
+  landed. Re-pushing is idempotent — a delete of an already-deleted row is a no-op — so the safe
+  sweep queues the mutation again and lets the normal confirm path settle it.
+- **`getStrandedPendingWorkouts` is the shape to copy**, including its grace period so the sweep
+  cannot race a push that is still in flight.
 
 ### [platform] LB-130 — the doc-size HISTORY file is now the guaranteed-conflict line that `.size` used to be
 

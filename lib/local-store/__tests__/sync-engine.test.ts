@@ -52,8 +52,48 @@ function mut(id: string, domain: PendingMutation['domain'], date: string): Pendi
            status: 'pending', nextRetryAt: null }
 }
 
+const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+
 describe('pushMutations', () => {
   beforeEach(() => { vi.clearAllMocks(); _resetSyncBackoff() })
+
+  // DV-8. The whole batch's outbox entries used to be deleted BEFORE the mark-synced loop ran,
+  // and that loop is unguarded — so one throwing arm left every row after it `pending` with its
+  // outbox entry already gone. Nothing retries a mutation that is no longer queued, and
+  // `applyDelta` only overwrites `synced` rows, so the row is stranded permanently. That is the
+  // signature measured on the phone: pending locally, both outboxes empty, delete applied
+  // server-side, 36 food tombstones over 14 days plus a set_logs row.
+  //
+  // Asserted here as a property of the ORDER rather than of any one domain: the arm chosen to
+  // throw is incidental, and a fix that only hardened that arm would leave the shape intact.
+  it('does not strand a row when a later confirm step throws (DV-8)', async () => {
+    // ob-2 is a DELETE, which is what DV-8 is made of: a tombstone confirms by key, so a
+    // missed mark leaves a row no later pull can correct.
+    const tombstone = mut('ob-2', 'food_logs', '2026-07-01')
+    tombstone.payload = { id: 'food-1', deleted: true }
+    fakeStore.getPendingMutations.mockResolvedValue([
+      mut('ob-1', 'injuries', '2026-07-01'),
+      tombstone,
+    ])
+    fakeStore.getInjuries.mockRejectedValueOnce(new Error('local read blew up'))
+    global.fetch = vi.fn().mockResolvedValue(okJson({ processed: 2, errors: [] })) as never
+
+    await pushMutations('u1')
+
+    // The survivor must still be confirmed — one bad arm cannot take its siblings down.
+    expect(fakeStore.markFoodLogSynced).toHaveBeenCalledWith('food-1')
+    // And the row that could not be confirmed keeps its outbox entry, so the next push retries
+    // it. Deleting it is what makes the strand permanent.
+    const deleted = fakeStore.deleteMutations.mock.calls.flatMap(c => c[0] as string[])
+    expect(deleted).toContain('ob-2')
+    expect(deleted).not.toContain('ob-1')
+    // And it must SAY so. This path deliberately does not dead-letter (the server applied the
+    // write, so counting it as a failure would misreport a success), which leaves the log as the
+    // only way a repeating confirm failure is ever noticed — swallowing it re-creates exactly the
+    // invisibility that let DV-8 accumulate 36 rows over 14 days.
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining('confirm failed'), 'injuries', expect.any(Error))
+  })
 
   it('deletes confirmed rows and records failures only for server-failed ids', async () => {
     fakeStore.getPendingMutations.mockResolvedValue([
