@@ -219,6 +219,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-472 — `coach_changes` is empty: the Coach's write capability has produced zero writes, which re-prices Q-467/Q-468 to zero production exposure). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
 - [`docs/reviews/2026-09-25-sweep-62-dv-design-capture.md`](../../reviews/2026-09-25-sweep-62-dv-design-capture.md) — **sweep 62, 2026-09-25: a design and feel pass for DV.** Probes P23 to P28 cover a screen gallery sent to a private Artifact, tap latency, scroll frames, keyboard occlusion, a token census and a motion inventory. The work is RV-205.
+- [`docs/reviews/2026-09-26-sweep-63-design-review.md`](../../reviews/2026-09-26-sweep-63-design-review.md) — **sweep 63, 2026-09-26: a design review from 69 web screenshots and a static audit.** Entries RV-207 to RV-215: initials, pressed states, colour and format consistency, the type scale, the keyboard, empty-account truths and loading states.
 
 ## Open issues
 

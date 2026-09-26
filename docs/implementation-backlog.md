@@ -2414,6 +2414,129 @@ which is the right shape for something that can only be validated by living with
   - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
   - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
 
+### [app-shell] RV-207 — design quick wins: wrong initials, "1 exercises", a dropped supplement tick, taps with no response, and bars that animate width
+- **Lane: B.** One PR, because every item is small and code-certain.
+- **Added:** 2026-09-26 · Review sweep 63 ([`docs/reviews/2026-09-26-sweep-63-design-review.md`](reviews/2026-09-26-sweep-63-design-review.md)). The source is a web-build screenshot pass at 412 px plus a static audit. Every line below was read at source.
+1. **Initials take the first two letters, not the initials.** "Test User" becomes **TE** and "Zero Data" becomes **ZE**.
+   - Sites: `components/more/profile-tab.tsx:177`, `app/session-select/session-select-content.tsx:1099`, and `app/admin/admin-content.tsx:358`.
+   - Fix: one shared `initialsOf(name)` that takes the first letter of the first and last words, falling back to two letters for a single word.
+2. **"3 sets · 1 exercises"** (`components/home-day-timeline.tsx:94`). Pluralise.
+3. **A second supplement tick is silently dropped.** `supplements-section.tsx:48` returns early while **any** supplement is toggling, so ticking B while A's write runs does nothing.
+   - Fix: track in-flight ids in a `Set` and guard per id.
+4. **Taps with no pressed state on the daily screens.** The WebView leaves `hover:` stuck after a tap, and nothing shows on the press itself. Sites:
+   - the tab bar (`bottom-nav.tsx:100/109/125`, and swap `transition-all` for `transition-[transform,background-color]`);
+   - More rows (`more-row.tsx:38`);
+   - Nutrition's date chevrons and settings (`nutrition-content.tsx:502/512/526`);
+   - pre-workout back (`pre-workout-screen.tsx:174`);
+   - the Home avatar (`session-select-content.tsx:1099`);
+   - Health's Log pills (`health-sections.tsx:204/408`);
+   - the supplement row (`supplements-section.tsx:180`).
+
+   Fix: `active:` feedback, or `<Button variant="ghost" size="icon-lg">`, which has it.
+   About 354 of 502 interactives lack feedback app-wide. These are the daily ones.
+5. **Progress bars animate `width`,** which re-lays-out every frame, although `components/ui/progress-fill.tsx` (scaleX) exists. Sites:
+   - `warmup-screen.tsx:97-99` (ticks every second, `width 1s linear`);
+   - `body-battery-card.tsx:153`, `metric-tiles-card.tsx:108`;
+   - `health-sections.tsx:473`, `goal-progress-bar.tsx:7`, `weekly-muscle-sets-card.tsx:133`.
+
+   Also the `height: auto` animations at `meal-card.tsx:113-115` (every food insert), `body-battery-card.tsx:164` and `achievements-section.tsx:55`. Use opacity/y, or the `collapsible-down` keyframes.
+6. **Home's Log tiles draw the "Log" pill on top of the icon** (`metric-tiles-card.tsx`), and the tiles size to their content: three narrow tiles leave a third of the row empty, and a different width when empty.
+   - Fix: put the label beside or below the icon, and use a fixed three-column grid.
+7. **"13.0T" volume on More** reads as trillions. Write `13.0 t`, or `13,000 kg` to match Health's `4,320 kg`.
+- **Done when:** each is fixed, and **RV-205's P24 re-run on the tab bar and More rows shows a first-frame change under 100 ms.**
+
+### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
+- **Lane: B.** One PR. **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.
+- **Added:** 2026-09-26 · Review sweep 63.
+- **Colour, on ONE screen.** Health → Training's calendar and load legend colour **Push orange, Pull green, Legs purple**. Two cards down, Movement balance colours **Push cyan, Pull purple, Legs green**.
+  - The same three words get two colour maps within a thumb's scroll.
+  - The session colours follow the session (per the no-hardcoded-sessions rule). Movement categories need their own palette, one that does not reuse the session hues.
+- **Time of day:** Home's timeline reads **6:40 AM**, and Health's activity list reads **6:40am**.
+  - `formatTimeOfDay` (`packages/shared/src/date-utils.ts:84`) is meant to be the one place that decides.
+  - Find which site bypasses it, and pick one casing app-wide.
+- **Dates:** "25 Sept", "26 Sept", "Saturday 26 September" and "September 2026" all appear. Settle short and long forms.
+- **Numbers:**
+  - `11900` steps (Home tile) against `1,660`/`2,000`/`4,320` elsewhere: use thousands separators everywhere;
+  - `7 × 68kg` against `98 kg`: one unit spacing;
+  - `55m` against `55 min`: one duration form.
+- **Brand in food names:** "Uncle Tobys — Rolled oats" (Log Food) against "Rolled oats / Uncle Tobys · …" (diary). Pick one.
+
+### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 63 (static audit).
+- **What:** there are 13 named sizes plus 29 arbitrary ones (`text-[10.5px]`, `[11.5px]`, `[12.5px]`, `[13.5px]`, `[14.5px]`…), from 7 px to 34 px.
+  - **1,035 uses are under 12 px:** 583 at 10 px, 287 at 11 px, 128 at 9 px, down to 7 px.
+  - 26 of those also sit at 40–70% opacity.
+  - No small-type token exists in `@theme`.
+- **Fix, in this order:**
+  1. Add `--text-2xs: 11px` to the `@theme` block.
+  2. Move **the workout screens' body text** (read at arm's length, mid-set) to it or to `text-xs`: `set-card.tsx:81/94/95/166`, `active-workout-screen.tsx:283/306/402`, `workout-clocks.tsx:202/213`.
+  3. Then the Home cards, then the rest, collapsing the half-pixel sizes onto the scale.
+- **Uppercase eyebrow labels (273) may stay at 10–11 px.** Chart axis text is separate and is P36's.
+- **This is a restyle, not a rearrangement,** so it needs no mockup. **Before and after captures come from RV-205's gallery,** P41.
+
+### [app-shell] RV-210 — the keyboard: nothing tells the WebView to resize, sheets are sized in `vh`, and no field says what its Enter key does
+- **Lane: B** — `app/layout.tsx:117` (the viewport), sheets under `components/**`.
+- **Added:** 2026-09-26 · Review sweep 63 (static audit). **The device check is RV-205's P26, so run it before and after this.**
+- **What:**
+  - No `interactiveWidget` is set, and nothing uses `visualViewport`. About 30 sheets use `max-h-[85–92vh]`, which does not shrink when the keyboard opens.
+  - Edge-to-edge is enforced (targetSdk 36).
+  - **0 of 135 inputs set `enterKeyHint`.**
+- **Fix:**
+  1. `interactiveWidget: "resizes-content"` in the viewport export.
+  2. `vh` → `dvh` on sheet heights.
+  3. `enterKeyHint="next"`/`"done"` on the numeric fields in food review (`review-step.tsx:175/251/273`), profile goals, and the metric-log sheets.
+- **Done when:** P26 shows no input or submit button covered, on food review and the weigh-in sheet.
+
+### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
+- **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.
+- **Added:** 2026-09-26 · Review sweep 63. **Items 4 and 5 are from the web build, so RV-205's gallery confirms them on the device first.**
+1. **"Your week in review is ready"** shows for an account with **no data at all**. Gate the banner on the week having at least one logged item.
+2. **Body Battery reads "Good · 50"** with no data behind it. The "Limited data" chip is beside it, but the headline still says Good. With no inputs, show the no-data state instead of a band.
+3. **The week strip labels every unprogrammed past day "rest".** With no program, nothing was a rest day; show a dash.
+4. **An empty rounded pill sits beside the date** in both accounts, probably the temperature chip (BF-96) rendering with no value. Render nothing until it has one.
+5. **Stray marks:** a dot between the Resting HR and Sleep rings, and a "·" glyph inside the "Limited data" chip.
+6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it, so "58" reads as a score. Add "bpm", or style it differently from the scores.
+- **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
+
+### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 63.
+1. **"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.
+   - A partial day is not a fault (the partial-day rule), and red reads as an error.
+   - Use neutral while the day is open, and reserve the warning colour for the End-of-Day review.
+2. **A taken supplement is struck through,** which reads as cancelled or deleted. Use the tick and a muted row.
+3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
+4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
+5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
+   - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
+   - **The definition is the owner's call. The copy is not.**
+
+### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **Lane: B**
+- **Gate: owner** — this visibly rearranges a daily screen. **Owed: a before/after mockup at 384 px.**
+- **Added:** 2026-09-26 · Review sweep 63.
+- **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
+- **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
+
+### [workouts] RV-214 — the session card leads with the equipment, not the session; the recovery chips slide under their label
+- **Lane: B** — `app/workout/**` session card.
+- **Added:** 2026-09-26 · Review sweep 63.
+1. **"Dumbbell" is set at about twice the size of "Push".** The largest text on the card is not the thing being chosen. Make the session name the title, and the equipment or program a subtitle.
+2. **The "Recommended today" pill wraps onto two lines** at 412 px. Shorten it to "Today", or let it sit on its own line.
+3. **"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous. Write "Last done yesterday".
+4. **The recovery chips scroll under the "RECOVERY" label,** so the first chip shows clipped at the label's edge. Start the scroller after the label, or give it a fading mask.
+5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. Use the same variant.
+
+### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
+1. **Weekly stats shows its skeleton forever on a failed fetch.** `health-sections.tsx:688` passes `loading={weeklyStats === null}`, and a failure leaves it null. That breaks the self-fetching-card failure rule.
+2. **12 components render `null` while loading or empty,** so the card vanishes rather than saying why. Among them: `observed-hr-card.tsx:37`, `workout-density-card.tsx:36`, `nutrition-activity-trends-card.tsx:37`.
+3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
+   - Convert the daily-screen ones first.
+   - **RV-206's P32 (the bad-network timeline) is the before and after.**
+
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
 - **Lane: A** — `.github/workflows/*.yml`, `.github/dependabot.yml`.
@@ -3570,6 +3693,17 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - keep to about 60 images a sitting;
   - use `rawTap`/`rawSwipe` rather than script focus or scroll.
   **A sitting that only finishes Tier 1 is a success. Record how far it got.**
+- **Targets from Review sweep 63 (web build at 412 px), to confirm on the device in Tier 1.**
+  Each one names the entry it confirms:
+  - Home's Log tiles: the "Log" pill drawn over the icon (RV-207 item 6).
+  - The empty pill beside Home's date, and the stray dots (RV-211 items 4–5).
+  - Which way Body Battery's bar fills (RV-211).
+  - Movement balance reading **0% Pull, 0% Legs over 60 days** while the calendar shows Pull and
+    Legs sessions. This was seed data on the web build, so check it against real data before
+    anyone files it.
+  - Nutrition's Adherence 0% against logged days (RV-212 item 5).
+  - The warmup bar's per-second width animation, in P25/P28 (RV-207 item 5).
+  - Keyboard occlusion on food review and the weigh-in sheet (RV-210).
 - **Result:** _(DV: Artifact URL, date, build, navigation mode, tiers completed)_
 
 ### [app-shell][platform] RV-206 — DEVICE: stress the design — large text, display size, slow phone, bad network, one hand, keyboards, launch, charts, overscroll, long values, a words-and-numbers census, back-position
