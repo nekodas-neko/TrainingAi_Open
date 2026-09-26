@@ -477,6 +477,12 @@ Live at the time of writing (2026-07-30):
   `ResizeObserver`. And `pb-nav-safe` reserves the nav and nothing else, so a `bottom-fab-safe`
   `h-14` FAB covers the bottom 56 px of a scroll — `pb-fab-safe` is the fix, with a scan that
   every screen mounting a FAB uses it.
+- **[`docs/overview/entries/2026-09-26-bf205-home-section-drag.md`](../../overview/entries/2026-09-26-bf205-home-section-drag.md)**
+  — BF-205. Home's "Reorder sections" button had no drag behind it; `@dnd-kit` on a grip handle,
+  reordering by KEY because the rendered list is a filtered subset. Two gotchas worth reading
+  before writing another drag here: `savePreference` PATCHes the server, so it belongs on
+  `dragend`; and `PointerSensor` only activates without a delay when the press lands on the handle
+  itself, which made the e2e flaky in a way that looked exactly like the defect.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)

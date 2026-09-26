@@ -598,6 +598,32 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-205 — the home "Reorder sections" button cannot reorder anything; every part of the feature exists except the gesture
 
+- **✅ SHIPPED (#PR, 2026-09-26) — `@dnd-kit`, on a HANDLE.** `HomeSortableSection` is a
+  `useSortable` now, with a grip that appears only in edit mode beside the existing eye-off, and
+  `lib/hooks/use-home-section-drag.ts` reorders `sectionOrder` on `dragover` and persists on
+  `dragend`. The recommendation's second option (up/down arrows) was not needed.
+- **The drag is on a handle, not the card, and that is the device fix rather than a style choice.**
+  Home's sections scroll vertically, so a whole-card drag puts the reorder and the scroll on one
+  touch — the direction-lock class `docs/mobile-ui-and-performance.md` warns about, and exactly
+  what this entry's pass test says to check. `touch-none` on the grip is the other half; without
+  it the browser claims the gesture before `PointerSensor` sees it, and a source guard holds it.
+- **Two things the build turned up that the entry could not have known.**
+  ① **`savePreference` is not a `localStorage` write — it PATCHes the server too**, so persisting
+  on `dragover` would have put a request behind every position the thumb passed. It persists on
+  `dragend` instead, and the guard pins that the per-event handler does not save.
+  ② **The reorder must address by KEY, not index.** Home renders a filtered subset and drops any
+  section whose content is `null`, so the third card on screen is not the third stored key.
+  `components/home/section-order.ts` is that move, unit-tested including the hidden-section case.
+- **The handlers live in a hook because `session-select-content.tsx` is size-ratcheted** and
+  `check-component-size` failed the first attempt at 1,465 lines against its 1,448 baseline. That
+  check did its job: the file is a known hotspot and the rule says extract rather than append.
+- **Keep:** the device pass, which is this entry's own and unchanged — a section can be moved, the
+  order survives leaving and re-entering Home, **and a plain vertical scroll in edit mode does not
+  pick anything up**. The harness proves the first two (`e2e/bf205-home-section-drag.spec.ts`,
+  including a reload) and cannot prove the third: a CDP pointer is not a thumb on a Samsung
+  WebView, which is where this class of bug lives.
+
+
 - **Lane:** B — `components/home-sortable-section.tsx`, `app/session-select/session-select-content.tsx`.
 - **Added:** 2026-09-26 · owner: *"when I click the grid button on the home screen I cannot move
   widgets and re-arrange them."*
