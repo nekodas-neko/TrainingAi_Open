@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 /**
  * LB-116 — the check-in sheet knew which sore ticks it had suggested and threw it away.

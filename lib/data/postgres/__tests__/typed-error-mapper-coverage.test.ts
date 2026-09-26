@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { stripComments } from '../../../../scripts/lib/strip-comments.js'
 
 // RV-46. Eighteen repository methods throw a typed `NotFoundError`/`UserFacingError`; thirteen
 // mutating routes call one. Twelve mapped it through `refusalResponse`/`routeErrorResponse`. The
@@ -72,9 +73,6 @@ describe('every route calling a throwing repository method maps its error', () =
   // matched the plain text of the fix's own explanatory comment on the route it was written for, so
   // reverting the fix left the scan green. A source check that reads prose is checking the wrong
   // file.
-  const stripComments = (src: string) =>
-    src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-
   // A hand-rolled walk rather than `fs.globSync`, which is Node 22+ and does not exist on the
   // Node 20 the CI jobs run: the first version passed locally and threw `globSync is not a
   // function` in the Tests job.

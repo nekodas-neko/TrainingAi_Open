@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { PROSE_GUARDS, PROSE_FIELD_GUARDS, METRIC_UNITS_RULE, NO_SUPERLATIVE_RULE, QUOTE_NUMBERS_RULE } from '../prompt-guards'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
@@ -104,10 +105,6 @@ describe('the two guard sets differ only where they have to', () => {
 // schema, and its routes carry PROSE_FIELD_GUARDS only where a user-facing text field is in the
 // object — which the explicit list above already covers.
 const PROSE_CALL = /\b(loggedStreamText|streamText|generateText)\s*\(/
-
-/** Comments discuss these very identifiers, so a raw scan matches its own prose. */
-const stripComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 function routeFiles(dir: string): string[] {
   const out: string[] = []

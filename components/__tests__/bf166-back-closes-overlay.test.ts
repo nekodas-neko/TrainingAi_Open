@@ -4,12 +4,13 @@ import path from 'node:path'
 import {
   openSurface, closeSurface, resetSheetBackStack, hasOpenSurface, type HistoryLike,
 } from '@/lib/hooks/sheet-back-stack'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** The handler explains this bug in prose, so a raw-source match would pass on the comment. */
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 const noopHistory: HistoryLike = { pushState() {}, back() {} }
 

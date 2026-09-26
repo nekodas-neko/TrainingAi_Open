@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const DIR = path.resolve(__dirname, '..')
 const strip = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  stripComments(s)
 const files = readdirSync(DIR).filter(f => /\.tsx?$/.test(f))
 const src = (f: string) => strip(readFileSync(path.join(DIR, f), 'utf8'))
 

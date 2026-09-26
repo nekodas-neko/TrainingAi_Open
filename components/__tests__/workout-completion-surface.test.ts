@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
@@ -10,10 +11,7 @@ const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
  * comments first, then collapse whitespace so an assertion survives a reformat.
  */
 const code = (rel: string) =>
-  read(rel)
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
     .replace(/\s+/g, ' ')
 
 describe('BF-169 — the COMPLETED stamp is not gated on the exercise library', () => {

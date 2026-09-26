@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 
@@ -12,9 +13,7 @@ const ROOT = path.resolve(__dirname, '../..')
  * for the wrong reason.
  */
 const code = (rel: string) =>
-  readFileSync(path.join(ROOT, rel), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+  stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 /**
  * RV-178 — six client-side gaps from review sweep 58.

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { rescaleRemaining, remainingMeals, MEAL_FLOOR_KCAL } from '../plan-rescale'
 import type { MealPlanMeal } from '@trainingai/shared/types/nutrition'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * Q-187's second half — the day recalculates against what was actually eaten.
@@ -131,8 +132,7 @@ describe('nothing here writes', () => {
   it('the module cannot log, fetch or store', () => {
     // The prefill's property is that nothing enters food_logs unconfirmed. A re-scale changes what
     // is SUGGESTED; the entry is explicit that mixing the two reintroduces the illegal state.
-    const src = readFileSync(path.join(path.resolve(__dirname, '../../..'), 'components/nutrition/plan-rescale.ts'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    const src = stripComments(readFileSync(path.join(path.resolve(__dirname, '../../..'), 'components/nutrition/plan-rescale.ts'), 'utf8'))
     for (const forbidden of ['fetch(', 'queueMutation', 'upsert', 'localStorage', 'setCached']) {
       expect(src, `plan-rescale must not ${forbidden}`).not.toContain(forbidden)
     }
@@ -144,8 +144,7 @@ describe('nothing here writes', () => {
  * fresh object into a `memo`ed row inside a `.map()`, is a feature that does not reach the screen.
  */
 const ROOT = path.resolve(__dirname, '../../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('the card is wired to it', () => {
   it('computes the re-scale and gates it on the day being today', () => {

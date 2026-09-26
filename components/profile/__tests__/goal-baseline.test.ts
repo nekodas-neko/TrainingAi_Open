@@ -4,6 +4,7 @@ import path from 'node:path'
 import { calculateBaseline } from '@trainingai/shared/nutrition/goal-recommendation'
 import { goalBaseline } from '../goal-baseline'
 import type { User } from '@trainingai/shared/types'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
@@ -76,7 +77,7 @@ describe('the deterministic path makes no model call', () => {
     // Comments stripped first: `goal-baseline.ts` names the recommend route in prose, explaining
     // that it shares that route's baseline rather than calling it. Matching the prose would make
     // this assertion fail for the documentation that justifies it.
-    const src = read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const src = stripComments(read(rel)).replace(/\/\/.*$/gm, '')
     expect(src).not.toMatch(/fetch\s*\(/)
     expect(src).not.toMatch(/\/api\//)
   })
@@ -98,7 +99,7 @@ describe('no button where there is no baseline', () => {
     // Comments stripped, exactly as the `no model call` case above does and for the same reason: a
     // comment explaining WHY there is no `RecommendedValue` here would otherwise fail the assertion
     // that documents it. What is guarded is a rendered control, not a mention of one.
-    const block = src.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, '')
+    const block = stripComments(src.slice(start, end))
     expect(block).not.toContain('RecommendedValue')
   })
 

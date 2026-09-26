@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { deloadOverrideOutcome, deloadRevertNames, deloadOverrideBlocked } from '@/components/workout/utils'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * LB-47 — a session-level `Full` override told the user it had worked when it had not.
@@ -65,8 +66,7 @@ describe('the cases that already worked must not move', () => {
 })
 
 const ROOT = path.resolve(__dirname, '../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('the card says the honest thing', () => {
   const card = () => source('components/workout/ai-prescription-card.tsx')

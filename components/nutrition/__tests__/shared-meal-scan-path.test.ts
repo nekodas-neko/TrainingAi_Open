@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = path.resolve(__dirname, '../../..')
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
@@ -57,7 +58,7 @@ describe('shared-meal scan path', () => {
     // Comments stripped before matching. The handler explains the check in prose naming both
     // helpers, and a bare-word assertion would pass on the comment documenting its own fix — the
     // shape that has slipped through three times in this repo.
-    const code = handler.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+    const code = stripComments(handler).replace(/\/\/.*/g, '')
 
     expect(code, 'the scan must ask whether this meal is already saved').toMatch(/findDuplicateMeal\s*\(/)
     expect(code, 'and ask it with the payload\'s own totals').toMatch(/sharedMealTotals\s*\(/)

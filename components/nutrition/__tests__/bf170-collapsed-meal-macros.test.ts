@@ -2,16 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { mealFooter } from '@/components/nutrition/meal-card-footer'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** The component explains this bug in prose and quotes the shape it replaced, so a raw match would
  *  pass on the comment. */
 const code = (rel: string) =>
-  read(rel)
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 /**
  * BF-170 — owner, on his Nutrition diary: *"Same issue here where the singular meal doesnt show

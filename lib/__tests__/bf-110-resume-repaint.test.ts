@@ -9,6 +9,7 @@ import {
 
 vi.mock('@/lib/client-error', () => ({ reportClientError: vi.fn() }))
 import { reportClientError } from '@/lib/client-error'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-110 — the blank resume survives a scroll, which means the renderer never died.
@@ -19,8 +20,7 @@ import { reportClientError } from '@/lib/client-error'
  */
 
 const ROOT = path.resolve(__dirname, '..', '..')
-const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const src = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 const el = (width: number, height: number, childCount: number) => ({
   getBoundingClientRect: () => ({ width, height }),

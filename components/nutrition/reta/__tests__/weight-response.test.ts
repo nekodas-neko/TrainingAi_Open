@@ -4,6 +4,7 @@ import path from 'node:path'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import type { WeightPoint } from '@trainingai/shared/health/long-term-goal-progress'
 import { weightResponse, formatRange, responseState, DEFAULT_BAND_PCT_PER_WEEK } from '../weight-response'
+import { stripComments } from '../../../../scripts/lib/strip-comments.js'
 
 /**
  * OR-102b ④. The property under test is not the arithmetic — that is LB-67's `computeWeightRateFit`
@@ -200,7 +201,7 @@ describe('the chip does not claim a shortage it does not have', () => {
   const raw = readFileSync(
     path.resolve(__dirname, '../weight-response-card.tsx'), 'utf8',
   )
-  const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  const code = stripComments(raw)
 
   it('picks the label from the state rather than falling through to one string', () => {
     expect(code).toMatch(/responseState\(result\) === 'undecided'/)

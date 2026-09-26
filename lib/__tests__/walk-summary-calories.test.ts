@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-107 — the walk summary shows the calories it was already being told.
@@ -15,8 +16,7 @@ import path from 'node:path'
  */
 
 const ROOT = path.resolve(__dirname, '..', '..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 const summary = () => source('components/guided-walk/walk-summary.tsx')
 

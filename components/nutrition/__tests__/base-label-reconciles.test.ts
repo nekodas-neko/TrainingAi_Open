@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const src = readFileSync(path.join(ROOT, 'components/nutrition/calorie-zone-bar.tsx'), 'utf8')
 /** The comments quote the old wording while explaining the bug, so a raw-source match would pass on
  *  prose — the failure mode already on this repo's record. */
-const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+const code = stripComments(src)
 
 /**
  * BF-99. The line read `1,264 base`, and `budgetProvenance().base` is

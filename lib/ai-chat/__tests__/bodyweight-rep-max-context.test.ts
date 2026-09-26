@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { build1RmTargets } from '@/lib/ai-chat/context'
 import { calcAmrap1RM, BW_REF } from '@trainingai/shared/1rm'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 // The owner's Hanging Leg Raise: eleven reps, stored as 128.
 const STORED = calcAmrap1RM(BW_REF, 11)
@@ -66,7 +67,7 @@ describe('ai-chat tools report the stored bodyweight estimate through the right 
     // Comments stripped first: the fix's own note NAMES the helper it replaced, and a substring
     // check that reads prose fails on the explanation rather than on the code. Exactly the shape
     // that made `check-e2e-stub-dates.js` flag a date inside its own header.
-    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const code = stripComments(raw)
     expect(code).toContain('bodyweightRepMax')
     expect(code).not.toContain('repMaxFromOneRm')
   })

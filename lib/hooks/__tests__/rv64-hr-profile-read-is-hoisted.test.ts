@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = path.resolve(__dirname, '../../..')
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
@@ -13,7 +14,7 @@ const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
  * call to it, and a test that cannot tell the difference punishes documenting the change.
  */
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(read(rel))
 
 const CHART = 'components/workout/live-hr-chart.tsx'
 /** The two screens that render the chart and stay mounted while it comes and goes. */
