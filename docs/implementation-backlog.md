@@ -3408,7 +3408,13 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   fixes already queued, and before the single-purpose probes.
 - **What comes back:** Review turns the gallery and numbers into a design critique and Lane B
   entries, one per fault, each citing its image by label.
-- **Result:** _(DV: Artifact URL, date, build, navigation mode)_
+- **Start with Part D's "Start here":**
+  - prove the image channel with one capture before any others;
+  - work the tiers in order (Tier 1 is the daily screens);
+  - keep to about 60 images a sitting;
+  - use `rawTap`/`rawSwipe` rather than script focus or scroll.
+  **A sitting that only finishes Tier 1 is a success. Record how far it got.**
+- **Result:** _(DV: Artifact URL, date, build, navigation mode, tiers completed)_
 
 ### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
 

@@ -418,6 +418,58 @@ repo**, and the owner has asked for screenshots, so for this part:
 Review reads the gallery (Artifact `read` with an asset `path` saves each image locally), writes the
 critique, and files the fixes to Lane B. **Review does not edit product code;** the lane does.
 
+### Start here — the order, the budget and the harness calls (added after review, same day)
+
+Part D is more than one sitting. Run it in this order and stop wherever the sitting ends. A partial
+gallery of the screens the owner uses daily is worth more than a complete one of admin pages.
+
+**0. Prove the channel first: one image, then read it back.**
+- Publish the Artifact with **one** labelled capture (Home, warm).
+- Attach the image as a **published supporting file** (the Artifact tool's `files` map). Do not use
+  the asset store, which needs a declared capability.
+- Read it back with the Artifact tool's `read` and that file's `path`, and record the URL on RV-205.
+- **If either step fails, the visual half is COULD NOT CHECK.** Say why, and go straight to the
+  numeric probes. Do not capture a hundred images first and discover the channel is closed.
+
+**1. Tier 1 — about the first hour.**
+- **P23** warm, with gesture nav where it is on, for the five tab roots and pre-workout.
+  **Not the active workout:** starting one is a write.
+- **P24** on those screens' primary controls.
+- **P26** on food search and Describe.
+
+**2. Tier 2.**
+- P23 for the remaining pushed routes, plus offline, plus the sheets reachable without a write.
+- P25.
+- P27.
+
+**3. Tier 3.**
+- P23 cold and error states.
+- P28.
+- Admin pages.
+
+**Budget and naming.**
+- **About 60 images a sitting.** Use JPEG at quality 80, or PNG at the phone's native width, to
+  stay well inside the Artifact limits: 15 MB per file, 64 MB per version.
+- **Name every file `<route>__<state>__<nav>__<scrollN>.jpg`** (for example
+  `nutrition__offline__gesture__1.jpg`). The name is the label, so it survives even if the page
+  around it does not.
+
+**Harness calls that work on this phone** (`scripts/device/pw.js`):
+- **P24 and P26 use `rawTap`, not a programmatic `focus()` or `dispatchTouchEvent`.** On Android a
+  script focus does not raise the soft keyboard, so P26 would pass for the wrong reason. A real tap
+  is also what P24 is meant to time.
+- **P25 uses `rawSwipe`,** with a `requestAnimationFrame` delta logger injected before the swipe.
+  `Input.synthesizeScrollGesture` is not used anywhere in the harness and is unproven on this
+  WebView.
+- **P24's timing comes from the screencast frame timestamps** (`cdp.js` already streams them).
+  Time from the `rawTap` call to the first frame whose pixels differ.
+
+**P27's reference.**
+- The intended tokens are the `@theme` blocks in `app/globals.css` (45 `--color-*` tokens) and the
+  variants in `components/ui/`.
+- Report a value as drift only when it **does not resolve to one of those**. Otherwise the census
+  lists every intended grey as a finding.
+
 ## P23 — the screen gallery
 
 `tour.js` already walks the routes and captures each. **Extend it rather than hand-driving.** For
