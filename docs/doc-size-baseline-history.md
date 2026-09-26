@@ -18,6 +18,41 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-26 — CLAUDE.md → 1046 (branch-meaning rule, and auto-merge confirmed working)
+
+The owner asked that every branch have a reason. The rule that answers it is one line — **a branch
+has meaning only if it has an open PR, and a draft PR is how you mark work worth keeping** — and the
+lines are spent on the two things that make it safe to apply.
+
+**Why not the backlog's `Branch:` field**, which is the obvious candidate and was rejected on
+measurement: 199 entries carry one and it records a PLAN. `Q-44`'s names `refactor/de-oura-identifiers`
+while its live branch is `lane-a/q44-phase3-pr1-table-rename`; `OR-127` and `RV-99` have live branches
+and no field at all. A draft PR is a fact GitHub maintains and cannot drift.
+
+**And why the sweep is not simply "no open PR → delete":** of 38 survivors, four held unmerged work
+for entries still in the queue, one of them rank 1 in `DV`. That is the sentence that stops the next
+session writing a one-line cleanup script and losing live work.
+
+**+4 more in the same PR: `enable_pr_auto_merge` was tested and it works**, so the passage that has
+now been wrong in both directions three times finally says something measured. It was enabled on this
+very PR while its checks were pending. The gotcha is recorded with it — the call refuses on an
+already-green PR, which is the tool declining rather than anything being broken, so enable it right
+after opening.
+
+## 2026-09-26 — CLAUDE.md → 1028 (two repository settings that were wrong, and the squash-merge trap)
+
+Growth in the file that most needs restraint, and it buys the removal of two false premises rather
+than new prose. CLAUDE.md asserted **auto-delete-head-branch was on** (it was off for the repo's whole
+history — 1,562 branches had accumulated) and asserted **`enable_pr_auto_merge` does not work** (that
+was the `ProtectMain`-was-`Disabled` signature, the same root cause as OR-164). The first is corrected
+outright; the second is marked STALE rather than flipped, because enabling the checkbox is not
+evidence it works and this passage has now been wrong in both directions three times in two days.
+
+Most of the 17 lines are the trap, which is the part a future session would otherwise rediscover
+expensively: **`git branch --merged` reported 3 merged out of 1,562**, because squash-merge means a
+merged branch's tip is never an ancestor of `main`. A cleanup keyed on ancestry deletes nothing; one
+"fixed" by ignoring ancestry deletes the 28 closed-but-unmerged branches that hold unlanded work.
+
 ## 2026-09-25 — backlog → BF-92's consent recorded as a runnable device check
 
 The owner approved throwing one deliberate client-side error in production to prove Sentry receives

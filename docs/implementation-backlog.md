@@ -485,6 +485,64 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LA-146 — the vitest teardown flake has nine sightings, zero entries, and now blocks the merge button
+
+- **Lane:** A
+- **Added:** 2026-09-26 · Orchestrator, on the ninth sighting (PR #1679).
+- **What it is.** A full run exits 1 reporting **zero failing tests**: `EnvironmentTeardownError:
+  [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`. A worker is torn down with a
+  `console.*` forward still in flight. Nine sightings, **nine clean re-runs on identical code**.
+- **Why it is filed NOW rather than at sighting one.** It was free until 2026-09-25, when `Tests`
+  became a **required** check — so a flake that used to cost a re-run now **blocks the merge**. That
+  is the cost change, not a new fault.
+- **⚠ Read [`docs/local-dev-database.md`](local-dev-database.md) before starting** — it already holds
+  the full investigation, and most of the obvious moves are ruled out there: 24 controlled runs
+  reproduced nothing, the named file alone is clean over 5 solo runs, upgrading does not help, and
+  the run log **cannot** settle it (the pending `onUserConsoleLog` IS the log that never arrived, so
+  its absence is guaranteed under every hypothesis).
+- **The best available lead, from that doc:** `hr-read-routes.test.ts` is named in 5 of 9 sightings,
+  and exercises `/api/oura/hr-data`, whose durable-snapshot writes are deliberately fire-and-forget
+  (`void repo.upsertWorkoutHrStats(…).catch(…)`). A promise no test awaits, whose `.catch` calls
+  `reportServerError`, is exactly the shape of a late continuation running past teardown. **Not
+  proven** — point a file-based trace there first.
+- **⛔ Do NOT "fix" it by quieting console output or setting `dangerouslyIgnoreUnhandledErrors`** —
+  the first treats the legible symptom rather than the broken one, the second hides real unhandled
+  rejections. `disableConsoleIntercept: true` is the one candidate worth weighing if it becomes
+  frequent, and it costs per-file log attribution for everyone.
+- **Meanwhile the response is unchanged and cheap:** `rerun_failed_jobs` on the run — it re-runs only
+  the failed job, keeps every green result, and pushes nothing.
+
+### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
+
+- **Lane: O** — needs the owner's call on the four, then it is a sweep anyone can run.
+- **Added:** 2026-09-26 · Orchestrator, after the 1,562 → 45 cleanup (#1679).
+- **The rule is now in CLAUDE.md: a branch has meaning only if it has an open PR**, and a draft PR is
+  how you mark work worth keeping. This entry is the backlog of what the first application of that
+  rule found.
+- **⚠ FOUR branches hold unmerged work for entries STILL IN THE QUEUE.** Deleting them discards a
+  head start, so each needs a yes/no before any sweep:
+  | branch | entry | size |
+  |---|---|---|
+  | `chore/or-127-device-cdp-harness` | **OR-127 — rank 1 in `DV`** | 12 files, 7 commits |
+  | `lane-a/q44-phase3-pr1-table-rename` | Q-44 | 13 files, 4 commits |
+  | `lane-a/rv99-score-band-theme-tokens` | RV-99 | 14 files, 4 commits |
+  | `lane-a/fix-gate-pin-q305` | Q-305 | 1 file, 1 commit |
+  **Recommended: open a draft PR for each**, which both preserves them and makes them obey the new
+  rule. Cheap, reversible, and it puts the work where the next implementer will see it.
+- **TWO are provably dead — 0 commits ahead, 0 files differing from `main`:**
+  `claude/implementation-agent-lane-a-ztkb3m` and `lane-a/tn46-baseline-already-retained`. Delete
+  outright. Note TN-46 is still queued while its branch is empty, so a branch matching a live entry
+  is not automatically worth keeping — check the diff, not just the name.
+- **The remaining 32 are sweepable** once the four above are resolved: no open PR, last touched
+  between 3 days and 6 weeks ago, and none had a merged PR (the cleanup would have taken it).
+- **Two of them violate the branch-naming rule outright** — `claude/implementation-agent-b-s1m4qs`
+  and `claude/implementation-agent-lane-a-ztkb3m` are exactly the auto-generated shape CLAUDE.md
+  forbids. Worth a moment's thought about what produced them, since the rule did not stop it.
+- **The audit is reproducible**, and the method matters more than this snapshot: compare
+  `git ls-remote --heads origin` against open-PR head refs, then check what is left against queued
+  entry IDs. **Never use `git branch --merged`** — it reported 3 of 1,562.
+
+
 ### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
 
 - **Lane: DV** — **re-laned from `O` on 2026-09-25**, when the owner asked which `O` entries belong to
@@ -2107,15 +2165,29 @@ which is the right shape for something that can only be validated by living with
      - `groupSignals`/`trendPhrase` (`group-signals.ts:42-83`) already turn the same signals into words on the same page.
      - **Replace:** a template that names the heaviest-weighted signal.
      - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
-  3. **running-plan explain** runs automatically, once per day per run (`prescribed-run-card.tsx:61-85`).
-     - The route's own header says it only rewords the deterministic `rationale` and is "never load-bearing".
-     - **Delete the route and the fetch;** the rationale is already on the card.
+  3. **✅ SHIPPED 2026-09-26 — running-plan explain is gone**
+     ([entry](overview/entries/2026-09-26-rv200-running-plan-explain.md)). Claim confirmed exactly:
+     the card rendered the deterministic `rationale` immediately and only swapped in the model's
+     sentence when it landed, so the call reworded text already on screen. Route, fetch, cache key
+     and TTL deleted.
+     - **Three things named it that the entry did not mention.** `lib/ai/degrade.ts` cited it as
+       **the reference implementation** for graceful degradation (re-pointed at `ai/health-insight`,
+       which that same comment already called "the more exact one"); `ai-prose-routes-fail-safe.test.ts`
+       pinned its 200-with-rationale behaviour; and `prose-guards.test.ts` carried a `>= 7` floor on
+       how many prose routes the scan finds, which is now 6.
+     - **`git ls-files` is how several checks enumerate source**, so `rm` without `git add` made
+       `check-tab-navigation` fail on a file that was gone from disk and present in the index. Stage
+       a deletion before running the gate.
   4. **nutrition-goals-recommend**: since RV-66, every number comes from `calculateBaseline`.
      - The model now only picks an activity level, using a threshold its own prompt spells out (`route.ts:316`), and writes prose.
      - A model failure still returns **500 and a "Failed to get recommendation" toast, discarding numbers already computed** (`:373-377`).
      - **Replace:** the threshold becomes a function and the "built from…" sentence becomes a template.
      - Correct the stale "AI adjusts this baseline" header in `components/profile/goal-baseline.ts`.
 - **Where it can, the text is built on the device, so it works offline:** daily-digest and session-explain read local-first data.
+- **Keep:** items **1, 2 and 4** — daily-digest, session-explain insight, and nutrition-goals-recommend.
+  Item 3 shipped on its own because the four are independent and it was the only one that is a pure
+  deletion; the other three each replace a model call with a builder and want their own verification.
+  **None of the three has been re-verified against `main`.**
 - **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
 
 ### [platform][app-shell] RV-201 — health-insight and weekly-digest: show computed text first, and let the week page work offline

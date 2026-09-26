@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.65",
+    date: "2026-09-26",
+    changes: [
+      "Changed: the prescribed run card now shows its reason straight away and keeps it, instead of replacing it a moment later with an AI rewording of the same thing. One less thing to load, and it works with no signal.",
+    ],
+  },
+  {
     version: "1.465.64",
     date: "2026-09-26",
     changes: [

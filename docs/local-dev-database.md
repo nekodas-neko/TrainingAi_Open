@@ -122,6 +122,22 @@ Instead, a local Postgres 16 instance is set up automatically:
     re-run was clean, eight for eight. What changes is where to point a file-based trace first, if
     anyone ever does. Do not re-retract the amendment either — the fifth, sixth and seventh sightings
     named other files and are equally real; the honest summary is *mostly one file, but not only*.
+  - **NINTH, 2026-09-26 (Orchestrator, PR #1679) — a FIFTH distinct file,
+    `lib/__tests__/nutrition-goals-recommend-route.test.ts`.** Shard 1 of a **docs-only** PR, so the
+    diff could not plausibly be involved: four markdown/`.size` files, none imported by anything.
+    `2498 passed | 14 skipped`, `Errors 1`. Re-ran clean — **nine for nine**. The tally is now
+    `hr-read-routes` ×5 against four other files ×1 each, which leaves the *"mostly one file, but not
+    only"* summary above standing rather than changing it.
+  - **⚠ TWO THINGS THIS ENTRY PREDATES, and the first changes what the flake COSTS.**
+    **`Tests` became a REQUIRED check on 2026-09-25** (`ProtectMain` set to Active, OR-164). Before
+    that this was a nuisance you re-ran; now it **blocks the merge button**, which is exactly the
+    consequence CLAUDE.md predicted — *"a flaky job now BLOCKS a merge instead of slipping through"*.
+    Nine sightings and zero backlog entries was tolerable while it was free; it is not now, so it is
+    filed as `LA-146`.
+    **And the re-run no longer has to be a push.** This entry says a re-run *"is a push, so it cancels
+    and restarts the 34-minute E2E alongside it"*. `mcp__github__actions_run_trigger` with
+    `rerun_failed_jobs` re-runs **only the failed job**, leaves every green job's result in place, and
+    pushes nothing — measured here at one shard re-run, ~2 minutes, E2E untouched. Use that.
 
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:
   1. **Fixture rows.** DB tests clean up in `afterEach`/`afterAll`, which a killed run never reaches. `program-session-tombstone.test.ts` left its `LB-66 Program` row behind, and the next full run failed with `UserFacingError: A program named "LB-66 Program" already exists` — an error that reads like a bug in the program-name guard and is really a corpse from the run you killed. It then **self-heals**, because that run's own `afterEach` clears the row, so it fails exactly once and looks like a flake.
