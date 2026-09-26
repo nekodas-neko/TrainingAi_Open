@@ -692,24 +692,6 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [sleep][platform] LA-149 — the sleep verdict is stored but nothing announces it yet
-
-- **Lane: A** — `app/api/**`, the morning check-in read path. **Added:** 2026-09-26, shipping TN-81.
-- **Needs:** — (TN-81 shipped; this is its other half)
-- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
-- TN-81 landed the computation (`sleep-verdict.ts`), the table (`sleep_verdicts`, migration 284) and
-  the repository methods. **Nothing calls them**, deliberately — the plan ships the engine half
-  first, and the announcement's integration point depends on the surface TN-82 builds.
-- **What is owed:** compute the verdict for the night on the morning check-in's read, persist it
-  through `upsertSleepVerdict` (which is idempotent per `(user, date)` and never touches
-  `response_state`), expose it to the sheet, and accept a response through
-  `setSleepVerdictResponse`.
-- **The rule that must survive the wiring:** the auto-filled value writes `touched: false`; only a
-  correction writes `touched: true` (TN-57). An announcement is not his answer, and nothing on this
-  path may make an un-corrected day look like one.
-- **`sleepVerdictForNight` returns `null` below 28 nights per component** — that is not an error
-  state to paper over, it is "say nothing today".
-
 ### [platform] LA-148 — four `median` implementations, and one of them disagrees
 
 - **Lane: A** — `packages/shared/src/health/**`, `packages/shared/src/workout/time-audit.ts`.
@@ -728,9 +710,11 @@ below threshold and left in place for next time.
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
-- **Needs:** LA-149 — **repointed 2026-09-26.** TN-81 shipped the verdict, the table and the
-  repository methods, but nothing calls them yet, so a surface built now would have no data to
-  announce. LA-149 is the wiring.
+- **Needs:** — cleared 2026-09-26. LA-149 shipped the announce path: `GET /api/sleep-verdict`
+  returns the night's verdict (computing and freezing it on first read, `null` when there is
+  nothing honest to say) and `POST` records `acknowledged`/`corrected`. **This entry is now
+  startable.** The route never writes a `touched` flag — the correction's VALUE is the check-in
+  save path's to write, and only his own correction is his answer (TN-57).
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
   interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
