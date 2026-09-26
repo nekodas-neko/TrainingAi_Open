@@ -7,9 +7,9 @@
  *   · `session-explain/insight` once returned `errorLog`'s output as the response body — which is
  *     `[ERROR]: ${error}` — so a driver error published **the whole failing statement, every column
  *     of `workout_sessions`, to the client** (Q-483). Reached by a malformed id (22P02).
- *   · `running-plan/explain` must answer 200 with the deterministic rationale when the model throws.
- *     The AI only rephrases a rationale the app already computed; a 500 there would blank a card
- *     that had the answer in hand.
+ *   · `running-plan/explain` used to be the second case here. **RV-200 deleted that route**: the
+ *     card already renders the deterministic rationale, so the model was only rewording text the
+ *     user could already see, and the fail-safe it needed disappeared with the call.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -51,7 +51,6 @@ vi.mock('@/lib/ai/insight-cache', () => ({
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 
 import { GET as sessionExplain } from '@/app/api/session-explain/insight/route'
-import { POST as runningExplain } from '@/app/api/running-plan/explain/route'
 
 const recommendation = () => ({
   session: { id: 's1', name: 'Upper' },
@@ -63,16 +62,10 @@ const recommendation = () => ({
   deloadOrRestRecommended: false,
 })
 
-/** A fresh user per case — both routes rate-limit per user and cases would throttle each other. */
+/** A fresh user per case — the route rate-limits per user and cases would throttle each other. */
 let seq = 0
 const freshUser = () => { sessionUser = { id: `u-${++seq}`, timezone: 'Australia/Brisbane' } }
 
-const explainPost = (body: unknown) =>
-  runningExplain(new Request('http://localhost/api/running-plan/explain', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  }) as never)
-
-const validBody = { type: 'easy', durationMin: 30, rationale: 'Your legs are fresh.', gateReasons: [] }
 
 beforeEach(() => {
   for (const m of [getNextSession, upsertAiHealthInsight, readFreshInsight, loggedStreamText, generateText, reportServerError]) m.mockClear()
@@ -134,31 +127,3 @@ describe('GET /api/session-explain/insight', () => {
   })
 })
 
-describe('POST /api/running-plan/explain', () => {
-  it('falls back to the deterministic rationale when the model throws, at 200', async () => {
-    // The AI only rephrases a rationale the app already computed. A 500 here would blank a card
-    // that has the answer in hand.
-    generateText.mockRejectedValue(new Error('model exploded'))
-    const res = await explainPost(validBody)
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ message: 'Your legs are fresh.', degraded: true })
-  })
-
-  it('returns the model sentence, trimmed, when it works', async () => {
-    expect(await (await explainPost(validBody)).json()).toEqual({ message: 'a warm sentence' })
-  })
-
-  it('caps what it will join into a prompt (F6), and rejects an unknown key', async () => {
-    // These strings go straight into the prompt; without caps a replayed client ships a megabyte.
-    expect((await explainPost({ ...validBody, rationale: 'x'.repeat(501) })).status).toBe(400)
-    expect((await explainPost({ ...validBody, gateReasons: Array(13).fill('r') })).status).toBe(400)
-    expect((await explainPost({ ...validBody, surprise: 1 })).status).toBe(400)
-    expect(generateText).not.toHaveBeenCalled()
-  })
-
-  it('refuses without a session, before reading the body', async () => {
-    sessionUser = null
-    expect((await explainPost(validBody)).status).toBe(401)
-    expect(generateText).not.toHaveBeenCalled()
-  })
-})

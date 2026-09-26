@@ -2107,15 +2107,29 @@ which is the right shape for something that can only be validated by living with
      - `groupSignals`/`trendPhrase` (`group-signals.ts:42-83`) already turn the same signals into words on the same page.
      - **Replace:** a template that names the heaviest-weighted signal.
      - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
-  3. **running-plan explain** runs automatically, once per day per run (`prescribed-run-card.tsx:61-85`).
-     - The route's own header says it only rewords the deterministic `rationale` and is "never load-bearing".
-     - **Delete the route and the fetch;** the rationale is already on the card.
+  3. **✅ SHIPPED 2026-09-26 — running-plan explain is gone**
+     ([entry](overview/entries/2026-09-26-rv200-running-plan-explain.md)). Claim confirmed exactly:
+     the card rendered the deterministic `rationale` immediately and only swapped in the model's
+     sentence when it landed, so the call reworded text already on screen. Route, fetch, cache key
+     and TTL deleted.
+     - **Three things named it that the entry did not mention.** `lib/ai/degrade.ts` cited it as
+       **the reference implementation** for graceful degradation (re-pointed at `ai/health-insight`,
+       which that same comment already called "the more exact one"); `ai-prose-routes-fail-safe.test.ts`
+       pinned its 200-with-rationale behaviour; and `prose-guards.test.ts` carried a `>= 7` floor on
+       how many prose routes the scan finds, which is now 6.
+     - **`git ls-files` is how several checks enumerate source**, so `rm` without `git add` made
+       `check-tab-navigation` fail on a file that was gone from disk and present in the index. Stage
+       a deletion before running the gate.
   4. **nutrition-goals-recommend**: since RV-66, every number comes from `calculateBaseline`.
      - The model now only picks an activity level, using a threshold its own prompt spells out (`route.ts:316`), and writes prose.
      - A model failure still returns **500 and a "Failed to get recommendation" toast, discarding numbers already computed** (`:373-377`).
      - **Replace:** the threshold becomes a function and the "built from…" sentence becomes a template.
      - Correct the stale "AI adjusts this baseline" header in `components/profile/goal-baseline.ts`.
 - **Where it can, the text is built on the device, so it works offline:** daily-digest and session-explain read local-first data.
+- **Keep:** items **1, 2 and 4** — daily-digest, session-explain insight, and nutrition-goals-recommend.
+  Item 3 shipped on its own because the four are independent and it was the only one that is a pure
+  deletion; the other three each replace a model call with a builder and want their own verification.
+  **None of the three has been re-verified against `main`.**
 - **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
 
 ### [platform][app-shell] RV-201 — health-insight and weekly-digest: show computed text first, and let the week page work offline
