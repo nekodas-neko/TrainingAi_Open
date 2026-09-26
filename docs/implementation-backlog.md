@@ -1527,7 +1527,7 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
 
 ### [platform][app-shell] DV-21 — health alerts schedule to a notification channel that is never created, so none of them can ever appear
 
-- **✅ SHIPPED (#PR, 2026-09-26) — and the guard that came with it found a SECOND dead channel.**
+- **✅ SHIPPED (#1720, 2026-09-26) — and the guard that came with it found a SECOND dead channel.**
   `capacitor-native-init.tsx` now creates `health-alerts` (importance **4**, heads-up, vibrating)
   beside the other five. **`components/__tests__/dv21-notification-channels-exist.test.ts` then
   failed on `workout-reminders`**: `reconcileWorkoutReminder` runs from `sync-provider.tsx` and has
