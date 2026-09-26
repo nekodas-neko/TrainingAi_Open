@@ -134,6 +134,31 @@ function bandFor(values: number[]): ComponentBand | null {
   }
 }
 
+/** A stored sleep session, reduced to what the verdict reads. `undefined` and `null` both mean
+ *  "not recorded" — `SleepSession` uses `undefined`, the DB row uses `null`. */
+export interface SleepSessionLike {
+  date: string
+  sleepStart: Date | string | number
+  durationHours?: number | null
+  efficiency?: number | null
+}
+
+/**
+ * Turn stored sleep sessions into the shape the verdict reads, in the USER's timezone.
+ *
+ * Separate from `sleepVerdictForNight` so that function stays free of clocks and zones and can be
+ * tested on plain numbers — this is the only place a stored row's `sleepStart` becomes a minute
+ * offset, and it is the only place that needs the timezone.
+ */
+export function toVerdictNights(sessions: readonly SleepSessionLike[], tz: string): VerdictNight[] {
+  return sessions.map(s => ({
+    date: s.date,
+    durationHours: s.durationHours ?? null,
+    onsetMinutes: onsetMinutesForNight(s.sleepStart, s.date, tz),
+    efficiency: s.efficiency ?? null,
+  }))
+}
+
 /**
  * Judge `target` against the nights before it.
  *
