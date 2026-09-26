@@ -692,10 +692,59 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
+### [sleep] TN-83 — the sleep verdict fires on naps and broken captures, and they poison its own baselines
+
+- **Lane: A** — the verdict's read path / night selection (`packages/shared/src/health/sleep-verdict.ts`
+  is correct; what feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped
+  thresholds against real nights before anything announces them.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **⚠ THIS BLOCKS `LA-149`.** Wire the announcement as it stands and the first thing the owner is told
+  is that his sleep was bad on a night he slept 7.9 hours. The whole design rests on an announcement
+  he trusts enough to correct; a false one on week one trains the opposite, and that is the failure
+  mode `OR-171`'s guard is about.
+- **Measured 2026-09-26, running the shipped `sleepVerdictForNight` over 125 real nights** (replica
+  cross-checked against the real function: identical counts, so the sweep below is sound):
+  **poor 25, good 10, normal 61** over 96 judged nights = **10.9 prominent announcements per 30
+  nights**, against the plan's stated target of **4–6**. So it fires at roughly twice the intended
+  rate — but that is the symptom, not the defect.
+- **The defect: `sleep_sessions` holds more than one row per date, and the verdict treats every row as
+  a night.** 125 rows across **106 distinct dates** (last 120 days: **120 rows, 102 dates, 30 rows
+  under 3 h, 6 at exactly 0 h with efficiency 0**). On every duplicate date the shape is **one real
+  night plus one fragment**: `7.92 / 0.00` · `8.25 / 0.00` · `8.50 / 0.00` · `7.17 / 0.08` ·
+  `8.58 / 0.00` · `7.00 / 0.00` · `8.17 / 1.42` · `7.42 / 4.75`.
+- **And several are plainly naps, judged as nights.** Onset minutes from local midnight on flagged
+  rows: **644 (10:44)**, **997 (16:37)**, **1055 (17:35)**, **1064 (17:44)**. An afternoon nap is
+  being announced as a bad night.
+- **It fails twice, in opposite directions, which is why the rate alone understates it.**
+  **(a) False alarms** — the fragment is judged as the night, so a 7.9 h night is announced poor.
+  **(b) Desensitised bands** — those same fragments sit in the trailing-28 window, so a 0 h and a
+  0.08 h value drag `p25` down, widen the "normal" band, and make a genuinely short night read as
+  acceptable. The verdict is simultaneously too loud on artifacts and too quiet on real nights.
+- **⛔ DO NOT fix this by raising `VERDICT_IQR_MULTIPLIER`.** The sweep makes that tempting and it is
+  the trap: `0.25 → 16.6` · **`0.5 → 10.9` (shipped)** · `0.75 → 9.1` · `1.0 → 8.1` ·
+  `1.5 → 6.6` · `2.0 → 6.6`. Multiplier **1.5** lands inside the 4–6 target and would be *wrong* — it
+  hits the rate by suppressing real signal while still announcing on fragments, and it takes `good`
+  to **zero**, so the whole "unusually good night" half of the feature disappears. The rate target is
+  a check on a correct population, never a knob to reach it.
+- **The fix, and it is not a threshold change:** select **one night per date** before judging (longest
+  row, or a main-sleep flag if one can be derived), and exclude sub-threshold fragments from **both**
+  the target night **and** the baselines. Then re-measure the rate, and only then consider tuning the
+  multiplier — on a population that is nights.
+- **A correction to Tuning's own plan, made here rather than quietly:** the plan's §5 cites *"119 rows
+  for the last 120 days — `duration_hours` on all 119"* as evidence the inputs are complete. **That
+  count included fragments.** It is 102 dates, with 30 of 120 rows under 3 h. The conclusion that
+  inputs are sufficient still holds; the completeness figure was inflated by exactly the artifact this
+  entry is about.
+- **What `TN-81` got right, and should not be touched:** components rather than a composite, signed
+  onset minutes so 23:50 and 00:10 are 20 minutes apart, per-component baseline readiness, a
+  `modelVersion` stamp on each snapshot, and `null` below 28 nights rather than a guess. The rule is
+  sound; it is being fed the wrong rows.
+
 ### [sleep][platform] LA-149 — the sleep verdict is stored but nothing announces it yet
 
 - **Lane: A** — `app/api/**`, the morning check-in read path. **Added:** 2026-09-26, shipping TN-81.
-- **Needs:** — (TN-81 shipped; this is its other half)
+- **Needs:** TN-83 — the verdict currently fires on naps and zero-hour fragments; wiring it first
+  announces a false "your sleep was bad" on nights he slept 7.9 h.
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - TN-81 landed the computation (`sleep-verdict.ts`), the table (`sleep_verdicts`, migration 284) and
   the repository methods. **Nothing calls them**, deliberately — the plan ships the engine half
@@ -787,32 +836,6 @@ below threshold and left in place for next time.
   change that gets noticed and resented afterwards.
 - **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
   `Footprints`, unchecked against the current glyph.
-
-### [app-shell][platform] OR-176 — may Device Verification change three phone settings during a sitting? (RV-206 P29–P31)
-
-- **Lane:** O — the deliverable is a yes or no. Ungated on purpose: getting the answer IS the work.
-- **Ask: owner** — may the device agent temporarily change font scale, display size and battery saver
-  on the S25 during a sitting, restoring each before the sitting ends?
-- **Added:** 2026-09-26 · Orchestrator, splitting the ask out of RV-206, where it sat as a prose line
-  inside a `Lane: DV` entry. The Orchestrator never saw it, so nobody was tasked with asking; sitting
-  4b reached those three probes and stopped.
-- **Recommendation: yes, all three at once, and standing rather than per-sitting.** Font scale and
-  display size are the two settings most likely to break this app's layout — it is built at one
-  viewport, and `RV-209` already found 1,035 uses of text under 12 px, which is the population that
-  breaks first when a user scales text up. Battery saver is where Android throttles the timers and
-  background work the workout screen depends on. These are the faults a real user hits and nothing in
-  the sandbox can see.
-- **Why standing and not per-sitting:** a permission asked every time is a permission that stops
-  getting asked, and the probe gets skipped instead — which is what just happened.
-- **Reversal cost: about a minute, and it is his own phone.** Each is a settings toggle restored in
-  the same sitting; the agent records the before and after values. The genuine risk is not the change
-  but a sitting that ends early and leaves the phone on 130% font — so the answer, if yes, should
-  come with "restore before anything else if the sitting is cut short".
-- **The alternative, if no:** drop P29–P31 and accept that large-text, display-size and
-  battery-saver behaviour is untested on the only runtime that ships. That is a defensible call for a
-  single-user app where the user never changes those settings — **and if that is the reason, say so,
-  because it retires the probes permanently rather than leaving them owed.**
-- **When answered:** record it on RV-206 and remove this entry.
 
 ### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
 
@@ -2503,6 +2526,118 @@ which is the right shape for something that can only be validated by living with
 - **Cheap to reverse** (one component's classes), which is the argument for showing a picture
   rather than a paragraph.
 
+### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
+
+- **📱 Sweep 4a, after the v1.465.62 fix (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** ③ **PASSES 3/3**: a right swipe on the row
+  closes the tray and the day stays Today. ① **still FAILS, and now has a threshold**: swipe (300 ms) then
+  a tap on Delete's own rect after **0 / 100 / 200 / 300 ms → no confirmation (8 of 8, tray left open)**;
+  after **500 ms → "Delete food log?" (2 of 2)**. A human "immediate" tap (~150–300 ms) is swallowed. ②
+  the slow tap works. Meal-list half not run (no logged meal that day).
+
+- **📱 Sweep 3 — the immediate tap FAILS (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** New harness call `rawSwipeThenTap` (one
+  `adb shell "input swipe … && input tap …"`, so the tap lands the moment the swipe ends). From a
+  verified-closed tray: the tray opens (`translateX(-64px)`) but **no confirmation, 2 of 2**. The slow
+  tap (tray open, 1.5 s, tap) opens *"Delete food log?"* every time.
+- **And a side effect:** after that swallowed tap, the next **rightward swipe on the row** (meant to
+  close the tray) moved Nutrition to **Yesterday** instead — **2 of 2**. The same swipe on a tray opened
+  normally closes it and leaves the day alone. It looks like the swallowed tap leaves the row not
+  owning the next gesture, so the page's day-swipe takes it. Meal-list half not run.
+
+- **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** swipe-open then tapping the tray's own Delete worked **3 of 3**. The
+  owed variant — an immediate tap from a verified-closed tray — was not run.
+
+- **📱 PARTIAL ON THE S25, 2026-09-23 — the immediate tap is still COULD NOT CHECK.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Food
+  rows only (Nutrition diary). Swiped with a real `adb shell input swipe` (300 ms): a tap **~1.5 s**
+  after the swipe opens *"Delete food log?"* on the first press, four times out of four — so the slow
+  tap works. At **~0.9 s** the harness's hit-test found an **svg of the row still over the Delete
+  button's centre** and refused to dispatch, which fits the defect still being there but does not
+  prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
+  tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
+- **📱 Second attempt, 2026-09-23 (sitting 2) — still COULD NOT CHECK, and why, so the next try
+  does not repeat it.** Three "immediate tap" runs showed no confirmation, but **none of them is
+  evidence**: the row's tray was **already open** before the swipe (a tray left open by an earlier
+  step stays open — the row sat at `translateX(-64px)`), and the tap aimed 32 px inside the *row's*
+  right edge, which is x=271 with the tray open — the row, not Delete (x 303–367). A 1.5 s control
+  tap at that point opened *Edit Serving*, confirming it hit the row. Measured once correctly: from
+  an **open** tray, a further left swipe overshoots to −134 px and settles back at −64 px by 300 ms,
+  with Delete on top throughout. **What the next attempt needs:** a verified-closed tray first
+  (`translateX(0)`; a right swipe starting inside the navigator's 24 px edge strip does not close it,
+  and neither did a raw tap on the row), then swipe and `input tap` at **Delete's own rect** in one
+  `adb shell` call. Note the tray is `aria-hidden` while closed, so a visibility filter hides it.
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-30 · owner, confirmed on device the same day: *"if I wait a second it works."*
+- **Shipped 2026-08-31** — the tray stacks above the row while open. Hit-testing follows the
+  *animated* transform, so for the 220 ms the row spends sliding out it is still over part of the
+  tray and swallows the tap.
+- **The regression test is the part to read before touching this again** (`e2e/food-log-swipe-delete.spec.ts`).
+  Three shapes do **not** reproduce it: a long drag overshoots the resting offset and animates back
+  **rightwards**, never covering the tray; a short flick through CDP falls under `FLICK_VELOCITY` so
+  the row snaps closed; and a tap at the tray's **centre** is uncovered almost at once, because the
+  tray uncovers from its right edge first. What works is a 36 px drag (rests open on distance,
+  leaving the row short of its offset), a tap 52 px into the tray, and the transition stretched to
+  6 s so the window is wider than a protocol round-trip. Mutation-proved both ways.
+- **⚠ The `Keep:` was removed 2026-09-24 (orchestrator review of sweep 3) — this is OPEN WORK, not
+  verification debt.** It read *"the device check, and only that"*, and the title said *"fixed"*.
+  **Sweep 3 ran that check and it FAILED, 2 of 2.** With a `Keep:` the entry printed for Lane B under
+  *"shipped; only the stated residue is owed. Not new work"* — so a defect confirmed broken on the
+  device read as finished to the lane that owns the fix, **while `BF-94` sat blocked behind it**.
+  CLAUDE.md states the rule this violated: a FAILED is work, and goes back to the lane with what
+  reproduces it rather than into a `Keep:` that reads as finished.
+- **Acceptance, and the third clause is the one the old wording would have let through.** On the
+  S25, swipe and tap Delete **immediately**: ① the confirmation appears on the **first** press, on
+  **both** the meal list and the food rows; ② the slow tap keeps working; ③ **the next rightward
+  swipe closes the tray and leaves the day alone.** Sweep 3 found that after the swallowed tap the
+  next rightward swipe moved Nutrition to **Yesterday**, 2 of 2 — the row stops owning the gesture
+  and the page's day-swipe takes it. That is downstream of the same swallowed tap, so one fix may
+  clear both; **it is written as its own clause because the old acceptance text would pass with the
+  day still jumping**, which is the more alarming half for the user.
+- **Still not run: the meal-list half.** Sweep 3 covered the food rows. COULD NOT CHECK, not a pass.
+- **`BF-29`'s 2026-08-30 pass is not evidence**: it was the meal list, tapped slowly.
+- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the entry names no file**: it is `components/ui/swipe-actions.tsx:89-101`. `z-10` applies only once `isOpen` (`offset <= -width`), so the first tap misses during the slide.
+- **⚠ `Verify: device` REMOVED 2026-09-26 — see the reopened note below.**
+- **✅ FIXED 2026-09-25 (v1.465.62) — the raise was gated on the END of the journey, not the start.**
+  Sweep 59's read was right about the file and understated the window. `isOpen` is
+  `offset <= -width`, i.e. true only once the row has travelled the **full** tray width, so the
+  `z-10` arrived when the slide finished and everything before it was still the original bug. The
+  gate is `offset < 0` now — the tray is raised for the whole of the window in which it is visible,
+  which is the invariant that actually matters: **if you can see it, you can hit it.** `aria-hidden`
+  and `tabIndex` follow the same flag, so there is no visible-but-`aria-hidden` clickable button.
+- **⚠ THE EXISTING REGRESSION TEST PASSES ON THE UNFIXED COMPONENT, which is why this shipped once
+  and failed on the device twice.** Control-run 2026-09-25 with the fix stashed and the spec kept:
+  *"the first tap on Delete opens the confirmation, even mid-animation"* — **green**. It stretches the
+  transition and taps after the row has **rested open**, so it only ever exercised the half that was
+  already fixed. Sweep 3's tap landed before React had committed the rest-open state at all, and that
+  window is **narrower than one CDP round-trip**, so no arrangement of `tap` calls can reach it.
+- **So the new test asserts the PROPERTY instead of racing it** — *while the row is displaced at all,
+  finger still down, the tray is the topmost element over its own rect.* Timing-free, held mid-drag at
+  36 px against a 64 px tray (displaced-but-not-open, exactly where the old gate left the tray
+  underneath). It **fails** against the unfixed component and passes with the fix. It also reads the
+  row's transform before probing, because the first version of it reported *"the tray is under the
+  row"* when the truth was that the drag had never happened.
+- **The meal list is covered by construction, not by a second fix.** `SwipeActions` is shared —
+  `meal-card.tsx` and `saved-meal-card.tsx` render the same component — so there is no per-surface
+  copy to miss. Still unverified on the device there, as the entry notes.
+- **⚑ REOPENED AS WORK 2026-09-26 (OR-176) — it was filed as verification debt and it is a defect.**
+  The v1.465.62 fix shipped, so this carried `Verify: device` and a `Keep:`, which put it in Lane B's
+  VERIFY list — *shipped, a look is owed* — while the entry's own title says the fix FAILED. A FAILED
+  device result is work for the lane that owns the surface, not a check still owed; that rule exists
+  and this entry is what it was written for. **`Verify:` removed so it prints as READY.**
+- **Sweep 4a turned it into a bug with a number, which is what makes it buildable now.** From a
+  verified-closed tray, a tap on Delete's own rect at **0 / 100 / 200 / 300 ms is swallowed (8 of 8)**;
+  at **500 ms it works (2 of 2)**. A human immediate tap is ~150–300 ms, so the app is losing the
+  press for somewhere under half a second after the swipe ends. **The v1.465.62 fix moved the `z-10`
+  raise to the start of the journey and the window survived it**, so the remaining cause is not the
+  `isOpen` gate alone — read what else the tray does during the slide before changing that line again.
+- **⚙ The pass test, all three clauses** (this is the check once it is fixed, not the work). On the
+  S25, swipe and tap Delete **immediately**:
+  ① the confirmation appears on the **first** press, on **both** the meal list and the food rows;
+  ② the slow tap keeps working; ③ the next rightward swipe closes the tray and leaves the day alone.
+  **Clause ③ is not separately fixed and is not claimed** — sweep 3 found the day jumping to Yesterday
+  only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
+  survives, it is its own entry with its own mechanism, not a re-open of this one.
+
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Lane: B.** One PR. **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.
 - **Added:** 2026-09-26 · Review sweep 63.
@@ -2517,6 +2652,10 @@ which is the right shape for something that can only be validated by living with
   - `11900` steps (Home tile) against `1,660`/`2,000`/`4,320` elsewhere: use thousands separators everywhere;
   - `7 × 68kg` against `98 kg`: one unit spacing;
   - `55m` against `55 min`: one duration form.
+- **🔎 Confirmed on the device (sweep 64, DV gallery):**
+  - "7:35am → 8:17am" (Health → Day) against "7:35 AM" (Home timeline);
+  - "0 / 1534 kcal" beside "1,534 left" on one Home card;
+  - "2815 XP total" beside "2,815 XP" on one More card.
 - **Brand in food names:** "Uncle Tobys — Rolled oats" (Log Food) against "Rolled oats / Uncle Tobys · …" (diary). Pick one.
 
 ### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
@@ -2553,6 +2692,7 @@ which is the right shape for something that can only be validated by living with
 2. **Body Battery reads "Good · 50"** with no data behind it. The "Limited data" chip is beside it, but the headline still says Good. With no inputs, show the no-data state instead of a band.
 3. **The week strip labels every unprogrammed past day "rest".** With no program, nothing was a rest day; show a dash.
 4. **An empty rounded pill sits beside the date** in both accounts, probably the temperature chip (BF-96) rendering with no value. Render nothing until it has one.
+   - **🔎 On the device (Review sweep 64, `p23-home-warm-01`):** the pills are populated there (weather, UV and battery), and **they squeeze the date to "S…"**. The header row cannot hold the date and both pills at 384 px. Give the date its own line, or let the pills wrap below the greeting. That is the real defect; the empty pill was the web build without data.
 5. **Stray marks:** a dot between the Resting HR and Sleep rings, and a "·" glyph inside the "Limited data" chip.
 6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it, so "58" reads as a score. Add "bpm", or style it differently from the scores.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
@@ -2565,6 +2705,7 @@ which is the right shape for something that can only be validated by living with
    - Use neutral while the day is open, and reserve the warning colour for the End-of-Day review.
 2. **A taken supplement is struck through,** which reads as cancelled or deleted. Use the tick and a muted row.
 3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
+   - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
 4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
 5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
    - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
@@ -2581,6 +2722,7 @@ which is the right shape for something that can only be validated by living with
 - **Lane: B** — `app/workout/**` session card.
 - **Added:** 2026-09-26 · Review sweep 63.
 1. **"Dumbbell" is set at about twice the size of "Push".** The largest text on the card is not the thing being chosen. Make the session name the title, and the equipment or program a subtitle.
+   - **🔎 On the device (sweep 64, `p23-workout-warm-01`):** the slot holds an **icon** (a red triangle) beside "Upper", not a word. So the web build's "Dumbbell" is most likely **an icon name rendered as text** when the icon does not resolve. Check the session-icon map's fallback; that is the fix, not a hierarchy change. **Item 4 (recovery chips clipped under their label) is confirmed on the device.**
 2. **The "Recommended today" pill wraps onto two lines** at 412 px. Shorten it to "Today", or let it sit on its own line.
 3. **"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous. Write "Last done yesterday".
 4. **The recovery chips scroll under the "RECOVERY" label,** so the first chip shows clipped at the label's edge. Start the scroller after the label, or give it a fading mask.
@@ -2594,6 +2736,78 @@ which is the right shape for something that can only be validated by living with
 3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
+
+### [workouts][app-shell] RV-216 — Home says a 111-day streak and More says the best streak is 49: two `computeStreak` functions disagree
+- **Lane: A** (the formula), then **B** (Home's call site).
+- **Added:** 2026-09-26 · Review sweep 64, from DV's gallery (`p23-home-warm-01`: "STREAK 111 days"; `p23-more-warm-01`: "Best streak 49").
+- **What:** a best streak lower than the current one is impossible, and both numbers sit on screens the owner opens daily. There are two implementations with the same name:
+  - `app/session-select/compute-streak.ts` (Home, fed by `/api/streak-data`'s trained days);
+  - `lib/achievements.ts:32` (More's `lifetimeStats.bestStreak`, which applies `maxCompliantRestGapFor` the schedule).
+
+  This is exactly the *one formula, one place* class.
+- **Fix:**
+  1. Move one definition into `packages/shared/src/workout/`, and have both screens import it.
+  2. Decide which rest-gap rule is right, recording why in the entry. That is a structural call, not the owner's.
+  3. Add a test that best ≥ current for the same input.
+- **Reversal cost:** low. Both are derived at read time; nothing is stored.
+
+### [sleep] RV-217 — the Sleep contributors list shows three raw keys: "hrv", "hr", "schedule"
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts:506` (`CONTRIBUTOR_KEYS`), plus the label table behind `labelFor` (`lib/oura/contributors`).
+- **Added:** 2026-09-26 · Review sweep 64 (`t2-sleep-01`, on the device).
+- **What:** of the ten contributors:
+  - seven carry a label and a chevron ("Deep sleep ›", "REM sleep ›"…);
+  - **three render the internal key, lowercase, with no chevron**: `hrv`, `hr`, `schedule`.
+
+  The vertical spacing is also uneven: there are larger gaps before Timing and Efficiency, which look like empty rows.
+- **Fix:**
+  1. **Code-certain cause:** `CONTRIBUTOR_KEYS` maps seven component keys to the Oura vocabulary and passes anything else through (`CONTRIBUTOR_KEYS[k] ?? k`). The sleep model's `hrv`, `hr` and `schedule` components have no entry, and `labelFor` has no label for the raw keys. Add all three to both tables ("HRV", "Heart rate", "Sleep schedule"), plus a `contributor-guide.ts` entry if each should get a chevron. A test should assert every component key the model emits has a label.
+  2. Give them chevrons if they have explanations, or mark them non-tappable consistently.
+  3. Find what renders the empty gaps.
+- **Sibling sweep:** check Readiness's "What goes into this score" list for the same fall-through.
+
+### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
+- **Lane: B.** If the numbers come from different routes, the reconciliation half goes to **A**.
+- **Added:** 2026-09-26 · Review sweep 64 (`p23-nutrition-warm-01/02`, `t2-day-01`, `home-nutri` crop).
+- **What the owner sees on one day:**
+  - the Nutrition ring: **"0 OF 1,534"** (1,297 resting + 237 movement);
+  - the "Why two numbers" card: **goal 1,660, budget 1,356, a 304 gap**;
+  - the 7-day chart: **"Target: 1660 kcal/day"**;
+  - Health → Day's Energy row: **"burned 1,694", "deficit -1,694"**.
+
+  So the ring's 1,534 is neither the goal nor the budget the explainer names. It is a third target the screen never explains, and "burned" is a fourth number on the next screen.
+- **Copy bugs (code-certain once found):**
+  - "**+237 earned from movement (205 workouts · 32 steps)**" on both Home and Nutrition: 205 is kcal, and without the unit it reads as 205 workouts. Write "205 kcal workouts · 32 kcal steps".
+  - "**deficit -1,694**" is a double negative.
+  - "**0 / 1534 kcal**" beside "**1,534 left**" on the same Home card (RV-208's separator item).
+- **The 7-day chart shows 5 bars (Sun–Thu)** on a Saturday. Days with no log disappear instead of drawing as zero, so a "7-day" chart has five days.
+- **Fix:**
+  1. Settle which number the ring's denominator is, and make the explainer name that one.
+  2. Make "burned" on Day and Nutrition come from the same function.
+  3. Fix the three copy bugs.
+  4. Draw zero days.
+- **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
+
+### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
+- **Lane: B.**
+- **Added:** 2026-09-26 · Review sweep 64 (`t2-day-01`).
+1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load), not zero.
+2. **"Chest-Supported Dumbb…"** truncates the part that distinguishes it. Let the name wrap to two lines, or shrink the edit and delete icons, which take about 25% of the row twice over.
+3. The times read "7:35am → 8:17am" here and "7:35 AM" on Home. That is RV-208's item; noted here as the second device sighting.
+
+### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
+- **Lane: DV** — `scripts/device/**`, then re-capture.
+- **Added:** 2026-09-26 · Review sweep 64, reading RV-205's gallery.
+- **What:**
+  1. **Health warm 01–04 are black, and 05 is the phone's launcher.** The app was not in the foreground when those five were taken.
+     - **05 shows the owner's home screen:** apps, notification counts, a location name and a media widget. It sits in a private Artifact, so this is not a leak.
+     - But **republish the gallery without it**, and have the capture helper refuse to shoot when the app is not the foreground activity. `back()` already has that guard.
+  2. **Scroll did not move on several pushed screens.**
+     - Sleep 01–04, Readiness 01–04 and Week 01–03 are byte-identical, and so are Health 06–09 and Heart rate 01/02 and 03/04.
+     - The helper scrolls the window, but these screens scroll an inner container.
+     - Scroll the element that actually has `scrollHeight > clientHeight`, and **assert that consecutive captures differ** before labelling them `scrolled`.
+  3. **P32's five timepoints are identical on every screen.** That is consistent with "painted from cache", but it measures nothing about loading states. Re-run once with the cache cleared for those routes, which is what P32 is for.
+- **Also for the record:** P34's concern is moot on this keyboard. Samsung shows the numeric pad for `type=number` (`t2-sheet-weigh-in-01`), so the finding is only the missing `enterkeyhint` ("Go" where "Done" belongs), which RV-210 covers.
+- **Then:** re-capture Health (full length) and the pushed screens' lower sections, and append them to the same Artifact.
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
@@ -3777,6 +3991,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - keep to about 60 images a sitting;
   - use `rawTap`/`rawSwipe` rather than script focus or scroll.
   **A sitting that only finishes Tier 1 is a success. Record how far it got.**
+- **🔎 Review read the gallery (sweep 64):** findings are filed as RV-216 to RV-219, with amendments to RV-208, RV-211, RV-212 and RV-214. **Two capture faults are RV-220:** a Health set of the launcher, and scrolls that did not move. Fix those before trusting the lower sections of any pushed screen.
 - **Targets from Review sweep 63 (web build at 412 px), to confirm on the device in Tier 1.**
   Each one names the entry it confirms:
   - Home's Log tiles: the "Log" pill drawn over the icon (RV-207 item 6).
@@ -3805,9 +4020,19 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 - **The probes are P29–P41,** Part E of [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
   They use the same private-Artifact gallery channel and file naming as RV-205.
 - **Runs after RV-205's Tier 1.** P41 keeps that tier as the "before" for every design fix.
-- **Three probes change phone settings:** P29 font scale, P30 display size, and P31's battery-saver
-  half. **Ask the owner once for all three**, restore each in the same sitting, and record the
-  before and after values. The rest is read-only.
+- **✅ THE OWNER APPROVED ALL THREE, 2026-09-26 — standing, not per-sitting** (*"This is fine"*, in
+  answer to OR-176, which is removed as answered). P29 font scale, P30 display size, P31 battery
+  saver: change them, restore each in the same sitting, record before and after values. **Restore
+  first if a sitting is cut short** — a phone left on 130% font is the only real cost here. The rest
+  of the probes are read-only and never needed an ask.
+- **⚠ But the three are not equally worth the phone's time, and the owner asked why we run them at
+  all.** **P31 (battery saver) has an INVOLUNTARY trigger** — Android turns it on by itself at low
+  battery, and it throttles exactly what this app leans on: the workout rest timers, the Oura BLE
+  foreground service, and background sync. That fault will reach him whether or not he chooses it,
+  which is what makes it worth a probe. **P29/P30 have no such trigger on a single-user app.** They
+  test how the layout survives a setting only he can change, so **if he never changes font scale or
+  display size, run P31 and retire P29/P30 rather than leaving them owed.** Put that to him once and
+  record the answer here; do not keep carrying them unasked.
 - **Priority inside this entry:**
   - P39 (words and numbers) and P33 (reach) need no capture and are quick, so run them first.
   - Then P29, P32 and P34, which are the likeliest to find faults a user hits daily.
@@ -5925,7 +6150,29 @@ drift.
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
   and mark the fresh half COULD NOT CHECK.
 
-### [workouts][nutrition][platform] DV-8 — local rows stick at `pending` after the server has applied the mutation: 36 food-delete tombstones, and one older `set_logs` row
+### [workouts][nutrition][platform] DV-8 — heal the rows already stuck at `pending`, and the one `set_logs` row that is a different bug
+
+- **✅ CAUSE OF THE TOMBSTONE STRAND FOUND AND FIXED 2026-09-26**
+  (`fix/dv8-strand-on-confirm-throw`, Lane A). Not a missing confirm arm: `pushMutations` deleted
+  the **whole batch's** outbox entries and *then* ran a hundred-line per-domain mark-synced loop
+  with **no error handling anywhere in it**. One arm throwing on a local read left every row after
+  it `pending` with its outbox entry already gone — nothing retries a mutation that is no longer
+  queued, and `applyDelta` only overwrites `synced` rows. The confirm now runs first, per row,
+  guarded, and the outbox is cleared only for rows that actually confirmed. **Reproduced by a test
+  against the old order**, not inferred from the symptom.
+- **⚠ THAT FIX DOES NOT EXPLAIN THE `set_logs` ROW, and must not be read as closing it.** The
+  id-reconciliation hypothesis below stands on its own evidence and is untouched by this change:
+  an orphaned `workout_session_id` is not something a confirm-ordering bug produces. Two causes,
+  one symptom.
+- **⚠ IT ALSO HEALS NOTHING.** The rows already stranded have no outbox entry to retry, so they
+  need a sweep — **that sweep is what keeps this entry open.**
+  - **Re-queue, do NOT mark synced.** A stranded tombstone is indistinguishable from one whose
+    mutation never got queued at all (the double-failure case `getStrandedPendingWorkouts` already
+    sweeps for), so marking it synced would silently drop a delete that never landed. Re-pushing is
+    idempotent — deleting an already-deleted row is a no-op — so the safe sweep re-queues and lets
+    the normal confirm path settle it. Copy `getStrandedPendingWorkouts`, grace period included, so
+    the sweep cannot race a push still in flight.
+- **Keep:** the heal above, and the `set_logs` id-reconciliation question.
 
 - **📱 It is common, not a one-off (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Local `food_logs` holds **36 rows stuck `pending` with
   both outboxes empty — every one a delete tombstone** (`deleted_at` set), spread over 14 days from
@@ -17234,106 +17481,6 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   no bottom-anchored action row to be flush against, it is another domain, and nothing was reported
   on it — re-judge it if one is.
 
-### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
-
-- **📱 Sweep 4a, after the v1.465.62 fix (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** ③ **PASSES 3/3**: a right swipe on the row
-  closes the tray and the day stays Today. ① **still FAILS, and now has a threshold**: swipe (300 ms) then
-  a tap on Delete's own rect after **0 / 100 / 200 / 300 ms → no confirmation (8 of 8, tray left open)**;
-  after **500 ms → "Delete food log?" (2 of 2)**. A human "immediate" tap (~150–300 ms) is swallowed. ②
-  the slow tap works. Meal-list half not run (no logged meal that day).
-
-- **📱 Sweep 3 — the immediate tap FAILS (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** New harness call `rawSwipeThenTap` (one
-  `adb shell "input swipe … && input tap …"`, so the tap lands the moment the swipe ends). From a
-  verified-closed tray: the tray opens (`translateX(-64px)`) but **no confirmation, 2 of 2**. The slow
-  tap (tray open, 1.5 s, tap) opens *"Delete food log?"* every time.
-- **And a side effect:** after that swallowed tap, the next **rightward swipe on the row** (meant to
-  close the tray) moved Nutrition to **Yesterday** instead — **2 of 2**. The same swipe on a tray opened
-  normally closes it and leaves the day alone. It looks like the swallowed tap leaves the row not
-  owning the next gesture, so the page's day-swipe takes it. Meal-list half not run.
-
-- **📱 Sweep 2 (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** swipe-open then tapping the tray's own Delete worked **3 of 3**. The
-  owed variant — an immediate tap from a verified-closed tray — was not run.
-
-- **📱 PARTIAL ON THE S25, 2026-09-23 — the immediate tap is still COULD NOT CHECK.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23. Food
-  rows only (Nutrition diary). Swiped with a real `adb shell input swipe` (300 ms): a tap **~1.5 s**
-  after the swipe opens *"Delete food log?"* on the first press, four times out of four — so the slow
-  tap works. At **~0.9 s** the harness's hit-test found an **svg of the row still over the Delete
-  button's centre** and refused to dispatch, which fits the defect still being there but does not
-  prove it: the harness refuses covered taps by design. **Next sitting:** a raw `adb shell input
-  tap` at Delete's centre 100–300 ms after the swipe, on the food rows **and** the meal list.
-- **📱 Second attempt, 2026-09-23 (sitting 2) — still COULD NOT CHECK, and why, so the next try
-  does not repeat it.** Three "immediate tap" runs showed no confirmation, but **none of them is
-  evidence**: the row's tray was **already open** before the swipe (a tray left open by an earlier
-  step stays open — the row sat at `translateX(-64px)`), and the tap aimed 32 px inside the *row's*
-  right edge, which is x=271 with the tray open — the row, not Delete (x 303–367). A 1.5 s control
-  tap at that point opened *Edit Serving*, confirming it hit the row. Measured once correctly: from
-  an **open** tray, a further left swipe overshoots to −134 px and settles back at −64 px by 300 ms,
-  with Delete on top throughout. **What the next attempt needs:** a verified-closed tray first
-  (`translateX(0)`; a right swipe starting inside the navigator's 24 px edge strip does not close it,
-  and neither did a raw tap on the row), then swipe and `input tap` at **Delete's own rect** in one
-  `adb shell` call. Note the tray is `aria-hidden` while closed, so a visibility filter hides it.
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-30 · owner, confirmed on device the same day: *"if I wait a second it works."*
-- **Shipped 2026-08-31** — the tray stacks above the row while open. Hit-testing follows the
-  *animated* transform, so for the 220 ms the row spends sliding out it is still over part of the
-  tray and swallows the tap.
-- **The regression test is the part to read before touching this again** (`e2e/food-log-swipe-delete.spec.ts`).
-  Three shapes do **not** reproduce it: a long drag overshoots the resting offset and animates back
-  **rightwards**, never covering the tray; a short flick through CDP falls under `FLICK_VELOCITY` so
-  the row snaps closed; and a tap at the tray's **centre** is uncovered almost at once, because the
-  tray uncovers from its right edge first. What works is a 36 px drag (rests open on distance,
-  leaving the row short of its offset), a tap 52 px into the tray, and the transition stretched to
-  6 s so the window is wider than a protocol round-trip. Mutation-proved both ways.
-- **⚠ The `Keep:` was removed 2026-09-24 (orchestrator review of sweep 3) — this is OPEN WORK, not
-  verification debt.** It read *"the device check, and only that"*, and the title said *"fixed"*.
-  **Sweep 3 ran that check and it FAILED, 2 of 2.** With a `Keep:` the entry printed for Lane B under
-  *"shipped; only the stated residue is owed. Not new work"* — so a defect confirmed broken on the
-  device read as finished to the lane that owns the fix, **while `BF-94` sat blocked behind it**.
-  CLAUDE.md states the rule this violated: a FAILED is work, and goes back to the lane with what
-  reproduces it rather than into a `Keep:` that reads as finished.
-- **Acceptance, and the third clause is the one the old wording would have let through.** On the
-  S25, swipe and tap Delete **immediately**: ① the confirmation appears on the **first** press, on
-  **both** the meal list and the food rows; ② the slow tap keeps working; ③ **the next rightward
-  swipe closes the tray and leaves the day alone.** Sweep 3 found that after the swallowed tap the
-  next rightward swipe moved Nutrition to **Yesterday**, 2 of 2 — the row stops owning the gesture
-  and the page's day-swipe takes it. That is downstream of the same swallowed tap, so one fix may
-  clear both; **it is written as its own clause because the old acceptance text would pass with the
-  day still jumping**, which is the more alarming half for the user.
-- **Still not run: the meal-list half.** Sweep 3 covered the food rows. COULD NOT CHECK, not a pass.
-- **`BF-29`'s 2026-08-30 pass is not evidence**: it was the meal list, tapped slowly.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **the entry names no file**: it is `components/ui/swipe-actions.tsx:89-101`. `z-10` applies only once `isOpen` (`offset <= -width`), so the first tap misses during the slide.
-- **Verify: device**
-- **✅ FIXED 2026-09-25 (v1.465.62) — the raise was gated on the END of the journey, not the start.**
-  Sweep 59's read was right about the file and understated the window. `isOpen` is
-  `offset <= -width`, i.e. true only once the row has travelled the **full** tray width, so the
-  `z-10` arrived when the slide finished and everything before it was still the original bug. The
-  gate is `offset < 0` now — the tray is raised for the whole of the window in which it is visible,
-  which is the invariant that actually matters: **if you can see it, you can hit it.** `aria-hidden`
-  and `tabIndex` follow the same flag, so there is no visible-but-`aria-hidden` clickable button.
-- **⚠ THE EXISTING REGRESSION TEST PASSES ON THE UNFIXED COMPONENT, which is why this shipped once
-  and failed on the device twice.** Control-run 2026-09-25 with the fix stashed and the spec kept:
-  *"the first tap on Delete opens the confirmation, even mid-animation"* — **green**. It stretches the
-  transition and taps after the row has **rested open**, so it only ever exercised the half that was
-  already fixed. Sweep 3's tap landed before React had committed the rest-open state at all, and that
-  window is **narrower than one CDP round-trip**, so no arrangement of `tap` calls can reach it.
-- **So the new test asserts the PROPERTY instead of racing it** — *while the row is displaced at all,
-  finger still down, the tray is the topmost element over its own rect.* Timing-free, held mid-drag at
-  36 px against a 64 px tray (displaced-but-not-open, exactly where the old gate left the tray
-  underneath). It **fails** against the unfixed component and passes with the fix. It also reads the
-  row's transform before probing, because the first version of it reported *"the tray is under the
-  row"* when the truth was that the drag had never happened.
-- **The meal list is covered by construction, not by a second fix.** `SwipeActions` is shared —
-  `meal-card.tsx` and `saved-meal-card.tsx` render the same component — so there is no per-surface
-  copy to miss. Still unverified on the device there, as the entry notes.
-- **Keep: the device pass, all three clauses.** On the S25, swipe and tap Delete **immediately**:
-  ① the confirmation appears on the **first** press, on **both** the meal list and the food rows;
-  ② the slow tap keeps working; ③ the next rightward swipe closes the tray and leaves the day alone.
-  **Clause ③ is not separately fixed and is not claimed** — sweep 3 found the day jumping to Yesterday
-  only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
-  survives, it is its own entry with its own mechanism, not a re-open of this one.
-
 ### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
 
 - **Lane:** B
@@ -22735,7 +22882,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
 - **Branch:** `fix/oura-raw-device-store-visibility`
-- **Lane B.** `app/admin/oura-ble/**` + `components/oura-ble/**` only — it calls plugin-bridge methods Lane A already shipped, so it needs nothing from Lane A and can run fully in parallel.
+- **Second lane field, demoted to prose 2026-09-26 (OR-176) — and unlike PS-4's, this pair DISAGREED.**
+  It read *Lane B, `app/admin/oura-ble/**` + `components/oura-ble/**` only*, which describes the
+  console-visibility half, not this entry's work. Under first-match-wins the `Lane: A` field above won,
+  so nothing was mis-served — but the two fields named different lanes for different work, which is
+  exactly the pair `lane.js` warns a duplicate creates. **The visibility half has SHIPPED** (sweep 2
+  read both "!" warnings rendering), so there is no Lane B work left here: the bound is Lane A's.
 - **Added:** 2026-08-17 · **Placement:** above the storage-policy items because it is true and getting
   worse under every option in that plan, and it is the one that can wedge the drain (ops-doc I21,
   `SQLITE_FULL` → cursor held).
