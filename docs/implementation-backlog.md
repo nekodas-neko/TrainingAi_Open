@@ -789,6 +789,32 @@ below threshold and left in place for next time.
 - **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
   `Footprints`, unchecked against the current glyph.
 
+### [app-shell][platform] OR-176 — may Device Verification change three phone settings during a sitting? (RV-206 P29–P31)
+
+- **Lane:** O — the deliverable is a yes or no. Ungated on purpose: getting the answer IS the work.
+- **Ask: owner** — may the device agent temporarily change font scale, display size and battery saver
+  on the S25 during a sitting, restoring each before the sitting ends?
+- **Added:** 2026-09-26 · Orchestrator, splitting the ask out of RV-206, where it sat as a prose line
+  inside a `Lane: DV` entry. The Orchestrator never saw it, so nobody was tasked with asking; sitting
+  4b reached those three probes and stopped.
+- **Recommendation: yes, all three at once, and standing rather than per-sitting.** Font scale and
+  display size are the two settings most likely to break this app's layout — it is built at one
+  viewport, and `RV-209` already found 1,035 uses of text under 12 px, which is the population that
+  breaks first when a user scales text up. Battery saver is where Android throttles the timers and
+  background work the workout screen depends on. These are the faults a real user hits and nothing in
+  the sandbox can see.
+- **Why standing and not per-sitting:** a permission asked every time is a permission that stops
+  getting asked, and the probe gets skipped instead — which is what just happened.
+- **Reversal cost: about a minute, and it is his own phone.** Each is a settings toggle restored in
+  the same sitting; the agent records the before and after values. The genuine risk is not the change
+  but a sitting that ends early and leaves the phone on 130% font — so the answer, if yes, should
+  come with "restore before anything else if the sitting is cut short".
+- **The alternative, if no:** drop P29–P31 and accept that large-text, display-size and
+  battery-saver behaviour is untested on the only runtime that ships. That is a defensible call for a
+  single-user app where the user never changes those settings — **and if that is the reason, say so,
+  because it retires the probes permanently rather than leaving them owed.**
+- **When answered:** record it on RV-206 and remove this entry.
+
 ### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
 
 - **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
@@ -1338,6 +1364,37 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   take the per-panel canvas count in the SAME sitting as this long-task measurement** — one is
   useless without the other.
 
+
+### [platform][app-shell] DV-21 — health alerts schedule to a notification channel that is never created, so none of them can ever appear
+
+- **Lane: B** — `components/capacitor-native-init.tsx:157-196` creates the channels; `lib/health-alerts.ts:8,121` is the caller.
+- **Added:** 2026-09-26 · Device Verification, sweep 4b, station A row 11584 (RV-155). On the S25 the
+  only app channel present is `oura-ble-v2`; there is no `health-alerts`.
+- **Confirmed at source the same day, so the device read is not the only evidence.**
+  `capacitor-native-init.tsx` creates exactly five channels — `WORKOUT_TIMERS`, `MEAL_REMINDERS`,
+  `SUPPLEMENT_REMINDERS`, `DAY_REVIEW`, `ACTIVITY_DETECTION`. `HEALTH_ALERTS_CHANNEL`
+  (`'health-alerts'`) is not among them, and `lib/health-alerts.ts:121` schedules with
+  `channelId: HEALTH_ALERTS_CHANNEL`. On Android 8+ a notification posted to a channel that does not
+  exist is dropped by the system.
+- **So the whole feature is dead on the device, not degraded.** Illness, high-stress and low-readiness
+  alerts (ids 9300/9301/9302) have never been able to fire. `reconcileHealthAlerts` runs from
+  `sync-provider.tsx`, `computeHealthAlertActions` is unit-tested and passes, and the dedup key is
+  written — every layer above the channel looks healthy, which is why this survived: **the only
+  surface that shows the fault is the device's channel list.**
+- **The fix is a sixth `createChannel` call** beside the other five, with an `importance` matching how
+  interrupting a health alert should be. Copy the shape of the existing five rather than inventing
+  fields.
+- **⚠ A channel's importance is IMMUTABLE once Android has created it** — the Kotlin services record
+  this and both carry a `-v2` id for exactly that reason (`OuraRingService.kt:48`,
+  `ScaleBleService.kt:57`). Pick the importance deliberately in this PR; changing it later needs a new
+  channel id and a delete of the old one, on every installed device.
+- **Not established:** whether any health alert has ever been *attempted* on the device. A dropped
+  post is silent, so the absence of alerts is equally consistent with the conditions never triggering.
+  A device check after the fix should force one rather than wait for a real anomaly.
+- **The device check this OWES once built** (stated as prose, not a `Verify:` field — that field means
+  SHIPPED, and putting it on unbuilt work files the entry under "done, a look is owed"): confirm
+  `health-alerts` appears in the app's channel list, and that a forced alert posts and routes to
+  `/health/readiness`.
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
 
@@ -5869,7 +5926,7 @@ drift.
   data **only** if the owner confirms the ring key is not at stake; otherwise report the warm half
   and mark the fresh half COULD NOT CHECK.
 
-### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
+### [workouts][nutrition][platform] DV-8 — local rows stick at `pending` after the server has applied the mutation: 36 food-delete tombstones, and one older `set_logs` row
 
 - **📱 It is common, not a one-off (S25 · web v1.465.67 · APK 1.465.52 · gesture nav · sweep 4b, 2026-09-26).** Local `food_logs` holds **36 rows stuck `pending` with
   both outboxes empty — every one a delete tombstone** (`deleted_at` set), spread over 14 days from
@@ -5895,6 +5952,15 @@ drift.
   **What remains true:** the set is still `pending` locally, and the server has it — the same
   bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
 
+- **⚑ RE-SCOPED 2026-09-26 (OR-176) after sweep 4b, and the retitle is the point.** This was filed as
+  one stale `set_logs` row and read as a curiosity. It is **36 rows**, every one a `food_logs` delete
+  tombstone, spread over 14 days and still arriving — so the `set_logs` row is the oldest instance of
+  a live defect, not the defect itself. **Read the food-delete confirm arm first**; the set row is one
+  case and the harder one, and starting there is what kept this looking like a one-off.
+  **What is NOT established:** whether anything downstream reads `sync_status` in a way this breaks.
+  Nothing is lost — the server applied every one of these — so the visible cost is unbounded `pending`
+  rows and a status column that lies, which is why this sits below the auth work in the lane rather
+  than at the top of it.
 - **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
   **Second independent reproduction in sweep 4a** — a food delete left pending with **both outboxes
   empty**, which is the sync write path rather than anything the phone can answer next. Two
@@ -6002,6 +6068,10 @@ drift.
 - **Keep:** the device look — on the S25, scroll Home and confirm the caption no longer runs through
   the clock, that the scrim is absent at rest, and **how the gradient composes with
   `DynamicBackground`'s sky**, which is the one thing the sandbox cannot judge. Check both themes.
+- **⚑ The PUSHED ROUTES have no scrim — that is `DV-22`, not this entry (sweep 4b, 2026-09-26).**
+  This fix is mounted once in `tab-shell.tsx`, which covers the five tab panels and nothing pushed on
+  top of them, so `/health/sleep` still scrolls under the clock. The fix was scoped narrower than the
+  defect: nothing here regressed and nothing here needs reopening.
 
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
@@ -6168,7 +6238,17 @@ drift.
   swipes ✓ (8223), edit/delete dialogs open and cancel ✓ (5121), Sleep contributors include HR and
   schedule ✓ (10715). Not run: station C (the throwaway-supplement writes), most of B/D/E, and F.
 
-- **Lane: DV**
+- **Lane: DV** — station A is done; C, E, F and most of B/D are still owed.
+- **⚑ Station A's one FAILED row is routed (OR-176, 2026-09-26): row 11584 → `DV-21`, Lane B** —
+  `health-alerts` is scheduled to a channel nothing creates, confirmed at source, so the whole
+  health-alert feature is dead on the device. The 36 pending tombstones went to `DV-8`. Per this
+  entry's own rule a failure becomes a lane's entry rather than an edit to the Known-Issues row, so
+  **both rows stay in `projectOverview.md` untouched.**
+- **⚑ Station A's VERIFIED rows are owed to `RV-156`, and that half has NOT been done.** WAL,
+  `user_version` 40, `oura_daily` `sync_status`, saved-meals servings and the cache pair, plus
+  station B's 11343/8267/11657 and station D's 8223/5121/10715. Moving those `projectOverview.md`
+  rows to the archive is the Orchestrator's work, not DV's; until it happens the Known-Issues list
+  overstates what is unverified, which is the same drift this entry was created to fix.
 - **Added:** 2026-09-24 · Review sweep 55. The station list is §1 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](reviews/2026-09-24-sweep-55-device-verification-debt.md).
 - **Why DV has never seen these:** each lives only in a `projectOverview.md` Known-Issues row
   saying *"NOT device-verified"*, or in `docs/device-verification-queue.md`. `next-item.js` reads
@@ -6189,6 +6269,29 @@ drift.
     Known-Issues row.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
+
+### [app-shell] DV-22 — the status-bar scrim is wired in the tab shell, so every pushed route scrolls under the clock without it
+
+- **Lane: B** — `components/shell/status-bar-scrim.tsx` is mounted once in `tab-shell.tsx`; a pushed
+  route is not inside that shell, so it gets nothing.
+- **Added:** 2026-09-26 · Device Verification, sweep 4b — observed on `/health/sleep` (S25 · web
+  v1.465.67 · APK 1.465.52 · gesture nav): cards scroll under the status-bar clock with no backing.
+- **This is DV-6's defect on a surface DV-6's fix never reached.** DV-6 shipped the scrim
+  (2026-09-25, v1.465.11) and its own note says *"wired once in `tab-shell.tsx`"* — which was the
+  right call for the five tab panels and is exactly why the pushed routes have none. Nothing
+  regressed; the fix was scoped narrower than the defect.
+- **The look is already decided, so this is placement only.** The owner chose a gradient that fades
+  in on scroll rather than a solid strip (DV-6, 2026-09-23). Reuse that component and controller —
+  do not design a second scrim, and do not make each pushed screen opt in, which is the "a future
+  screen forgets" shape DV-6 deliberately avoided.
+- **Two things to establish before building**, neither of which the sweep answers:
+  ① which layout every pushed route actually shares, if any — if there is no common parent the
+  component can mount in, that choice IS the work;
+  ② whether the controller's capture-phase listener and its per-panel re-read still hold when the
+  scrolling element is a pushed page rather than one of the five panels it remembers.
+- **The device check this OWES once built** (prose, not a `Verify:` field — that field means SHIPPED):
+  scroll a pushed route (`/health/sleep` is the observed one) and confirm the scrim behaves as it does
+  on the tabs — absent at rest, faded in on scroll. Both themes.
 
 ### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
 
@@ -13899,10 +14002,12 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
   `/stats` → `stats`, `/workout` → `null`. Deleting them would have removed the palette from two
   live routes. Whether those ROUTES should exist is PS-35's owner-gated question and untouched.
 - **Reversal cost:** low throughout. No data, no migration.
-- **Verify:** device — launch from the installed icon and confirm it lands without a redirect
-  flash; and confirm the weather chip resolves or shows its `—` state rather than pulsing. **The
-  sandbox has no outbound route to `api.open-meteo.com`, so only the FAILURE path could be
-  rendered here** — the success path and the keyed cache are unit-tested, not observed.
+- **Verify:** device — **the launch half is DISCHARGED (sweep 4b, 2026-09-26):** force-stop then
+  the launcher intent lands on `/` with `redirectCount` 0, no flash. The chip resolves (18°, sweep 2).
+  **One half is still owed:** the chip's FAILURE state, which sweep 2 could not reach because the
+  cached value painted with the request blocked. **The sandbox cannot supply it either** — there is
+  no outbound route to `api.open-meteo.com`, so the success path and the keyed cache are
+  unit-tested, not observed. Reaching it needs the cache cleared first, not just the request blocked.
 - **✅ SHIPPED 2026-09-11** (`fix/ps35b-boot-and-weather`).
   [Journal](overview/history-2026-09-14-folded-1.md#2026-09-11-fix-ps35b-boot-and-weather). All four, plus the palette
   correction above.
