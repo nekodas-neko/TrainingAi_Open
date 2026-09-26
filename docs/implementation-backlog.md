@@ -2151,17 +2151,131 @@ which is the right shape for something that can only be validated by living with
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
 - **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).
+- **Needs: LB-158** — the only remaining half is ②, and it cannot be built until the barcode reaches
+  the device. See that entry.
 - **Added:** 2026-09-25 · Review sweep 61. nutrition-scan is the second-largest AI user, with 29 calls in 30 days.
 - **Photo and recipe-link scans stay on the model;** they genuinely need it. Everything below is logic-first, with the model kept as the fallback:
-  1. **Describe goes straight to the model** (`capture-actions.tsx:219-223`) and never searches the user's own foods. `store.searchFoodItems` already powers `ingredient-picker.tsx:87` and `food-list.tsx:105`.
-     - **Fix:** search saved foods (including earlier AI estimates) and saved meals first, and offer the model only when nothing matches.
-  2. **Barcode always calls Open Food Facts** (`capture-actions.tsx:250`), so a product scanned before still fails offline.
-     - **Fix:** look up the user's saved foods by barcode first.
-  3. **"Refine" with a portion correction** ("it was 300 g") calls the model again (`review-step.tsx:129`).
-     - **Fix:** parse a plain weight or serving count and rescale with the existing weight editor. Anything else still goes to the model.
-  4. **Meal plans default to inventing every meal:** `useLibrary` starts `false` (`meal-plan-setup-sheet.tsx:81`).
-     - **Fix:** default it on when the user has saved meals, so the model fills only the gaps. The route already skips the model when every slot is filled (`generate/route.ts:297-307`).
-- **Done when:** a repeat Describe or barcode for a known food works offline with no `nutrition-scan` row logged.
+- **① SHIPPED 2026-09-26** (`lane-b/rv203-food-capture-local-first`). Describe went straight to the
+  model and never looked at the user's own foods. It now offers matching saved foods and saved
+  meals above the Analyse button, from the local store (offline, whole table) and the
+  `ALL_ITEMS_KEY` list the sibling `FoodList` already seeds (the web build, which has no local
+  store). **No fetch was added** — a search-as-you-type cache key would churn, and the one route
+  that could serve it is already read by the list behind the panel.
+  - **The raw text cannot be the query.** `searchFoodItems` is `name LIKE %q%`, so *"200g chicken
+    breast with white rice and broccoli"* matches nothing as one substring.
+    `describe-search-phrase.ts` reduces a description to the food name it is about and returns
+    `null` for a composite — a multi-item meal is not a row in `food_items`, and a partial match
+    for one would be worse than none.
+  - Analyse is untouched, so a wrong phrase costs a list nobody taps.
+  - **Guarded by `e2e/rv203-describe-offers-your-own-foods.spec.ts`**, which asserts the negative —
+    the assign step is reached with **no `/api/nutrition/scan` request at all** — plus a control
+    (a two-food description must offer nothing), so a list that never rendered cannot pass it. The
+    control run against a stubbed phrase extractor fails. **It reaches the seeded-cache fallback
+    only**: `getLocalStore` is null on the web, so the source that matters is untested here.
+- **② Barcode always calls Open Food Facts** (`capture-actions.tsx:250`), so a product scanned
+  before still fails offline. **BLOCKED, and the reason is not in this entry.** The fix as written
+  — "look up the user's saved foods by barcode first" — has nothing to look it up *in*: the local
+  `food_items` table has **no `barcode` column** (`lib/sqlite/migrations.ts` `CREATE_FOOD_ITEMS`),
+  `LocalFoodItem` has no such field, and the pull delta therefore never carries one. The server has
+  it (`schema.ts:691`). That is a local SQLite version bump, which is **Lane A's alone** — filed as
+  **LB-158**. The Lane B half is then three lines at `handleBarcode`.
+- **③ SHIPPED 2026-09-26**, same branch. "Refine" with a portion correction posted the whole
+  estimate back to `/api/nutrition/scan` and asked the model to redo it; *"it was 300g"* now
+  rescales through the serving-size editor's own base snapshot, on the device, and clears the box.
+  - `portion-correction.ts` is deliberately timid, and the asymmetry is the design: **a miss costs
+    one model call, which is today's behaviour; a false positive silently rescales the user's
+    macros and nothing on screen says the model was skipped.** So no unit-less numbers, no
+    millilitres (grams are what the row stores and ml→g is a density the app does not know), and
+    nothing with a second clause — *"it was chicken thigh not breast"*, *"300g and it was fried"*
+    and *"double it"* all still go to the model.
+  - An estimate that arrived with **no serving size** has no base to scale from, so it still asks
+    the model.
+- **④ MOVED OUT to LB-159.** Meal plans default to inventing every meal (`useLibrary` starts
+  `false`, `meal-plan-setup-sheet.tsx:81`). Turning it on by default changes what every generated
+  plan contains, which is the owner's call rather than a lane's — and the off-by-default was a
+  deliberate, written choice (BF-11h, 2026-08-27), not an oversight. It is a question, so it is
+  `Lane: O`.
+- **Done when:** a repeat barcode for a known food works offline with no `nutrition-scan` row
+  logged. (The Describe half of that test passes now.)
+- **Keep:** ② above, and the device look at the new suggestion list — it renders inside the Log
+  Food sheet on the owner's daily path and the sandbox has no local store, so the offline half of
+  ① is unexercised here. **Pass test:** on the S25 in airplane mode, Log Food → Describe → type the
+  name of a food logged before → it appears under *"You already have"* and tapping it reaches the
+  assign step.
+
+### [nutrition][platform] LB-158 — the barcode never reaches the device, so an offline re-scan cannot work
+- **Lane: A** — `lib/sqlite/migrations.ts` (a local SQLite version), `lib/local-store/**`,
+  `lib/data/postgres/slices/nutrition.ts` if the pull delta needs widening.
+- **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-203 ② after finding the
+  column missing.
+- **What:** `food_items.barcode` exists on the server (`schema.ts:691`) and **nowhere on the
+  device** — not in `CREATE_FOOD_ITEMS`, not on `LocalFoodItem`, not in `foodItemRowToItem`, so the
+  pull delta drops it silently. RV-203 ② asks for "look up the user's saved foods by barcode
+  first", and there is nothing local to look up.
+- **Why it matters beyond RV-203:** a barcode is the one identifier a food row has that is exact.
+  Without it the device cannot recognise a product it has already stored, so every re-scan of the
+  same tin is an Open Food Facts round trip that fails outright with no network.
+- **Shape:** a column + local version bump, the field on `LocalFoodItem` and both mappers, the
+  server's food-item payload carrying it, and `getFoodItemByBarcode(code)` on the store. **Not a
+  Postgres migration** — the column is already there.
+- **Then Lane B:** three lines at `capture-actions.tsx` `handleBarcode` — ask the store before
+  `fetch('/api/nutrition/barcode')`, and hand a hit to `onSelectFood`.
+- **Done when:** scanning a barcode already in the user's foods resolves with no network.
+
+### [nutrition] LB-159 — should a meal plan reuse your own meals by default?
+- **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, split out of RV-203 ④.
+- **Ask: owner — when you generate a meal plan, should it start from the meals you have already
+  saved, or keep inventing new ones?** Today it invents: `useLibrary` starts `false`
+  (`meal-plan-setup-sheet.tsx:81`), and the "use my saved meals" tick is there to be found rather
+  than to be untucked. Review sweep 61 wants the default flipped; the toggle's author deliberately
+  left it off (BF-11h, 2026-08-27, reasoning: *"on changes what every generation returns, so it is
+  the user's call rather than a new default"*).
+- **Recommendation: default it ON when you have saved meals, and off when you have none.** A plan
+  built from meals you have already cooked and already like is one you are more likely to eat, the
+  macros are your real ones rather than an estimate, and the route already fills only the slots the
+  library cannot (`generate/route.ts:297-307`) — so variety is not lost, it is *filled in around*
+  what you keep. Defaulting on for an empty library would be worse than useless: it would tick a
+  box that changes nothing.
+- **Why a year out:** the saved-meal library only grows, so the value of this default rises with
+  time while the cost stays flat. Leaving it off means the library is quietly worth less every
+  month it fills up.
+- **The alternative, and what it is genuinely better at: leave it off.** It is better at
+  *discovery* — an invented plan is where new meals come from, and if you generate a plan partly to
+  be given ideas, a library-first default removes exactly the thing you wanted. It is also the
+  status quo, so it is the safe answer if you are not sure which of the two you use plans for.
+- **Reversal cost: one line, one release.** It is a default on a toggle that is on screen either
+  way, so a wrong answer is visible on the next plan and undone in the next PR. This is cheap
+  enough that "try it for a month" is a legitimate answer.
+
+### [platform] LB-160 — 34 source-scan tests hand-roll a comment stripper that eats string literals
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, found when RV-203's own
+  comments changed which half of a file a guard could see.
+- **What:** **37 `.test.ts` files** copy the same regex pair to strip comments before matching
+  source. It has the defect `scripts/lib/strip-comments.js` was written to fix (LA-64): a `/` + `*`
+  inside a STRING opens a comment for it, and it then deletes everything to the next closer.
+  `accept="image/*"` is the common trigger.
+- **Measured 2026-09-26.** 11 source files carry the trigger; **4 test→file pairs read one**, and
+  the loss is not marginal:
+
+  | test | reads | naive stripper keeps |
+  |---|---|---:|
+  | `food-image-write-paths` | `capture-actions.tsx` | 11,900 of 27,245 |
+  | `food-image-write-paths` | `meal-photo-tile.tsx` | 7,025 of 14,411 |
+  | `header-meta-row-overflow` | `session-select-content.tsx` | 57,665 of 77,106 |
+  | `bf5-week-in-review-page` | `session-select-content.tsx` | 57,665 of 77,106 |
+
+  **`food-image-write-paths` held two `.not.toMatch` assertions over a source with 56% of its bytes
+  gone** — the vacuous direction, and the one a guard cannot report. Re-run against the correct
+  stripper they still pass, so nothing was hiding behind it; what was missing was any reason to
+  believe that.
+- **Already done (RV-203's PR):** those three files plus `rv111-scanner-back-dismiss` and
+  `rv203-local-first-capture` now `require('scripts/lib/strip-comments.js')`. **34 copies remain**,
+  none of which reads a trigger file today — which is exactly how this one waited, since whether a
+  test is affected depends on the file it reads rather than on the test.
+- **Shape:** swap the remaining 34, then consider a Custom Rules step — *a test file does not
+  hand-roll a comment stripper* — since prose did not hold this and the population regrew to 37.
+  `check-comment-blindness.test.ts` is the precedent for measuring rather than judging it.
+- **Done when:** no `.test.ts` carries its own `/\*[\s\S]*?\*/` strip.
 
 ### [workouts] RV-204 — workout-review and the recap have code that already does their job; neither ran in 30 days
 - **Lane: A.** Low priority: zero calls in 30 days.

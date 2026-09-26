@@ -1,14 +1,23 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera as CameraIcon, Hash, PenLine, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
+import { FoodRow } from './food-row'
+import { portionRows, sumRows } from './saved-meal-totals'
+import { ALL_ITEMS_KEY } from './food-list'
+import { describeSearchPhrase, nameMatchesPhrase } from './describe-search-phrase'
+import { readCacheSync } from '@/lib/sqlite/cache'
+import { getLocalStore } from '@/lib/local-store'
 import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
-import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, NutritionScanResult, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelScan, type SharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { downscaleToJpegDataUrl, downscaleToThumbDataUrl, dataUrlToBlob, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
 import { rejectMealImage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
+
+/** Enough to recognise the food you meant; more than this is a list to read rather than scan. */
+const SUGGESTION_LIMIT = 4
 
 interface Props {
   onScanResult: (result: NutritionScanResult) => void
@@ -18,6 +27,20 @@ interface Props {
   onScannedSavedMeal?: (mealId: string) => void
   /** A label carrying the whole recipe (BF-57), rather than a pointer to one of the scanner's own. */
   onScannedSharedMeal?: (meal: SharedMeal) => void
+  /**
+   * RV-203 ① — what the description panel needs to answer from the user's own data.
+   *
+   * All four are optional and the suggestions simply do not render without them, because the
+   * describe flow has to keep working on a surface that has no local store (the web QA build) and
+   * for a caller that has no list to hand.
+   */
+  userId?: string
+  /** Already loaded by the parent for the list behind this panel — filtered here, never refetched. */
+  savedMeals?: SavedMeal[]
+  /** A tapped food goes where the list's own rows go: the assign step. */
+  onSelectFood?: (item: FoodItem) => void
+  /** A tapped meal opens its detail, which is where the list's meal rows go. */
+  onOpenSavedMeal?: (meal: SavedMeal) => void
   /**
    * What the screen shows when no capture is in progress — the search, the tabs and the list.
    *
@@ -63,7 +86,7 @@ async function thumbFromPhoto(previewUrl: string): Promise<string | undefined> {
  * is not a decision anyone can make before seeing the fields. The owner's decided action row calls
  * the pair `Describe or enter` for the same reason.
  */
-export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onScannedSharedMeal, children }: Props) {
+export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onScannedSharedMeal, userId, savedMeals, onSelectFood, onOpenSavedMeal, children }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [describeText, setDescribeText] = useState('')
@@ -88,6 +111,52 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
   // matters more here than elsewhere, because the scanner hides every other body child with a
   // global rule it only removes on unmount.
   useSheetBackDismiss(showBarcode, () => setShowBarcode(false))
+
+  /**
+   * RV-203 ① — the user's own foods, offered before the model is.
+   *
+   * Describe posts straight to `/api/nutrition/scan`, so a food already saved with real macros is
+   * re-estimated every time it is typed, and the flow fails outright with no network. Everything
+   * below is already on the device or already in memory: the local store answers offline, the
+   * seeded `ALL_ITEMS_KEY` list (written by the `FoodList` rendered as this component's own child)
+   * covers the web build where there is no local store, and `savedMeals` is the parent's list.
+   *
+   * **No fetch is added here on purpose.** A search-as-you-type key would churn the cache, and the
+   * one route that could serve it is already read by the list behind this panel.
+   *
+   * This only ever ADDS a shortcut. Analyse is untouched, so a phrase that finds nothing — or
+   * finds the wrong thing — costs a list nobody taps.
+   */
+  const [foodMatches, setFoodMatches] = useState<FoodItem[]>([])
+  const [mealMatches, setMealMatches] = useState<SavedMeal[]>([])
+
+  useEffect(() => {
+    if (!showDescribe) { setFoodMatches([]); setMealMatches([]); return }
+    const phrase = describeSearchPhrase(describeText)
+    if (!phrase) { setFoodMatches([]); setMealMatches([]); return }
+
+    let cancelled = false
+    // Same 250 ms as the list's own search, so typing does not run a query per keystroke.
+    const t = setTimeout(() => { void (async () => {
+      setMealMatches((savedMeals ?? []).filter(m => nameMatchesPhrase(m.name, phrase)).slice(0, SUGGESTION_LIMIT))
+
+      const seeded = readCacheSync<FoodItem[]>(ALL_ITEMS_KEY)
+      const byId = new Map<string, FoodItem>()
+      for (const f of Array.isArray(seeded) ? seeded : []) {
+        if (nameMatchesPhrase(f.name, phrase)) byId.set(f.id, f)
+      }
+      const store = userId ? getLocalStore(userId) : null
+      if (store) {
+        try {
+          // The full LIKE over every stored food, which is the half that works offline and the
+          // half that reaches past the twenty rows the seeded list holds.
+          for (const f of await store.searchFoodItems(phrase)) byId.set(f.id, f)
+        } catch {}
+      }
+      if (!cancelled) setFoodMatches([...byId.values()].slice(0, SUGGESTION_LIMIT))
+    })() }, 250)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [showDescribe, describeText, savedMeals, userId])
 
   /**
    * `imageDataUri` is the photo the user just took, downscaled to a stored thumbnail (OR-108).
@@ -359,6 +428,42 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
           />
           <p className="text-xs text-muted-foreground">Include the portion size — it is what the estimate hangs on.</p>
         </div>
+        {(foodMatches.length > 0 || mealMatches.length > 0) && (
+          /* RV-203 ①. Above the buttons rather than below them: it is an answer to what was just
+             typed, and a shortcut nobody sees until after they have committed to Analyse is not a
+             shortcut. Bounded and scrollable so it cannot push the action row off a 412 dp
+             screen. */
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              You already have
+            </p>
+            <div className="flex max-h-44 flex-col overflow-y-auto">
+              {mealMatches.map(meal => (
+                <FoodRow
+                  key={meal.id}
+                  name={meal.name}
+                  secondary="Saved meal"
+                  // One portion, which is what logging the meal writes — the same figure
+                  // `saved-meal-card` shows, through the same helper, so the two lists cannot
+                  // disagree about what a meal costs.
+                  calories={Math.round(sumRows(portionRows(meal)).calories)}
+                  showChevron
+                  onPress={onOpenSavedMeal ? () => onOpenSavedMeal(meal) : undefined}
+                />
+              ))}
+              {foodMatches.map(food => (
+                <FoodRow
+                  key={food.id}
+                  name={food.name}
+                  secondary={food.brand ? `${food.brand} · ${food.servingSizeG}g` : `${food.servingSizeG}g`}
+                  calories={Math.round(food.calories)}
+                  showChevron
+                  onPress={onSelectFood ? () => onSelectFood(food) : undefined}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         {error && <p className="text-xs text-destructive text-center">{error}</p>}
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={() => { setShowDescribe(false); setError(null) }}>Back</Button>

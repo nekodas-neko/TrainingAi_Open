@@ -561,7 +561,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           // LB-16: this IS the Log Food screen now, not a list stacked on one. `CaptureActions`
           // renders these children while idle and takes the whole screen once a capture starts, so
           // the tabs cannot be left showing behind a half-open camera.
-          <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal} onScannedSharedMeal={onScannedSharedMeal}>
+          // RV-203 ①: `userId`/`savedMeals`/`onSelectFood`/`onOpenSavedMeal` let the describe panel
+          // offer the user's own foods before the model — the same list and the same two
+          // destinations the tabs below already use, with nothing fetched for it.
+          <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal} onScannedSharedMeal={onScannedSharedMeal}
+            userId={userId} savedMeals={meals} onSelectFood={onSelectFood} onOpenSavedMeal={openDetail}>
             <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-4" />
             {listTab === 'meals' && (
               <MealListActions

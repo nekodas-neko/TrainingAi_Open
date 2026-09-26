@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { NutritionScanResult, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { sumIngredientEntries } from '@trainingai/shared/nutrition/log-food'
+import { correctedServingG, parsePortionCorrection } from './portion-correction'
 import { MacroCalorieWarning } from './macro-calorie-warning'
 
 interface EditableNutrition {
@@ -119,6 +120,29 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
 
   async function handleRefine() {
     if (!correction.trim() || refining) return
+
+    /**
+     * RV-203 ③ — a portion-only correction never reaches the model.
+     *
+     * `handleServingChange` rescales every macro from the same base snapshot the serving-size
+     * field uses, so "it was 300g" has an exact local answer; asking the model to redo the estimate
+     * produces a *different* one for no reason, costs a round trip, and fails outright offline.
+     * `parsePortionCorrection` returns null for anything that is not unambiguously a quantity, and
+     * that falls through to the model exactly as before.
+     */
+    const base = baseRef.current
+    const portion = parsePortionCorrection(correction)
+    // No base means the estimate arrived with no serving size, so there is nothing to scale from
+    // and the model genuinely knows more than this does.
+    if (base && portion) {
+      const grams = correctedServingG(portion, base.servingSizeG)
+      if (grams != null) {
+        handleServingChange(grams)
+        setCorrection('')
+        return
+      }
+    }
+
     setRefining(true)
     try {
       const context = `Previous estimate: ${value.name}${value.brand ? ` (${value.brand})` : ''}, ${value.servingSizeG}g — ${value.calories} kcal, ${value.proteinG}g protein, ${value.carbsG}g carbs, ${value.fatG}g fat.`
