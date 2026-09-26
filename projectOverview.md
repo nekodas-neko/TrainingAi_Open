@@ -2880,6 +2880,16 @@ the pg pool's SSL on and the local Postgres speaks none).
 day" as the first action of the session. If it opens, the chunk boundary was the cause; if not, that
 reading was a red herring and the entry says where to resume. Reversal is one line.
 
+### [platform] ⚠️ A vitest bug can fail a green test run; CI absorbs one per shard (LA-146, 2026-09-26)
+
+[vitest#11153](https://github.com/vitest-dev/vitest/issues/11153) is open and unfixed: a worker's
+RPC closes with a `console.*` forward in flight, so a run exits 1 reporting **zero failing tests**.
+Present in 4.1.11 **and** 5.0.0 alike (upstream measured 3/10 each; 3.2.4 is clean), so upgrading
+is not the way out. Ten sightings, two of them in one day. Since `Tests` became required it blocks the merge button, so
+`scripts/ci/vitest-retry-teardown-flake.js` re-runs a shard once on that exact signature — a real
+failure still fails, and a second occurrence in the same job fails it. **Owed: delete the wrapper
+when upstream closes the issue.** Locally the response is unchanged — just re-run.
+
 ### [platform] ⚠️ A merge went through on a FAILING required check — the merge call is not a gate (LB-134, 2026-09-23)
 
 **Read this before merging anything.** PR #1467 was squash-merged at 10:18 while its `Tests` job

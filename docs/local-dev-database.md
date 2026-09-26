@@ -72,7 +72,17 @@ Instead, a local Postgres 16 instance is set up automatically:
   - **Not reproducible on demand, but it is not rare either.** 24 controlled full runs on 2026-09-10 produced none — 8 with file-based console tracing, 8 plain, 4 with a `pnpm dev` server and 200 concurrent API requests against the same Postgres. Contention was the leading theory and did not survive that experiment. It then fired **three times in one run** on 2026-09-11, unprompted, during ordinary work. Whatever the trigger is, a controlled loop does not have it and an ordinary session does.
   - **Not the named file ALONE.** 5 solo runs of `hr-read-routes.test.ts` are clean, so it does not fail by itself — which is different from being uninvolved, per the amendment above.
   - **Not the `check-comment-blindness` interaction** (the first guess, from its unusually heavy console output): 3 paired runs, clean.
-  - **Not fixable by upgrading.** 4.1.11 is the latest 4.1.x and no 4.2 exists.
+  - **⚠ NOT fixable by upgrading — and the reason given here until 2026-09-26 was stale.** It read
+    *"4.1.11 is the latest 4.1.x and no 4.2 exists"*, which was true when written. **Vitest 5.0.2
+    now exists, and it does not help:** this is upstream
+    [vitest-dev/vitest#11153](https://github.com/vitest-dev/vitest/issues/11153), open and
+    labelled `p3-minor-bug`, where the reporter measured **3/10 runs failing on 4.1.11 and 3/10 on
+    5.0.0**, against **0/10 on 3.2.4**. It is a v4 regression that survives into v5. Downgrading to
+    3.2.4 is the only version that clears it, and this config uses `projects`, which is v4+.
+  - **Upstream has already ruled out the obvious knobs, so do not re-measure them here:**
+    `maxWorkers: 1` (still 2/10, and 5× slower), `isolate: false` (still 2/6, and it broke tests in
+    2 of 6 runs), `silent: 'passed-only'` (3/10), spying on console in a setup file (3/10), and
+    draining pending scheduled work (no effect).
   **Fourth sighting 2026-09-14 (Lane A, LA-48), and it holds the pattern on both counts.** Two
   unhandled errors in one run, both naming `lib/__tests__/hr-read-routes.test.ts`, with
   **8,665 passed / 0 failed** above them; the file then passed 31/31 alone, and the whole suite
@@ -107,8 +117,38 @@ Instead, a local Postgres 16 instance is set up automatically:
     full 1,076-file suite locally, green. The identical tree re-run clean, **seven for seven** —
     and note what that costs in CI rather than locally: the re-run is a push, so it cancels and
     restarts the 34-minute E2E alongside it.
+  - **TENTH SIGHTING, 2026-09-26 (#1687), and the RATE is what changed.** Another docs-only PR,
+    shard 1, `2496 passed | 14 skipped`, **`Errors 2`** — two unhandled errors in one run, which
+    also happened at sighting four and is not itself new. Re-ran clean: **ten for ten.** The honest
+    framing, because a first attempt at it overstated the case: this is **2 of the 3 PRs opened
+    that day** (#1679 yes, #1684 **no**, #1687 yes), *not* two consecutive. Against sightings 1–8
+    spread over several days, two in one day is still a step up — the claim is "more often than it
+    was", not "every run". That rate is what took it from a re-run tax to rank 1, and it is the
+    number to watch: if it keeps climbing, `disableConsoleIntercept` starts to look cheap despite
+    the log volume measured above.
+
   - **The run log cannot settle it, and this is the trap worth knowing.** The natural move is to grep the failing log for whatever logged last — e.g. `[pg pool] idle client error`, the one console writer that fires asynchronously outside any test's control. Its absence proves nothing: **the pending `onUserConsoleLog` IS the log that never got delivered**, so the message you are looking for is the one the failure destroys. Absence is guaranteed under every hypothesis. File-based tracing (append in a `console.*` wrapper, never through the RPC) is the only way to see it — that harness worked, it simply had nothing to catch.
-  **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too. `disableConsoleIntercept: true` would make `onUserConsoleLog` structurally impossible, and is the one candidate worth considering *if this ever becomes frequent* — it costs per-file log attribution for everyone, which is too high a price for a fault nobody can currently reproduce.
+  **Do not "fix" this by quieting console output or by setting `dangerouslyIgnoreUnhandledErrors`** — the first treats the symptom that is legible rather than the one that is broken, and the second hides real unhandled rejections too.
+
+  **`disableConsoleIntercept: true` WOULD work, and its cost is not what this file used to say
+  (measured 2026-09-26, LA-146).** It works structurally rather than probabilistically: vitest
+  installs the worker-side RPC console sender only when the option is false
+  (`if (!config.disableConsoleIntercept) await setupConsoleLogSpy()`), and that sender is the only
+  caller of `rpc.onUserConsoleLog` — so the race becomes impossible, not rarer.
+
+  The stated cost — *"it costs per-file log attribution for everyone"* — is **wrong as this repo is
+  configured**, and the real cost is worse. Measured on one probe file: with intercept ON a
+  **passing** test's `console.log` is dropped entirely, and only a **failing** test's output is kept
+  and attributed (`stdout | file > test`). So the attribution on offer is narrower than claimed.
+  What disabling it actually costs is volume: across `lib/data/postgres/__tests__/` (176 files) the
+  run log goes from **12 lines to 526**, 342 of them `[ensureSchema]`, because passing tests' output
+  stops being suppressed. Over a full shard that buries the failure you opened the log to read.
+
+  **That is why CI retries instead** — `scripts/ci/vitest-retry-teardown-flake.js` re-runs a shard
+  once, and only on this exact signature with zero failing tests and zero failing files. It cannot
+  turn a red green: a false positive costs one extra run, because a real failure recurs on the
+  retry. Every retry prints a greppable notice, so sightings keep being counted — two in one job
+  fails the job, and that is the evidence that would justify paying for `disableConsoleIntercept`.
   - **Seventh, same day: `lib/__tests__/user-account-routes.test.ts`** — a FOURTH distinct file.
     Re-run clean, seven for seven.
   - **⚠ EIGHTH, same day, and it names `hr-read-routes.test.ts` AGAIN — which the amendment above
@@ -138,6 +178,11 @@ Instead, a local Postgres 16 instance is set up automatically:
     and restarts the 34-minute E2E alongside it"*. `mcp__github__actions_run_trigger` with
     `rerun_failed_jobs` re-runs **only the failed job**, leaves every green job's result in place, and
     pushes nothing — measured here at one shard re-run, ~2 minutes, E2E untouched. Use that.
+  - **TENTH, 2026-09-26 (#1687).** Docs-only again, shard 1, `2496 passed`, **`Errors 2`**. Re-ran
+    clean — **ten for ten**. Two sightings in one day (#1679 and #1687; **#1684 in between was
+    clean**), which is a step up from the earlier spread but is **not** the "every run" a same-day
+    reading first suggested — worth stating, because over-reading the rate is how a bounded tax gets
+    treated as an emergency. `rerun_failed_jobs` turned each into ~2 minutes, no push, E2E untouched.
 
 - **Killing a suite mid-run damages the NEXT run and, worse, the working tree — measured 2026-09-10 (LA-101).** Two distinct kinds of residue survive a `pkill`, and neither announces itself:
   1. **Fixture rows.** DB tests clean up in `afterEach`/`afterAll`, which a killed run never reaches. `program-session-tombstone.test.ts` left its `LB-66 Program` row behind, and the next full run failed with `UserFacingError: A program named "LB-66 Program" already exists` — an error that reads like a bug in the program-name guard and is really a corpse from the run you killed. It then **self-heals**, because that run's own `afterEach` clears the row, so it fails exactly once and looks like a flake.

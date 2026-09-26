@@ -77,7 +77,11 @@ canonical-display-source table in the same section).
   production sleep-integrity sweep came back clean beyond one n=1 edge case (a 45-minute nap stored
   with all sleep-stage fields zeroed — noted for awareness, not filed as a bug).
 - Plans: `ls docs/superpowers/plans/*sleep*` (7 today, plus archived ones under `plans/archive/`).
-  Not matched by that glob: [`2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md) (Q-91-followup).
+  Not matched by that glob: [`2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md) (Q-91-followup),
+  [`2026-09-26-outlier-gated-rating-prompt.md`](../../superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) — the app fills
+  the sleep category and **announces** it; the owner only ever **corrects** it (answers `OR-171`; built
+  as `TN-81`/`TN-82`). Also the record of **why three in-sheet rating questions each decayed to zero**,
+  which is the thing to read before adding a fourth — the finding is that *asking* is what failed.
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
