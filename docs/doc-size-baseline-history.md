@@ -18100,3 +18100,12 @@ own and needs the device.
 The last third is what stops the row being deleted on the next sweep: an entry that says "not
 verified" without saying what would verify it never leaves. It also names the two splits
 (`LB-162`, `LB-163`) so the reader does not go looking for the other half in this diff.
+
+## 2026-09-26 — `projectOverview.md` +4 → DV-21's Known-Issues row
+
+One open-issue row for two notification channels the app posted to and never created. It is four
+lines — heading plus a single paragraph — because the detail lives on `DV-21` and in the journal
+entry; what has to survive a cold read here is only that the fix is unverified on the phone and
+what would verify it. It earns a row rather than nothing because a notification change is one of
+the surfaces the device-verification gate names explicitly, and because the symptom is silence:
+without the row, "no alerts have appeared" reads the same before and after.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.469.1",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: health alerts and the daily workout reminder could never appear on your phone. Both were being sent to a notification channel Android had never been told about, so it dropped them without a word.",
+    ],
+  },
+  {
     version: "1.469.0",
     date: "2026-09-26",
     changes: [
