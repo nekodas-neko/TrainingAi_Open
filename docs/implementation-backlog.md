@@ -939,7 +939,7 @@ below threshold and left in place for next time.
 
 ### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
 
-- **✅ SHIPPED the durable home (#PR, 2026-09-26).** `components/home/sleep-verdict-note.tsx` sits
+- **✅ SHIPPED the durable home (#1727, 2026-09-26).** `components/home/sleep-verdict-note.tsx` sits
   under the Home Sleep card and states last night's verdict: quiet for `normal`, prominent with the
   numbers first for `poor`/`good`, and a **That's wrong** control that records the disagreement and
   opens the morning check-in, where the value the correction sets actually lives (TN-57 owns
