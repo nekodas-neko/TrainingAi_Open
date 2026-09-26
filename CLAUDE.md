@@ -183,14 +183,18 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   one is not. **Measured 2026-09-20:** `main` took a commit roughly every
   8 minutes against a ~6-minute CI run, and Q-1a needed **five rebases and four refused merges** to
   land. This is a convention, not a code change, and it does not apply to implementer PRs — those
-  are already one change per PR for a reason. **⚠ The claim that `enable_pr_auto_merge` does NOT work
-  here is now STALE and is probably wrong (2026-09-26).** It failed with *"Protected branch rules not
-  configured for this branch"* — which was almost certainly the `ProtectMain` ruleset sitting at
-  Enforcement `Disabled`, the same root cause as OR-164. The ruleset is Active now and **Allow
-  auto-merge is enabled on the repository** (owner, 2026-09-26). **It has NOT been tested since**, so
-  do not record it as working either — try it, and correct this line with what happens. It is worth
-  trying: one session hand-merged five PRs and hit seven conflicts against a moving base, all of
-  which auto-merge would have absorbed.
+  are already one change per PR for a reason. **✅ `enable_pr_auto_merge` WORKS — tested 2026-09-26 on PR #1684 and it
+  enabled first try.** This line said it did **not** work, citing *"Protected branch rules not
+  configured for this branch"*; that was the `ProtectMain` ruleset sitting at Enforcement `Disabled`,
+  the same root cause as OR-164. The owner set the ruleset Active and ticked **Allow auto-merge** on
+  2026-09-26, and it has been exercised since rather than assumed.
+  **USE IT instead of hand-merging.** One session hand-merged five PRs and hit **seven** conflicts
+  against a moving base, every one of which auto-merge would have absorbed — it waits for the
+  required checks and merges the moment they pass, which is exactly the window a hand-merge loses to.
+  **One gotcha worth knowing:** `enable_pr_auto_merge` refuses on a PR that is ALREADY green —
+  *"already in clean status … auto-merge only applies when checks are pending"*. That is the tool
+  declining, not GitHub, and it is not evidence of anything being broken. Enable it **right after
+  opening the PR**, while checks are still running; on an already-green PR just merge directly.
 - **`Needs:` / `Gate:` / `Reference:` are fields, not prose.** `Needs:` names another entry and clears
   when that entry leaves the queue — **an absent target counts as shipped**, because the protocol
   removes completed entries. `Gate:` takes only `owner` or `device`. **`Reference:` marks an entry other
@@ -780,6 +784,20 @@ said nothing, because both had skipped inside it.
   headRefName`), intersect that with what is actually on the remote, and subtract open PRs and
   `main`. A naive ancestry sweep deletes nothing; an ancestry sweep "fixed" by ignoring ancestry
   deletes the closed-but-unmerged branches, which are the ones holding work that never landed.
+  **⚑ A BRANCH HAS MEANING ONLY IF IT HAS AN OPEN PR — that is the whole rule (owner, 2026-09-26:
+  *"ideally we want every branch to have meaning"*).** Auto-delete now clears merged branches, so
+  anything left over is a branch whose PR was closed unmerged, or one that never had a PR. **If work
+  on a branch is worth keeping, open a DRAFT PR** — that is the marker, it costs nothing, and it makes
+  the work visible in one list. Anything with no open PR is sweepable without asking.
+  **Do NOT use the backlog's `Branch:` field as that marker — it records a PLAN, not a fact, and it is
+  already wrong.** 199 entries carry one; audited 2026-09-26, `Q-44`'s names
+  `refactor/de-oura-identifiers` while its live branch is `lane-a/q44-phase3-pr1-table-rename`, and
+  `OR-127` and `RV-99` have live branches and no field at all. A draft PR is a fact GitHub maintains
+  and cannot go stale; a prose field is one more thing to keep in sync and it already is not.
+  **⚠ The sweep is NOT "no open PR → delete", and the audit is why.** Of 38 survivors, **four held
+  unmerged work for entries STILL IN THE QUEUE** — `OR-127` (rank 1 in `DV`), `Q-44`, `RV-99`,
+  `Q-305`. A blanket sweep discards a head start on live work. Check the branch list against queued
+  entry IDs before deleting, and open draft PRs for the matches.
   Squash-merge + auto-delete-head-branch means stale local refs break things silently — CI has failed to trigger entirely off a stale base (sessions 167, 171–173). Ritual: `git fetch origin main && git remote prune origin && git checkout -B <branch> origin/main`. If CI doesn't start, suspect a stale base and rebase before anything else. Expect `package.json`/`packages/shared/src/changelog.ts` conflicts when PRs land in parallel — resolve by re-bumping on the fresh base.
 - **Commit before you switch branches, and never `git add -A` straight after a checkout that carried changes.** `git checkout <other-branch>` with a dirty tree silently *carries the modified files across*, and the next `git add -A` sweeps them into a commit on the wrong branch. This happened **twice in one session (2026-08-08)** while working several items in parallel: Q-127's two-file change rode into Q-119's PR (#1140) and shipped under its name, so `git log` attributes it to a change it has nothing to do with. Nothing unsound merged — both files were CI-green either way — but the history is wrong and it took a revert commit plus a correction note in three documents to make honest. The habit that prevents it: **commit (or stash) before every `git checkout`**, and if a checkout prints modified paths you did not expect, run `git status` before staging anything. Prefer `git add <paths>` over `git add -A` when several items are in flight.
 - **An entry ID cannot collide across agents any more, but it still can within one role.** Each agent counts up from its own letter, so Lane A and Review cannot take the same number by construction. What no allocation scheme prevents is two sessions of the *same* role running at once and not seeing each other's unmerged PR — that has happened, and once cost a whole PR's work when two sessions ran the same compaction chore. `scripts/check-backlog-pointers.js` fails CI on a duplicate ID, so it surfaces at review rather than living in the queue; resolve one by appending a letter (the second `RV-14` becomes `RV-14a`).
