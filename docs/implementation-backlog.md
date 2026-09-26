@@ -2833,6 +2833,25 @@ which is the right shape for something that can only be validated by living with
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
 
+- **⛔ THE PROBE SPEC IS RED IN CI, AND ITS OWN MESSAGE SAYS WHAT THAT MEANS — observed
+  2026-09-26 from an unrelated PR's run, by the engine implementer.** `e2e/food-log-swipe-delete.spec.ts:220`
+  ("a tap the instant the swipe ends opens the confirmation") **failed** on CI run
+  [36236669420](https://github.com/nekodas-neko/TrainingAi_Open/actions/runs/36236669420) —
+  1 failed, 6 flaky, 240 passed — and on `#1722`'s own run
+  [36236193250](https://github.com/nekodas-neko/TrainingAi_Open/actions/runs/36236193250) before
+  it merged. It is **not** in the 6 flaky; it is the single hard failure.
+- **Which inverts the conclusion above.** That test was written to pin the half that IS ours, and
+  its failure message is *"the press right after the release was swallowed on the web path too —
+  the cause is now ours."* The entry says the web path passes at every delay. **In CI it does
+  not.** So either the harness reproduces it after all — on slower, contended runners, which is
+  the difference from a local run — or the spec is timing-sensitive in a way that makes it unfit
+  to pin anything. Both are worth knowing and neither is "flaky".
+- **⚠ It is red on `main` now**, and E2E is not a required check, so it merged and will fail on
+  every lane's PR until someone acts. Not the engine implementer's to fix — recorded on the entry that owns
+  the spec, rather than filed as a duplicate. **Whoever takes it: run it locally first.** If it
+  passes locally and fails in CI, that gap is the finding, not an obstacle to it.
+- The `DV` routing above stands; this changes what the measurement should ask.
+
 - **⚑ THE WEB PATH PASSES AT EVERY DELAY, SO THE CAUSE IS NOT IN THE SHARED JS — LANE B, #PR,
   2026-09-26. Re-laned `B` → `DV`: the next action is a measurement, not a change.** Sweep 4a's
   window (0–300 ms swallowed, 500 ms works) is **far wider than a CDP round-trip**, unlike sweep
