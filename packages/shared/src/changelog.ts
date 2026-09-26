@@ -6,10 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.466.1",
+    version: "1.468.1",
     date: "2026-09-26",
     changes: [
       "Faster: switching tabs no longer makes the day's heart-rate chart redraw itself behind the screen you just left.",
+    ],
+  },
+  {
+    version: "1.468.0",
+    date: "2026-09-26",
+    changes: [
+      "New: every cat has its own name, shown on a little tag in the Home pen. When cats merge, the new one takes a name blended from theirs, and if it ever breaks apart, the same cats come back with their own names.",
+      "New: the smallest cats walk at the front and the bigger ones further back and higher, so your best cats stand out.",
+      "New: the Collection card warns you by name when skipping today would cost a cat, and tells you who wandered off and when. The Collection screen lists every cat, the day it arrived and who it was made from.",
+    ],
+  },
+  {
+    version: "1.467.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the Collection card on Home is now a little meadow where every cat you hold wanders about, swishing its tail and blinking. Bigger cats are bigger, and anything past twelve shows as \"+N more\".",
+      "New art: every class now has a sixth, mythic tier, and each tier has a rare shiny colouring, ready for when the collection rules add them.",
     ],
   },
   {

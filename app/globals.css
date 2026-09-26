@@ -838,3 +838,32 @@ html[data-app-hidden="true"] .meteor-particle {
 .tab-panel-idle * {
   animation-play-state: paused !important;
 }
+
+/* The collection pen (BF-126 follow-up). Each cat walks between two points and back,
+   idling at both ends, and shrinks slightly as it moves up the pen (further away). Its
+   face flips halfway through a double-length cycle, which is exactly when the
+   alternating walk turns round. Transform only, so it composites. The per-cat points
+   and timings arrive as custom properties from collection-pen.tsx; the tail, paws and
+   blink are animated inside each sprite's own SVG. */
+@keyframes ta-pen-walk {
+  0%, 12%   { transform: translate(var(--pen-x0), var(--pen-y0)) scale(var(--pen-s0)); }
+  88%, 100% { transform: translate(var(--pen-x1), var(--pen-y1)) scale(var(--pen-s1)); }
+}
+@keyframes ta-pen-face {
+  0%, 49.99% { transform: scaleX(1); }
+  50%, 100%  { transform: scaleX(-1); }
+}
+.pen-cat { transform-origin: bottom center; animation: ta-pen-walk var(--pen-dur) ease-in-out var(--pen-delay) infinite alternate both; will-change: transform; }
+.pen-cat-face { animation: ta-pen-face calc(var(--pen-dur) * 2) linear var(--pen-delay) infinite both; }
+/* T5 and T6 fly: a slow bob above their shadow, so the rarest cats are the ones that catch the eye. */
+@keyframes ta-pen-fly {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.pen-fly { animation: ta-pen-fly 2.6s ease-in-out infinite; }
+.pen[data-paused="true"] *,
+html[data-app-hidden="true"] .pen * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  .pen-cat, .pen-cat-face, .pen-fly { animation: none !important; }
+  .pen-cat { transform: translate(var(--pen-x0), var(--pen-y0)) scale(var(--pen-s0)); }
+}

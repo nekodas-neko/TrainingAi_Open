@@ -1,4 +1,5 @@
 import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { spawnName, blendName, nameHash } from './names'
 
 /**
  * The cat collection (BF-122a) — a pure fold over day series the app already stores.
@@ -31,6 +32,18 @@ export interface Ladder {
 /** How many of each tier are held, indexed to match `Ladder.tiers`. */
 export type Stock = number[]
 
+/** One held cat, as the client sees it. Top level only: `from` names its parts rather than nesting them. */
+export interface CatSummary {
+  /** Stable across replays of the same history, so a client can key on it. */
+  id: string
+  tier: number
+  name: string
+  /** The day it spawned, or the day its merge completed. */
+  born: string
+  /** The names of the cats it was merged from; empty for a spawned one. */
+  from: string[]
+}
+
 export interface CollectionState {
   stock: Stock
   /** Days the input listed more than once. A faucet day spawns once however many rows it has. */
@@ -38,25 +51,41 @@ export interface CollectionState {
   /** How many decay events fired. Surfaced so a widget can say "you lost one" rather than only
    *  showing a smaller number, which reads as a bug. */
   decayEvents: number
+  /** Every held cat, biggest tier first. `stock[i]` always equals the number of tier-`i` cats here. */
+  cats?: CatSummary[]
+  /** True when skipping today would cost a cat: tomorrow is past the rest allowance. */
+  restless?: boolean
+  /** The most recent cat lost to decay, so a widget can name it rather than show a smaller number. */
+  lastLost?: { name: string; day: string } | null
 }
 
 /**
- * Merge upward as far as the stock allows.
+ * A cat inside the fold. The replay holds real cats rather than counts so each one keeps a stable
+ * identity and name, and so a breakdown gives back the SAME cats that were merged, names and all.
+ * Counts are derived from these lists, so there is still exactly one rule set, not two.
+ */
+interface Cat { id: string; tier: number; name: string; born: string; parts: Cat[] }
+type Held = Cat[][]
+
+const byBorn = (a: Cat, b: Cat) => (a.born === b.born ? (a.id < b.id ? -1 : 1) : a.born < b.born ? -1 : 1)
+
+/**
+ * Merge upward as far as the stock allows, oldest cats first.
  *
  * Repeated to a fixed point rather than one pass: five slimes making one tier-2 can complete a
  * tier-3 in the same step, and a single pass would leave the collection one merge behind its own
  * rule until the next spawn happened to trigger it.
  */
-function settle(stock: Stock, ladder: Ladder): void {
+function settle(held: Held, ladder: Ladder, day: string): void {
   let moved = true
   while (moved) {
     moved = false
     for (let i = 0; i < ladder.tiers.length - 1; i++) {
       const cost = ladder.tiers[i + 1].mergeCost
-      if (cost > 0 && stock[i] >= cost) {
-        const merges = Math.floor(stock[i] / cost)
-        stock[i] -= merges * cost
-        stock[i + 1] += merges
+      while (cost > 0 && held[i].length >= cost) {
+        const parts = held[i].splice(0, cost)
+        const id = `${ladder.faucet}-t${i + 1}-${nameHash(parts.map(p => p.id).join('.')).toString(36)}`
+        held[i + 1].push({ id, tier: i + 1, name: blendName(parts[0].name, parts[parts.length - 1].name), born: day, parts })
         moved = true
       }
     }
@@ -72,18 +101,22 @@ function settle(stock: Stock, ladder: Ladder): void {
  *   · **A big item breaks into its components, never vanishes.** Losing a Tank costs the merge, not
  *     the workouts underneath it. Progress is recoverable; the top of the ladder is not free.
  *
- * Returns false when the collection is already empty, so the caller can stop counting events for a
- * loss that did not happen.
+ * The newest loose cat is the one that leaves; a breakdown hands back the exact cats that were
+ * merged, so they return under their own names.
+ *
+ * Returns the cat lost, or null when the collection is already empty, so the caller can stop
+ * counting events for a loss that did not happen.
  */
-function decayOnce(stock: Stock, ladder: Ladder): boolean {
-  const lowest = stock.findIndex(n => n > 0)
-  if (lowest === -1) return false
-  if (lowest === 0) { stock[0] -= 1; return true }
+function decayOnce(held: Held): Cat | null {
+  const lowest = held.findIndex(t => t.length > 0)
+  if (lowest === -1) return null
+  if (lowest === 0) return held[0].pop()!
 
   // Nothing loose: break the smallest held item down one rung, then take from what that produced.
-  stock[lowest] -= 1
-  stock[lowest - 1] += ladder.tiers[lowest].mergeCost
-  return decayOnce(stock, ladder)
+  const broken = held[lowest].pop()!
+  held[lowest - 1].push(...broken.parts)
+  held[lowest - 1].sort(byBorn)
+  return decayOnce(held)
 }
 
 export interface ReplayInput {
@@ -122,7 +155,8 @@ const addDays = (d: string, n: number) => shiftDateStr(d, n)
 export function replayCollection(input: ReplayInput): CollectionState {
   const { ladder, maxRestGap, today } = input
   const paused = new Set(input.pausedDays ?? [])
-  const stock: Stock = ladder.tiers.map(() => 0)
+  const held: Held = ladder.tiers.map(() => [])
+  let lastLost: CollectionState['lastLost'] = null
 
   const distinct = [...new Set(input.days)].sort()
   const duplicateDays = input.days.length - distinct.length
@@ -140,23 +174,41 @@ export function replayCollection(input: ReplayInput): CollectionState {
     return Math.max(0, span - 1 - excused)
   }
 
+  /** The n-th day after `from` that the clock was running (not paused). */
+  const nthChargeableDay = (from: string, n: number): string => {
+    let day = from
+    for (let seen = 0; seen < n;) { day = addDays(day, 1); if (!paused.has(day)) seen++ }
+    return day
+  }
+
   const applyGap = (from: string, to: string) => {
     const over = chargeableGap(from, to) - maxRestGap
     for (let k = 0; k < over; k++) {
-      if (decayOnce(stock, ladder)) decayEvents++
+      // The k-th decay of a gap lands on the k-th day past the allowance, which is the day to name.
+      const lost = decayOnce(held)
+      if (lost) { decayEvents++; lastLost = { name: lost.name, day: nthChargeableDay(from, maxRestGap + k + 1) } }
     }
   }
 
   let previous: string | null = null
   for (const day of distinct) {
     if (previous) applyGap(previous, day)
-    stock[0] += 1
-    settle(stock, ladder)
+    const id = `${ladder.faucet}-${day}`
+    held[0].push({ id, tier: 0, name: spawnName(id), born: day, parts: [] })
+    settle(held, ladder, day)
     previous = day
   }
   if (previous) applyGap(previous, today)
 
-  return { stock, duplicateDays, decayEvents }
+  const stock: Stock = held.map(t => t.length)
+  const total = stock.reduce((a, b) => a + b, 0)
+  // Skipping today means tomorrow's gap counts today; if that is past the allowance, a cat leaves.
+  const restless = previous != null && total > 0 && chargeableGap(previous, addDays(today, 1)) > maxRestGap
+  const cats: CatSummary[] = [...held].reverse().flat().map(c => ({
+    id: c.id, tier: c.tier, name: c.name, born: c.born, from: c.parts.map(p => p.name),
+  }))
+
+  return { stock, duplicateDays, decayEvents, cats, restless, lastLost }
 }
 
 /** The three ladders, one per faucet. Constants, per the versioning note at the top of this file. */

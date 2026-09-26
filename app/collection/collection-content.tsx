@@ -8,6 +8,7 @@ import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
 import { LADDERS, STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP, type CollectionState, type Ladder } from '@trainingai/shared/collection/ladder'
 import { nextMerge, mergeLine, totalHeld, restGapSentence, FAUCET_TITLE, type FaucetKey } from '@/components/home/collection-summary'
 import { CatSprite } from '@/components/home/cat-sprite'
+import { CatRoster } from './cat-roster'
 import type { CollectionResponse } from '@/components/home/collection-card'
 
 /**
@@ -88,6 +89,8 @@ function LadderCard({ faucet, ladder, state }: { faucet: FaucetKey; ladder: Ladd
       </ul>
 
       {next && <p className="mt-3 text-xs text-muted-foreground">{mergeLine(next)}</p>}
+
+      <CatRoster faucet={faucet} ladder={ladder} cats={state.cats} />
 
       {state.decayEvents > 0 && (
         <p className="mt-1.5 text-[11px] text-muted-foreground">

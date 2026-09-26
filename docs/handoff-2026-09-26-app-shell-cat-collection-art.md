@@ -1,12 +1,13 @@
 # Handoff — 2026-09-26 · Cat collection art, and the v2 rules it is waiting for
 
 _Domain: `app-shell` (also touches `platform` for the widget, `devices` for PS-50) · Branch:
-`art/cat-collection-art` · PR: [#1694](https://github.com/nekodas-neko/TrainingAi_Open/pull/1694),
-merged by this session once CI was green, at the owner's instruction_
+`art/cat-collection-art` then `feat/collection-pen-widget` · PRs: [#1694](https://github.com/nekodas-neko/TrainingAi_Open/pull/1694)
+(merged) and the pen PR on `feat/collection-pen-widget`, merged by this session once CI was green, at the
+owner's instruction_
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > `docs/domains/app-shell/README.md`, then `docs/implementation-backlog.md` (PS-48, PS-49, PS-50,
-> BF-126). This file covers only what this one-off session did and what it leaves behind.
+> PS-51, BF-126). This file covers only what this one-off session did and what it leaves behind.
 
 ## Goal
 
@@ -82,34 +83,65 @@ and deliberately not built.
 - `pnpm typecheck:tests` cannot spawn `npx.cmd` on Windows (Node 22). Run
   `npx tsc --noEmit -p tsconfig.tests.json` and compare against the baseline instead.
 
+## Second pass, same session: the pen (v1.467.0)
+
+- **Home card = `CollectionPen`**: every held cat wandering over a backdrop scene, using the whole
+  card. Self-animating sprites (tail, paws, blink, three poses per loop), a mythic **T6** for every
+  class, a **shiny** recolour of every tier, and four **scenes** (meadow default, forest, house,
+  castle). 52 generated files, all covered by the drift test.
+- **Decided:** workout tiers 1·5·20·100·300·900 sessions; workout decay is per-user and gap-only
+  (`maxCompliantRestGap`), not a constant drain, because the owner's own rule (*"2 days of not
+  training doesnt kill any … but 3 would"*) is exactly that and it adapts to any schedule. Rares and
+  lucky procs must be pure functions of the day. All in the plan.
+- **Gotcha:** the dev browser keeps stale CSS/JS chunks, because Next dev reuses chunk filenames
+  when their content changes. It produced a no-animation render and phantom hydration mismatches.
+  Refetch chunks with `cache: 'reload'`, or use a fresh headless profile, before debugging code.
+- **Unmeasured:** the pen's frame rate with a dozen filtered, animated sprites on Samsung's WebView.
+  If it stutters, drop the rim filter from the animated group first.
+
+## Third pass, same session: named cats (v1.468.0)
+
+- **`replayCollection` now holds real, named cats** (`names.ts` + the lineage fold in
+  `ladder.ts`). The rules are the same and the counts are derived, so all prior tests pass. Merges
+  blend names; decay breaks a big cat back into the same named cats. The state gains `cats`,
+  `restless` and `lastLost`. **This touched Lane A's `ladder.ts` at the owner's request**; PS-49 is
+  told to keep the fold.
+- **Pen:** name tags, depth by tier (small in front, big further back and higher), and flying
+  T5–T6. **Card:** named restless warning and named "wandered off". **`/collection`:** a roster
+  with arrival day and parents.
+- **PS-52 (Lane O):** attachment ideas for the owner to pick from; the recommended three are a named
+  nudge notification, merge moments and anniversaries.
+
 ## Open questions / blockers
 
-- **PS-48 (Lane O, #1 in O's READY list):** ② the Rogue's cardio unit and drain, ③ the tier-5 cap,
-  and ④ re-scoring history from scratch. ① was answered in-session: the Health cat.
+- **PS-48 (Lane O, #1 in O's READY list):** ② the Rogue's cardio unit and drain, and ④ re-scoring
+  history from scratch. ① (the Health cat) and ③ (six tiers) were answered in-session.
+- **PS-51:** which title unlocks which scene. The proposal is in the entry; it is the owner's call.
 - **BF-126 `Verify: owner`:** does the drawn cat read better than the emoji on the S25?
 
 ## Pickup prompt
 
 ```
 You are picking up the cat collection work after the art session of 2026-09-26. Everything from
-that session is merged to main (PR #1694, v1.466.0).
+that session is merged to main (#1694 v1.466.0, #1706 v1.467.0, and the named-cats PR v1.468.0).
 
 Read in order:
   1. projectOverview.md — the "collection cats are drawn now" Known-Issues row
   2. docs/domains/app-shell/README.md
   3. docs/handoff-2026-09-26-app-shell-cat-collection-art.md
   4. docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md
-  5. docs/implementation-backlog.md — PS-48, PS-49, PS-50, BF-126 (grep for them)
+  5. docs/implementation-backlog.md — PS-48, PS-49, PS-50, PS-51, PS-52, BF-126 (grep for them)
 
-If you are the Orchestrator: first action is PS-48 — put its three remaining questions (Rogue cardio
-rate, tier-5 cap, re-score history) to the owner in the "Decisions That Come Back To Me" shape, and
+If you are the Orchestrator: first action is PS-48 — put its two remaining questions (Rogue cardio
+rate, re-score history) to the owner, plus PS-51's title→scene mapping and PS-52's pick, in the "Decisions That Come Back To Me" shape, and
 record the answers in PS-48 and the plan. Also route BF-126's owner look into his next S25 sitting.
 
 If you are Lane A: PS-49's steps, workout and Health-cat halves can start now; only the cardio
-faucet waits on PS-48. Before merging, replay the owner's production history under v2 and put his
+faucet waits on PS-48. The workout ladder needs only new LADDERS constants (six tiers, costs
+5·4·5·3·3) — v1's gap-only decay is already the owner's rule. Before merging, replay the owner's production history under v2 and put his
 resulting cat counts in the PR — he asked for that explicitly. Bump COLLECTION_RULES_VERSION to 2;
-no migration is needed (the collection is replayed). Use CatSprite for five tiers — it already
-renders them.
+no migration is needed (the collection is replayed). CatSprite and CollectionPen already render six
+tiers and shinies; add a `shiny` flag to the route's payload when the rares land.
 
 Constraints: dark theme only; nothing here is device-verified; /cats/*.svg is behind the auth
 middleware (PS-50 must bundle the art in the APK); edit the art only through

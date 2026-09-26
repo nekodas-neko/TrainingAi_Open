@@ -131,6 +131,26 @@ const radiantHalo = p => `
   <path d="M46 10 C54 8 62 7 68 7" fill="none" stroke="#fff6cf" stroke-width="1.8" stroke-linecap="round"/>
   <circle cx="64" cy="38" r="4" fill="${GOLD}" ${o(2.5)}/>`
 
+// ---------- Tier 6 · mythic ----------
+// Everything T5 has, plus a two-ring aura, more stars, and one signature piece per class.
+const mythicAura = (id, a, b) => `
+  <defs><radialGradient id="myth-${id}" cx="50%" cy="55%" r="50%">
+    <stop offset="0" stop-color="${a}" stop-opacity=".75"/><stop offset=".45" stop-color="${b}" stop-opacity=".35"/><stop offset="1" stop-color="${b}" stop-opacity="0"/>
+  </radialGradient></defs>
+  <circle cx="64" cy="70" r="64" fill="url(#myth-${id})"/>
+  <circle cx="64" cy="70" r="56" fill="none" stroke="${GOLD}" stroke-width="1.6" stroke-dasharray="2 7" opacity=".7"/>
+  ${star(12, 26, 7, a)}${star(116, 18, 6, GOLD)}${star(8, 92, 5, '#fff')}${star(122, 58, 5, a)}${star(20, 60, 3.5, GOLD)}${star(112, 100, 4, '#fff')}`
+const tankHelmetGold = tankHelmet.split(STEEL).join(GOLD).split(STEEL_D).join(GOLD_D)
+const horns = `<path d="M42 30 C28 26 20 14 24 3 C30 14 38 19 48 22 Z" fill="#f4ecd8" ${o(3)}/>` +
+  `<path d="M86 30 C100 26 108 14 104 3 C98 14 90 19 80 22 Z" fill="#f4ecd8" ${o(3)}/>`
+const spiritBow = p => `<path d="M28 26 C-6 50 -6 102 28 126" fill="none" stroke="#7fe3ff" stroke-width="12" stroke-linecap="round" opacity=".28"/>` +
+  bow(p, true).split(WOOD).join('#7fe3ff')
+const antlers = `${line('M44 22 C38 12 38 6 42 2 M41 12 L34 8', WOOD, 3)}${line('M84 22 C90 12 90 6 86 2 M87 12 L94 8', WOOD, 3)}`
+const glowDagger = (p, x) => `<ellipse cx="${x}" cy="78" rx="8" ry="20" fill="${p.C}" opacity=".35"/>` + dagger(p, x)
+const smoke = p => `<g fill="${p.C}" opacity=".35"><ellipse cx="30" cy="120" rx="16" ry="5"/><ellipse cx="98" cy="121" rx="18" ry="5"/><ellipse cx="64" cy="124" rx="26" ry="4"/></g>`
+const bigWing = `<g transform="translate(-4 -8) scale(1.07)">${wing}</g>`
+const starOrbStaff = p => staff(p, true) + star(106, 26, 13, GOLD) + `<circle cx="106" cy="26" r="5" fill="#fff"/>`
+
 // tier -> { gearBack, gearHead, gearFront }
 export const GEAR = {
   tank: [
@@ -139,6 +159,7 @@ export const GEAR = {
     p => ({ gearHead: tankHelmet + tankPlume(p), gearFront: breastplate(p) + sword(p) + roundShield(p) }),
     p => ({ gearBack: cape(p.D), gearHead: tankHelmet + tankCrest(p), gearFront: breastplate(p) + sword(p) + towerShield(p) }),
     p => ({ gearBack: aura('tank', '#ff7a6a') + cape(p.D), gearHead: tankHelmet + tankCrown(p), gearFront: breastplate(p, true) + sword(p) + towerShield(p, true) }),
+    p => ({ gearBack: mythicAura('tank', '#ff9a7a', '#f2c14e') + cape(p.C), gearHead: tankHelmetGold + horns + tankCrown(p), gearFront: breastplate(p, true) + sword(p) + towerShield(p, true) }),
   ],
   ranger: [
     p => ({ gearHead: rangerHood(p) }),
@@ -146,6 +167,7 @@ export const GEAR = {
     p => ({ gearBack: quiver(p), gearHead: rangerHood(p), gearFront: jerkin(p) + bow(p) }),
     p => ({ gearBack: cape(p.D) + quiver(p), gearHead: rangerHood(p) + feather, gearFront: jerkin(p) + bow(p, true) }),
     p => ({ gearBack: aura('ranger', '#8ef09a') + cape(p.D) + quiver(p), gearHead: rangerHood(p) + feather + laurel(), gearFront: jerkin(p) + bow(p, true) }),
+    p => ({ gearBack: mythicAura('ranger', '#9dfbb0', '#7fe3ff') + cape(p.D) + quiver(p), gearHead: rangerHood(p) + antlers + laurel(), gearFront: jerkin(p) + spiritBow(p) }),
   ],
   rogue: [
     p => ({ gearHead: rogueMask(p) }),
@@ -153,6 +175,7 @@ export const GEAR = {
     p => ({ gearHead: rogueMask(p), gearFront: vest(p) + dagger(p, 106) + dagger(p, 22) }),
     p => ({ gearBack: cape('#4b2f86') + scarf(p), gearHead: rogueMask(p), gearFront: vest(p) + dagger(p, 106) + dagger(p, 22) }),
     p => ({ gearBack: aura('rogue', '#b98cff') + cape('#4b2f86') + scarf(p), gearHead: rogueMask(p) + circlet(p), gearFront: vest(p) + dagger(p, 106) + dagger(p, 22) }),
+    p => ({ gearBack: mythicAura('rogue', '#c9a3ff', '#5a3399') + cape('#4b2f86') + scarf(p) + smoke(p), gearHead: rogueMask(p) + circlet(p), gearFront: vest(p) + glowDagger(p, 106) + glowDagger(p, 22) }),
   ],
   cleric: [
     p => ({ gearHead: clericHalo(p) }),
@@ -160,5 +183,6 @@ export const GEAR = {
     p => ({ gearHead: clericHalo(p), gearFront: robe(p) + staff(p) }),
     p => ({ gearBack: wing + mirror(wing), gearHead: clericHalo(p), gearFront: robe(p) + staff(p, true) }),
     p => ({ gearBack: aura('cleric', '#ffd86a') + wing + mirror(wing), gearHead: radiantHalo(p), gearFront: robe(p) + staff(p, true) }),
+    p => ({ gearBack: mythicAura('cleric', '#fff1b0', '#ffd86a') + bigWing + mirror(bigWing), gearHead: radiantHalo(p), gearFront: robe(p) + starOrbStaff(p) }),
   ],
 }
