@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-26 — CLAUDE.md → 1028 (two repository settings that were wrong, and the squash-merge trap)
+
+Growth in the file that most needs restraint, and it buys the removal of two false premises rather
+than new prose. CLAUDE.md asserted **auto-delete-head-branch was on** (it was off for the repo's whole
+history — 1,562 branches had accumulated) and asserted **`enable_pr_auto_merge` does not work** (that
+was the `ProtectMain`-was-`Disabled` signature, the same root cause as OR-164). The first is corrected
+outright; the second is marked STALE rather than flipped, because enabling the checkbox is not
+evidence it works and this passage has now been wrong in both directions three times in two days.
+
+Most of the 17 lines are the trap, which is the part a future session would otherwise rediscover
+expensively: **`git branch --merged` reported 3 merged out of 1,562**, because squash-merge means a
+merged branch's tip is never an ancestor of `main`. A cleanup keyed on ancestry deletes nothing; one
+"fixed" by ignoring ancestry deletes the 28 closed-but-unmerged branches that hold unlanded work.
+
 ## 2026-09-25 — backlog → BF-92's consent recorded as a runnable device check
 
 The owner approved throwing one deliberate client-side error in production to prove Sentry receives
