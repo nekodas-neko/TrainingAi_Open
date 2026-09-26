@@ -1,12 +1,9 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
-import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Footprints, TrendingUp, Info, Check } from 'lucide-react'
 import type { RunType } from '@trainingai/shared/running/types'
-import { readCacheSync, setCached } from '@/lib/sqlite/cache'
-import { todayInTz } from '@trainingai/shared/date-utils'
 
 export interface RunPrescription {
   type: RunType
@@ -34,7 +31,6 @@ interface Props {
 }
 
 function PrescribedRunCardImpl({ prescription, gateAction, gateReasons, isPushSession, onStart }: Props) {
-  const tz = useUserTimezone();
   const { type, durationMin, distanceKm, targets, rationale } = prescription
 
 
