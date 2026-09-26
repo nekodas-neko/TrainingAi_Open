@@ -174,8 +174,13 @@ Lane B. (Device Verification owns `scripts/device/**`, its own harness.)
   handed to a lane while the rest of the sitting continues.
 - **A filing sweep ships as ONE PR, not one PR per entry** (owner decision, 2026-09-22). BugFix,
   Review and Tuning write their findings in bursts — review sweep 53 was twenty entries — and every
-  PR touches `docs/doc-size/docs/implementation-backlog.md.size`, so N PRs from one sweep is N-1
-  guaranteed conflicts on a single line. **Measured 2026-09-20:** `main` took a commit roughly every
+  PR edits `docs/implementation-backlog.md`, so N PRs from one sweep is N-1 chances to conflict in
+  the same file. **⚠ The single-line mechanism this rule used to cite is GONE, and the rule stands
+  anyway (LA-129, 2026-09-25):** every such PR also had to raise
+  `docs/doc-size/docs/implementation-backlog.md.size`, which made the conflict *guaranteed* rather
+  than merely likely. That baseline no longer exists — the backlog is reported by
+  `check-doc-index-size`, not ratcheted — so the guaranteed collision is removed and the ordinary
+  one is not. **Measured 2026-09-20:** `main` took a commit roughly every
   8 minutes against a ~6-minute CI run, and Q-1a needed **five rebases and four refused merges** to
   land. This is a convention, not a code change, and it does not apply to implementer PRs — those
   are already one change per PR for a reason. **Note `enable_pr_auto_merge` does NOT work on this
