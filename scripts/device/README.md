@@ -351,3 +351,16 @@ was the reading, not the connection:
   raises "Leave workout?". Press **Stay**, never *Leave*, and leave with `go()` instead.
 - **Read the active panel, not the document** — `document.querySelector('header')` returns
   whichever tab's header comes first. Scope to `[data-tab-active="true"]`.
+
+### Sweep 4a's lessons (2026-09-26)
+
+- **A force-stop leaves the dead process's DevTools socket listed.** `findSocket` used to pick the
+  numerically largest `webview_devtools_remote_<pid>`, and pids are not monotonic, so every attach after
+  a cold start timed out. It now prefers the socket that matches `pidof com.trainingai.app`.
+- **With gesture navigation on, a raw swipe that starts at x < ~24 px is Android's back gesture.** A
+  close-swipe computed from a row that was already translated (x = −47 + 60 = 13) navigated to Home twice.
+  Start every raw swipe at x ≥ 100.
+- **Screencast latency needs a still screen.** The dynamic background's animations send frames on their
+  own, so "first frame after the tap" can land before the tap. Turn the background off for P24.
+- **A text match on a card can match its own description.** Watch the result element itself, not the
+  card's whole text.

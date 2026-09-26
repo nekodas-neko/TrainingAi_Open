@@ -106,6 +106,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   session_periodization: { kind: 'user_id' },
   set_hr_stats: { kind: 'user_id' },
   sleep_sessions: { kind: 'user_id' },
+  sleep_verdicts: { kind: 'user_id' },
   step_live_windows: { kind: 'user_id' },
   supplement_logs: { kind: 'user_id' },
   supplement_vials: { kind: 'user_id' },

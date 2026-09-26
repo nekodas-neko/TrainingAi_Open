@@ -3187,22 +3187,6 @@ a Capacitor channel Playwright cannot fire.** Pass tests: on the S25, Cardio →
 screen leaves `/workout?session=…`. Detail:
 [`2026-09-25-lane-b-back-gesture-sitting`](docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lane-b-back-gesture-sitting).
 
-### [nutrition][platform] ⚠️ "kcal left" now subscribes to the post-push invalidation — NOT device-verified, and the device is where it failed three times (BF-177, 2026-09-25, v1.465.57) · needs: device
-
-The card's refetch fired at the **local** write and reached the server ~60–70 ms before
-`POST /api/sync/push` did, so it re-cached the pre-log figure and the number sat wrong until the
-user left the tab and came back — the owner's report, traced on the S25 with response bodies
-(857 · push · 846, the correct answer belonging to somebody else's request). Three fixes each added
-another one-shot refetch and the device failed each time; the web path awaits its POST, which is why
-the e2e spec stayed green throughout. `log-food.ts` was already invalidating a second time *after*
-the push — nothing was listening. `use-energy-balance-refetch.ts` now subscribes to
-`energy-balance:` and refetches the day on screen, and takes that date as a required argument so the
-subscription is live before the hook's first fetch. **Exercised against `pnpm dev`, the suite and
-the gate only: native SQLite, the outbox push and Samsung's WebView are the whole mechanism here and
-none was run.** Pass test: log a food on the S25, "kcal left" changes within 3 s without leaving the
-tab. Detail:
-[`2026-09-25-lane-b-bf177-balance-subscribes`](docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lane-b-bf177-balance-subscribes).
-
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 
 The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,

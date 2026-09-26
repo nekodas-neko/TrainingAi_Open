@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **284** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **286** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v40** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -556,131 +556,6 @@ below threshold and left in place for next time.
   entry IDs. **Never use `git branch --merged`** — it reported 3 of 1,562.
 
 
-### [devices][platform][app-shell] OR-127 — drive the real APK over USB, so the three check classes no sandbox can reach become testable
-
-- **Lane: DV** — **re-laned from `O` on 2026-09-25**, when the owner asked which `O` entries belong to
-  the device agent. This is the definition of a DV task: a measurement **nobody has taken**, with an
-  objective pass/fail (*does `probe.js` connect to the S25 and return?*), on hardware only that agent
-  has. Superseded field, demoted to prose so it cannot route this entry: it read *“Lane O —
-  `scripts/device/**`”*. **Added:** 2026-09-22, owner-requested.
-- **⚠ It sat in `O` behind a `Keep:` that reads as finished, which is the trap CLAUDE.md names.** The
-  harness SHIPPED, so the entry looked done-with-residue — but **the residue IS the test**, and until
-  a phone answers, nothing here is verified, including that it connects at all.
-- **This outranks the rest of the device work.** The three check classes no sandbox can reach are
-  blocked on this harness working, so the sittings that would clear ~109 owed checks all depend on
-  it. **Run `probe.js` first**, before any sitting is planned around it.
-- **✅ THE HARNESS SHIPPED** (`scripts/device/cdp.js`, `probe.js`, `README.md`). **⚠ It has NEVER
-  been run against a device** — no sandbox in this project has `adb` or a phone, so every line was
-  reasoned from the protocol rather than observed. **The first run on the S25 is the test**, and
-  what it takes to make it connect is the finding worth writing down.
-- **The `Keep:` field is REMOVED, 2026-09-25, and that is the point of the re-lane.** It read *"Keep:
-  the first real run, and the fix it will probably need"* — which buckets the entry under
-  *shipped, residue owed* and keeps it out of any lane's READY list. The first real run is not
-  residue; it is the entire remaining task, and it now sits in DV's work list where someone will pick
-  it up.
-
-**Why it is worth building.** `playwright.config.ts` states its own ceiling: *"it drives the web
-build, where `getLocalStore` returns null... A green run is evidence about the web path only."*
-Three classes of check are unreachable as a consequence, and they are precisely the ones the
-backlog is full of:
-
-| class | why no sandbox reaches it |
-|---|---|
-| offline-first reads | `getLocalStore` returns null off the APK, so the device branch never runs |
-| safe-area clearance | `env(safe-area-inset-bottom)` is `0` in desktop Chromium — the floored-utility rule is uncheckable |
-| what is painted | the Samsung WebView compositor is where the SVG/gradient faults live |
-
-Plus the one `back-gesture-sitting` exists for: **the Android system back**, which Playwright
-cannot fire because it arrives over a Capacitor channel. `adb shell input keyevent 4` is the real
-thing.
-
-- **It is already possible — checked, not assumed.** `MainActivity.java:519` calls
-  `setWebContentsDebuggingEnabled(true)`, gated on the manifest's debuggable flag, and the APK is
-  built with `assembleDebug`. The installed app is inspectable now; nothing needs rebuilding.
-- **Raw CDP rather than `chromium.connectOverCDP`, and this is the decision to revisit first.**
-  connectOverCDP would be less code and would let the **existing `e2e/` specs run unchanged against
-  the device**, which is a far bigger prize than any bespoke check. It was not taken because it
-  needs a *browser* target and an Android WebView commonly exposes only page targets
-  (`/json/version` with no `webSocketDebuggerUrl`) — shipping a harness that might not connect at
-  all was the worse risk from a sandbox that cannot test either path. **Once a device confirms the
-  forward works, try connectOverCDP against the same port before writing a second bespoke check.**
-- **⛔ Do not add a coordinate tap that skips the actionability assert.** `session.tap` scrolls the
-  element into view and requires `elementFromPoint` to land on it before dispatching. BF-165 paid
-  three rounds of confident wrong conclusions for that: two controls below the fold on a 412x915
-  viewport took taps that hit nothing, and *"both failures share the `/activity` prefix"* read as a
-  real differential when it was a coordinate artifact.
-- **⚠ Gesture navigation must be on** or every safe-area reading is meaningless — three-button
-  navigation reports a bottom inset of `0` and a broken clearance looks correct.
-- **`record.js` exists because a screenshot has no time in it, and that was a gap in the first
-  draft** (added the same day, on the owner pointing at `chrome://inspect`'s mirrored screen). That
-  mirror is `Page.startScreencast` plus `Input.dispatchTouchEvent` — this same protocol. The picture
-  is for a human to watch; what it has that a still frame does not is **milliseconds**, and the
-  whole `motion-polish` batch is timing questions: **RV-74** (does the ring finish with the number
-  or 600 ms before it), **RV-75** (300 ms or the stock 500 — and `duration-250` compiled to nothing
-  because it is not a Tailwind class, which only a measurement finds), **RV-72** (a compositor
-  property or a layout one). Frames are written named by their offset from the start.
-  **⛔ Read the timestamps, never the frame count** — the phone drops frames under load, so a sparse
-  recording reads as a fast transition and is not one. `record.js` prints the longest gap for
-  exactly that reason.
-- **What this does NOT license, and it is the part most likely to be overread.** A pass here is
-  evidence about one screen, one orientation, one navigation mode, on one phone. It does not reach
-  anything needing the owner physically present, or any *"does this feel instant"* judgement.
-  **⚠ The ring and the scale are NOT in that list — the first draft of this entry wrongly put them
-  there, corrected the same day.** This drives the app on *the phone they are paired to*, so every
-  app-side BLE surface is reachable: what the pipeline ingested, what the admin consoles read,
-  whether a sync button does anything. That is most of the `devices` group and all of
-  `admin-console-sitting`. The limit is on making the hardware **produce** — wearing the ring
-  overnight, waking a radio that is power-gating, standing on the scale — not on reading it. **Automatable is not the
-  same as owed:** these are behavioural checks, and a large share of the 104 device checks are
-  look-and-feel, where an automated pass is the weakest evidence. Expect it to clear the
-  unambiguous ones and leave a shorter, harder list - not an empty one.
-- **This does not retire the device-verification gate**, and no Known-Issues row may cite it as a
-  substitute. It narrows what the gate has to cover.
-
-**The order to work the 104 in, decided 2026-09-22 rather than put to the owner** (their standing
-instruction: structural questions are the agent's). **Not by group size — by how unambiguous the
-answer is.** A check whose result is a number or a boolean is worth ten whose result is an opinion.
-
-1. **Prove the pipe.** `probe.js`, once. It is the only step that needs the owner, and everything
-   else is worthless until it passes.
-2. **Try `connectOverCDP` against the same forwarded port, BEFORE writing a single bespoke check.**
-   If it attaches, the ~100 existing `e2e/**` specs run against the real device with the config
-   change and nothing else — which is a multiplier no amount of hand-written checks matches. If it
-   refuses (an Android WebView commonly exposes no browser target), that is a one-line finding and
-   the bespoke path continues. **This is the highest-leverage unknown in the whole plan; resolve it
-   first.**
-3. **Offline-first reads.** Binary, mechanical, and *currently untestable anywhere* — `getLocalStore`
-   returns null off the APK, so these have never been exercised. Highest value per check.
-4. **Safe-area clearance, as one sweep rather than N checks.** Walk every bottom-anchored action row
-   and assert computed bottom padding ≥ the measured inset. That is one spec clearing a whole class,
-   and the floored-utility rule it enforces has never been checkable at all.
-5. **Devices and the admin console** — `devices` (10) plus `admin-console-sitting` (7). Reachable
-   for the reason the correction above records: this is the phone the ring and scale are paired to.
-   Mostly *"does this button do anything"*, which is binary.
-6. **`motion-polish`, via `record.js`.** Measurable: does the ring finish with the number, is the
-   sheet 300 ms or the stock 500.
-7. **Everything look-and-feel stays the owner's.** Automation is the weakest evidence for exactly
-   those, and pretending otherwise is how a green run starts meaning less than it says.
-
-- **How a session that is not on the owner's machine reviews the app — decided 2026-09-22, owner's
-  question.** It cannot see the phone, and screenshots pasted by hand do not scale past a handful.
-  **The channel is git:** `tour.js` walks a set of screens, captures each, and writes a folder; that
-  folder is committed to a scratch `device-captures/<date>` branch and pushed; the reviewing session
-  pulls it and reads it. The branch is **deleted once read** and never merges — this puts images in
-  a repository, which is a cost accepted only because it is bounded and auditable.
-  - **The digest is the part that matters, not the image.** Each screen carries a DOM summary taken
-    *in the page*: the real route, the active tab, visible error text, the button count, whether the
-    page scrolls horizontally, and the lowest action row's computed bottom padding against the
-    measured inset. **A remote reviewer pays for every image and reads text for free**, and most
-    *"is this feature working"* questions are answerable from the digest alone.
-  - Alternatives rejected: pasting screenshots by hand (works, does not scale, and is what prompted
-    the question); a live view (impossible — the reviewing session is a container with no path to a
-    USB device).
-- **⛔ A device result that does not name its screen, orientation and navigation mode is not a
-  result.** `probe.js` prints the path for that reason. Three-button navigation alone silently
-  invalidates every clearance reading in step 4.
-
-
 ### [devices] OR-172 — the Oura BLE path is the OWNER'S setup, not a product feature
 
 - **Lane: O** · **Added:** 2026-09-25 · from the owner's answer closing `OR-160`.
@@ -818,40 +693,45 @@ answer is.** A check whose result is a number or a boolean is worth ten whose re
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [sleep][platform] TN-81 — the verdict, the snapshot, and the three response states
+### [sleep][platform] LA-149 — the sleep verdict is stored but nothing announces it yet
 
-- **Lane: A** — `packages/shared/src/health/**`, `lib/data/postgres/**` (migration). **Added:** 2026-09-26.
-- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) · answers `OR-171`.
-- **Why it matters beyond one prompt:** Tuning has no validated outcome variable. `TN-73` produced the
-  only working instrument in the project and five other validation attempts failed for want of a
-  label. This is the cheapest label available, which is why the storage half is worth getting right.
-- **The measurement that sets the hard requirement:** `sleep_sessions` holds **119 rows for the last
-  120 days** — `duration_hours` on all 119, `average_hrv_ms` on 102 — and **`sleep_score` is non-null
-  on 0 of them.** The score is computed on read, never persisted. So **the verdict and the values
-  behind it must be snapshotted**: store only the outcome and a later scoring change rewrites what each
-  correction was disagreeing with, and the corrections decay into noise with no signal that it
-  happened. A correction whose paired verdict is not pinned is not evidence.
-- **Build:** **per-component** rolling median/IQR baselines (duration, onset time, efficiency) with a
-  minimum-coverage guard — 28 nights needs 28 nights, `temperature-baseline.ts` is the in-repo
-  precedent. The owner named the inputs (*"sleep was later; or short"*), so the gate reads components
-  rather than only a composite: a night of normal duration that started two hours late is strange, and
-  a composite averages that away. Verdict is `normal | poor | good` **plus which components triggered
-  it**, because the reason is what gets announced and a verdict with no stated cause cannot be argued
-  with. Persist the verdict, the component values behind it, the bands, and the response state
-  (`none | acknowledged | corrected`).
-- **Hard constraint, and it is `TN-57` verbatim:** the auto-filled value writes **`touched: false`**;
-  **only a correction writes `touched: true`** and the owner's value. That one rule is the whole
-  difference between "the app's guess" and "his answer", and every analysis downstream rests on it.
-  `sleep_quality_feel_touched` exists because `sleep_quality` was defaulted to `'ok'` for 91 days and
-  two surfaces read that default back as the owner's answer. **Never infer a label from an announcement
-  he did not respond to.** Coverage: `lib/__tests__/tn57-untouched-scales-are-not-answers.test.ts`.
-- **Migration ships its regenerated `claude_ro` twin in the same PR**, and the two TCP-`DATABASE_URL`
-  tests run before pushing (they skip under the full suite).
+- **Lane: A** — `app/api/**`, the morning check-in read path. **Added:** 2026-09-26, shipping TN-81.
+- **Needs:** — (TN-81 shipped; this is its other half)
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- TN-81 landed the computation (`sleep-verdict.ts`), the table (`sleep_verdicts`, migration 284) and
+  the repository methods. **Nothing calls them**, deliberately — the plan ships the engine half
+  first, and the announcement's integration point depends on the surface TN-82 builds.
+- **What is owed:** compute the verdict for the night on the morning check-in's read, persist it
+  through `upsertSleepVerdict` (which is idempotent per `(user, date)` and never touches
+  `response_state`), expose it to the sheet, and accept a response through
+  `setSleepVerdictResponse`.
+- **The rule that must survive the wiring:** the auto-filled value writes `touched: false`; only a
+  correction writes `touched: true` (TN-57). An announcement is not his answer, and nothing on this
+  path may make an un-corrected day look like one.
+- **`sleepVerdictForNight` returns `null` below 28 nights per component** — that is not an error
+  state to paper over, it is "say nothing today".
+
+### [platform] LA-148 — four `median` implementations, and one of them disagrees
+
+- **Lane: A** — `packages/shared/src/health/**`, `packages/shared/src/workout/time-audit.ts`.
+- **Added:** 2026-09-26, found while building TN-81's baselines.
+- **Measured:** `median` exists four times — `health/energy-balance.ts` (`medianOf`),
+  `health/daily-medians.ts`, `health/hr-smoothing.ts`, `workout/time-audit.ts`. Three agree
+  (average the two middles on an even count, `null` on empty). **`hr-smoothing.median` does not:
+  it returns the UPPER middle, and `0` on empty.** A zero bpm is a plausible-looking value, which
+  is what makes that the dangerous one.
+- `quantile` is now exported once (`daily-medians.ts`, added by TN-81) and `time-audit.ts` still
+  carries a private `quantileSorted` with the same definition — two copies that agree today.
+- **Not urgent and not free:** `hr-smoothing` is on a live display path, so changing its
+  empty-list answer from `0` to `null` needs its callers checked rather than a blind swap. That is
+  the whole of the work; the other three can move to one import.
 
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
-- **Needs:** TN-81
+- **Needs:** LA-149 — **repointed 2026-09-26.** TN-81 shipped the verdict, the table and the
+  repository methods, but nothing calls them yet, so a surface built now would have no data to
+  announce. LA-149 is the wiring.
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
   interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
@@ -1239,6 +1119,10 @@ the Orchestrator's to do.
 
 ### [app-shell] RV-113 — the tab switch blanks the panel for 58–109 ms; drop the opacity ramp
 
+- **📱 Sweep 4a — the objective half PASSES (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Per-frame panel sampler, 10 switches over
+  Home/Health/Nutrition/More: **zero frames with neither panel painted** (sweep 3: 58–109 ms on every
+  switch). Whether the switch *reads* better is the owner's call; the gallery on RV-205 has the tabs.
+
 - **Lane: DV** · **Batch: tab-switch-speed** — shipped; only the device look is owed.
 - **✅ SHIPPED 2026-09-24** (LB-144, #…). The opacity ramp is gone from `ta-tab-enter`
   (`app/globals.css`); the 0.96 scale settle stays, with the comment above it rewritten — it used
@@ -1253,6 +1137,18 @@ the Orchestrator's to do.
   the blink is gone. `DV-12` still holds the 68–118 ms block underneath it.
 
 ### [app-shell][platform] DV-12 — every tab tap holds the main thread 68–118 ms in one task
+
+- **⚑ CAUSE NAMED 2026-09-26 (OR-175, from sweep 4a).** `OR-162` carries it: the two
+  *HEART RATE · TODAY* charts **re-measure on every tab switch while hidden**, and sweep 4a
+  measured **16 of 20 taps** with one 51–104 ms task. `RV-153` is a second candidate on the same
+  tap — **~120k characters of `localStorage` rewritten per Home tap**, friends-feed 459k.
+  **Both fixes are Lane B and are now laned there. This entry is the PASS TEST, not the fix** —
+  do not start it as work; re-measure it once OR-162 and RV-153 land.
+
+- **📱 Sweep 4a, after #1675 (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): still FAILS the pass test.** `perf.js longtasks` ×2: **16
+  of 20** taps carry one long task of 51–104 ms; 4 carry none (sweep 3: every tap, 68–118 ms). The profile
+  still shows chart.js `update → _tickSize → _getLabelSizes → _computeLabelSizes` on every tap, 6–45 ms.
+  OR-162 now names the charts.
 
 - **⚑ THE OWNER'S HIGHEST PRIORITY, stated 2026-09-24: *"speed/performance/efficiency when switching
   pages tabs is my highest priority."*** Of everything in the queue touching the tab switch, **this is
@@ -1445,7 +1341,17 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
 
 ### [app-shell][platform] OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source
 
-- **Lane: DV** · **Batch: tab-switch-speed** · **Added:** 2026-09-24 ·
+- **📱 ANSWERED (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26) — a canvas `font`-setter hook, counted per canvas per switch.** Canvases per
+  panel: Home 1, Workout 0, Nutrition 1, Health 5, More 0. On **every** switch the two **"HEART RATE ·
+  TODAY"** charts re-measure **while their panel is hidden**: Home's (1200×600) 30 font writes per switch,
+  180 on arriving at Home; Health's (1194×600) 80 per switch, 320 on arriving at Health. Health's **"WEAR
+  TIME — 14 DAYS"** (1068×330) re-measures 43× on arriving at Health. Health's other three canvases and
+  Nutrition's do not. So the fix is two components, not every chart.
+
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Sweep 4a named the cause**, which is what this entry was for: the two *HEART RATE · TODAY* charts
+  **re-measure on every tab switch while hidden**. That is `components/**`, so Lane B.
+  It is the mechanism behind `DV-12`'s 51–104 ms task — fix here, verify there.
 - **⚑ RE-LANED `B` → `DV` and UNGATED, 2026-09-25, on the owner's instruction** (*"Make sure anything
   that can be done by DV agent is assigned to it. I shouldn't need to do device checks are possible
   by DV"*). It carried `Lane: B` + `Gate: device`, which PARKED it into the owner's `--sittings` list —
@@ -2529,9 +2435,12 @@ which is the right shape for something that can only be validated by living with
   below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
   of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
   is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
-- **The defects behind it are real and measured** (`metric-tiles-card.tsx`): the pill overlaps the
-  icon, the tiles size to their content so three narrow ones leave a third of the row empty, and
-  the row is a different width when a tile is empty.
+- **The defects behind it are real, and REPRODUCED rather than read** (`metric-tiles-card.tsx`).
+  Rendered in the Playwright harness at the 412 px dark viewport, 2026-09-26: the word **"Log" is
+  drawn directly over each tile's icon** and is barely readable against it, and the three tiles
+  occupy roughly **58% of the row**, leaving the right third empty. The row is a different width
+  again when a tile is empty. Screenshot method: `page.goto('/')` after `suppressMorningCheckin`,
+  2.5 s settle — Health times out at 45 s in `next dev` and needs a longer budget.
 - **Why not just build it:** a lane can implement the entry exactly and still produce a Home the
   owner does not want — the failure the mockup rule exists to prevent. Three columns fixes the
   ragged row and makes each tile narrower, which is a trade rather than a strict improvement.
@@ -3725,7 +3634,21 @@ FROM claude_ro.oura_daily_derived WHERE readiness_contributors IS NOT NULL;
 
 ### [platform][app-shell] RV-186 — DEVICE: the performance sitting, run BEFORE the fixes so each one has a "before"
 
-- **Lane: DV**
+- **📱 Rows 1–6 as AFTER readings (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26; RV-180–183 had shipped).** ① cold launch → Home: **30**
+  `/api` in 10 s, six endpoints doubled (bedtime-estimate, readiness-score, sync/pull, sleep-sessions,
+  energy-balance, body-metadata). ② resume ×5: **4 every time** (bedtime-estimate, next-session,
+  readiness-score, body-battery) — **fails** the ≤2 bar. ③ per switch: Home 4 ✓, Workout 3 ✓, **Health 24**
+  (est. 5–7), **Nutrition 7** (1–2), **More 7** (2). ④ a food log: 21 `/api` from tap to push+5 s; kcal
+  moved. ⑤ time-to-headers from the phone (includes network): sleep-sessions 225–240 ms, **hr-profile
+  427–555, zone-minutes 497–610** (bar 100–150), cardio-week 512–1,116, **health/trends 1.0–1.3 s**. ⑥
+  exercise-library on Workout re-shows: **0** ✓. Rows 7–9 not run (7 needs a live workout, 9 DV-13).
+
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Sweep 4a answered the measurement and three items FAILED, so what is left is code, not the phone.**
+  ② **4 requests per resume**, ③ **Health switch = 24 requests**, ⑤ **`hr-profile`/`zone-minutes` 430–610 ms.**
+  ⑤ is route latency and is squarely Lane A. ②③ are client request counts and are Lane B — per the
+  path rule, an entry reaching both goes to **Lane A, engine half first**, so ⑤ ships first and ②③
+  follow in B. Do not send this back to `DV`: the numbers exist, and a FAILED is work.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). **This is sweep 58's device half.** Review measured the server side (`pg_stat_statements`,
 code, `next build`); these are the numbers only the phone can give. Run it **now**, so RV-180 to
 RV-185 each ship against a recorded baseline, then re-run each row after its fix lands.
@@ -3763,6 +3686,13 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [app-shell][platform] RV-205 — DEVICE: the design and feel pass — a screen gallery Review can see, plus tap latency, scroll, keyboard, token and motion numbers
 - **Lane: DV**
+- **Result (sitting 4a):** private Artifact **https://claude.ai/artifact/6chic4wxSBEC6maezNXdGS** —
+  2026-09-26, web v1.465.66, APK 1.465.52, **gesture nav**, portrait, dark. Channel proven (published, read
+  back). Tier 1 done: P23 warm, full length, all five tab roots (22 images); P24 (Add food sheet 118 ms is
+  the only control over 100 ms — the animated background makes other readings noisy); P26 passes; P27
+  and P28 also run (numbers on the page). Not yet: pre-workout (behind a write), pushed routes, offline,
+  cold and error states, P25.
+
 - **Added:** 2026-09-25 · Review sweep 62 ([`docs/reviews/2026-09-25-sweep-62-dv-design-capture.md`](reviews/2026-09-25-sweep-62-dv-design-capture.md)). **Owner request, same day:** *"keep looking at reviewable actions for UI/performance/design that can be tested through DV — get it to write up a report or screenshots so you can work on them."*
 - **The probes are P23–P28** in [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md) Part D:
   - P23: the screen gallery, full-length, across warm, cold, offline and error states, with sheets open;
@@ -3815,98 +3745,12 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 - **What comes back:** Review files one Lane B entry per fault, each citing its image by file name.
 - **Result:** _(DV: Artifact URL, date, build, navigation mode, probes completed)_
 
-### [app-shell][workouts] RV-145 — Home requests `/api/workout-data` twice per visit, and nothing names the second caller
-
-- **Lane: DV** — the deliverable is an attribution only the running app can give.
-- **Added:** 2026-09-24 · Review, reading device sweep 1. **Found by** RV-139 (P13), which failed
-  its own pass line (*"no endpoint requested twice for one screen"*) and was closed without the
-  failure being filed; the result sat only in the sweep-1 journal.
-- **The measurement (S25 · web v1.465.10 · gesture nav · sweep 1):** every Home visit requests
-  `/api/workout-data` twice. Home and Health each also carry one 2-deep serial chain.
-- **What the source says, and why it does not settle it:** nothing under `components/home/` fetches
-  that endpoint. The client callers are `workout-screen.tsx` (`:412`, `:1557`, mounted persistently
-  in the tab shell), the sync-provider warm list (`workout-data:meta`), `calendar-widget.tsx`
-  (Health), `ai-periodization-status-card.tsx` (Health), and the two select screens. So the second
-  Home request is probably the hidden Workout panel revalidating, or the warm list, and reading
-  cannot tell which.
-- **The method:** P13 again with `Network.requestWillBeSent`'s **`initiator.stack`** recorded, which
-  names the calling function for each of the two requests. Add `Network.setBypassServiceWorker(true)`
-  for the same pass: that gives RV-139 the **byte half** it could not read through the service worker.
-- **The falsifiable claim:** both requests carry the same query string and one of them comes from a
-  panel that is not on screen. **FAILED** means the fix belongs to the lane that owns that caller
-  (Lane B for a component; Lane A for the warm list). **VERIFIED** means the two requests differ in
-  query and both are needed, and this entry closes.
-
-### [workouts][app-shell] DV-16 — "Leave workout? Your workout is already done" — shipped, device pass owed
-
-- **Lane:** B · **Branch:** `fix/dv16-completed-workout-leave-prompt` · v1.465.24.
-- **Found:** Device Verification sweep 3, 2026-09-24 (S25, three-button nav, 2 of 2).
-- **Cause** (the entry left this "not established", and neither guess was right as framed):
-  `applyRehydrateFixups` rewrites a persisted `done` to `pre` on reopen so `DoneScreen` cannot
-  replay its confetti, and that was the only term telling `isWorkoutActive` the workout had ended —
-  `workoutStartMs` survives anything under four hours. The card read COMPLETED off `workoutEndMs`
-  while the guard read active. Full write-up in the journal entry.
-- **Fix:** `isWorkoutActive` also requires `!workoutEndMs`, a stamp written once at completion and
-  nulled by `startWorkout`/`resetSession`, so it re-arms on Start Again. A third term, not a change
-  to either existing one — `pre` is the mid-workout hub and stays included. Four tests, control-run:
-  exactly one goes red against the pre-fix predicate.
-- **Keep:** the device pass test this entry specified. With a completed workout today, restart the
-  app, open Workout, tap another tab — it should switch with no dialog. Not runnable here: the
-  path needs the APK and a real completed day.
-
-### [nutrition][app-shell] DV-17 — Nutrition's meal-plan skeleton on every warm visit — shipped, device pass owed
-
-- **Lane:** B · **Branch:** `fix/dv17-meal-plan-skeleton-on-warm-visit` · v1.465.25.
-- **Found:** Device Verification sweep 3, 2026-09-24 — 3 of 3 warm Nutrition visits, against 9 of 9
-  clean on Health/More/Home.
-- **The entry located it at `meal-plan-section.tsx:99`, and the defect is one level up.** That
-  component's `if (loading && plan == null)` is correct given its props. The parent passed
-  `loading={loading && mealPlan === null}` — and for an account with no plan, `null` is the
-  **settled answer the cache already gave**, indistinguishable from "no answer yet". So every warm
-  visit re-pulsed while the refetch ran.
-- **Fix:** `app/nutrition/nutrition-content.tsx` tracks `planLoaded` — set by the synchronous cache
-  seed (the only thing that runs before first paint) and by the fetch, but not by an `undefined`
-  payload, since `cachedFetch` swallows `!res.ok`. The presentational guard is unchanged and pinned.
-- **Verified:** 4 tests, control-run against `origin/main` — 3 of 4 go red without the change.
-- **Keep:** the device pass test — three warm Nutrition visits on an account with no plan, zero
-  skeleton frames. Needs the APK and a per-frame scan, so it stays owed.
-
-### [nutrition][app-shell] LB-140 — "Prefer the step-by-step setup?" does nothing; the sheet never mounts
-
-- **Lane: DV** — the next action is a reproduction on the phone with an objective pass/fail, and
-  nobody has run it. Back to `B` the moment it reproduces; **closed** if it does not, because
-  then the whole finding is a dev-server artefact. **Added:** 2026-09-24 · Lane B, found while
-  verifying LB-139's extraction · re-laned by Lane B 2026-09-24 after the sandbox probe ran out.
-- **Measured (web, `pnpm dev`, seeded e2e account with no meal plan, mobile-chromium 384 px).** Tap
-  the stepper link under *Build a meal plan* and **nothing happens**: 0 elements with `role=dialog`
-  and 0 `[data-slot="sheet-content"]` in the tree **20 seconds** after the tap, with no console
-  error, no page error and no failed chunk request. The accessibility snapshot shows the screen
-  unchanged. Waiting 3 s after the route boundary settles before tapping makes no difference.
-- **Not caused by LB-139's extraction — control-run against `origin/main`'s `nutrition-content.tsx`
-  (stash out, same spec, same account) and it fails identically.** The wiring is intact either way:
-  `onStepByStep` → `openPlanSetup` → `setPlanSetupOpen(true)`, threaded through `ActivePlanCard` to
-  `MealPlanSection`, and `MealPlanSetupSheet` has no early `return null`.
-- **The one asymmetry worth starting from.** The two overlays that DO open on this screen —
-  `FoodLoggerSheet` and the settings sheet — are **statically** imported. The one that does not is
-  `dynamic({ ssr: false })`. That is precisely the shape **LB-129** measured for `EndOfDayReview`
-  ("`reviewOpen` goes true, the element is in the tree, and the component body never runs") and
-  fixed by making it static. Its comment says reverting that reopens the bug; this may be the same
-  bug still live on a sibling.
-- **The production-build probe was attempted and CANNOT be run in a container — do not retry it.**
-  The first failure (`routesManifest.dataRoutes is not iterable`) was a corrupted `.next`, and a
-  clean `pnpm build` fixed it. The real blocker is one layer down and is deliberate: `next start`
-  sets `NODE_ENV=production`, and `instrumentation-node.ts`'s `fatalOrLoud` **throws on boot** when
-  the model constants cannot be fetched — *"could not list the bucket: SignatureDoesNotMatch
-  (403)"*. That gate is `NODE_ENV`-keyed on purpose so a real deploy that lost its storage variables
-  fails loudly, and the file's own comment states that no session sandbox can authenticate to the
-  bucket. So a production-mode server is unreachable here by design, not by accident.
-- **Which leaves the phone, and that is why this is `Lane: DV` now.** Everything recorded here is the
-  dev server, where `next/dynamic` behaves differently, so the finding is unconfirmed on the runtime
-  that matters.
-- **Pass test:** on the S25, from `/nutrition` with no active plan, tap *Prefer the step-by-step
-  setup?* — the New meal plan sheet opens on the first tap.
-
 ### [platform][app-shell] DV-18 — private media went through Next's image optimizer, which cannot authenticate
+
+- **📱 Sweep 4a (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): the admin half PASSES** — Admin → Exercises' *AI style reference* loads
+  (`/exercise-media/reference-figure.png`, 1,350 px), and 0 of 143 visible images on the page are broken.
+  The still-frame-in-a-workout half was not run: the Workout tab draws no `<img>`, and the pre-workout list
+  sits behind *Start Again*, which is a write.
 
 - **Lane:** A — shipped 2026-09-24. The S25 check below is the only thing left.
 - **Verify:** device
@@ -3937,7 +3781,27 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   rejects what it cannot serve, and the proxy serves the stored type rather than guessing from the
   extension.
 
+### [activity][platform] DV-19 — one treadmill walk is three rows on the device, and the list shows it twice
+
+- **Lane:** A — the activity write/sync path; B for the list if the rows are legitimate.
+- **Added:** 2026-09-26 · Device Verification, sweep 4a (seen while checking BF-107).
+- **Measured (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** The 2026-09-24 treadmill walk (~09:18–09:59) is **three** `activity_logs` rows in
+  the local store, all `synced`, none deleted:
+  - `d0231b08` 09:19:00–09:59:00, 133 kcal, 3,190 steps, HR 92/109 — the complete one;
+  - `b8083d04` 09:18:00–09:58:00, 133 kcal, no steps or HR (updated 23:19:13.245Z);
+  - `4b5c23e0` `09:18`–`09:58` (no seconds), calories NULL (updated 23:19:12.887Z).
+  Health → Training → *Activities this week* shows **two** "Treadmill interval walk · 24 Sept · 40 min ·
+  133 kcal" rows.
+- **Not established:** what the server holds (my read of `/api/activity-logs?date=` returned an empty list,
+  and its parameters are unverified), and which write created the 09:18 pair 0.4 s apart.
+- **Pass test (device):** one walk produces one row, and the list shows it once.
+
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
+
+- **📱 Sweep 4a (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): the pass test PASSES, 5 of 5.** Full cream milk logged and deleted five
+  times; every delete went `DEL/pending` within 12 ms and stayed deleted for the 15 s watched; the
+  server list for the day was empty after each. One side effect is filed on DV-8: delete #3 stayed
+  `pending` locally with both outboxes empty.
 
 - **📱 Reproduced twice more in sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24) — 3 in about 9 food deletes so far.** (1) A Lite
   Cheese row logged, then deleted **~1.5 min later**, came back `live/synced` (updated_at
@@ -5388,6 +5252,11 @@ drift.
 
 ### [app-shell][platform] RV-146 — two fonts only the meal-label printer uses are preloaded on every page
 
+- **📱 Sweep 4a (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): the label faces are fixed; one question remains.** Font preloads are down
+  to **2** (the Geist pair); Archivo and Instrument Serif are no longer preloaded. Cold-start FCP **1,040 ms**
+  (baseline 1,020 — no change). But `document.fonts` reports **Geist unloaded** while it is preloaded, so a
+  *"preloaded but not used"* warning may remain; the harness attaches after load and could not read it.
+
 - **SHIPPED 2026-09-24 (Lane B).** `preload: false` on `Archivo` and `Instrument_Serif`, plus the
   explicit `document.fonts.load` the renderer needed once nothing preloaded them.
 - **Keep:** the device check this entry specified — on a cold start on the S25, the four
@@ -6052,6 +5921,10 @@ drift.
 
 ### [app-shell] RV-132 — DEVICE PROBE: route census on a fresh install
 
+- **📱 Sweep 4a (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): the link census is nearly empty by construction.** Only **one** `<a href>`
+  route is reachable from the five tab roots (Home → `/coach`); every other navigation is a button that
+  calls the router. The census this entry needs is tap-by-tap over buttons, with a write-safe allowlist.
+
 - **Lane: DV** — re-laned from `O` 2026-09-24 by Review. **Correction: this probe was never run.**
   OR-135's note said it had been. Sweeps 1 and 2 planned it (`tour.js`, station H), sweep 3 left it
   out, and no measurement was ever recorded. It still needs the device. The warm half can run
@@ -6072,6 +5945,12 @@ drift.
 
 ### [workouts][platform] DV-8 — one `set_logs` row has been pending since 2026-09-19, and its session id is not in the local store
 
+- **📱 A second instance, on a food delete (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Delete #3 of DV-15's five went `DEL/pending`
+  and never flipped to `synced` (still pending 35 s+ later), while **`mutations_outbox` and
+  `sync_outbox` were both empty** and the server had applied the delete (the day's list no longer held
+  the row; "kcal left" moved back). 1 of 5. Same shape as the `set_logs` row: a local row left
+  `pending` after its mutation was confirmed. The set row is also still pending (re-read this sitting).
+
 - **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24):** unchanged — set_logs `86314832` is still `pending` (since
   2026-09-19T22:41:16Z) against an **empty** outbox. Its `exercise_logs.workout_session_id`
   (`a1847680…`) **does** resolve to a local `workout_sessions` row.
@@ -6083,8 +5962,11 @@ drift.
   **What remains true:** the set is still `pending` locally, and the server has it — the same
   bookkeeping gap DV-5's fix (#1445) closed for deletes, not for this older row.
 
-- **Lane:** DV — establishing this needs the device; nothing in the sandbox can reach a local
-  SQLite file.
+- **Lane: A** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Second independent reproduction in sweep 4a** — a food delete left pending with **both outboxes
+  empty**, which is the sync write path rather than anything the phone can answer next. Two
+  reproductions is enough; further device time on it is the trap where a probe already run gets
+  re-run. Lane A.
 - **⚠ THE DEVICE GATE IS REMOVED (OR-136, 2026-09-23) — it parked this lane on itself.** The entry
   is `Lane: DV` and its gate said `device`, so the one agent that can discharge it saw it under
   PARKED rather than READY. A gate names what someone ELSE must do first; when the lane and the
@@ -6363,23 +6245,17 @@ drift.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
 
-### [app-shell][platform] RV-149 — DEVICE PROBE: the timezone census, every screen with two clocks that disagree
-
-- **Lane: DV**
-- **Added:** 2026-09-24 · Review. Method: **P17** in
-  [`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md).
-- **Why:** rendering in the device's zone rather than the user's is a strict CLAUDE.md rule, and it
-  has broken six screens at once before (2026-08-03). Every check since has been one screen at a
-  time: DV-7's Sleep check is the only device run. The override is read-only and costs one walk.
-- **The falsifiable claim:** with the device zone overridden to `America/New_York` and the profile
-  left on Brisbane, every visible clock time, date and day-word on every route matches the
-  un-overridden walk. **FAILED** per route that differs, with the text diff. Each failing route goes
-  to the lane that owns that screen.
-- **Also (sweep 55, Q-163's Known-Issues row):** the Home header's date and greeting stay in the profile's zone under the override.
-
 ### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
 
-- **Lane: DV**
+- **📱 ANSWERED for warm revisits (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Blocking each of 24 read endpoints in turn (Home 4,
+  Nutrition 6, More 4, Health 10) and revisiting the tab: **nothing visible changed in any case** — no
+  section lost, no error or "may be stale" signal, identical text. A failed refetch is invisible: every
+  card keeps its cached value as if current. Not tested: a failure with no cache (cold start).
+
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Answered: a failed refetch is invisible — no stale signal reaches the user.** This is the
+  `Q-499` shape (`cachedFetch`/`useCachedValue` swallow `!res.ok` unless the caller passes
+  `onError`), so the fix is at the call sites in `components/**`. Lane B.
 - **Added:** 2026-09-24 · Review. Method: **P18**.
 - **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
   `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
@@ -6404,20 +6280,20 @@ drift.
   necessarily a bug, but then CLAUDE.md's delivery sentence needs a qualifier, and that part goes to
   Lane O. Report which step, if any, picked it up, and what the service worker's cache still held.
 
-### [app-shell] RV-152 — DEVICE PROBE: accessibility tree and broken-image census on every route
-
-- **Lane: DV**
-- **Added:** 2026-09-24 · Review. Method: **P20**.
-- **Why:** DV-11 (unnamed switches) and DV-18 (a broken admin image) were each found by eye on one
-  screen, and #1462's guard covers switches only. `Accessibility.getFullAXTree` plus a
-  `naturalWidth === 0` scan covers every route in one read-only walk.
-- **The falsifiable claim:** no interactive node on any route has an empty accessible name, and no
-  image is broken. **FAILED** per offender, with its role, route and nearest text. The fixes go to
-  Lane B.
-
 ### [app-shell][platform] RV-153 — DEVICE PROBE: which localStorage keys a tab tap writes, and how full the store is
 
-- **Lane: DV**
+- **📱 ANSWERED (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** localStorage: 284 keys, **2.84 MB** (UTF-16) — under half the quota. Keys
+  over 50k characters: friends-feed **459k**, oura-hr-day:<today> 169k, exercise-library 103k, saved-meals
+  81k, workout-data:all 78k, body-battery 62k. **Per tap** (2.5 s): Home 11 writes / 120k chars
+  (workout-data:meta 25.8k, workout-card:<id> ×5 up to 16.4k each), Workout 9 / 113k, Health 13 / 62k
+  (meta again, sleep-sessions 15.7k), Nutrition 3 / 6.4k, More 3 / 11.8k; `ta_nav_timing_v1` (5.4k) is
+  rewritten on every tap. **Fails the 10 kB-per-key bar** on workout-data:meta, workout-card and
+  sleep-sessions. → Lane B/A to decide whether warm-tab rewrites of unchanged payloads can be skipped.
+
+- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
+  **Answered on device: ~120k characters of `localStorage` rewritten per Home tap, and the
+  friends-feed entry is 459k.** A synchronous main-thread write of that size on every tap is a
+  plausible contributor to `DV-12`. Stores and hooks are Lane B.
 - **Added:** 2026-09-24 · Review. Method: **P21**. Feeds **DV-12**, whose profile found
   `localStorage.setItem` at 1–15 ms on every tab tap and left the caller unnamed.
 - **The suspect, from source:** `lib/sqlite/cache.ts:82` writes `JSON.stringify(entry)` of the
@@ -6442,6 +6318,14 @@ drift.
 - **Also a resume leg (sweep 55, RV-35's Known-Issues row):** background the app before 00:00, resume after, and without a tab switch confirm Nutrition's diary date is the new day.
 
 ### [nutrition][platform] RV-103 — the balance refetch that could not report its own failure
+
+- **📱 Sweep 4a: the fix PASSES (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** With `energy-balance` blocked (CDP), a food log showed
+  *"Refreshing your budget…"* at **+263 ms** and, at **+15.3 s**, *"Couldn't refresh — this budget is from
+  before your last entry."* with **Retry**; unblocked, Retry corrected the card (1,534 → 1,454).
+- **One follow-on found straight after, 1 of 1:** deleting that food left the card on **1,454** for 16 s+
+  while the server's balance said 1,534. The DV-15 rounds' deletes (no Retry) did refresh. A tab swap
+  corrected it. It looks like the Retry path leaves the card's refresh subscription dead — **that is what
+  this entry now owes**, not the failure line.
 
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** With `energy-balance` blocked at the network
   (CDP `Network.setBlockedURLs`; 4 requests failed) a Cocoa powder log left the card on **"320 kcal
@@ -6571,48 +6455,6 @@ drift.
 - **Keep:** the device pass — log a weight on the S25 and confirm the surfaces that read
   `body-metadata`, `day-log:` and `energy-balance:` move without waiting for TTL. The sandbox can
   prove the calls are present and cannot watch 202 keys on a phone.
-
-### [nutrition][app-shell] RV-111 — back while the barcode scanner is open discards the whole Log Food flow
-
-- **📱 CONFIRMED on the device (S25 · web v1.465.16 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** Log Food → **Barcode**: `body.scanner-active` is set
-  and the app's own window keeps focus (the scanner is JS, not a native activity, so nothing
-  intercepts back first). **One** hardware back → **no dialog left** — the Log Food sheet is gone
-  with the scanner. The ordering risk did **not** fire: `scanner-active` was cleared, the page was not
-  left hidden.
-
-- **Lane:** B — `components/nutrition/capture-actions.tsx:262-264`,
-  `components/nutrition/ingredient-picker.tsx:302`. **Added:** 2026-09-22 · Review sweep 53.
-- **Gate removed 2026-09-23 (device sweep handover) — it has been ANSWERED.** It read *"the
-  hardware back path only exists on the APK"*, which was true and is now discharged: sweep 2
-  **CONFIRMED the defect on the S25**, and the open question OR-137 raised — whether the native
-  barcode activity swallows back before the JS listener runs — is settled by that confirmation, so
-  the fix below is the right fix. This is Lane B work now, not a check. A gate that outlives its
-  answer parks the entry for a question nobody is still asking.
-- The scanner **replaces the sheet's body** rather than opening a surface of its own, and neither
-  file registers a back-stack entry (`grep` for `useSheetBackDismiss`/`sheet-back-stack` in both →
-  none). `SheetContent` renders `BackDismiss` once, so the native listener sees one open surface and
-  pops the **Log Food sheet**, throwing away the capture flow instead of stepping back one level.
-- Adjacent to, not a repeat of, BF-166 / BF-95 / BF-34, which are all handled.
-- **Fix:** `useSheetBackDismiss(scanning, () => setScanning(false))` in both files. The stack is
-  already depth-aware and already handles a surface opening inside another.
-- **⚠ The ordering risk is the thing to test, and it is not cosmetic.** The scanner injects a global
-  `body.scanner-active > *:not([data-scanner-overlay]) { visibility: hidden !important }`
-  (`barcode-scanner.tsx:73-76`) and removes it in `stopNative()` on unmount. **If one back press
-  ever closed both surfaces in a single pop, the app would be left with every body child hidden.**
-  The existing `pendingSelfPops` accounting is what prevents that.
-- **✅ Shipped 2026-09-24 (Lane B).** `useSheetBackDismiss` in both files, exactly as the entry
-  specified. Nothing in the stack needed changing: `sheet-back-stack.test.ts`'s LB-17 case already
-  proves three layers unwind one press at a time, and the depth accounting is why — popping the
-  scanner's entry lands on the sheet's, so `arrivedDepth` is 1 and only surfaces deeper than 1
-  close. **The ordering risk therefore cannot fire**, which is the half worth having checked, since
-  the scanner's global `body.scanner-active` rule hides every other body child until it unmounts.
-- **Keep:** the device re-check — on the S25, Log Food → Barcode → one hardware back returns to the
-  Log Food sheet with the scanner gone, the sheet intact, and nothing left hidden; a second back
-  then closes the sheet. The sandbox cannot drive the scanner (it wants a camera), so this is the
-  only way the fix is observed. **Lane: DV.**
-- **Still not established, and unchanged by this:** whether the native barcode activity intercepts
-  hardware back before the JS listener runs — device-only. Sweep 2's confirmation implies it does
-  not, since the JS path was reached; the device re-check above settles it either way.
 
 ### [platform] LB-133 — the guard for the post-push class cannot see the class
 
@@ -8889,106 +8731,6 @@ why the count of affected entries always understated the harm.
   with a `dismissed` + expired fixture — **derive the timestamps from the clock, never hardcode
   them**, per this repo's rolling-window test rule. **The device look is owed**: the 52% is what the
   owner sees, and only the APK proves it is gone.
-
-### [nutrition] BF-177 — "kcal left" is the server's subtraction against a stale intake, so it sits still while the ring moves
-
-- **📱 Sweep 2 — STILL FAILS on v1.465.16 (after #1467 deployed).** A Cocoa powder log (11 kcal)
-  left *"320 kcal left"* unchanged for **8.2 s** on the tab; it moved (→ 309) only when the next
-  action fired a refetch. #1467's half is visible working — in a traced delete, `POST sync/push` was
-  followed by re-GETs of energy-balance, weekly-summary, adherence, day-timeline and food-logs — so
-  the remaining gap looks like **the push not firing promptly after a log**, not the invalidation.
-  Not established: when that log's push actually went.
-
-- **Still reproduces on web v1.465.10 (sweep 1):** card stayed at "867 kcal left" for 5 s while the
-  post-push response carried 856 — the same one-shot refetch before the push.
-
-- **❌ FAILED ON THE S25, 2026-09-23 — this is open work again, not verification debt.** S25 · web v1.465.4 · APK 1.460.4 · portrait · **gesture nav** (inset 15px) · Device Verification, 2026-09-23.
-  Log *Cocoa powder, 5 g, 11 kcal* to Lunch from the Nutrition tab: the diary row appears, the ring
-  moves, and **"857 kcal left" does not change — sampled every second for 6 s, and still 857 a
-  minute later** while `/api/nutrition/energy-balance` on the server already said
-  `remainingKcal: 846, intakeKcal: 445`. Only leaving the tab and coming back shows 846 — the
-  owner's report, exactly. **Why, measured with response bodies:**
-  ```
-  +176ms GET energy-balance → remainingKcal=857   ← the hook's one-shot refetch, BEFORE the push
-  +238ms POST /api/sync/push → 200                ← the outbox lands the food
-  +677ms GET energy-balance → remainingKcal=846   ← correct, but not the card's request
-  ```
-  On the web path the write is an awaited POST, so the one-shot refetch sees it — which is why
-  `e2e/bf177-kcal-left-updates-after-log.spec.ts` is green. **On the APK the write is local-first +
-  outbox**, the refetch in `use-energy-balance-refetch.ts` fires at the local write and reaches the
-  server before the push, and the card never applies the post-push answer another subscriber fetches.
-  The file's own comment — *"'kcal left' lands a round trip later"* — never happens on the device.
-  **Fix direction:** have the card read `energy-balance:` through a subscription
-  (`useCachedValue`, Q-402's fix — Home's card already does and updated on visit), or refetch after
-  the outbox push for the nutrition domain resolves. A second timing race will not do: the gap was
-  60–70 ms on the S25. Delete is the same mechanism; it only looked right because the card was already
-  showing the post-delete number. **Pass test:** log a food on the S25, "kcal left" changes within
-  3 s without leaving the tab.
-
-- **Lane: B** — `app/nutrition/nutrition-content.tsx`, `app/nutrition/use-energy-balance-refetch.ts`.
-- **Added:** 2026-09-19 (BugFix intake) · owner: *"requires page switching to show"*.
-- **Verify: device**
-- **✅ SHIPPED 2026-09-19** (`fix/bf177-kcal-left-stale-after-log`, v1.459.1). A balance-only refetch
-  now runs on every write that changes intake. The entry's diagnosis was exactly right and is worth
-  keeping: **the cache bust the owner proposed already existed** — `logFoodEntries` clears
-  `energy-balance:` — and this was the Q-402 shape, where evicting a key and re-rendering the
-  component that reads it are two different things.
-- **⚠ THREE SITES, NOT TWO. The sweep found one the entry did not name.** It flagged
-  `handleFoodLogged`'s optimistic branch and `handleQuickEditSaved`; the **delete** path's
-  `refreshAffected` refreshes the log list and the weekly summary and *not* the balance, so deleting
-  a food entry left the same number stale. All three now refetch.
-- **The trap the entry warned about was real and is avoided:** `remainingKcal` is `-deviationKcal`,
-  and `zoneLabel`, `zoneColor` and the bar all read that same number. Deriving only the figure
-  client-side would have printed a live "kcal left" beside an unmoved band and bar.
-- **Extracted, not appended.** The reasoning lives in `use-energy-balance-refetch.ts` because
-  inlining it took `nutrition-content.tsx` to **811 lines against the hard 800 limit**; it is 789 now.
-- **Pinned by `e2e/bf177-kcal-left-updates-after-log.spec.ts`**, which logs a 250 kcal item and reads
-  the card **without navigating** — anything that leaves the screen re-runs `fetchData` and passes
-  against the unfixed component. Control run: with the refetch removed the spec reports
-  **`kcal left went 1810 → 1810`**, which is the owner's report reproduced exactly.
-- **Was the Keep, now superseded by the FAILED bullet above:** ① the device look — the entry's own reason stood: the
-  optimistic-append timing is what decides whether the round trip *feels* instant, and the browser
-  can only show the arithmetic. ② **Two further `energy-balance:` readers were seen and NOT swept**
-  — `app/health/day/day-detail-content.tsx:122` and
-  `components/nutrition/end-of-day/day-read-through-section.tsx:37`, both hand-rolled `cachedFetch`.
-  Neither is mounted during a Nutrition-tab log, so neither is this report; they are recorded here
-  rather than claimed clean. Home is genuinely clean — `useEnergyBalanceToday` uses
-  `useCachedValue`, which subscribes to invalidation (Q-402's fix).
-- **Branch:** `fix/bf177-kcal-left-stale-after-log`
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** point the fix at extending `use-nutrition-derived-refresh.ts:33`'s invalidation subscription to `energy-balance:`. `handleFoodLogged` (`nutrition-content.tsx:295-302`) still does one `refetchBalance`, and the card does not subscribe, so #1467's post-push invalidate cannot reach it.
-- **🔧 SHIPPED 2026-09-25 (v1.465.57) — the card subscribes to `energy-balance:` now, and the
-  one-shot refetch stays.** The re-read's diagnosis was right and its *location* was not: it pointed
-  at `use-nutrition-derived-refresh.ts:33`, RV-104's hook, which owns two other keys and a different
-  load function. The subscription belongs in `use-energy-balance-refetch.ts`, which already owns
-  this key, the retry ladder and the date — so every consumer of the hook gets it and there is no
-  second place that decides when the balance is refetched. Four links now pinned as a chain by
-  `app/nutrition/__tests__/bf177-balance-subscribes.test.ts`: log-food's post-push invalidate →
-  `invalidateNutritionWrite` clearing `energy-balance:` → the hook subscribing → refetching the day
-  on screen. Control run against `origin/main`: the three new-behaviour assertions fail, the two
-  pre-existing links pass.
-- **The hook now takes the date, and that is the load-bearing half.** `lastDateRef` is only ever set
-  by `refetch`, so a subscription reading it is dead until the hook has already fetched once — which
-  excludes the case subscribing exists for: a write made from another surface while the Nutrition tab
-  sits mounted in the persistent shell. `useEnergyBalanceRefetch` takes `selectedDateRef` as a
-  **required** second argument for that reason; optional, it would have shipped a subscription that
-  silently never fires.
-- **No new GET on the log path.** `cachedFetch` de-dupes by key (`inFlightRequests`), so the
-  first invalidation's subscription-driven fetch and `handleFoodLogged`'s explicit `refetchBalance`
-  attach to one request. The explicit calls were left in place: the **web fallback** branch of
-  `logFoodEntries` never reaches `pushThenRevalidate`, so on that path the one-shot is the only
-  refetch there is.
-- **⚠ The entry was wrong about one of the two "unswept" readers.**
-  `components/nutrition/end-of-day/day-read-through-section.tsx:37` is **not** a hand-rolled
-  `cachedFetch` — it uses `useCachedValue`, which subscribes to invalidation, and its own docblock
-  says why. It was already clean. `app/health/day/day-detail-content.tsx` is genuinely hand-rolled
-  and stays so deliberately: it guards each response against a date-swipe that has already moved on,
-  and it refetches after its own writes. Not swept into this PR — it is a route page rather than a
-  tab in the persistent shell, so it has no window in which another surface's write can strand it.
-- **What is NOT established:** the S25 look. The traces above are from sweeps 1 and 2; this change
-  has been exercised only against `pnpm dev` and the suite. **Pass test unchanged:** log a food on
-  the S25, *"kcal left"* changes within 3 s without leaving the tab. Native SQLite, the outbox push
-  and Samsung's WebView were not exercised here — which is the entire mechanism this fix is about,
-  so the device look is the verification, not a formality.
 
 ### [readiness][app-shell] TN-50 — the "self-report" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable
 
@@ -14960,6 +14702,10 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [activity] BF-107 — the walk summary shows its calories (REOPENED 2026-09-24 — reported blank again)
 
+- **📱 Sweep 4a (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26): the re-open half PASSES** — Health → Training → *Activities this week* →
+  the 24 Sept walk → *"40 min · 133 kcal (est.) · HR avg 92 max 109"*. The same list shows that walk
+  **twice**; filed as DV-19. The (a)/(b) halves need an owner walk.
+
 - **⚑ REOPENED, exactly as this entry said to.** It stated: *"If the calories tile is reported blank
   again, that is a regression against an unverified fix."* The owner reported it blank on
   2026-09-24: *"Why is the no calories burned in the top?"*
@@ -15999,192 +15745,6 @@ one. A swipe on the single Start button adds an affordance that does not current
   change tabs or scroll the page; the first tap on the revealed Rest lands (BF-61); a vertical drag
   still scrolls; the card still reaches Rest in one tap on a deload day; and the choice survives a
   tab switch and an app restart (which is BF-84's half).
-
-### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
-
-- **✅ CONSENT GIVEN 2026-09-25 — the owner approved throwing a deliberate client-side error in
-  PRODUCTION.** That was the whole remaining gate, and it is now struck.
-- **Lane: DV** — this is a device check with an objective pass/fail, and only the device agent can run
-  it: the error has to originate in a real signed-in browser, because the tunnel at `/monitoring`
-  sits **behind** the auth gate (decided 2026-09-03, above) and no sandboxed agent holds a session.
-- **The pass test, stated so it cannot be run ambiguously.** On the S25, in the APK, signed in: throw
-  one client-side error, then confirm it **arrives in the Sentry project**. Record the Sentry event
-  id and the timestamp.
-  - **VERIFIED** — the event appears. This entry then leaves the queue: 13 days of client-side
-    silence had a cause and it is fixed.
-  - **FAILED** — the event does not appear. That is NOT verification debt; it is live work, and it
-    goes back to Lane A with what was thrown and what the network tab showed for the POST to
-    `/monitoring`.
-  - **COULD NOT CHECK** is a real answer here — say so rather than inferring from the absence of an
-    event, because absence is exactly the symptom under investigation.
-- **⚠ It creates ONE real Sentry event, and that is the point.** The earlier note that it *"may page
-  someone"* is why nobody had just done it; the owner has now weighed that and said yes. Throw one,
-  not a loop, and label it recognisably (an error message naming BF-92) so whoever sees it in Sentry
-  knows within a second that it is a deliberate probe and not an incident.
-- **This does not test the sign-in path**, which stays uncaptured by design — see the cost stated
-  below. A pass here means "errors from a signed-in session reach Sentry", nothing wider.
-
-> **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
-> whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
-> `tunnelRoute: '/monitoring'`, so the browser POSTs **same-origin** — which `connect-src 'self'`
-> already permits — and Next rewrites it on to `*.ingest.sentry.io`. **No CSP edit**, per this
-> entry's own recommendation ①, so the next edit to `lib/security/csp.ts` cannot silently break it
-> again.
->
-> **✅ THE AUTH-GATE QUESTION IS DECIDED (2026-09-03): the tunnel stays BEHIND the gate.** The owner
-> delegated the call. What settled it is that **the reported defect is fixed either way** — a
-> signed-in request falls through `middleware.ts` without a redirect, so the tunnel works for every
-> session, and BF-92's 13 days of silence happened while the owner was signed in. Excluding the path
-> would only have added errors from the **sign-in screen**, which is a bonus rather than the fix.
->
-> Against that: exclusion makes `/monitoring` an unauthenticated relay. The SDK installs it as a Next
-> *rewrite*, so `?o=<org>&p=<project>` are caller-supplied and anyone could forward an envelope to
-> another Sentry project through this domain. ⚠ **Note what that is and is not** — it is bandwidth
-> and reputation, **not** extra exposure of our own project, whose DSN already ships in every client
-> bundle by design. Small either way, and one line either way; the deciding argument is that a new
-> unauthenticated surface should not be taken for a speculative bonus.
->
-> **What this costs, stated plainly: errors on the sign-in path are still uncaptured** — by Sentry
-> now, and by `/api/client-error` always, since that route requires auth. The first-run APK flow that
-> `middleware.ts`'s own comment records as fragile therefore still has no reporting.
-> **To revisit, the evidence to look for is a sign-in failure nobody can diagnose**; adding
-> `monitoring|` to the matcher's negative lookahead is the whole change.
-> `sentry-tunnel-reachability.test.ts` now pins the gated state, so reintroducing the exclusion is a
-> deliberate decision rather than a tidy-up.
-
-> **The middleware was a second, undiscovered instance of the same bug.** `/monitoring` fell inside
-> `middleware.ts`'s matcher and is in no `PUBLIC_PATHS`, so an unauthenticated report would have
-> been 307'd to `/sign-in` and dropped — the identical silent drop, moved from the CSP to the auth
-> gate. It is excluded from the matcher now. That is a genuine **widening**: `/monitoring` is
-> reachable without a session. ⚠ **Owner-visible trade-off** — it buys the errors most worth having
-> (the sign-in path has no session by definition, and `/api/client-error` requires auth, so it has
-> never captured one), and it costs a relay that could forward an envelope to another Sentry project
-> via this domain. No data of ours, no auth surface, no database; the rewrite's destination host
-> pattern is fixed by the SDK. One line to revert if the owner would rather not.
->
-> Also: recommendation ③ shipped — `sentry.server.config.ts` logs one line at boot naming whether
-> **each** DSN was found (the server process can read the `NEXT_PUBLIC_` one too, so one server log
-> covers the path that has no log of its own). The DSN value itself is never printed.
->
-> **Verified in the sandbox, end to end at the artefact level, not by intent:** a real `pnpm build`
-> emits the tunnel rewrite into `routes-manifest.json` (`afterFiles`, with both the region and
-> non-region variants) and bakes `_sentryRewritesTunnelPath="/monitoring"` into the client chunks;
-> the built `middleware-manifest.json` regex carries the `monitoring` exclusion. ⚠ **The first read
-> of this said the rewrite had NOT landed — it was read from `beforeFiles`, which is empty. Check
-> `afterFiles`.** `lib/security/__tests__/sentry-tunnel-reachability.test.ts` holds all of it
-> (mutation-checked: reverting the matcher fails it), including an assertion that no Sentry host
-> reappears in `connect-src`, since that would mean somebody had reverted to the shape that broke.
->
-> **NOT verified: that an event actually arrives.** That needs the APK and a deliberate throw — it is
-> the `Gate: device` below, unchanged, and it is still the only thing that proves this.
-> [`journal`](overview/history-2026-09-10-folded-6.md#2026-09-03-sentry-client-tunnel).
-
-  Routing before 2026-09-25 was the queue's, while the consent above was outstanding; the
-  code half it refers to shipped 2026-09-03. Superseded by the device routing at the top of
-  this entry — one field of a kind per entry, per `Q-529`.
-- **Ungated 2026-09-24 (OR-143).** A deliberate client-side throw in **production** may page someone, so it is still asked before it is fired — but that ask is one sentence and it is the Orchestrator's to make. `Gate:` parked it instead, which is why thirteen days of silence went thirteen more.
-  Once he says yes it is a measurement with one objective answer and goes straight to `DV`.
-- **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
-  working. not sure if its being used."* The first half is right — it is connected and the
-  integration is good work (Q-404). The second half is the finding.
-
-**ONE failure, not two — this entry's first draft was wrong and is corrected here (2026-09-01).**
-
-**The CSP blocks every client event.** The served `Content-Security-Policy` has
-`connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss: ws:` —
-**no Sentry ingest host, no wildcard, no bare `https:`**. The bundle's own ingest host
-(`o…​.ingest.us.sentry.io`, inlined from the DSN) is not among them, so every browser/WebView event
-is refused before it leaves the page.
-
-> **⚠ RETRACTED: "`NEXT_PUBLIC_SENTRY_DSN` is not set".** The first draft claimed this, on a `curl`
-> of **`/login`** — which is a **52-byte redirect stub**, not a page. Grepping a redirect answers
-> "not found" to every question. Re-measured against `/sign-in` and its 33 JS chunks: the DSN **is**
-> inlined, in three of them. The owner confirmed the variable independently. **The method error is
-> the lesson: confirm the response you fetched is the thing you meant to search — check its size
-> before grepping it.**
-
-**`instrumentation-client.ts:11` predicted this failure in its own comment** — *"a `connect-src` that
-does not include the ingest host silently drops every client event — the exact failure mode this item
-exists to avoid. Verify on the device, not just in a browser."* The warning was written and the host
-was never added. **That is the lesson worth keeping: a comment describing a hazard is not a guard
-against it.**
-
-- **What IS plausibly working: the server side.** `sentry.server.config.ts` and
-  `sentry.edge.config.ts` read `SENTRY_DSN` (not `NEXT_PUBLIC_`), and server→Sentry is a
-  server-to-server call that **no CSP touches**. `instrumentation.ts`'s `onRequestError` hook calls
-  `captureRequestError` for everything escaping a route handler. **The owner confirmed `SENTRY_DSN`
-  is set (2026-09-01).** So the server path should be live and collecting.
-- **✅ ANSWERED 2026-09-01 — the owner looked, and the dashboard settles it.** Sentry holds
-  **exactly one issue**: `Q404WiringProbe`, *"Deliberate error proving the Sentry wiring delivers"*,
-  1 event, 13 days old, `url: --`, `transaction: --`, geography **US** (Railway's region, not the
-  owner's). A server-side event — the probe Q-404 fired at setup. Three conclusions:
-  1. **Server → Sentry works.** The probe delivered.
-  2. **Client → Sentry is blocked — now shown rather than argued.** Over the same 13 days
-     `error_events` recorded **9 client-source rows** while Sentry holds **zero** browser events.
-     Same app, same window, same device; the reporter that lands is same-origin and the one that
-     does not is cross-origin. That is the CSP.
-  3. **Sentry holding nothing else is CORRECT, not a second fault.** It only sees what escapes a
-     route handler uncaught, and nothing did: the 34 server rows over that window are **31 ×** the
-     `daytime-stress` constants guard plus **3 ×** `aborted` client disconnects, all caught and
-     reported by the app's own path, which by design never reaches the hook.
-- **⚠ Even with the CSP fixed, Sentry will see a narrow slice.** There are **0** explicit
-  `captureException`/`captureMessage` call sites, so its whole view is uncaught escapes: **1 event
-  against `error_events`' 43** over the same 13 days. Whether to forward caught server faults is a
-  separate decision this entry does not take — but nobody should read a quiet Sentry as a quiet app.
-- **(answered — kept for the reasoning) The deciding observation this entry asked for.** If this entry is right,
-  Sentry holds **server** events and **zero browser** events — the two paths differ only in whether a
-  CSP sits between them. A dashboard with both would refute the CSP diagnosis outright; a dashboard
-  with neither points at the server DSN or the SDK rather than the header. Filter by platform
-  (`node`/`javascript`) or by whether an event carries a URL and a browser name. **One look settles
-  which of the three it is** — cheaper than any further reading of the code.
-- **Nothing reads it either way.** `grep -ci sentry CLAUDE.md` → **0**; `error_events` appears
-  **4×**, in the session-start ritual. So no session has ever been told to look at Sentry, which is
-  exactly the owner's *"not sure if its being used"*. And there are **0** explicit
-  `captureException`/`captureMessage` call sites: Sentry sees only what escapes a route handler
-  uncaught. A route that catches its own error and returns a 500 — the common shape — reaches
-  `error_events` and never Sentry.
-
-**The owner states `SENTRY_DSN` IS set** (2026-09-01, asked directly). Recorded as his statement, not
-as a verification — the entry's whole point is that an unset DSN is invisible from outside, and that
-cuts both ways. If it is set, **server-side capture has been live all along and nobody has looked**:
-there may be weeks of real server errors in the dashboard right now, which is the cheapest thing to
-check here and needs no code.
-
-**Live proof of the CSP diagnosis, from the app's own data (2026-09-01).** `error_events` over the
-last 7 days holds 6 groups, **4 of them `source: client`** — from the same WebView, on the same
-device, at the same time Sentry's client SDK was recording nothing. The homegrown reporter POSTs
-**same-origin** to `/api/…`, which `connect-src 'self'` allows; Sentry POSTs **cross-origin**, which
-the header does not. Same app, same errors, different origin, opposite outcome. That is a natural
-experiment, not an inference.
-
-- **`withSentryConfig` is NOT wired into `next.config.ts`** — checked 2026-09-01. Two consequences:
-  **no source-map upload**, so a server stack trace in Sentry points at built output rather than the
-  file you would edit; and **no release tagging**, so an error cannot be attributed to a deploy.
-  Neither blocks capture, and neither is why the client is silent — but both make what does arrive
-  much less useful, which matters if the server side has been quietly collecting.
-- **⚠ Recommendation CHANGED: prefer `tunnelRoute` over adding the ingest host.** `withSentryConfig`'s
-  `tunnelRoute` (e.g. `/monitoring`) makes the browser POST events **same-origin**, through the app,
-  which `connect-src 'self'` **already allows** — no CSP edit, and it is immune to the next CSP change
-  breaking it silently again. One change then fixes three things at once: the client blackout, source
-  maps, and release tagging. Adding the ingest host to `connect-src` stays the fallback if tunnelling
-  is rejected for cost or latency.
-- **Recommendation, in this order.** ① Wire `withSentryConfig` with `tunnelRoute` (fallback: add the
-  ingest host to `connect-src` in `lib/security/csp.ts`). ② ~~Set `NEXT_PUBLIC_SENTRY_DSN`~~ — done;
-  it is set and inlined. ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
-  because an unset DSN is indistinguishable from a quiet week. ④ Only then add the session-start read
-  to CLAUDE.md beside `error_events`; pointing sessions at an empty dashboard teaches them to ignore
-  it.
-- **⚠ Do not widen `connect-src` to a wildcard.** Add the specific host, or tunnel. The CSP file's
-  comments show it has been reasoned about host by host; a `*` would undo that for one vendor.
-- **⚠ Verify ② and ① on the DEVICE, not a browser.** The canonical runtime is a WebView loading the
-  Railway URL, and its CSP behaviour is what matters. This is the entry's own `Gate: device` and it
-  is the honest kind — a real check that cannot be automated, not verification debt.
-- **Do not treat this as a reason to distrust the integration.** `beforeSend: scrubEvent`,
-  `sendDefaultPii: false`, `tracesSampleRate: 0` and no replay are all deliberate and all correct for
-  a health app. The code is right; the environment and one header are not.
-- **Verification:** a deliberate client-side throw in production appears in Sentry within a minute,
-  **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
-  violation for the ingest host.
 
 ### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
@@ -18051,6 +17611,12 @@ height. BF-73 removed that class rather than leave it implying a floor it does n
   on it — re-judge it if one is.
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
+
+- **📱 Sweep 4a, after the v1.465.62 fix (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** ③ **PASSES 3/3**: a right swipe on the row
+  closes the tray and the day stays Today. ① **still FAILS, and now has a threshold**: swipe (300 ms) then
+  a tap on Delete's own rect after **0 / 100 / 200 / 300 ms → no confirmation (8 of 8, tray left open)**;
+  after **500 ms → "Delete food log?" (2 of 2)**. A human "immediate" tap (~150–300 ms) is swallowed. ②
+  the slow tap works. Meal-list half not run (no logged meal that day).
 
 - **📱 Sweep 3 — the immediate tap FAILS (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24).** New harness call `rawSwipeThenTap` (one
   `adb shell "input swipe … && input tap …"`, so the tap lands the moment the swipe ends). From a
@@ -24391,6 +23957,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
+
+- **Lane: A** — set 2026-09-26 (OR-175). This entry had NO lane field, so it was printing as UNCLASSIFIED and no implementer could pick it up.
+  **The device question is discharged.** Sweep 4a blocked `/api/health-trends*` and the *Rest
+  discipline* card showed *"Couldn't load this trend"* — so it renders from the **server route**,
+  not `getLocalStore`. That was the one thing the entry still owed.
+  What remains is the RPE model gaining a rest term, which is domain math in `packages/shared/**`.
+
+- **📱 ANSWERED (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** With `/api/health-trends*` blocked, *Rest discipline* shows *"Couldn't
+  load this trend…"* — no rows. So on the device this card renders from the server route; the
+  `getLocalStore` path is not what paints it.
 
 - **📱 Sweep 3 (S25 · web v1.465.17 · APK 1.460.4 · three-button nav · sweep 3, 2026-09-24): renders on the device** — Health → Training → *Rest discipline*: *"YOUR
   REST VS THE PLAN · 443 sets · 90 days"*, PLANNED / YOU TAKE / DIFF / SETS rows. The page also
@@ -31602,115 +31178,6 @@ indefinitely.
   rows, and the admin backfill can recompute on request. **Still open, separately:** whether 15 bpm is
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
-
-### [heart-rate][workouts] 🟡 Q-11 — 22 of 78 completed sessions still hold no per-set HR attribution, and only the owner can backfill them
-- **✅ OWNER AUTHORISED THE DEVICE AGENT TO RUN THIS, 2026-09-24:** *"It should be able to do the admin sitting too."* The gate was never his JUDGEMENT — it was that the action needs an admin session, and DV runs on his machine holding his login. Nobody had noticed that made it DV's rather than his. Re-laned from `Gate: owner` to `Lane: DV`.
-- **Startable now.** It FILLS rows that are empty rather than rewriting stored history, so it does not wait on `RV-170`. Two such entries exist, and they are the answer to *"the DV agent needs more of a backlog before testing"*.
-
-- **Lane:** DV
-- **Keep:** the one-off backfill over pre-fix sessions. Measured 2026-08-20: **56 of 78 completed
-  workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
-  has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
-  old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
-- **Batch:** `owner-admin-sitting` — added 2026-09-24 (OR-151). Its own note already said to fold this into the next batch of owner actions rather than re-ask it; this is that batch.
-- **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
-  they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
-  refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the
-  next batch of owner actions so it costs one decision rather than a nag.
-
-> **⚑ 2026-08-05 — this now BLOCKS an analysis, which raises its value.** The
-> [data-analysis review](reviews/2026-08-05-data-analysis-opportunities.md) §4 B2 went looking for
-> the most interesting unbuilt question in the dataset — *does how physiologically recovered you
-> were at the end of rest predict the next set?* — and could not answer it. Field-level coverage of
-> `set_hr_stats` (582 rows): `peak_bpm` 210, `drop_60s` 160, `pct_hrr_at_rest_end` **122**,
-> `sec_to_hrr50` 74, `coverage_ok` 138. Only **92** rows join to a following set. That is not enough
-> to test anything. Fixing Q-11 unlocks a genuinely new class of set-level physiology analysis, so
-> it is a prerequisite, not an independent cleanup.
->
-> **✅ Re-measured against production 2026-08-08 (615 rows).** The side-check is answered and split
-> out as **Q-149** — `rest_adequate` is not stuck, it is *degenerate*: 278 non-null, 278 true, and
-> **271 of them (97.5%) come from the `bpmAtLog < 120 → true` shortcut**. Do not build a view on it.
-> The B2 blocker has eased but not cleared: rows joining to a following set went **92 → 108**, and
-> `pct_hrr_at_rest_end` is accruing at ~10–13 per training day, so it is a matter of waiting rather
-> than re-engineering.
-
-> **⚑ Half of this shipped as v1.257.2; the other half is now precisely stated.** Two separate
-> defects were hiding behind one entry, and neither was the device-side cause this entry originally
-> guessed at. (The earlier "~20% of sets" / device-gate framing on this entry is superseded by
-> Defect A/B below — dropped here rather than kept as a third, redundant annotation.)
-
-**Defect A — `workout_hr_stats` at 0 rows. FIXED (v1.257.2), root cause proven.** Not a missing
-producer: `upsertWorkoutHrStats` was called on every recap, sitting three lines above the
-`upsertSetHrStats` call that reached 582 rows. It threw every single time.
-`workout_hr_stats.workout_hrv_ms` is the **only integer HRV column in the schema** — every sibling
-(`sleep_sessions.average_hrv_ms`, `oura_daily_derived.hrv_rmssd_ms`, …) is `doublePrecision` — and
-its producer `rmssdFromRr` returns `Math.sqrt(mean)`. node-postgres sends the float as text and
-Postgres rejects the whole insert:
-
-```
-invalid input syntax for type integer: "38.42156862745098"
-```
-
-Reproduced against the local DB, and the new regression test fails with that exact message when the
-`Math.round` is removed. The caller's fire-and-forget `.catch(err => console.error(…))` swallowed
-it, and the recap renders either way, so there was no user-facing symptom for months. Both persist
-calls now go through `reportServerError`, and the previously button-less
-`/api/oura-ble/backfill-hr-stats` has an Admin → Tools card.
-
-**Defect B — four recent sessions have ZERO `set_hr_stats` rows. FIXED 2026-08-05, v1.266.1.** See
-[`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
-`POST /api/complete-workout` now fires a best-effort fire-and-forget HR compute/upsert at completion
-(closes the gap outright for a live chest strap already in `oura_heartrate`), and
-`listSessionsMissingSetHrStats`/`listSessionsMissingHrStats` are now coverage-aware — a session whose
-only attempt produced `readings_count = 0` rows stays on the backfill work-list instead of being
-permanently marked done, so a delayed Oura-ring drain still gets picked up by a later backfill pass.
-**Did not** fold `coverage_ok = false` into the coverage-aware check, only `readings_count = 0` — the
-two are different questions (see "Also still open" below) and conflating them risked the work-list
-permanently re-listing genuine-dropout sessions that can never improve on reprocessing.
-
-Measured per session against production before the fix, kept for the record:
-
-| day | session | sets | set_hr_stats rows | computed_at |
-|---|---|---|---|---|
-| 2026-08-02 | Pull | 15 | **0** | — |
-| 2026-08-01 | Lower | 18 | 18 | 2026-08-04 (3 days later) |
-| 2026-07-30 | Upper | 18 | **0** | — |
-| 2026-07-30 | Legs | 18 | **0** | — |
-| 2026-07-27 | Push | 14 | 14 | 2026-07-28 |
-| 2026-07-26 | Pull | 15 | **0** | — |
-| 2026-07-20 | Push | 14 | 14 | 2026-07-29 (9 days later) |
-
-**Zero rows, not rows-with-null-metrics** — so attribution never ran, rather than running and
-finding nothing. And every `computed_at` lags its workout by days. The cause is structural: the
-only trigger is `GET /api/oura/hr-data`, which is the **recap fetch**. Finish a workout and never
-open its recap and that session is never attributed, permanently. Everything before 2026-07-22 has
-rows because the backfill was run once that day; the four gaps are all sessions after it.
-
-- Admin → Tools → "Backfill per-set HR stats" still exists and still works for any pre-fix gaps
-  already in production — running it once is on the owner checklist, since this fix only prevents
-  *new* gaps, it doesn't retroactively attribute old sessions.
-
-**✅ ANSWERED 2026-08-08 — it was the artefact, not device dropout.** The open question was whether
-the 79% `coverage_ok=false` / 67% NULL `peak_bpm` figures meant real strap dropout during lifting or
-were contaminated by days-late computes. Re-measured against production by `computed_at` day, which
-separates the two cleanly:
-
-| computed_at | rows | coverage_ok | peak_bpm | readings_count = 0 |
-|---|---|---|---|---|
-| **2026-07-22** (the one-off backfill) | **508** | 74 | 138 | **334** |
-| 2026-07-23 → 08-04 (recap-triggered) | 74 | 64 | 71 | 0 |
-| 2026-08-06 (post-fix, same-day) | 24 | 18 | 23 | 0 |
-| 2026-08-08 (post-fix, same-day) | 9 | 3 | 9 | 1 |
-
-**508 of 615 rows are that single backfill batch**, run over old sessions whose HR series was thin
-or absent — 334 of them have zero readings. Every aggregate that treated the table as one population
-was measuring that batch. Same-day computes since the Defect B fix carry near-complete `peak_bpm`
-and no zero-reading rows. So: no evidence of systematic device dropout; nothing further to fix here.
-
-Two things confirmed while measuring, recorded so they are not re-investigated: `source` is populated
-only from 2026-08-06 onward (23/24 then 8/9), which is exactly when v1.260.0 shipped it — not a gap;
-and the whole dataset's **maximum `bpm_at_end` is 128**, which is what makes Q-149's threshold
-degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 

@@ -74,7 +74,11 @@ async function findSocket() {
       "manifest's debuggable flag, so a release APK can never expose it).",
     );
   }
-  // Several sockets means several WebView processes; the app's is the newest.
+  // A dead process's socket can linger after a force-stop, and pids are not monotonic (sweep 4 found
+  // _7270 listed beside the live app's _5093), so match the app's own pid rather than the largest.
+  const pid = (await adb(['shell', 'pidof', 'com.trainingai.app']).catch(() => '')).trim().split(/\s+/)[0];
+  const live = pid && unique.find((n) => n.endsWith(`_${pid}`));
+  if (live) return live;
   return unique.sort((a, b) => Number(b.split('_').pop()) - Number(a.split('_').pop()))[0];
 }
 
