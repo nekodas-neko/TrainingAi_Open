@@ -598,7 +598,7 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-205 — the home "Reorder sections" button cannot reorder anything; every part of the feature exists except the gesture
 
-- **✅ SHIPPED (#PR, 2026-09-26) — `@dnd-kit`, on a HANDLE.** `HomeSortableSection` is a
+- **✅ SHIPPED (#1739, 2026-09-26) — `@dnd-kit`, on a HANDLE.** `HomeSortableSection` is a
   `useSortable` now, with a grip that appears only in edit mode beside the existing eye-off, and
   `lib/hooks/use-home-section-drag.ts` reorders `sectionOrder` on `dragover` and persists on
   `dragend`. The recommendation's second option (up/down arrows) was not needed.
