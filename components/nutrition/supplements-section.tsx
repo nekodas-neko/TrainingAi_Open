@@ -31,7 +31,14 @@ interface Props {
 export function SupplementsSection({ supplements, loading, onChanged, userId , grouped}: Props) {
   const tz = useUserTimezone();
   const [manageOpen, setManageOpen] = useState(false)
-  const [toggling, setToggling] = useState<string | null>(null)
+  /**
+   * RV-207 ③ — the ids whose write is in flight, not "is anything in flight".
+   *
+   * This was a single `string | null`, and `toggleLog` returned early on ANY truthy value — so
+   * ticking B while A's request was still running did nothing at all, silently. The guard exists
+   * to stop a double-tap on ONE row, and it was applying per screen.
+   */
+  const [toggling, setToggling] = useState<ReadonlySet<string>>(() => new Set())
   const [promptFor, setPromptFor] = useState<SupplementWithStatus | null>(null)
   const [promptAmount, setPromptAmount] = useState('')
   const [vialFor, setVialFor] = useState<SupplementWithStatus | null>(null)
@@ -45,13 +52,13 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
    * fills it from the definition, which is what freezes it against later edits (BF-3 gap 1).
    */
   async function toggleLog(s: SupplementWithStatus, promptedAmount?: number) {
-    if (toggling) return
+    if (toggling.has(s.id)) return
     if (s.dosePrompt && !s.loggedToday && promptedAmount == null) {
       setPromptFor(s)
       setPromptAmount(s.defaultAmount == null ? '' : String(s.defaultAmount))
       return
     }
-    setToggling(s.id)
+    setToggling(prev => new Set(prev).add(s.id))
     const dose = promptedAmount == null ? null : { amount: promptedAmount, unit: s.unit ?? null }
     // The tick's own effect on the day's total. Flipping `loggedToday` alone leaves the previous
     // log's number on screen — un-ticking 5 mg still read "5 mg today", and re-ticking at 7.5 mg
@@ -127,7 +134,11 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
         // stay silent here only because it had not painted yet.
         revertOptimistic()
       } finally {
-        setToggling(null)
+        setToggling(prev => {
+          const next = new Set(prev)
+          next.delete(s.id)
+          return next
+        })
       }
     })()
   }
@@ -175,9 +186,9 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
               <button
                 type="button"
                 onClick={() => toggleLog(s)}
-                disabled={toggling === s.id}
+                disabled={toggling.has(s.id)}
                 aria-pressed={s.loggedToday}
-                className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors"
+                className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 transition-[background-color] duration-100 active:bg-muted/60 motion-reduce:transition-none"
               >
                 <div
                   className={cn(

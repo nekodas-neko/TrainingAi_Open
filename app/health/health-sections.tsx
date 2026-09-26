@@ -45,6 +45,7 @@ import type { TrainingLoadResponse } from "@/app/api/training-load/route";
 import type { SleepCorrelationResponse } from "@/app/api/sleep-performance-correlation/route";
 import type { MuscleRecoveryEntry } from "@/app/api/muscle-recovery/route";
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 const OuraSection = dynamic(
   () => import("@/components/health/oura-section").then(m => ({ default: m.OuraSection })),
@@ -203,7 +204,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
             </button>
             <button
               onClick={() => openLog("weightKg", "Body Weight", "kg", 0.1)}
-              className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/80 transition-colors"
+              className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold transition-[transform,background-color] duration-100 active:scale-95 active:bg-muted/80 motion-reduce:active:scale-100 motion-reduce:transition-none"
             >
               Log
             </button>
@@ -410,7 +411,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                 </button>
                 <button
                   onClick={() => openLog("steps", "Steps", "steps", 1)}
-                  className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/80 transition-colors"
+                  className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold transition-[transform,background-color] duration-100 active:scale-95 active:bg-muted/80 motion-reduce:active:scale-100 motion-reduce:transition-none"
                 >
                   Log
                 </button>
@@ -462,16 +463,16 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
             </div>
             <button
               onClick={() => setWaterLogOpen(true)}
-              className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/80 transition-colors"
+              className="tap-dense tap-target-44 rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold transition-[transform,background-color] duration-100 active:scale-95 active:bg-muted/80 motion-reduce:active:scale-100 motion-reduce:transition-none"
             >
               Log
             </button>
           </div>
           {waterGoalMl > 0 && todayWaterMl != null && (
             <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: 'rgba(56,189,248,0.15)' }}>
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${Math.min((todayWaterMl / waterGoalMl) * 100, 100).toFixed(1)}%`, background: 'linear-gradient(90deg, #38bdf8, #0ea5e9)' }}
+              <ProgressFill
+                pct={(todayWaterMl / waterGoalMl) * 100}
+                color="linear-gradient(90deg, #38bdf8, #0ea5e9)"
               />
             </div>
           )}
