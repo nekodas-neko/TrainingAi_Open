@@ -477,6 +477,10 @@ Live at the time of writing (2026-07-30):
   `ResizeObserver`. And `pb-nav-safe` reserves the nav and nothing else, so a `bottom-fab-safe`
   `h-14` FAB covers the bottom 56 px of a scroll — `pb-fab-safe` is the fix, with a scan that
   every screen mounting a FAB uses it.
+- **[`docs/overview/entries/2026-09-26-bf208-pen-moon-and-chip.md`](../../overview/entries/2026-09-26-bf208-pen-moon-and-chip.md)**
+  — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
+  `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
+  which the same misread had justified — a guard now keeps the pen's top-right corner clear.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)

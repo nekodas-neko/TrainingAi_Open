@@ -714,7 +714,49 @@ below threshold and left in place for next time.
   and adds three tiers, so a redesign now is a redesign twice. Nothing breaks by waiting.
 - **Reversal cost:** low — one component, no state, no stored data.
 
+### [app-shell] LB-164 — the Coach button is an unlabelled sparkle; do you want a label on it?
+
+- **Lane: O** · **Added:** 2026-09-26 · Lane B, out of `BF-206`'s correction.
+- **Ask: owner — one yes or no.** Should the Coach button on Home carry a visible **Coach** label
+  beside its sparkle, or stay the icon-only circle it has always been?
+- **This is here because it was SHIPPED ONCE BY MISTAKE AND REVERTED.** `#1730` added the label on
+  the reading that you had asked what that button was. You had not — you were pointing at the moon
+  in the collection pen (`BF-208`), and `BF-206` struck the label finding as an unrequested
+  restyle. It is reverted, because a visual change to the screen you open first is yours to make.
+  If the extended pill was in front of you between those two deploys and you liked it, say so and
+  it comes straight back.
+- **RECOMMENDATION: take the label.** A sparkle is this app's generic AI mark — it is also on the
+  weekly-recap banner, the meal-source row and the profile tab — so on its own it names a category
+  rather than a destination, and an extended FAB is the standard treatment for a primary action
+  whose icon is not self-evident. **The reason it is not simply shipped is that you did not ask
+  for it and you look at this screen every day**, which CLAUDE.md puts on your side of the line.
+- **Alternatives.** *Leave it iconic* — you already know what it does, and it is one less word on
+  a busy screen; that is the honest case for no. *A one-time tooltip* — cheapest, and it teaches
+  only the person who does not dismiss it, so it is the worst of the three.
+- **Reversal cost: none.** One span, either direction. It is already been reverted once today.
+
 ### [app-shell] BF-208 — the "button" on the collection widget is the MOON, and the one thing beside it that looks tappable is a `<span>`
+
+- **✅ SHIPPED (#PR, 2026-09-26) — and the sweep found a DIFFERENT set than the entry predicted.**
+  Three of the twelve scenes drew a bright, hard-edged disc in the top-right, and they are
+  **`meadow`, `space` and `kitchen`** — not the `space`/`snow`/`bedroom` the entry guessed.
+  `snow` and `forest` have no large disc at all; `bedroom`'s is at `cx=90`, the left quarter, so
+  it fails the corner test; and `kitchen`'s is a moon inside a drawn window frame, which the
+  entry had no reason to expect. Measured, not read.
+  Each is softened and moved: meadow `cx 300 → 72, opacity 1 → .55`; space `cx 300 → 82,
+  opacity 1 → .8`; kitchen `cx 290 → 232` **within its window frame**, `opacity 1 → .6`. That
+  breaks ① and ③ of the four, which is what the entry asked for.
+- **④ the chip is a caption now**, not `rounded-full bg-background/70 px-1.5`. It keeps a text
+  shadow instead of the background plate, because the scene behind it is anything from a night sky
+  to a kitchen wall. The alternative — making it a real button — is still the wrong call: the whole
+  card is already the link to `/collection`.
+- **`components/home/__tests__/bf208-pen-corner.test.ts` holds the corner for scene thirteen.**
+  It fails any `<circle>` of r ≥ 6 at opacity ≥ .9 with `cx > 240, cy < 60` in any
+  `public/cats/scene-*.svg`. That is the half a one-file fix leaves open, and the reason the entry
+  called for a sweep. Control-run: restoring meadow's moon fails it.
+- **Keep:** the device look. Whether the softened moon still reads as a moon rather than a smudge
+  is the owner's eye, and the pen is his screen.
+
 
 - **Lane:** B — `public/cats/scene-*.svg`, `components/home/collection-pen.tsx`.
 - **Added:** 2026-09-26 · owner, pointing at the Home collection card: *"there is that button on
