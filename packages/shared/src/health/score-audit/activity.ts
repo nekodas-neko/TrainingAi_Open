@@ -150,7 +150,7 @@ export function buildActivityAudit(input: ActivityAuditInput): PillarAudit {
       strengthFreqGoal: { value: goals.strengthFreqGoal, unit: 'sessions/week' },
       sessionVolumeGoalKg: { value: goals.sessionVolumeGoalKg, unit: 'kg/session', note: 'Absolute per-session target (Q-190) — deliberately NOT the median of your own sessions.' },
       volume7dKg: { value: Math.round(volume7dKg), unit: 'kg' },
-      typicalSessionVolumeKg: { value: Math.round(typicalSessionVolumeKg), unit: 'kg', note: 'Median single-session tonnage — the volume-lane denominator.' },
+      typicalSessionVolumeKg: { value: Math.round(typicalSessionVolumeKg), unit: 'kg', note: 'Median single-session tonnage. Reported for context only — Q-190 took the volume lane off it, and the row above is the denominator.' },
       acwr: { value: acwr != null ? Math.round(acwr * 100) / 100 : null, note: acwrExcludedReason ?? 'Acute:chronic workload ratio driving the over-exertion taper.' },
       preTaperScore: { value: result?.preTaperScore ?? null, note: 'Goal-completion score before the taper — this is what readiness reads.' },
       taperApplied: { value: result?.taperApplied ?? false },
