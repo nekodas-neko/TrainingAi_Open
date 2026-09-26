@@ -2243,17 +2243,49 @@ which is the right shape for something that can only be validated by living with
      - **Fix:** thread the base sets/reps/pct into the signals, build a rules prescription from
        them through the existing `fitToBudget`, and return it flagged `source: 'rules'` instead of
        502. Do NOT reuse the deload builder.
-  2. **A duration preset change re-runs the whole model call** (`use-duration-preset.ts:52`, `mood-checkin-sheet.tsx:148`), although the budget fit is pure code.
-     - **Re-verified 2026-09-26:** confirmed. `components/workout/use-duration-preset.ts:48-58`
-       POSTs `{ durationPreset }` to `/api/ai-periodization/session/[sessionId]/prescribe`, whose
-       route (86 lines) passes it straight to `generatePrescriptionForSession` — the full model
-       call. **This item is the tractable half of the entry** and is independent of item 1: the
-       re-fit happens in that route, against the stored prescription.
-     - **Fix:** re-fit the stored prescription with `fitToBudget`, with no model call. That also works offline.
+  2. ~~**A duration preset change re-runs the whole model call**~~ — **SHIPPED 2026-09-26**
+     (`feat/duration-refit-without-the-model`). The route re-fits the stored plan through the
+     extracted `budget-stage.ts` and never reaches the model. Measured on the dev server against
+     a reachable model: **three preset changes, 0 rows added to `ai_call_log`**, ~0.4 s each.
+     - **The entry's "re-fit the stored prescription with `fitToBudget`" would have been wrong,
+       and quietly.** The budget passes only ever REMOVE sets, and a return to the session's own
+       length runs neither `dropToBudget` nor `expandToBudget` — so re-fitting the *stored*
+       (already-trimmed) plan cannot give sets back. Measured on the fixture: standard → short →
+       standard returned `{Squat 4, Row 2, Curl 3, Raise 3}` against the correct
+       `{4, 4, 2, 2}`. The row silently loses half its sets and nothing on screen says so.
+       The fix therefore stores the PRE-budget shape as `AiPrescription.refitBaseline`, the same
+       way `preDeload` keeps a revertible snapshot, and re-fits from that.
+     - **"That also works offline" was wrong too** and is retracted: the re-fit still needs
+       `aggregateSignals` for weekly volume, time profiles and targets, so it is a server round
+       trip. Doing it on the device is the local-store work this entry puts out of scope.
+     - Every prescription already in production has no baseline and falls through to a full
+       generation — which then writes one, so each session self-heals on its next real generation.
+     - **Not done, deliberately:** the re-fit still spends the route's `prescribe:` rate limit,
+       which is sized for model calls (20/hour). Splitting the buckets is a separate change; the
+       limit is an abuse guard on a DB-heavy path either way.
   3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
      - The pending flag only comes from a server response (`workout-screen.tsx:446`).
      - **Fix (B):** label the source ("Base program" or "From {date}").
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
+
+### [workouts] LA-147 — a duration change still spends the model's hourly budget, though it no longer calls the model
+
+- **Lane: A** (`app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`, `lib/rate-limit.ts`).
+- **Added:** 2026-09-26 · found while shipping RV-202 ②.
+- **What:** the prescribe route takes `rateLimit('prescribe:<user>', 20, 1h)` before it knows
+  whether the request is a generation or a re-fit. Since RV-202 ② a `durationPreset` request
+  usually re-fits the stored plan with no model call, so after 20 preset switches in an hour the
+  lifter is told *"Too many plan rebuilds this hour"* for work that cost nothing to the AI budget.
+  The limit's own comment cites preset-switching as the reason it is 20 rather than 10 — that
+  justification is now spent on the wrong thing.
+- **Not just "raise it to 60".** The re-fit runs a full `aggregateSignals` (~30 repository reads),
+  so it needs a real limit; what it does not need is the *model's* one. Two buckets, checked on the
+  branch that is actually taken.
+- **The ordering is the catch:** the branch is only knowable after `getSessionPeriodization`, and a
+  limit checked after a database read is a limit an attacker has already spent. Either check the
+  cheap generation limit first and refund/relax it on the re-fit path, or give the re-fit its own
+  bucket checked up front and let a request hold whichever it lands in.
+- **Low priority** — it needs 20 switches in an hour to bite, and the failure is a toast, not data.
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
 - **Lane: B** (`components/nutrition/**`, with `store.searchFoodItems` already on the device).

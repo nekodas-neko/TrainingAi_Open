@@ -3400,8 +3400,12 @@ as the plan instructed. The labels are **relative** and the numbers **absolute**
 **Nothing is user-visible yet, deliberately.** No control can send 45 until Lane B builds it
 (`session-duration-picker.tsx` and four siblings), so this half only makes 45 expressible and
 correct when it arrives. **BF-7 stays queued** for that control, which must commit on release rather
-than per detent — a prescription averages 2,445 ms and the preset path deliberately bypasses the
-cooldown. **Not device-verified; no APK needed** (TypeScript only, ships via Railway).
+than per detent. **Not device-verified; no APK needed** (TypeScript only, ships via Railway).
+
+**⚠ The reason for "commit on release" changed on 2026-09-26 (RV-202 ②); the conclusion did not.**
+It was *"a prescription averages 2,445 ms"* — a preset change no longer calls the model at all
+(~0.4 s, **0** `ai_call_log` rows over three switches). Per-detent stays wrong because each re-fit
+still runs a full `aggregateSignals` and spends the route's 20/hour `prescribe:` budget (LA-147).
 
 ### [workouts] ⚠️ An expired prescription ages out whatever its status — NOT device-verified (BF-179, 2026-09-20)
 

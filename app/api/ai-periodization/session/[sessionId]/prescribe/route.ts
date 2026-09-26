@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { generatePrescriptionForSession } from '@trainingai/shared/ai-periodization/generate-prescription'
+import { refitPrescriptionToBudget } from '@trainingai/shared/ai-periodization/refit-prescription'
 import { z } from 'zod'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -70,6 +71,24 @@ export async function POST(
   const { excludeSessionId, durationPreset } = parsed.data
   const repo = await getRepository()
   const tz = session.user?.timezone ?? DEFAULT_TZ
+
+  // A duration change does not need the model. The plan it would produce is the stored one
+  // re-fitted to a different budget, and that fit is deterministic arithmetic — asking Gemini
+  // again cost ~30 s of "Preparing your AI workout…" and a token spend for nothing (RV-202 ②).
+  // Anything the stored plan cannot answer — no prescription yet, one generated before the
+  // baseline existed, an expired or finished one, a whole-session deload — falls through to the
+  // full generation below, which is what used to run every time.
+  if (durationPreset != null) {
+    const refit = await refitPrescriptionToBudget(userId, programSessionId, repo, tz, durationPreset)
+    if (refit.ok) {
+      return NextResponse.json({
+        prescription: refit.prescription,
+        prescriptionStatus: refit.prescriptionStatus,
+        estimatedSessionDurationMin: refit.estimatedSessionDurationMin,
+        durationPreset: refit.prescription.durationPreset ?? 'standard',
+      })
+    }
+  }
 
   // All generation/validation/persistence lives in the shared function so the
   // workout-completion path (lib/workout/complete-workout.ts) can regenerate the
