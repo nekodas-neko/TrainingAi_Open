@@ -26,6 +26,15 @@ export async function GET() {
       nativeVersionStatus: status,
       nativeBuildSha: release?.sha ?? null,
       nativeBuiltAt: release?.publishedAt ?? null,
+      // OR-168. The commit this WEB deploy was built from — the only field here that identifies a
+      // deploy. `version` moves only when a PR bumps the changelog, which most merges do not, and
+      // `nativeBuildSha` above is the APK's sha, a different artefact entirely. Railway sets this
+      // at runtime; `app/sw.js/route.ts` already keys the service-worker cache on it.
+      //
+      // Read it with a cache-busting param: this response is `public, max-age=300` (deliberately,
+      // and the one written exemption in `check-api-no-store.js`), so an unbusted poll can answer
+      // from five minutes ago and report a deploy that has not happened.
+      webBuildSha: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
     },
     { headers: { "Cache-Control": "public, max-age=300" } },
   )
