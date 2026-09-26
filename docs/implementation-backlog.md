@@ -2678,20 +2678,55 @@ which is the right shape for something that can only be validated by living with
   **None of the three has been re-verified against `main`.**
 - **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
 
-### [platform][app-shell] RV-201 — health-insight and weekly-digest: show computed text first, and let the week page work offline
-- **Lane: A**, then **B**. One PR. **Supersedes PS-31(a) and (b) for these two routes**; update PS-31 when this lands.
+### [readiness][platform] LA-152 — Reference: two contributor shapes, one reader, and `[object Object]` in production
+
+- **Lane: A.** **Added:** 2026-09-26 by `RV-201`, which fixed it. **Reference** — recorded so the
+  next reader of these columns does not rediscover it; there is no work left here.
+- **What was live.** `oura_daily.readiness_contributors` stores `{ hrv_balance: 90 }` — Oura's
+  numbers. `oura_daily_derived.readiness_contributors`, which the app writes and which every
+  reader PREFERS when present, stores `{ hrvBalance: { score, input, gap, provisional } }`.
+  `formatContributors` assumed the first, so for as long as a derived row has existed the
+  readiness insight was assembled from
+  `Contributors: checkin [object Object]/100, hrvBalance [object Object]/100, …` and handed to
+  the model as fact. Confirmed against production, 2026-09-26.
+- **Two faults, one root.** The values stringified as `[object Object]`, AND the camelCase keys
+  missed the snake_case label map, so even the names rendered raw. Three keys differ by more than
+  casing and had no label at all: `checkin` (no Oura equivalent), `temperature` and
+  `prevDayActivity`.
+- **⛔ Why nothing caught it.** The only caller wrote
+  `as Record<string, number | null>` on the row. The cast is the whole story: it made the wrong
+  shape typecheck, so neither the compiler nor any test nor any review could see it, and the
+  route's own tests mocked contributors as plain numbers. **It was found by running the route
+  against the dev server and reading the output** — the gate CLAUDE.md requires before a merge,
+  doing exactly the job it is there for.
+- **Fixed in `RV-201`'s first half:** `lib/oura/contributors.ts` reads `.score` from either
+  shape, `labelFor` matches both casings, the three renamed keys have labels, the cast is gone,
+  and 18 tests cover it including one that asserts every `READINESS_WEIGHTS` key resolves.
+- **The lesson worth keeping, which is not about contributors:** a cast on a row read from JSONB
+  is an assertion that nothing verifies. Where two writers put different shapes in one column,
+  the reader takes `unknown` and narrows.
+
+### [platform][app-shell] RV-201 — weekly-digest: show computed text first, and let the week page work offline
+- **Lane: A**, then **B**. **Supersedes PS-31(b) for `weekly-digest`**; update PS-31 when this lands.
+- **✅ THE `health-insight` HALF SHIPPED 2026-09-26** (`feat/rv201-computed-health-insight`). The
+  model call is gone; `app/api/ai/health-insight/insight-text.ts` renders the headline and band,
+  the weakest contributor, today against the recent values, and an explicit absence sentence —
+  the same four things the prompt had been asking the model for. `PS-31(a)` is settled with it.
+- **⚠ SPLIT FROM ITS "one PR", deliberately.** The two halves share no code, no route and no
+  component, and the done-when is per-surface. `main` merged five times during the first half
+  alone, and a single PR spanning two routes plus three components would have carried that
+  conflict risk for no review benefit. This entry carries no `Batch:` field, which is the
+  enforced mechanism, so nothing was overridden.
+- **What the first half found, which is not in the measurements below:** running the route
+  against the dev server — not reading it — showed **every readiness insight in production was
+  built on `[object Object]`**. Filed and fixed as `LA-152`; read it before touching the
+  contributor lines here.
 - **Added:** 2026-09-25 · Review sweep 61.
-- **health-insight** has 26 calls in 30 days, the most of any prose route. It runs automatically on every Health detail screen (`ai-insight-card.tsx:72-77`).
-  - Every data line is computed in `app/api/ai/health-insight/route.ts:100-181`, and the numbers-only fallback already exists (`:195-198`).
-  - The cache key hashes the prompt, and the prompt includes a "Past week scores" line (`:116`) that changes daily. So it **regenerates every day**, and again on any back-fill.
-  - It is also where Q-292's false "perfect" and the imperial units came from: 16% of 117 insights audited.
-  - **Fix:** a template per section (band, weakest contributor, today against the 7-day values), rendered immediately and offline.
-  - Keep the model only if the owner later wants the prose back. The recommendation is to drop it.
 - **weekly-digest** runs automatically on **every Home visit** until the week's result is cached (`weekly-recap-banner.tsx:53`), and when `/health/week` opens.
   - **The week page's charts ride on the AI POST**, so offline the whole page shows its error state.
   - The rate-limit exit (`route.ts:277-279`) returns 429 **without** the metrics it has already computed.
   - **Fix:** serve `WeeklyDigestMetrics` from a GET through `cachedFetch`, so the charts paint offline, and template the bullets from the week-over-week deltas.
-- **Done when:** both surfaces render with the network off, and neither shows a superlative or an imperial unit.
+- **Done when:** the week page renders with the network off, and shows no superlative and no imperial unit. (The health-insight surface already does, as of the first half.)
 
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
 - **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
@@ -2917,6 +2952,25 @@ which is the right shape for something that can only be validated by living with
   rather than a paragraph.
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
+
+- **⛔ THE PROBE SPEC IS RED IN CI, AND ITS OWN MESSAGE SAYS WHAT THAT MEANS — observed
+  2026-09-26 from an unrelated PR's run, by the engine implementer.** `e2e/food-log-swipe-delete.spec.ts:220`
+  ("a tap the instant the swipe ends opens the confirmation") **failed** on CI run
+  [36236669420](https://github.com/nekodas-neko/TrainingAi_Open/actions/runs/36236669420) —
+  1 failed, 6 flaky, 240 passed — and on `#1722`'s own run
+  [36236193250](https://github.com/nekodas-neko/TrainingAi_Open/actions/runs/36236193250) before
+  it merged. It is **not** in the 6 flaky; it is the single hard failure.
+- **Which inverts the conclusion above.** That test was written to pin the half that IS ours, and
+  its failure message is *"the press right after the release was swallowed on the web path too —
+  the cause is now ours."* The entry says the web path passes at every delay. **In CI it does
+  not.** So either the harness reproduces it after all — on slower, contended runners, which is
+  the difference from a local run — or the spec is timing-sensitive in a way that makes it unfit
+  to pin anything. Both are worth knowing and neither is "flaky".
+- **⚠ It is red on `main` now**, and E2E is not a required check, so it merged and will fail on
+  every lane's PR until someone acts. Not the engine implementer's to fix — recorded on the entry that owns
+  the spec, rather than filed as a duplicate. **Whoever takes it: run it locally first.** If it
+  passes locally and fails in CI, that gap is the finding, not an obstacle to it.
+- The `DV` routing above stands; this changes what the measurement should ask.
 
 - **⚑ THE WEB PATH PASSES AT EVERY DELAY, SO THE CAUSE IS NOT IN THE SHARED JS — LANE B, #PR,
   2026-09-26. Re-laned `B` → `DV`: the next action is a measurement, not a change.** Sweep 4a's

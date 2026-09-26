@@ -370,6 +370,18 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **`readiness_contributors` is stored in TWO shapes under one name, and reading the wrong one is
+  silent.** `oura_daily.readiness_contributors` holds Oura's `{ hrv_balance: 90 }`;
+  `oura_daily_derived.readiness_contributors` — what the app writes, and what every reader prefers
+  when it exists — holds `{ hrvBalance: { score, input, gap, provisional } }` keyed to
+  `READINESS_WEIGHTS`. The keys differ in case, and three of the nine differ by name outright
+  (`checkin`, `temperature`, `prevDayActivity`). Assuming the first shape does not fail: it
+  stringifies to `[object Object]`, which is how every readiness AI insight was assembled until
+  2026-09-26 (`LA-152`, fixed in `RV-201`). **Read them through
+  `lib/oura/contributors.ts`**, which handles both, and never re-assert the type of a row read
+  from JSONB — the `as Record<string, number | null>` on that row is the whole reason nothing
+  caught it.
+
 - **⚑ `mood_logs.energy_level` BEFORE 2026-09-19 MAY BE AUTO-FILLED; FROM 2026-09-19 IT IS AN ANSWER
   (TN-50).** This is the documented cutoff, and it is deliberately a dated line rather than a stored
   flag. Until that date `mood-checkin-sheet.tsx` pre-selected the level by running

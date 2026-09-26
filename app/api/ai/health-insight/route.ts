@@ -1,24 +1,20 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { generateText } from 'ai'
-import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
-import { degradedFromFacts } from '@/lib/ai/degrade'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
-import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
-import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, ageFromDob, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { z } from 'zod'
-import { formatContributors } from '@/lib/oura/contributors'
+import { formatContributors, weakestContributor } from '@/lib/oura/contributors'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { computeActivityScore } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
-import { metric, splitMeasured, buildPrompt, type MetricLine } from './prompt'
+import { metric, splitMeasured, type MetricLine } from './metrics'
+import { buildInsightText, type RecentComparison } from './insight-text'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // An enum, a date and a boolean.
@@ -62,7 +58,10 @@ export async function POST(req: Request) {
   // `new Date(\`${date}T00:00:00.000Z\`)` sites below and surface as a bodiless 500 (RV-177).
   const date = body.date ? normalizeDateParamIso(body.date) : todayInTz(tz)
   if (date === null) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
-  const { section, force } = body
+  // `force` stays in the schema and is deliberately unread: the card still sends it on a manual
+  // refresh, and `.strict()` would reject the request outright if the key were dropped. With no
+  // cache left there is nothing for it to bypass (RV-201).
+  const { section } = body
 
   const repo = await getRepository()
 
@@ -97,6 +96,11 @@ export async function POST(req: Request) {
     : null
 
   let entries: (MetricLine | string)[]
+  // The three things the prompt used to ask the model to pick out. Computing them here rather
+  // than describing them in English is the whole of RV-201.
+  let headline: { label: string; value: string; band?: string | null } | null = null
+  let weakest: { label: string; value: number } | null = null
+  let recent: RecentComparison | null = null
   if (section === 'readiness') {
     const latestIllness = latestIllnessFromDerived(derivedRows)
     // Readiness is the own BLE-derived composite (contributors still come from the derived row),
@@ -104,16 +108,28 @@ export async function POST(req: Request) {
     const readinessMap = liveReadinessByDay(derivedRows, ouraRows)
     const todayReadiness = readinessMap.get(date) ?? (todayOura ? readinessMap.get(todayOura.date) ?? null : null)
     const todayDerived = derivedRows.find(r => r.day === date) ?? derivedRows[derivedRows.length - 1] ?? null
+    // No cast. The derived row's contributors are `{score, input, gap, provisional}` objects and
+    // the Cloud row's are plain numbers; asserting the latter is what let `[object Object]` reach
+    // the model for every readiness insight. `formatContributors` reads both shapes now.
+    const contributors = todayDerived?.readinessContributors ?? todayOura?.readinessContributors
+    if (todayReadiness != null) headline = { label: 'Readiness', value: `${todayReadiness}/100`, band: bandLabel(todayReadiness) }
+    weakest = weakestContributor(contributors)
+    // Today is excluded from its own baseline, so "above the past week" cannot be satisfied by
+    // today's own value sitting in the series it is compared against.
+    recent = {
+      noun: "the past week's scores",
+      values: ouraRows.filter(r => r.date !== date).map(r => readinessMap.get(r.date)).filter((v): v is number => v != null),
+      today: todayReadiness,
+    }
     entries = [
-      metric('Readiness score', todayReadiness != null ? `${todayReadiness}/100 (${bandLabel(todayReadiness)})` : null),
-      `Contributors: ${formatContributors((todayDerived?.readinessContributors ?? todayOura?.readinessContributors) as Record<string, number | null> | null | undefined)}`,
+      ...(todayReadiness == null ? [metric('Readiness score', null)] : []),
+      `Contributors: ${formatContributors(contributors)}`,
       latestSummary?.tempDevC != null
         ? metric('Body temp deviation (vs personal ring baseline)', `${latestSummary.tempDevC > 0 ? '+' : ''}${latestSummary.tempDevC.toFixed(1)}°C`)
         : metric('Body temp deviation', todayOura?.temperatureDeviation != null
           ? `${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (pre-re-key Cloud value — not current)`
           : null),
       metric('Illness radar', latestIllness ? `${latestIllness.flag} (score ${latestIllness.score}/100, vs personal baseline)` : null),
-      `Past week scores: ${ouraRows.map(r => `${r.date} ${readinessMap.get(r.date) ?? '—'}`).join(', ')}`,
     ]
   } else if (section === 'sleep') {
     // Nights, not rows (Q-76): `find(date === …)` returns whichever row for the day came back first,
@@ -121,9 +137,18 @@ export async function POST(req: Request) {
     // last row has the same exposure.
     const nights = nightSessions(sleepRows, tz)
     const todaySleep = canonicalNightForDate(nights, date) ?? canonicalLatestNight(nights)
+    if (todayOura?.sleepScore != null) {
+      headline = { label: 'Sleep score', value: `${todayOura.sleepScore}/100`, band: bandLabel(todayOura.sleepScore) }
+    } else if (todaySleep?.durationHours != null) {
+      // No score tonight, so duration leads rather than the card opening on an absence.
+      headline = { label: 'Sleep duration', value: `${Math.round(todaySleep.durationHours * 60)} min`, band: null }
+    }
+    weakest = weakestContributor(todayOura?.sleepContributors as Record<string, number | null> | null | undefined)
     entries = [
-      metric('Sleep score', todayOura?.sleepScore != null ? `${todayOura.sleepScore}/100` : null),
-      metric('Duration', todaySleep?.durationHours != null ? `${Math.round(todaySleep.durationHours * 60)} min` : null),
+      ...(todayOura?.sleepScore == null ? [metric('Sleep score', null)] : []),
+      ...(todayOura?.sleepScore != null
+        ? [metric('Duration', todaySleep?.durationHours != null ? `${Math.round(todaySleep.durationHours * 60)} min` : null)]
+        : []),
       metric('Efficiency', todaySleep?.efficiency != null ? `${todaySleep.efficiency}%` : null),
       metric('Overnight HRV', todaySleep?.averageHrvMs != null ? `${Math.round(todaySleep.averageHrvMs)} ms` : null),
       metric('Avg sleeping HR', todaySleep?.avgHeartRate != null ? `${Math.round(todaySleep.avgHeartRate)} bpm` : null),
@@ -131,11 +156,21 @@ export async function POST(req: Request) {
     ]
   } else if (section === 'heart-rate') {
     const todayBm = bodyMetrics.find(r => r.date === date) ?? bodyMetrics[bodyMetrics.length - 1] ?? null
-    const rhr7d = bodyMetrics.filter(r => r.restingHeartRate).map(r => `${r.restingHeartRate}`)
+    if (todayBm?.restingHeartRate != null) {
+      // No band: `scoreBand` reads a 0-100 score, and a resting heart rate is not one. Calling
+      // 52 bpm "excellent" is precisely the invented judgement Q-292 caught the model making.
+      headline = { label: 'Resting heart rate', value: `${todayBm.restingHeartRate} bpm`, band: null }
+    }
+    // A lower resting heart rate is the better one, so the comparison's wording flips.
+    recent = {
+      noun: 'the recent readings',
+      values: bodyMetrics.filter(r => r.date !== date && r.restingHeartRate != null).map(r => r.restingHeartRate as number),
+      today: todayBm?.restingHeartRate ?? null,
+      lowerIsBetter: true,
+    }
     entries = [
-      metric('Resting heart rate', todayBm?.restingHeartRate != null ? `${todayBm.restingHeartRate} bpm` : null),
+      ...(todayBm?.restingHeartRate == null ? [metric('Resting heart rate', null)] : []),
       metric('Overnight HRV (daily record, same metric as above)', todayBm?.hrvMs != null ? `${todayBm.hrvMs} ms` : null),
-      metric('7-day RHR readings', rhr7d.length > 0 ? rhr7d.join(', ') : null),
     ]
   } else {
     // The Oura Cloud activity fields are frozen since the 2026-07-07 re-key (always null), so this
@@ -169,8 +204,11 @@ export async function POST(req: Request) {
       typicalSessionVolumeKg: load.typicalSessionVolumeKg,
       goals,
     })
+    if (activityResult?.score != null) {
+      headline = { label: 'Activity', value: `${activityResult.score}/100`, band: bandLabel(activityResult.score) }
+    }
     entries = [
-      metric('Activity score', activityResult?.score != null ? `${activityResult.score}/100 (${bandLabel(activityResult.score)})` : null),
+      ...(activityResult?.score == null ? [metric('Activity score', null)] : []),
       metric('Steps', todayBmForActivity?.steps != null ? `${todayBmForActivity.steps} (goal ${goals.stepGoal})` : null),
       metric('Active calories', todayBmForActivity?.activeCalories != null ? `${todayBmForActivity.activeCalories} kcal (goal ${goals.activeEnergyGoal} kcal)` : null),
       // Session count is a real count from our own history — zero sessions IS a measurement, not an
@@ -197,47 +235,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ insight })
   }
 
-  if (staleNote) dataLines.unshift(staleNote)
-
-  const prompt = buildPrompt(section, dataLines, absent)
-  const contextHash = hashInsightContext(prompt)
-
-  if (!force) {
-    const cached = await readFreshInsight(repo, userId, section, date, contextHash)
-    if (cached) return NextResponse.json({ insight: cached })
-  }
-
-  // Rate limit only applies when we actually need to call the AI
-  if (!rateLimit(`ai-insight:${userId}`, 10, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-  }
-
-  let text: string
-  try {
-    // F7: route retries through the shared helper (maxRetries: 0 on the SDK call) like every other
-    // AI route, so backoff + reportServerError live in one place instead of the SDK's default retry.
-    ;({ text } = await loggedGenerateText(
-      { section: 'health-insight', userId, fingerprint: { section, date, contextHash } },
-      signal => generateText({
-        model: aiModel(),
-        prompt,
-        maxRetries: 0,
-        abortSignal: signal,
-      }),
-    ))
-  } catch (err) {
-    console.error('[ai/health-insight] generateText failed:', err)
-    // RV-69. `dataLines` and not `prompt` — the prompt carries the instructions and the absent-metric
-    // notes too, and only the measured lines are facts about this section. Not cached, for the same
-    // reason as its siblings: the context hash is unchanged, so a stored fallback would be served
-    // ahead of every later attempt.
-    const degraded = degradedFromFacts('here are the readings as recorded', dataLines.join('\n'))
-    if (degraded) return NextResponse.json({ insight: degraded, degraded: true })
-    return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
-  }
-
-  const insight = text.trim()
-  await repo.upsertAiHealthInsight(userId, section, date, insight, contextHash)
+  // No model, no cache, no rate limit (RV-201). The text is a pure function of numbers this
+  // handler has already computed, so recomputing it is cheaper than the round-trip that would
+  // read it back — and it works with the network off, which the model never did.
+  //
+  // What went with the model: `hashInsightContext`/`readFreshInsight` (a cache exists to avoid a
+  // paid call), the 10/hour limit (nothing to rate-limit), and the `degradedFromFacts` catch path
+  // (there is no failure left to degrade from). `upsertAiHealthInsight` is no longer written here;
+  // the stored rows stay for history and nothing reads them on this path.
+  const insight = buildInsightText({ headline, lines: dataLines, absent, weakest, recent, staleNote })
 
   return NextResponse.json({ insight })
 }

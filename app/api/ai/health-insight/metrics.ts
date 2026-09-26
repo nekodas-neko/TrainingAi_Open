@@ -1,4 +1,9 @@
-import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
+// Assembling a section's metric lines, and keeping an absent reading distinguishable from a zero.
+//
+// Named prompt.ts until RV-201, when the model call went and `buildPrompt` with it. What survives
+// is the part that was never about the model: a metric with no reading must not reach the reader
+// as a value. `splitMeasured` is what enforces that, by routing an absent label away from the
+// lines entirely — see `insight-text.ts` for the one sentence absent labels are allowed to appear in.
 
 /**
  * Q-353. A metric that has no reading is **omitted**, and its name is collected instead.
@@ -28,20 +33,4 @@ export function splitMeasured(entries: (MetricLine | string)[]): { lines: string
     else absent.push(e.label)
   }
   return { lines, absent }
-}
-
-export function buildPrompt(section: string, dataLines: string[], absent: string[]): string {
-  // Stated in the instruction as well as enforced by omission. The two guard different failures:
-  // omission stops the model reading an absent metric as a value, and the instruction stops it
-  // inferring one from silence — a section with no steps line can still be told the user did not
-  // walk today unless it is told otherwise.
-  const absentNote = absent.length > 0
-    ? `\n\nNot measured today, because no reading exists — ${absent.join(', ')}. These are missing readings, NOT zeros and NOT observed behaviour. Do not describe them as low, absent, skipped, or as anything the user did or did not do. Mention one only to say it was not recorded, and never build the tip around one.`
-    : ''
-  return `You are a concise health coach. Write a single insight (2-3 sentences, no markdown) for the user's ${section} data. Be specific to the numbers you are given, and never infer a value that is not listed.${absentNote}
-
-${PROSE_GUARDS}
-
-Data:
-${dataLines.join('\n')}`
 }
