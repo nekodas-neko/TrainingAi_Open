@@ -1070,6 +1070,31 @@ the Orchestrator's to do.
 - **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
   new). `Ran 78 of 78` Custom Rules steps.
 
+### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
+- **Ask:** owner — one mockup to approve (RV-213), one product choice (RV-218's daily calorie target), and a merge-time yes on six security fixes as each PR goes green.
+
+- **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
+- **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
+- **1. RV-213: a mockup, before it is built.** Empty meal slots on Nutrition take a full card each, with two add controls. Lane B produces a before/after at 384 px, and the owner says yes or no.
+  - **Recommendation:** one compact row per empty meal, with its name and a single `+`.
+  - The same shape as RV-207 ⑥'s Log-tile mockup (the Lane O entry Lane B split out). **Show both in one sitting.**
+- **2. RV-218: which number is the day's calorie target.**
+  - The ring shows 1,534 (resting plus movement). The explainer names a goal of 1,660 and a budget of 1,356.
+  - **Recommendation:** the ring shows the budget the explainer already defends. The goal stays as the reference line, and the third number goes. The owner confirms which one he reads as "today's target".
+  - RV-218's copy bugs ("205 workouts", "-1,694 deficit", missing zero days) need no answer and can ship first.
+- **3. A merge-time yes on the security fixes.** These are needed **when each PR is green, not now**:
+  - **RV-191** (the feedback screenshot);
+  - **RV-190** (admin query session state; build it before OR-138);
+  - **RV-192** (registration). **It also carries one product option:** drop password sign-up entirely, since every current user signs in with Google. The recommendation is to keep it and verify email.
+  - **RV-193** (refresh token in the session);
+  - **RV-195** (three low auth gaps);
+  - **RV-196** (the ring-key plugin; needs an APK).
+- **Already asked elsewhere, listed so nothing is lost:**
+  - **RV-199 ②:** the GitHub "keep my email private" setting, which only the owner can flip.
+  - **RV-65:** whether the prescription keeps its model call, which is gated on the owner in Lane A.
+  - **OR-176** is answered: a standing yes for DV's three settings probes.
+- **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
+
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
 
@@ -2708,6 +2733,7 @@ which is the right shape for something that can only be validated by living with
    - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
 4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
 5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
+   - **🔎 Device, sweep 64 (`p23-nutrition-warm-03`):** the owner's real screen reads 14% (7 days) and 39% (28 days), with "required meal (3)". Those are sensible numbers for his configuration, so the web build's 0% was the seed's six-meal setup. **Drop this item.**
    - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
    - **The definition is the owner's call. The copy is not.**
 
@@ -2808,6 +2834,18 @@ which is the right shape for something that can only be validated by living with
   3. **P32's five timepoints are identical on every screen.** That is consistent with "painted from cache", but it measures nothing about loading states. Re-run once with the cache cleared for those routes, which is what P32 is for.
 - **Also for the record:** P34's concern is moot on this keyboard. Samsung shows the numeric pad for `type=number` (`t2-sheet-weigh-in-01`), so the finding is only the missing `enterkeyhint` ("Go" where "Done" belongs), which RV-210 covers.
 - **Then:** re-capture Health (full length) and the pushed screens' lower sections, and append them to the same Artifact.
+- **The rest of Review's device pass, in the same sitting, after the capture fixes.** This is the one DV entry Review needs worked next:
+  1. **P41, before and after on RV-207's shipped fixes**, against sitting 4a's captures:
+     - initials;
+     - "1 exercise" and "1 set";
+     - press feedback on the tab bar, More rows, Nutrition's chevrons, the Home avatar and Health's Log pills (re-run P24 on each; the target is a first-frame change under 100 ms);
+     - ticking two supplements in quick succession (both must land). **Tick then untick, per the standing write permission;**
+     - "13.0 t".
+  2. **RV-206 P29–P31**, now that OR-176 gave standing approval: font scale 1.15 and 1.3, display size, and CPU throttle plus battery saver. **Restore each before anything else if the sitting is cut short.**
+  3. **RV-206 P35–P38:** launch and bars, chart legibility, overscroll, and the longest real values.
+  4. **RV-205's remainder:** cold start, one error state per card family (via P18), and **P32 with the route's cache cleared**.
+  5. **A P28 follow-up:** the "11 background meteors on every tab". Report whether **hidden** tabs' animations keep running while another tab is shown (`document.getAnimations()` per panel, with the panel's visibility). Running while hidden is a defect Lane B can fix without asking anyone. Whether the visible ones stay is a matter of taste, so not a finding.
+- **Result:** _(DV: Artifact URL and version, date, build, navigation mode, which of 1–5 ran)_
 
 ### [platform] RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope
 
