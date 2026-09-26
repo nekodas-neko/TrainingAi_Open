@@ -74,10 +74,26 @@ Full suite **1,080 files / 10,102 tests passed** · `check:rules` **Ran 80 of 80
 / 817 warnings, equal to the base** (the base is 817 too; that drift arrived with other sessions'
 merges, not this branch) · tsc, test-typecheck, build, doc gates clean by exit code.
 
+## Rendered, after this entry first said it had not been
+
+The version of this entry that shipped in #1693 said *"everything visual here is unverified"*. That
+was true of the diff and did not have to stay true: the Playwright harness drives the real app at
+the 412 px dark viewport, and a design entry is exactly what it is for. Three of four surfaces
+captured — Health times out at 45 s in `next dev` and wants a longer budget.
+
+**Seen on screen, not merely asserted:** the avatar reads **TU** on both Home and More, where it
+read TE; lifetime volume reads **13.0 t**; Nutrition's date chevrons and settings gear render
+unchanged after the className rewrites; the three converted bars draw at the right width.
+
+**It also reproduced RV-207 ⑥,** which was read at source when filed: the word "Log" is drawn
+directly over each tile's icon and is barely readable against it, and the three tiles occupy about
+**58% of the row**. That is now on LB-163, so the mockup starts from an observation rather than a
+description.
+
 ## Not exercised
 
-**Everything visual here is unverified.** Press states, the three converted bars and the unit change
-were typechecked and reasoned from the diff; nothing was opened in a browser or on the S25, and
-there is no DOM project in the suite, so ④ and ⑦ are held by source assertions. **RV-207's own
-"done when" — RV-205's P24 re-run showing a first-frame change under 100 ms on the tab bar and More
-rows — has NOT been run**, and needs the device.
+**A screenshot is not a press.** `active:` states need a real touch and the S25's WebView — the
+harness cannot show the stuck-`hover:` behaviour that prompted ④, because that is a device
+behaviour, and the `motion-reduce:` branches are unexercised. **RV-207's own "done when" —
+RV-205's P24 re-run showing a first-frame change under 100 ms on the tab bar and More rows — has
+NOT been run**, and needs the device. Nothing here ran on the APK.

@@ -1,40 +1,41 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-162 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-164 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161**;
-eighteen more on 2026-09-25 — the journal entries are the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161**
+(#1685), **RV-207 five of seven** (#1693); eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** READY was **0** at
-2026-09-26 04:00, with nothing left to convert. The bottleneck is not this lane's: **~116 device
-checks owed** (`--sittings`) and the owner questions. **Do not invent work — if READY is 0, say so
-and stop.** Before saying it, check the parks are real — `BF-94` on `BF-61` LOOKS stale and is not
-(BF-61 owes a device pass on the same swipe tray). Verifying that is what found LB-161: the two
-`check-backlog-pointers` advisories, one of which was arguing against a correct entry.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Review sweep 63 refilled
+the queue on 2026-09-26: **RV-208** (inconsistent formatting), **RV-209** (42 font sizes),
+**RV-210** (the keyboard), **RV-211** (Home's empty account), **RV-212** (Nutrition's tone),
+**RV-214** (the session card), **RV-215** (loading and failure states). Before that it sat at 0 for
+a day and a half, so expect it to empty again; when it does, say so and stop rather than inventing
+work — the bottleneck is ~116 device checks and the owner questions, neither of which is this lane's.
 
 ## Blocked / owed
 
 - **PARKED:** `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width`
-  (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated, inline `Ask:`):** `LB-157`,
-  `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`. **Claimed paths: none.**
+  (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated):** `LB-157`, `LB-152` (14 sites,
+  not ~113), `LB-153`, `LB-159`, **`LB-163`** (Home's Log tiles — a mockup is owed, and it is
+  ungated BECAUSE the mockup does not exist yet; gate it once he has seen one). **Own follow-up:**
+  `LB-162`. **Claimed paths: none.**
 
 ## Lessons that cost real time
 
 - **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
-  Twenty-four running. RV-203 ② asked to look a barcode up in a table that **has no barcode column**;
-  the answer was a Lane A entry, not an implementation. **A change that alters what renders without
-  fixing a disagreement is the OWNER'S:** `Lane: O` + `Ask: owner`, never `Gate: owner` (it parks).
+  Twenty-six running: "seven quick wins" was five (RV-207); one asked to query a column that does
+  not exist (RV-203 ②). **A change that alters what renders is the OWNER'S:** `Lane: O` + `Ask:`.
+  `Gate: owner` PARKS it — gate only once a mockup has been SHOWN; producing one is ungated work.
+- **RENDER IT — `npx playwright test` drives the real app at 412 px dark.** For a design entry that
+  IS the verification; it reproduced a defect I had only read. (Health needs >45 s in `next dev`.)
+  A screenshot is not a press, though: `active:` and stuck-`hover:` still need the S25.
 - **A REGRESSION TEST CAN BE GREEN ON THE BUG IT GUARDS — CONTROL-RUN IT.** Stash the SOURCE, keep
-  the spec, confirm it FAILS. Done for BF-61, DV-12 and RV-203; DV-12 also had me publish two wrong
-  causes (a ResizeObserver that never fires on a tab switch, a "0 cost" that was a 1500 ms probe).
-- **MEASURE A COUNT, NOT A TIME, IN `next dev`** — unminified + on-demand compile made a `resizeDelay`
-  A/B unreadable; canvas `font`-setter calls gave 578 → 0. `pnpm start` cannot boot here (creds).
-- **A POPULATION YOU GREPPED IS A FLOOR** — LB-160 was filed at 37 files and was **88** (the grep
-  used one of five regexes). Write the CHECK, then count from it.
+  the spec, confirm it FAILS. A literal is the wrong thing to pin — `rv68`'s `setToggling(null)`
+  broke on a sound refactor while the property it guards held (RV-207). Pin the property.
 - **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (WARNINGS vs base: 811) ·
   `pnpm test` (with `DATABASE_URL`, or ~211 skip) · `pnpm build` · `tsc` · `check-test-typecheck` ·
   `check-doc-index-size` · `check-backlog-pointers` · `check-doc-links`. Two files conflict on nearly
