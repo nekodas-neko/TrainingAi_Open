@@ -110,13 +110,26 @@ produced them (which bias value and window, so a stored estimate can be explaine
 
 **`food_logs` is not touched.** This is the load-bearing decision — see §5.
 
-**⚠ One thing planning must settle first: `plan_meal_answers.answer` already defaults to `'no'`.**
-So "unanswered" today is the *absence of a row*, not a value — and it is not currently distinguishable
-from an explicit "no, I didn't eat it" once a row exists. The trigger in this section is written as
-*no row and no matching food log*, which is correct for today's data, but the `'no'` default has to be
-reconciled (is a defaulted `'no'` really an answer?) before the estimate state is added beside it.
-Getting this wrong would either estimate over a meal the owner deliberately declined, or never
-estimate at all.
+**✅ RESOLVED DURING PLANNING, 2026-09-26 — and it corrects this spec.** An earlier draft flagged
+`plan_meal_answers.answer` defaulting to `'no'` as an ambiguity. It is not one. The schema comment
+(Q-187 phase 2) states the table's rule: **only DECLINES live here.** A row's existence *is* the
+decline, so the default never materialises on its own, and absence of a row means "not declined".
+
+That same comment settles two more things:
+
+- **`'yes'` must never be stored.** *"'I ate it' stays derivable from the food log itself — storing a
+  'yes' beside it would be two sources of truth for one fact."* So confirming an estimate writes the
+  **food log** and clears the estimated row; it does not write an answer. "Skipped" is the existing
+  `'no'`. **This feature therefore adds exactly ONE new state: `estimated`.**
+- **The approach in §5 is the one this table was already built on.** The comment's own justification
+  for keeping unconfirmed prefills out of `food_logs` is *"what stops the day's totals counting food
+  nobody ate, without teaching 23 readers a new filter"* — arrived at independently, before this
+  feature existed.
+
+**One deliberate departure to state plainly:** the owner has chosen that estimated meals **do** count
+toward the ring. That is the opposite *effect* from the comment's "stops the totals counting food
+nobody ate", while keeping its *reasoning* — the estimate is counted by **one explicit consumer**
+(`energy-balance-service`), not by 23 implicit ones, and it is visibly marked wherever it lands.
 
 **Materialised on read, never pushed.** There is no cron layer in this app (module-map §0), so on app
 open and on local-day rollover, any plan meal whose window has passed with no answer and no matching

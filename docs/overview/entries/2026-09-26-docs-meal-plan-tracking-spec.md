@@ -29,3 +29,30 @@ defects, and leaving correctness to every consumer remembering a filter is how b
 
 Spec: `docs/superpowers/specs/2026-09-26-meal-plan-tracking-design.md`. Calibration constants are
 flagged as the owner's, not an implementer's, and the build is not blocked on them.
+
+## The plan, and two corrections the code made to the spec
+
+Phase A's plan is written: `docs/superpowers/plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md`
+— ten TDD tasks, the migration shipping as its own PR per the no-batching rule. BF-203 became a spec
+pointer with BF-203a/b/c beneath it, the way BF-11 and Q-395 were split.
+
+**Reading the code corrected the spec twice.** The schema comment on `plan_meal_answers` (Q-187 phase
+2) states the table's actual rule — *only declines live here* — which resolved an ambiguity the spec
+had flagged (the `'no'` default never materialises on its own) and **invalidated the resolve flow the
+spec described**: storing `'yes'` would be *"two sources of truth for one fact"*, since "I ate it" is
+derivable from the food log. So confirming an estimate writes the log and clears the estimate, and
+the feature adds exactly **one** new state rather than several.
+
+That comment also reached this design's conclusion independently, before the feature existed: keeping
+unconfirmed prefills out of `food_logs` is *"what stops the day's totals counting food nobody ate,
+without teaching 23 readers a new filter."*
+
+**Plans for B and C are deliberately not written yet.** They depend on the shape A actually lands, and
+writing them now would be guessing at interfaces that do not exist — the same reasoning as the
+protocol's "re-verify the plan against current `main`", applied forwards.
+
+**Two checks caught real defects during the write-up.** The plan's own self-review found three helper
+functions called in Task 8 and defined nowhere (now Task 5b). And `check-backlog-pointers` rejected
+`Needs:` written inline on the `Added:` bullet — where it is silently ignored — which would have left
+BF-203b and BF-203c printing as READY and let someone start the corrector before the migration
+existed.
