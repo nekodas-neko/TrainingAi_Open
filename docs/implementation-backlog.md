@@ -692,11 +692,12 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [sleep] TN-83 — the sleep verdict fires on naps and broken captures, and they poison its own baselines
+### [sleep] TN-83 — the sleep verdict bypasses `nightSessions()`, so it judges naps as nights
 
-- **Lane: A** — the verdict's read path / night selection (`packages/shared/src/health/sleep-verdict.ts`
-  is correct; what feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped
-  thresholds against real nights before anything announces them.
+- **Lane: A** — the verdict's read path (`packages/shared/src/health/sleep-verdict.ts` is correct; what
+  feeds it is not). **Added:** 2026-09-26 · Tuning, measuring `TN-81`'s shipped thresholds against real
+  nights before anything announces them. **The work is one import, not a new rule — see the correction
+  below before starting.**
 - **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
 - **⚠ THIS BLOCKS `LA-149`.** Wire the announcement as it stands and the first thing the owner is told
   is that his sleep was bad on a night he slept 7.9 hours. The whole design rests on an announcement
@@ -726,10 +727,32 @@ below threshold and left in place for next time.
   hits the rate by suppressing real signal while still announcing on fragments, and it takes `good`
   to **zero**, so the whole "unusually good night" half of the feature disappears. The rate target is
   a check on a correct population, never a knob to reach it.
-- **The fix, and it is not a threshold change:** select **one night per date** before judging (longest
-  row, or a main-sleep flag if one can be derived), and exclude sub-threshold fragments from **both**
-  the target night **and** the baselines. Then re-measure the rate, and only then consider tuning the
-  multiplier — on a population that is nights.
+- **⤷ THE FIX IS ONE IMPORT, AND THIS ENTRY'S FIRST ANSWER WAS WRONG — corrected 2026-09-26, same day.**
+  `nightSessions()` (`packages/shared/src/health/sleep-night.ts`) **already does exactly this**:
+  circadian nap/night classification first, then fragment merging inside the night band. **15 sites
+  route through it; the verdict path is the one that does not.** The fix is to become the sixteenth
+  consumer, in `LA-149`'s wiring — not to write a selection rule.
+- **⛔ The first recommendation here — "longest row per date" — would have been a SECOND implementation
+  of a solved problem, and wrong on its own terms.** That helper's header carries the measurement: the
+  one genuine fragmented night in this history is **2.53 h + 4.02 h across a 105-minute gap**, and a
+  longest-row rule scores it as a 4.02 h night instead of merging it to 6.55 h. Three nap→night
+  transitions have *smaller* gaps than that real fragmented night, so no gap threshold separates them
+  either — which is why the helper classifies by circadian position first
+  (`NIGHT_BAND_START_HOUR` 21 → `NIGHT_BAND_END_HOUR` 10, with `ALWAYS_NIGHT_MIN_HOURS` 4 as the
+  shift-work escape). This is the **One Formula, One Place** trap, and this entry walked into it before
+  checking whether the formula already existed.
+- **⚠ SEVERITY IS HIGHER THAN "a new bug" — this is a DOCUMENTED, ALREADY-FIXED CLASS RECURRING.**
+  `Q-76` (shipped 2026-08-05) found every consumer answering *"which row is the night?"* for itself and
+  **all of them answering it the same wrong way** — sort by `sleepEnd` descending, take the first — and
+  routed eleven read sites through the one helper rather than adding a rule beside it. That helper's own
+  header records what it prevented: *"a Sleep Score of 5 on a 7.86 h night, and — because the rollup
+  folds its pick into the checkpointed EMA baselines — it poisoned every later z-score too."* **That is
+  the same two-directional failure this entry re-measured independently** — a false verdict on a real
+  night, plus poisoned baselines. Known, named, fixed and documented; `TN-81` reintroduced it by not
+  reaching for the helper.
+- **Still true, and still what to do after the fix:** re-measure the announcement rate, then consider
+  the multiplier. **The sweep above measured the WRONG population, so none of its numbers carry over** —
+  re-run it against nights.
 - **A correction to Tuning's own plan, made here rather than quietly:** the plan's §5 cites *"119 rows
   for the last 120 days — `duration_hours` on all 119"* as evidence the inputs are complete. **That
   count included fragments.** It is 102 dates, with 30 of 120 rows under 3 h. The conclusion that
@@ -774,6 +797,69 @@ below threshold and left in place for next time.
   empty-list answer from `0` to `null` needs its callers checked rather than a blind swap. That is
   the whole of the work; the other three can move to one import.
 
+### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
+
+- **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
+- **Added:** 2026-09-26 · Tuning, checking whether the announce-and-correct design can collect anything
+  at all before more effort goes into what it announces.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **This is a hard constraint on `TN-82`, not a polish item.** `TN-82` assumes the announcement is seen.
+  Measured from source, it gets **one showing per day and no second chance**:
+  - The morning sheet **auto-opens once**, from an effect in `session-select-content.tsx:791`, only when
+    no morning check-in exists for the local day.
+  - `markMorningCheckinPromptDone(tz)` is called **`onClose`** (line 1398) — so dismissing it, or saving,
+    retires it for the rest of the day.
+  - The effect lives **only on `/session-select`**. Open the app to Home and never navigate there and
+    the sheet never appears, so nothing is announced.
+- **Why that defeats the design.** The whole instrument is the owner **disagreeing** with a verdict. He
+  has saved **82** of these sheets in three months and touched a scale in **3** of them, so the
+  established behaviour on this surface is dismissal — and here dismissal is indistinguishable from
+  having read it, while also being final for the day. An announcement delivered once, into the one
+  surface with a three-month record of reflexive dismissal, produces silence that `OR-171`'s guard then
+  has to interpret. **That is the silence trap arriving by construction rather than by bad luck.**
+- **RECOMMENDATION: give the verdict a durable home as well as the modal.** Put it on a surface that
+  persists for the day — the Home sleep card is the obvious one — so a missed or dismissed modal is
+  recoverable and a correction stays possible later. The modal keeps the *prominent* outlier
+  announcement; the durable surface keeps the quiet line and the correction affordance. Cost: one card
+  state, no schema (the verdict and its response state are already persisted by `TN-81`).
+- **Alternatives, and why each loses.** *Re-open the modal until answered* — turns an announcement back
+  into a demand, which is the thing that failed three times. *Leave it modal-only* — cheapest, and it
+  makes near-zero corrections uninterpretable, which is the one outcome the plan says must not be
+  ambiguous. *Notification instead* — the S25 has no working `health-alerts` channel (`RV-155`, sweep 4b).
+- **Reversal cost: low** — a card state and where it reads from, no stored data.
+- **Not device work:** every claim here is from source, so there is nothing for the device agent to
+  reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
+
+### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
+
+- **Lane: O** · **Added:** 2026-09-26 · Tuning, split out of `TN-82` so it reaches him through the
+  Orchestrator rather than sitting inside a build entry.
+- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
+- **Why this one IS his, when most wording is not.** The whole design rests on an announcement he reads
+  and occasionally disagrees with. If he stops reading it, the feature produces silence that *looks*
+  like agreement — `OR-171`'s recorded guard — and the corrections that are the entire point never
+  arrive. Three in-sheet questions have already decayed to zero on this exact surface, so the framing
+  is the mechanism, not decoration. It is also cheap now and expensive after it has trained another
+  reflex.
+- **RECOMMENDATION — ship this copy; he edits it if he wants something else.** Two lines, no question
+  mark anywhere:
+  - **Ordinary day, quiet, no interaction:** `Sleep looks normal — filled in for you.`
+  - **Outlier day, prominent, reason first, one tap to disagree:**
+    `Slept 5h10, 90 min later than usual. Marked this a poor night — tap if that's wrong.`
+- **Why that shape.** The **numbers come before the verdict**, because the verdict is arguable only if
+  its evidence is visible — "your sleep was bad" invites being ignored, "5h10, 90 minutes later than
+  usual" invites either a nod or a correction. `tap if that's wrong` asks for a **disagreement**, not a
+  rating, which is the only thing this collects. And it never says *"how did you sleep?"* — asking is
+  what failed three times.
+- **What he might reasonably want instead, and the cost of each.** Softer (*"looks like a rough
+  night"*) reads better and makes disagreement feel less pointed, at the price of being easier to skim
+  past. Blunter (*"bad night"*) is unmissable and will annoy him on the days it is wrong — which, until
+  `TN-83` lands, is often. Neither is wrong; both are his taste, and the draft above sits between them.
+- **Reversal cost: near zero.** It is two strings on one surface, no schema and no stored data. If the
+  wording is wrong he says so and it changes in a one-line PR — which is the argument for shipping the
+  draft rather than waiting on it.
+- **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
+
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
@@ -794,11 +880,15 @@ below threshold and left in place for next time.
   problem (*"If I remember; I will let you know"*).
 - **The failure mode to watch is him not reading it** — see `OR-171`'s guard. That is why the quiet line
   stays quiet and the loud one stays rare: announce loudly twice a week and it becomes wallpaper.
-- **Ask:** owner — the announcement copy, and the copy only. The whole design rests on an announcement
-  he will actually read. A rare prompt lives or dies on its framing, and
-  it is cheap to review now and expensive to re-do after it has trained another reflex. Show it at
-  384 px dark. Deliberately **not** `Gate: owner`: gating parks the entry, and the build does not
-  need the copy settled to start — `Needs: TN-81` is the only real block here.
+- **⚠ READ `TN-85` BEFORE BUILDING THIS.** The sheet this entry targets auto-opens **once** a day, only
+  on `/session-select`, and is retired for the day `onClose` — so as things stand the announcement gets
+  one showing on a surface with a three-month record of reflexive dismissal. `TN-85` recommends a
+  durable second home for the verdict; building this entry modal-only makes near-zero corrections
+  uninterpretable.
+- **The announcement copy is the owner's, and it is now its own entry — `TN-84`, `Lane: O`.** Split out
+  2026-09-26 on the owner's instruction that anything needing him is routed to the Orchestrator rather
+  than asked in a Tuning session. It does **not** block this build: ship with the drafted copy in
+  `TN-84` and swap in whatever he settles on.
 - **Device:** the morning sheet is the canonical daily surface and the local store is on the write
   path, so the pass needs the APK, not `pnpm dev`.
 
