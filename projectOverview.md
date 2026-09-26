@@ -2620,6 +2620,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][app-shell] ⚠️ Health alerts and workout reminders posted to channels that did not exist — created, NOT seen on the phone (DV-21, 2026-09-26)
+
+Android drops a notification posted to a channel it has never been told about, silently, so illness/high-stress/low-readiness alerts and the daily workout reminder have never been able to appear. Both channels are created now (`health-alerts` importance 4, `workout-reminders` importance 3) and a source guard fails on any `channelId:` with no `createChannel`. **No APK needed** — it is WebView TypeScript. **Pass test:** on the S25 after a Railway deploy, both channels appear in the app's notification settings; force one health alert and it posts and opens `/health/readiness`. Still unknown: whether an alert was ever *attempted*, since a dropped post leaves nothing behind.
+
 ### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
 
 Drawn SVG cats replace the collection's emoji, with the emoji as fallback. The Home card is now an

@@ -1439,6 +1439,27 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
 
 ### [platform][app-shell] DV-21 — health alerts schedule to a notification channel that is never created, so none of them can ever appear
 
+- **✅ SHIPPED (#PR, 2026-09-26) — and the guard that came with it found a SECOND dead channel.**
+  `capacitor-native-init.tsx` now creates `health-alerts` (importance **4**, heads-up, vibrating)
+  beside the other five. **`components/__tests__/dv21-notification-channels-exist.test.ts` then
+  failed on `workout-reminders`**: `reconcileWorkoutReminder` runs from `sync-provider.tsx` and has
+  been scheduling to a channel nothing creates, for as long as health alerts have. It is created
+  here too, at importance **3** like the other reminders — it is a time the owner asked for, not an
+  anomaly. That is the sibling-surface sweep the rule asks for, and it needed the source scan
+  rather than a second sighting: both features look healthy from every layer above the channel.
+- **Why 4 for health alerts.** Illness, sustained high stress and low readiness are things to know
+  BEFORE the day starts, they fire at most once per type per day, and a silent tray entry missed
+  for a day is worth nothing. The importance is immutable once Android has created the channel, so
+  this is the one chance to choose it without a new id and a delete on every installed device.
+- **Verify: device** — confirm `health-alerts` AND `workout-reminders` appear in the app's channel
+  list after a launch on the new APK, then force one health alert and confirm it posts and routes
+  to `/health/readiness`. **Needs a new APK?** No — `capacitor-native-init.tsx` is TypeScript in the
+  WebView, so a Railway deploy reaches it.
+- **Keep:** the device check above. Also still **not established**, and unchanged by this PR:
+  whether any health alert was ever *attempted*. A dropped post is silent, so the absence of alerts
+  is equally consistent with the conditions never triggering — which is why the check forces one
+  rather than waiting for a real anomaly.
+
 - **Lane: B** — `components/capacitor-native-init.tsx:157-196` creates the channels; `lib/health-alerts.ts:8,121` is the caller.
 - **Added:** 2026-09-26 · Device Verification, sweep 4b, station A row 11584 (RV-155). On the S25 the
   only app channel present is `oura-ble-v2`; there is no `health-alerts`.
