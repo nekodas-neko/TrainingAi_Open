@@ -14,7 +14,7 @@ const signals = (over: Partial<PrescriptionSignals> = {}): PrescriptionSignals =
       muscleGroups: ['glutes'], muscleAssignments: [{ muscle: 'glutes', role: 'main' }],
       baseline1rm: 100, current1rm: 120, rm1Trend: 'flat', rm1ChangeKg: 0,
       avgSetDurationSec: 40, timeProfile: null, equipment: ['barbell'], transitionSec: 240,
-      plateau: false, rpeDelta: null, repCompletionRate: null,
+      plateau: false, rpeDelta: null, repCompletionRate: null, baseSets: [],
     },
   ],
   phase: 'accumulation', sessionsInPhase: 2,
@@ -43,7 +43,7 @@ const bodyweight = signals({
     baseline1rm: 110, current1rm: 118, exerciseType: 'bodyweight',
     rm1Trend: 'up', rm1ChangeKg: 8,
     avgSetDurationSec: 40, timeProfile: null, equipment: [], transitionSec: 240,
-    plateau: false, rpeDelta: null, repCompletionRate: null,
+    plateau: false, rpeDelta: null, repCompletionRate: null, baseSets: [],
   }],
 })
 const weighted = signals({

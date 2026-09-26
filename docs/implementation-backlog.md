@@ -2784,9 +2784,21 @@ which is the right shape for something that can only be validated by living with
        the signals first. That is server-side gathering, so it is NOT the local-store work this
        entry puts out of scope, but it is a bigger change than "return the deterministic
        prescription instead of 502" suggests.
-     - **Fix:** thread the base sets/reps/pct into the signals, build a rules prescription from
-       them through the existing `fitToBudget`, and return it flagged `source: 'rules'` instead of
-       502. Do NOT reuse the deload builder.
+     - **✅ SHIPPED 2026-09-26** (`fix/rv202-rules-fallback`). `PrescriptionSignals.exercises` now
+       carries `baseSets` from the exercise's own progression style, and `buildRulesPrescription`
+       turns those into a plan through the same `fitToBudget` the model path uses. The catch
+       returns it flagged `source: 'rules'` with confidence 0.3; the deload builder is untouched.
+     - **The rules plan is NOT persisted, which the entry did not specify.** `storePrescription`
+       holds a plan for seven days, so storing this would give the model no further attempt until
+       it expired — one provider blip becoming a week of uninformed plans, the shape RV-69 fixed
+       for the digests. The slot stays empty and the next open re-runs the model.
+     - **Measured on the dev server with a deliberately invalid API key:** HTTP **200** (was 502),
+       `source: 'rules'`, phase unchanged, `deload: false`, and the prescribed 3×8 @ 75% rest 90
+       matching `style_sets` set for set. `prescription IS NOT NULL` read **f** afterwards, so the
+       non-persistence is observed rather than argued. With a valid key the model path still wins,
+       which is the regression half of the same run.
+     - **Returns null when NO exercise in the session has a progression style**, and the 502
+       stands there — a prescription that invents a load is worse than an error.
   2. ~~**A duration preset change re-runs the whole model call**~~ — **SHIPPED 2026-09-26**
      (`feat/duration-refit-without-the-model`). The route re-fits the stored plan through the
      extracted `budget-stage.ts` and never reaches the model. Measured on the dev server against
@@ -2810,6 +2822,11 @@ which is the right shape for something that can only be validated by living with
   3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
      - The pending flag only comes from a server response (`workout-screen.tsx:446`).
      - **Fix (B):** label the source ("Base program" or "From {date}").
+     - **⚠ Item 1 gave this a second unlabelled source and did not make it worse.** A rules plan
+       carries `source: 'rules'` and nothing renders it, so a model outage now shows the base
+       numbers immediately where it used to show them after ~30 s of "Preparing your AI workout…".
+       Same numbers, same silence, less waiting — but the field this item wants to read now
+       exists, so the label no longer has to be inferred.
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
 
 ### [workouts] LA-147 — a duration change still spends the model's hourly budget, though it no longer calls the model
