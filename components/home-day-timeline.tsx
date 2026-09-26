@@ -87,11 +87,11 @@ function WorkoutCard({ ev }: { ev: TimelineEvent }) {
         {ev.sets != null && (
           <span className="flex items-center gap-1">
             <Dumbbell className="h-3 w-3" />
-            {ev.sets} sets
+            {ev.sets} {ev.sets === 1 ? 'set' : 'sets'}
           </span>
         )}
         {ev.exerciseCount != null && (
-          <span>{ev.exerciseCount} exercises</span>
+          <span>{ev.exerciseCount} {ev.exerciseCount === 1 ? 'exercise' : 'exercises'}</span>
         )}
       </div>
     </div>

@@ -27,6 +27,7 @@ import { TrophyCase } from './trophy-case'
 import { StatsGrid } from './stats-grid'
 import { FeedbackSection } from './feedback-section'
 import { MoreRow, MoreRowGroup } from './more-row'
+import { initialsOf } from '@/lib/initials'
 
 const AchievementsSection = dynamic(
   () => import('./achievements-section').then(m => ({ default: m.AchievementsSection })),
@@ -174,7 +175,7 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
 
   const displayAvatar = avatarOverride ?? user?.avatar ?? null
   const displayName = user?.displayName ?? user?.name ?? null
-  const initials = (displayName ?? user?.email ?? '?').slice(0, 2).toUpperCase()
+  const initials = initialsOf(displayName ?? user?.email)
   const title = equippedTitle ? TITLES[equippedTitle] : null
 
   // RV-87: every figure below is a `??` default, and the screen used to render all of them as

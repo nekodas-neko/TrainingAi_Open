@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.465.67",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: ticking a second supplement while the first one was still saving did nothing at all. Each row now waits only on its own save.",
+      "Fixed: avatar initials took the first two letters of your name, so \"Test User\" showed TE instead of TU.",
+      "Fixed: a workout with one exercise read \"1 exercises\" on the day timeline.",
+      "Fixed: lifetime volume on More read \"13.0T\", which is the symbol for teslas — it now reads \"13.0 t\".",
+      "The tab bar, More rows, Nutrition's date arrows and several other daily controls now respond to a press instead of leaving a stuck highlight behind.",
+    ],
+  },
+  {
     version: "1.465.66",
     date: "2026-09-26",
     changes: [

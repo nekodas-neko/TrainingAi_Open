@@ -57,6 +57,7 @@ import { OuraScoreChipRow } from "@/components/oura-score-chip-row";
 import { IllnessAdvisoryBanner } from "@/components/home/illness-advisory-banner";
 import { BodyBatteryCard } from "@/components/body-battery-card";
 import { HomeDayTimeline } from "@/components/home-day-timeline";
+import { initialsOf } from '@/lib/initials';
 const ExerciseDetectedCard = dynamic(
   () => import("@/components/activity/exercise-detected-card").then(m => ({ default: m.ExerciseDetectedCard })),
   { ssr: false },
@@ -1087,7 +1088,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             <div className="relative flex-none">
               <button
                 onClick={() => navigateToTab(router, "/more")}
-                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border hover:border-brand transition"
+                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border transition-[transform,border-color] duration-100 active:scale-95 active:border-brand motion-reduce:active:scale-100 motion-reduce:transition-none"
                 style={{ background: "var(--brand-card-bg)" }}
                 aria-label="Profile"
               >
@@ -1096,7 +1097,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                     unoptimized={userAvatar.startsWith('data:')} className="object-cover" />
                 ) : (
                   <span className="text-xs font-bold" style={{ color: "var(--color-brand)" }}>
-                    {displayName ? displayName.slice(0, 2).toUpperCase() : "?"}
+                    {initialsOf(displayName)}
                   </span>
                 )}
               </button>

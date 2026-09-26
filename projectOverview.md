@@ -2620,6 +2620,24 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The daily controls answer a press now, and none of it has been seen on the phone (RV-207, 2026-09-26)
+
+The tab bar, More rows, Nutrition's date arrows and settings, pre-workout back, the Home avatar,
+Health's Log pills and the supplement row all had no pressed state, and the WebView left `hover:`
+stuck after a tap. They now use the shared Button's press pattern, `motion-reduce:` guards included.
+Also fixed in the same pass: a second supplement tick was silently dropped while the first was
+saving; avatar initials took the first two letters ("Test User" → TE); "1 exercises"; and lifetime
+volume read "13.0T", the symbol for teslas.
+
+**Not verified: any of it visually.** There is no DOM project in the suite, so the press states and
+the unit are held by source assertions; nothing was opened in a browser or on the S25.
+**Pass test:** RV-207's own — RV-205's P24 re-run on the tab bar and More rows showing a first-frame
+change under 100 ms, on the device.
+
+**Still open:** three of the six `width`-animating bars are not mechanical (a scaling glow, a
+deliberate `overflow-visible`, one that fills right-to-left) — `LB-162`. Home's Log-tile layout is
+an owner decision needing a mockup — `LB-163`.
+
 ### [nutrition][app-shell] ⚠️ Describe now offers your own foods before the AI — the offline half NOT seen on the phone (RV-203, 2026-09-26)
 
 Typing a food into **Describe or enter** went straight to the AI, so a food already saved with real
