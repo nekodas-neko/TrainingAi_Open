@@ -527,7 +527,7 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-204 — the pen always draws its TWELVE LARGEST cats on one line, so it is crowded by construction
 
-- **✅ SHIPPED ① ② ③ — and NOT ④, which the entry was right to warn off (#PR, 2026-09-26).**
+- **✅ SHIPPED ① ② ③ — and NOT ④, which the entry was right to warn off (#1730, 2026-09-26).**
   ① `penCats` round-robins from the rarest tier down instead of sorting biggest-first and slicing,
   so the drawn set spans several `BAND` intervals rather than sharing one 12 px band — and the
   rare cats are still led with, which is what the sort was for. ② `MAX_SHOWN` is a **ceiling**
@@ -633,7 +633,7 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-206 — the Coach button covers 56 px of Home that nothing reserves
 
-- **✅ SHIPPED BOTH HALVES (#PR, 2026-09-26).** ① `.pb-fab-safe` is in `globals.css` beside
+- **✅ SHIPPED BOTH HALVES (#1730, 2026-09-26).** ① `.pb-fab-safe` is in `globals.css` beside
   `pb-nav-safe` — the same nav + inset + gutter, **plus the button's own 3.5rem** — and Home's
   scroll container uses it. ② The FAB is **extended**: the sparkle with a `Coach` label beside it,
   which is the standard treatment for a primary action whose icon is not self-evident. The
