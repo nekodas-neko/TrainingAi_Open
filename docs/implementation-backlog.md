@@ -4077,6 +4077,124 @@ drift.
   `Deload recommended`). Pass/fail: on the S25, with a pending phase transition, confirm the
   prescription row still shows the estimate and the transition text is not clipped away.
 
+### [nutrition] BF-203 — meal-plan tracking: estimated meals when a window passes, and a weight-corrected estimator
+- **Lane:** A — `plan_meal_answers` + a migration, `lib/health/energy-balance-service.ts`, the corrector; **Lane B** takes the resolve sheet once the data lands.
+- **Added:** 2026-09-26 · BugFix intake, from the owner's design session. Owner: *"There is a meal plan tracking feature i wanna explain and have it added."*
+- **Reference:** the spec and checkpoint its three phases read. **The work is in BF-203a/b/c below, not here.**
+- **Not a work item.** Split into three phases 2026-09-26, the way `BF-11` and `Q-395` were. Strike
+  this entry when all three have shipped *and* the whole flow has been walked once on the S25: a
+  window closing into an estimate, resolving it to a real meal, and the corrector moving a
+  subsequent estimate.
+- **Phase order is binding.** A ships first and alone (it carries a migration, which CLAUDE.md
+  forbids batching). B needs A's columns. C needs both, plus enough estimates on the record to
+  correct against.
+- **The design:** [`docs/superpowers/specs/2026-09-26-meal-plan-tracking-design.md`](superpowers/specs/2026-09-26-meal-plan-tracking-design.md) — read it before planning. It carries the measurements, and they are what cut the scope.
+
+- **⚑ MOST OF THIS FEATURE ALREADY SHIPS, which is why the entry is small.** Measured before
+  designing: the target is already goal-derived (`goal-recommendation`), meal windows already exist
+  (`meal_types.timeStartHour/timeEndHour`), reminders already fire with a skip action
+  (`lib/meal-reminders.ts`), plan meals already carry per-slot target macros, **`plan_meal_answers`
+  already tracks whether a planned meal was eaten**, adherence already computes, and **carbs are
+  already skewed around training** (`meal-split.ts`, with a `timingRole` per slot). The request
+  reduced from "build meal-plan tracking" to **three** additions.
+- **The three:** ① an `estimated` answer state filled when a window passes unanswered, materialised
+  on read (there is no cron layer); ② a resolve surface — confirm / swap / skip / add extras, also
+  reachable from the reminder's actions; ③ a rolling corrector that learns how far the estimates run
+  from the truth and shifts FUTURE ones.
+- **⭐ The architecture call, recorded so it is not revisited.** The estimate is an **answer against
+  the plan meal**, never a `food_logs` row. A flagged `food_logs` row is genuinely better at one
+  thing — every existing surface would work untouched — and loses because invented calories would sit
+  in the table the maintenance estimator and adaptive TDEE read, leaving correctness to every
+  consumer remembering a filter. `BF-137` and `BF-138` are both live energy-model defects already.
+  Approach A makes the feedback loop **impossible by construction**. Owner picked it 2026-09-26.
+- **⚠ The corrector is a 14-day window, NOT a next-day adjustment, and that is measured rather than
+  cautious.** The owner's original ask was to infer a missed meal from the next weigh-in. On his own
+  data: a 500 kcal meal is **65 g** of tissue against a median daily weight swing of **200 g** — 1:3.
+  Re-tested on his directional framing over **61 day-pairs**: r = **+0.175**, direction agreed
+  **57%** of the time. The sign is right; applied per-day the correction would be **wrong 4 times in
+  10**. The same edge over a fortnight is reliable, so this is his mechanism at the resolution where
+  it works.
+- **Fat mass is the primary corrector input, weight the agreement check** (his suggestion, tested):
+  fat mass is **28% quieter** (median |Δ| 0.179 vs 0.250 kg) and correlates better (r = +0.217 vs
+  +0.175). It is **not** a clean separation — the scale infers fat from impedance and impedance
+  tracks hydration, so body fat % carries an sd of **2.26 pp** across his history. Hence: robust
+  (median/trimmed) estimator, never a mean; days where the two signals disagree are dropped as
+  hydration events.
+- **Verification that gates the ship:** replay the corrector over ~120 days of his history and state
+  **how many days it would have moved** — the standing bar for anything that changes numbers he reads
+  daily, and the honest test of whether it works. Plus a test asserting estimated answers never reach
+  the TDEE/maintenance inputs.
+- **Blocked on nothing, but one thing must be settled in planning:** `plan_meal_answers.answer`
+  already defaults to `'no'`, so "unanswered" is currently the absence of a row rather than a value.
+  Reconcile that before adding the `estimated` state beside it — the spec says why.
+- **The calibration constants are the owner's**, not an implementer's: window length, bias cap, and
+  the fat-mass/weight agreement threshold. They ship as their own `Lane: O` entry with
+  recommendations once the build shape is fixed, in the shape `BF-201` used. **The build is not
+  blocked on them.**
+- **Verification:** the three items above are built; estimated entries count toward the day's ring and
+  render distinctly; a resolved estimate leaves no estimated row behind; the corrector moves only
+  future estimates; and the replay figure is recorded here. **Device pass owed** on the resolve sheet.
+
+
+### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
+- **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
+- **Added:** 2026-09-26 · BugFix intake. First of BF-203's three phases.
+- **Needs:** — nothing.
+- **The plan:** [`plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md`](superpowers/plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md) — nine tasks, TDD, with the migration shipping as its own PR.
+- **Adds exactly ONE state.** `plan_meal_answers` is declines-only (Q-187 phase 2) and gains
+  `estimated` plus the macros that estimate carries. **`'yes'` is never stored** — *"I ate it stays
+  derivable from the food log itself"* — so confirming an estimate writes the log and clears the
+  estimate rather than answering.
+- **A decline always outranks an estimate.** The upsert does nothing where a row exists, and a test
+  asserts it: the user saying they did not eat something must survive the app assuming they did.
+- **⚠ One assumption the plan makes the implementer check before shipping:** logged-slot matching is
+  by **meal type**, because `food_logs` has no `plan_meal_id`. If any two plan meals share a meal
+  type, one logged snack satisfies both slots. The plan gives the query that answers it and says to
+  stop if it returns rows.
+- **Verification:** an estimate appears only after its window closes, only for today, only where
+  nothing is logged and nothing declined; re-reading does not duplicate; the ring includes it with
+  `estimatedKcal` reported separately; **`food_logs` gains no row this feature wrote**. Device pass
+  owed — materialisation must be seen on the APK, since `getLocalStore` is null in the web sandbox.
+
+### [nutrition][app-shell] BF-203b — phase B: the resolve surface
+- **Lane:** B — the estimated row's styling and its sheet; the reminder's action set.
+- **Added:** 2026-09-26 · BugFix intake.
+- **Needs:** BF-203a — the columns and the state must exist before a surface can resolve them.
+- **Plan not yet written**, deliberately: it depends on the shape A actually lands (column names, the
+  materialisation contract), and writing it now would be guessing at an interface that does not
+  exist. Write it when A merges, re-verifying against `main` per the backlog protocol.
+- **What it covers:** an estimated row is tappable — **I ate this** (writes the food log, clears the
+  estimate), **I ate something else** (pick from slot-tagged meals or usual-at-this-time, then the
+  same), **I skipped it** (the existing `'no'` decline), **Add extras**. The reminder notification
+  already carries an action set (`lib/meal-reminders.ts`) and gains the same choices so a meal can be
+  answered without opening the app.
+- **Estimated entries must render distinctly** wherever they appear — the owner agreed they count
+  toward the ring, on condition the assumed portion is always visible.
+- **`BF-183` feeds the recommendation list** when it lands; B should not build its own.
+
+### [nutrition] BF-203c — phase C: the rolling corrector
+- **Lane:** A — a new estimator module plus the bias read in `meal-estimate.ts` (currently hardcoded 0).
+- **Added:** 2026-09-26 · BugFix intake.
+- **Needs:** BF-203b — there is nothing to correct until estimates are being resolved.
+- **Plan not yet written** — same reason as B, and additionally because the window length is an owner
+  decision that should land first.
+- **Fat mass primary, weight as the agreement check, median/trimmed never a mean.** Measured on the
+  owner's data: fat mass is **28% quieter** (median |Δ| 0.179 vs 0.250 kg) and correlates better with
+  intake (r = **+0.217** vs +0.175). It is *not* a clean separation — the scale infers fat from
+  impedance and impedance tracks hydration, so body fat % carries an sd of **2.26 pp**. Days where
+  the two signals disagree in direction are dropped as hydration events rather than learned from.
+- **Forward-only.** The bias shifts FUTURE estimates and never rewrites a stored answer, so a day the
+  owner has already reviewed does not change under him.
+- **⚠ Guard rails that are part of the work, not polish:** the bias is **capped** so one bad fortnight
+  cannot run away, and a **retatrutide titration change resets the window** — a drug-driven weight
+  change is indistinguishable from an intake change, which is `BF-137`'s live failure.
+- **⭐ The constants are the OWNER'S, not an implementer's** — window length, bias cap, agreement
+  threshold. They ship as their own `Lane: O` entry with recommendations, in the shape `BF-201` used.
+  **The build is not blocked on them**; provisional defaults are fine and the entry replaces them.
+- **Verification that gates the ship:** replay the corrector over ~120 days of the owner's history and
+  **state how many days it would have moved**. That is the standing bar for anything that changes
+  numbers he reads daily, and it is the honest test of whether the corrector works at all.
+
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
 - **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
 - **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
