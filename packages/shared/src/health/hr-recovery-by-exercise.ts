@@ -9,6 +9,8 @@
 // Shared so the done screen and the day-overlay sheet — which render this identically —
 // cannot drift (One Formula, One Place).
 
+import { median } from '@trainingai/shared/stats'
+
 export interface SetRecoveryInput {
   exerciseName: string
   hrr1: number | null
@@ -29,12 +31,6 @@ export interface ExerciseRecovery {
   adequate: boolean | null
 }
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
-}
-
 /** Groups sets by exercise, preserving first-seen order (which is workout order).
  *  Exercises with no set reporting an hrr1 are omitted — there is nothing to show. */
 export function aggregateHrRecoveryByExercise(sets: SetRecoveryInput[]): ExerciseRecovery[] {
@@ -48,8 +44,11 @@ export function aggregateHrRecoveryByExercise(sets: SetRecoveryInput[]): Exercis
   const out: ExerciseRecovery[] = []
   for (const [exerciseName, group] of byExercise) {
     const withReading = group.filter(s => s.hrr1 != null)
-    if (withReading.length === 0) continue
     const medianHrr1 = median(withReading.map(s => s.hrr1!))
+    // The local copy this replaced returned NaN on an empty group, behind a `length === 0`
+    // guard that made it unreachable. Branching on the null says the same thing without
+    // keeping a NaN that nothing could ever produce (LA-151).
+    if (medianHrr1 === null) continue
     // Unknown (null) rather than false when no set reported an adequacy verdict — absence of
     // evidence is not a failed recovery, and the UI renders no mark for null.
     const verdicts = withReading.filter(s => s.adequate != null)

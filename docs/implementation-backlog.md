@@ -1015,62 +1015,81 @@ below threshold and left in place for next time.
   corrections means the instrument FAILED, not that the model is validated.
 - **Keep:** the announcement copy is the owner's to approve — it rides with `TN-82`.
 
-### [platform] LA-151 — eight more `median` copies, outside the shared health/workout core
+### [platform] LA-151 — Reference: one `median`, one `lowerMedian`, and the four that stay private
 
-- **✅ `acwr.ts` DONE 2026-09-26** (`refactor/la151-acwr-median`) — **and this entry's reason for
-  taking it first was wrong.** It said the copy "feeds training-load advice". It does not:
-  `typicalSessionVolumeKg` is declared on `ActivityScoreInput` and **never read**, because
-  `Q-190` replaced the volume lane's denominator with the absolute `sessionVolumeGoalKg`
-  precisely so the target would stop chasing the user's own median. So the upper-middle bias
-  reached a **display** and nothing that computes.
-- **Measured before assuming, over the owner's real 119 sessions (180 days):** across the rolling
-  28-day windows the two tie-breaks differ on **39% of days**, always upward, median **1.85%**,
-  max **21%**. That is what the audit row has been showing; no score moved, so no owner gate.
-- **Two findings that came with it, neither in this entry:**
-  1. **`typicalSessionVolumeKg` is a dead input** on `ActivityScoreInput`, threaded from
-     `computeVolumeAcwr` through `readiness-payload.ts`, `build-day-audit.ts` and the
-     health-insight route into a function that ignores it. Removing it touches ~6 files and is
-     cleanup, not this fix — left here rather than widened into it.
-  2. **The score audit displayed a contradiction, now fixed.** Its `typicalSessionVolumeKg` row
-     read *"the volume-lane denominator"* directly beneath a `sessionVolumeGoalKg` row reading
-     *"deliberately NOT the median of your own sessions"*. Q-190 changed the first and left the
-     second's note behind.
-- **The lesson for the remaining seven:** this entry named the wrong consumer, and the measurement
-  that mattered took ten minutes. **Establish what actually reads the number before deciding how
-  risky its tie-break is** — the one that looked most dangerous was inert.
+- **✅ DONE 2026-09-26** (`refactor/la151-remaining-medians`, after `refactor/la151-acwr-median`).
+  **Reference** — kept so the next reader of these files does not re-open a decision; there is no
+  work left here.
+- **Lane: A.** **Added:** 2026-09-26 by `LA-148`. Its count was four; this entry's was eight; the
+  real number of hand-rolled copies was **eleven**, and the census that found them is one grep:
+  `grep -rn "length % 2" packages/shared/src lib app` plus a scan for
+  `function median*`. **Neither count was low because the work was hard — both were low because
+  the grep was scoped.** `LA-148` looked only in `health/**`; this entry looked only where
+  `LA-148` had pointed, so it inherited the blind spot and added two of its own.
+- **Consolidated (9):** `health/hr-recovery-by-exercise.ts` · `health/sleep-score.ts` ·
+  `health/temperature-baseline.ts` (its frame series) · `workout/hrr-trend.ts` ·
+  `lib/activity/cadence-tracker.ts` · `lib/activity/auto-detection-service.ts` ·
+  `lib/health/daytime-stress.ts` · `lib/health/device-comparison.ts` · `lib/oura-ble/decode.ts`.
+  Plus `ai-periodization/acwr.ts` earlier. Every one already averaged the two middles, so **no
+  number moved**; what differed was the empty case, and each was decided from its callers rather
+  than swapped.
+- **`lowerMedian` is now a named concept in `stats.ts`, not a copy that drifted.** Three callers
+  want the LOWER of the two middles and each has a reason: `oura-models/daily-baselines.ts` and
+  `oura-models/cumulative-stress.ts` mirror `torch.median` and their goldens pin it (46.923 over
+  14 symmetric values only comes out of the lower middle), and
+  `/api/oura-ble/step-counter-export` is a diagnostic console where averaging `[1,2,3,4]` into
+  2.5 Hz reports a stride frequency the ring never decoded. **This entry called that third one
+  "a THIRD tie-break" as though it were accidental.** It is not, and its test said so in a
+  comment — which is what a mutation run turned up, after the change had already been made.
 
-- **Lane: A** — `lib/activity/**`, `lib/health/daytime-stress.ts`, `lib/oura-ble/decode.ts`,
-  `app/api/oura-ble/step-counter-export/route.ts`, `packages/shared/src/health/sleep-staging.ts`,
-  `packages/shared/src/health/hrv-5min.ts`, `packages/shared/src/health/hr-recovery-by-exercise.ts`,
-  `packages/shared/src/health/sleep-score.ts`, `packages/shared/src/ai-periodization/acwr.ts`,
-  `packages/shared/src/workout/hrr-trend.ts`.
-- **Added:** 2026-09-26 by `LA-148`, which consolidated six copies into
-  `packages/shared/src/stats.ts` and found the population was larger than it had measured.
-  **`LA-148` said four; the real count was fourteen.** It had scoped its grep to
-  `packages/shared/src/health/**` plus one workout file, so everything in `lib/` and `app/api/`
-  was invisible to it — and four copies inside its own declared scope were missed as well.
-- **Measured 2026-09-26, after `LA-148` landed.** One implementation is now canonical
-  (`stats.ts`: average of the two middles, `null` on empty). These still have their own:
+- **⛔ Four stay private, with the reason, so they are not re-swept:**
+  1. `health/sleep-staging.ts` — **nearest-rank**, a genuinely different definition, and the file
+     has its own `quantile` used at q=0.05 and `WAKE_MOVE_QUANTILE`. Consolidating the median
+     alone would leave two quantile definitions in one file, which is worse than one consistent
+     local pair. Moving both is a threshold change and needs measurement.
+  2. `health/hrv-5min.ts` — pinned to a `torch.quantile` citation and equal to canonical at
+     q=0.5, so consolidating trades a real cross-reference for no behavioural gain.
+  3. `health/temperature-baseline.ts`'s `median7` — `sorted[3]` of a fixed 7-slot ring buffer, in
+     a per-sample loop. The name is its contract; the shared function would add a null check to a
+     hot path for nothing.
+  4. `lib/health/daytime-stress.ts`'s `hrMinMedianMax` — **not a median at all.** It reads
+     `hr[0]/hr[1]/hr[2]` positionally from an already-ordered `[min, median, max]` triple that
+     mirrors the model. (Its *other* function, the real `median` at what was line 186, was
+     consolidated. A first pass here read only the positional one and concluded the file had no
+     median copy — wrong, and caught by the census rather than by reading.)
+- **Already delegating, not copies:** `health/cadence.ts`'s `medianRounded` and
+  `health/daily-medians.ts`'s `medianGated` both call the shared `median` already.
 
-  | where | even count | empty | note |
-  |---|---|---|---|
-  | `health/sleep-staging.ts` | **nearest-rank** | null | its own `quantile` too — rounds `q*(n-1)` instead of interpolating, so it is a genuinely DIFFERENT definition, not a copy |
-  | `health/hrv-5min.ts` | average | **NaN** | linear-interp at q=0.5, so equal to canonical; pinned to a `torch.quantile` source, and that citation is a reason to leave it |
-  | `health/hr-recovery-by-exercise.ts` | average | **NaN** | no empty guard at all |
-  | `health/sleep-score.ts` | average | **NaN** | inline arrow inside one function |
-  | `workout/hrr-trend.ts` | average | — | inline |
-  | `ai-periodization/acwr.ts` | **upper** | **0** | the same shape as the bug `LA-148` fixed |
-  | `lib/activity/cadence-tracker.ts` · `auto-detection-service.ts` · `lib/health/daytime-stress.ts` | avg | varies | three separate private copies |
-  | `lib/oura-ble/decode.ts` · `app/api/oura-ble/step-counter-export/route.ts` | avg / **lower** | — | the export route takes `sorted[floor((n-1)/2)]`, a THIRD tie-break |
-- **⛔ Not a mechanical sweep, and `LA-148`'s experience is the evidence.** Swapping the divergent
-  one there changed live-HR values on real fixtures and needed a display-boundary rounding decision;
-  five tests encoded the old tie-break deliberately, with comments. Each site here needs its empty
-  case and its tie-break checked against its callers before it moves.
-- **Take `acwr.ts` first** — upper-middle plus `0`-on-empty is exactly the pair that made
-  `hr-smoothing` the dangerous one, and ACWR feeds training-load advice.
-- **Leave `hrv-5min.ts` alone unless its citation is re-checked**: it mirrors an external model's
-  quantile and is equivalent at q=0.5 anyway, so consolidating it trades a real cross-reference
-  for no behavioural gain.
+- **The `acwr.ts` half, kept because its lesson outlived it.** This entry said that copy "feeds
+  training-load advice". It does not: `typicalSessionVolumeKg` is declared on
+  `ActivityScoreInput` and **never read**, because `Q-190` replaced the volume lane's denominator
+  with the absolute `sessionVolumeGoalKg` precisely so the target would stop chasing the user's
+  own median. The upper-middle bias reached a **display** and nothing that computes. Measured over
+  the owner's real 119 sessions (180 days): across rolling 28-day windows the two tie-breaks
+  differ on **39% of days**, always upward, median **1.85%**, max **21%**. No score moved, so no
+  owner gate. **Establish what actually reads a number before deciding how risky its tie-break
+  is** — the one that looked most dangerous was inert.
+
+- **Still owed, and deliberately not widened into this:** `typicalSessionVolumeKg` is a dead input
+  threaded from `computeVolumeAcwr` through `readiness-payload.ts`, `build-day-audit.ts` and the
+  health-insight route into a function that ignores it. Removing it touches ~6 files and is a
+  type-surface change, not a math one — `LA-154`.
+
+### [platform] LA-154 — remove the dead `typicalSessionVolumeKg` input
+
+- **Lane: A** — `packages/shared/src/ai-periodization/acwr.ts`, the `ActivityScoreInput` type,
+  `readiness-payload.ts`, `build-day-audit.ts`, `app/api/ai/health-insight/**`.
+- **Added:** 2026-09-26 by `LA-151`, which found it and declined to widen a median consolidation
+  into a type-surface change.
+- `computeVolumeAcwr` computes it, three call sites thread it, and the scoring function **never
+  reads it** — `Q-190` replaced the volume lane's denominator with the absolute
+  `sessionVolumeGoalKg` so the target would stop chasing the user's own median, and left the
+  input behind.
+- **Not a rename or a behaviour change:** nothing consumes the value, so removing it cannot move
+  a score. The care needed is only that the day-audit row and the readiness payload shape are
+  read by tests and by the admin console.
+- **Done when:** no file outside a test mentions `typicalSessionVolumeKg`, and the score audit
+  no longer prints a row for it.
 
 ### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
 

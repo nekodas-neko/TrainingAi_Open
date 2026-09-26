@@ -1,3 +1,5 @@
+import { lowerMedian } from '@trainingai/shared/stats'
+
 // daily_short_term_baselines_1_1_0 — a faithful TypeScript port of the 0-parameter algorithmic
 // TorchScript model (StressBaselines). Given a trailing window (5–21 days) of daily medians, it
 // produces the personal short-term baselines the stress/illness/readiness pipeline compares against:
@@ -52,9 +54,9 @@ function gaussianWeightedAverage(medians: number[]): number {
 // (element at index floor((n−1)/2) of the sorted array), NOT the average. The golden's night-HRV
 // baseline (46.923 over 14 symmetric values) pins this.
 function torchMedian(values: number[]): number {
-  if (values.length === 0) return NaN
-  const s = [...values].sort((a, b) => a - b)
-  return s[Math.floor((s.length - 1) / 2)]
+  // NaN on empty, not null: this mirrors the model, and downstream arithmetic propagating a NaN
+  // is what the port does. The sort-and-index itself lives in `lowerMedian` (LA-151).
+  return lowerMedian(values) ?? NaN
 }
 
 function calcNightHrvBaseline(i: DailyBaselinesInput): number {
