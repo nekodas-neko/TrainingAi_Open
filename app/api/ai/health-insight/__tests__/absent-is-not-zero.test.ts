@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { metric, splitMeasured, buildPrompt } from '../prompt'
+import { describe, it, expect, vi } from 'vitest'
+import { metric, splitMeasured } from '../metrics'
+import { buildInsightText } from '../insight-text'
 
 vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({ user: { id: '00000000-0000-4000-8000-000000000353', timezone: 'Australia/Brisbane' } })),
@@ -62,7 +63,7 @@ describe('an absent metric is omitted, not rendered as a value', () => {
     ])
     expect(lines).toEqual([])
     expect(JSON.stringify(lines)).not.toContain('no data')
-    expect(buildPrompt('activity', lines, absent)).not.toContain('no data')
+    expect(buildInsightText({ lines, absent })).not.toContain('no data')
   })
 
   it('keeps a genuine zero, which is a measurement and not an absence', () => {
@@ -78,61 +79,68 @@ describe('an absent metric is omitted, not rendered as a value', () => {
   })
 })
 
-describe('the prompt tells the model what absence means', () => {
-  it('names the absent metrics and forbids reading them as zero or behaviour', () => {
-    const prompt = buildPrompt('activity', ['Activity score: 40/100 (low)'], ['Steps', 'Active calories'])
-    expect(prompt).toContain('Steps, Active calories')
-    expect(prompt).toMatch(/NOT zeros/)
-    expect(prompt).toMatch(/observed behaviour/)
-    // The specific editorialising the incident produced: low / absent / skipped / "did not".
-    expect(prompt).toMatch(/low, absent, skipped/)
-    expect(prompt).toContain('never build the tip around one')
+describe('the rendered insight says what absence means (RV-201)', () => {
+  // The prompt used to spend a paragraph instructing the model not to read a missing reading as a
+  // zero, as "low", or as something the owner did or did not do. These assert the property that
+  // paragraph was asking for, now that a template rather than a model decides the wording.
+  it('names the absent metrics and says only that no reading exists', () => {
+    const text = buildInsightText({
+      headline: { label: 'Activity', value: '40/100', band: 'low' },
+      lines: [],
+      absent: ['Steps', 'Active calories'],
+    })
+    expect(text).toContain('No reading was recorded today for Steps and Active calories.')
+    // The specific editorialising the incident produced.
+    expect(text).not.toMatch(/\b(skipped|did not|no steps|zero)\b/i)
   })
 
-  // Omission alone is not enough: a section with no steps line can still have the model infer the
-  // user did not walk. The instruction guards that; omission guards the value being read.
-  it('still forbids inventing a value even when nothing is absent', () => {
-    const prompt = buildPrompt('sleep', ['Sleep score: 80/100'], [])
-    expect(prompt).toContain('never infer a value that is not listed')
-    expect(prompt).not.toMatch(/Not measured today/)
+  it('cannot describe an absent metric as a value, because absent labels never reach the readout', () => {
+    const { lines, absent } = splitMeasured([
+      metric('Steps', null),
+      metric('Active calories', '350 kcal'),
+    ])
+    const text = buildInsightText({ lines, absent })
+    expect(text).toContain('350 kcal')
+    // "Steps" appears once, in the absence sentence — never as "Steps: something".
+    expect(text).not.toMatch(/Steps: /)
+    expect(text).toContain('No reading was recorded today for Steps.')
   })
 
-  it('puts the data after the instruction, unchanged', () => {
-    const prompt = buildPrompt('sleep', ['Duration: 430 min', 'Efficiency: 91%'], ['Overnight HRV'])
-    expect(prompt.endsWith('Data:\nDuration: 430 min\nEfficiency: 91%')).toBe(true)
-  })
-})
-
-describe('the route, end to end', () => {
-  const RING_USER = '00000000-0000-4000-8000-000000000353'
-  let captured = ''
-
-  beforeEach(() => { captured = '' })
-
-
-  // The exact shape Q-452's gate lets through and this bug then misreports: ONE reading present
-  // (a sleep score) and every other sleep field absent. Before Q-353 this prompt carried four
-  // `no data` lines.
-  it('sends a prompt with the score, no "no data", and the absent metrics named', async () => {
-    const { POST } = await import('../route')
-    const res = await POST(new Request('http://localhost/api/ai/health-insight', {
-      method: 'POST',
-      body: JSON.stringify({ section: 'sleep', date: '2026-08-18' }),
-    }))
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ insight: 'stub insight' })
-
-    const prompt = (globalThis as { __capturedPrompt?: string }).__capturedPrompt
-    // Proves the model was actually reached — an empty capture would make every assertion below
-    // vacuously true, which is how this test would silently stop testing anything.
-    expect(prompt).toBeTruthy()
-    expect(prompt).toContain('Sleep score: 80/100')
-    expect(prompt).not.toContain('no data')
-    for (const gone of ['Duration:', 'Efficiency:', 'Overnight HRV:', 'Avg sleeping HR:']) {
-      expect(prompt).not.toContain(gone)
+  // A mutation that appended the absent labels to the "Also recorded" readout survived the first
+  // version of this file: the assertions looked for "Steps: ", and a BARE label slipped through.
+  // An absent metric must appear in exactly one place — the sentence that says no reading exists.
+  it('lets an absent label appear only in the absence sentence, never in the readout', () => {
+    const text = buildInsightText({
+      headline: { label: 'Activity', value: '44/100', band: 'low' },
+      lines: ['Steps: 3120 (goal 8000)'],
+      absent: ['Active calories', 'Illness radar'],
+    })
+    const marker = 'No reading was recorded today for'
+    const [readout, absence] = [text.slice(0, text.indexOf(marker)), text.slice(text.indexOf(marker))]
+    for (const label of ['Active calories', 'Illness radar']) {
+      expect(readout, `"${label}" reached the readout, where it reads as a value`).not.toContain(label)
+      expect(absence).toContain(label)
     }
-    expect(prompt).toContain('Duration, Efficiency, Overnight HRV, Avg sleeping HR')
-    expect(prompt).toMatch(/NOT zeros/)
-    void RING_USER; void captured
+    expect(readout).toContain('Steps: 3120')
+  })
+
+  it('says nothing about absence when nothing is absent', () => {
+    const text = buildInsightText({
+      headline: { label: 'Sleep score', value: '80/100', band: 'good' },
+      lines: [],
+      absent: [],
+    })
+    expect(text).toBe('Sleep score is 80/100 (good).')
+    expect(text).not.toMatch(/No reading/)
+  })
+
+  it('uses the band word, never a superlative the band does not support (Q-292)', () => {
+    const text = buildInsightText({
+      headline: { label: 'Sleep score', value: '80/100', band: 'good' },
+      lines: [],
+      absent: [],
+    })
+    expect(text).toContain('(good)')
+    expect(text).not.toMatch(/perfect|excellent|amazing|flawless/i)
   })
 })

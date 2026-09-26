@@ -631,7 +631,7 @@ below threshold and left in place for next time.
   `docs/mobile-ui-and-performance.md`. Pass/fail: a section can be moved, the new order survives
   leaving and re-entering Home, and a plain vertical scroll in edit mode does not pick anything up.
 
-### [app-shell] BF-206 — the Coach button covers 56 px of Home that nothing reserves, and nothing on screen says what it is
+### [app-shell] BF-206 — the Coach button covers 56 px of Home that nothing reserves
 
 - **✅ SHIPPED BOTH HALVES (#PR, 2026-09-26).** ① `.pb-fab-safe` is in `globals.css` beside
   `pb-nav-safe` — the same nav + inset + gutter, **plus the button's own 3.5rem** — and Home's
@@ -648,8 +648,16 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `components/coach/coach-fab.tsx`, `app/session-select/session-select-content.tsx`,
   `app/globals.css`.
-- **Added:** 2026-09-26 · owner, on the Home screenshot: *"there is that button on the widget the
-  white circle."* Two problems in one control.
+- **Added:** 2026-09-26 · found while investigating an owner report that turned out to be about a
+  different control entirely.
+- **⚠ THIS ENTRY WAS FILED AGAINST THE WRONG BUTTON, corrected the same day.** The owner's *"that
+  button on the widget the white circle"* is the **moon in the collection pen's backdrop** — see
+  `BF-208`, which is the report. The Coach FAB is a different white circle further down the same
+  screenshot, and reading his words onto it was a guess presented as a trace.
+- **What survives the correction, and why:** finding ① below was measured from the CSS, not inferred
+  from his words, so it is true regardless of what he meant. **Finding ② did not survive and has
+  been struck** — "nothing identifies this button" was an unreported design opinion that existed
+  only because the misread made it look like his complaint.
 - **Needs:** — nothing.
 - **① The reserved space is one control short, and the arithmetic is exact.** Home's scroll
   container uses `pb-nav-safe` = `3.5rem + inset + 0.75rem` — the **nav bar only**. The FAB is
@@ -660,19 +668,17 @@ below threshold and left in place for next time.
   **Fix: a `pb-fab-safe` utility** (`nav + gutter + 3.5rem + inset`) applied to Home's
   `scrollClassName`, beside the existing `pb-nav-safe` in `globals.css`. Home is the only screen
   mounting `CoachFab`, so nothing else changes.
-- **② Nothing identifies it.** The control is a `SparklesIcon` in a filled circle with **no visible
-  text**; the only thing naming it is `aria-label="Open AI Coach"`. A sparkle is the app's generic
-  "AI" mark — it is also on the weekly-recap banner, the meal-source row and the profile tab — so it
-  names a *category*, not this destination.
-  **Recommendation: an extended FAB — the icon with a short "Coach" label beside it**, which is the
-  standard treatment for a primary action whose icon is not self-evident and costs one span.
-  Alternative: leave it iconic and teach it with a one-time tooltip; cheaper, but it only works once
-  and is invisible to anyone who dismisses it.
+- **② ~~Nothing identifies it~~ — STRUCK 2026-09-26.** This said the FAB needed a visible label
+  because a bare sparkle names a category rather than a destination. That may still be true, but
+  **nobody reported it**; it was written because the control had been mistaken for the one the owner
+  actually flagged. An unrequested restyle of a working button is not intake's to file. If it is
+  ever wanted it starts as a fresh `Lane: O` preference, not as a defect.
 - **Checked and NOT a finding: the colour.** `bg-foreground text-background` reads as a stark white
   circle in the dark theme, but it is the repo's standard filled-control treatment — segmented tabs,
   coach messages, macro targets, the goal and personal-detail toggles and the calendar's today cell
   all use it. It is consistent, so it is not what to change.
 - **Reversal cost:** none. One CSS utility and one label.
+- **Scope is now finding ① alone: add `pb-fab-safe` and apply it.** That is the whole entry.
 - **Verify on the device**, three-button nav *and* gesture nav: scroll Home to the very bottom and
   confirm the last row clears the button. Per the device rule, an inset read of `0` under
   three-button navigation makes a broken clearance look correct, so both modes are required.
@@ -682,6 +688,9 @@ below threshold and left in place for next time.
 - **Lane: O** · **Added:** 2026-09-26 · owner: *"the info page isnt TOO well designed."* Ungated on
   purpose: this is a judgement about looks, so it waits for him rather than going to a lane.
 - **Ask:** owner — approve a direction for the `/collection` explanation, or name your own.
+  **Answer this together with `BF-209`**, which covers the rest of the same screen: the owner sent
+  one screenshot of `/collection` and said *"not very good on UI"* about the whole of it, and
+  splitting the answer across two sittings would get the page redesigned twice.
 - **What is there now, measured:** `Rules()` in `app/collection/collection-content.tsx` is a single
   card holding **four paragraphs, 177 words**, all at `text-xs` (12 px) in `text-muted-foreground`,
   with one bolded lead-in per paragraph and no other structure. It sits below three ladder cards
@@ -704,6 +713,82 @@ below threshold and left in place for next time.
 - **Sequencing: this is worth doing AFTER PS-49**, not before. v2 changes every number on the page
   and adds three tiers, so a redesign now is a redesign twice. Nothing breaks by waiting.
 - **Reversal cost:** low — one component, no state, no stored data.
+
+### [app-shell] BF-208 — the "button" on the collection widget is the MOON, and the one thing beside it that looks tappable is a `<span>`
+
+- **Lane:** B — `public/cats/scene-*.svg`, `components/home/collection-pen.tsx`.
+- **Added:** 2026-09-26 · owner, pointing at the Home collection card: *"there is that button on
+  the widget the white circle"* — then, after a wrong first trace, *"No not the ai coach white
+  button; its the one on the collection widget."*
+- **Needs:** — nothing.
+- **It is not a button. It is the moon in the pen's backdrop**, and it is decoration that has been
+  drawn to look exactly like a control. In `public/cats/scene-meadow.svg`:
+  `<circle cx="300" cy="36" r="14" fill="#f3ecd2"/>` — a **28 px solid near-white disc** on a
+  `#16203a → #2a3a5c` night sky. The scene renders at a 360×150 viewBox into a ~348 px pen, so it
+  lands almost 1:1, in the **upper-right corner** — the one screen position that means "control".
+- **Four things converge to make it read as tappable**, and the fix has to break at least two:
+  ① it is the **highest-contrast element in the card**, brighter than any text on it;
+  ② it is a **hard-edged filled circle**, the exact shape of every icon button in the app;
+  ③ it sits in the **top-right corner**; and
+  ④ **`+12 more` is 30 px to its left**, styled `rounded-full bg-background/70 px-1.5` — a pill.
+- **④ is its own defect and the more serious half.** That chip is a plain `<span>`
+  (`collection-pen.tsx`), inside a `<div aria-hidden="true">`. It is styled as a chip, reads as
+  "tap to see the other twelve", and **does nothing**. The whole card navigates to `/collection`,
+  so a tap does eventually show them — by accident, not because the chip did it. So the corner
+  holds two button-shaped things, **neither of which is a button**, next to each other.
+- **Recommendation: soften the moon and demote the chip.** Take the moon to ~60 % opacity, move it
+  off the corner (it can sit left of centre — nothing else is up there, per `BF-204`'s finding that
+  75 % of the pen is empty sky), and drop the pill styling from the count so it reads as a caption
+  rather than a control. That is a change to one SVG attribute and one class list.
+  **Alternative — make the chip real**, a button that opens `/collection` directly. It is honest
+  about the affordance and it is the wrong call here: the entire card is already that link, so it
+  adds a second tap target for the same destination inside it, which is the nested-interactive
+  shape the repo's own Custom Rules check exists to catch.
+- **Sweep the other eleven scenes in the same PR.** `scene-meadow.svg` is the default and the one he
+  saw; `public/cats/` holds twelve, several of which (`space`, `snow`, `bedroom`) will have their
+  own bright disc in the same corner. A fix applied to meadow alone is half done, per the
+  sibling-surface rule.
+- **Reversal cost:** none. One fill/opacity/position in an SVG and one class list.
+- **Verify on the device** at the real width, dark theme: the corner should read as sky, and nothing
+  in the pen should invite a tap.
+
+### [app-shell] BF-209 — `/collection` is 2.2 screens of scroll whose main layout element is a 59 % empty row
+
+- **Lane: O** · **Added:** 2026-09-26 · owner, on the `/collection` screenshot: *"This is what both
+  screens look like. Not very good on UI."* Ungated on purpose — a judgement about looks is his, and
+  this is the second of the two screens `BF-207` covers.
+- **Ask:** owner — approve a direction for the `/collection` screen, or name your own. `BF-207`
+  holds the same question for the explanation block at the bottom of it; answer them together.
+- **Measured, at 412 dp:**
+  **①** The tier row is `flex items-end justify-around` with three 48 px sprites in a 348 px card —
+  **144 px of content and 204 px of gap, 59 % blank**, scattered at ~68 px apart. It is the first
+  thing on every card and the emptiest.
+  **②** Nothing in that row says the three tiers **turn into each other**. No arrow, no cost, no
+  grouping — three sprites spaced like unrelated stats, on a screen whose entire subject is that
+  they merge.
+  **③** The roster runs to `SHOWN = 20` per ladder. At the owner's current 8 per ladder the screen
+  is **~1,770 px, about 2.2 viewports**; at the cap it is **~3,000 px, 3.7 viewports**, and 60 of
+  those rows are two lines of grey text.
+  **④** The roster's second line names cats **that no longer exist**. `from` lists the parts a merge
+  consumed, and `settle()` does `held[i].splice(0, cost)` — so "from Beanger, Wag, Junky +1" is four
+  names with no referent anywhere in the app. (A decay can restore them, via `held[lowest-1].push
+  (...broken.parts)`, but while the cat is held they are unfindable.)
+- **Checked and NOT a finding: the 10 px type.** `text-[10px]` looked like the problem and is used
+  **586 times** across the app, with `text-[11px]` 288 more — it is the house caption size, not an
+  outlier here. The density complaint stands on the **row count**, not the type size.
+- **Recommendation: make the tier row the ladder it describes, and put the roster behind a
+  disclosure.** Draw the three tiers as a chain with the merge cost on each link, filling the width
+  it already occupies; collapse the per-cat list to a "Show all 8" toggle. That takes the screen to
+  roughly one viewport of substance with the detail a tap away, and it fixes ①, ② and ③ together.
+  **Alternative ① — keep the list, fix only the spacing and grouping.** Cheapest, genuinely better,
+  and it leaves a 2.2-viewport screen at 2.2 viewports.
+  **Alternative ② — split the roster onto its own screen per ladder.** Best for someone who wants to
+  read every cat, and it adds a navigation level to a feature that is meant to be glanced at.
+- **On ④, a separate small call:** either drop the `from` line, or make those names tappable to show
+  the lineage. Dropping it is the recommendation — a name you cannot look up is noise.
+- **Sequencing: after PS-49**, like `BF-207`. v2 changes the tier count from three to six and the
+  costs to 3→1, which is exactly what ① and ② would be laying out.
+- **Reversal cost:** low — one screen, two components, no stored state and no engine change.
 
 ### [platform] OR-174 — 38 branches survive with no open PR, and four of them hold live queued work
 
@@ -967,6 +1052,26 @@ below threshold and left in place for next time.
 
 ### [sleep][app-shell] TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
 
+- **✅ SHIPPED the durable home (#1727, 2026-09-26).** `components/home/sleep-verdict-note.tsx` sits
+  under the Home Sleep card and states last night's verdict: quiet for `normal`, prominent with the
+  numbers first for `poor`/`good`, and a **That's wrong** control that records the disagreement and
+  opens the morning check-in, where the value the correction sets actually lives (TN-57 owns
+  writing it). Copy in `components/health/sleep/sleep-verdict-copy.ts` so **TN-82's modal reuses it
+  rather than growing a second wording**. It renders NOTHING when there is no verdict — a daily
+  "not enough data" is a card that gets tuned out, and this one must not be.
+  Rendered at 412 px dark and pinned by `e2e/tn85-sleep-verdict-on-home.spec.ts` (3 tests, control
+  run: breaking the correction callback fails the wiring test).
+- **The note is a SIBLING of the card, not inside it.** The Sleep card is itself a `role="button"`
+  that navigates, so a control within it is a button inside a button — invalid, and what
+  `check-nested-buttons.js` fails on. It is also hidden in section-edit mode: the editor is about
+  layout, and a live control does not belong in a rearranging surface.
+- **Keep:** ① the device look, with `TN-82`'s APK pass — the note is new furniture on the owner's
+  daily screen and no sandbox drives a Samsung WebView. ② `TN-82` itself, which is now the MODAL
+  half only: its removal of the two scales is an information-architecture change to a daily screen,
+  so per CLAUDE.md it owes a mockup and a yes before any code. This entry deliberately removed
+  nothing. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
+
+
 - **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
 - **Added:** 2026-09-26 · Tuning, checking whether the announce-and-correct design can collect anything
   at all before more effort goes into what it announces.
@@ -999,6 +1104,21 @@ below threshold and left in place for next time.
   reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
 
 ### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
+
+- **⚑ TWO DEVIATIONS FROM THE DRAFT, MADE WHILE BUILDING `TN-85` — both are here to be overruled.**
+  ① **`— tap if that's wrong` is a separate control labelled `That's wrong`, not a phrase inside the
+  sentence.** A phrase in a paragraph is not a tap target on a touch-only product, and the Sleep
+  card is already a `role="button"` that navigates, so the affordance has to be a real button
+  outside it. The sentence therefore ends at *"Marked this a poor night."*
+  ② **"90 min later than usual" cannot be said from a stored verdict.** `sleep_verdicts` snapshots
+  the band's `low`/`high` and drops `ComponentBand.median`, so there is no middle to measure from
+  without re-deriving one the verdict never saw. The shipped line measures to the **edge** of the
+  band — *"65 min later than usual"* means 65 minutes past the late end of your usual range. It is
+  the smallest true claim and it is the one the verdict actually acted on. Saying "than usual"
+  against a median would need TN-81 to snapshot it, which is Lane A and a migration.
+  **Live wording, as shipped:** `Sleep looks normal — filled in for you.` /
+  `Slept 5h10, 65 min later than usual. Marked this a poor night.`
+
 
 - **Lane: O** · **Added:** 2026-09-26 · Tuning, split out of `TN-82` so it reaches him through the
   Orchestrator rather than sitting inside a build entry.
@@ -2586,20 +2706,55 @@ which is the right shape for something that can only be validated by living with
   **None of the three has been re-verified against `main`.**
 - **Done when:** none of the four sections appear in `ai_call_log`, and each surface renders with the network off.
 
-### [platform][app-shell] RV-201 — health-insight and weekly-digest: show computed text first, and let the week page work offline
-- **Lane: A**, then **B**. One PR. **Supersedes PS-31(a) and (b) for these two routes**; update PS-31 when this lands.
+### [readiness][platform] LA-152 — Reference: two contributor shapes, one reader, and `[object Object]` in production
+
+- **Lane: A.** **Added:** 2026-09-26 by `RV-201`, which fixed it. **Reference** — recorded so the
+  next reader of these columns does not rediscover it; there is no work left here.
+- **What was live.** `oura_daily.readiness_contributors` stores `{ hrv_balance: 90 }` — Oura's
+  numbers. `oura_daily_derived.readiness_contributors`, which the app writes and which every
+  reader PREFERS when present, stores `{ hrvBalance: { score, input, gap, provisional } }`.
+  `formatContributors` assumed the first, so for as long as a derived row has existed the
+  readiness insight was assembled from
+  `Contributors: checkin [object Object]/100, hrvBalance [object Object]/100, …` and handed to
+  the model as fact. Confirmed against production, 2026-09-26.
+- **Two faults, one root.** The values stringified as `[object Object]`, AND the camelCase keys
+  missed the snake_case label map, so even the names rendered raw. Three keys differ by more than
+  casing and had no label at all: `checkin` (no Oura equivalent), `temperature` and
+  `prevDayActivity`.
+- **⛔ Why nothing caught it.** The only caller wrote
+  `as Record<string, number | null>` on the row. The cast is the whole story: it made the wrong
+  shape typecheck, so neither the compiler nor any test nor any review could see it, and the
+  route's own tests mocked contributors as plain numbers. **It was found by running the route
+  against the dev server and reading the output** — the gate CLAUDE.md requires before a merge,
+  doing exactly the job it is there for.
+- **Fixed in `RV-201`'s first half:** `lib/oura/contributors.ts` reads `.score` from either
+  shape, `labelFor` matches both casings, the three renamed keys have labels, the cast is gone,
+  and 18 tests cover it including one that asserts every `READINESS_WEIGHTS` key resolves.
+- **The lesson worth keeping, which is not about contributors:** a cast on a row read from JSONB
+  is an assertion that nothing verifies. Where two writers put different shapes in one column,
+  the reader takes `unknown` and narrows.
+
+### [platform][app-shell] RV-201 — weekly-digest: show computed text first, and let the week page work offline
+- **Lane: A**, then **B**. **Supersedes PS-31(b) for `weekly-digest`**; update PS-31 when this lands.
+- **✅ THE `health-insight` HALF SHIPPED 2026-09-26** (`feat/rv201-computed-health-insight`). The
+  model call is gone; `app/api/ai/health-insight/insight-text.ts` renders the headline and band,
+  the weakest contributor, today against the recent values, and an explicit absence sentence —
+  the same four things the prompt had been asking the model for. `PS-31(a)` is settled with it.
+- **⚠ SPLIT FROM ITS "one PR", deliberately.** The two halves share no code, no route and no
+  component, and the done-when is per-surface. `main` merged five times during the first half
+  alone, and a single PR spanning two routes plus three components would have carried that
+  conflict risk for no review benefit. This entry carries no `Batch:` field, which is the
+  enforced mechanism, so nothing was overridden.
+- **What the first half found, which is not in the measurements below:** running the route
+  against the dev server — not reading it — showed **every readiness insight in production was
+  built on `[object Object]`**. Filed and fixed as `LA-152`; read it before touching the
+  contributor lines here.
 - **Added:** 2026-09-25 · Review sweep 61.
-- **health-insight** has 26 calls in 30 days, the most of any prose route. It runs automatically on every Health detail screen (`ai-insight-card.tsx:72-77`).
-  - Every data line is computed in `app/api/ai/health-insight/route.ts:100-181`, and the numbers-only fallback already exists (`:195-198`).
-  - The cache key hashes the prompt, and the prompt includes a "Past week scores" line (`:116`) that changes daily. So it **regenerates every day**, and again on any back-fill.
-  - It is also where Q-292's false "perfect" and the imperial units came from: 16% of 117 insights audited.
-  - **Fix:** a template per section (band, weakest contributor, today against the 7-day values), rendered immediately and offline.
-  - Keep the model only if the owner later wants the prose back. The recommendation is to drop it.
 - **weekly-digest** runs automatically on **every Home visit** until the week's result is cached (`weekly-recap-banner.tsx:53`), and when `/health/week` opens.
   - **The week page's charts ride on the AI POST**, so offline the whole page shows its error state.
   - The rate-limit exit (`route.ts:277-279`) returns 429 **without** the metrics it has already computed.
   - **Fix:** serve `WeeklyDigestMetrics` from a GET through `cachedFetch`, so the charts paint offline, and template the bullets from the week-over-week deltas.
-- **Done when:** both surfaces render with the network off, and neither shows a superlative or an imperial unit.
+- **Done when:** the week page renders with the network off, and shows no superlative and no imperial unit. (The health-insight surface already does, as of the first half.)
 
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
 - **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
@@ -2825,6 +2980,25 @@ which is the right shape for something that can only be validated by living with
   rather than a paragraph.
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
+
+- **⛔ THE PROBE SPEC IS RED IN CI, AND ITS OWN MESSAGE SAYS WHAT THAT MEANS — observed
+  2026-09-26 from an unrelated PR's run, by the engine implementer.** `e2e/food-log-swipe-delete.spec.ts:220`
+  ("a tap the instant the swipe ends opens the confirmation") **failed** on CI run
+  [36236669420](https://github.com/nekodas-neko/TrainingAi_Open/actions/runs/36236669420) —
+  1 failed, 6 flaky, 240 passed — and on `#1722`'s own run
+  [36236193250](https://github.com/nekodas-neko/TrainingAi_Open/actions/runs/36236193250) before
+  it merged. It is **not** in the 6 flaky; it is the single hard failure.
+- **Which inverts the conclusion above.** That test was written to pin the half that IS ours, and
+  its failure message is *"the press right after the release was swallowed on the web path too —
+  the cause is now ours."* The entry says the web path passes at every delay. **In CI it does
+  not.** So either the harness reproduces it after all — on slower, contended runners, which is
+  the difference from a local run — or the spec is timing-sensitive in a way that makes it unfit
+  to pin anything. Both are worth knowing and neither is "flaky".
+- **⚠ It is red on `main` now**, and E2E is not a required check, so it merged and will fail on
+  every lane's PR until someone acts. Not the engine implementer's to fix — recorded on the entry that owns
+  the spec, rather than filed as a duplicate. **Whoever takes it: run it locally first.** If it
+  passes locally and fails in CI, that gap is the finding, not an obstacle to it.
+- The `DV` routing above stands; this changes what the measurement should ask.
 
 - **⚑ THE WEB PATH PASSES AT EVERY DELAY, SO THE CAUSE IS NOT IN THE SHARED JS — LANE B, #PR,
   2026-09-26. Re-laned `B` → `DV`: the next action is a measurement, not a change.** Sweep 4a's

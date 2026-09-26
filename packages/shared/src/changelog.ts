@@ -6,11 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.469.2",
+    version: "1.470.1",
     date: "2026-09-26",
     changes: [
       "Fixed: the cat pen on Home was drawing your twelve biggest cats in one row, so they overlapped and the name tags cut each other off. It now shows a mix of sizes, as many as actually fit, and names only the rarest few.",
       "Fixed: the Coach button sat on top of the last row of Home and nothing could be scrolled clear of it. It also says \"Coach\" now, instead of being an unlabelled white circle.",
+    ],
+  },
+  {
+    version: "1.470.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the Home sleep card now tells you what the app filled in for last night — quietly when it was an ordinary night, and with the numbers first when it was not. If it has it wrong, \"That's wrong\" takes you straight to the check-in.",
     ],
   },
   {

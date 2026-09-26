@@ -18110,6 +18110,14 @@ what would verify it. It earns a row rather than nothing because a notification 
 the surfaces the device-verification gate names explicitly, and because the symptom is silence:
 without the row, "no alerts have appeared" reads the same before and after.
 
+## 2026-09-26 — `projectOverview.md` +4 → TN-85's Known-Issues row
+
+One open-issue row for the sleep verdict's new home on the Home card. Four lines — heading plus a
+single paragraph — with the detail on `TN-85` and in the journal entry. It earns a row because it
+is new furniture on the screen the owner opens first and nothing about it has been seen on the
+S25, and because the row is where the split from `TN-82` is recorded: this shipped a surface and
+removed nothing, while the modal half still owes a mockup.
+
 ## 2026-09-26 — `projectOverview.md` +3 → BF-204/BF-206's Known-Issues row
 
 One row for two Home defects the owner reported off one screenshot, shipped together because they

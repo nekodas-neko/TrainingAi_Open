@@ -21,10 +21,13 @@ import { stripComments } from '../../../scripts/lib/strip-comments.js'
 const root = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
 
-// Routes whose whole output is prose. `prompt.ts` is health-insight's builder, which is where all
-// 7 Fahrenheit errors landed.
+// Routes whose whole output is prose, and which therefore need the shared guards in their prompt.
+//
+// `app/api/ai/health-insight/prompt.ts` headed this list — it was where all 7 Fahrenheit errors
+// landed — and RV-201 removed it by removing the model: the insight is now assembled from the
+// numbers by `insight-text.ts`, which cannot pick a unit or a superlative at all. A route leaves
+// this list when its model call goes, never because the guards became inconvenient.
 const PROSE_ROUTES = [
-  'app/api/ai/health-insight/prompt.ts',
   'app/api/daily-digest/route.ts',
   'app/api/weekly-digest/route.ts',
   'app/api/workout-sessions/[id]/recap/route.ts',
@@ -142,9 +145,10 @@ describe('every route that writes prose can reach the guards (RV-173)', () => {
   it('finds the prose routes at all — a scan that matches nothing would pass silently', () => {
     // A floor, not a target: it exists so a scan that silently matches nothing cannot pass. It was
     // 7 until RV-200 deleted `running-plan/explain`, whose model call only reworded a rationale
-    // the card was already rendering. Lower it when a prose route genuinely goes; never raise it to
-    // paper over one that stopped matching.
-    expect(prose.length).toBeGreaterThanOrEqual(6)
+    // the card was already rendering, and 6 until RV-201 did the same to `ai/health-insight` —
+    // the most-called prose route, whose every fact the handler had already computed. Lower it
+    // when a prose route genuinely goes; never raise it to paper over one that stopped matching.
+    expect(prose.length).toBeGreaterThanOrEqual(5)
   })
 
   it.each(prose)('%s reaches PROSE_GUARDS or PROSE_FIELD_GUARDS', rel => {

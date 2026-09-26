@@ -442,6 +442,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const handleNavigateStats = useCallback(() => navigateToTab(router, "/health?tab=training"), [router]);
   const handleNavigateHealthBody = useCallback(() => navigateToTab(router, "/health?tab=body"), [router]);
   const handleOpenWaterLog = useCallback(() => setWaterLogOpen(true), []);
+  // TN-85 — a correction has to land somewhere it can be acted on, and the value lives on the
+  // morning check-in's sleep scale (TN-57 owns writing it). `useCallback` because `HomeCardWidget`
+  // is memoised and an inline arrow would defeat it on every render of the section list.
+  const handleCorrectSleepVerdict = useCallback(() => setMorningCheckinOpen(true), []);
   const hrData = useMemo(
     () => (ouraHrReadings.length > 0 ? { readings: ouraHrReadings, workoutSessions: ouraWorkoutSessions, sleep: ouraSleepWindow } : null),
     [ouraHrReadings, ouraWorkoutSessions, ouraSleepWindow],
@@ -1206,6 +1210,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   muscleData={muscleRecovery}
                   hrData={hrData}
                   setMoodSheetOpen={setMoodSheetOpen}
+                  onCorrectSleepVerdict={handleCorrectSleepVerdict}
                 />
               );
               switch (key) {

@@ -2620,6 +2620,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep][app-shell] ⚠️ Last night's verdict is on Home now, and nobody has seen it on the phone (TN-85, 2026-09-26)
+
+The Home Sleep card carries a line stating what the app filled in — quiet for an ordinary night, prominent with the numbers first for an outlier — and a **That's wrong** control that records the disagreement and opens the morning check-in. It exists because the modal is a bad home: it opens once a day on one screen and retires on dismissal, and the owner has saved 82 of those sheets while touching a scale in 3. Rendered at 412 px dark; **not seen on the S25**. `TN-82` is untouched and is now the modal half only — its removal of the two scales owes a mockup first. **Pass test:** on the S25, Home shows the line for last night and **That's wrong** opens the check-in with the sleep scale reachable.
+
 ### [app-shell] ⚠️ Home's cat pen and Coach button are fixed on paper, not on the phone (BF-204, BF-206, 2026-09-26)
 
 The pen drew its twelve largest cats into 348 px — one tier, so one 12 px band, so one crowded line with clipped name tags. It now round-robins across tiers and takes its count and its tag count from its own measured width (six cats, three tags at 348 px). The Coach button is an extended pill saying **Coach**, and Home reserves its height with a new `pb-fab-safe` so the last row of the scroll can clear it. **Both rendered at 412 px dark, neither seen on the S25.** **Pass test:** on the S25, no cat name clipped by a neighbour and no cat fully hidden behind another (the cats wander, so this is a look, not a screenshot); and the bottom of Home scrolls clear of the Coach pill.
