@@ -3986,7 +3986,9 @@ drift.
 
 ### [workouts] BF-196 — "~51 min" is WORKING minutes and reads as whole-session minutes, so a full session looks nine short
 
-- **Gate:** device — the 384 dp look on two rows; the strings are shipped.
+- **Verify: device** — the 384 dp look on two rows; the strings are shipped. **Was `Gate: device`
+  until 2026-09-26**, which PARKED shipped work beside work that genuinely cannot start — the thing
+  BF-90 measured, and `check-backlog-pointers.js` had been advising on it every run.
 - **Lane: B** — shipped; only the width check is owed.
 - **✅ SHIPPED 2026-09-25** (LB-146, #…). Both strings, as this entry required:
   `ai-prescription-card.tsx` now reads `~51 min of work`, and `done-screen.tsx`'s tile is labelled
