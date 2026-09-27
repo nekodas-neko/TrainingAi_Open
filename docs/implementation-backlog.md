@@ -3203,6 +3203,23 @@ which is the right shape for something that can only be validated by living with
   otherwise stop injected script from sending data off-origin.
 - **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
   `generativelanguage.googleapis.com` at the same time.
+- **✅ SHIPPED (Lane A, 2026-09-27), both halves, exactly as written — the entry is right and its
+  evidence reproduces.** No `WebSocket` is constructed anywhere in `app/`, `components/`, `lib/` or
+  `packages/`, and there is no ws client in `package.json`.
+- **The stronger check, because a source grep cannot see a dependency:** built the app and grepped
+  the **emitted client bundles** (`.next/static`). Zero hits for `generativelanguage`, zero for
+  `WebSocket(`, and zero `ws://`/`wss://` literals of any kind. Nothing the browser ships wants
+  either of the things removed.
+- **`ws: wss:` is kept for dev rather than deleted** — the HMR socket is a real consumer. If a
+  production feature ever needs one, **name its host** (`wss://host`); do not restore the scheme.
+- **The enumerating test was loosened while being extended, deliberately.** `dev and production
+  differ only in …` compared exact strings, so it failed when the two ws schemes were merely
+  reordered — a change that changes nothing. It strips them by pattern now and still catches the
+  thing worth catching: a THIRD difference nobody decided on. Found by the mutation pass's
+  equivalent control, which is what that control is for.
+- **NOT verified against a running production server.** `pnpm start` cannot boot in the sandbox —
+  the instrumentation hook needs S3 credentials for the vendored model constants — so the header
+  was read from `buildCsp(false)` and from the bundles, never off the wire.
 
 ### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
 - **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
