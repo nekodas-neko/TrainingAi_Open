@@ -4679,6 +4679,47 @@ volume7dKg,                             // likewise
   residue — the even split by set position says it is per-exercise, but the exercises were not named.
   And whether the −0.81-point mean deviation is the owner rounding to available plates or genuinely
   under-loading; a plate-rounding check would settle it and was not run.
+- **⚙ DECOMPOSED EXACTLY 2026-09-27 (Lane A). September's shortfall is THREE causes, two of them
+  benign, and the coverage percentage should stop being read as one number.** Re-measured on more
+  data than the filing had (172 sets, 71.5%, so it is not recovering). **49 sets lack a plan and
+  all 49 are accounted for:**
+
+  | cause | sets | what it is |
+  |---|---:|---|
+  | Bodyweight exercises | **23** | Chin-Up, Pull-Up, Hanging Leg Raise — `equipment = {bodyweight}` |
+  | The 09-06 → 09-12 window | **20** | five sessions, one set per exercise, no plan on any |
+  | Barbell Skull Crusher | **6** | no `style_id`, so no per-set percentages exist to record |
+
+- **Split loaded from bodyweight and the picture inverts.** August: loaded **233/233 = 100%**,
+  bodyweight 14/33. September: loaded **121/147 = 82.3%**, bodyweight **2/25 = 8%**. So the
+  headline drop is mostly a change in what was TRAINED, not in what was recorded — and there is
+  still a real loaded regression underneath it, which is the next two rows.
+- **⚠ The entry's proposed signature for the window does NOT separate it.** It says the hole's
+  sessions "all carry `intensity_mode` NULL where the 2–6 September sessions carry `'deload'`".
+  True, and useless as a discriminator: **every session from 09-13 to 09-24 also carries NULL**
+  and every one of them has full coverage. `was_override` does not separate them either (09-10
+  false and no plans, 09-13 false and fully planned). **The discriminator that does work is set
+  count: the window logged exactly ONE set per exercise** (3/3, 5/5, 4/4, 4/4, 4/4) against two
+  per exercise on every healthy day. Start there, not at `intensity_mode`.
+- **⚠ And two readings of the residue are wrong — both were mine, and the data killed them.**
+  ① *"It is the bodyweight mix"* — no: loaded coverage itself fell from 100% to 82.3%.
+  ② *"The residue is sets performed beyond the prescribed count"* — no: on 09-19 the same **one**
+  exercise is unplanned at set 1, set 2 AND set 3 (4/3, 4/3, 4/3), which is the per-exercise shape
+  the entry originally measured. The entry was right and the tidy explanation was wrong.
+- **The whole loaded residue is one exercise: Barbell Skull Crusher**, 6 sets across 09-19 and
+  09-25, carrying `style_id` NULL where every planned exercise carries one. **That is almost
+  certainly the same root as BF-200**, which is the owner reporting Skull Crusher alone ignoring a
+  deload in the 09-25 Upper session — same exercise, same session, same missing per-exercise
+  prescription data. Whoever takes BF-200 should check whether fixing it also restores this.
+- **What is left, and it is one question:** what happened in 09-06 → 09-12. The database does not
+  hold it — session metadata is uniform across the boundary — so it needs the deploy history for
+  those dates, not another query.
+- **And one product question, not a defect:** should a bodyweight exercise carry a plan at all?
+  `planned_pct` is a percentage of a 1RM that bodyweight movements do not have. 23 of September's
+  49 gaps are this, and every future adherence figure is computed over a denominator that silently
+  includes them. Deciding it is `Lane: O`; until it is decided, adherence coverage should be quoted
+  over LOADED sets only.
+
 - **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
   written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
 
@@ -5732,6 +5773,13 @@ drift.
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
 - **Needs:** — nothing.
+- **⚙ A SECOND SYMPTOM, same exercise, found 2026-09-27 (Lane A) while decomposing TN-75.**
+  Barbell Skull Crusher is the ONLY loaded exercise in September with no `planned_pct` on any
+  set — 6 sets across 09-19 and 09-25, including the very Upper session in the table below — and
+  its `exercise_logs` rows carry **`style_id` NULL** where every planned exercise carries one.
+  So the deload it ignored and the plan it never recorded may be one missing link rather than
+  two faults. **Check that before treating this as a rounding or basis-resolution bug**, and if
+  the fix restores `planned_pct`, say so in TN-75.
 
 - **He is right, and it is one exercise out of five.** Measured against production for the deloaded
   Upper session (prescription stored 2026-09-25 21:24, all five exercises `pct: 52`,
