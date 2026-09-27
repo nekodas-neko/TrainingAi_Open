@@ -1322,6 +1322,48 @@ below threshold and left in place for next time.
 - **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
   `Footprints`, unchecked against the current glyph.
 
+### [platform] OR-184 — the collaborator's issue and two PRs, and the channel that had no reader
+
+- **Lane: O** — the routing and the reviews to commission; the reviews themselves are Review's.
+- **Added:** 2026-09-27 · the collaborator, relayed by the owner: *"it's also not picking up the
+  issues and PRs I raise to your Training app, so they're never getting touched/reviewed either."*
+  **He is right, and it was checked rather than assumed.**
+- **What is actually open, read from GitHub 2026-09-27:**
+  | item | author | opened | state in this repo |
+  |---|---|---|---|
+  | **issue #1620** — replace the manual migration counter with a calculated next number | `jsboiss` | 09-25 | **nothing references it**; `grep 1620` over the backlog returns one hit and it is not this |
+  | **PR #1607** — return bearer tokens for native mobile login | `jsboiss` | 09-25 | in `TN-80` as *waiting on the owner*; **never reviewed** |
+  | **PR #1608** — add storage for HealthKit samples and deletion records | `jsboiss` | 09-25 | branch named in one entry; **not tracked as a PR at all** |
+- **Why nothing read them, which is the part worth fixing.** BugFix owns intake and its two channels
+  were spoken reports and `feedback_submissions` — neither is GitHub. `CLAUDE.md`'s CI/CD section is
+  written end to end for **our own** PRs (*"when the user pushes a feature branch and opens a PR"*),
+  so an inbound PR landed in a channel with no reader at all. **`grep -c list_issues` over `CLAUDE.md`
+  and `docs/agents/README.md` returned 0.** `TN-80` caught two of the three sideways while doing
+  something else, which is luck, not a channel.
+- **✓ FIXED IN THIS PR (OR-183):** GitHub issues are BugFix's third intake channel and inbound PRs
+  are Review's, both in the session-start list and both roles' sections. **That fixes the future and
+  not the three that are already open** — this entry is the three.
+- **What each needs next, and they are not the same:**
+  ① **#1620 is the easiest and nobody has to decide anything** — it is a tooling suggestion about the
+  migration counter, which is exactly the kind of structural call an agent takes. It needs a read and
+  either an entry or a reply saying why not.
+  ② **#1607 is AUTH.** Review reads it and posts a review; **the merge is the owner's**, per the
+  standing carve-out. `Q-1a` already covers the client half of the same area — check them against
+  each other before reviewing, because a conflicting design is the likely finding.
+  ③ **#1608 adds STORAGE**, so Lane A owns the half that touches schema, and any migration number is
+  Lane A's alone.
+- **Ask: owner** — **recommendation: let Review post reviews on #1607 and #1608 now, and keep the
+  merges yours.** A review is not a merge: it costs nothing to reverse, and the alternative is that a
+  contributor's work sits unread for a fourth day. **What I am NOT proposing** is that agents merge
+  outside PRs — both touch a carve-out (auth, storage), and outside code entering your app is the
+  clearest case for your eyes there is. **If you would rather no agent comments on his PRs at all**,
+  say so and this becomes "summarise them for him in chat instead", which is slower and keeps every
+  word yours.
+- **Reversal cost: a posted review can be edited or deleted.** Nothing here is hard to undo, which is
+  most of the argument for doing it now.
+- **Not established:** whether the collaborator expects review *comments* or just merges. Worth
+  asking him directly rather than inferring it.
+
 ### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
 
 - **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
