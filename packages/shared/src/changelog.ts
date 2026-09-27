@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.6",
+    version: "1.477.7",
     date: "2026-09-27",
     changes: [
       "Fixed: when the AI coach cannot be reached, the workout screen now shows your program's own numbers instead of sitting on \u201CPreparing your AI workout\u2026\u201D for half a minute and then giving up. The fallback plan was already being built \u2014 nothing was showing it to you. Your coach is tried again a few hours later.",
+    ],
+  },
+  {
+    version: "1.477.6",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a brand-new account is no longer told things that are not true. Home announced a week in review for a week with nothing in it, Body Battery read \"Good\" and 50 with nothing behind it, and the week strip called every past day a rest day before you had a program. All three now say plainly that there is nothing yet.",
     ],
   },
   {
