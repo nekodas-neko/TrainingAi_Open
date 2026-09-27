@@ -3844,43 +3844,18 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   `recovery_index_hours` and the training-load pair are all legitimately written-but-empty — so it
   needs a reasoned allowlist rather than a bare scan, and is its own piece of work.
 
-### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
-
-- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch),
-  `packages/shared/src/ai-periodization/`.
-- **Added:** 2026-09-25 while building TN-64(b). **⚠ REWRITTEN 2026-09-25 — the original filing's
-  central measurement was WRONG, and the wrong version is quoted here so it is not re-derived.**
-- **What the first version claimed:** *"`program_phases` holds 0 rows for all five programs."*
-  **False.** It came from a query joining `program_phases` on **`program_id`** — a legacy column
-  that is **NULL on all 46 rows** since phases moved under `phase_set_id`. The join matched nothing
-  and read as a clean zero. No error, no warning: the same silent-absence failure the External API
-  field-name rule in `CLAUDE.md` exists for, in a diagnostic query rather than in product code.
-- **Measured properly 2026-09-25:** `program_phases` holds **46 rows across 8 phase sets**,
-  **8 of them `phase_type = 'deload'`**, all 46 keyed by `phase_set_id`.
-
-  | program | mode | phase set | phases |
-  |---|---|---|---:|
-  | Bankai (**active**) | `ai_dynamic` | none | 0 |
-  | Shikai | `ai_dynamic` | none | 0 |
-  | AI-Phase1 | `ai_dynamic` | none | 0 |
-  | Main | `automatic` | yes | 6 |
-  | Strength + Hypertrophy | `automatic` | yes | 6 |
-
-- **So the real finding is narrower and still real.** `listProgramPhases` resolves through
-  `programs.phase_set_id` and returns `[]` when there is none, so on any `ai_dynamic` program
-  `inDeloadPhase` is always false. For the two `automatic` programs the suppression works exactly
-  as written. Since TN-64(b) extended the gate to `ai_dynamic`, the **active** program is now gated
-  without any in-deload suppression at all.
-- **The prior question is therefore answered: `ai_dynamic` is not *supposed* to write phase rows.**
-  It periodizes dynamically instead of from a fixed set, which is the point of the mode. **Do not
-  populate `program_phases` for it** — that was the trap the first version of this entry set up.
-- **What is actually open:** `ai_dynamic` has its own deload notion (`ai-dynamic.ts` carries an
-  elevated-temperature deload trigger), and the early-deload gate does not consult it. Whether it
-  should is the question. Worst case today is a redundant prompt, since every early deload needs
-  the owner's confirmation.
-- **Also worth a sweep, separately:** `program_phases.program_id` is dead — 0 of 46 populated — and
-  its presence is what made the bad query look answered. Dropping it is a migration and belongs to
-  whoever next touches that table, not here.
+### [readiness][platform] LA-159 — `program_phases.program_id` is dead and made a diagnostic query read as a clean zero
+- **Lane: A** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-138 on closing it.
+- **What:** `program_phases.program_id` is populated on **0 of 46 rows** — phases moved under
+  `phase_set_id` and the column stayed. Dropping it is a migration.
+- **Why it is worth an entry rather than a shrug:** joining on it returns nothing, with no error
+  and no warning, and that is exactly how LA-138's first filing came to claim *"`program_phases`
+  holds 0 rows for all five programs"* when it holds 46. A dead column that silently answers
+  "none" is a trap for the next person writing a diagnostic query, not just dead weight.
+- **Shape:** one migration (`DROP COLUMN program_id`) plus the regenerated `claude_ro` twin, and
+  a check that nothing reads it first. **Ships alone, and it is data-dropping, so
+  confirm-before-merge** — see LA-142 (#1749) for the shape, including that the `claude_ro` view
+  must be dropped in the same file before the column can go.
 
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 

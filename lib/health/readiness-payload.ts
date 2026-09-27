@@ -676,6 +676,27 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // The thresholds are NOT touched here (EARLY_DELOAD_SCORE_MAX / EARLY_DELOAD_ACWR_MIN). Moving
   // them in the same change would make it impossible to tell whether a prompt appeared because the
   // gate opened or because the bar dropped — and a threshold is Tuning's proposal, not this one's.
+  // LA-138, answered 2026-09-27 and closed: `ai_dynamic` gets NO in-deload suppression, on
+  // purpose. `inDeloadPhase` below can only ever be false for it — `listProgramPhases` resolves
+  // through `programs.phase_set_id` and that mode has none (it periodizes dynamically, which is
+  // the point of the mode; do NOT populate `program_phases` for it). The active program also has
+  // `started_at` NULL, so the ternary below short-circuits before the phases are even fetched —
+  // two independent reasons, where the entry named one.
+  //
+  // **Do not "fix" this by consulting `ai-dynamic.ts`'s deload signal.** That is
+  // `deloadOrRestRecommended` — a RECOMMENDATION to deload, not a state of being in one.
+  // Suppressing this warning on it would silence the prompt exactly when two independent systems
+  // agree a deload is due, which is backwards. The honest "already deloading" signal for this
+  // mode is a stored prescription with `phaseAction === 'deload'` under `prescriptionDrivesLoad`,
+  // and that is SESSION-scoped while this gate is program-scoped — it would have to guess which
+  // session it meant.
+  //
+  // What settles it is the asymmetry plus the count. A false suppression hides a health warning;
+  // a false prompt costs one confirmation tap, since every early deload needs the owner's yes.
+  // And there is nothing to suppress. Measured in production 2026-09-27: of the 119 logged
+  // workout sessions, `is_early_deload` is false on every one — the 3 that carry a deload
+  // `phase_type` are scheduled phase deloads off the two `automatic` programs, which is the
+  // path that already has suppression. Revisit if an early deload ever actually fires.
   let earlyDeloadRecommended = false
   let earlyDeload: EarlyDeloadReason | null = null
   if (program?.phaseMode === 'automatic' || program?.phaseMode === 'ai_dynamic') {
