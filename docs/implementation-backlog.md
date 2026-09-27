@@ -567,6 +567,9 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
   than re-deriving it; the diff read is still Review's.
 - **Needs:** — nothing.
+- **Superseded in part by BF-214 ① (built 2026-09-27, awaiting the owner).** `#1608` has since
+  renumbered to 290/291. Once BF-214 merges, its `291_claude_ro_views_…` twin must be deleted and
+  `lib/data/postgres/claude-ro-views.sql` regenerated instead; the new test fails the PR until then.
 - **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
   `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
   holds `288_training_load_grid_dimensions.sql` and `289_claude_ro_views_grid_dimensions.sql`
@@ -634,6 +637,23 @@ below threshold and left in place for next time.
   collision by name**, so ② can be judged against a working detector rather than against prose. ②
   makes that command obsolete when it lands, which is a deletion, not a conflict.
 - **Needs:** — nothing.
+- **⚙ ① BUILT 2026-09-27 (Lane A, `lane-a/bf214-claude-ro-views-file`) — held for the owner's yes,
+  given 2026-09-27 for the deletion; the merge changes what runs at every deploy.** The views are
+  `lib/data/postgres/claude-ro-views.sql`, applied by `ensureSchema`/`migrate.js` after the
+  migrations in a transaction, gated on a content hash in `schema_migrations`. 59 twins deleted
+  (287 → 228 files). `next-schema-number.js` floors at 289. `claude-ro-views-file.test.ts`
+  regenerates and diffs, so a missed COLUMN now fails CI.
+  - **Corrections to this entry, measured:** the "no CI check" line is half-right —
+    `claude-ro-readonly-role.test.ts` DOES run in CI (the Tests job's URL is TCP) and fails on a
+    table with no view; what was missing was column level. And ① also lifts the baton's
+    "a column rename is not available in this repo", which the historical twins caused.
+  - **The explicit transaction is not what makes the file atomic** — Postgres already runs a
+    multi-statement query as one implicit transaction (a mutant removing `BEGIN` survived for that
+    reason). It ties the marker row to the rebuild.
+  - **Open PRs holding twins must drop them and regenerate the file instead:** `#1608`
+    (`291_claude_ro_views_apple_health_samples.sql`) and `#1749` (`287_claude_ro_views_drop_dead_derived.sql`).
+    Merging either as it stands fails the new test, which is the intent.
+  - **② is what remains**, and it stays this entry.
 - **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
   are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
   SNAPSHOT opening `DROP SCHEMA claude_ro CASCADE` and rebuilding all 98 views. **Only the newest
@@ -4739,6 +4759,8 @@ which is the right shape for something that can only be validated by living with
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
 - **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
+- **Rebase note (2026-09-27):** `#1749` carries `287_claude_ro_views_drop_dead_derived.sql`. If
+  BF-214 merges first, delete that twin and regenerate `lib/data/postgres/claude-ro-views.sql`.
 - **Added:** 2026-09-25, Lane A — found while fixing LA-140, by asking how many columns share its
   shape. **Corrected the same day; the first version of this entry was wrong, see below.**
 - **Measured on production 2026-09-25: 11 of `oura_daily_derived`'s columns are NULL on every row.**
