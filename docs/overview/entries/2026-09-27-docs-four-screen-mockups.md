@@ -48,3 +48,30 @@ artefact still has to be redrawn.
 
 **Not exercised:** a static page, not the app. No component was changed and nothing was rendered on
 a device. Gates: `check-backlog-pointers` and `check-doc-links` clean by exit code.
+
+---
+
+## Answered the same day, and the cardio pane was wrong
+
+**Approved:** `LB-163` and `LA-136` — gates cleared, both released to Lane B.
+**Declined:** `RV-213`. No reason was given and none is invented in the entry; the finding stays on
+the record and the entry is struck, because a declined change is finished rather than parked.
+
+**`RV-166` was redrawn.** The owner asked two questions the first pane could not answer — *"if we
+only have run/walk where does Other live? And if you do one; how do you do another?"* — and both
+were real defects in the drawing rather than in the idea.
+
+The mistake was conflating two separate things. The **prescription** is today's plan and there is
+one of it; the **activity log** is what was actually done and there can be any number, of any kind.
+The first pane showed the prescription card *replacing* the modality picker, which deleted `Other`
+and left no way to log a second activity. Merging walk and run applies to the prescription only.
+
+The revision shows two states — before training and after a walk followed by a bike ride — with the
+picker present and unchanged in both, and a **Logged today** list where the activity that satisfied
+the prescription carries a `Plan` chip and the second carries `Extra`.
+
+**One edge is now explicit rather than assumed.** His rule was "one or the other", so `Run` and
+`Walk` satisfy the prescription and `Other` does not: a 42-minute bike ride logs as Extra and leaves
+the run To do. That is followed literally and flagged on the page as possibly wrong for him — if a
+hard ride should count, the fix is a per-activity "count this as today's cardio" action, not a
+blanket rule.

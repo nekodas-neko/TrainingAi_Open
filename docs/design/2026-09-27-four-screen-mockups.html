@@ -290,76 +290,69 @@
 
   <!-- ============ 4. RV-166 ============ -->
   <section>
-    <p class="id">RV-166 — Cardio hub, walk and run</p>
-    <h2>No prescribed run has ever been marked done, although you do most of them as walks</h2>
-    <p class="ask">Your instruction: <b>“the walk/run section should be combined in the cardio hub; and would require one or the other to be done.”</b> Today the running plan lives on its own screen and reaches the hub only through the modality picker, while walking is tracked through the steps and zone quotas — so a prescribed run stays pending forever while you complete it on foot.</p>
+    <p class="id">RV-166 — Cardio hub, walk and run · <span style="color:var(--page-warn)">revised</span></p>
+    <h2>The prescription and the activity log are two different things</h2>
+    <p class="ask">The first draft of this pane was wrong: it showed the prescription card <i>replacing</i> the modality picker, which lost <b>Other</b> and left no way to log a second activity. They are separate. The <b>prescription</b> is today's plan and there is one of it; the <b>log</b> is what you actually did and there can be any number, of any kind. Merging walk and run applies to the first only.</p>
     <div class="pair">
       <div class="pane">
-        <div class="cap"><span class="chip now">Now</span><span class="w">384 px</span></div>
+        <div class="cap"><span class="chip now">Before you train</span><span class="w">384 px</span></div>
         <div class="phone"><div class="screen">
           <div class="mx" style="display:flex;flex-direction:column;gap:12px">
             <div class="card">
-              <div class="row sp"><span class="lbl">Zone minutes</span><span class="pill">Today</span></div>
-              <div class="row" style="margin-top:8px;gap:10px">
-                <span style="font-size:22px;font-weight:700" class="num">8</span>
-                <span class="tiny dim">of 22 min</span>
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill">To do</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">Easy 25 min</div>
+              <div class="tiny dim" style="margin-top:2px">Zone 2 &middot; a run or a walk both count</div>
+              <div class="seg">
+                <div class="segbtn">Run it</div>
+                <div class="segbtn">Walk it</div>
               </div>
-              <div class="bar" style="margin-top:8px"><i style="width:36%"></i></div>
-            </div>
-            <div class="card">
-              <div class="row sp"><span class="lbl">Steps</span><span class="pill">Today</span></div>
-              <div class="row" style="margin-top:8px;gap:10px">
-                <span style="font-size:22px;font-weight:700" class="num">11,900</span>
-                <span class="tiny dim">of 10,000</span>
-              </div>
-              <div class="bar" style="margin-top:8px"><i style="width:100%"></i></div>
             </div>
             <div class="tiny dim" style="letter-spacing:.14em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace">What do you want to do?</div>
             <div class="row" style="gap:8px">
               <div class="segbtn">Run</div><div class="segbtn">Walk</div><div class="segbtn">Other</div>
             </div>
-            <div class="empty-flag" style="height:52px;padding:6px 10px;text-align:center;line-height:1.35">
-              PRESCRIBED RUN LIVES ON /running<br>· STILL PENDING ·
+            <div class="tiny dim" style="margin-top:-4px">Log anything &mdash; cycling, rowing, a class. Unchanged.</div>
+            <div class="card">
+              <div class="row sp"><span class="lbl">Zone minutes</span><span class="pill">Today</span></div>
+              <div class="row" style="margin-top:8px;gap:10px"><span style="font-size:22px;font-weight:700" class="num">8</span><span class="tiny dim">of 22 min</span></div>
+              <div class="bar" style="margin-top:8px"><i style="width:36%"></i></div>
             </div>
           </div>
         </div></div>
       </div>
       <div class="pane">
-        <div class="cap"><span class="chip new">Proposed</span><span class="w">384 px</span></div>
+        <div class="cap"><span class="chip new">After a walk, then a bike ride</span><span class="w">384 px</span></div>
         <div class="phone"><div class="screen">
           <div class="mx" style="display:flex;flex-direction:column;gap:12px">
             <div class="card" style="background:rgba(0,255,135,.07);border-color:rgba(0,255,135,.18)">
-              <div class="row sp"><span class="lbl">Today’s cardio</span><span class="pill done">Done</span></div>
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill done">Done</span></div>
               <div style="margin-top:8px;font-weight:600;font-size:15px">Easy 25 min</div>
-              <div class="tiny dim" style="margin-top:2px">Completed as a walk · 11,900 steps</div>
-              <div class="seg">
-                <div class="segbtn on">✓ Walk</div>
-                <div class="segbtn">Run</div>
-              </div>
-              <div class="tiny dim" style="margin-top:8px">Either one completes it.</div>
+              <div class="tiny dim" style="margin-top:2px">Completed as a <b style="color:var(--brand)">walk</b> &middot; 28 min &middot; 7:40 am</div>
             </div>
-            <div class="card">
-              <div class="row sp"><span class="lbl">Zone minutes</span><span class="pill">Today</span></div>
-              <div class="row" style="margin-top:8px;gap:10px">
-                <span style="font-size:22px;font-weight:700" class="num">8</span>
-                <span class="tiny dim">of 22 min</span>
-              </div>
-              <div class="bar" style="margin-top:8px"><i style="width:36%"></i></div>
+            <div class="tiny dim" style="letter-spacing:.14em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace">What do you want to do?</div>
+            <div class="row" style="gap:8px">
+              <div class="segbtn">Run</div><div class="segbtn">Walk</div><div class="segbtn">Other</div>
             </div>
+            <div class="tiny dim" style="margin-top:-4px">Still here. Doing one does not close the day.</div>
             <div class="card">
-              <div class="row sp"><span class="lbl">Steps</span><span class="pill">Today</span></div>
-              <div class="row" style="margin-top:8px;gap:10px">
-                <span style="font-size:22px;font-weight:700" class="num">11,900</span>
-                <span class="tiny dim">of 10,000</span>
+              <div class="row sp" style="margin-bottom:8px"><span class="lbl">Logged today</span><span class="tiny dim num">2</span></div>
+              <div class="row sp" style="padding:7px 0;border-bottom:1px solid var(--border)">
+                <div class="row" style="gap:8px"><span style="color:var(--brand)">&#10003;</span><span>Walk &middot; 28 min</span></div>
+                <span class="pill done">Plan</span>
               </div>
-              <div class="bar" style="margin-top:8px"><i style="width:100%"></i></div>
+              <div class="row sp" style="padding:7px 0">
+                <div class="row" style="gap:8px"><span class="dim">&bull;</span><span>Cycling &middot; 42 min</span></div>
+                <span class="pill">Extra</span>
+              </div>
             </div>
           </div>
         </div></div>
       </div>
     </div>
-    <p class="note">One card at the top of the hub holds the day's prescription and both ways to satisfy it. The run plan stops being a separate screen you never reach, and a walk marks the day done.</p>
-    <p class="note cost"><b>This one changes stored numbers, not just layout.</b> Every past run day becomes completable, so adherence, streaks and compliance all move once it ships. Say how far before merging it. The “before” pane is rebuilt from the components rather than screenshotted — the hub needs live data this sandbox does not have.</p>
+    <p class="note"><b>Where &ldquo;Other&rdquo; lives:</b> exactly where it does now. The modality picker is untouched and always available &mdash; the prescription card sits <i>above</i> it, it does not replace it. My first draft dropped the picker from the after pane, which is what made this look like a problem.</p>
+    <p class="note"><b>How you do another:</b> the same way as the first. The prescription is one item and is satisfied once; every activity after it is logged normally and appears under <b>Logged today</b>. The <b>Plan</b> chip marks the one that satisfied the prescription, so you can see which did at a glance.</p>
+    <p class="note cost"><b>One edge your rule leaves open, followed literally here.</b> You said &ldquo;one or the other&rdquo;, so <b>Run</b> and <b>Walk</b> satisfy the prescription and <b>Other</b> does not &mdash; a 42-minute bike ride logs as Extra and leaves the run To&nbsp;do. That may be wrong for you: if a hard ride should count as having done your cardio, say so and Other gets a &ldquo;count this as today&rsquo;s cardio&rdquo; action rather than a blanket rule.</p>
+    <p class="note cost"><b>Still true:</b> this changes stored numbers, not just layout. Every past run day becomes completable, so adherence, streaks and compliance all move once it ships. Both panes here are rebuilt from <code>cardio-content.tsx</code> rather than screenshotted &mdash; the hub needs live data the sandbox lacks.</p>
   </section>
 
   <footer>

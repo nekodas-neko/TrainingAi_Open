@@ -3036,10 +3036,19 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
+  The sleep line returns under the mood card from `sleepQualityFeel` (1–5), with the caption naming
+  it as his rating rather than a score. **The caption is part of the approval, not decoration** —
+  the line it replaces was fabricated and read as derived for 91 days.
+  **⚠ The cost is unchanged and is the whole risk here:** Home is in the persistent tab shell, so
+  this needs `useCachedValue`, a canonical TTL in `cache-ttl.ts`, and registration in every write
+  group touching `day_checkins`. A hand-rolled `useEffect(() => { cachedFetch(…) }, [])` never
+  re-runs there and the line will hold its first value until the app is killed — the Q-402 shape,
+  which this repo has shipped twelve times.
 - **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
   Before/after at the real **384 px dark viewport**, using the app's own tokens from
   `app/globals.css`. **Proposed:** the sleep line returns under the mood card, driven by `sleepQualityFeel` (1–5), captioned *"Your rating, not a score"* so it cannot be misread as derived the way the fabricated `Sleep: OK` was.
-- **Gate:** owner — **and it is correct NOW, which it was not before.** The mockup did not exist,
+- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
   so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
   is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
   `LB-163` describes; applying it before the picture existed is the trap.)
@@ -3626,10 +3635,16 @@ which is the right shape for something that can only be validated by living with
   bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
+- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
+  Fixed three-column grid, `Log` out from under the icon and below the value. **Acceptance:** at
+  384 px the row fills the width and `Log` does not overlap the icon at any tile count. **Keep the
+  44 px tap target** — the overlap came from `min-h-11` on an absolutely-positioned pill, not from
+  the size, so shrinking the target is the wrong fix. **Known trade, accepted:** a fourth widget
+  wraps to a second line instead of scrolling.
 - **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
   Before/after at the real **384 px dark viewport**, using the app's own tokens from
   `app/globals.css`. **Proposed:** a fixed three-column grid filling the row, and `Log` moved out from under the icon to its own control below the value. The `absolute top-0.5 right-0.5` pill with `min-h-11` is what puts it on the icon; the flex row is what leaves the right third empty.
-- **Gate:** owner — **and it is correct NOW, which it was not before.** The mockup did not exist,
+- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
   so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
   is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
   `LB-163` describes; applying it before the picture existed is the trap.)
@@ -4072,6 +4087,14 @@ which is the right shape for something that can only be validated by living with
    - **The definition is the owner's call. The copy is not.**
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **⛔ DECLINED 2026-09-27 — the owner said no to this one and yes to the other three in the same
+  sitting. Do NOT build it.** No reason was given and none is invented here.
+- **The finding itself was not disputed and is left on the record:** four empty meals render a
+  header `+` **and** a body `+ Add food` (`meal-card.tsx:73`, `:105`) — two controls for one action
+  — across roughly 320 px of mostly empty card. The mockup that was declined is in
+  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html).
+- **Nothing is owed. Strike this entry** — a declined change is finished, not parked. Re-opening it
+  needs a new entry and a new reason, not a second attempt at this one.
 - **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
   Before/after at the real **384 px dark viewport**, using the app's own tokens from
   `app/globals.css`. **Proposed:** an empty meal collapses to one row — its name and a single `+`; meals with food keep the full card. Four empty meals go from roughly **320 px to 170 px**.
