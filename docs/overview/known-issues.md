@@ -31,6 +31,20 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [activity][app-shell] ⚠️ Leaving a walk by the back gesture now asks, and the phone is the only place it can be seen (LB-141, 2026-09-27)
+
+The back gesture used to call `reset()` and throw a walk away silently, whatever its length; it now
+raises a save-or-discard prompt (the owner's decision, 2026-09-26). **The prompt itself is a
+Capacitor `backButton` listener with no web equivalent, so the sandbox cannot press it** — the
+harness verified the dialog's three options and their 336×48 hit areas by mounting it from the tab
+bar at 384 px, which is a different trigger reaching the same component, and the source guards pin
+the wiring. **Pass test:** on the S25, with a walk more than a minute old, press back — "Leave this
+walk?" appears with Save walk / Discard / Keep walking; **Save must land on the walk summary and
+produce a row in history**, not return to the previous screen; under a minute the same gesture shows
+the plain "Discard this walk?" confirm with no offer to save. **The save path is the half worth
+checking hardest**: it runs the walk screen's own finish, so a walk saved this way should read the
+same duration and calories as one ended with the End button.
+
 ### [workouts] ⚠️ The session card's icon, elapsed label and recovery strip are fixed but unseen on the phone (RV-214, 2026-09-27)
 
 Items ①③④ shipped and were rendered at 412 px dark: the icon slot renders a component (it printed the stored value as a 30 px **word**, because three surfaces bypassed `getSessionIcon` despite a comment claiming none did), "Last done 9 days ago" replaces the ambiguous "9 days ago", and the recovery chips fade out instead of being cut dead against the RECOVERY label. **The fade is a `mask-image`, and the harness is Chromium** — `-webkit-mask-image` is included because Samsung's WebView is the canonical runtime, but nothing here has confirmed it composites there. **Pass test:** on the S25, the session card shows a dumbbell glyph rather than a word, the recovery strip's chips fade at both ends rather than clipping, and the elapsed line reads "Last done …". **Still open on the entry:** ② (the "Recommended today" pill wrapping) **does not reproduce** at 412 px with the seeded program — a long session name may be what the sweep saw, so his own names would settle it; and ⑤ (the two Start Workout buttons differ — one has an icon) is confirmed but is a pick, not a defect.

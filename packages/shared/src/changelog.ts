@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.17",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: pressing back during an interval walk threw the walk away without asking, however long you had been walking. It now asks \u2014 save it to your history, discard it, or keep walking. A walk under a minute still just offers to discard, as before.",
+    ],
+  },
+  {
     version: "1.477.16",
     date: "2026-09-27",
     changes: [
