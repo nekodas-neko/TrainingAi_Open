@@ -53,7 +53,7 @@ Cadence only has a value when a wearable that can produce it is connected during
   `RING_CADENCE_VALIDATED = false` (`cadence.ts:218`) because the stride-frequency signal is
   octave-ambiguous (half/double-counting risk) and unresolved. Even if it were validated, ring
   readings are far sparser (~1 per 30-min walk per
-  `docs/overview/entries/2026-08-02-empty-cadence-series.md`) — enough for a single walk-level
+  `docs/overview/history-2026-07-30.md#2026-08-02-empty-cadence-series`) — enough for a single walk-level
   number, not a real fast/slow split.
 - **GPS-only walk, no strap/ring connected** — no cadence source at all today. There is no phone
   accelerometer step-counter wired into activity logging (Health Connect steps are a daily/coarse

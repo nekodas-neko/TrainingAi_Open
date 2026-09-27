@@ -6005,7 +6005,7 @@ Two things reduce (not remove) the risk: both statements are plain `ADD COLUMN` 
 `reconcileSchema()` carries both columns, so a partial v22 heals on the next open rather than
 wedging.
 
-Session journal: `docs/overview/entries/2026-08-08-supplements-sync-and-route-hygiene.md`.
+Session journal: `docs/overview/history-2026-08-07.md#2026-08-08-supplements-sync-and-route-hygiene`.
 
 ### [app-shell] Day-detail screen behind the training calendar (Q-110, 2026-08-08, v1.270.0) — swipe NOT verified on device · needs: android
 
@@ -6024,7 +6024,7 @@ thumb. Nothing else here is device-sensitive — no blur, filter or backdrop-fil
 is the shape Q-107 blames for pool exhaustion — if the gap is common, run the existing backfill rather
 than making this screen expensive). ~~The old `day-overlay-sheet.tsx` still exists~~ — **deleted, LB-3.**
 
-Session journal: `docs/overview/entries/2026-08-08-day-detail-screen.md`.
+Session journal: `docs/overview/history-2026-08-07.md#2026-08-08-day-detail-screen`.
 
 ### [app-shell][cardio][activity] Navless safe-area utility sweep (Q-118, 2026-08-07, v1.269.1) — NOT verified on device · needs: android
 
@@ -6061,7 +6061,7 @@ Low device risk by construction: no blur, filter or backdrop-filter, and the row
 bottom-anchored, so neither the Samsung compositor bug nor the safe-area floor applies. The one
 unexercised surface is Samsung WebView rendering of the `color-mix(in oklch, …)` gradient.
 
-Session journal: `docs/overview/entries/2026-08-07-cardio-hub-entry-card.md`.
+Session journal: `docs/overview/history-2026-08-04.md#2026-08-07-cardio-hub-entry-card`.
 Design docs: `docs/design/2026-08-07-other-activity-mockups.html`, `…-cardio-hub-fullscreen.html`.
 
 ### [app-shell] Fourteen new home score-card styles (2026-08-07, v1.268.0) — NOT verified on device · needs: browser
@@ -6078,7 +6078,7 @@ Chrome renders them fine, which is exactly why this needs the APK. The other twe
 filter, backdrop-filter or gradient at all and are low-risk by construction. Nothing here touches
 safe-area (the row is not anchored), gestures, native plugins or an offline-first domain.
 
-Session journal: `docs/overview/entries/2026-08-07-health-metrics-button-designs.md`.
+Session journal: `docs/overview/history-2026-08-04.md#2026-08-07-health-metrics-button-designs`.
 Design galleries: `docs/design/2026-08-07-score-row-mockups*.html`.
 
 Secondary, non-blocking: the picker is now a flat list of nineteen radio options, which wants
@@ -6090,7 +6090,7 @@ grouping or thumbnails rather than a longer list. Not scoped.
 than archived because the device check is still owed, which is what this section is for. Full
 investigation, including the measurement traps that make it expensive to re-derive:
 [`docs/handoffs/handoff-2026-08-07-activity-ring-clock-compression.md`](../handoffs/handoff-2026-08-07-activity-ring-clock-compression.md);
-session journal `docs/overview/entries/2026-08-08-ring-clock-compression.md`.
+session journal `docs/overview/history-2026-08-07.md#2026-08-08-ring-clock-compression`.
 
 **The slope was never the unknown** — the ring's counter ticks at exactly 100 ms/ds by construction,
 only the offset is unobserved. `resolveDsToMs` now applies that fixed slope with one offset per
@@ -8924,7 +8924,7 @@ tools → "Run backfill" (`POST /api/workout/backfill-set-hr-stats`, oldest-firs
 `docs/superpowers/plans/2026-07-21-per-set-hr-metrics.md`.
 
 ### [workouts][app-shell] Workout & health UX batch (v1.198.0, 2026-07-22) — capture paths NOT device-verified · needs: browser
-Owner-directed batch (see `docs/overview/entries/2026-07-22-workout-screen-fixes.md`): workout
+Owner-directed batch (see `docs/overview/history-2026-07-17.md#2026-07-22-workout-screen-fixes`): workout
 category/intensity pills, home deload "why" panel, per-factor health deep-dives across the 4 pillars,
 AI-prescription card refreshing in place (no app reopen), and an end-of-workout Time Summary
 (setup/work/rest actual-vs-planned). Logic + endpoints are `tsc`/lint/test green and dev-server

@@ -33,7 +33,7 @@ for them to be read, scoped, and turned into an implementation plan. **This was 
 | Corrected the stale "Local SQLite is at **v20**" line → v21 (`lib/sqlite/__tests__/migrations.test.ts` asserts 21) | `docs/implementation-backlog.md` |
 | Known-Issues entry covering all five, tagged and explicitly marked NOT fixed | `projectOverview.md` |
 | Plan linked from five pillar indexes | `docs/domains/{activity,platform,readiness,workouts,devices}/README.md` |
-| Session journal entry | `docs/overview/entries/2026-08-02-bug-investigation-scoping.md` |
+| Session journal entry | `docs/overview/history-2026-07-30.md#2026-08-02-bug-investigation-scoping` |
 
 ## The five diagnoses (all traced to source — do not re-derive these)
 

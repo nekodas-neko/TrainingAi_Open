@@ -35,6 +35,9 @@ export interface ExerciseLog {
   interExerciseRestSec?: number
   prepTimeSec?: number
   exerciseDeloaded?: boolean
+  /** `exercise_library.exercise_type` via `exercise_id`, null when the log has none. Decides a
+   *  display unit — see `isBodyweightType` in `1rm.ts` (RV-219). */
+  exerciseType?: string | null
 }
 
 // Lightweight alternative to WorkoutSession for the exercise-history view — one row

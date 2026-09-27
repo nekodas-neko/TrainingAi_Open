@@ -819,25 +819,6 @@ below threshold and left in place for next time.
   docs PR now and after, or it is a change with no evidence it helped.
 - **Reversal cost: one workflow file.**
 
-### [platform] OR-198 — the journal fold breaks `Detail:` pointers, and no check can see it
-
-- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, found while relocating `Current Status` (OR-197).
-- **Measured:** of 281 narrative paragraphs, 152 cite a journal file. One — `LB-158`'s — pointed at
-  `docs/overview/entries/2026-09-26-lb158-local-barcode.md`, which `scripts/fold-journal-entries.js`
-  had already folded into `docs/overview/history-2026-09-27-folded-2.md`. The fold moves the file and
-  does not rewrite anything citing it.
-- **Why nothing caught it:** these are bare paths inside backticks, not markdown links, so
-  `check-doc-links.js` structurally cannot see them. It reported OK on the same file.
-- **1 of 152 is a low rate and that is the danger** — it is rare enough to be trusted and silent
-  enough to spread. Every fold sweep can add more.
-- **Recommendation: have the fold rewrite the pointers it invalidates**, in the same commit as the
-  move — the script knows both paths, which nothing downstream does. Alternative: teach a checker to
-  resolve backticked `docs/**.md` paths; useful anyway, but it reports a break after the fact rather
-  than preventing it.
-- **The one instance is already fixed** in the relocated file; this is about the mechanism.
-- **Reversal cost:** low — one script.
-
-
 ### [platform] OR-199 — Reference: do NOT compact `CLAUDE.md` the way `projectOverview.md` was compacted
 
 - **Reference:** the measurement and the reasoning behind a structural call, so it is not re-proposed.
@@ -4353,34 +4334,20 @@ which is the right shape for something that can only be validated by living with
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
 
-### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
-- **✅ ② SHIPPED 2026-09-27 (#1785), rendered at 412 px. ① IS LANE A's — established, not assumed. ③ is RV-208's.**
-- **Lane: A** for what remains (① needs a field on `app/api/day-log/route.ts`).
-- **Added:** 2026-09-26 · Review sweep 64 (`t2-day-01`).
-1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load),
-   not zero. — **CONFIRMED (rendered: `0kg`), and it is LANE A's, for a specific reason.**
-   - The repo already has the resolver and already states the rule: `isBodyweightType`
-     (`packages/shared/src/1rm.ts`), whose module comment says *"Every surface that shows a stored
-     1RM resolves its unit here rather than hardcoding kg"* (BF-162, Q-19).
-   - **The card cannot call it.** `DayExercise` (`app/api/day-log/route.ts`) carries `name`,
-     `weightKg`, `sets`, `reps` — **no `exerciseType`**. And every existing consumer of
-     `isBodyweightType` receives the type as a PROP; there is no name→type lookup on the client to
-     copy, so inventing one here would be new machinery beside an established pattern.
-   - **The fix is one field**: add `exerciseType` to `DayExercise`, then
-     `components/health/day-detail/day-sections.tsx:161` resolves the unit the way every other
-     surface does. Route change → Lane A.
-2. ~~**"Chest-Supported Dumbb…"** truncates the part that distinguishes it.~~ — **SHIPPED**, by
-   letting the name wrap (`truncate` → `line-clamp-2` on both the button and span branches).
-   Rendered at 412 px: "Chest-Supported / Dumbbell Row" over two lines with the sets, weight and
-   both icons still aligned on the row.
-   - **The entry's OTHER suggestion — shrink the icons — is not available, and the measurement it
-     cites is right.** `ICON_BTN` is `h-12 w-12`: 96 px of ~380 usable at 412 px, exactly the
-     "about 25% of the row twice over". But **48 px IS the Android minimum touch target** and this
-     repo's tap-target floor, so shrinking trades a naming problem for an accessibility one. The
-     test pins `h-12 w-12` so the trade is not made later by someone who has not read this.
-3. The times read "7:35am → 8:17am" here and "7:35 AM" on Home. — **RV-208's, and still open
-   there as LANE A's** (the casing comes from `app/api/day-timeline/route.ts`). Noted here as the
-   second device sighting; nothing to do on this entry.
+### [workouts] LA-164 — Health → Day's workout card still reads "0 kg" for a chin-up; the route now says which lifts are bodyweight
+- **Lane: B** — `components/health/day-detail/day-sections.tsx`.
+- **Needs: RV-219**
+- **Added:** 2026-09-27 · Lane A, the render half of `RV-219` ①.
+- **What:** `/api/day-log`'s `DayExercise` now carries `exerciseType` (`'bodyweight'` / `'weighted'`
+  / `null`), resolved from `exercise_library` via `exercise_logs.exercise_id`. Every one of the
+  owner's 504 logs has that id, and his Chin-Up resolves to `bodyweight` (measured on production
+  2026-09-27). The card's weight cell (`day-sections.tsx`, the `{ex.weightKg ?? "—"}` + `kg` span)
+  ignores it, so a chin-up still renders `0kg`.
+- **Fix shape:** pass `ex.exerciseType` to `isBodyweightType` (`packages/shared/src/1rm.ts`) and
+  render bodyweight rather than kg: `BW` at 0 kg added, `BW +10` when weighted. That is what the
+  entry asked for; the exact copy is a Lane B call.
+- **Done when:** rendered at 412 px, a bodyweight lift at 0 kg reads as bodyweight, and a weighted
+  lift is unchanged.
 
 ### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
 - **Lane: DV** — `scripts/device/**`, then re-capture.
@@ -13625,7 +13592,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 - **✅ SHIPPED 2026-09-12** — `components/admin/exercise-manager.tsx` and the new
   `components/admin/gif-review-sweep.tsx`. Journal:
-  `docs/overview/entries/2026-09-12-bf147-admin-exercise-manager.md`.
+  `docs/overview/history-2026-09-14-folded-1.md#2026-09-12-bf147-admin-exercise-manager`.
   - **The name fix is the action row, and THIS ENTRY'S DIAGNOSIS WAS WRONG.** It blamed the
     `SourceBadge` for not collapsing. Measured at 412 dp: the badge is **25 px**; the four action
     buttons are **204 px of a 340 px row**, because the global 48 dp tap-target floor inflates each
@@ -13667,7 +13634,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **✅ SHIPPED — the surface ramp now carries the user's brand hue.** `--brand-hue` is set in all
   four places `--brand` is (`:root`, each `[data-brand]` block, `applyCustomHue`, and the pre-paint
   script in `app/layout.tsx`), and the dark surface tokens are built from it. See
-  `docs/overview/entries/2026-09-12-bf145-tinted-dark-surfaces.md`.
+  `docs/overview/history-2026-09-14-folded-1.md#2026-09-12-bf145-tinted-dark-surfaces`.
   - **The entry's own prescription — chroma 0.01–0.03, lightness untouched — does not work, and it
     was measured rather than argued.** At the old lightnesses `--card` (L 0.09) with chroma 0.018
     paints sRGB `1,3,1`: a channel spread of 2 out of 255. No chroma is visible at L 0.05–0.13, so
@@ -31161,7 +31128,7 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Added:** 2026-08-05 · owner-reported (screenshot): the "Weighing you…" progress toast appeared
   on the Home screen with nobody on the scale — recurrence of a symptom a 2026-08-01 session
   already investigated and shipped a fix for
-  (`docs/overview/entries/2026-08-01-scale-false-weighing-toast-on-home-focus.md`).
+  (`docs/overview/history-2026-07-30.md#2026-08-01-scale-false-weighing-toast-on-home-focus`).
 - **⚑ 2026-08-10 update — the on-device log capture this entry was waiting for, and hypothesis (b)
   now looks confirmed by direct code read, not just log speculation.** Owner reported "when
   scrolling to home screen the weigh-in keeps triggering" with two screenshots: Home's live

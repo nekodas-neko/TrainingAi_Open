@@ -705,7 +705,7 @@ git commit -m "feat: add the cardio trends surface to the /cardio hub"
 
 **Files:**
 - Modify: `package.json`, `lib/changelog.ts`, `projectOverview.md`
-- Create: `docs/overview/entries/2026-07-27-cardio-trends.md`
+- Create: `docs/overview/history-2026-07-23.md#2026-07-27-cardio-trends`
 - Modify: `docs/implementation-backlog.md`
 
 - [ ] **Step 1: Run the full local gate**
@@ -734,7 +734,7 @@ the three trend views and the anchor-dependent deferral.
 
 - [ ] **Step 4: Write the session journal entry**
 
-Create `docs/overview/entries/2026-07-27-cardio-trends.md` per the convention in
+Create `docs/overview/history-2026-07-23.md#2026-07-27-cardio-trends` per the convention in
 `docs/overview/entries/README.md`: what shipped, the deferred distance/pace-vs-anchor and PR-history
 views and why (blocked on backlog item "Density-progression engine"), and what wasn't verified
 (populated efficiency/cadence charts if the seed lacked qualifying data, on-device APK rendering).

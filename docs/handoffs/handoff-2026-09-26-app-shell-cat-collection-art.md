@@ -38,7 +38,7 @@ and deliberately not built.
   labels stacked under the sprites).
 - `components/home/__tests__/collection-sprites.test.ts`: fails if an SVG drifts from its source.
 - Docs: plan `docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md`; PS-48/49/50; BF-126
-  rewritten; journal `docs/overview/entries/2026-09-26-art-cat-collection-art.md`.
+  rewritten; journal `docs/overview/history-2026-09-27-folded-1.md#2026-09-26-art-cat-collection-art`.
 
 ## Deliberately NOT done
 
