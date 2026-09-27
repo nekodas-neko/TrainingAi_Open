@@ -3077,6 +3077,27 @@ which is the right shape for something that can only be validated by living with
      or require the password before linking.
 - **Alternatives:** drop email and password registration and keep only Google, since every current
   user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
+- **✅ BOTH HALVES OF THE TAKEOVER PATH ARE CLOSED (Lane A, 2026-09-27) — but NOT by verifying
+  email, because there is nothing in this repository that can send one.** `createEmailUser` no
+  longer defaults `isActive` to `isInvited(email)`; a password account starts inactive and the owner
+  activates it. `linkOAuthAccount` clears `password_hash` as it links. Google sign-in still honours
+  the invite through `upsertUser`, and that stays right: **Google has verified the address, so there
+  the invite IS being matched against a proven owner.** The asymmetry is the whole fix.
+- **Why clearing the password is safe rather than destructive.** It runs only on the FIRST Google
+  sign-in for a row with no `oauthSub`, and the person triggering it is signing in with Google at
+  that moment, so they are not locked out. The owner's own account already carries an `oauthSub`, so
+  the branch cannot fire for him. `auth.ts:57` already returns null on a falsy hash, so a cleared
+  password is a refusal and not an empty one — pinned by a test, because the fix would be worse than
+  useless if null meant "no password required".
+- **How this survived a test file named for it.** `lib/__tests__/register-inactive.test.ts` is
+  titled *"accounts must start inactive/pending"* and asserts that the **route** passes no `isActive`
+  override — leaving activation to `isInvited`, which is the defect. A test named for a property,
+  asserting something weaker.
+- **Keep: fix 1 as the entry actually words it — real email verification — is NOT done, and it is
+  the owner's.** It needs a mail provider (none exists: no nodemailer/Resend/SES anywhere), a
+  secret, a token table and a verification screen. **Ask him the product question first**, because
+  the entry's own alternative may be the answer: every current user signs in with Google, so
+  dropping password registration outright would close this without building any of it.
 
 ### [platform] RV-193 — the Google refresh token is copied into the session JSON that page scripts can read
 - **Lane: A** — `auth.config.ts:51`, `app/api/log-calendar-event/route.ts:22`.
