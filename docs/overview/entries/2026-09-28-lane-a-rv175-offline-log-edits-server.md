@@ -8,7 +8,7 @@ domain. Offline the app toasted "Updated", then "Failed to update", and the chan
 - **The writes moved out of the routes into one place each.** `lib/workout/exercise-log-edits.ts`
   holds `editExerciseLog` and `deleteExerciseLog`, moved verbatim from `PATCH`/`DELETE
   /api/workout-entry`, including the PR reconcile and the recap invalidation.
-  `lib/workout/delete-session.ts` gains `deleteWorkoutSessionAndReconcile`, which carries the PR
+  `lib/workout/delete-session-reconcile.ts` holds `deleteWorkoutSessionAndReconcile`, which carries the PR
   reconcile the sessions route used to do on its own. The routes keep auth, body limits and the HTTP
   answers. The existing route tests (35) pass unchanged.
 - **Three outbox domains:** `exercise_log_edit`, `exercise_log_delete`, `workout_session_delete`.
@@ -42,6 +42,15 @@ nothing queues the new domains, so they are inert.
   of the log 200 with `sessionDeleted: true`; `DELETE /api/workout-sessions` 200; `POST /api/sync/push`
   carrying an edit and a session delete returned `processed: 2, errors: []`, with both writes in the DB.
 - `check-push-mutations`: OK.
+
+## A trap met on the way
+
+The composed session delete first lived beside `deleteWorkoutSession` in `delete-session.ts`. The
+full suite then failed `workout-write-path-routes.test.ts`, which had passed when run alone before
+that change: it mocks `deleteWorkoutSession`, and a call from inside the same module never reaches a
+mock of its export. Moving the composition to `delete-session-reconcile.ts`, which imports it, put
+the test's contract back unchanged. **Run the suite for the files a refactor touches AFTER the last
+edit, not only before it.**
 
 ## Not exercised
 

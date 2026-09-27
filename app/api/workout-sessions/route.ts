@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { deleteWorkoutSessionAndReconcile, WorkoutSessionDeleteSchema } from "@/lib/workout/delete-session";
+import { deleteWorkoutSessionAndReconcile, WorkoutSessionDeleteSchema } from "@/lib/workout/delete-session-reconcile";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 

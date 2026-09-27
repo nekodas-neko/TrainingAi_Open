@@ -5248,7 +5248,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           await deleteExerciseLog(userId, parsed.data.exerciseLogId)
           processed++
         } else if (mut.domain === 'workout_session_delete') {
-          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session')
+          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session-reconcile')
           const parsed = WorkoutSessionDeleteSchema.safeParse(mut.payload)
           if (!parsed.success) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_session_delete payload' })

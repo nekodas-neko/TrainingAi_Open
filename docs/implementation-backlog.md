@@ -7537,7 +7537,7 @@ drift.
 - **Lane: A** — `lib/local-store/sqlite-backend.ts`, `lib/local-store/sync-engine.ts`.
 - **Needs:** — nothing. The server half shipped as RV-175 (2026-09-28): the push domains
   `exercise_log_edit`, `exercise_log_delete` and `workout_session_delete` exist and call the same
-  functions as the web routes (`lib/workout/exercise-log-edits.ts`, `lib/workout/delete-session.ts`).
+  functions as the web routes (`lib/workout/exercise-log-edits.ts`, `lib/workout/delete-session-reconcile.ts`).
 - **Added:** 2026-09-28 · Lane A, while building RV-175.
 - **Why the hook cannot just swap `fetch` for `queueMutation` today:**
   ① `updateExerciseLogLocally`, `deleteExerciseLogLocally` and `deleteWorkoutSessionLocally` all write
@@ -7564,7 +7564,7 @@ drift.
   locally in pending mode and `queueMutation` the matching domain: `exercise_log_edit`
   (`{ exerciseLogId, weights, reps }`), `exercise_log_delete` (`{ exerciseLogId }`) or
   `workout_session_delete` (`{ workoutSessionId }`). Payload schemas are in
-  `lib/workout/exercise-log-edits.ts` and `lib/workout/delete-session.ts`. `handleDeleteActivity` in
+  `lib/workout/exercise-log-edits.ts` and `lib/workout/delete-session-reconcile.ts`. `handleDeleteActivity` in
   the same hook is the reference (Q-328).
 - **Done when:** offline, each action toasts once, survives an app restart, and reaches the server on
   reconnect. **Device check owed** — the local store is null on the web.
