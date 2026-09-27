@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { toast } from "sonner";
 import { CheckIcon, XIcon, SparklesIcon, ChevronDownIcon, ArrowRightIcon, PlusIcon, AlertTriangleIcon, BatteryLowIcon, TrendingUpIcon } from "lucide-react";
@@ -331,7 +332,7 @@ export function AiPrescriptionCard({
                     <span className="text-muted-foreground flex-none tabular-nums whitespace-nowrap">
                       {ex.sets}×{ex.reps}
                       {weightKg != null
-                        ? ` @ ${weightKg}kg (${ex.pct}%)`
+                        ? ` @ ${formatLoadKg(weightKg)} (${ex.pct}%)`
                         : ` @ ${ex.pct}%`
                       }
                       {" · "}{ex.restSec >= 60 ? `${Math.round(ex.restSec / 60)}min` : `${ex.restSec}s`} rest
