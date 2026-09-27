@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatHoursMinutes, formatMinutes } from '@trainingai/shared/format/units'
 import { Sparkline } from '@/components/ui/sparkline'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
@@ -107,13 +108,11 @@ function MetricTrendChart({ pts, color, unit, formatValue }: {
 // tz threaded, not defaulted — module scope cannot read the user-timezone context (Q-148).
 const fmtTime = (iso: string, tz: string) => formatTimeOfDay(iso, tz)
 
-function fmtHours(h: number) {
-  const hrs = Math.floor(h)
-  const mins = Math.round((h - hrs) * 60)
-  if (hrs === 0) return `${mins}m`
-  if (mins === 0) return `${hrs}h`
-  return `${hrs}h ${mins}m`
-}
+// RV-208: a third hand-rolled copy of `formatHoursMinutes`, which RV-90 consolidated five
+// variants onto. The shared one takes MINUTES, which is why this one was written instead of
+// imported. An exact hour now reads `7h 00m` rather than `7h` — the padded minute is deliberate
+// there, for the `tabular-nums` columns these sit in.
+const fmtHours = (h: number) => formatHoursMinutes(h * 60)
 
 const STAGE_DEFS = [
   { key: 'deepSleepHours' as const,  label: 'Deep',  color: STAGE_COLOR.deep },
@@ -184,7 +183,7 @@ function SleepDetailView({ r, allNights = [], color, onBack }: { r: SleepDetailR
         {displayStart && displayEnd && (
           <span className="text-xs text-muted-foreground ml-1">
             {fmtTime(displayStart, userTz)} – {fmtTime(displayEnd, userTz)}
-            {onsetMin != null && ` · ${onsetMin}m latency`}
+            {onsetMin != null && ` · ${formatMinutes(onsetMin)} latency`}
           </span>
         )}
       </div>
@@ -378,7 +377,7 @@ export function HealthMetricSheet({
                     const rangeEnd = win?.end ?? r.sleepEnd
                     const onsetMin = r.onsetLatencySec != null ? Math.round(r.onsetLatencySec / 60) : null
                     const timeRange = rangeStart && rangeEnd
-                      ? `${fmtTime(rangeStart, userTz)} – ${fmtTime(rangeEnd, userTz)}${onsetMin != null ? ` · ${onsetMin}m latency` : ''}`
+                      ? `${fmtTime(rangeStart, userTz)} – ${fmtTime(rangeEnd, userTz)}${onsetMin != null ? ` · ${formatMinutes(onsetMin)} latency` : ''}`
                       : null
                     return (
                       <button

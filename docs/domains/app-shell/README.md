@@ -487,6 +487,11 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
+- **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
+  — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
+  one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
+  casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
+  collides with `SESSION_PALETTE` because that palette is indexed by POSITION, not by name.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)

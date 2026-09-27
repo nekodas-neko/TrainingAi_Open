@@ -65,6 +65,9 @@ function MetricTilesCardComponent({
               : null;
 
           const val = todayVal ?? recentVal;
+          // RV-208: `11900` steps sat beside `1,660` and `2,000` on the same screen. Separators
+          // everywhere; `toLocaleString` keeps the decimals a weight or a protein figure needs.
+          const valText = val != null ? val.toLocaleString() : null;
           const tileColor = pillColors[def.key] ?? def.color;
 
           const waterWeeklyPct =
@@ -78,7 +81,7 @@ function MetricTilesCardComponent({
               onClick={onTileClick}
               role="button"
               tabIndex={0}
-              aria-label={`${def.label}: ${metaLoading ? "loading" : val != null ? val : "no data"} ${
+              aria-label={`${def.label}: ${metaLoading ? "loading" : valText ?? "no data"} ${
                 def.unit || ""
               } — tap to view`}
               className="flex-none flex flex-col items-center gap-1 rounded-2xl px-4 py-3 min-w-[76px] transition active:scale-95 relative cursor-pointer overflow-hidden"
@@ -100,7 +103,7 @@ function MetricTilesCardComponent({
               </button>
               <def.icon className="h-4 w-4" style={{ color: tileColor }} />
               <span className="text-sm font-bold tabular-nums">
-                {metaLoading ? "…" : val != null ? val : "—"}
+                {metaLoading ? "…" : valText ?? "—"}
               </span>
               <span className="text-[10px] text-muted-foreground">{def.unit || def.label}</span>
               {waterWeeklyPct !== null && (

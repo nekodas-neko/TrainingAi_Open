@@ -1,6 +1,7 @@
 "use client";
 
 import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
+import { formatMinutes } from '@trainingai/shared/format/units'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
@@ -55,7 +56,9 @@ export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubP
     // for every non-zero week. It moves to the `unit` line, which already exists and is where the
     // other three tiles put theirs. (`/api/weekly-stats` rounds, so there is no fractional case.)
     { label: "Volume",       value: data.totalVolumeKg > 0 ? data.totalVolumeKg.toLocaleString() : "—", unit: "kg lifted" },
-    { label: "Avg Duration", value: data.avgDurationMin != null ? `${data.avgDurationMin}m` : "—",          unit: "per session" },
+    // RV-208: `55m` against `55 min` elsewhere. The unit goes on the `unit` line like Volume's
+    // above, so the form agrees with the rest of the app without widening a 74px cell.
+    { label: "Avg Duration", value: data.avgDurationMin != null ? formatMinutes(data.avgDurationMin, { unit: false }) : "—", unit: "min per session" },
   ];
 
   return (

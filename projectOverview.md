@@ -2658,6 +2658,9 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ Durations and counts read the same everywhere now; two daily screens changed what they print and neither has been seen (RV-208, 2026-09-27)
+
+Seven hand-rolled duration formatters went through `formatHoursMinutes`/`formatMinutes`, and one of them was a **defect**: the day timeline floored to the hour and dropped the remainder, so a 45-minute nap read `0h`. Thousands separators added at the three sites the device sweep confirmed. **An exact hour now prints `7h 00m` rather than `7h`** on the day timeline and the sleep sheet — the shared formatter's padded minute, for the `tabular-nums` columns. **Pass test:** on the S25, a sub-hour sleep or nap shows its minutes, and the padded form does not look wrong beside the numbers around it. Still open on RV-208: the time-of-day casing and `formatKg` spacing (both Lane A), the movement-category palette, dates, and brand names.
 ### [readiness][devices] ⚠️ Resilience stopped publishing on 2026-09-22 and nothing says so (LA-158, 2026-09-27)
 `oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22** while the
 rollup runs normally — last write **2026-09-27 02:19 UTC**, `daytime_stress_coverage_min`
