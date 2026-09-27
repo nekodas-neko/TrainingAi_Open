@@ -15,4 +15,7 @@ follows the snippet there and never opens the reference doc is exactly the perso
 wrong output. The narrative is in the journal entry
 (`docs/overview/entries/2026-09-27-la161-grid-dimensions.md`); only the operative warning is here.
 
-1061 → 1068 (rebased onto a parallel raise of the same baseline).
+The net number moved **down**, not up: a parallel compaction shrank `CLAUDE.md` between this
+branch being cut and merging, so the recomputed baseline is 946 rather than the ~1068 this note
+was first written against. The 7 lines below are still this branch's, and the baseline was
+recomputed rather than spliced when the two raises conflicted.
