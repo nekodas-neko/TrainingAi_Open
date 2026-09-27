@@ -4174,11 +4174,33 @@ which is the right shape for something that can only be validated by living with
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
 
 ### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
-- **Lane: B.**
+- **✅ ② SHIPPED 2026-09-27 (#1785), rendered at 412 px. ① IS LANE A's — established, not assumed. ③ is RV-208's.**
+- **Lane: A** for what remains (① needs a field on `app/api/day-log/route.ts`).
 - **Added:** 2026-09-26 · Review sweep 64 (`t2-day-01`).
-1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load), not zero.
-2. **"Chest-Supported Dumbb…"** truncates the part that distinguishes it. Let the name wrap to two lines, or shrink the edit and delete icons, which take about 25% of the row twice over.
-3. The times read "7:35am → 8:17am" here and "7:35 AM" on Home. That is RV-208's item; noted here as the second device sighting.
+1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load),
+   not zero. — **CONFIRMED (rendered: `0kg`), and it is LANE A's, for a specific reason.**
+   - The repo already has the resolver and already states the rule: `isBodyweightType`
+     (`packages/shared/src/1rm.ts`), whose module comment says *"Every surface that shows a stored
+     1RM resolves its unit here rather than hardcoding kg"* (BF-162, Q-19).
+   - **The card cannot call it.** `DayExercise` (`app/api/day-log/route.ts`) carries `name`,
+     `weightKg`, `sets`, `reps` — **no `exerciseType`**. And every existing consumer of
+     `isBodyweightType` receives the type as a PROP; there is no name→type lookup on the client to
+     copy, so inventing one here would be new machinery beside an established pattern.
+   - **The fix is one field**: add `exerciseType` to `DayExercise`, then
+     `components/health/day-detail/day-sections.tsx:161` resolves the unit the way every other
+     surface does. Route change → Lane A.
+2. ~~**"Chest-Supported Dumbb…"** truncates the part that distinguishes it.~~ — **SHIPPED**, by
+   letting the name wrap (`truncate` → `line-clamp-2` on both the button and span branches).
+   Rendered at 412 px: "Chest-Supported / Dumbbell Row" over two lines with the sets, weight and
+   both icons still aligned on the row.
+   - **The entry's OTHER suggestion — shrink the icons — is not available, and the measurement it
+     cites is right.** `ICON_BTN` is `h-12 w-12`: 96 px of ~380 usable at 412 px, exactly the
+     "about 25% of the row twice over". But **48 px IS the Android minimum touch target** and this
+     repo's tap-target floor, so shrinking trades a naming problem for an accessibility one. The
+     test pins `h-12 w-12` so the trade is not made later by someone who has not read this.
+3. The times read "7:35am → 8:17am" here and "7:35 AM" on Home. — **RV-208's, and still open
+   there as LANE A's** (the casing comes from `app/api/day-timeline/route.ts`). Noted here as the
+   second device sighting; nothing to do on this entry.
 
 ### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
 - **Lane: DV** — `scripts/device/**`, then re-capture.

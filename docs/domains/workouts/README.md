@@ -346,6 +346,11 @@ Live at the time of writing (2026-07-30):
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
+  [`2026-09-27-rv219-day-workout-card.md`](../../overview/entries/2026-09-27-rv219-day-workout-card.md)
+  (RV-219 ② — the Day card's exercise name wraps instead of cutting the distinguishing words; why
+  shrinking the icons was ruled out by the 48 px tap-target floor; and why the "0 kg" half needs a
+  field on `day-log`, since `DayExercise` carries no `exerciseType` and nothing resolves one
+  client-side),
   [`docs/overview/entries/2026-09-27-rv214-session-card.md`](../../overview/entries/2026-09-27-rv214-session-card.md)
   (RV-214 ①③④ — three surfaces printed `session.icon` as text because they bypassed the map A-7's
   comment said everyone used; plus why the check is keyed narrowly, and what ②⑤ still need),
