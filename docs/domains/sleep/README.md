@@ -223,8 +223,8 @@ curve). **Before writing anything that treats one row as one night, call the hel
 
 ## History
 
-- Handoffs: `ls docs/handoff-*-sleep-*.md` — most recent:
-  [`2026-08-03-sleep-asymmetric-interruption-window-fix.md`](../../handoff-2026-08-03-sleep-asymmetric-interruption-window-fix.md)
+- Handoffs: `ls docs/handoffs/handoff-*-sleep-*.md` — most recent:
+  [`2026-08-03-sleep-asymmetric-interruption-window-fix.md`](../../handoffs/handoff-2026-08-03-sleep-asymmetric-interruption-window-fix.md)
   (a real mid-night interruption could get its earlier sleep bout silently dropped, reading as a
   much later bedtime; fixed in `lib/sleep/sensing-span.ts`, PR #1043)
 - Journal: `grep -rl 'sleep' docs/overview/entries/`

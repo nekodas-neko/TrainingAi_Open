@@ -49,8 +49,8 @@ Domain tags are written as bracketed slugs and are **greppable** — that is the
   `### [sleep][devices] 🟠 Sleep/HRV/breathing metrics changed scale at the BLE re-key`.
   To get every issue for a pillar: `grep -n '^### .*\[sleep\]' projectOverview.md`.
 - **Handoff docs** — the domain is in the filename:
-  `docs/handoff-YYYY-MM-DD-<domain>-<title>.md`. To get every sleep handoff:
-  `ls docs/handoff-*-sleep-*.md`. A handoff spanning several pillars uses its **primary**
+  `docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md`. To get every sleep handoff:
+  `ls docs/handoffs/handoff-*-sleep-*.md`. A handoff spanning several pillars uses its **primary**
   domain in the filename and lists the rest in the doc header.
 - **`cross`** is the escape hatch for genuinely app-wide items (a full-app review, the
   "recently resolved" roll-up). Use it sparingly — three items carry it today.

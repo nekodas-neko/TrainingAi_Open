@@ -1,7 +1,7 @@
 # Plan — make the BLE rollup incremental, and stop it running on the request event loop (Q-213)
 
 **Date:** 2026-08-13 · **Domain:** `platform` / `devices`
-**Evidence:** [`docs/handoff-2026-08-13-platform-production-event-loop-starvation.md`](../../handoff-2026-08-13-platform-production-event-loop-starvation.md)
+**Evidence:** [`docs/handoffs/handoff-2026-08-13-platform-production-event-loop-starvation.md`](../../handoffs/handoff-2026-08-13-platform-production-event-loop-starvation.md)
 **Owner decision (2026-08-13):** build the correct, future-proof fix rather than the cheapest one.
 
 ---

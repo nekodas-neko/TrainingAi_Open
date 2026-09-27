@@ -18,7 +18,7 @@ comprehension cost paid by the next agent**, who starts cold and has only the do
 
 | Surface | Why it matters |
 |---|---|
-| `docs/handoff-*.md` | Read cold by the next session. Vagueness here is re-discovery cost. |
+| `docs/handoffs/handoff-*.md` | Read cold by the next session. Vagueness here is re-discovery cost. |
 | `docs/overview/entries/*.md` | The permanent record of what a session did. |
 | `projectOverview.md` Known Issues / Risks | A vague issue row is an unactionable issue row. |
 | PR titles and bodies | Reviewed by a human; also the squash-commit message. |

@@ -42,7 +42,7 @@ single write) or a backfill (`today - i`).
 - [ ] **Task 1 — find what ran at `2026-07-30T03:44:09 UTC` (≈13:44 AEST).** Check whether this
       correlates with a specific deploy, migration, or manual admin action around that time (that
       session shipped several BLE/sync fixes — Q-36 through Q-40 — check
-      `docs/handoff-2026-08-02-platform-batch-queue-drain.md` and nearby PRs/commits for anything that
+      `docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md` and nearby PRs/commits for anything that
       writes a multi-day batch of `body_metrics`/`oura_daily` rows). Rule in or out: a backfill script,
       a redecode pass, a rollup re-run, or a live sync that mis-timestamped its output.
 - [ ] **Task 2 — read the ring-clock-anchor / BLE-daily-rollup date computation.** Per CLAUDE.md's

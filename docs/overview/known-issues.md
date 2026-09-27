@@ -4166,7 +4166,7 @@ the next device change.
 - **Not yet fixed** — queued as Q-310, near the top of `docs/implementation-backlog.md` given its
   severity. Needs a production data check (any already-wrong `personal_records` rows from this
   path) before or alongside the code fix. Full trace:
-  [`docs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md).
+  [`docs/handoffs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../handoffs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md).
 
 ### [platform] ✅ The repo can now run its own app — E2E harness shipped (Q-249, 2026-08-15)
 
@@ -6070,7 +6070,7 @@ grouping or thumbnails rather than a longer list. Not scoped.
 **Fixed 2026-08-08 in v1.270.25.** Owner decision: **fix forward, no backfill.** Kept here rather
 than archived because the device check is still owed, which is what this section is for. Full
 investigation, including the measurement traps that make it expensive to re-derive:
-[`docs/handoff-2026-08-07-activity-ring-clock-compression.md`](../handoff-2026-08-07-activity-ring-clock-compression.md);
+[`docs/handoffs/handoff-2026-08-07-activity-ring-clock-compression.md`](../handoffs/handoff-2026-08-07-activity-ring-clock-compression.md);
 session journal `docs/overview/entries/2026-08-08-ring-clock-compression.md`.
 
 **The slope was never the unknown** — the ring's counter ticks at exactly 100 ms/ds by construction,
@@ -6975,7 +6975,7 @@ and Q-53…Q-56 collided with the separate cross-domain bug review below; both l
   *lowest* confirmed reading instead.
 
 Full root causes, decisions, and rejected alternatives (with rationale) in
-[`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../handoff-2026-08-03-cross-owner-bug-batch-triage.md).
+[`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md).
 Plans and branch names in `docs/implementation-backlog.md`. **Do not strike any of these seven
 until each is actually implemented and verified** — this entry only records that they were scoped.
 
@@ -7245,7 +7245,7 @@ status in both teardown paths instead of dying silently.
   device-only by construction; only the unpaired web state was rendered.
 
 Both device checks are on the checklist in
-[`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff-2026-08-02-platform-batch-queue-drain.md).
+[`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md).
 Do not strike this row on intent.
 
 ### [devices][platform] `oura_raw_samples` is 452 MB and ~130 MB of that is index bloat (measured 2026-08-02)
@@ -7290,7 +7290,7 @@ real provider. Specifically unproven:
 Everything else is proven: the DB rank-merge orderings, the route degradation boundaries, the
 rasteriser, and a `/api/sync-health` POST landing a row with `source_map` stamped `health_connect`.
 Do not strike this row on intent — the device check is on the owner checklist in
-[`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff-2026-08-02-platform-batch-queue-drain.md).
+[`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md).
 
 **Adjacent finding (Q-45) — ✅ FIXED 2026-08-02 in #1007, v1.250.9.** On the Readiness breakdown a
 *provisional* contributor rendered a weight-derived bar value that read exactly like a score —
@@ -7306,7 +7306,7 @@ the investigation session and **all five have now shipped** (#987, #988, #995, #
 the plan is
 [`docs/superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md`](../superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md)
 with follow-ups Q-41/Q-42 still queued. What remains is **device verification** — see the checklist
-in [`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff-2026-08-02-platform-batch-queue-drain.md).
+in [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md).
 
 1. ✅ **[activity] A guided walk can never sync, and so never reaches the training calendar (Q-36).**
    Fixed in **#987** (v1.249.5). ⚠️ The owner's stranded walk needs a manual **Retry** tap on the
@@ -7656,7 +7656,7 @@ night is therefore entirely unobserved, and the plan names a concrete failure mo
 can fight the Viterbi bout decoder on a fragmented night. The revert is deleting two addends.
 
 Clear this row from the device check on the owner checklist in
-[`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff-2026-08-02-platform-batch-queue-drain.md)
+[`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md)
 — Redecode a night, read the `spo2V` column in the admin debug dump. Do not tune `W_SPO2` before
 that answer exists; the verdict belongs in
 [`docs/oura-ble-sleep-staging-findings.md`](../oura-ble-sleep-staging-findings.md).

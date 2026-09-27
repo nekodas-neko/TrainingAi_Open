@@ -387,7 +387,7 @@ call: *"I don't think we need the handoff hook anymore; this is deprecated."*
 
 `.claude/hooks/context-usage-warn.mjs` fired at each context threshold with:
 
-> *Wrap up soon: invoke the handoff skill to write `docs/handoff-<date>-<title>.md` (commit + push
+> *Wrap up soon: invoke the handoff skill to write `docs/handoffs/handoff-<date>-<title>.md` (commit + push
 > it), then start a fresh session and read that doc first.*
 
 CLAUDE.md now says the opposite, in the session-start rule: **a standing agent is meant to run as
@@ -429,7 +429,7 @@ would be a second mechanism racing the first.
 ## Not done
 
 Nothing is left behind for a successor to find. The two historical docs that mention the hook
-(`docs/handoff-2026-08-17-platform-context-warning-window.md` and the 2026-08-15 history) are
+(`docs/handoffs/handoff-2026-08-17-platform-context-warning-window.md` and the 2026-08-15 history) are
 records of when it was tuned and stay as they are — an archive that describes a thing that existed
 is not stale.
 
