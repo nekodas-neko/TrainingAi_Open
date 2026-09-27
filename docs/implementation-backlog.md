@@ -2804,6 +2804,10 @@ which is the right shape for something that can only be validated by living with
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
+- **Ask:** owner — SECOND question on this entry, separate from the outlier-only answer: validating the score needs the readiness number HIDDEN until the check-in is saved, otherwise the rating is anchored by the score it is meant to validate. That is a product change to his morning flow.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 - **✅ ANSWERED 2026-09-27 — outlier-only prompting. He will not rate daily again.**
   Ask for a rating only on days the score is unusual, the same shape he approved for a different
   prompt in `OR-171`. He answered maybe-twice-a-week over daily and over retiring it entirely.
@@ -4987,6 +4991,10 @@ volume7dKg,                             // likewise
   the composite's output is wrong by that much — `prevDayActivity` is 9% of it.
 
 ### [readiness][heart-rate] TN-72 — v6 will never re-score a single stored day, and TN-55's plan said it would. That claim was mine and is retracted here
+- **Ask:** owner — re-derive 84 days of `body_battery_daily`, or freeze history and label the discontinuity in the UI? Freezing reverses his 2026-08-26 decision, which is why it is his. Same question covers `TN-74`.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, verifying TN-55's own acceptance test after
   the fix shipped. **This corrects my own plan**, not Lane A's implementation — the constants landed
@@ -6199,6 +6207,24 @@ drift.
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
+- **✅ SECOND PASS RUN 2026-09-27 — all thirteen live questions now carry an `Ask:` field and are
+  visible. This entry's work is DONE; strike it once they are answered.**
+  `Ask:` was used rather than a new `Lane: O` entry each: it promotes an entry to WAITING without
+  moving it, where `Gate: owner` would have PARKED it — the inversion this file already warns about.
+  Thirteen fields added (`BF-144` covering the whole `destructive-migration` group, `Q-540`,
+  `Q-297`, `Q-251`, `TN-72` covering `TN-74`, `TN-67`, `RV-166`, `PS-51`, `BF-145`, `BF-96`
+  covering `BF-139`, `LA-89`, `LB-38`, `BF-168`). Queue-wide `Ask: owner` went **16 → 28**.
+- **⛔ THE SECOND PASS CAUGHT AN ERROR THE FIRST PASS MADE, and it is the more useful finding.**
+  The first pass re-laned **`LA-121` to `T`** on the strength of its sentence *"a scoring decision,
+  so not an implementer's"*. **The owner answered that question on 2026-09-22** — do not port the
+  temperature ladder — and both `LA-121` and `LA-122` item 2 record it. The re-lane parked
+  startable dead-code removal behind a Tuning proposal that was not owed. Reverted to `Lane: A`.
+  **The rule this yields: a sentence saying a decision is the owner's does not mean it is still
+  OPEN.** Group ① of the first pass said exactly that about other entries and the sweep then did it
+  anyway on one. **Reconcile against `LA-122` before re-laning anything on the strength of a
+  question** — that ledger is where the answers to Lane A's owner decisions are recorded.
+  The other four `T` re-lanes were re-checked against their own text and stand; `Q-420`'s open half
+  says outright *"picking them is a scoring change — Tuning proposes, the owner signs off."*
 - **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
 - **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
 - **Needs:** — nothing.
@@ -7175,6 +7201,10 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
+- **Ask:** owner — does a guided or treadmill walk on a prescribed run day count as DOING the run? No prescribed run has ever been marked done although he does most of them as walks. An unanswered rider of `RV-170`.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
 - **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
@@ -9640,6 +9670,15 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 
 ### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
+- **⛔ CORRECTION 2026-09-27 — this entry was re-laned to `T` earlier today and that was WRONG; it is
+  back in `Lane: A` and is STARTABLE.** The `BF-202` sweep read the step-(1) sentence *"Ask the
+  owner whether the temperature ladder should be ported … a scoring decision, so not an
+  implementer's"* and routed it as a scoring change owing a Tuning proposal. **The owner already
+  answered it on 2026-09-22 — do NOT port the ladder, let `tempZ` stand** — and both this entry and
+  `LA-122` item 2 record the answer. Parking it behind a proposal that is not owed stopped
+  startable dead-code removal. **The lesson, which is the sweep's own rule turned on itself: a
+  sentence saying a decision is the owner's does not mean it is still OPEN.** Check for the answer
+  before re-laning on the strength of the question.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
 - **Lane: A** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
@@ -11658,6 +11697,10 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   is not.
 
 ### [workouts] BF-168 — "Leave workout?" fires on the session-select tab after the workout is finished (fixed; device look owed)
+- **Ask:** owner — ONE factual question, not a decision: was *Start Again* pressed before the back press? If yes this is a labelling problem rather than a stale-state one, and the fix is a different one.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Batch:** `workout-completion-surface` — shipped with **BF-169** and **BF-167**.
 - **Verify:** device — on the S25, complete a session, return to the tab **without** tapping Start
@@ -13350,6 +13393,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Needs:** nothing.
 
 ### [app-shell] BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision
+- **Ask:** owner — leave the wallpaper tint opt-in, or turn it on? The tint now reaches all 46 sheets through `--background`, and the wallpaper may not even be enabled on his phone.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Lane:** B
 - **Keep:** ② only — the sheet question below, which is a decision rather than an implementation.
@@ -13393,6 +13440,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
     reaches all 46 sheets through `--background` and the wallpaper may not even be on for him.
 - **Needs:** nothing.
 ### [workouts] BF-144 — the dead `program_session_id` column that misled BF-143, and whether to drop it
+- **Ask:** owner — ONE yes covers the `destructive-migration` group (`BF-144`, `LA-71`, `LB-42`): approve dropping columns that hold data. Recommendation below; it is a data-dropping migration, so it is confirm-first by CLAUDE.md.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **⚠ PRESENT WITH THE OTHER DATA-LOSING SCHEMA CHANGES — `destructive-migration` (grouped
   2026-09-16, OR-118): BF-144, LA-71, LB-42.** All three ask the owner to approve a migration that
@@ -14955,6 +15006,10 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   must never feed the replay.
 
 ### [app-shell] PS-51 — titles that unlock the collection pen's backdrop scenes
+- **Ask:** owner — which titles unlock which backdrop scene? Proposed: forest ← first Ranger T4, house ← first Health-cat T3, castle ← first Tank T4. A product preference, not derivable from the repo.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Lane:** A for the titles (derived in `packages/shared/src/collection/`, returned by
   `/api/collection`), then B for a scene picker on `/collection`.
@@ -17445,6 +17500,10 @@ two screens, and a user who sets one has no way to know the other exists.
   a small button for each session to choose 'rest'."*
 
 ### [app-shell] BF-96 — the temperature/UV pill wrapped (the fix FAILED on device; open work)
+- **Ask:** owner — the temperature/UV pill cannot be made smaller; the only levers left MOVE A READING OUT of the row. Which one goes? Same question covers `BF-139`.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Batch:** `header-row-width` — ships with **BF-139**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
 - **Needs: LB-157**
@@ -24571,6 +24630,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 
 ### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
+- **Ask:** owner — the `event_name` drop, a data-dropping migration. The column is derivable from `tag` and no reader has touched it since Q-541 Task 7, but dropping stored data needs his yes.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
 - **Branch:** `perf/oura-raw-row-narrowing`
@@ -28708,6 +28771,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
 ### [platform] Q-297 — cover Nutrition's day navigation (done; two residues, one of them owner's)
+- **Ask:** owner — should the E2E job become a REQUIRED check? It is a branch-protection change to a shared system, so it is his, not a lane's. `LB-56` has been the placeholder for this since it was deferred.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
   page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
@@ -28991,6 +29058,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Added:** 2026-08-31 · Lane B, from a red `Tests` check that took an hour to place.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
+- **Ask:** owner — authorise a second Railway service for staging? Shape (a) shipped as Q-530; shape (b) COSTS MONEY to run, which is his call and not an implementation.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **✅ ANSWERED 2026-09-27 (OR-182): NOT YET, and the trigger is named.** He declined the second Railway service for now — the snapshot endpoint shipped as Q-530 already gives agents a real copy of the data to test against, which was most of the value, and the remaining half is a recurring cost against a risk that has not yet bitten. **The trigger: the first migration that damages production authorises it immediately, without asking again.** The gate is removed because nothing is waiting on him; this entry now waits on an event. Original text: shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
   service**, which costs money to run and is the owner's call to authorise, not an implementation.
@@ -32842,6 +32913,10 @@ adopted.
   precisely the thing that looks fixed for weeks.
 
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
+- **Ask:** owner — delete `oura/hr-sync`? It has no callers and its name says something untrue. Removing an HTTP surface is his call; it is tested and pinned as it stands.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
 - **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
@@ -32994,6 +33069,10 @@ patch.
   it had never imported and still passed `tsc`.
 
 ### [platform][nutrition] LB-38 — the share-code e2e "flake" was a zxing decoder bug (shipped; device owed)
+- **Ask:** owner — keep `@zxing/browser` as the app's scanner, or change it? A product note the entry flags as his.
+  **Surfaced 2026-09-27 by the `BF-202` second pass** — the question was inside this entry's body,
+  where `Lane:` cannot route it, so nobody was tasked with putting it to him. The entry keeps its
+  lane; `Ask:` promotes it to WAITING rather than parking it, which `Gate: owner` would do.
 
 - **Lane:** B — `e2e/qr-decode.ts`, `e2e/meal-label.spec.ts`, `lib/__tests__/qr-decode-rotations.test.ts`.
 - **Verify:** device — nothing in this diff is app code, but see the product note below: the app's own
