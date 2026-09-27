@@ -27,7 +27,7 @@
 ## 🔖 Current Status
 
 **Version:** v1.477.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-26.
+**Last updated:** 2026-09-27.
 
 **Recent changes are NOT listed here.** They live in the session journal —
 [`docs/overview/entries/`](docs/overview/entries/) for recent work, one file per PR, and the batched
