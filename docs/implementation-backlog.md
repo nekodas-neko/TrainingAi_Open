@@ -6344,7 +6344,8 @@ drift.
 ### [workouts][platform] LA-143 — backfill `session_exercises.exercise_id` for the rows already saved
 
 - **Lane: A** — a one-statement migration, no new table or column so no `claude_ro` twin.
-- **Gate: owner** — it writes production rows, the only reason it is not already done.
+- **✅ AUTHORISED 2026-09-27 (OR-182) — gate removed; this is the ADD half of the new policy.** It writes production rows and adds nothing destructive, so it no longer needs a separate yes. **The policy he set 2026-09-27 (OR-182):** an agent may run a production DB change that ADDS or backfills, and may drop an object proved dead with the evidence shown — each after a verified snapshot. **Anything that DELETES rows holding data still comes to him individually.**
+  **Two conditions before running it:** take the snapshot first and confirm it restores, and print the affected-row count and compare it against what the backfill predicted — a count that does not match the prediction stops the run rather than being written up afterwards.
 - **Added:** 2026-09-25, Lane A, while shipping RV-168.
 - **What is left.** RV-168 made `saveProgram` fill the FK, so it is correct from each program's next
   save onward. Rows saved before that are still NULL — Bankai **0 of 25**, the others 1/25, 2/25,
@@ -7271,7 +7272,14 @@ drift.
   flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
-- **Keep:** ① above. **Lane: DV.**
+- **⚑ REOPENED AS LANE B WORK 2026-09-27 (OR-182) — the `Keep:` filed a live defect as residue.**
+  Sweep 4a passed the original fix and found a **new** one, 1 of 1: after using **Retry**, deleting
+  that food left the card on 1,454 for 16 s+ while the server's balance said 1,534, and a tab swap
+  corrected it. Deletes in the DV-15 rounds, which had not used Retry, refreshed normally. **The
+  entry's own text already said this is what it now owes**, and the diagnosis is written — the Retry
+  path looks like it leaves the card's refresh subscription dead. That is a code fix, so the old
+  `Lane: DV` inside this bullet is wrong too: **nothing further is owed by the phone before it can be
+  built.** Read `use-energy-balance-refetch.ts`'s Retry arm against the subscription it re-establishes.
 
 ### [platform] LB-132 — write paths that invalidate for this device but not after the push
 
@@ -12486,7 +12494,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   strictly one at a time, each with its own migration number and its own green CI.
 
 - **Lane:** A — a column drop is a migration, and migrations are Lane A's alone.
-- **Gate:** owner — the drop is data-losing and needs confirmation. Deliberately added ONLY now that
+- **✅ AUTHORISED 2026-09-27 (OR-182) — gate removed, WITH the evidence condition.** **The policy he set 2026-09-27 (OR-182):** an agent may run a production DB change that ADDS or backfills, and may drop an object proved dead with the evidence shown — each after a verified snapshot. **Anything that DELETES rows holding data still comes to him individually.** This column is the dead-object case, so it qualifies — **but only once the diff shows it is dead**: no reader in `app/**`, `lib/**` or `packages/**`, no value in production that anything selects, and the snapshot taken and restored first. **If any of those three does not hold, it is a row-deleting change and comes back to him.** Original gate text: the drop is data-losing and needs confirmation. Deliberately added ONLY now that
   the startable half is out: a `Gate:` parks the whole entry, and putting one here while the guard
   was still owed would have hidden real work behind a question, which is the failure this entry's
   own filing warned about.
@@ -16158,6 +16166,15 @@ feature and not a deletion like LB-41:
 - **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** expanded sections draw the macro line once (`pDraws` 1). The
   collapse half could not be driven — the header chevron has **no `aria-expanded`** (Q-491).
 
+- **✅ THE READING IS SETTLED 2026-09-27 (OR-182): it is (b) — the grouped MEAL ROW itself.** He
+  confirmed he minimised the meal, not the section, so **build (b) and do not start from (a)**: the
+  meal row's own macro summary is missing, which is a different component from the section totals and a
+  plausible gap after Q-406 moved per-item macros into the detail sheet. Reading (a) is struck —
+  `meal-card.tsx:90` already renders section totals when collapsed, and chasing it was the wrong file.
+- **⚑ The `Verify: device` was struck the same day.** The fix shipped, the device said it FAILED, and
+  the field kept printing this to Lane B as *shipped, a look is owed*. A FAILED is work.
+- **⚠ One harness limit survives the answer:** the collapse half cannot be driven automatically at
+  all, because the header chevron has no `aria-expanded` (Q-491). Verification is by hand or by eye.
 - **❌ FAILED ON THE S25, 2026-09-13, and the report is the INVERSE of the original defect.**
   Owner: *"if you add a meal to a section and minimize it, it shows no overview of the macros; but if
   you have all single items and minimize the block, it still does"*.
@@ -16171,7 +16188,9 @@ feature and not a deletion like LB-41:
   but "the block" in the second clause fits (a). **One screenshot settles it.**
 
 - **Lane:** B — `components/nutrition/meal-card.tsx`, one condition. **Shipped 2026-09-01.**
-- **Verify:** device — the owner's screenshot is the only place the duplication has been seen. On
+- **The device check this still owes once the reading is settled** (prose, not a `Verify:` field — that
+  field means SHIPPED and the device said this FAILED): the owner's screenshot is the only place the
+  duplication has been seen. On
   the S25, open a meal section holding **only** a scanned or saved group: exactly one macro row and
   one calorie total. Then add a loose item to that section — the footer returns, with numbers that
   differ from the group's.
@@ -20467,9 +20486,13 @@ the bar to beat, not to assume).
 
 ### [readiness] TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign
 
-- **Gate:** owner — and it is NOT SIGNABLE yet, so do not offer it in a tuning batch. The metric runs the wrong way (n = 33), so the warning would fire on his best days. `Needs: Q-507` to settle the sign; then it becomes an ordinary proposal.
+- **✓ THE OWNER GATE IS REMOVED AND THIS IS TUNING'S, 2026-09-27 (OR-182).** The field said *"NOT SIGNABLE
+  yet, so do not offer it in a tuning batch"* — an instruction not to ask him, written in the field
+  that makes every sweep count it as his. **What is owed is a better proposal**, which is exactly what
+  `Lane: T` is for (OR-178). `Needs: Q-507` still parks it, so nothing becomes startable. Original
+  text: The metric runs the wrong way (n = 33), so the warning would fire on his best days. `Needs: Q-507` to settle the sign; then it becomes an ordinary proposal.
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
-- **Lane: B**
+- **Lane: T** — set deliberately 2026-09-27 (OR-182): the next action is a Tuning proposal that runs the right way round, not a build. **Implementation is Lane B’s** once one exists.
 - **Needs: Q-507** — deliberately. Read the next paragraph before starting.
 - ⛔ **That owner gate is NOT SIGNABLE, and a blanket sign-off does not clear it.** Offered one on
   2026-08-30 as part of a tuning batch and **deliberately not applied here.** This gate is a stop
@@ -23854,7 +23877,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   keep/hide/delete per row.
 - **Hide beats delete for anything recoverable.** A destructive admin control that is gone cannot be
   used when it is needed; one behind a disclosure is out of the way and still there.
-- **Gate:** owner — the keep/hide/delete call per control is theirs once the inventory exists. The
+- **✓ GATE REMOVED 2026-09-27 (OR-182) — it is gated on OUR work, not his.** The call per control is his
+  *"once the inventory exists"*, and the inventory does not exist. Gating on him made it owner debt
+  for work nobody had started. **Build the inventory first**; the keep/hide/delete call then becomes a
+  real question and gets an `Ask:` with the list attached. Original text: the keep/hide/delete call per
+  control is theirs once the inventory exists. The
   inventory itself is not gated and is the next action.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
@@ -27618,7 +27645,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
 - **✅ NOT rerouted to OR-150, checked 2026-09-24 (OR-153) — this one IS owner-ready.** Every other scoring gate went to Tuning because no proposal existed; this entry's gate already states the number a proposal owes (*"moves ~20% of days at the deload boundary and turns 4 taper days"*). A scoring gate is not automatically premature — check for the days-moved figure before assuming it is.
-- **Gate:** owner — the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
+- **✅ ANSWERED 2026-09-27 (OR-182): SWITCH TO UNCOUPLED EWMA.** He took it over keeping the coupled window and over re-tuning the taper threshold to preserve the current firing count — that third option was offered and declined, so **do not re-tune 1.5 to hold 4 tapers**; fitting a threshold to preserve an outcome is how a calibration drifts, and the point of the switch is that the four were not all genuine spikes. **Build it as measured:** early-deload 12/95 → 15/95, taper 4 → 1, ~20% of days flipping at the deload boundary in both directions. Lane A. Original gate text: the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
   firings into 1. Measured 2026-09-03, so this is a decision with numbers rather than a guess.
 - **Added:** 2026-08-15 · from the comprehensive review §2.2
 - **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: it names `lib/health/readiness-payload.ts`, which three API routes reach.
@@ -28055,7 +28082,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
-- **Gate: owner** — shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
+- **✅ ANSWERED 2026-09-27 (OR-182): NOT YET, and the trigger is named.** He declined the second Railway service for now — the snapshot endpoint shipped as Q-530 already gives agents a real copy of the data to test against, which was most of the value, and the remaining half is a recurring cost against a risk that has not yet bitten. **The trigger: the first migration that damages production authorises it immediately, without asking again.** The gate is removed because nothing is waiting on him; this entry now waits on an event. Original text: shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
   service**, which costs money to run and is the owner's call to authorise, not an implementation.
 - **Lane:** A
 - **Branch:** `feat/staging-environment`
@@ -30792,7 +30819,10 @@ millisecond count talk a future session out of it.
 ### [devices][readiness][app-shell] 🟠 Q-29 — Oura on-device rollup migration — Task 4 built, Task 5 next
 
 - **Lane:** A
-- **Gate: owner** — and the ball is **OURS**, not theirs. Put to the owner 2026-09-22 (OR-125) as a
+- **✓ GATE REMOVED 2026-09-27 (OR-182) — the field said so itself.** It read *"the ball is **OURS**, not
+  theirs"*, which is an argument for not gating it on him. Whatever is owed here is ours to produce
+  first; when it produces a real question, that question gets an `Ask:`. Original text: the ball is
+  **OURS**, not theirs. Put to the owner 2026-09-22 (OR-125) as a
   yes-on-principle to Task 5's drop of the server raw archive. **They declined to answer against a
   one-line summary and asked for the case first**, which is the right call and is now a debt on this
   entry rather than on them. It is tracked as **OR-126**.
