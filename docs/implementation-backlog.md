@@ -577,6 +577,59 @@ below threshold and left in place for next time.
   and a real gap in our own watching, and the answer is more interesting than the request.
 - **Reversal cost:** low — one script and one docs row, no stored state.
 
+### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
+
+- **Lane: A** — the formula lives in shared/server code, so the engine half goes first by the path
+  rule; the display half is Lane B and follows in the same batch.
+- **Added:** 2026-09-27 · Orchestrator, from the owner's answer to `RV-221` ② / `RV-164`. He was
+  offered three existing numbers to pick from and rejected the premise:
+  > *"I just want one number the correct one - the one thats rmr + live activty +/- deficit for weight goal"*
+- **⚠ THAT IS A FORMULA, NOT ONE OF THE THREE.** Do not read it as "he chose the budget". Measured
+  on his screen today: the ring shows **1,534** (resting + movement, **no deficit applied**), the
+  explainer names a goal of **1,660** and a budget of **1,356**. His number is
+  **RMR + activity-so-far − the deficit for his weight goal**, recomputed live as the day goes on.
+  The ring's 1,534 is the right *inputs* with the deficit missing; 1,356 may be the right shape with
+  stale or fixed inputs. **Establish which existing computation, if any, already produces his
+  number before writing a new one** — `docs/module-map.md` first, per One Formula One Place.
+- **The other two numbers come OFF the screen.** He asked for one number, and three unlabelled ones
+  is the confusion `RV-218` filed. If a reference line is still wanted it is a design call for the
+  mockup, not a reason to keep both.
+- **Blocked on one input, and it must be resolved first:** `RV-164` asks whether the 09-14
+  recommendation of **1,618 kcal** was meant to be applied — the app still budgets **1,660**. The
+  deficit term cannot be correct while that is unsettled, and it is a one-line answer from him.
+- **`LA-126` is the same area and is ALSO waiting on him** — his live nutrition targets are numbers
+  a model invented, and what is owed there is one tap to accept the post-`RV-66` recommendation.
+  **Do not build this on top of invented targets**: if he accepts that recommendation the deficit
+  term changes, so `LA-126` should be cleared in the same sitting as `RV-164`.
+- **Reversal cost:** the formula is one function and the display is one component. Low — but it is a
+  number he reads every day, so it owes the device-verification gate, not just a green `pnpm dev`.
+- **Ask:** owner — one line: was the 09-14 recommendation of 1,618 kcal meant to be applied? The app still budgets 1,660, and the deficit term cannot be right until that is settled.
+
+
+### [platform] OR-192 — the owner set a 30-day retention instinct; answer whether the raw archive is the exception before re-asking him
+
+- **Lane: O** · **Added:** 2026-09-27 · Orchestrator, splitting the retention question out of `Q-30`,
+  which is `Gate: owner` and therefore PARKED — the question would have died inside it.
+- **What he said**, offered the archive's size and cost and declining to decide: *"Lets come back to
+  this i dont wanna keep dead weight data for more than 30days if we dont need it."*
+- **The offer was the mistake.** He was given 25 MB and cents a month. His condition is **"if we
+  don't need it"**, and money was never the axis.
+- **One measurement decides it, and it is not his to make.** `oura_raw_packed` is the only
+  re-decodable copy of the ring's history: the ring's buffer moves forward, the sync cursor never
+  rewinds, and a protocol fix can only back-fill by re-decoding stored bytes. The device-local copy
+  is **not** a second copy — the 14-day rolling window never shipped (`pruneRaw` has no caller) and
+  none of it is backed up.
+  **So: has any decoder fix since the BLE pipeline shipped (2026-07-07) needed bytes older than 30
+  days, and how far back did it reach?** Answerable from the git history of the decoders and the
+  redecode passes. If the answer is "never in five months", his instinct is right and this becomes
+  a retention change. If protocol fixes routinely reach further, the archive is not dead weight and
+  he should be told that in one line instead of being shown the bill again.
+- **Then re-ask him** with that number attached and nothing else. Prior art:
+  [`docs/oura-raw-archive-retention-brief.md`](oura-raw-archive-retention-brief.md).
+- **Reversal cost: none for the measurement; total and permanent for acting on a wrong answer** —
+  a pruned raw row cannot be re-drained from the ring.
+
+
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
@@ -802,13 +855,15 @@ below threshold and left in place for next time.
   three-button navigation makes a broken clearance look correct, so both modes are required.
 
 ### [app-shell] BF-207 — the collection's explanation is 177 words of 12 px grey prose for a mechanic that is entirely visual
+- **✅ ANSWERED 2026-09-27 — do the redesign, but AFTER `PS-49`. Answered together with `BF-209`.**
+  He took the recommendation on both halves of the screen and accepted the sequencing: v2 changes
+  every number on the page and adds three tiers, so a redesign now is a redesign twice. He did not
+  take the cheap typography-only pass in the meantime — the screen stays as it is until v2 lands.
+  **Now Lane B**, parked behind PS-49.
+- **Needs:** PS-49
 
-- **Lane: O** · **Added:** 2026-09-26 · owner: *"the info page isnt TOO well designed."* Ungated on
+- **Lane: B** · **Added:** 2026-09-26 · owner: *"the info page isnt TOO well designed."* Ungated on
   purpose: this is a judgement about looks, so it waits for him rather than going to a lane.
-- **Ask:** owner — approve a direction for the `/collection` explanation, or name your own.
-  **Answer this together with `BF-209`**, which covers the rest of the same screen: the owner sent
-  one screenshot of `/collection` and said *"not very good on UI"* about the whole of it, and
-  splitting the answer across two sittings would get the page redesigned twice.
 - **What is there now, measured:** `Rules()` in `app/collection/collection-content.tsx` is a single
   card holding **four paragraphs, 177 words**, all at `text-xs` (12 px) in `text-muted-foreground`,
   with one bolded lead-in per paragraph and no other structure. It sits below three ladder cards
@@ -831,27 +886,6 @@ below threshold and left in place for next time.
 - **Sequencing: this is worth doing AFTER PS-49**, not before. v2 changes every number on the page
   and adds three tiers, so a redesign now is a redesign twice. Nothing breaks by waiting.
 - **Reversal cost:** low — one component, no state, no stored data.
-
-### [app-shell] LB-164 — the Coach button is an unlabelled sparkle; do you want a label on it?
-
-- **Lane: O** · **Added:** 2026-09-26 · Lane B, out of `BF-206`'s correction.
-- **Ask: owner — one yes or no.** Should the Coach button on Home carry a visible **Coach** label
-  beside its sparkle, or stay the icon-only circle it has always been?
-- **This is here because it was SHIPPED ONCE BY MISTAKE AND REVERTED.** `#1730` added the label on
-  the reading that you had asked what that button was. You had not — you were pointing at the moon
-  in the collection pen (`BF-208`), and `BF-206` struck the label finding as an unrequested
-  restyle. It is reverted, because a visual change to the screen you open first is yours to make.
-  If the extended pill was in front of you between those two deploys and you liked it, say so and
-  it comes straight back.
-- **RECOMMENDATION: take the label.** A sparkle is this app's generic AI mark — it is also on the
-  weekly-recap banner, the meal-source row and the profile tab — so on its own it names a category
-  rather than a destination, and an extended FAB is the standard treatment for a primary action
-  whose icon is not self-evident. **The reason it is not simply shipped is that you did not ask
-  for it and you look at this screen every day**, which CLAUDE.md puts on your side of the line.
-- **Alternatives.** *Leave it iconic* — you already know what it does, and it is one less word on
-  a busy screen; that is the honest case for no. *A one-time tooltip* — cheapest, and it teaches
-  only the person who does not dismiss it, so it is the worst of the three.
-- **Reversal cost: none.** One span, either direction. It is already been reverted once today.
 
 ### [app-shell] BF-208 — the "button" on the collection widget is the MOON, and the one thing beside it that looks tappable is a `<span>`
 
@@ -916,12 +950,19 @@ below threshold and left in place for next time.
   in the pen should invite a tap.
 
 ### [app-shell] BF-209 — `/collection` is 2.2 screens of scroll whose main layout element is a 59 % empty row
+- **✅ ANSWERED 2026-09-27 — do the redesign, but AFTER `PS-49`. Answered together with `BF-207`.**
+  Approved direction: draw the three tiers as a **chain with the merge cost on each link**, filling
+  the width the 59%-blank row already occupies, and **collapse the roster behind a "Show all N"**
+  disclosure. That fixes ①, ② and ③ together and takes the screen to about one viewport of
+  substance. On ④, the recommendation stands unopposed: **drop the `from` line** — a name you cannot
+  look up is noise.
+  **Now Lane B**, parked behind PS-49 — v2 takes the tier count from three to six and the costs to
+  3→1, which is exactly what the chain would be laying out.
+- **Needs:** PS-49
 
-- **Lane: O** · **Added:** 2026-09-26 · owner, on the `/collection` screenshot: *"This is what both
+- **Lane: B** · **Added:** 2026-09-26 · owner, on the `/collection` screenshot: *"This is what both
   screens look like. Not very good on UI."* Ungated on purpose — a judgement about looks is his, and
   this is the second of the two screens `BF-207` covers.
-- **Ask:** owner — approve a direction for the `/collection` screen, or name your own. `BF-207`
-  holds the same question for the explanation block at the bottom of it; answer them together.
 - **Measured, at 412 dp:**
   **①** The tier row is `flex items-end justify-around` with three 48 px sprites in a 348 px card —
   **144 px of content and 204 px of gap, 59 % blank**, scattered at ~68 px apart. It is the first
@@ -1476,13 +1517,23 @@ below threshold and left in place for next time.
   asking him directly rather than inferring it.
 
 ### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
+- **⚑ RECONCILE BEFORE ACTING — BugFix has already filed all three, with findings this entry does
+  not have.** `BF-211` (issue #1620), `BF-212` (#1607, and it notes `Q-1a` covers the same area),
+  and **`BF-213`, which is the one that matters: #1608 takes migration numbers 288/289 that `main`
+  has already used, and the collision destroys its `claude_ro` twin.** That is a blocking defect
+  found by reading the diff, not a routing note. **Those three are now the live record; this entry
+  is the routing history.** Strike it once the security review is posted rather than working it
+  twice.
+- **✅ ANSWERED 2026-09-27 — run a security review on `#1607` first, then the owner reads the diff himself.**
+  He declined both the approve-if-clean option and the comment-only one. So: **a `/security-review`
+  pass, findings posted concisely on the PR, and then it waits for him.** No agent merges it — it is
+  auth AND it is not ours, so the ceiling is review/comment/approve under the 2026-09-27 rule.
+  **`#1608`** (HealthKit sample storage) is an ordinary external PR and gets a normal review on the
+  same pass. **Orchestrator holds this** until the review is posted; `OR-184` tracks the same three
+  items from the intake side and the two should be reconciled, not worked twice.
 
 - **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
   `Gate: owner` would park it, and getting these in front of him is the work.
-- **Ask:** owner — three PRs are waiting on him with no queue entry: **#1607** bearer tokens for native
-  login (auth, external contributor), **#1592** accept `activeCalories` in health imports (**already merged as #1616 —
-  no longer his**, kept for the Q-204/Q-524 consequence), **#1499** widen `/api/admin/db-query` (his own Lane A work, held
-  for his yes). Recommendations below.
 - **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
   review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
   message.
@@ -1654,7 +1705,16 @@ below threshold and left in place for next time.
   new). `Ran 78 of 78` Custom Rules steps.
 
 ### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
-- **Ask:** owner — one mockup to approve (RV-213), one product choice (RV-218's daily calorie target), and a merge-time yes on six security fixes as each PR goes green.
+- **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
+  - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
+    Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
+    deficit for weight goal"*. **Filed as `OR-191`** with the measurement and the blocking input
+    (`RV-164`'s 1,618-vs-1,660). This item is closed here; do not re-ask it.
+  - **① RV-213's mockup: still owed, and it is now UNGATED** — the mockup is the work, and the gate
+    was parking it. **It ships in one sitting with `LB-163` and `LA-136`**, three Home/Nutrition
+    mockups owed to one person.
+  - **③ the six security fixes: unchanged** — still a merge-time yes as each PR goes green, not now.
+- **Ask:** owner — unchanged: the RV-213 mockup when it is drawn, and a merge-time yes on the six security fixes as each goes green.
 
 - **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
 - **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
@@ -1679,7 +1739,25 @@ below threshold and left in place for next time.
 - **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
-- **Ask:** owner — five decisions the production reads made answerable: the rederive-baselines run, Q-72 sleep ratings, Q-30 archive, Q-527 corrupt row, PS-17 priority.
+- **✅ PARTLY ANSWERED 2026-09-27 — items 1 and 2 are settled; 3 is deferred with a steer; 4 and 5 are still owed.**
+  - **① `rederive-baselines`: YES — dry-run first, then run.** Authorised. It is a recompute from
+    stored inputs, which is the half of the history-row policy he already said yes to. **This
+    releases `BF-13`, `TN-6`, `Q-506`, `TN-8` and `TN-42`**, whose pass tests fail today only
+    because it has never run. The run belongs to the device agent; the dry-run diff does not
+    need showing first — he declined that option.
+  - **② Q-72 sleep ratings: OUTLIER-ONLY.** He will not go back to rating daily. Prompt only on days
+    the score is unusual, the shape he approved in `OR-171`. See `TN-67`, which now carries the
+    build.
+  - **③ Q-30 raw archive: DEFERRED, with a steer that is nearly an answer** — *"i dont wanna keep
+    dead weight data for more than 30days if we dont need it."* Re-asked properly on `Q-30`: the
+    question he needs is not the 25 MB, it is what the archive is FOR, and the answer decides
+    whether it is dead weight or the only re-decodable copy.
+  - **④ Q-527's corrupt 07-29 row: ALREADY ANSWERED, 2026-09-25 — this entry was STALE.** He
+    approved nulling the corrupt fields and keeping the row, as a stated narrow exception to his own
+    hand-edits-no policy. Nothing is owed from him; the production write is Lane A's.
+    Re-ask on its own.
+  - **⑤ PS-17's queue position: NOT ASKED** — dropped for room in the 2026-09-27 round. Still owed.
+- **Ask:** owner — one left from the five: whether PS-17 moves up the queue. (Q-30 is re-asked on its own entry.)
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
 - **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
@@ -2525,12 +2603,20 @@ which is the right shape for something that can only be validated by living with
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
+- **✅ ANSWERED 2026-09-27 — outlier-only prompting. He will not rate daily again.**
+  Ask for a rating only on days the score is unusual, the same shape he approved for a different
+  prompt in `OR-171`. He answered maybe-twice-a-week over daily and over retiring it entirely.
+  **Now Lane B** — the prompt lives in `components/**` (`morning-checkin-sheet.tsx`). What "unusual"
+  means is an engineering call, not his: copy `OR-171`'s threshold rather than inventing a second one.
+  **⚠ What this does NOT change: the score still has no external validation and nothing may claim it
+  does.** The entry's finding stands in full. Outlier-only sampling reaches n≈30 LATER than daily
+  would, so the 2026-10-20 re-measurement date in this entry is now optimistic — Tuning re-runs the
+  date split when the clean sample is actually there, and re-dates this entry when the prompt ships.
 
-- **Ask:** owner — the readiness score has no validated external agreement. Saving a check-in rating to validate it against is a PRODUCT change (one more thing to answer each morning), so it is his call, not an assumption. See `OR-171` — he has just redesigned a different rating prompt to fire only on outliers, and the same shape may apply here.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
   conclusion I had already drawn in this session.
-- **Lane: O** — nothing to build; it sets what may and may not be claimed about the score, and names a
+- **Lane: B** — nothing to build; it sets what may and may not be claimed about the score, and names a
   dated point at which the real measurement becomes possible.
 - **The measurement that looked like validation.** Reported `energy_level` against same-day
   `readiness_score`, **n = 67, r = +0.619**, with group means monotonic across every level present —
@@ -2696,10 +2782,20 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **✅ ANSWERED 2026-09-27 — yes, put his morning sleep-feel back on Home, but SHOW HIM A MOCKUP FIRST.**
+  He picked the mockup-gated variant over building it straight. So the next act is to produce a
+  before/after at **384 px dark** and put it to him; the code waits on his yes to that picture.
+  **Now Lane B, ungated on purpose** — producing the mockup is work, and `Gate: owner` would park
+  it. Add the gate once the mockup has been shown and his answer is the only thing outstanding
+  (`LB-163` is the reference for this distinction).
+  **Show it in the same sitting as `LB-163` and `RV-213`** — three Home/Nutrition mockups owed to
+  one person; splitting them across three sittings gets the same screen judged three times.
+  **The cost stated in this entry still holds and is not optional:** Home is inside the persistent
+  tab shell, so the new read needs `useCachedValue`, a canonical TTL in `cache-ttl.ts`, and
+  registration in every write group touching `day_checkins` — or it paints once and never refreshes.
 
-- **Ask:** owner — Home lost its sleep line and nothing replaced it. `sleepQualityFeel` (1–5, with a touched flag) IS collected and unused. Does he want a sleep line back on Home, and driven by that? A product preference; the code half is then Lane B.
 
-- **Lane: O** — it needs a product preference before it needs code, and the code half is then Lane B
+- **Lane: B** — it needs a product preference before it needs code, and the code half is then Lane B
   (`components/home/**`). **Added:** 2026-09-24 · Lane A, as the stated residue of TN-66.
 - **What TN-66 removed and why.** Home showed *"Sleep: OK"* under the mood card. It came from
   `mood_logs.sleep_quality`, a `NOT NULL` column the check-in stopped collecting on 2026-06-25, so
@@ -3158,13 +3254,12 @@ which is the right shape for something that can only be validated by living with
   assign step.
 
 ### [nutrition] LB-159 — should a meal plan reuse your own meals by default?
-- **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, split out of RV-203 ④.
-- **Ask: owner — when you generate a meal plan, should it start from the meals you have already
-  saved, or keep inventing new ones?** Today it invents: `useLibrary` starts `false`
-  (`meal-plan-setup-sheet.tsx:81`), and the "use my saved meals" tick is there to be found rather
-  than to be untucked. Review sweep 61 wants the default flipped; the toggle's author deliberately
-  left it off (BF-11h, 2026-08-27, reasoning: *"on changes what every generation returns, so it is
-  the user's call rather than a new default"*).
+- **✅ ANSWERED 2026-09-27 — default it ON when there are saved meals, OFF when there are none.**
+  He took the recommendation outright, not the try-it-for-a-month variant, so this ships as a
+  settled default and needs no follow-up re-ask.
+  **Now Lane B** — `useLibrary`'s initial value in `meal-plan-setup-sheet.tsx:81`. It is conditional
+  on the library being non-empty: defaulting on with nothing saved ticks a box that changes nothing.
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, split out of RV-203 ④.
 - **Recommendation: default it ON when you have saved meals, and off when you have none.** A plan
   built from meals you have already cooked and already like is one you are more likely to eat, the
   macros are your real ones rather than an estimate, and the route already fills only the slots the
@@ -3654,7 +3749,12 @@ which is the right shape for something that can only be validated by living with
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
 - **Lane: B**
-- **Gate: owner** — this visibly rearranges a daily screen. **Owed: a before/after mockup at 384 px.**
+- **UNGATED 2026-09-27 — the mockup does not exist yet, so the next act is to PRODUCE one, and that
+  is work. `Gate: owner` PARKED this entry, which meant nobody was tasked with drawing the picture
+  it was waiting on — the exact inversion `LB-163` documents. Add the gate back once the mockup has
+  been shown and his answer is the only thing outstanding.
+- **⚑ Show this in ONE sitting with `LB-163` and `LA-136`** — three mockups owed to one person
+  across Home and Nutrition. Split across three sittings, the same screens get judged three times.
 - **Added:** 2026-09-26 · Review sweep 63.
 - **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
@@ -4078,15 +4178,24 @@ which is the right shape for something that can only be validated by living with
   ones *should*.
 
 ### [activity][heart-rate] TN-78 — the zone-minutes goal is WHO's MODERATE target scored at a VIGOROUS threshold, so walking can never earn it
+- **✅ ANSWERED 2026-09-27 — 40% of heart-rate reserve. The floor moves from 134 bpm to 107.**
+  The owner took ACSM's definition, which is the one the 22-minute goal's own WHO citation implies.
+  **Now Lane A** by the path rule: `packages/shared/src/health/hr-zones.ts` (`ZONE_DEFS` Light
+  `lowerFrac: 0.6` → `0.4`), `zone-minutes.ts`, `daily-goals.ts`.
+  **⚠ Two things the implementer must not skip.** ① This RE-SCORES HISTORY — the owner hit the old
+  floor on 3 of 31 days and hits the new one on 24, so every past day's zone-minutes and anything
+  derived from them changes. State how many days move before merging, per the Tuning rule that a
+  proposal is incomplete without it. ② `DEFAULT_ZONE_MINUTES_GOAL = 22` was sized against the 60%
+  floor. At 40% it will be met most days and is probably too low — measure it and file the re-size
+  as its own entry rather than changing both numbers in one PR and losing the attribution.
 
 - **Branch:** `tuning/zone-minutes-intensity-floor`
-- **Lane:** O — the deliverable is an owner decision on the threshold, and **getting** that answer is
+- **Lane:** A — the deliverable is an owner decision on the threshold, and **getting** that answer is
   the Orchestrator's work. Filed **ungated on purpose**: `Gate: owner` would PARK this in
   `next-item.js`, so the question would sit in the queue with nobody tasked to put it. Once the
   threshold is settled the build is Lane A by the path rule (`packages/shared/src/health/hr-zones.ts`,
   `zone-minutes.ts`, `daily-goals.ts`) — reroute it then, do not pre-assign it.
 - **Added:** 2026-09-24 · Tuning agent, found while checking TN-76's `zoneMinutes` contributor.
-- **Ask:** owner — does a moderate-activity minute start at 40% of heart-rate reserve (ACSM, which the 22-min goal's own WHO citation implies) or stay at the 60% the zone map uses? At 60% the floor is 134 bpm, hit on 3 of 31 days; at 40% it is 107, hit on 24.
 - **The decision, in one line:** does a minute of moderate activity start at 40% of heart-rate
   reserve (ACSM's definition, which the 22-minute goal's own WHO citation implies) or stay at the
   60% the zone map uses? Scoring calibration, so his — everything needed to answer it is below.
@@ -5832,9 +5941,18 @@ drift.
   every entry it keeps carries either an `Ask:` field or a split-out `O` entry.
 
 ### [workouts] BF-201 — two decisions about the loads he actually trains at, split out of BF-197 and BF-199 so they reach him
-- **Ask:** owner — two numbers, both recommended: (1) how much finish-early margin the duration model should keep once BF-197's double-count is removed, and (2) the rep→%1RM table BF-199 would replace the model's numbers with. Both change the weights and set counts on his screen.
+- **✅ DECISION 1 ANSWERED 2026-09-27 — size the finish-early margin to his 75th percentile.**
+  Not a fixed buffer, not zero, and not leaving the double-count in. The margin is derived from his
+  own variance so it adapts as he gets faster. **That half is now Lane A** (`BF-197`'s off-by-one
+  fix plus the p75 constant) and should ship without waiting on decision 2.
+- **⚠ DECISION 2 IS STILL OPEN — the rep→%1RM table was not put to him** (dropped for room in the
+  2026-09-27 round). It is the other half of this entry and it changes the kilograms on the bar, so
+  it stays here.
+- **Ask:** owner — decision 2 only: the rep→%1RM table `BF-199` would replace the prescription's numbers with.
 - **Lane: O** — **Added:** 2026-09-26 · BugFix intake, from the standing rule that a decision sitting INSIDE a `Lane: A` entry is invisible to the Orchestrator, because the lane field is what routes it.
-- **Needs:** — nothing, deliberately. **Neither lane is blocked on this.** BF-197's off-by-one fix is a correctness bug and should ship without waiting; BF-199 wants a plan doc first. Only the *numbers* below need him.
+- **Nothing blocks this and nothing is blocked BY it — deliberately, and there is no `Needs:` field
+  on purpose.** The off-by-one duration fix is a correctness bug that should ship without waiting,
+  and the prescription entry wants a plan doc first. Only the *numbers* here need him.
 
 - **Why these two and not the rest of BF-197/BF-199.** Both entries are architecture, which is the
   lane's to decide under the 2026-09-22 narrowing. What is left over is **scoring calibration** — the
@@ -8419,9 +8537,17 @@ drift.
   rule independently — 3 of its 4 assertions fail against `origin/main`.
 
 ### [platform][workouts] LB-153 — three chart palettes disagree; merging them changes colours you see daily
+- **✅ ANSWERED 2026-09-27 — merge everything, the workout set colours included.**
+  He took the biggest of the three, knowing set 1 amber / set 2 green changes on a screen he sees
+  every session. One categorical palette, and **no colour in it that also means good/warning/bad
+  elsewhere** — that constraint is the point of the change, not a detail of it.
+  **Now Lane A** by the path rule: the palette lands in `packages/shared/src/chart-colors.ts` beside
+  `resolveColor()`. RV-102 prescribed Lane B; that was wrong and is why only its invisible halves
+  shipped. The three surfaces to convert in the same PR: the AI chat charts, the HR-recovery trace,
+  and `set-card.tsx`'s `SET_COLORS`. Sibling-surface sweep applies — grep for every other chart
+  before calling it done.
 
-- **Lane: O**
-- **Ask: owner — three charts use three different palettes, and in the workout screen set 1 is amber and set 2 green purely by index. Merge them onto one neutral palette, or leave it?**
+- **Lane: A**
 - **Added:** 2026-09-25 · split out of RV-102 by Lane B, which shipped that entry's two invisible halves.
 - **Recommendation: merge them, and include the workout set colours.** One categorical palette, no
   colour in it that also means good/warning/bad elsewhere.
@@ -31424,6 +31550,20 @@ the S25) — the client pieces have been ready since #758/v1.200.0 and nobody ha
 D4's durability precondition and can happen in the same device session as future D2 work.
 
 ### [platform] 🟠 Q-30 — DB volume: finish the diagnosed fix, and resolve the O1 tension with D4's raw-drop-vs-bytea decision
+- **⏸ RE-ASKED 2026-09-27, with a steer that is nearly an answer.** Offered the archive's numbers
+  (25 MB, growing ~0.7 MB/day, cents a month) he deferred and said: *"i dont wanna keep dead weight
+  data for more than 30days if we dont need it."*
+  **So the money was never the question and offering it was the mistake.** His condition is
+  **"if we don't need it"**, and that is answerable from the repo rather than from him:
+  `oura_raw_packed` is the ONLY re-decodable copy of the ring's history — the ring's buffer moves
+  forward, the sync cursor never rewinds, and a decoder fixed later can only back-fill by
+  re-decoding stored bytes. **The device-local copy does NOT count as a second copy**, because the
+  14-day rolling window never shipped (`pruneRaw` has no caller) and none of it is backed up.
+  **Before re-asking, someone must answer: has a decoder fix ever needed the archive, and how far
+  back?** If the answer is "never, in five months", his 30-day instinct is probably right and this
+  becomes a retention change. If protocol fixes routinely reach back further, it is not dead weight
+  and he should be told so plainly.
+- **Ask:** owner — deferred pending that measurement. Do NOT re-offer him the storage cost; the question is whether a decoder fix has ever needed bytes older than 30 days.
 
 - **Lane:** A
 **✅ OWNER DECISION 2026-08-13 — D4 is confirmed as the direction, and the reason is multi-user.**
