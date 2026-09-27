@@ -79,7 +79,7 @@ export interface RollupIO {
   upsertBodyMetrics(rows: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[]): Promise<void>
 
   // ── heart rate ───────────────────────────────────────────────────────────────────────────────
-  /** Workout windows starting at or after `since`, excluding soft-deleted sessions. */
+  /** Workout windows that overlap `since` or come after it, excluding soft-deleted sessions. */
   readWorkoutWindows(since: Date): Promise<RollupWorkoutWindow[]>
   /**
    * Remove the BLE heart-rate rows at or after `since` whose timestamps are NOT in `keep`.
