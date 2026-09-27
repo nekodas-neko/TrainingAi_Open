@@ -3614,30 +3614,6 @@ which is the right shape for something that can only be validated by living with
   name of a food logged before → it appears under *"You already have"* and tapping it reaches the
   assign step.
 
-### [nutrition] LB-159 — should a meal plan reuse your own meals by default?
-- **✅ ANSWERED 2026-09-27 — default it ON when there are saved meals, OFF when there are none.**
-  He took the recommendation outright, not the try-it-for-a-month variant, so this ships as a
-  settled default and needs no follow-up re-ask.
-  **Now Lane B** — `useLibrary`'s initial value in `meal-plan-setup-sheet.tsx:81`. It is conditional
-  on the library being non-empty: defaulting on with nothing saved ticks a box that changes nothing.
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, split out of RV-203 ④.
-- **Recommendation: default it ON when you have saved meals, and off when you have none.** A plan
-  built from meals you have already cooked and already like is one you are more likely to eat, the
-  macros are your real ones rather than an estimate, and the route already fills only the slots the
-  library cannot (`generate/route.ts:297-307`) — so variety is not lost, it is *filled in around*
-  what you keep. Defaulting on for an empty library would be worse than useless: it would tick a
-  box that changes nothing.
-- **Why a year out:** the saved-meal library only grows, so the value of this default rises with
-  time while the cost stays flat. Leaving it off means the library is quietly worth less every
-  month it fills up.
-- **The alternative, and what it is genuinely better at: leave it off.** It is better at
-  *discovery* — an invented plan is where new meals come from, and if you generate a plan partly to
-  be given ideas, a library-first default removes exactly the thing you wanted. It is also the
-  status quo, so it is the safe answer if you are not sure which of the two you use plans for.
-- **Reversal cost: one line, one release.** It is a default on a toggle that is on screen either
-  way, so a wrong answer is visible on the next plan and undone in the next PR. This is cheap
-  enough that "try it for a month" is a legitimate answer.
-
 ### [workouts] RV-204 — the recap half, once LA-155 says why the screen is never reached
 - **Lane: A** · **Branch:** `feat/rv204-rules-workout-review` (workout-review half) · **Added:** 2026-09-25 · Review sweep 61.
 - **Needs: LA-155** — ② cannot be built until that answers why the screen is never reached.

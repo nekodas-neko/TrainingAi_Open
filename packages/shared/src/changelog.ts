@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.14",
+    date: "2026-09-27",
+    changes: [
+      "Changed: when you build a meal plan step by step, \"Use my saved meals\" now starts switched on if you have saved meals \u2014 so a plan is built around food you already cook, with your real macros. It stays off when your library is empty, where it would change nothing.",
+    ],
+  },
+  {
     version: "1.477.13",
     date: "2026-09-27",
     changes: [
