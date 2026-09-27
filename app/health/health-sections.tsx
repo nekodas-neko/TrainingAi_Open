@@ -137,6 +137,8 @@ export interface HealthSectionsCtx {
   recoveryMuscles: MuscleRecoveryEntry[];
   handleDayClick: (date: string) => void;
   weeklyStats: WeeklyStatsResponse | null;
+  weeklyStatsError: boolean;
+  retryWeeklyStats: () => void;
   activeSessions: ProgramSession[];
   /** The active program's training goal — scales the volume landmarks (Q-305). */
   trainingGoal?: string;
@@ -160,7 +162,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
-    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
+    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError, retryWeeklyStats,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
     progressSummary, bodyBaseline, healthTrends, bodyFatCalibration,
   } = ctx;
@@ -686,7 +688,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       // calendar entry; but for the whole week"*, and this is the entry point that outlives the
       // dismissible banner (BF-5).
       case "weekInReview":    return <WeekInReviewCard key="weekInReview" />;
-      case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} sessions={activeSessions} />;
+      case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} error={weeklyStatsError} onRetry={retryWeeklyStats} sessions={activeSessions} />;
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
       case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
