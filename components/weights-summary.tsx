@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import { ChevronDownIcon, ChevronUpIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,7 +91,7 @@ export const WeightsSummary = ({ exercises, loading, onRefresh }: WeightsSummary
                               ? "text-muted-foreground"
                               : "font-semibold"
                           )}>
-                            {e.weight !== null ? `${e.weight}kg` : "—"}
+                            {e.weight !== null ? formatLoadKg(e.weight) : "—"}
                           </span>
                         </div>
                       ))}
