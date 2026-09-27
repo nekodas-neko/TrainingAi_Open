@@ -4167,21 +4167,6 @@ which is the right shape for something that can only be validated by living with
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
 
-### [workouts] LA-164 — Health → Day's workout card still reads "0 kg" for a chin-up; the route now says which lifts are bodyweight
-- **Lane: B** — `components/health/day-detail/day-sections.tsx`.
-- **Needs: RV-219**
-- **Added:** 2026-09-27 · Lane A, the render half of `RV-219` ①.
-- **What:** `/api/day-log`'s `DayExercise` now carries `exerciseType` (`'bodyweight'` / `'weighted'`
-  / `null`), resolved from `exercise_library` via `exercise_logs.exercise_id`. Every one of the
-  owner's 504 logs has that id, and his Chin-Up resolves to `bodyweight` (measured on production
-  2026-09-27). The card's weight cell (`day-sections.tsx`, the `{ex.weightKg ?? "—"}` + `kg` span)
-  ignores it, so a chin-up still renders `0kg`.
-- **Fix shape:** pass `ex.exerciseType` to `isBodyweightType` (`packages/shared/src/1rm.ts`) and
-  render bodyweight rather than kg: `BW` at 0 kg added, `BW +10` when weighted. That is what the
-  entry asked for; the exact copy is a Lane B call.
-- **Done when:** rendered at 412 px, a bodyweight lift at 0 kg reads as bodyweight, and a weighted
-  lift is unchanged.
-
 ### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
 - **Lane: DV** — `scripts/device/**`, then re-capture.
 - **Added:** 2026-09-26 · Review sweep 64, reading RV-205's gallery.

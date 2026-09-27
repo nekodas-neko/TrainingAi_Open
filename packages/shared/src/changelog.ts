@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.16",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a chin-up on a day's workout card read \"0kg\", as if you had lifted nothing. Bodyweight lifts now read \"BW\", and \"BW +10kg\" when you add weight.",
+    ],
+  },
+  {
     version: "1.477.15",
     date: "2026-09-27",
     changes: [
