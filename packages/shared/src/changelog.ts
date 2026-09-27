@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.26",
+    date: "2026-09-28",
+    changes: [
+      "An activity saved at the same minute as one the server already had no longer shows twice on this phone.",
+      "An activity saved offline at the minute of a deleted one no longer arrives deleted.",
+    ],
+  },
+  {
     version: "1.477.25",
     date: "2026-09-28",
     changes: [
