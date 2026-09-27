@@ -1556,7 +1556,9 @@ below threshold and left in place for next time.
   daily screen and no sandbox drives a Samsung WebView. ② `TN-82` itself, which is now the MODAL
   half only: its removal of the two scales is an information-architecture change to a daily screen,
   so per CLAUDE.md it owes a mockup and a yes before any code. This entry deliberately removed
-  nothing. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
+  nothing. **The mockup was produced and shown 2026-09-27** — three frames from the running app,
+  linked on `TN-82` — so what is outstanding there is the ANSWER, not the picture. Do not draw a
+  second one. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
 
 
 - **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
@@ -1640,6 +1642,33 @@ below threshold and left in place for next time.
 - **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
 
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
+
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
+  Rendered from the *running app* at **384 px dark** rather than drawn, three frames — the sheet as it
+  is, an ordinary night (quiet line), an outlier night (prominent, numbers first): <https://claude.ai/artifact/Wx6SNHDTMVRBhJbCGctTAZ>.
+  The temporary code was reverted; `git diff origin/main` is empty.
+- **Gate: owner** — this removes two inputs from a screen he opens daily, which CLAUDE.md gates on a
+  mockup and a yes. `TN-85`'s `Keep:` ② already said so.
+- **Ask** — owner: should the morning check-in stop asking for Recovery and Sleep quality and state its
+  own verdict instead, and does **Recovery** go with it? `Ask:` rather than position, because
+  `Gate: owner` alone would sink this into PARKED where an owner answer is indistinguishable from a
+  device check.
+- **⚠ A GAP THE MOCKUP EXPOSED, AND THE PLAN DOES NOT ADDRESS IT.** `sleep-verdict` is the only verdict
+  that exists — there is no recovery verdict, and nothing measures one. So "replace the two scales"
+  is really **two different changes**: sleep gets an announcement that can be corrected, and
+  **Recovery loses its input with nothing in its place**. Only building it made that visible.
+  **Recommendation: remove Recovery too**, on the plan's own measurement — `perceived_recovery` has
+  **0 touched answers in 102 check-ins**, so it costs a reading that has never once been taken. The
+  alternative (keep Recovery, drop only Sleep quality) leaves one scale beside the announcement, which
+  is the arrangement §1 argues against.
+- **⚠ Do NOT argue this from `vs_yesterday` — it collected 2 of 82.** The first draft of the mockup
+  said "the sheet still asks *Compared to yesterday*, which is the same question in the form you
+  actually answer". The plan's own table refutes that: `vs_yesterday` was placed first specifically to
+  escape the two scales and **decayed to zero like the other two**. The honest argument is that asking
+  has failed in three forms and three positions, not that one of them works.
+- **The copy is `TN-84`'s and is NOT settled by this mockup.** The frames use the wording
+  `verdictCopy()` already ships (TN-85), so what he is approving here is the *shape* — scales out,
+  announcement in — not the sentence.
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
 - **Needs:** — cleared 2026-09-26. LA-149 shipped the announce path: `GET /api/sleep-verdict`
