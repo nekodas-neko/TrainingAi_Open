@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.15",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: Home's streak allowed a fixed two rest days, so if you train on a fixed weekly pattern with a longer gap \u2014 Monday and Tuesday, say \u2014 Home broke your streak while the achievements page kept it. Home now reads your schedule the same way, and the two agree.",
+    ],
+  },
+  {
     version: "1.477.14",
     date: "2026-09-27",
     changes: [
