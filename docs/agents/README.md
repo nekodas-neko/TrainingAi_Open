@@ -296,6 +296,26 @@ showing untagged work to both implementer lanes is the safe failure it was desig
 showing the same 400 entries to the Orchestrator or the device agent would bury the few genuinely
 theirs.
 
+### Two ways to break the queue with prose (OR-187, 2026-09-27 — both hit in one session)
+
+**⛔ Never write a field's token inside prose.** The field parsers are **first-match-wins** and know
+nothing about quotes, backticks or context. A bullet reading *"which is exactly what `Lane: T` is
+for"* **set that entry's lane to `T`** — before its real `- **Lane: B**` line, so `T` won. Another
+rewrite left the word `Gate:` inside a quoted sentence and `check-backlog-pointers` refused the push,
+correctly, as a decorated field. **The habit: after any edit near a field, read the entry back
+through `parseEntries` and check the resolved value** — do not trust that prose reads as prose. The
+second one was caught by CI; the first was caught only because the value was re-read.
+
+**⚑ A sweep's action list is a hypothesis, not an instruction.** `RV-156` listed about thirty
+Known-Issues rows as ready for the archive. Tested one at a time against the actual rule — *move only
+when nothing is still owed* — **eleven of eleven failed**, one of them describing a live defect and
+one covering an entry still in the queue. The sweep was not careless: it asked *"is this answered
+somewhere?"* while the rule asks *"is anything still owed?"*, and those agree often enough that the
+gap is invisible until tested. **The same shape appeared in the owner-gate triage**, where a good
+fraction of entries said in their own gate text that they were not decisions. **So: when an entry
+hands you a list to act on, re-test each item against the rule before acting** — and when a field
+and its own prose disagree, the prose is usually right and the field is the bug.
+
 **The entry's LETTER and its LANE are different things**, and this is where they diverge most
 visibly: `DV-1` was found by the device agent and carries `Lane: O`, because the work is the
 Orchestrator's. The letter records who found it and never changes; the lane records who builds it.
