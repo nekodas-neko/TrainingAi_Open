@@ -1226,6 +1226,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           .orderBy(asc(s.setLogs.exerciseLogId), asc(s.setLogs.setNumber))
       : []
 
+    // RV-219: the type decides whether a lift is shown in kg or as bodyweight. A separate lookup
+    // rather than a join on the query above, so the log rows keep the shape every caller reads.
+    const libIds = [...new Set(elRows.map(e => e.exerciseId).filter((id): id is string => !!id))]
+    const typeById = new Map(libIds.length
+      ? (await this.db.select({ id: s.exerciseLibrary.id, exerciseType: s.exerciseLibrary.exerciseType })
+          .from(s.exerciseLibrary).where(inArray(s.exerciseLibrary.id, libIds)))
+          .map(r => [r.id, r.exerciseType] as const)
+      : [])
+
     return wsRows.map(ws => ({
       id: ws.id, userId: ws.userId, sessionId: ws.programSessionId ?? undefined,
       sessionName: ws.sessionName, startedAt: ws.startedAt,
@@ -1247,6 +1256,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           muscleGroups: e.muscleGroups ?? [], loggedAt: e.loggedAt,
           interExerciseRestSec: e.interExerciseRestSec ?? undefined,
           prepTimeSec: e.prepTimeSec ?? undefined,
+          exerciseType: (e.exerciseId && typeById.get(e.exerciseId)) ?? null,
           sets: setRows
             .filter(ss => ss.exerciseLogId === e.id)
             .map<SetLog>(ss => ({

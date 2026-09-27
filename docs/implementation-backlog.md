@@ -1556,7 +1556,9 @@ below threshold and left in place for next time.
   daily screen and no sandbox drives a Samsung WebView. ② `TN-82` itself, which is now the MODAL
   half only: its removal of the two scales is an information-architecture change to a daily screen,
   so per CLAUDE.md it owes a mockup and a yes before any code. This entry deliberately removed
-  nothing. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
+  nothing. **The mockup was produced and shown 2026-09-27** — three frames from the running app,
+  linked on `TN-82` — so what is outstanding there is the ANSWER, not the picture. Do not draw a
+  second one. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
 
 
 - **Lane: B** — `app/session-select/session-select-content.tsx`, `components/morning-checkin-sheet.tsx`.
@@ -1640,6 +1642,33 @@ below threshold and left in place for next time.
 - **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
 
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
+
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
+  Rendered from the *running app* at **384 px dark** rather than drawn, three frames — the sheet as it
+  is, an ordinary night (quiet line), an outlier night (prominent, numbers first): <https://claude.ai/artifact/Wx6SNHDTMVRBhJbCGctTAZ>.
+  The temporary code was reverted; `git diff origin/main` is empty.
+- **Gate: owner** — this removes two inputs from a screen he opens daily, which CLAUDE.md gates on a
+  mockup and a yes. `TN-85`'s `Keep:` ② already said so.
+- **Ask** — owner: should the morning check-in stop asking for Recovery and Sleep quality and state its
+  own verdict instead, and does **Recovery** go with it? `Ask:` rather than position, because
+  `Gate: owner` alone would sink this into PARKED where an owner answer is indistinguishable from a
+  device check.
+- **⚠ A GAP THE MOCKUP EXPOSED, AND THE PLAN DOES NOT ADDRESS IT.** `sleep-verdict` is the only verdict
+  that exists — there is no recovery verdict, and nothing measures one. So "replace the two scales"
+  is really **two different changes**: sleep gets an announcement that can be corrected, and
+  **Recovery loses its input with nothing in its place**. Only building it made that visible.
+  **Recommendation: remove Recovery too**, on the plan's own measurement — `perceived_recovery` has
+  **0 touched answers in 102 check-ins**, so it costs a reading that has never once been taken. The
+  alternative (keep Recovery, drop only Sleep quality) leaves one scale beside the announcement, which
+  is the arrangement §1 argues against.
+- **⚠ Do NOT argue this from `vs_yesterday` — it collected 2 of 82.** The first draft of the mockup
+  said "the sheet still asks *Compared to yesterday*, which is the same question in the form you
+  actually answer". The plan's own table refutes that: `vs_yesterday` was placed first specifically to
+  escape the two scales and **decayed to zero like the other two**. The honest argument is that asking
+  has failed in three forms and three positions, not that one of them works.
+- **The copy is `TN-84`'s and is NOT settled by this mockup.** The frames use the wording
+  `verdictCopy()` already ships (TN-85), so what he is approving here is the *shape* — scales out,
+  announcement in — not the sentence.
 
 - **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
 - **Needs:** — cleared 2026-09-26. LA-149 shipped the announce path: `GET /api/sleep-verdict`
@@ -4338,34 +4367,20 @@ which is the right shape for something that can only be validated by living with
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
 
-### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
-- **✅ ② SHIPPED 2026-09-27 (#1785), rendered at 412 px. ① IS LANE A's — established, not assumed. ③ is RV-208's.**
-- **Lane: A** for what remains (① needs a field on `app/api/day-log/route.ts`).
-- **Added:** 2026-09-26 · Review sweep 64 (`t2-day-01`).
-1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load),
-   not zero. — **CONFIRMED (rendered: `0kg`), and it is LANE A's, for a specific reason.**
-   - The repo already has the resolver and already states the rule: `isBodyweightType`
-     (`packages/shared/src/1rm.ts`), whose module comment says *"Every surface that shows a stored
-     1RM resolves its unit here rather than hardcoding kg"* (BF-162, Q-19).
-   - **The card cannot call it.** `DayExercise` (`app/api/day-log/route.ts`) carries `name`,
-     `weightKg`, `sets`, `reps` — **no `exerciseType`**. And every existing consumer of
-     `isBodyweightType` receives the type as a PROP; there is no name→type lookup on the client to
-     copy, so inventing one here would be new machinery beside an established pattern.
-   - **The fix is one field**: add `exerciseType` to `DayExercise`, then
-     `components/health/day-detail/day-sections.tsx:161` resolves the unit the way every other
-     surface does. Route change → Lane A.
-2. ~~**"Chest-Supported Dumbb…"** truncates the part that distinguishes it.~~ — **SHIPPED**, by
-   letting the name wrap (`truncate` → `line-clamp-2` on both the button and span branches).
-   Rendered at 412 px: "Chest-Supported / Dumbbell Row" over two lines with the sets, weight and
-   both icons still aligned on the row.
-   - **The entry's OTHER suggestion — shrink the icons — is not available, and the measurement it
-     cites is right.** `ICON_BTN` is `h-12 w-12`: 96 px of ~380 usable at 412 px, exactly the
-     "about 25% of the row twice over". But **48 px IS the Android minimum touch target** and this
-     repo's tap-target floor, so shrinking trades a naming problem for an accessibility one. The
-     test pins `h-12 w-12` so the trade is not made later by someone who has not read this.
-3. The times read "7:35am → 8:17am" here and "7:35 AM" on Home. — **RV-208's, and still open
-   there as LANE A's** (the casing comes from `app/api/day-timeline/route.ts`). Noted here as the
-   second device sighting; nothing to do on this entry.
+### [workouts] LA-164 — Health → Day's workout card still reads "0 kg" for a chin-up; the route now says which lifts are bodyweight
+- **Lane: B** — `components/health/day-detail/day-sections.tsx`.
+- **Needs: RV-219**
+- **Added:** 2026-09-27 · Lane A, the render half of `RV-219` ①.
+- **What:** `/api/day-log`'s `DayExercise` now carries `exerciseType` (`'bodyweight'` / `'weighted'`
+  / `null`), resolved from `exercise_library` via `exercise_logs.exercise_id`. Every one of the
+  owner's 504 logs has that id, and his Chin-Up resolves to `bodyweight` (measured on production
+  2026-09-27). The card's weight cell (`day-sections.tsx`, the `{ex.weightKg ?? "—"}` + `kg` span)
+  ignores it, so a chin-up still renders `0kg`.
+- **Fix shape:** pass `ex.exerciseType` to `isBodyweightType` (`packages/shared/src/1rm.ts`) and
+  render bodyweight rather than kg: `BW` at 0 kg added, `BW +10` when weighted. That is what the
+  entry asked for; the exact copy is a Lane B call.
+- **Done when:** rendered at 412 px, a bodyweight lift at 0 kg reads as bodyweight, and a weighted
+  lift is unchanged.
 
 ### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
 - **Lane: DV** — `scripts/device/**`, then re-capture.
