@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.476.1",
+    date: "2026-09-27",
+    changes: [
+      "Changed: the smallest text on the workout screens is legible again. Five labels read mid-set \u2014 the set-type caption, the rest/set clock labels and the 1RM caption \u2014 were set at 9 and 10 pixels; they are now 11, which is the app's new floor for small text.",
+    ],
+  },
+  {
     version: "1.476.0",
     date: "2026-09-27",
     changes: [
