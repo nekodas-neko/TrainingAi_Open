@@ -45,11 +45,15 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isActiveCheckedAt).toBe(0)
   })
 
-  it('treats a missing user row as no evidence, and retries next request', async () => {
+  it('treats a DELETED user row as deactivation (RV-195 ②)', async () => {
+    // This assertion is inverted from what it was, deliberately, and the pair above is what makes
+    // the inversion safe: an outage THROWS and is handled there. Reaching this line means the
+    // query ran and answered "no such user", which is the strongest form of deactivation there is.
+    // Before, a deleted account stayed signed in until its token expired — up to seven days.
     const token = { userId: 'u1', isActive: true, isActiveCheckedAt: 0 }
     await refreshIsActiveClaim(token, async () => null, NOW)
-    expect(token.isActive).toBe(true)
-    expect(token.isActiveCheckedAt).toBe(0) // not advanced — next request tries again
+    expect(token.isActive).toBe(false)
+    expect(token.isActiveCheckedAt).toBe(0) // nothing to re-check; a restored row takes effect at once
   })
 
   it('does nothing without a userId', async () => {
