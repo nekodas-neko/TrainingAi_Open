@@ -1,3 +1,4 @@
+import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema'
 import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
@@ -321,28 +322,10 @@ export interface BloodPanel {
 
 export type BloodPanelInput = Omit<BloodPanel, 'id'> & { id?: string }
 
-export type MutationDomain =
-  | 'body_metrics'
-  | 'mood_logs'
-  | 'food_logs'
-  | 'food_items'
-  | 'supplement_logs'
-  | 'injuries'
-  | 'supplements'
-  | 'activity_logs'
-  | 'fitness_tests'
-  | 'prescribed_run'
-  | 'workout_log'
-  | 'day_checkins'
-  | 'session_rpe'
-  | 'complete_workout'
-  | 'saved_meals'
-  | 'oura_daily_summary'
-  | 'oura_daily_derived'
-  | 'sleep_session'
-  | 'plan_meal_answers'
-  | 'manual_bedtime'
-  | 'rest_days';
+// Derived, not listed (RV-175): this was a hand-kept copy of SYNCED_MUTATION_DOMAINS, identical to it
+// member for member, and adding a domain meant remembering both. The canonical list's own comment
+// says every domain type derives from it so the two cannot drift; this one had not.
+export type MutationDomain = SyncedMutationDomain
 
 export interface FitnessTest {
   id: string
