@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.12",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the movement line under your calorie bar said \"205 workouts \u00b7 32 steps\" when both numbers were calories. It now says \"205 kcal workouts \u00b7 32 kcal steps\".",
+      "Fixed: a day under your target read \"-1,694 deficit\" \u2014 the minus and the word both meant the same thing. It reads \"1,694 deficit\".",
+    ],
+  },
+  {
     version: "1.477.11",
     date: "2026-09-27",
     changes: [

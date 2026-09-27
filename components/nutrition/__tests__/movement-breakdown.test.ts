@@ -117,7 +117,18 @@ describe('the parts the service hands us already add up', () => {
 
   it('drops the addends that contributed nothing, and keeps the rest in a fixed order', () => {
     expect(movementSummary({ workoutKcal: 320, activityKcal: 0, stepsKcal: 227 }))
-      .toBe('320 workouts · 227 steps')
+      .toBe('320 kcal workouts · 227 kcal steps')
+  })
+
+  // RV-218: without the unit this read "205 workouts · 32 steps" under a calorie bar, where the
+  // numbers are kcal — so it parsed as a COUNT of workouts and a number of steps, which is a
+  // different claim about the same day and a plausible one. Asserted per addend rather than on
+  // the whole string, so a reworded separator or order cannot quietly drop it.
+  it('gives every addend its unit, because every number here is kcal', () => {
+    const summary = movementSummary({ workoutKcal: 205, activityKcal: 11, stepsKcal: 32 })
+    for (const part of summary.split(' · ')) {
+      expect(part, `"${part}" has no unit — it reads as a count`).toMatch(/^[\d,]+ kcal \w+$/)
+    }
   })
 })
 
