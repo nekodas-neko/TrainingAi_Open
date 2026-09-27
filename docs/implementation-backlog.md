@@ -3880,6 +3880,13 @@ which is the right shape for something that can only be validated by living with
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
+- **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
+  **not** a one-off. Review sweep 63 flagged Nutrition's "I've finished logging" as the only
+  near-white button in the app; sweep 64 then found the weigh-in sheet's Save is the same
+  (`t2-sheet-weigh-in-01`), so **white is the DIALOG primary** while green is the page primary.
+  Nobody has decided whether that split is intentional. If this entry's consistency pass picks one
+  primary for the whole app, that is where it gets settled — and until it does, neither button is
+  wrong on its own.
 
 - **✅ PART ONE SHIPPED (#1743, 2026-09-27) — numbers and durations. The rest is below, with who owns each.**
   **Thousands separators** at the three device-confirmed sites: Home's metric tile (`11900` →
@@ -4086,46 +4093,6 @@ which is the right shape for something that can only be validated by living with
    render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
-### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
-- **✅ ①② SHIPPED 2026-09-27 (#1773). ③⑤ were already struck by sweep 64. ④ IS THE OWNER'S AND IS NOW `LB-167` — do not implement it from this entry.** Nothing is left here for a lane.
-- **Lane: B.**
-- **Added:** 2026-09-26 · Review sweep 63.
-1. ~~**"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.~~ —
-   **SHIPPED, in the half that had precedent.** The 2xl headline number in
-   `calorie-balance-bar.tsx` no longer takes `zoneColor`.
-   - **`energy-card.tsx` had already made this exact change for its own copy of the number**, and
-     its comment names this component as the one still doing it: *"`CalorieBalanceBar` coloured
-     this number by band, which paints the headline red at 10 am for a day that is legitimately
-     'well under so far'."* Following an established in-repo decision, not inventing one.
-   - **The qualified LABEL keeps its colour, deliberately, and the entry asked otherwise.**
-     `energy-card`'s same comment settles it: *"The verdict keeps the colour, on the label below
-     where it is qualified."* The label carries " so far" on the current day, which is what makes
-     the colour a running state rather than a verdict. Overriding a documented decision needed
-     evidence the entry did not bring; the compounding it DID observe ("over a red bar") is
-     addressed by removing the largest red element, which is the number.
-   - Both halves are pinned by `rv212-tone-and-emphasis.test.ts`, so a later sweep cannot quietly
-     take the label's colour as well.
-2. ~~**A taken supplement is struck through,** which reads as cancelled or deleted.~~ — **SHIPPED.**
-   `supplements-section.tsx` mutes the row instead; **the green tick already existed** to its left,
-   so the meaning was never carried by the strikethrough alone.
-   - **The `manage-supplements-sheet.tsx` strikethrough is a DIFFERENT claim and stays**: it marks
-     `!s.active`, i.e. discontinued, where "crossed out" is right. A sibling-surface sweep that
-     took both would have been wrong, and the test pins that it survives.
-3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
-   - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
-4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed
-   image. — **NOT A LANE'S TO CHANGE. Re-filed as `LB-167`, `Lane: O`.**
-   `components/nutrition/meal-thumb.tsx` records the owner's instruction in its own docstring —
-   *"it should show the default one in the mockup if no image is attached"* — and states the
-   placeholder is *"the always-present state, not a fallback bolted on afterwards"* (BF-32), with
-   the reason: a row without the box makes the list read ragged. **Implementing this entry as
-   written would undo a design he specified**, which is the shape the Coach-label revert (`LB-164`)
-   was about. The decision brief, with a recommendation, is on `LB-167`.
-5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
-   - **🔎 Device, sweep 64 (`p23-nutrition-warm-03`):** the owner's real screen reads 14% (7 days) and 39% (28 days), with "required meal (3)". Those are sensible numbers for his configuration, so the web build's 0% was the seed's six-meal setup. **Drop this item.**
-   - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
-   - **The definition is the owner's call. The copy is not.**
-
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
@@ -4136,11 +4103,16 @@ which is the right shape for something that can only be validated by living with
 - **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
   Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
   goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
-- **⚠ One thing the recommendation below misses, and it is a rule violation rather than a taste
-  call.** Once the "Add food" card goes, the header `+` is the ONLY way into an empty meal — and it
-  is `h-9 w-9`, a **36 px** target, under the 48 px floor the rest of the app holds to. Enlarging it
-  is part of this change, not a follow-up, so the page presents it that way rather than offering the
-  collapse alone and leaving him to approve a regression.
+- **⚠ RETRACTED 2026-09-27, SAME DAY — the tap-target caveat on this entry was WRONG, and it was
+  shown to the owner before it was checked.** It said the header `+` is `h-9 w-9`, a 36 px target
+  under the floor, so enlarging it had to ride along with the collapse. **Measured in the harness:
+  the button renders at 48 × 48.** `app/globals.css` carries a global floor —
+  `button, [role="button"] { min-height: 48px; min-width: 48px }`, with a `.tap-dense` opt-out — so
+  a Tailwind `h-9 w-9` on a `<button>` is raised to 48 and the class is not the rendered size.
+  **`LB-169` was filed on that misreading and has been removed.** The mockup page has been corrected.
+  **Nothing blocks this entry: collapsing an empty meal to its header row leaves a control that is
+  already at the floor.** The lesson is the one this repo keeps relearning from the other direction —
+  a source grep is a hypothesis, and a global stylesheet can make a class a poor guide to a size.
 
 - **Lane: B**
 - **UNGATED 2026-09-27 — the mockup does not exist yet, so the next act is to PRODUCE one, and that
@@ -4262,26 +4234,6 @@ which is the right shape for something that can only be validated by living with
   is what applies, which is why this is not urgent for him.
 - **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
   deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
-
-### [nutrition][app-shell] LB-169 — the empty meal's header `+` is a 36 px tap target, under the 48 px floor
-- **Lane: B** · **Added:** 2026-09-27 · Lane B, split out of `RV-213` while rendering its mockup.
-- **Deliberately NOT part of `RV-213`, and that is the point of splitting it.** `RV-213` is a layout
-  preference gated on the owner; this is a defect with one right answer. Left inside that entry the
-  tap floor would sit blocked behind a question about whether to collapse the cards, which is a
-  different decision entirely.
-- **What, measured rather than read.** `components/nutrition/meal-card.tsx` gives the header's add
-  button `h-9 w-9` — **36 px** — where CLAUDE.md's mobile rules and every other icon button on the
-  screen hold to **48**. Found at the 384 px dark viewport on 2026-09-27 while capturing `RV-213`'s
-  before/after in the Playwright harness.
-- **It is already live and already the harder target of the two.** Today an empty meal offers both
-  the header `+` and a full "Add food" card, so the undersized control has a large sibling and the
-  defect is easy to miss. It is a real miss regardless: a 36 px target on the S25 is the one a thumb
-  fails on, and he reaches for whichever is nearer rather than whichever is bigger.
-- **⚠ And it becomes the ONLY way in if `RV-213` is taken** — that entry removes the "Add food"
-  card. So shipping `RV-213` without this is shipping a regression, which is why the mockup put the
-  two together in front of him rather than offering the collapse alone. Fixing it here means
-  `RV-213` needs no such caveat whichever way he answers.
-- **Scope:** the one button's classes. No layout decision, nothing gated.
 
 ### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
 - **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
