@@ -659,26 +659,26 @@ explicit Known-Issues row in `docs/overview/known-issues.md` marking the change 
 ## Migrations that add a table or column — the `claude_ro` twin, and the two tests that catch it
 
 `claude_ro` is **default-deny**: a table with no view is unreadable, and the generator emits an
-explicit column list, so a new column on a covered table is invisible to `/api/admin/db-query`
-until the views are rebuilt. Every migration that adds a table or a column therefore ships its
-regenerated twin **in the same PR**:
+explicit column list, so a new column on a covered table is invisible to `/api/admin/db-query` until
+the views are rebuilt. Every migration adding a table or column ships its twin **in the same PR**:
 
 ```
+node scripts/next-schema-number.js     # what <NEXT-FREE> is — fetches, and reads every branch
 LOCAL_DATABASE_URL=<tcp url> CLAUDE_RO_OWNER_USER_ID=<uuid> \
   node scripts/generate-claude-ro-views.js \
   > lib/data/postgres/migrations/<NEXT-FREE>_claude_ro_views_<reason>.sql
 ```
 
-**⚠ It reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (this line omitted it until LA-161,
-2026-09-27). Setting the wrong one does not fail — it silently generates against the session's dev
-database, and if that has had anything hand-applied, the twin drops real columns. Generate against
-a database matching the branch; build a scratch one (`CREATE DATABASE` +
-`node scripts/local-db/migrate.js`) if in doubt.
+**Take the number from that command — not `ls | tail -1`, not a line in a doc.** A number is reserved
+by the branch holding the file, and an open PR's file is not in the merged tree: `#1608` holds 288/289
+against `main`'s own 288/289 right now (#1620 → BF-211). Always a NEW number (`ensureSchema` tracks by
+filename, so an edited applied migration is skipped forever); diff the twin against its predecessor,
+and **the owner's id must not appear** (Q-456) — views scope on `current_setting('app.claude_ro_owner', true)`.
 
-Always a NEW number (`ensureSchema` tracks by filename, so an edited applied migration is skipped
-forever), and diff it against the previous one to confirm only the intended views moved. **The
-owner's id must not appear in the output** (Q-456) — the views scope on
-`current_setting('app.claude_ro_owner', true)`.
+**⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (this line omitted it until
+LA-161, 2026-09-27). The wrong one does not fail — it generates against the session's dev database,
+and if that has had anything hand-applied, the twin drops real columns. Build a scratch database
+(`CREATE DATABASE` + `node scripts/local-db/migrate.js`) if in doubt.
 
 **⚠ The two tests that catch a missed twin are NOT "CI-only", and believing they were cost a red
 run on 2026-09-20 (TN-54).** `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`

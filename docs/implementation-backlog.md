@@ -7,19 +7,24 @@ git history and the session journal (`docs/overview/`).
 
 ## Live pointers
 
-**These two numbers are the ones sessions collide on.** They are checked by
-`scripts/check-backlog-pointers.js` in the Custom Rules job, which reads the real values from the
-migrations directory and `lib/sqlite/migrations.ts` — so a stale line here fails CI instead of
-silently misdirecting the next session. Update them in the same PR that consumes a number.
+**The two schema numbers sessions collide on are not written down here any more — ask for them:**
 
-| Pointer | Value | Source of truth |
-|---|---|---|
-| Next free Postgres migration | **290** | `lib/data/postgres/migrations/` | (286/287 are reserved by the unmerged LA-142 PR; 288/289 are LA-161) |
-| Local SQLite schema version | **v43** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max | (v42 is reserved by the unmerged LA-142 PR) |
+```
+node scripts/next-schema-number.js
+```
 
-> **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
-> never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
-> unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
+It fetches, then prints the next free Postgres migration number and the next free local SQLite
+version, and — the part a filename cannot tell you — which numbers are already **claimed by a
+branch that has not merged**, named by branch and file. It fetches because a stale remote-tracking
+ref answers with whatever that branch held last time, and a wrong pair reads exactly as
+authoritative as a right one. The table that used to sit here was checked against
+`max(merged) + 1`, so it could only ever restate what the directory already said, and it could never
+run ahead of the merged tree to reserve anything. What it actually held was a free-text parenthetical
+no check read. It had also drifted eleven behind the directory once, and five behind another time.
+
+> **There is no pointer table any more, and there is no entry-ID pointer either.** Entry IDs are
+> not allocated from a shared counter and never were safely: a next-free pointer is a *floor*, not
+> an authority, because it cannot see an unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
 > bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
 > 50 in two days — plus a ledger that drifted twice.
 >
@@ -564,6 +569,14 @@ below threshold and left in place for next time.
 - **This is `BF-211`'s evidence, and the two should be read together** — the issue proposes deriving
   the migration number from filenames, and this is what deriving it produces when an unmerged branch
   holds numbers the filenames cannot show.
+- **Reproduced independently by the tool BF-211 shipped**, 2026-09-27: `node
+  scripts/next-schema-number.js` names `288: merged: 288_training_load_grid_dimensions.sql vs
+  origin/health-sample-storage: 288_apple_health_samples.sql`, and the same for 289. It also reports
+  **290** as the next free pair, which is what this entry recommends. So the renumber can be
+  verified rather than argued.
+- **It flags a second collision that is NOT work: 273/274 on `origin/lane-a/q44-phase3-pr1-table-rename`**,
+  a branch with no open PR. A dead branch reads exactly like a reservation to any tool that scans
+  refs. Delete the branch or leave it; do not renumber anything for it.
 - **Reversal cost:** none here — nothing has merged.
 
 ### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
@@ -584,47 +597,6 @@ below threshold and left in place for next time.
   underneath it. Re-run before anyone reads that green.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
-
-### [platform] BF-211 — issue #1620 asks to derive the migration number from filenames, which cannot see an unmerged branch
-
-- **Lane:** A — `scripts/check-backlog-pointers.js`, `docs/implementation-backlog.md`.
-- **Added:** 2026-09-27 · BugFix, triaging GitHub issue **#1620** (`jsboiss`, opened 2026-09-25,
-  assigned to the owner). Per OR-185 an issue becomes a queue entry rather than a reply.
-- **Needs:** — nothing.
-- **The diagnosis is right.** `docs/implementation-backlog.md` carries a hand-maintained *Next free
-  Postgres migration* row, and `check-backlog-pointers.js:558-573` already computes
-  `max(filenames) + 1` and fails when the Markdown disagrees. The number really is derived twice, and
-  every migration costs an unrelated docs edit.
-- **The proposed fix removes something the filenames cannot replace, and `main` proves it today.**
-  The migrations directory runs `…284, 285, 288, 289` — **286 and 287 are missing**, reserved in that
-  row's prose by the unmerged `#1749`. A command deriving from filenames sees only what merged. Had
-  LA-161 derived its number that way it would have taken **286**, which `#1749` is already using.
-- **`#1608` is that failure, live** — an outside contributor derived 288/289 from the filenames they
-  could see and collided with LA-161. See `BF-213` for the consequence, which is a silently dropped
-  `claude_ro` view rather than a loud duplicate.
-- **The author anticipated this** and proposed detecting duplicates before merging. That is the right
-  instinct and the wrong moment for this repo: with several agents running against a `main` that
-  takes a commit roughly every 8 minutes, a collision found at merge time means rebuilding a
-  migration **and** regenerating its twin, which is the expensive half.
-- **Recommendation: keep a reserved number, and stop maintaining it by hand — derive it from every
-  branch rather than from `main`.** `git log --all --diff-filter=A --name-only --
-  lib/data/postgres/migrations/` names every migration added on any fetched branch, merged or not, so
-  one command gives the contributor's convenience *and* sees `#1749`. Removes the manual edit the
-  issue is about without removing the reservation it depends on.
-  **Alternative — derive from `main`'s filenames only**, as the issue proposes. Genuinely better at
-  one thing: it needs no fetch and works on a shallow clone, which CI has. It is what `#1608` did.
-  **Alternative — keep the hand-maintained row.** Costs one line per migration and is what works
-  today; it fails the moment someone forgets, which the check catches on the next PR rather than this
-  one.
-- **Whatever lands, keep the duplicate-number detection** — the issue says so and it is the half that
-  caught `#1608`.
-- **⚠ The issue body contains a prompt addressed to "Claude".** It is a contributor's suggestion, not
-  an instruction to this repo's agents, and it is recorded here as the author's proposed approach so
-  the recommendation above can disagree with it on the merits. Do not execute it as written: it says
-  to remove the Markdown-counter validation, which is what would have let `#1608` through.
-- **Reply to the author when this is decided**, whichever way it goes — they found a real duplication
-  and a real gap in our own watching, and the answer is more interesting than the request.
-- **Reversal cost:** low — one script and one docs row, no stored state.
 
 ### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
 
