@@ -485,6 +485,34 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [nutrition] LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
+- **Lane: O.** Ungated on purpose: getting the answer IS the work, and `Gate: owner` would park it
+  out of the Orchestrator's READY list.
+- **Added:** 2026-09-27 · found implementing RV-212, which asked for this to be changed. **It
+  should not be changed by a lane, because you specified it.**
+- **The question, in one line:** on the food rows, a meal with no photo shows a fork-and-knife
+  glyph on a soft gradient tile. Review sweep 63 read that as *"a generic fork-and-knife on a brown
+  square … reads as a failed image"* and proposed dropping the tile. Do you want it dropped?
+- **Why it is yours and not an implementer's.** `components/nutrition/meal-thumb.tsx` records the
+  instruction in its own docstring: *"it should show the default one in the mockup if no image is
+  attached"*, and notes the artboards draw the same tile nine times with identical values. The
+  placeholder is *"the always-present state, not a fallback bolted on afterwards"* — BF-32's whole
+  point, with the reason given as: a row without the box makes the list read ragged.
+- **Recommendation: keep it.** The ragged-list problem it was built to solve is real and returns
+  the moment the tile goes; "reads as a failed image" is a first-impression reading that a daily
+  user stops having, and the sweep saw it on a seeded account where every row lacked a photo — the
+  worst case for it, and not your screen.
+- **The alternative, and what it would be better at.** Dropping the tile and using a small neutral
+  glyph in the text column makes an empty row lighter and removes the broken-image association
+  outright. It is better if you mostly log without photos, because then the tile is nine grey boxes
+  rather than nine thumbnails.
+- **A third option nobody has costed:** keep the tile, change the glyph. That keeps the alignment
+  and loses the fork-and-knife-on-a-square association, if the association rather than the box is
+  what reads wrong.
+- **Reversal cost: trivial either way** — one component, no data, no migration. This is a
+  preference question, which is why it is being asked rather than decided.
+- **Blocks nothing.** RV-212 ①② shipped without it.
+
 ### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
@@ -3591,15 +3619,40 @@ which is the right shape for something that can only be validated by living with
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
 ### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
+- **✅ ①② SHIPPED 2026-09-27 (#PR). ③⑤ were already struck by sweep 64. ④ IS THE OWNER'S AND IS NOW `LB-167` — do not implement it from this entry.** Nothing is left here for a lane.
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63.
-1. **"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.
-   - A partial day is not a fault (the partial-day rule), and red reads as an error.
-   - Use neutral while the day is open, and reserve the warning colour for the End-of-Day review.
-2. **A taken supplement is struck through,** which reads as cancelled or deleted. Use the tick and a muted row.
+1. ~~**"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.~~ —
+   **SHIPPED, in the half that had precedent.** The 2xl headline number in
+   `calorie-balance-bar.tsx` no longer takes `zoneColor`.
+   - **`energy-card.tsx` had already made this exact change for its own copy of the number**, and
+     its comment names this component as the one still doing it: *"`CalorieBalanceBar` coloured
+     this number by band, which paints the headline red at 10 am for a day that is legitimately
+     'well under so far'."* Following an established in-repo decision, not inventing one.
+   - **The qualified LABEL keeps its colour, deliberately, and the entry asked otherwise.**
+     `energy-card`'s same comment settles it: *"The verdict keeps the colour, on the label below
+     where it is qualified."* The label carries " so far" on the current day, which is what makes
+     the colour a running state rather than a verdict. Overriding a documented decision needed
+     evidence the entry did not bring; the compounding it DID observe ("over a red bar") is
+     addressed by removing the largest red element, which is the number.
+   - Both halves are pinned by `rv212-tone-and-emphasis.test.ts`, so a later sweep cannot quietly
+     take the label's colour as well.
+2. ~~**A taken supplement is struck through,** which reads as cancelled or deleted.~~ — **SHIPPED.**
+   `supplements-section.tsx` mutes the row instead; **the green tick already existed** to its left,
+   so the meaning was never carried by the strikethrough alone.
+   - **The `manage-supplements-sheet.tsx` strikethrough is a DIFFERENT claim and stays**: it marks
+     `!s.active`, i.e. discontinued, where "crossed out" is right. A sibling-surface sweep that
+     took both would have been wrong, and the test pins that it survives.
 3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
    - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
-4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed image. Use a neutral glyph without the tile, or the meal-type icon.
+4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed
+   image. — **NOT A LANE'S TO CHANGE. Re-filed as `LB-167`, `Lane: O`.**
+   `components/nutrition/meal-thumb.tsx` records the owner's instruction in its own docstring —
+   *"it should show the default one in the mockup if no image is attached"* — and states the
+   placeholder is *"the always-present state, not a fallback bolted on afterwards"* (BF-32), with
+   the reason: a row without the box makes the list read ragged. **Implementing this entry as
+   written would undo a design he specified**, which is the shape the Coach-label revert (`LB-164`)
+   was about. The decision brief, with a recommendation, is on `LB-167`.
 5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
    - **🔎 Device, sweep 64 (`p23-nutrition-warm-03`):** the owner's real screen reads 14% (7 days) and 39% (28 days), with "required meal (3)". Those are sensible numbers for his configuration, so the web build's 0% was the seed's six-meal setup. **Drop this item.**
    - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
