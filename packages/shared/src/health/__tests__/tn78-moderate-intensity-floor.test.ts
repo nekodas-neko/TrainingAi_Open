@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { computeHrZones, moderateIntensityBpm, MODERATE_INTENSITY_FRAC } from '../hr-zones'
 import { activeMinutesFromReadings } from '../zone-minutes'
 import { targetsForRunType } from '@trainingai/shared/running/hr-targets'
+import type { FitnessSnapshot } from '@trainingai/shared/running/types'
 
 /**
  * TN-78 — the zone-minutes goal is WHO's MODERATE target, and it was scored at a threshold where
@@ -34,7 +35,10 @@ describe('the moderate-intensity floor (TN-78)', () => {
 
   it('does not move a recovery run\'s ceiling', () => {
     // The concrete regression: `recovery` caps at zone 1, so its ceiling is the Light floor.
-    const fit = { maxHr: 190, restingHr: 50 }
+    const fit: FitnessSnapshot = {
+      maxHr: 190, restingHr: 50, vo2max: 50, thresholdHr: null,
+      weeklyBaseMinutes: 90, source: 'baseline',
+    }
     expect(targetsForRunType('recovery', fit).hrHighBpm).toBe(134)
   })
 
