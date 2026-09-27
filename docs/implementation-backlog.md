@@ -3946,7 +3946,7 @@ which is the right shape for something that can only be validated by living with
    to the card, or drop it from the pre-workout screen) and it is a two-line change.
 
 ### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
-- **✅ ① SHIPPED 2026-09-27 (#PR). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**
+- **✅ ① SHIPPED 2026-09-27 (#1780). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
 1. ~~**Weekly stats shows its skeleton forever on a failed fetch.**~~ — **SHIPPED, and exactly as
