@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
 import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
+import { CLAUDE_RO_OWNER_UUID_RE } from '@/lib/data/postgres/claude-ro-owner'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
@@ -76,12 +77,21 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
 async function logQuery(entry: {
   sql: string; rowCount: number | null; durationMs: number
   truncated: boolean; ok: boolean; error: string | null; ip: string
+  /** OR-138: the user this query was scoped to, when the caller pivoted away from the default. */
+  pivotedTo?: string | null
 }) {
   try {
+    // OR-138 records the pivot as a leading comment rather than a column, so this stays one PR: a
+    // dedicated `read_user_id` column is a migration, and a migration ships alone. The requirement
+    // is that a cross-user read is attributable afterwards, and a comment on the same audit row as
+    // the query it scoped satisfies that and greps cleanly. A column would be tidier — follow-up.
+    const sqlText = entry.pivotedTo
+      ? `-- claude_ro pivot: ${entry.pivotedTo}\n${entry.sql}`
+      : entry.sql
     await getPool().query(
       `INSERT INTO db_query_log (sql_text, row_count, duration_ms, truncated, ok, error, caller_ip)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [entry.sql.slice(0, 20_000), entry.rowCount, entry.durationMs, entry.truncated, entry.ok, entry.error, entry.ip],
+      [sqlText.slice(0, 20_000), entry.rowCount, entry.durationMs, entry.truncated, entry.ok, entry.error, entry.ip],
     )
   } catch (err) {
     console.error('[admin/db-query] audit log write failed:', err)
@@ -114,6 +124,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only a single statement per request' }, { status: 400 })
   }
 
+  // OR-138: an optional pivot to the user who filed a feedback report. Absent, every line below
+  // behaves exactly as before and the role's own `app.claude_ro_owner` default applies.
+  const rawUserId = (read.body as { userId?: unknown } | null)?.userId
+  let pivotTo: string | null = null
+  if (rawUserId !== undefined && rawUserId !== null) {
+    if (typeof rawUserId !== 'string' || !CLAUDE_RO_OWNER_UUID_RE.test(rawUserId)) {
+      return NextResponse.json({ error: 'userId must be a uuid' }, { status: 400 })
+    }
+    // The pivot is allowed only to someone who actually filed feedback — the justification the
+    // owner gave. This check runs on the APP's pool, not the read-only one: `claude_ro` views are
+    // themselves scoped to the current owner, so asking the read-only role whether another user
+    // filed feedback would always answer no. One predicate to delete if the scope is ever widened
+    // deliberately; the narrow version costs nothing to reverse and the broad one cannot be
+    // un-shipped.
+    const { rows } = await getPool().query(
+      `SELECT 1 FROM feedback_submissions WHERE user_id = $1 LIMIT 1`, [rawUserId],
+    )
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { error: 'userId has filed no feedback — the read-only pivot is limited to reporters' },
+        { status: 403 },
+      )
+    }
+    pivotTo = rawUserId
+  }
+
   const ip = clientIp(req)
   const started = Date.now()
 
@@ -121,7 +157,31 @@ export async function POST(req: NextRequest) {
     // Wrapping in a subquery bounds ANY submitted query without parsing it. MAX_ROWS + 1 detects
     // truncation rather than silently returning a capped set as if it were complete.
     const wrapped = `SELECT * FROM (${sql.replace(/;\s*$/, '')}) _q LIMIT ${MAX_ROWS + 1}`
-    const result = await getReadonlyPool().query(wrapped)
+    // `SET LOCAL` is not a style preference: this endpoint reads through a POOL, so a bare `SET`
+    // would persist on that pooled connection and silently re-scope whichever later request reused
+    // it. `SET LOCAL` cannot outlive its transaction — and outside one it warns and does nothing,
+    // so the explicit BEGIN is load-bearing rather than decorative.
+    //
+    // A caller cannot reach this by hand: the wrapping above turns a submitted `SET …` into
+    // `SELECT * FROM (SET …) _q`, which is a syntax error. Verified against Postgres rather than
+    // assumed, for both `SET` and `SET LOCAL`, with the setting still null afterwards.
+    let result
+    if (pivotTo) {
+      const client = await getReadonlyPool().connect()
+      try {
+        await client.query('BEGIN')
+        await client.query(`SET LOCAL app.claude_ro_owner = '${pivotTo}'`)
+        result = await client.query(wrapped)
+        await client.query('COMMIT')
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {})
+        throw e
+      } finally {
+        client.release()
+      }
+    } else {
+      result = await getReadonlyPool().query(wrapped)
+    }
 
     const truncated = result.rows.length > MAX_ROWS
     const rows = truncated ? result.rows.slice(0, MAX_ROWS) : result.rows
@@ -129,14 +189,14 @@ export async function POST(req: NextRequest) {
 
     const payload = JSON.stringify(rows)
     if (payload.length > MAX_BYTES) {
-      await logQuery({ sql, rowCount: rows.length, durationMs, truncated, ok: false, error: 'payload too large', ip })
+      await logQuery({ sql, rowCount: rows.length, durationMs, truncated, ok: false, error: 'payload too large', ip, pivotedTo: pivotTo })
       return NextResponse.json(
         { error: `Result too large (${Math.round(payload.length / 1e6)} MB) — narrow the SELECT or add a LIMIT` },
         { status: 413 },
       )
     }
 
-    await logQuery({ sql, rowCount: rows.length, durationMs, truncated, ok: true, error: null, ip })
+    await logQuery({ sql, rowCount: rows.length, durationMs, truncated, ok: true, error: null, ip, pivotedTo: pivotTo })
     return NextResponse.json({
       rows,
       rowCount: rows.length,
@@ -146,7 +206,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await logQuery({ sql, rowCount: null, durationMs: Date.now() - started, truncated: false, ok: false, error: message, ip })
+    await logQuery({ sql, rowCount: null, durationMs: Date.now() - started, truncated: false, ok: false, error: message, ip, pivotedTo: pivotTo })
     // The DB error text is the useful part (permission denied, syntax, timeout) and this route is
     // admin-only, so it is surfaced rather than swallowed.
     return NextResponse.json({ error: message }, { status: 400 })

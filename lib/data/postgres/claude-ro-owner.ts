@@ -26,6 +26,18 @@ import { getPool } from './client'
  * **Unset is not an error.** No variable, no `ALTER ROLE`, and the views keep returning nothing —
  * the same fail-closed state, announced rather than mysterious.
  */
+/**
+ * The interpolation safety boundary for `app.claude_ro_owner` (OR-138 exported it).
+ *
+ * `ALTER ROLE … SET` and `SET LOCAL` take no bind parameter, so the value is pasted into SQL — this
+ * regex is what makes that safe, admitting only hex and dashes. It is deliberately NOT
+ * `@trainingai/shared/validation/uuid`'s `isUuid`, which additionally pins the version and variant
+ * nibbles: a stricter test would refuse a legitimate id that happens not to be a v4, and refusing to
+ * scope is a availability failure where the only thing this guards is string interpolation.
+ */
+export const CLAUDE_RO_OWNER_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function bootstrapClaudeRoOwner(): Promise<void> {
   if (!process.env.DATABASE_URL) return
   const source = (['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID'] as const)
@@ -38,7 +50,7 @@ export async function bootstrapClaudeRoOwner(): Promise<void> {
   }
   // `ALTER ROLE … SET` takes no bind parameter, so the value is interpolated — which makes this
   // regex the safety boundary, not validation. Same rule as the VACUUM allowlist.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(owner)) {
+  if (!CLAUDE_RO_OWNER_UUID_RE.test(owner)) {
     console.error(`[instrumentation] ${source} is not a uuid — refusing to set the claude_ro owner.`)
     return
   }
