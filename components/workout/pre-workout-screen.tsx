@@ -14,6 +14,7 @@ import { RoleChip } from "./role-chip";
 import type { PrescriptionStatus } from "@trainingai/shared/types/ai-periodization";
 import type { DurationPreset } from "@trainingai/shared/workout/duration-model";
 import { DeloadToggle } from "@/components/workout/deload-toggle";
+import { numbersSourceLabel, type NumbersSource } from "./numbers-source";
 import { AiBaselineBanner } from "./ai-baseline-banner";
 import { AiPrescriptionCard } from "./ai-prescription-card";
 import { SessionDurationPicker } from "./session-duration-picker";
@@ -65,6 +66,10 @@ interface PreWorkoutScreenProps {
   // The regeneration didn't land within the poll window (AI slow/offline) — reveal the
   // base numbers with a note so the workout is never blocked.
   prescriptionGenTimedOut?: boolean;
+  // Set when the numbers on screen are NOT a server payload built today — a cached payload
+  // from an earlier day, or the on-device program mirror. Labels the heading rather than
+  // blocking anything; `null`/absent is today's answer and says nothing (RV-202 ③).
+  numbersSource?: NumbersSource | null;
   // The session's own configured time budget, shown as the "Standard" option's sublabel.
   sessionBudgetMin?: number;
   // Regenerate today's prescription against a different time budget. Omitted (undefined)
@@ -103,6 +108,7 @@ export function PreWorkoutScreen({
   periodizationLoading,
   prescriptionPending = false,
   prescriptionGenTimedOut = false,
+  numbersSource = null,
   sessionBudgetMin,
   onDurationPresetChange,
   deload = false,
@@ -132,6 +138,7 @@ export function PreWorkoutScreen({
   onStartWorkoutRef.current = onStartWorkout;
 
   const today = formatInTimeZone(new Date(), tz, "EEEE d MMMM");
+  const sourceLabel = numbersSourceLabel(numbersSource);
 
   const allDoneToday =
     !loading &&
@@ -330,7 +337,17 @@ export function PreWorkoutScreen({
                   Preparing your AI workout…
                 </>
               ) : (
-                "Recommended workout"
+                <>
+                  Recommended workout
+                  {/* Where these numbers came from, when it is not today's server answer. Suppressed
+                      while a fresh plan is being prepared: that heading already says the numbers are
+                      about to be replaced, and two provenance claims on one line read as neither. */}
+                  {sourceLabel && (
+                    <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-amber-600 dark:text-amber-400">
+                      {sourceLabel}
+                    </span>
+                  )}
+                </>
               )}
             </p>
             {exercises.map((ex, idx) => {

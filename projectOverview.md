@@ -2658,6 +2658,14 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][app-shell] ⚠️ The workout list now names which day its numbers are from, and nobody has seen the pill on the phone (RV-202 ③, 2026-09-27)
+
+An amber pill beside "Recommended workout" reads **`From 26 Sept`** when the painted payload was built on an earlier day, or **`Base program`** when it came from the on-device mirror; today's payload stays unlabelled. Rendered in the harness at 412 px dark and asserted not to wrap below the heading — but **not seen on the S25**, and the harness cannot speak for the Samsung WebView's amber against the card gradient. **The `Base program` branch was never rendered at all**: reaching it needs an empty cache *and* a local mirror, and `getLocalStore` returns null in the web sandbox, so that half is source reasoning only. **Pass test:** on the S25, open a session offline and confirm the pill names a day, sits on the heading's line, and is readable.
+
+### [workouts] ⚠️ The rules-prescription fallback reaches no screen, so the ~30 s wait it was written to remove is still there (LA-160, 2026-09-27)
+
+`RV-202 ①` shipped a deterministic plan for when the model call fails, and **nothing renders it**. Code-certain in five links: the plan is deliberately not persisted; `/prescribe` returns it in a body both client callers ignore (`res.ok` then refetch); `workout-data` reads the *stored* prescription and never consults the background generation it fires; and `isAiPrescriptionPending` keys on a status the rules path never flips. So a model outage still costs ten 3 s polls and the amber "couldn't generate" banner. The entry's measurement — HTTP 200 where there was a 502 — was real and was about the route; the conclusion drawn from it was about a layer it did not test. **Lane A's**, filed as `LA-160`; the non-persistence reasoning is sound and is not what needs changing.
+
 ### [app-shell] ⚠️ Durations and counts read the same everywhere now; two daily screens changed what they print and neither has been seen (RV-208, 2026-09-27)
 
 Seven hand-rolled duration formatters went through `formatHoursMinutes`/`formatMinutes`, and one of them was a **defect**: the day timeline floored to the hour and dropped the remainder, so a 45-minute nap read `0h`. Thousands separators added at the three sites the device sweep confirmed. **An exact hour now prints `7h 00m` rather than `7h`** on the day timeline and the sleep sheet — the shared formatter's padded minute, for the `tabular-nums` columns. **Pass test:** on the S25, a sub-hour sleep or nap shows its minutes, and the padded form does not look wrong beside the numbers around it. Still open on RV-208: the time-of-day casing and `formatKg` spacing (both Lane A), the movement-category palette, dates, and brand names.
