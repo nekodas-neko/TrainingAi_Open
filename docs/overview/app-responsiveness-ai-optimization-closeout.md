@@ -8,7 +8,7 @@ Two linked workstreams, run **measure-first, then fix from the data**:
 - **B** — AI-usage observability, then cut the redundant calls the data reveals
 
 Reference: audit `docs/reviews/2026-07-21-ui-responsiveness-audit.md`; per-PR journal entries in
-`docs/overview/entries/2026-07-21-ui-responsiveness-fixes-a2.md`,
+`docs/overview/history-2026-07-17.md#2026-07-21-ui-responsiveness-fixes-a2`,
 `…-ai-usage-observability.md`, `2026-07-23-b3-prescription-dedup.md`.
 
 ---

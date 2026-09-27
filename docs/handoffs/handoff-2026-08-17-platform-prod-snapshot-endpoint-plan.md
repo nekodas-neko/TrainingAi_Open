@@ -36,7 +36,7 @@ implemented, by design.**
 | Q-251 marked as split — stays open for shape (b) only | `docs/implementation-backlog.md` | #25 |
 | The optional `Lane:` field, documented | `docs/implementation-backlog.md` | #25 |
 | Q-530's step-3 gate flipped from ⛔ blocked to ✅ settled | backlog + plan §3.1 | #55 |
-| Journal entry | `docs/overview/entries/2026-08-17-q251-export-endpoint-plan.md` | #25 |
+| Journal entry | `docs/overview/history-2026-09-10-folded-1.md#2026-08-17-q251-export-endpoint-plan` | #25 |
 | Plan linked from the pillar index | `docs/domains/platform/README.md` | #25 |
 | One-off Q allocation (530) recorded | `docs/agents/README.md` | #25 |
 

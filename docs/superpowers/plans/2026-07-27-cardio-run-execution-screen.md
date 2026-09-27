@@ -545,7 +545,7 @@ git commit -m "feat: route run activities to the dedicated run execution screen"
 
 **Files:**
 - Modify: `package.json`, `lib/changelog.ts`, `projectOverview.md`
-- Create: `docs/overview/entries/2026-07-27-cardio-run-execution-screen.md`
+- Create: `docs/overview/history-2026-07-23.md#2026-07-27-cardio-run-execution-screen`
 - Modify: `docs/implementation-backlog.md`
 
 - [ ] **Step 1: Run the full local gate**
@@ -572,7 +572,7 @@ Minor bump; changelog entry describing the new live run screen in plain language
 
 - [ ] **Step 4: Journal entry**
 
-`docs/overview/entries/2026-07-27-cardio-run-execution-screen.md` — what shipped, and explicitly
+`docs/overview/history-2026-07-23.md#2026-07-27-cardio-run-execution-screen` — what shipped, and explicitly
 flag **not verified**: on-device (APK) — live HR requires a real Polar strap or Oura ring, and the
 map/GPS path needs a real device fix, neither reachable in the sandbox. Also note the inherited,
 pre-existing `ActivityRouteMap` limitation that the map's viewport does not auto-recenter as new

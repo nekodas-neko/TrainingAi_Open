@@ -65,6 +65,9 @@ function candidates(text) {
       if (PATTERN.test(p)) continue       // a glob is not a path
       if (/\s/.test(p) || p.includes('|')) continue
       p = p.replace(/[),.]+$/, '')
+      // A fragment names a place in the file, not a file: `docs/overview/history-x.md#entry` is how
+      // the journal fold cites a folded entry (OR-198). Check the file.
+      p = p.split('#')[0]
       if (!out.has(p)) out.set(p, i + 1)
     }
   })

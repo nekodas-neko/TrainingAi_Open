@@ -52,7 +52,7 @@ analysis. Fixed by requiring the measurement and emitting `null` otherwise; cove
 to ~7 verdicts.
 
 **3. Check the distribution before trusting a derived column.** Both of the above were found by
-querying production, not by reading code. `docs/overview/entries/2026-08-08-production-counter-audit.md`
+querying production, not by reading code. `docs/overview/history-2026-08-07.md#2026-08-08-production-counter-audit`
 records the method and the negative results (counters clean) so the next pass starts further along.
 
 ## Key decisions (with rationale)
