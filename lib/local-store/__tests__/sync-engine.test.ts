@@ -97,6 +97,71 @@ describe('pushMutations', () => {
       expect.stringContaining('confirm failed'), 'injuries', expect.any(Error))
   })
 
+  // LB-151. Eleven call sites reach pushMutations, and two overlapping calls both drained the outbox.
+  it('never drains twice at once: callers arriving mid-drain share ONE trailing drain', async () => {
+    fakeStore.getPendingMutations.mockResolvedValue([mut('ob-1', 'food_logs', '2026-07-01')])
+    let release!: (v: unknown) => void
+    const first = new Promise(r => { release = r })
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => first)
+      .mockResolvedValue(okJson({ processed: 1, errors: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const a = pushMutations('u1')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const b = pushMutations('u1')
+    const c = pushMutations('u1')
+    // B and C arrived while A was on the wire: nothing more has gone out, and they share one promise.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(b).toBe(c)
+
+    release(okJson({ processed: 1, errors: [] }))
+    await Promise.all([a, b, c])
+    // One trailing drain for both latecomers — so a mutation queued after A read the outbox still goes.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('a SECOND wave of latecomers gets its own trailing drain, not the first wave’s finished one', async () => {
+    fakeStore.getPendingMutations.mockResolvedValue([mut('ob-1', 'food_logs', '2026-07-01')])
+    const gates: Array<(v: unknown) => void> = []
+    const fetchMock = vi.fn((_url: string, _init?: unknown) => new Promise(r => { gates.push(r) }))
+    vi.stubGlobal('fetch', fetchMock)
+    const open = async (n: number) => {
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(n))
+      gates[n - 1](okJson({ processed: 1, errors: [] }))
+    }
+
+    const wave1 = [pushMutations('u1')]
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    wave1.push(pushMutations('u1'))          // latecomer → trailing drain #2
+    await open(1); await open(2); await Promise.all(wave1)
+
+    const wave2 = [pushMutations('u1')]      // drain #3
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    wave2.push(pushMutations('u1'))          // latecomer → must be a NEW trailing drain #4
+    await open(3); await open(4); await Promise.all(wave2)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('starts a fresh drain once the previous one has finished', async () => {
+    fakeStore.getPendingMutations.mockResolvedValue([mut('ob-1', 'food_logs', '2026-07-01')])
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ processed: 1, errors: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await pushMutations('u1')
+    await pushMutations('u1')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('a failed drain does not wedge the next one', async () => {
+    fakeStore.getPendingMutations.mockRejectedValueOnce(new Error('store unavailable'))
+      .mockResolvedValue([mut('ob-1', 'food_logs', '2026-07-01')])
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ processed: 1, errors: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await pushMutations('u1').catch(() => null)
+    await pushMutations('u1')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('deletes confirmed rows and records failures only for server-failed ids', async () => {
     fakeStore.getPendingMutations.mockResolvedValue([
       mut('ob-1', 'food_logs', '2026-07-01'),
