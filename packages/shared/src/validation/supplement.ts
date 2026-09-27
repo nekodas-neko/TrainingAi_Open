@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isCalendarDate } from '../date-utils'
 
 // Q-484: `POST /api/supplements` accepted a 300,002-character name and a 100,000-character dose and
 // stored both in full, while `PATCH /api/supplements/[id]` beside it bounded the same fields at 200.
@@ -18,7 +19,7 @@ const FIELDS = {
   // The transform is what keeps a slash form off the `date` column: Postgres reads `2026/09/01`
   // under whatever DateStyle the session has, so normalising here rather than at each call site is
   // the difference between one rule and two routes that must both remember it.
-  windowDate:      z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/)
+  windowDate:      z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date')
                      .transform(v => v.replace(/\//g, '-')).nullable(),
   dosePrompt:      z.boolean(),
   reminderEnabled: z.boolean(),

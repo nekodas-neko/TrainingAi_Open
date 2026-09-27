@@ -230,6 +230,14 @@ describe('/api/admin/timing-baseline', () => {
     expect(await (await timingGet()).json()).toEqual({ date: null })
   })
 
+  // LA-145. A NULL still clears the baseline; an impossible day is refused rather than stored.
+  it('refuses a well-shaped date that is not a real day', async () => {
+    for (const date of ['2026-02-31', '2026/02/30']) {
+      expect((await timingReq({ date })).status, date).toBe(400)
+    }
+    expect(setTimingBaselineDate).not.toHaveBeenCalled()
+  })
+
   it('accepts both separators, because localDateString() emits slashes', async () => {
     // Q-130. A dash-only regex rejects every request from a client that fills the field from
     // `localDateString()`, and it fails in the validation gate before the handler runs.
