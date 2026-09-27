@@ -1324,7 +1324,15 @@ below threshold and left in place for next time.
 
 ### [platform] OR-184 — the collaborator's issue and two PRs, and the channel that had no reader
 
-- **Lane: O** — the routing and the reviews to commission; the reviews themselves are Review's.
+- **Lane: O** — the routing only. **The three are now covered by a standing rule rather than by this
+  entry** (OR-185): BugFix reads GitHub at session start, so its next session finds all three without
+  being told. This stays open to catch the case where that does not happen, and **self-clears the
+  moment BugFix files them.**
+- **⛔ Deliberately NOT adding a `Lane: BF`.** The routing gap is real — the next action here is
+  BugFix's and no lane names BugFix — but `OR-150` waited for fifteen entries and three sweeps before
+  `Lane: T` was justified, and this is one entry. **A fifth lane value added for a single case is a
+  channel nobody reads.** Revisit if a second and third entry need to be handed to BugFix; until
+  then the session-start rule is the mechanism.
 - **Added:** 2026-09-27 · the collaborator, relayed by the owner: *"it's also not picking up the
   issues and PRs I raise to your Training app, so they're never getting touched/reviewed either."*
   **He is right, and it was checked rather than assumed.**
@@ -1352,7 +1360,18 @@ below threshold and left in place for next time.
   each other before reviewing, because a conflicting design is the likely finding.
   ③ **#1608 adds STORAGE**, so Lane A owns the half that touches schema, and any migration number is
   Lane A's alone.
-- **Ask: owner** — **recommendation: let Review post reviews on #1607 and #1608 now, and keep the
+- **✅ ANSWERED 2026-09-27: POST THE COMMENTS, AND KEEP THEM VERY CONCISE.** Owner: *"Yes write
+  comments but make sure they are very concise. No fluff."* The concision rule is now in `CLAUDE.md`
+  and `docs/agents/README.md` — no preamble, no praise, no restating the PR; one finding per comment
+  with the `file:line` or rule behind it; *"no issues found"* is one line. **He also moved the
+  watching to BugFix** (OR-185), so the channel has one watcher and Review reads the patch it is
+  handed. **The merges stay his** — unchanged, and both live PRs hit a carve-out anyway (`#1607`
+  auth, `#1608` storage).
+- **So the three are routed:** `#1620` → BugFix, triage and file or reply with why not. `#1607` and
+  `#1608` → BugFix files them, **Review reads the diffs and posts the reviews**, owner merges.
+  **Check `#1607` against `Q-1a` before reviewing** — same area, client half, and a conflicting
+  design is the likely finding.
+- **The superseded ask, kept for the reasoning:** **recommendation: let Review post reviews on #1607 and #1608 now, and keep the
   merges yours.** A review is not a merge: it costs nothing to reverse, and the alternative is that a
   contributor's work sits unread for a fourth day. **What I am NOT proposing** is that agents merge
   outside PRs — both touch a carve-out (auth, storage), and outside code entering your app is the
