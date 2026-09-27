@@ -14,7 +14,8 @@ or the ring/strap hardware that measures it ([`devices`](../devices/README.md)).
 |---|---|
 | Night selection, merging, sensing span | `lib/sleep/` — `primary-sleep.ts`, `merge-sessions.ts`, `actual-window.ts`, `sensing-span.ts` |
 | Score & derived metrics | `packages/shared/src/health/` — `sleep-score.ts`, `sleep-night.ts`, `sleep-staging.ts`, `sleep-trend.ts`, `sleep-consistency.ts`, `sleep-feel-calibration.ts`, `hypnogram.ts`, `sleepnet-preprocess.ts`, `breathing-rate.ts`, `hrv-frequency.ts`, `spo2-variability.ts`, `hr-sleep-band.ts`, `night-vitals.ts` (**not** `lib/health/` — several plan docs still point there and are wrong) |
-| Tables | `sleep_sessions` (+ Oura columns), `oura_daily` — see the Data Model in [`CLAUDE.md`](../../../CLAUDE.md) |
+| The app's verdict on last night | `packages/shared/src/health/sleep-verdict.ts` — per-component median/IQR over a trailing 28 nights, returning `normal \| poor \| good` **plus the bands and values it judged against**, so a later correction stays paired with the rule that produced it. Read by `GET /api/sleep-verdict` and stored in `sleep_verdicts` (migration 284). `VERDICT_IQR_MULTIPLIER` is **the owner's calibration**, currently 1.00 (TN-83) — see the Gotchas below before changing it. No UI renders it yet (TN-82). |
+| Tables | `sleep_sessions` (+ Oura columns), `oura_daily`, `sleep_verdicts` — see the Data Model in [`CLAUDE.md`](../../../CLAUDE.md) |
 | UI | `app/health/`, `components/health/` |
 
 Shared formulas and their single home: [`docs/module-map.md`](../../module-map.md) §6 (and its
@@ -25,6 +26,7 @@ canonical-display-source table in the same section).
 - [`docs/reviews/2026-09-03-why-a-good-night-scored-63.md`](../../reviews/2026-09-03-why-a-good-night-scored-63.md) — **why an 8 h 15 m night at 97% efficiency scored 63, 2026-09-03 (TN-23).** The **blend is 76.04** and `SCORE_CALIBRATION` ships **63** — reproduced exactly from the stored contributors. **Three causes, two already queued:** the display curve costs **11.9 points** (**TN-5**, approved 2026-08-24, unshipped); 8.25 h scores **81** where `TOTAL_SLEEP`'s own comment says ~92 (**TN-10**); and **NEW — `hrv` and `hr` are one autonomic event scored twice**, `r = +0.869` / **75% shared variance** across 38 nights, carrying **28 of 110 = 25%** of the score and dragging this night's blend **12.7 points**. **⛔ Do not delete one contributor** — both curves are correct and the combined signal is the score's strongest recovery evidence; collapse or down-weight the pair instead. **Honest answer: ~76 today, low-to-mid 80s after TN-5 and TN-10, with a few points still owed to a real HRV dip (50 ms against a 59 ms norm).**
 - [`docs/reviews/2026-09-24-sweep-57-data-census.md`](../../reviews/2026-09-24-sweep-57-data-census.md) — **"last night" is picked by four different rules (RV-163), 2026-09-24.** Longest, latest, latest and earliest, across the rollup, the readiness payload, Body Battery and the score audit. On 09-23 a 6.17 h daytime rest became the night: sleep 42, readiness 44, and a flat Body Battery with 2 samples against 203. This is TN-20's trigger for its non-zero cases.
 - [`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](../../reviews/2026-09-24-sweep-56-reads-nobody-ran.md) — **12 of 27 recent nights have no overnight `sleep_sessions` row, 2026-09-24** (PS-17, Q-274). Each of those dates holds only a 0.0–4.1 h daytime fragment, while the ring's overnight HR is complete and the summary holds 7–9 h. It was 5 of 13 on 09-17, so it is getting worse. Q-274's *"does not reproduce"* is false.
+- [`docs/reviews/2026-09-26-sweep-64-dv-gallery-review.md`](../../reviews/2026-09-26-sweep-64-dv-gallery-review.md) — **sweep 64, 2026-09-26: DV's device gallery read.** RV-216 to RV-220: the streak contradiction, raw sleep keys, four calorie numbers, Day's card, and the gallery's own capture faults.
 - [`docs/reviews/2026-09-17-the-app-saw-it-and-said-nothing.md`](../../reviews/2026-09-17-the-app-saw-it-and-said-nothing.md) — **a real autonomic event, detected and never surfaced, 2026-09-17** (TN-45). The illness radar's `watch` band has fired **twice in 72 days** and readiness on those days averages **32 against 64** — but `watch` carries a zero readiness penalty *and* renders no banner, so **the only band that has ever fired is the silent one**. ⚠ Also corrects a Tuning report from the day before: the owner's sleep had not "collapsed to 3.1 h" — that was PS-17's midday fragments dragging the mean, and the HRV finding it accompanied stands on its own (50 ms on fragment nights vs 45 on real ones, so not a capture artefact).
 - [`docs/reviews/2026-09-05-app-checkpoint.md`](../../reviews/2026-09-05-app-checkpoint.md) — **the whole-app checkpoint, 2026-09-05/06** (twenty-six lanes collated; PS-24…PS-39. For this pillar: see the report's pattern sections and per-lane table).
 - [`docs/reviews/2026-08-26-manual-bedtime-write-audit.md`](../../reviews/2026-08-26-manual-bedtime-write-audit.md)
@@ -77,7 +79,11 @@ canonical-display-source table in the same section).
   production sleep-integrity sweep came back clean beyond one n=1 edge case (a 45-minute nap stored
   with all sleep-stage fields zeroed — noted for awareness, not filed as a bug).
 - Plans: `ls docs/superpowers/plans/*sleep*` (7 today, plus archived ones under `plans/archive/`).
-  Not matched by that glob: [`2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md) (Q-91-followup).
+  Not matched by that glob: [`2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md) (Q-91-followup),
+  [`2026-09-26-outlier-gated-rating-prompt.md`](../../superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md) — the app fills
+  the sleep category and **announces** it; the owner only ever **corrects** it (answers `OR-171`; built
+  as `TN-81`/`TN-82`). Also the record of **why three in-sheet rating questions each decayed to zero**,
+  which is the thing to read before adding a fourth — the finding is that *asking* is what failed.
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
@@ -225,6 +231,17 @@ curve). **Before writing anything that treats one row as one night, call the hel
 
 ## Gotchas specific to this domain
 
+- **The verdict's `VERDICT_IQR_MULTIPLIER` is a calibration the owner signs off, and the
+  announcement rate is a CHECK on it, never a knob to turn.** It sits at **1.00** (TN-83,
+  2026-09-26), giving 5.8 prominent announcements per 30 of his real nights against a 4–6 target.
+  1.5 also lands in that band and is wrong: it reaches the rate by suppressing signal and takes
+  `good` to **zero**, deleting half the feature. Two rules follow. **(a)** Sweep over
+  `nightSessions()` output, never raw `sleep_sessions` rows — the original 0.5 was fitted over rows
+  including naps and 0 h fragments, and those fragments *widened* the bands, so fixing the
+  population made the rate go **up** (15.7), not down. **(b)** Move
+  `SLEEP_VERDICT_MODEL_VERSION` in the same commit, or two incompatible rules share one version and
+  every stored correction becomes unattributable to what it was disagreeing with.
+
 - **A ring re-pair can silently re-time every night in history.** `aggregateOuraRawSamples`'s
   `toDate` resolves each `ds` against `currentEpoch(anchors)`, so whichever clock epoch is newest
   governs *all* history — and a history re-drain after a re-pair opens a spurious epoch whose offset
@@ -289,3 +306,9 @@ curve). **Before writing anything that treats one row as one night, call the hel
   beat looks like a plausible record low. Both gate on the *same* MET windows. Never re-derive
   these — call the module.
   ([`2026-08-03-night-vitals-extraction.md`](../../overview/history-2026-07-30.md))
+
+- **[`docs/overview/entries/2026-09-26-tn85-sleep-verdict-on-home.md`](../../overview/entries/2026-09-26-tn85-sleep-verdict-on-home.md)**
+  — TN-85. Last night's verdict is stated on the Home Sleep card, quietly for an ordinary night and
+  with the numbers first for an outlier, with a correction one tap away. The morning modal is not a
+  home for it: it opens once a day on one screen and retires on dismissal, and the owner has saved
+  82 of those sheets while touching a scale in 3.

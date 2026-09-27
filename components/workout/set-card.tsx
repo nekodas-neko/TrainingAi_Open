@@ -78,7 +78,7 @@ function SetCardComponent({
           <CheckCircle2 className="h-4 w-4" style={{ color: "var(--accent-green)" }} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-muted-foreground">{isAmrap ? 'AMRAP' : `Set ${index + 1}`} · Logged</p>
+          <p className="text-2xs text-muted-foreground">{isAmrap ? 'AMRAP' : `Set ${index + 1}`} · Logged</p>
           <div className="flex items-baseline gap-1.5 mt-0.5">
             {weightLabel ? (
               <>
@@ -91,8 +91,8 @@ function SetCardComponent({
           </div>
         </div>
         <div className="text-right flex-none">
-          {lapTime !== undefined && <p className="text-[11px] text-muted-foreground">{formatTime(lapTime)} set</p>}
-          {restTime !== undefined && <p className="text-[11px] text-muted-foreground">{restTime}s rest</p>}
+          {lapTime !== undefined && <p className="text-2xs text-muted-foreground">{formatTime(lapTime)} set</p>}
+          {restTime !== undefined && <p className="text-2xs text-muted-foreground">{restTime}s rest</p>}
           {loggedRpe !== undefined && (
             <p
               className="text-[11px] font-bold leading-none mt-0.5"
@@ -163,7 +163,7 @@ function SetCardComponent({
                   <span className="text-6xl font-black tabular-nums leading-none" style={{ color: "var(--color-brand)" }}>
                     {repValue}
                   </span>
-                  <span className="text-[11px] text-muted-foreground mt-1.5">reps</span>
+                  <span className="text-2xs text-muted-foreground mt-1.5">reps</span>
                   {isAmrap && (
                     <span className="text-[11px] font-bold uppercase tracking-wide leading-none mt-1" style={{ color: "var(--color-brand)" }}>
                       AMRAP · beat it

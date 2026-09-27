@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import type { WorkoutRepository, SetHrStatsRow } from '@/lib/data/repository'
 
@@ -18,6 +19,7 @@ const repo = {
   getSetHrStatsSince: async () => [setRow({}), setRow({ loggedAt: new Date('2026-06-10T00:00:00Z'), drop120s: 50 })],
   getOuraWorkouts: async () => [],
   getHrForWindow: async () => [],
+  getObservedHrProfile: async () => computeObservedHr([]),
   getUserById: async () => null,
   listBodyMetrics: async () => [],
 } as unknown as WorkoutRepository

@@ -310,10 +310,27 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         icon: sess.icon ?? null,
         timeBudgetMinutes: sess.timeBudgetMinutes ?? 60,
       })))
+      // RV-168: the catalogue FK, resolved the same way migration 099 backfilled it — exact,
+      // case-sensitive match on the library's unique name. Without this every program save wiped
+      // `exercise_id` back to NULL, because a save is a delete + re-insert and the insert never
+      // carried it; only the Coach swap wrote it, which is why stray rows had it and no others did.
+      const libraryNames = [...new Set(
+        sessionsWithIds.flatMap(({ exercises }) => exercises.map(({ ex }) => ex.exerciseName)),
+      )]
+      const libraryIdByName = new Map<string, string>()
+      if (libraryNames.length) {
+        const libRows = await tx.select({ id: s.exerciseLibrary.id, name: s.exerciseLibrary.name })
+          .from(s.exerciseLibrary)
+          .where(inArray(s.exerciseLibrary.name, libraryNames))
+        for (const r of libRows) libraryIdByName.set(r.name, r.id)
+      }
       const exerciseRows = sessionsWithIds.flatMap(({ sessionId, exercises }) =>
+        // `exerciseId` destructured here is the ROW's own primary key; `exerciseId:` below is the
+        // catalogue FK. Two different things, one name — see the `id:` line.
         exercises.map(({ ex, exerciseId }) => ({
           id: exerciseId,
           sessionId, exerciseName: ex.exerciseName,
+          exerciseId: libraryIdByName.get(ex.exerciseName) ?? null,
           styleId: ex.styleId ?? null,
           muscleGroups: ex.muscleGroups.map(mg => mg.toLowerCase()),
           position: ex.position,

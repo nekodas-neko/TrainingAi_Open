@@ -10,6 +10,7 @@ import { Sparkline } from "@/components/ui/sparkline";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { volumeVerdict } from "@/components/health/volume-band";
 import { TTL_LONG } from "@trainingai/shared/cache-ttl";
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 const MIN_TARGET = 10;
 const MAX_TARGET = 20;
@@ -129,10 +130,13 @@ export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles
                   </span>
                 </div>
                 <div className="relative h-2 rounded-full bg-muted overflow-visible">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${barPct}%`, background: color }}
-                  />
+                  {/* LB-162 — the clip belongs to this wrapper, not the track. `scaleX` scales a
+                      fill's corner radius with it, so an unclipped `rounded-full` fill goes oval
+                      at low percentages; but the track stays `overflow-visible` on purpose, so the
+                      two `h-3` markers below can escape an `h-2` track. Clipping here gets both. */}
+                  <div className="absolute inset-0 rounded-full overflow-hidden">
+                    <ProgressFill pct={barPct} color={color} />
+                  </div>
                   {/* Target marker — the program's target, or MEV when the landmarks are in use. */}
                   <div
                     className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 rounded-full bg-muted-foreground/40"

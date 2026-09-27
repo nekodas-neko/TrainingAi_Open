@@ -13,22 +13,29 @@
 // and says the things it has to. An eleventh route added without either constant is what this
 // catches.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { PROSE_GUARDS, PROSE_FIELD_GUARDS, METRIC_UNITS_RULE, NO_SUPERLATIVE_RULE, QUOTE_NUMBERS_RULE } from '../prompt-guards'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
 
-// Routes whose whole output is prose. `prompt.ts` is health-insight's builder, which is where all
-// 7 Fahrenheit errors landed.
+// Routes whose whole output is prose, and which therefore need the shared guards in their prompt.
+//
+// `app/api/ai/health-insight/prompt.ts` headed this list — it was where all 7 Fahrenheit errors
+// landed — and RV-201 removed it by removing the model: the insight is now assembled from the
+// numbers by `insight-text.ts`, which cannot pick a unit or a superlative at all. A route leaves
+// this list when its model call goes, never because the guards became inconvenient.
+//
+// `app/api/workout-review/session/[sessionId]/route.ts` left the field list the same way
+// (RV-204): its `generateObject` call is gone and the `reasoning` it returns is now assembled by
+// `buildRulesReview` from the budget arithmetic, so there is no model text to guard and
+// `review/prompt.ts` has been deleted.
 const PROSE_ROUTES = [
-  'app/api/ai/health-insight/prompt.ts',
   'app/api/daily-digest/route.ts',
-  'app/api/weekly-digest/route.ts',
   'app/api/workout-sessions/[id]/recap/route.ts',
   'app/api/session-explain/insight/route.ts',
-  'app/api/running-plan/explain/route.ts',
 ]
 
 // Routes that return structured data with a user-facing text field in it, and whose numbers are
@@ -37,7 +44,6 @@ const PROSE_FIELD_ROUTES = [
   'app/api/nutrition-goals/recommend/route.ts',
   'app/api/generate-program/route.ts',
   'app/api/builder-chat/route.ts',
-  'app/api/workout-review/session/[sessionId]/route.ts',
 ]
 
 describe('the prose guards reach every route that writes prose (Q-292, PS-32)', () => {
@@ -91,5 +97,64 @@ describe('the two guard sets differ only where they have to', () => {
     // once, silently, in a way only a model run would show.
     expect(PROSE_GUARDS).toContain(QUOTE_NUMBERS_RULE)
     expect(PROSE_FIELD_GUARDS).not.toContain(QUOTE_NUMBERS_RULE)
+  })
+})
+
+// RV-173 — the list above is hand-written, and Coach was not on it for as long as Coach existed.
+// It streams free prose about the owner's own numbers and carried none of the guards, while its
+// docstring still claimed "no user-facing entry point yet" — `app/coach/coach-content.tsx` has
+// driven it the whole time. A list cannot notice a route nobody adds to it, so this block DISCOVERS
+// them instead: anything that calls a prose generator must be able to reach the guards.
+//
+// `generateObject` is deliberately not a prose generator here. It returns structured data against a
+// schema, and its routes carry PROSE_FIELD_GUARDS only where a user-facing text field is in the
+// object — which the explicit list above already covers.
+const PROSE_CALL = /\b(loggedStreamText|streamText|generateText)\s*\(/
+
+function routeFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${e.name}`
+    if (e.isDirectory()) { if (e.name !== '__tests__') out.push(...routeFiles(rel)) }
+    else if (e.name === 'route.ts') out.push(rel)
+  }
+  return out
+}
+
+/** The guards may live in a sibling the route imports — health-insight builds its prompt in ./prompt. */
+/** The INTERPOLATION, not the identifier: an import that is never spliced into a prompt is a
+ *  route with no guards and a tidy import list. Matching the bare name let that pass. */
+const interpolates = (src: string) =>
+  src.includes('${PROSE_GUARDS}') || src.includes('${PROSE_FIELD_GUARDS}')
+
+function reachesGuards(rel: string): boolean {
+  const src = stripComments(read(rel))
+  if (interpolates(src)) return true
+  const dir = rel.slice(0, rel.lastIndexOf('/'))
+  for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
+    for (const ext of ['.ts', '.tsx', '/index.ts']) {
+      const cand = join(root, dir, m[1] + ext)
+      if (existsSync(cand)) {
+        if (interpolates(stripComments(readFileSync(cand, 'utf8')))) return true
+      }
+    }
+  }
+  return false
+}
+
+describe('every route that writes prose can reach the guards (RV-173)', () => {
+  const prose = routeFiles('app/api').filter(f => PROSE_CALL.test(stripComments(read(f))))
+
+  it('finds the prose routes at all — a scan that matches nothing would pass silently', () => {
+    // A floor, not a target: it exists so a scan that silently matches nothing cannot pass. It was
+    // 7 until RV-200 deleted `running-plan/explain`, 6 until RV-201 did the same to
+    // `ai/health-insight`, and 5 until RV-201's second half took `weekly-digest` — each one a
+    // model rewording facts its own handler had already computed. Lower it when a prose route
+    // genuinely goes; never raise it to paper over one that stopped matching.
+    expect(prose.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it.each(prose)('%s reaches PROSE_GUARDS or PROSE_FIELD_GUARDS', rel => {
+    expect(reachesGuards(rel), `${rel} streams prose about the owner's data with no guards`).toBe(true)
   })
 })

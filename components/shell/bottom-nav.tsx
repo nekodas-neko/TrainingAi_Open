@@ -102,11 +102,11 @@ export function BottomNav({
                   href={href}
                   prefetch={onTabChange ? false : true}
                   onClick={(e) => handleNavClick(key, href, e)}
-                  className="flex flex-1 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-bold transition-colors relative"
+                  className="flex flex-1 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-bold transition-colors relative active:[&>div]:scale-95 motion-reduce:active:[&>div]:scale-100"
                   style={{ color: active ? "var(--color-brand)" : undefined }}
                 >
                   <div
-                    className="absolute -top-4 left-1/2 -translate-x-1/2 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all"
+                    className="absolute -top-4 left-1/2 -translate-x-1/2 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-[transform,background-color] duration-100 motion-reduce:transition-none"
                     style={{
                       background: active
                         ? "var(--color-brand)"
@@ -128,7 +128,7 @@ export function BottomNav({
                 prefetch={onTabChange ? false : true}
                 onClick={(e) => handleNavClick(key, href, e)}
                 className={cn(
-                  "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
+                  "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-[transform,color] duration-100 active:scale-95 motion-reduce:active:scale-100 motion-reduce:transition-none",
                   active ? "text-brand" : "text-muted-foreground",
                 )}
               >

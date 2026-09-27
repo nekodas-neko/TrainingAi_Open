@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stripComments } from '../../../scripts/lib/strip-comments.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 /** Comments are stripped first: the fix's own comment quotes the shape it replaced. */
 const code = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  stripComments(s);
 const src = (rel: string) => code(readFileSync(path.join(ROOT, rel), 'utf8'));
 
 /**

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { ChevronDownIcon } from "lucide-react"
@@ -211,9 +211,11 @@ export function MoodCheckInSheet({
     setSeededFromSuggestions(true)
   }, [open, initialLog, suggested, seededFromSuggestions])
 
-  function toggleSoreMuscle(m: string) {
+  // RV-178: `SoreMusclePicker` is memo()'d, so a handler re-created every render defeated it
+  // silently while the component still read as optimised.
+  const toggleSoreMuscle = useCallback((m: string) => {
     setSoreMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])
-  }
+  }, [])
 
   function toggleIssue(val: BodyState) {
     setIssues(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])

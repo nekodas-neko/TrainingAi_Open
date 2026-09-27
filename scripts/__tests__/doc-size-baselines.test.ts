@@ -102,9 +102,27 @@ describe('the baselines actually committed', () => {
   const baselines = loadBaselines(path.join(repoRoot, BASELINE_DIR))
 
   it('tracks at least the orientation docs every session reads', () => {
-    for (const rel of ['projectOverview.md', 'docs/implementation-backlog.md', 'CLAUDE.md']) {
+    for (const rel of ['projectOverview.md', 'CLAUDE.md']) {
       expect(Object.keys(baselines), `${rel} must stay tracked`).toContain(rel)
     }
+  })
+
+  // LA-129, owner-approved 2026-09-25. The backlog was in the list above until then, on the reading
+  // that it is an orientation doc. It is not: CLAUDE.md sends an implementer to `next-item.js`, and
+  // nobody reads 32,000 lines to orient. What the baseline actually produced was collisions — 54 of
+  // the last 63 `.size` changes on `main` were this one file, because every agent edits the backlog
+  // and it genuinely grows, so two open PRs raise the same number by construction.
+  //
+  // This assertion is deliberately the INVERSE of the one it replaces rather than a deletion: an
+  // absent expectation would let the baseline be silently re-added by a `--fix` run on some future
+  // branch, which is exactly how it would come back.
+  it('deliberately does NOT ratchet the backlog — it is reported instead', () => {
+    expect(
+      Object.keys(baselines),
+      'docs/implementation-backlog.md must stay UNRATCHETED (LA-129) — it is printed by ' +
+        'check-doc-index-size on every run and enforced by nothing. If a --fix run re-created ' +
+        'docs/doc-size/docs/implementation-backlog.md.size, delete it rather than raising it.',
+    ).not.toContain('docs/implementation-backlog.md')
   })
 
   // A baseline for a file that does not exist is a ratchet guarding nothing, and the check script

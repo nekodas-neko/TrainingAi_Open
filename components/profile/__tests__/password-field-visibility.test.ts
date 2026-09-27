@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * LB-40 — a user who already had a password could not change it.
@@ -24,8 +25,7 @@ const ROOT = join(__dirname, '..', '..', '..')
 const SHEET = 'components/profile/edit-profile-sheet.tsx'
 
 /** Comments gone, imports kept — one assertion below is about an import. */
-const code = readFileSync(join(ROOT, SHEET), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+const code = stripComments(readFileSync(join(ROOT, SHEET), 'utf8'))
   .replace(/\/\/.*/g, '')
 
 describe('LB-40 — the current-password field can actually appear', () => {

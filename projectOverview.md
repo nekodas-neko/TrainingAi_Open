@@ -26,8 +26,44 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.465.8 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-23.
+**Version:** v1.477.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-26.
+
+**Three Sleep contributors rendered their own key, and the class had shipped twice before (RV-217, v1.477.0).** Of the Sleep score's ten rows, seven carried a label and a chevron and three showed `hrv`, `hr`, `schedule` in lowercase with nothing to tap. The fall-through causing it is correct and stays — `CONTRIBUTOR_KEYS` translates the model's keys into Oura's vocabulary, and Oura's `daily_sleep` set is exactly the seven that are mapped, so the app's own three pass through by design. What was missing is a label and a guide entry for what comes out. **The sibling sweep found the same defect one step along:** readiness's `checkin` has a label (RV-201) and no guide, so it was the one row there that read correctly and did nothing when tapped. Both fixed. The test **derives** the key set by running the model rather than listing it — a list is what let the third occurrence happen — and carries a vacuity guard so it cannot quietly stop testing. ⚠️ **Nothing was rendered**: `labelFor`/`guideFor` are pure and covered by test, but the Sleep list itself was not opened. The entry's third item, uneven row spacing that "looks like empty rows", is a layout question a screenshot cannot settle and is filed as **LA-157** (Lane B). Detail: `docs/overview/entries/2026-09-27-rv217-contributor-labels.md`.
+
+**A best streak below the current one, because the two were counting different things (RV-216, v1.476.0).** Home said a 111-day streak and More said the best was 49. Both functions were called `computeStreak` and neither was arithmetically wrong: Home counts **calendar days** (`count += 1 + consecutiveRest`), achievements counted **sessions** (`streak++` per dated entry). Replayed against the owner's real 103 trained days: **111 days against 83 sessions at the same gap**, and the 49 was the session count at BF-122a's rotation allowance of 1. One shared `computeDayStreak` in `packages/shared/src/workout/day-streak.ts` now serves `/api/achievements` and `/api/friends/leaderboard`, counting days — which is what the card ("STREAK … days"), the four achievements ("7-day", "30-day") and the banner already promised. **The rest gap is a floor, not a replacement:** `streakRestGapFor` is `max(2, maxCompliantRestGapFor(schedule))`, because a flat 2 would have regressed BF-122a, whose Mon+Tue user has a legitimate five-day hole. The achievements file's function is renamed `computeEntryStreak` and still serves food, sleep and calorie streaks, which correctly count entries. ⚠️ **This raises his best streak from 49 to 111 and awards "Iron Will" (60-day)** — the intended change, stated plainly because it is a number he reads. ⚠️ **Home still holds its own identical copy**; the swap is `LA-156` (Lane B), and until then a *weekly* user sees Home under-report, since Home cannot read the schedule. Detail: `docs/overview/entries/2026-09-27-rv216-one-streak-formula.md`.
+
+**The Workout Review stopped calling a model, and the recap turned out to be broken rather than unused (RV-204, v1.475.0).** The review's `generateObject` call is gone: `reconcileReview` already clamped every number, refused unsafe drops, back-filled omissions and recomputed the totals, so what survived the model was the *choice* — and that choice is already made deterministically on every prescription by the same trim ordering. Running it here is what makes a review and a prescription agree instead of proposing contradicting shapes. **The second half is the finding.** The entry priced both routes as unused ("neither ran in 30 days"); over 60 days both are at zero, but the recap fires **automatically** on the done screen, and against **43 workouts completed 2026-07-30 → 2026-09-25** it has stored **4** rows ever, the last on **2026-07-23**, with nothing in `error_events`. It is never being called — a fault, not disuse — so RV-204 ② is parked behind **LA-155** rather than built into a screen that may not be reached. The mutation pass also deleted a branch this work had written: a trim-before-drop guard that could not change any answer, because `dropToBudget` already is trim-then-drop. Detail: `docs/overview/entries/2026-09-26-rv204-rules-workout-review.md`.
+
+**The barcode column existed everywhere and held nothing (LB-158, v1.474.0).** `food_items.barcode`
+had a column, a Zod schema, a server read mapper, a route that passes it through and a push branch
+that Q-131 fixed *specifically* so an offline save would keep it — and production held **341 food
+items with zero barcodes, 42 of them `source: 'barcode'`**, because no client ever set the field.
+The entry was filed as a mirroring problem ("the server has it, the device does not"), which is
+true about the device and wrong about the cause: mirroring would have mirrored nulls. The code now
+travels on `NutritionScanResult` / `NewFoodItem` / `NewFoodEntry`, the device holds it at local
+SQLite **v41**, and one shared `lookupBarcode(code, userId)` asks the user's saved foods before the
+network — so a re-scan of a tin you already have resolves with no signal. That closes **RV-203 ②**,
+which was blocked on this. The local upsert **COALESCEs** that one column: a code is known only at
+the scan, so `excluded` winning would erase it the next time the food is logged from Recent.
+⚠️ **The library-first read is unexercised end to end** — `getLocalStore` is null in the sandbox, so
+the local hit is covered by unit tests and a mutation, never by a device. Open Food Facts is also
+unreachable from the container, so the route's echo of the code is proved by its test rather than a
+live scan. Detail: `docs/overview/entries/2026-09-26-lb158-local-barcode.md`.
+
+**The weekly recap stopped calling a model, and became a cacheable GET (RV-201 ②, v1.471.0).**
+`/api/weekly-digest` is now `GET`-only — every number it reports was already computed before the
+model was ever reached, so `buildWeeklyDigestText` writes the sentences from the same
+`WeeklyDigestMetrics`. The method is the change that matters: `cachedFetch` caches only GETs, so as
+a POST the week page's charts had no stored copy and the screen fell to its error state offline.
+Home's banner and `/health/week` now share one `weekly-digest:<week>` entry, cleared by four write
+groups; the cached row, the rate limit and the degrade path went with the model. **Three defects
+came out of the work rather than the entry:** the banner's own `ta_weekly_recap_v1_` entry was a
+second cache nothing invalidated; a hook cannot be skipped, so moving the fetch into one would have
+made a *dismissed* banner fetch on every Home mount; and the recap said "first week of data"
+whenever the prior week logged no tonnage, so a deload read as no history. ⚠️ **The offline
+*navigation* is not demonstrated** — it needs the service worker, which `pnpm dev` does not run, so
+it is owed a device check. Detail: `docs/overview/entries/2026-09-26-rv201-weekly-digest-offline.md`.
 
 **Four sync confirm arms could never mark a pushed row synced (DV-5).** `pushMutations` confirms a
 drained mutation by re-reading the row through the **UI-facing getter**, and every one of those
@@ -712,7 +748,9 @@ owner is stale — **it merged 2026-08-23**, verified against `main`, so BF-9 ha
 and is blocked only on the owner's word to merge.
 
 **The weekly digest returns its numbers now, so the week in review can be drawn rather than
-described (BF-5 PR 2a — no version bump, nothing user-visible changed).** `/api/weekly-digest`
+described (BF-5 PR 2a — no version bump, nothing user-visible changed). ⚠️ The prompt this
+paragraph freezes no longer exists — RV-201 removed the model on 2026-09-26, and the byte-identical
+golden is now over the digest the user reads. The rest of the paragraph still holds.** `/api/weekly-digest`
 computed every figure the Home banner talks about, flattened them into the model's prompt and threw
 the values away; it now builds `WeeklyDigestMetrics`, formats the prompt **from** that, and returns
 it — on the cached path too, which is the one the banner almost always takes. The prompt is
@@ -1348,7 +1386,15 @@ and the spec passes. Two placement calls: a **second tsconfig** rather than edit
 would have failed CI on the entry's own suggestion
 ([journal](docs/overview/history-2026-09-10-folded-5.md#2026-09-01-typecheck-tests)).
 
-**⚠ One decision is waiting on the owner: whether the E2E job becomes a required check (Q-297).**
+**✅ ANSWERED AND IN FORCE, 2026-09-25 (OR-164): E2E is NOT a required check, and the other five now
+genuinely are.** The owner set the `ProtectMain` ruleset to **Active** — it had been sitting at
+Enforcement `Disabled` since 2026-08-17, which is why none of its rules bound anything. Required:
+`Lint, Tests, Build, Migration Check, Custom Rules`. Also enforced now: PR-before-merge, **squash as
+the only merge method**, force-pushes and deletions blocked. The paragraph below is the state of the
+question before it was answered, kept because its measurement is what made E2E safe to require had
+he wanted to.
+
+**⚠ (Historical) One decision was waiting on the owner: whether the E2E job becomes a required check (Q-297).**
 **Measured rather than read — it is NOT required today:** PR #776 merged while its E2E job was still
 `in_progress`. LA-22 has since made the job always-run and always-report specifically so it is safe
 to require, so the only remaining question is whether to, and it is **branch protection** — a shared
@@ -2612,6 +2658,105 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The workout screens' smallest text moved up; nobody has read it mid-set (RV-209, 2026-09-27)
+
+`--text-2xs: 11px` is the floor of the type scale, and the nine sites the audit named on the workout screens are on it — five of them moved up from 9–10 px. The other **103 sub-11 px literals across 24 workout files are frozen, not fixed**: a per-file shrink-only ratchet, so every future touch pays some down. Rendered at 412 px dark and nothing overflows, but **two of the nine were not on screen in that state** (the last-session panel) and none of it has been read at arm's length on the S25, which is the whole point of the change. **Pass test:** on the S25 mid-set, the set card and clock captions are readable without leaning in, and nothing has reflowed. Untouched: the 26 small sites that also sit at 40–70% opacity.
+### [app-shell] ⚠️ Durations and counts read the same everywhere now; two daily screens changed what they print and neither has been seen (RV-208, 2026-09-27)
+
+Seven hand-rolled duration formatters went through `formatHoursMinutes`/`formatMinutes`, and one of them was a **defect**: the day timeline floored to the hour and dropped the remainder, so a 45-minute nap read `0h`. Thousands separators added at the three sites the device sweep confirmed. **An exact hour now prints `7h 00m` rather than `7h`** on the day timeline and the sleep sheet — the shared formatter's padded minute, for the `tabular-nums` columns. **Pass test:** on the S25, a sub-hour sleep or nap shows its minutes, and the padded form does not look wrong beside the numbers around it. Still open on RV-208: the time-of-day casing and `formatKg` spacing (both Lane A), the movement-category palette, dates, and brand names.
+### [readiness][devices] ⚠️ Resilience stopped publishing on 2026-09-22 and nothing says so (LA-158, 2026-09-27)
+`oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22** while the
+rollup runs normally — last write **2026-09-27 02:19 UTC**, `daytime_stress_coverage_min`
+populated through 2026-09-27. It computes and then declines to publish. The mechanism is
+code-certain: a day counts only at **240 min** of daytime-stress coverage
+(`stress-resilience.ts:144`) and a level needs **5 valid days of 14** (`:288`). Coverage since
+09-15 reads **290, 290, 170, 170, 120, 50, 150, 60, 150, 60, 140, 110, 50** — **2 of the last 13
+clear 240**. On 09-22 confidence was exactly 5/14; on 09-23 the window rolled and the gate closed.
+**The only reason this is known is that someone queried the table** — there is no surface saying
+"not enough daytime coverage", so the absence looks like the app not having got to it. Two
+candidate causes for the coverage collapse, neither established: the ring is worn less in the
+daytime, or daytime-stress ingest has degraded; `worn_hours_ble` is NULL on every row, so the
+database cannot separate them. **Do not fix by lowering the gate** — 4 hours is the vendor
+model's own constant. This also narrows TN-70: the September 1→4 spread it tabulates was already
+decaying to the floor as it was measured.
+
+### [workouts][app-shell] ⚠️ The workout recap has not run since July, across 43 completed workouts (LA-155, 2026-09-26)
+`GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx` whenever a
+workout completes. Measured against production on 2026-09-26: `ai_health_insights` holds **4**
+`session-recap` rows, newest **2026-07-23**; `workout_sessions` holds **43** completions spanning
+**2026-07-30 → 2026-09-25**; `ai_call_log` has no `workout-recap` section in 60 days; and no
+`error_events` row implicates the route — that whole window is BF-110's own instrumentation. So
+the route is not failing, it is never reached. Both reads are row-scoped to the owner, so this is
+his workouts against his recaps. **What the sandbox cannot settle** is whether `mode === 'done'`
+is reached at all after the last set, or reached with `store.workoutSessionId` null — the recap,
+energy and HR loaders on that screen share one `if (!workoutSessionId) return`, so a single null
+disables all three. Filed as **LA-155**, `Lane: DV`; it blocks **RV-204 ②**, which proposes
+building a stat block into the same screen.
+
+### [app-shell] ⚠️ Home sections can be dragged now, and the scroll interaction has not been tried on the phone (BF-205, 2026-09-26)
+
+The "Reorder sections" button had no drag behind it at all — every other part of the feature existed. Sections now drag by a grip that appears in edit mode (`@dnd-kit`, the same primitive the program editor uses), and the order persists on drop. **The drag is on a handle, not the card, precisely so a vertical scroll in edit mode cannot pick a section up** — but that is the claim a CDP pointer cannot test. **Pass test:** on the S25 in edit mode, a section can be moved, the order survives leaving and re-entering Home, and a plain vertical scroll picks nothing up.
+
+### [sleep][app-shell] ⚠️ Last night's verdict is on Home now, and nobody has seen it on the phone (TN-85, 2026-09-26)
+
+The Home Sleep card carries a line stating what the app filled in — quiet for an ordinary night, prominent with the numbers first for an outlier — and a **That's wrong** control that records the disagreement and opens the morning check-in. It exists because the modal is a bad home: it opens once a day on one screen and retires on dismissal, and the owner has saved 82 of those sheets while touching a scale in 3. Rendered at 412 px dark; **not seen on the S25**. `TN-82` is untouched and is now the modal half only — its removal of the two scales owes a mockup first. **Pass test:** on the S25, Home shows the line for last night and **That's wrong** opens the check-in with the sleep scale reachable.
+
+### [app-shell] ⚠️ Home's cat pen and Coach button are fixed on paper, not on the phone (BF-204, BF-206, 2026-09-26)
+
+The pen drew its twelve largest cats into 348 px — one tier, so one 12 px band, so one crowded line with clipped name tags. It now round-robins across tiers and takes its count and its tag count from its own measured width (six cats, three tags at 348 px). Home reserves the Coach button's height with a new `pb-fab-safe` so the last row of the scroll can clear it. (The extended **Coach** label that shipped alongside it is **reverted** — it was filed against the wrong button, and the label is now the owner's call as `LB-164`.) **Both rendered at 412 px dark, neither seen on the S25.** **Pass test:** on the S25, no cat name clipped by a neighbour and no cat fully hidden behind another (the cats wander, so this is a look, not a screenshot); and the bottom of Home scrolls clear of the Coach pill.
+
+### [app-shell][heart-rate] ⚠️ Half of the tab-switch cost is gone; the other half is untouched and neither has been measured on the phone (OR-162, 2026-09-26)
+
+`HrDayChart` is memoised by value, removing the 30 (Home) and 80 (Health) canvas `font` writes sweep 4a counted on **every** tab switch, all while the panel is hidden. **The arrival half is a different mechanism and is NOT fixed** — 180 on arriving at Home, 320 on Health, 43 for Wear Time. The sandbox can number neither: the e2e seed has no heart-rate readings, so the chart never renders there. **Pass test:** `DV-12` — every tab tap's longest task under 50 ms; 16 of 20 were 51–104 ms after #1675.
+
+### [platform][app-shell] ⚠️ Health alerts and workout reminders posted to channels that did not exist — created, NOT seen on the phone (DV-21, 2026-09-26)
+
+Android drops a notification posted to a channel it has never been told about, silently, so illness/high-stress/low-readiness alerts and the daily workout reminder have never been able to appear. Both channels are created now (`health-alerts` importance 4, `workout-reminders` importance 3) and a source guard fails on any `channelId:` with no `createChannel`. **No APK needed** — it is WebView TypeScript. **Pass test:** on the S25 after a Railway deploy, both channels appear in the app's notification settings; force one health alert and it posts and opens `/health/readiness`. Still unknown: whether an alert was ever *attempted*, since a dropped post leaves nothing behind.
+
+### [app-shell] ⚠️ The collection cats are drawn now — NOT seen on the phone (BF-126, 2026-09-26)
+
+Drawn SVG cats replace the collection's emoji, with the emoji as fallback. The Home card is now an
+animated pen of every held, named cat over a backdrop scene (v1.468.0), and `/collection` lists them.
+The full design set (7 classes, 4 coats, 12 scenes) is catalogued in
+`docs/domains/app-shell/cat-collection-design-catalog.md`; review is PS-53. The signed-in card never ran locally (no Postgres), and nothing ran on the S25.
+**Pass test:** on the S25, turn on the Collection card. It shows a drawn cat, and `/collection`
+shows three drawn tiers per ladder. The owner's judgement is owed in BF-126 (`Verify: owner`).
+
+### [app-shell] ⚠️ The daily controls answer a press now, and none of it has been seen on the phone (RV-207, 2026-09-26)
+
+The tab bar, More rows, Nutrition's date arrows and settings, pre-workout back, the Home avatar,
+Health's Log pills and the supplement row all had no pressed state, and the WebView left `hover:`
+stuck after a tap. They now use the shared Button's press pattern, `motion-reduce:` guards included.
+Also fixed in the same pass: a second supplement tick was silently dropped while the first was
+saving; avatar initials took the first two letters ("Test User" → TE); "1 exercises"; and lifetime
+volume read "13.0T", the symbol for teslas.
+
+**Not verified: any of it visually.** There is no DOM project in the suite, so the press states and
+the unit are held by source assertions; nothing was opened in a browser or on the S25.
+**Pass test:** RV-207's own — RV-205's P24 re-run on the tab bar and More rows showing a first-frame
+change under 100 ms, on the device.
+
+**Still open:** three of the six `width`-animating bars are not mechanical (a scaling glow, a
+deliberate `overflow-visible`, one that fills right-to-left) — `LB-162`. Home's Log-tile layout is
+an owner decision needing a mockup — `LB-163`.
+
+### [nutrition][app-shell] ⚠️ Describe now offers your own foods before the AI — the offline half NOT seen on the phone (RV-203, 2026-09-26)
+
+Typing a food into **Describe or enter** went straight to the AI, so a food already saved with real
+macros was re-estimated every time and the panel did nothing at all without a network. It now lists
+matching saved foods and saved meals above Analyse, from the local store and from the list the
+screen behind it has already loaded — nothing new is fetched. In the same change, a portion-only
+correction in the Review sheet (*"it was 300g"*) rescales on the device instead of asking the AI to
+redo the estimate.
+
+**Not verified: the local-store branch, which is the half that works offline.** `getLocalStore`
+returns null in the sandbox and in the test suite, so what ran was the cached-list branch; there is
+no DOM project either, so the wiring is held by source assertions rather than by rendering.
+**Pass test:** on the S25 in airplane mode, Log Food → *Describe or enter* → type the name of a food
+logged before → it appears under *"You already have"* and tapping it reaches the assign step.
+**Still open:** a barcode re-scan cannot work offline, and not for the reason the finding gave —
+the device has no `barcode` column to look one up in. Engine change, filed as `LB-158`.
+
 ### [platform][app-shell] ⚠️ Low reception hung the app instead of showing saved data — engine fixed, NOT seen on the phone (BF-195, 2026-09-24)
 
 The owner: *"I went to an area with low reception and nothing really worked on the app."* Connectivity
@@ -2836,6 +2981,16 @@ the pg pool's SSL on and the local Postgres speaks none).
 **Owed — the only thing that can close it:** on the S25, from a cold app start, tap "review your
 day" as the first action of the session. If it opens, the chunk boundary was the cause; if not, that
 reading was a red herring and the entry says where to resume. Reversal is one line.
+
+### [platform] ⚠️ A vitest bug can fail a green test run; CI absorbs one per shard (LA-146, 2026-09-26)
+
+[vitest#11153](https://github.com/vitest-dev/vitest/issues/11153) is open and unfixed: a worker's
+RPC closes with a `console.*` forward in flight, so a run exits 1 reporting **zero failing tests**.
+Present in 4.1.11 **and** 5.0.0 alike (upstream measured 3/10 each; 3.2.4 is clean), so upgrading
+is not the way out. Ten sightings, two of them in one day. Since `Tests` became required it blocks the merge button, so
+`scripts/ci/vitest-retry-teardown-flake.js` re-runs a shard once on that exact signature — a real
+failure still fails, and a second occurrence in the same job fails it. **Owed: delete the wrapper
+when upstream closes the issue.** Locally the response is unchanged — just re-run.
 
 ### [platform] ⚠️ A merge went through on a FAILING required check — the merge call is not a gate (LB-134, 2026-09-23)
 
@@ -3109,6 +3264,24 @@ Device Verification agent's — and **RV-124's device probe settles this class b
 these three included. Detail:
 [`2026-09-23-rv106-rv107-rv109-stale-surfaces`](docs/overview/history-2026-09-24-folded-2.md#2026-09-23-rv106-rv107-rv109-stale-surfaces).
 
+### [app-shell][activity] ⚠️ A navigation from inside a closing sheet or dialog is no longer undone — NOT device-verified, and the device is 60× faster at breaking it (BF-165, DV-2, 2026-09-25, v1.465.61) · needs: device
+
+The owner's *"when I try click the treadmill; or any Other activity nothing actually happens"*. The
+push always happened: the sheet's own history entry was popped by its close **7 ms later on the
+S25**, so `/cardio` came straight back, at the top of its nested scroller. *Leave* on *"Leave
+workout?"* was the same mechanism in a dialog — the one `history.back()` meant to leave the screen
+was spent on the dialog's entry. Both now hand that entry to the navigation **before it starts**
+(`releaseTopSurfaceEntry`), so nothing is left to pop; the forward case also `replace`s rather than
+pushes, or backing out would cost two presses with the first doing nothing. **Three cheaper fixes
+were built and measured as failing first** — waiting for the pop to drain (it is not yet pending),
+reordering the call site (the view transition holds the close behind the navigation), and
+lengthening the navigation cap (it turns a dead tap into a slow one). Reproduced and control-run in
+the harness for the sheet half; **the dialog half cannot be — it needs the Android back gesture over
+a Capacitor channel Playwright cannot fire.** Pass tests: on the S25, Cardio → *Other activity* →
+*Treadmill* lands and stays, one back returns to the hub; and start a workout, back, *Leave* → the
+screen leaves `/workout?session=…`. Detail:
+[`2026-09-25-lane-b-back-gesture-sitting`](docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lane-b-back-gesture-sitting).
+
 ### [nutrition][platform] ⚠️ A balance refresh that fails can still go unreported — and NOT device-verified (RV-103, LB-128, 2026-09-22, v1.465.6) · needs: device
 
 The Nutrition card's "kcal left" refetch now retries and, where every attempt produces nothing,
@@ -3341,8 +3514,12 @@ as the plan instructed. The labels are **relative** and the numbers **absolute**
 **Nothing is user-visible yet, deliberately.** No control can send 45 until Lane B builds it
 (`session-duration-picker.tsx` and four siblings), so this half only makes 45 expressible and
 correct when it arrives. **BF-7 stays queued** for that control, which must commit on release rather
-than per detent — a prescription averages 2,445 ms and the preset path deliberately bypasses the
-cooldown. **Not device-verified; no APK needed** (TypeScript only, ships via Railway).
+than per detent. **Not device-verified; no APK needed** (TypeScript only, ships via Railway).
+
+**⚠ The reason for "commit on release" changed on 2026-09-26 (RV-202 ②); the conclusion did not.**
+It was *"a prescription averages 2,445 ms"* — a preset change no longer calls the model at all
+(~0.4 s, **0** `ai_call_log` rows over three switches). Per-detent stays wrong because each re-fit
+still runs a full `aggregateSignals` and spends the route's 20/hour `prescribe:` budget (LA-147).
 
 ### [workouts] ⚠️ An expired prescription ages out whatever its status — NOT device-verified (BF-179, 2026-09-20)
 
@@ -5332,15 +5509,14 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
 
-### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
+### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 and LB-4 all fixed; the device look is what remains, 2026-08-23)
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-one-calorie-budget)).
-- **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path. **v1.336.0 finished Q-323's display half** — the bar fills toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), Home's donut became a progress ring, and **`barPosition`/`barBands` are deleted** for `barProgress`. The entry said "the macro ring" but described Home's donut; the Nutrition ring already did the asked-for thing ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-calorie-progress-bar)). **Keep: not device-verified** — the sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here and only the heart-rate contribution ran; the bar and ring are purely visual, judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair. **v1.337.0 shipped Q-387's Lane B half and closed Q-359.** The Nutrition day now ends with an "I've finished logging" button, its Undo and the "N of 10 days" counter — the flag `estimateMaintenance` filters on, which until now nothing could set, so the calibration was stuck on `'formula'` ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-food-logging-complete)). **That write has no outbox domain**: marking a day complete offline fails visibly rather than queueing — deliberate for a once-a-day action, not an oversight. Q-359's can-bite group has been zero since v1.325.9 and its remaining twelve sites are latent by definition, frozen shrink-only.
+- **✅ LB-4 SHIPPED — corrected 2026-09-26 (OR-180); this bullet said 🟠 open and had since LB-4 left the queue.** It fixed three engine paths (LB-6 then found five more, which is its own entry). The historical description follows: logging food invalidated BEFORE its push, so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path. **v1.336.0 finished Q-323's display half** — the bar fills toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), Home's donut became a progress ring, and **`barPosition`/`barBands` are deleted** for `barProgress`. The entry said "the macro ring" but described Home's donut; the Nutrition ring already did the asked-for thing ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-calorie-progress-bar)). **Keep: not device-verified** — the sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here and only the heart-rate contribution ran; the bar and ring are purely visual, judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair. **v1.337.0 shipped Q-387's Lane B half and closed Q-359.** The Nutrition day now ends with an "I've finished logging" button, its Undo and the "N of 10 days" counter — the flag `estimateMaintenance` filters on, which until now nothing could set, so the calibration was stuck on `'formula'` ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-food-logging-complete)). **That write has no outbox domain**: marking a day complete offline fails visibly rather than queueing — deliberate for a once-a-day action, not an oversight. Q-359's can-bite group has been zero since v1.325.9 and its remaining twelve sites are latent by definition, frozen shrink-only.
 
 ### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
 **Fixed in v1.334.0** — `/health/day` carries edit + delete on every exercise row, delete on every session card and every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and* `health-content.tsx`, so there is one write path per domain. Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases asserting on the **database**, not on the row disappearing: every handler toasts and closes *before* its request resolves, so a control wired to nothing looks identical on screen ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-day-screen-edit-delete)). **How it happened:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet` to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
-- **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path. **v1.336.0 finished Q-323's display half** — the bar fills toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), Home's donut became a progress ring, and **`barPosition`/`barBands` are deleted** for `barProgress`. The entry said "the macro ring" but described Home's donut; the Nutrition ring already did the asked-for thing ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-calorie-progress-bar)). **Keep: not device-verified** — the sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here and only the heart-rate contribution ran; the bar and ring are purely visual, judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair.
 
 ### [platform][devices] 🟡 The CSP now permits WASM, and dropped two dead hosts — neither checked on the device (Q-546, 2026-08-20)
 
@@ -11105,8 +11281,18 @@ is a false-positive health signal.
 Same audit. Of 550 `set_hr_stats` rows, **436 (79%) have `coverage_ok = false`** and **370 (67%) have
 a NULL `peak_bpm`**, so v1.197.0's "Heart & Recovery" card trends over roughly one set in five;
 `workout_hr_stats` holds 0 rows. Likely cause (strap disconnection / ring power-gating during
-lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.** Queued
-as backlog Q-11.
+lifting) leaves no trace in Postgres — **this needs the device smoke checklist, not more SQL.**
+
+**⚠ The backfill half is DISCHARGED, and not by being filled (2026-09-26).** The owner-authorised
+run processed 33 sessions and filled **0**; Q-11 left the queue in #1698, which asked Lane A to
+confirm why. Confirmed here, and **the cause it guessed at was wrong: not pruned raw samples —
+the data never existed.** Measured against production — those 33 span **2026-04-30 → 2026-06-21** and `oura_heartrate`'s
+oldest row is **2026-06-22**, so not one of them has a single HR reading inside its own window.
+Pruning is ruled out: the table is 96 days old against a 180-day retention and has never reclaimed
+a row. **Zero pending sessions start on or after 2026-06-22**, so every session that *could* be
+filled already is, and no button will ever fill the rest. The set-level physiology analysis this
+was blocking has to come from sessions after that date. What survives is LA-150: the work list
+keeps re-selecting those 33, so every future run reports the same *33 remaining, 0 filled*.
 
 ### [sleep] ⚠️ Only 12 of 57 nights have a persisted derived score — tooling shipped, **not yet run on prod** (v1.222.0, 2026-07-27)
 `oura_daily_derived` scores are written as a side effect of loading `/api/readiness-score`, which only

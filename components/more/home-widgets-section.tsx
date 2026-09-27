@@ -11,6 +11,7 @@ import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { savePreference } from '@/lib/user/preferences-sync'
 import { SCORE_RING_STYLES, SCORE_RING_STYLE_CHANGE_EVENT, loadScoreRingStyle, type ScoreRingStyle, type CardWidgetKey } from '@/lib/home/home-prefs'
+import { CARD_DEFAULT_COLORS } from '@/app/session-select/constants'
 
 type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake"
 type HomeSectionKey = "recommendation" | "streak" | "weekStrip" | "metricTiles"
@@ -23,19 +24,6 @@ const HIDDEN_SECTIONS_KEY = "ta_home_hidden_sections"
 const WEIGHT_LOOKBACK_KEY = "ta_weight_lookback"
 
 const DEFAULT_WIDGETS: MetaKey[] = ["weightKg", "steps", "calories"]
-
-const CARD_DEFAULT_COLORS: Record<CardWidgetKey, string> = {
-  weightSparkline:    '#00d4ff',
-  nutritionDonut:     '#bf5fff',
-  sleepWidget:        '#8b5cf6',
-  stepsWidget:        '#2dd4bf',
-  moodWidget:         '#fbbf24',
-  acwrWidget:         '#f59e0b',
-  muscleStatusWidget: '#22c55e',
-  hrChartWidget:      'transparent',
-  energyBalanceWidget: '#22c55e',
-  collectionWidget:   '#fb923c',
-}
 
 const HOME_SECTION_DEFS: { key: HomeSectionKey; label: string; icon: LucideIcon }[] = [
   { key: "recommendation", label: "Today's Recommendation", icon: Star        },

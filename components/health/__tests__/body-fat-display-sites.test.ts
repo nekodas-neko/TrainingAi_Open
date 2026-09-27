@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { displayBodyFat, isCorrectedReading, correctedSpan } from '../body-fat-display'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -33,7 +34,7 @@ function source(rel: string): string {
 /** Comments name the raw field constantly, explaining why it must stay raw. Strip them, or the
  *  guard passes on prose — the "it matched its own comment" failure this repo keeps hitting. */
 function code(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  return stripComments(src)
 }
 
 describe('every body-fat display site renders the corrected reading', () => {

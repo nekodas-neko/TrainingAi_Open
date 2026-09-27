@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { baselineHint, hasAnyHint } from '@/components/workout/baseline-hints';
 import { BW_REF, displayOneRm } from '@trainingai/shared/1rm';
+import { stripComments } from '../../../scripts/lib/strip-comments.js';
 
 // The owner's live row: `personal_records` holds Pull-Up estimated_1rm = 118.25, and
 // `exercise_library.exercise_type` for Pull-Up is 'bodyweight'.
@@ -66,7 +67,7 @@ describe('the premise: a bodyweight 1RM is not kilograms', () => {
 });
 
 const code = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  stripComments(s);
 const src = (rel: string) => code(readFileSync(path.resolve(__dirname, '../..', rel), 'utf8'));
 
 describe('the banner no longer hardcodes a unit', () => {

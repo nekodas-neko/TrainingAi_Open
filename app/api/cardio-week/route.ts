@@ -3,8 +3,8 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, startOfWeekInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { resolveHrProfileWithWindow } from '@trainingai/shared/health/hr-profile'
-import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
+import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
@@ -39,11 +39,6 @@ export async function GET() {
   const { from, to } = weekWindow(today, startOfWeekInTz(tz))
   const from28dIso = toAestDay(new Date(todayMidnightUtc(tz).getTime() - WEIGHT_LOOKBACK_DAYS * 86_400_000), tz)
 
-  // RV-73 — the profile's own 90-day pull is the heaviest query in the app, and both windows this
-  // route reports on sit inside it, so the rows come back with it rather than being fetched twice
-  // more. See `resolveHrProfileWithWindow` for why slicing is equivalent to re-querying.
-  const { profile, hrRows: profileHrRows } = await resolveHrProfileWithWindow(repo, userId, tz)
-
   const observedTo = new Date()
   const observedFrom = new Date(todayMidnightUtc(tz).getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
   // Rolling prior window (the 30 days immediately before the current one) — the baseline
@@ -54,14 +49,21 @@ export async function GET() {
   const priorWindowFromIso = toAestDay(priorFrom, tz)
   const priorWindowToIso = toAestDay(priorTo, tz)
 
-  // Inclusive at both ends, matching `getHrForWindow`'s `gte`/`lte` — including that a reading
-  // landing exactly on `observedFrom` counts in BOTH windows, which is what the two queries did.
-  const inWindow = (f: Date, t: Date) => profileHrRows.filter(r => {
-    const ms = r.timestamp.getTime()
-    return ms >= f.getTime() && ms <= t.getTime()
-  })
-  const hrRows = inWindow(observedFrom, observedTo)
-  const priorHrRows = inWindow(priorFrom, priorTo)
+  // RV-181 — this route used to take the profile's 90-day rows and slice its own two windows out
+  // of them (RV-73), because that pull was the heaviest query in the app and fetching the windows
+  // separately paid it three times. Now that all three are database-side aggregates returning one
+  // row each, there is nothing to share: each window is queried on its own terms, which also
+  // restores the exact `preferStrapBuckets` behaviour per window that slicing could only
+  // approximate at the boundaries. Both ends stay inclusive, so a reading landing exactly on
+  // `observedFrom` counts in BOTH windows — as it did before.
+  const [profile, observed, observedPrior] = await Promise.all([
+    resolveHrProfile(repo, userId, tz),
+    // Guarded, because they used to be: both windows came out of the profile's one row fetch,
+    // which was itself `.catch`ed, so a database fault left the card painting with an empty heart
+    // section rather than 500ing the whole week.
+    repo.getObservedHrProfile(userId, observedFrom, observedTo).catch(() => EMPTY_OBSERVED_HR),
+    repo.getObservedHrProfile(userId, priorFrom, priorTo).catch(() => EMPTY_OBSERVED_HR),
+  ])
 
   const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
@@ -97,8 +99,6 @@ export async function GET() {
   const dailyTargets = targets.perZone.map((t) => ({ zoneId: t.zoneId, minutes: t.minutes / 7 }))
   const dayQuota = computeZoneQuota(dailyTargets, days.filter((d) => d.day === today))
 
-  const observed = computeObservedHr(hrRows.map((r) => r.bpm))
-  const observedPrior = computeObservedHr(priorHrRows.map((r) => r.bpm))
   const restingHrNow = avgRestingHr(currentRestingMetrics)
   const restingHrPrior = avgRestingHr(priorRestingMetrics)
   const restingHrDeltaBpm = restingHrNow != null && restingHrPrior != null ? restingHrNow - restingHrPrior : null

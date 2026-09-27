@@ -23,12 +23,16 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`docs/reviews/2026-09-23-sweep-54-reading-the-instruments.md`](../../reviews/2026-09-23-sweep-54-reading-the-instruments.md) — **sweep 54, 2026-09-23: what the instruments already recorded**, rather than what the source implies. Two findings of one shape — an instrument answered and the doc that directs people still states the question. **BF-110's reading is in** (25 `recheck stuck`, **0** `resized`, **0** `dom-lost` across 62 reported resumes) so the fix is native by the module's own criterion, but its `Keep:` still says the reading is owed, which parks it in KEEP as *"not new work"* (RV-135); the blank resume has tripled since sweep 50. **CLAUDE.md's fetch-once rule was 19 wrong** — it claimed 19 can-bite sites where the script's baseline has said **0 since 2026-08-19**; corrected in place, and it had propagated into RV-125. Measured healthy: DB **232 MB / 1.53 MB per day**, on trend; no fault of the owner's in 7 days that is not `bf110`.
 - [`docs/device-agent-probe-checklist.md`](../../device-agent-probe-checklist.md) — **what the device-verification agent should instrument, and what to send back (2026-09-22).** Ten probes for the things only CDP can answer, which is exactly what every Review sweep ends on (*nothing was rendered or reproduced*): counting requests after a write to decide the Q-402 shape mechanically (P1), a `window.fetch` census over a fixed walk to find which effects never re-run inside the persistent shell (P2), the local-store write path that `getLocalStore` returning null makes untestable in the sandbox (P3), computed-style enumeration at 384 px (P4), transition frame capture for RV-113/114/115 (P5), and an offline pass (P8). **Its contract is that every probe returns a number, a list or an artifact** — "looks fine" cannot be filed as an entry. Complements the owner's tap-list in `device-verification-queue.md` rather than repeating it.
 - [`docs/superpowers/plans/2026-09-15-week-in-review-page.md`](../../superpowers/plans/2026-09-15-week-in-review-page.md)
-  — **BF-5, the week in review as a page.** The engine half shipped 2026-09-15:
-  `/api/weekly-digest` now returns `WeeklyDigestMetrics` alongside the prose instead of flattening
-  every number into the prompt and discarding it. The surface half — a week page alongside the
-  existing `app/health/day/`, its permanent Health entry point, the banner becoming navigation,
-  the notification retarget — does not exist yet; it is Lane B's and still owed. Read §1 before
-  touching it, because three of the backlog entry's own claims about the current code were stale.
+  — **BF-5, the week in review as a page. Both halves shipped; the plan is history now.** The
+  engine half landed 2026-09-15 (`/api/weekly-digest` returning `WeeklyDigestMetrics` alongside
+  the prose rather than flattening every number into the prompt and discarding it) and the surface
+  half followed: `app/health/week/`, its Health entry point, the banner as navigation, the
+  notification retarget. **RV-201 then removed the model entirely (2026-09-26)** — the route is a
+  `GET`, the prose comes from `buildWeeklyDigestText`, and Home's banner and the week page share
+  one cached `weekly-digest:<week>` entry, which is what lets the page paint without a network.
+  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md).
+  Read §1 before touching the plan, because three of the original backlog entry's claims about the
+  code were stale even then.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
   — **Q-112, the unified day review.** Relevant here for the entry points: Home's day-review banner,
   the two local reminders in `lib/day-review-reminders.ts`, and the argument for `/health/day` being
@@ -218,6 +222,9 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`2026-08-24-memo-call-site-stability`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-memo-call-site-stability) — **Q-357, the memo baseline emptied, 2026-08-24** (four defeated call sites cleared; the `SavedMealCard` one was inside a `.map()`, so its callbacks now take the meal and hand it back rather than being closed over per row). **Render saving not measured.**
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-472 — `coach_changes` is empty: the Coach's write capability has produced zero writes, which re-prices Q-467/Q-468 to zero production exposure). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+- [`docs/reviews/2026-09-25-sweep-62-dv-design-capture.md`](../../reviews/2026-09-25-sweep-62-dv-design-capture.md) — **sweep 62, 2026-09-25: a design and feel pass for DV.** Probes P23 to P28 cover a screen gallery sent to a private Artifact, tap latency, scroll frames, keyboard occlusion, a token census and a motion inventory. The work is RV-205.
+- [`docs/reviews/2026-09-26-sweep-63-design-review.md`](../../reviews/2026-09-26-sweep-63-design-review.md) — **sweep 63, 2026-09-26: a design review from 69 web screenshots and a static audit.** Entries RV-207 to RV-215: initials, pressed states, colour and format consistency, the type scale, the keyboard, empty-account truths and loading states.
+- [`docs/reviews/2026-09-26-sweep-64-dv-gallery-review.md`](../../reviews/2026-09-26-sweep-64-dv-gallery-review.md) — **sweep 64, 2026-09-26: DV's device gallery read.** RV-216 to RV-220: the streak contradiction, raw sleep keys, four calorie numbers, Day's card, and the gallery's own capture faults.
 
 ## Open issues
 
@@ -256,6 +263,13 @@ Live at the time of writing (2026-07-30):
   art (BF-126, owner-gated). `CardWidgetKey` now has ONE declaration, in `lib/home/home-prefs.ts` —
   it had three. **Not device-verified.** See
   [`the journal entry`](../../overview/history-2026-09-10-folded-6.md#2026-09-07-feat-bf-122b-cat-collection-surface).
+- **[`cat-collection-design-catalog.md`](cat-collection-design-catalog.md)** — every designed collection asset: 7 classes (one per category), 6 tiers, 4 coats, 12 scenes, the animation spec and names, with what is wired and what is art only. `node scripts/collection-art/preview.mjs` renders it all.
+- ⚠️ **The cat collection's drawn art** (BF-126, 2026-09-26, v1.466.0). The sprites are SVGs in
+  `public/cats/`, generated by `scripts/collection-art/build.mjs` and rendered by
+  `components/home/cat-sprite.tsx`, with the glyph as fallback. **Owner's look at 56 px owed.**
+  The v2 rules are planned in
+  [`2026-09-26-cat-collection-rules-v2.md`](../../superpowers/plans/2026-09-26-cat-collection-rules-v2.md)
+  (PS-48 owner questions, PS-49 engine, PS-50 Android widget).
 - ⚠️ **The three exercise roles are named once** (BF-124/BF-125, 2026-09-07, v1.436.40) —
   `components/workout/exercise-role-labels.ts`, as Main / Secondary / Accessory. The editor's role
   row wraps and marks the chosen option in `bg-brand`; the near-white `bg-primary` selected slab is
@@ -327,6 +341,8 @@ Live at the time of writing (2026-07-30):
     would be the evidence narrowing needed and never had.
 
 ## History
+
+- **[`docs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
 
 - **[`2026-08-30-apk-banner-tap-target`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-apk-banner-tap-target)**
   — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
@@ -446,6 +462,41 @@ Live at the time of writing (2026-07-30):
   remaining ~18 ready items into two parallel-agent pickup prompts by file territory; Agent 2 owns
   the app-shell/UI/cache-correctness half (`lib/cache-groups.ts`, `components/*`). Filed under
   `cross` because it also covers `platform`-territory items.
+- **[`docs/overview/entries/2026-09-26-or162-hr-chart-memo.md`](../../overview/entries/2026-09-26-or162-hr-chart-memo.md)**
+  — OR-162. The tab switch's cost is a RE-RENDER, not a resize: `TabVisibilityProvider`'s `epoch`
+  makes every screen refetch on re-show and hand its chart a value-identical new array, which
+  defeats the default shallow `memo`. `HrDayChart` is memoised by value; the **arrival** half
+  (180/320/43 font writes) is a different mechanism and is still open.
+- **[`docs/overview/entries/2026-09-26-dv21-notification-channels.md`](../../overview/entries/2026-09-26-dv21-notification-channels.md)**
+  — DV-21. Android drops a notification posted to a channel that was never created, silently.
+  `health-alerts` and `workout-reminders` had both been posting to nothing; a source guard now
+  fails on any `channelId:` with no `createChannel`.
+- **[`2026-09-26-bf204-bf206-home-crowding`](../../overview/history-2026-09-27-folded-1.md#2026-09-26-bf204-bf206-home-crowding)**
+  — BF-204/BF-206. The cat pen drew its twelve LARGEST cats, so every drawn cat shared one 12 px
+  band and they landed on one line; it round-robins across tiers now and sizes itself from its own
+  `ResizeObserver`. And `pb-nav-safe` reserves the nav and nothing else, so a `bottom-fab-safe`
+  `h-14` FAB covers the bottom 56 px of a scroll — `pb-fab-safe` is the fix, with a scan that
+  every screen mounting a FAB uses it.
+- **[`2026-09-26-bf205-home-section-drag`](../../overview/history-2026-09-27-folded-1.md#2026-09-26-bf205-home-section-drag)**
+  — BF-205. Home's "Reorder sections" button had no drag behind it; `@dnd-kit` on a grip handle,
+  reordering by KEY because the rendered list is a filtered subset. Two gotchas worth reading
+  before writing another drag here: `savePreference` PATCHes the server, so it belongs on
+  `dragend`; and `PointerSensor` only activates without a delay when the press lands on the handle
+  itself, which made the e2e flaky in a way that looked exactly like the defect.
+- **[`2026-09-26-bf208-pen-moon-and-chip`](../../overview/history-2026-09-27-folded-1.md#2026-09-26-bf208-pen-moon-and-chip)**
+  — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
+  `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
+  which the same misread had justified — a guard now keeps the pen's top-right corner clear.
+- **[`docs/overview/entries/2026-09-27-rv209-type-scale-floor.md`](../../overview/entries/2026-09-27-rv209-type-scale-floor.md)**
+  — RV-209 steps 1–2. `--text-2xs: 11px` is the floor of the type scale (42 sizes, 1,035 uses under
+  12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
+  named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
+  than a sweep.
+- **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
+  — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
+  one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
+  casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
+  collides with `SESSION_PALETTE` because that palette is indexed by POSITION, not by name.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)

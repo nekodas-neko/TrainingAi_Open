@@ -4,6 +4,7 @@ import path from 'node:path';
 import { perPortion, showsPerPortion } from '@/components/nutrition/meal-builder-portions';
 import { oneServingItems } from '@trainingai/shared/nutrition/saved-meal-ingredients';
 import type { SavedMeal } from '@trainingai/shared/types/nutrition';
+import { stripComments } from '../../../scripts/lib/strip-comments.js';
 
 // The owner's screenshot: Protein Pancakes, 4 portions.
 const PANCAKES = { calories: 983, protein: 52, carbs: 103, fat: 39 };
@@ -78,7 +79,7 @@ describe('it agrees with the canonical per-portion path', () => {
 });
 
 const code = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  stripComments(s);
 
 describe('the footer shows both denominators, each labelled', () => {
   const footer = code(readFileSync(path.resolve(__dirname, '../meal-builder-footer.tsx'), 'utf8'));

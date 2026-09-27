@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { readStrapBattery, writeStrapBattery, STRAP_BATTERY_KEY } from '../strap-battery'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * Q-111 — the strap's last-seen battery, and the two writers that must land in one place.
@@ -69,8 +70,7 @@ describe('the store', () => {
 })
 
 const ROOT = path.resolve(__dirname, '../../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('both writers reach the one store', () => {
   it('the native status listener records it', () => {

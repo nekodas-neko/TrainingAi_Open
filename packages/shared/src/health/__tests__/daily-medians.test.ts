@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { median, medianGated, metActiveWindows, MET_ACTIVE_THRESHOLD } from '../daily-medians'
+import { medianGated, metActiveWindows, MET_ACTIVE_THRESHOLD } from '../daily-medians'
+import { median } from '@trainingai/shared/stats'
 
 describe('median', () => {
   it('odd count → middle value', () => {

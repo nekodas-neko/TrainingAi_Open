@@ -46,6 +46,14 @@ export const CORROBORATION = 5
 // Below this many plausible readings the profile is shown but flagged not-yet-reliable.
 export const MIN_RELIABLE_SAMPLES = 60
 
+/** The profile of nothing — what an empty reading set, and any read that failed, resolves to.
+ *  Exported so a caller degrading a failed query says "no data" in the same words the computation
+ *  does, rather than hand-writing a seventh field and drifting. */
+export const EMPTY_OBSERVED_HR: ObservedHrProfile = {
+  min: null, max: null, avg: null, sampleCount: 0, isReliable: false,
+  outOfBandRejected: 0, highestPlausible: null,
+}
+
 export interface ObservedHrOptions {
   corroboration?: number
   minReliableSamples?: number
@@ -61,10 +69,7 @@ export function computeObservedHr(bpms: readonly number[], opts?: ObservedHrOpti
   const sampleCount = plausible.length
   const outOfBandRejected = bpms.length - sampleCount
   if (sampleCount === 0) {
-    return {
-      min: null, max: null, avg: null, sampleCount: 0, isReliable: false,
-      outOfBandRejected: bpms.length, highestPlausible: null,
-    }
+    return { ...EMPTY_OBSERVED_HR, outOfBandRejected: bpms.length }
   }
 
   const avg = Math.round(plausible.reduce((a, b) => a + b, 0) / sampleCount)

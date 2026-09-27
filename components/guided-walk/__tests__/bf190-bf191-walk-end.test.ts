@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
@@ -98,7 +99,7 @@ describe('BF-191 — a sub-minute walk is offered as a discard, in ONE dialog', 
   it('no dialog still promises the old sentence the app did not keep', () => {
     // Comments stripped first: this file's own docblock quotes the retired copy to explain why the
     // `outcome` prop exists, and asserting over it would fail on the explanation rather than a use.
-    const body = src(DIALOG).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    const body = stripComments(src(DIALOG))
     expect(body).not.toMatch(/will stop it early/)
   })
 })

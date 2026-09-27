@@ -1,54 +1,48 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-25 · **Session title:** `🚧 Implementation Agent (B) 🟢`
-**Next ID:** LB-151 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-165 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-RV-111/121/164/167/171/176, BF-190/191, RV-113+OR-161 (half of `tab-switch-speed`), BF-196, RV-183's supplement AND meal halves, LB-148. LB-141, LB-149, LB-150 filed; RV-183's remaining fetch half proved Lane A's.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert** (#1741), **RV-208 part one** (#1743), **RV-209 steps 1–2** (#1748); eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Read it on `main`; sweeps
-reorder the head daily. **The owner's stated top priority is tab/page switch speed**, so `DV-12`
-heads the lane once the phone is available. Otherwise RV-185, RV-178, RV-122 —
-RV-183 is now Lane A's the whole way down.
-**A BLOCKED ENTRY NEEDS A FIELD, NOT A PARAGRAPH** — RV-166 (`Needs:`) and DV-12/OR-162 (`Gate: device`) headed READY while unstartable. The field must LEAD its own bullet; inline after `Lane:` parses as nothing.
-**RV-117/118/119 are `Lane: O` — leave them** (gate satisfied, mockup is with the Orchestrator). **BF-177's plan is STALE** — LB-128 (#1456) may have voided its premise.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Next is **RV-202 ③** (the only half left is Lane B's), then **RV-210**…**RV-215**, review sweep 63. `RV-208` is PART-DONE and stays queued: its time-casing and `formatKg` halves are **Lane A's** (`app/api/day-timeline/route.ts`, `packages/shared/format/units.ts`), and its palette half is design work of its own. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
 
 ## Blocked / owed
 
-- **LB-134 is the owner's** (branch protection). Until he rules, read the five job CONCLUSIONS before every merge and expect the merge race below.
-- **A QUESTION FILED `Lane: O` COMES BACK** — write the brief properly, then build it. Device checks are DV's to RUN, mine to RECORD.
-
-## Claimed paths
-
-- None. (`lib/calendar-month.ts`, LB-143, released — #1578 merged.)
+- **PARKED:** `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width` (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated):** `LB-157`, `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`, **`LB-163`** (Home's Log tiles — a mockup is owed, and it is ungated BECAUSE the mockup does not exist yet; gate it once he has seen one). **Own follow-up:** `LB-162`, `TN-84`'s two copy deviations, **`LB-164`** (the Coach label, reverted and put to him), and **`OR-162`'s arrival half** — 180/320/43 font writes on ARRIVING at a tab, a different mechanism from the per-switch re-render and unmeasurable here. **Claimed paths: none.**
 
 ## Lessons that cost real time
 
-- **⚠ THE MERGE CALL IS NOT A GATE** (#1467 merged past a PENDING `Tests`, which then failed). Read
-  the five conclusions — `get_job_logs failed_only` is cheap but "0 failed" on a RUNNING run is not
-  green. **The merge race is arithmetic:** CI ~7 min vs a commit to `main` every ~4, so merge the
-  instant the five are green; no run for your head = conflicted PR.
-- **NEVER SCALE A PARTIAL MEASUREMENT UP** (RV-167) — store null below a floor, and say so on the
-  entry when the floor is a judgement rather than a fit.
-- **GREP THE FIELD, NOT THE FILES THE ENTRY NAMES** — six in a row named one surface and had more, or one already fixed. BF-196's third surface had solved it (match it, don't re-coin); RV-183's catalogue claim was WRONG (`freshWithinTtl` since the snapshot) and its "3,040 server reads" was a 6 h TTL over many days — **a read count localises nothing**. Verify every bullet of a multi-part entry before building any of it, and retract what does not hold.
-- **A BATCH OR A MULTI-PART ENTRY CAN SHIP HALF** — ship what holds, sharpen the rest, SAY which half.
-- **THE GATE IS FIVE THINGS AND THEY RUN AFTER THE BASE MERGE, NOT BEFORE.** `check:rules` · `pnpm
-  lint` (repo-wide — `--file` covers only what you name, and a `console.log` in a new spec took
-  #1587 red; `no-console` allows info/warn/error) · `pnpm test` · `pnpm build` · `tsc`. The doc-size
-  ratchet is BASE-RELATIVE, so a clean run before merging `main` proves nothing — that put #1574
-  red, and another lane hit it four minutes later.
-- **A BACKLOG CONFLICT IS NOT ALWAYS TWO DELETIONS** — two sweeps inserting at one point is two
-  ADDITIONS; read the headings each side, then DIFF THE FULL HEADING SET after every merge (#1481
-  silently deleted RV-117/118).
-- **REBUILD `changelog.ts` FROM `origin/main`, NEVER SPLICE** — a shared header means a splice drops the other PR's entry; it conflicts on EVERY merge.
-- **CONTROL-RUN every new test against `origin/main`**; E2E is ADVISORY, so pair a spec with a gating vitest file. **A source scanner has four traps, all of which have bitten:** it
-  matches ITSELF (`git ls-files` hides it only while untracked, and `ls-files A B -- '*.tsx'` UNIONS
-  pathspecs — filter in JS); it matches the COMMENTS explaining the fix (strip them); **a regex cannot balance
-  parens — write the depth-counting scan FIRST** (this lesson was already here and `[^)]*` still
-  falsely accused 3 callers in LB-148, stopping at the `)` in `new Date()`); arity is per-function.
-- **A DEFERRAL IS A CLAIM — RE-READ IT BEFORE TRUSTING IT.** RV-183's meal half was deferred as "needs a join"; there was none, just an over-wide parameter type demanding four fields the file never reads.
-- **⚠ ASSERT EVERY SCRIPTED `str.replace`.** This file's "Now" line sat three PRs stale because one no-oped silently on text an earlier no-op never wrote. Code edits were asserted; the baton's were not, and the baton is what survives a compaction.
-- **A gate's exit code must be read DIRECTLY** — never via `&&`/`;` into `git commit`, and never through a PIPE (`| tail`, `| cut`) which returns the LAST command's status, so a failing check reads as 0 (hit again in LB-149); COMMIT before `git stash`/`checkout`; `tsc --noEmit` typechecks NEITHER an auth-gated page nor tests, so run `node scripts/check-test-typecheck.js` before pushing a spec; and vitest's unit project does not transform JSX, so a testable helper goes in a `.ts`.
+- **A HUNDRED-SITE DEBT IS BETTER FROZEN PER-FILE SHRINK-ONLY THAN SWEPT BLIND.** RV-209 left 103 sub-floor literals across 24 files unconverted on purpose: a hundred class edits nothing verifies is a worse risk than the debt, and one wrong class on a card read mid-set is a real cost. A per-file shrink-only baseline with an EXACT-match assertion makes every future touch pay a little down and makes a stale number visible instead of silently tolerated. Ship the token and the sites the entry actually names; ratchet the rest.
+- **`pnpm test` CAN EXIT 1 WITH ZERO TESTS FAILED** — `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending` is a vitest WORKER-TEARDOWN race, reported as `Errors 1` beside `1105 passed`. It did not reproduce on a re-run of the file or of the suite. Read the failure COUNT, not the exit code alone, then re-run before touching anything — but never call a real red a flake on this precedent.
+- **A SWEEP ENTRY IS NOT ONE LANE'S** — RV-208's five items split across Lane A (`app/api`, `packages/shared`), design work and copy. Ship the half you own COMPLETE and write who owns each of the rest onto the entry; do not half-do all five.
+- **`public/cats/` IS BUILD OUTPUT** — the pen backdrops and every cat sprite come from `scripts/collection-art/scenes.mjs` through `build.mjs`, and `collection-sprites.test.ts` fails a hand-edited SVG.
+- **A FIX JUSTIFIED BY A MISREAD OF THE OWNER GETS REVERTED, NOT KEPT BECAUSE IT SHIPPED.** #1730 labelled the Coach FAB on the reading that he had asked what it was; he meant the MOON in the pen backdrop (BF-208). The clearance half was measured from CSS and stands; the restyle was never requested, so it is reverted and filed as `LB-164`. Already-merged is not a reason to keep an unasked-for change to the screen he opens first — and a reading of what someone MEANT is a hypothesis, never to be listed beside a measured finding as though both were established.
+- **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
+  Twenty-seven running: "seven quick wins" was five (RV-207); one asked to query a column that does
+  not exist (RV-203 ②). **A change that alters what renders is the OWNER'S:** `Lane: O` + `Ask:`.
+  `Gate: owner` PARKS it — gate only once a mockup has been SHOWN; producing one is ungated work.
+- **RENDER IT — `npx playwright test` drives the real app at 412 px dark.** It caught a two-clause
+  sleep line running to THREE lines (TN-85) and proved the pen's six-cat spread (BF-204); neither
+  was visible from source. A screenshot is not a press, though: `active:` and stuck-`hover:` still
+  need the S25. **The seeded account is POOR** — no HR readings, cards off by default — so stub the
+  route and set `ta_ss_cards` in an init script, and probe what it draws before promising a number.
+- **A REGRESSION TEST CAN BE GREEN ON THE BUG IT GUARDS — CONTROL-RUN IT.** Stash the SOURCE, keep the spec, confirm it FAILS. A literal is the wrong thing to pin — `rv68`'s `setToggling(null)` broke on a sound refactor while the property it guards held (RV-207). Pin the property. **And make a FLAKE say so:** BF-205's drag spec failed one run in three in a way indistinguishable from the defect, until it asserted the pickup separately. Two causes, both worth knowing — `getByRole('button', {name})` matched 12 elements for 6 handles (Home's cards are `role="button"` and the name resolved onto both; use an attribute selector), and `@dnd-kit`'s `PointerSensor` activates instantly ONLY when the press lands on the handle, everything else getting a 200 ms delay and `preventActivation` on interactive elements — so re-measure and check `elementFromPoint` before pressing.
+- **A `memo` WITHOUT A COMPARATOR SKIPS NOTHING HERE.** Every tab re-show bumps `epoch`, the screens refetch, and `setState` gets a value-identical NEW array. It is not a resize: `ResizeObserver` gives 5 callbacks during load and ZERO on a switch (OR-162, DV-12's spec).
+- **WHEN A DEVICE DEFECT DOES NOT REPRODUCE HERE, THAT IS THE FINDING — DON'T SHIP A THIRD GUESS.** BF-61's window turned out to be wider than a CDP round-trip and the web passed 4 of 4; a CDP tap enters the renderer directly while a real tap goes through the compositor's hit test, so the harness cannot see what is left. Re-laned to `DV` with a three-step instrumented probe.
+- **WRITE THE SOURCE GUARD, NOT JUST THE FIX — DV-21's found a SECOND dead notification channel the same minute**, and BF-206's guards every future FAB. Where a defect is invisible from every layer above it, the scan IS the sibling-surface sweep.
+- **THE GATE RUNS AFTER THE BASE MERGE:** `check:rules` · `pnpm lint` (WARNINGS vs base: 828) · `pnpm test` (with `DATABASE_URL`, or ~211 skip) · `pnpm build` · `tsc` · `check-test-typecheck` · `check-doc-index-size` · `check-backlog-pointers` · `check-doc-links`. A doc-size-only remerge is NOT re-gated; one bringing source IS. On a conflict: a `.size` → `--fix` (it only RAISES; `--tighten` is the compaction sweep's, never yours); **`changelog.ts`/`package.json` REBUILD from `origin/main`, never splice**; a baseline REASON now goes in its own `docs/doc-size/history/<date>-<branch>.md` (LB-130), not the batched log.
+- **CI: `curl -sS api.github.com/…/commits/<sha>/check-runs` WORKS UNAUTHENTICATED here**, the
+  cheapest and least-laggy read. `get_check_runs` does not exist; `list_workflow_runs` IGNORES
+  `branch`. Five required checks; **wait for advisory E2E only when the PR touches an e2e spec**
+  (~34 min). Run a new spec locally first: `DATABASE_URL=… npx playwright test <file>` starts its
+  own `pnpm dev`, which doubles as the dev-server pass; without the env it fails in `setup`.
+  `enable_pr_auto_merge` right after opening; it refuses on an already-green PR.
+- **Read a gate's exit code DIRECTLY, never through a pipe** — a piped `git merge` exit was read as
+  0 and a branch got pushed mid-conflict. COMMIT before `stash`/`checkout`. vitest has NO DOM
+  project. **ASSERT EVERY SCRIPTED `replace` — and write the file BEFORE the final assert**, or a
+  raised assertion leaves conflict markers on disk that the next `git add -A` stages. An unanchored
+  alternation matches SHORTEST-first (`cup` before `cups`).

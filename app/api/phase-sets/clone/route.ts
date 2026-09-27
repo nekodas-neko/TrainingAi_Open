@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { PhaseSetCloneBody } from '@trainingai/shared/validation/phase-set'
 
 // A phase set to clone.
 const MAX_BODY_BYTES = 256 * 1024
@@ -18,19 +19,9 @@ export async function POST(req: NextRequest) {
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-  const body = (read.body ?? {}) as {
-    phaseSetId: string
-    programName: string
-    overrides: Record<number, number>  // position → durationCycles
-    includeBaseline?: boolean
-  }
-
-  if (!body.phaseSetId) {
-    return NextResponse.json({ error: 'phaseSetId is required' }, { status: 400 })
-  }
-  if (!body.programName?.trim()) {
-    return NextResponse.json({ error: 'programName is required' }, { status: 400 })
-  }
+  const parsed = PhaseSetCloneBody.safeParse(read.body ?? {})
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  const body = parsed.data
 
   const repo = await getRepository()
   const phaseSets = await repo.listPhaseSets(userId)
@@ -43,7 +34,7 @@ export async function POST(req: NextRequest) {
   let clonedPhases = source.phases.map(p => ({
     position:       body.includeBaseline ? p.position + 1 : p.position,
     name:           p.name,
-    durationCycles: (body.overrides ?? {})[p.position] ?? p.durationCycles,
+    durationCycles: body.overrides[p.position] ?? p.durationCycles,
     phaseType:      p.phaseType,
     primaryStyleId: p.primaryStyleId,
   }))

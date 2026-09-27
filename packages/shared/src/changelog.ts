@@ -6,6 +6,300 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.2",
+    date: "2026-09-27",
+    changes: [
+      "Changed: the smallest text on the workout screens is legible again. Five labels read mid-set \u2014 the set-type caption, the rest/set clock labels and the 1RM caption \u2014 were set at 9 and 10 pixels; they are now 11, which is the app's new floor for small text.",
+    ],
+  },
+  {
+    version: "1.477.1",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a sleep or nap under an hour showed as \"0h\" on the day timeline, with the minutes thrown away. It reads \"45m\" now.",
+      "Durations read the same everywhere \u2014 \"55 min\" rather than \"55m\" on some screens. A whole hour now prints as \"7h 00m\".",
+      "Big numbers get their commas back: your steps tile, the calories line on Home and the XP total on More all had a few that did not.",
+    ],
+  },
+  {
+    version: "1.477.0",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: three rows in the Sleep score breakdown showed their internal names \u2014 \u201chrv\u201d, \u201chr\u201d and \u201cschedule\u201d \u2014 in lowercase, with nothing to tap. They now read HRV, Heart rate and Sleep schedule, and each opens an explanation like the other seven.",
+      "Fixed: the morning check-in row on Readiness read correctly but did nothing when tapped. It now opens an explanation too.",
+    ],
+  },
+  {
+    version: "1.476.0",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: your best streak read lower than your current one, which is impossible. Home counted the days your streak has run and the profile counted the sessions in it, and both were labelled \u201cstreak\u201d \u2014 111 against 49 for the same history. Everything now counts days, the way the card and the streak badges always said.",
+      "Changed: a streak survives two rest days for everyone, and more than two if your own schedule has a longer gap in it \u2014 training Monday and Tuesday no longer breaks your streak every week.",
+    ],
+  },
+  {
+    version: "1.475.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: Workout Review now answers straight away instead of waiting on the AI. It works out what to trim the same way your workout prescription already does, so the two can no longer suggest different things about the same session. The only thing lost is the written sentence explaining each dropped exercise.",
+    ],
+  },
+  {
+    version: "1.474.1",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: the white circle in the corner of the collection card was the moon, not a button. It has moved out of the corner and dimmed, and the \"+N more\" count beside it no longer looks like something to tap.",
+      "The Coach button is back to its plain circle. The label added earlier today was a mistake — it was put there to answer a question about a different button entirely.",
+    ],
+  },
+  {
+    version: "1.474.0",
+    date: "2026-09-26",
+    changes: [
+      "Added: scanning the barcode of something you have scanned before now finds it in your own saved foods, instantly and with no signal at all. Every re-scan used to be a fresh lookup against the food database, which meant waiting for it and getting nothing offline.",
+      "Fixed: a scanned barcode is now actually saved with the food. It never had been \u2014 the product code was read, used once and thrown away, so nothing you had scanned could be recognised again.",
+    ],
+  },
+  {
+    version: "1.473.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the grid button on Home actually rearranges your widgets now. Tap it and each section grows a grip on its left — drag that to move the section, and the new order is kept.",
+    ],
+  },
+  {
+    version: "1.472.0",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: when the AI coach cannot be reached, your workout now comes up straight away with your program's own sets and reps. It used to sit on \"Preparing your AI workout…\" for about half a minute and then show you those same numbers anyway.",
+    ],
+  },
+  {
+    version: "1.471.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: your week in review is written by the app now rather than by the AI, so it opens straight away instead of waiting on a model, and once you have looked at it once it still opens with no signal.",
+      "Fixed: the recap called a week your \"first week of data\" whenever the week before it logged no weight — a deload or a run-only week read as if you had no history.",
+    ],
+  },
+  {
+    version: "1.470.1",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: the cat pen on Home was drawing your twelve biggest cats in one row, so they overlapped and the name tags cut each other off. It now shows a mix of sizes, as many as actually fit, and names only the rarest few.",
+      "Fixed: the Coach button sat on top of the last row of Home and nothing could be scrolled clear of it. It also says \"Coach\" now, instead of being an unlabelled white circle.",
+    ],
+  },
+  {
+    version: "1.470.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the Home sleep card now tells you what the app filled in for last night — quietly when it was an ordinary night, and with the numbers first when it was not. If it has it wrong, \"That's wrong\" takes you straight to the check-in.",
+    ],
+  },
+  {
+    version: "1.469.1",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: health alerts and the daily workout reminder could never appear on your phone. Both were being sent to a notification channel Android had never been told about, so it dropped them without a word.",
+    ],
+  },
+  {
+    version: "1.469.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: your sleep cats are now Mages, with wizard hats, moon staffs and star robes as they grow.",
+      "Cats flick an ear every so often, as well as swishing their tails and blinking.",
+    ],
+  },
+  {
+    version: "1.468.1",
+    date: "2026-09-26",
+    changes: [
+      "Faster: switching tabs no longer makes the day's heart-rate chart redraw itself behind the screen you just left.",
+    ],
+  },
+  {
+    version: "1.468.0",
+    date: "2026-09-26",
+    changes: [
+      "New: every cat has its own name, shown on a little tag in the Home pen. When cats merge, the new one takes a name blended from theirs, and if it ever breaks apart, the same cats come back with their own names.",
+      "New: the smallest cats walk at the front and the bigger ones further back and higher, so your best cats stand out.",
+      "New: the Collection card warns you by name when skipping today would cost a cat, and tells you who wandered off and when. The Collection screen lists every cat, the day it arrived and who it was made from.",
+    ],
+  },
+  {
+    version: "1.467.0",
+    date: "2026-09-26",
+    changes: [
+      "New: the Collection card on Home is now a little meadow where every cat you hold wanders about, swishing its tail and blinking. Bigger cats are bigger, and anything past twelve shows as \"+N more\".",
+      "New art: every class now has a sixth, mythic tier, and each tier has a rare shiny colouring, ready for when the collection rules add them.",
+    ],
+  },
+  {
+    version: "1.466.0",
+    date: "2026-09-26",
+    changes: [
+      "New: your collection cats are drawn now. Workouts raise an armoured Tank, steps a hooded Ranger and sleep a haloed Cleric, and each tier adds gear. If a picture ever fails to load, the old emoji stands in.",
+    ],
+  },
+  {
+    version: "1.465.67",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: ticking a second supplement while the first one was still saving did nothing at all. Each row now waits only on its own save.",
+      "Fixed: avatar initials took the first two letters of your name, so \"Test User\" showed TE instead of TU.",
+      "Fixed: a workout with one exercise read \"1 exercises\" on the day timeline.",
+      "Fixed: lifetime volume on More read \"13.0T\", which is the symbol for teslas — it now reads \"13.0 t\".",
+      "The tab bar, More rows, Nutrition's date arrows and several other daily controls now respond to a press instead of leaving a stuck highlight behind.",
+    ],
+  },
+  {
+    version: "1.465.66",
+    date: "2026-09-26",
+    changes: [
+      "Faster: changing a session's length no longer rebuilds the plan from scratch. Picking a shorter or longer workout used to wait about 30 seconds while the AI was asked again; it now re-fits the plan you already have, which is instant and gives back exactly the sets it took away when you switch back.",
+    ],
+  },
+  {
+    version: "1.465.65",
+    date: "2026-09-26",
+    changes: [
+      "Changed: the prescribed run card now shows its reason straight away and keeps it, instead of replacing it a moment later with an AI rewording of the same thing. One less thing to load, and it works with no signal.",
+    ],
+  },
+  {
+    version: "1.465.64",
+    date: "2026-09-26",
+    changes: [
+      "Describing a food now shows the foods and meals you have already saved before asking the AI to estimate it — so a food you log often comes back with its real macros, instantly, and works with no signal.",
+      "Correcting only the portion in the review sheet — \"it was 300g\" — now rescales on the phone instead of asking the AI to redo the whole estimate. Anything else you type still goes to the AI.",
+    ],
+  },
+  {
+    version: "1.465.63",
+    date: "2026-09-26",
+    changes: [
+      "Switching to the Health tab no longer redraws its five trend charts from scratch each time. They only redraw when their numbers have actually changed, which takes work off the tab switch itself.",
+    ],
+  },
+  {
+    version: "1.465.62",
+    date: "2026-09-25",
+    changes: [
+      "Fixed: swiping a food log or a saved meal and tapping Delete straight away now opens the confirmation on the first press, instead of needing a second tap once the row had finished sliding.",
+    ],
+  },
+  {
+    version: "1.465.61",
+    date: "2026-09-25",
+    changes: [
+      "Fixed: picking a type under \"Other activity\" on the Cardio hub did nothing — it now opens the activity screen, and one back returns to the hub.",
+      "Fixed: \"Leave\" on the \"Leave workout?\" prompt now actually leaves the workout screen instead of closing the prompt and staying put. Same for leaving a guided walk or an activity.",
+    ],
+  },
+  {
+    version: "1.465.60",
+    date: "2026-09-25",
+    changes: [
+      "The heart-rate trace on the just-finished-activity screen is kept, so it reappears instantly instead of being re-fetched, and entering a treadmill distance no longer requests it a second time.",
+      "Your dietary restrictions are remembered between meal-plan setups rather than re-downloaded each time.",
+    ],
+  },
+  {
+    version: "1.465.59",
+    date: "2026-09-25",
+    changes: [
+      "Scanning a meal label with no signal now finds meals saved on your other devices, instead of only the ones this phone has stored. The first scan after opening the app also stops re-downloading your meal types.",
+    ],
+  },
+  {
+    version: "1.465.58",
+    date: "2026-09-25",
+    changes: [
+      "The \"Warm up complete\" green on the warmup screen now matches the green the next screen uses for the same thing, instead of being a slightly different shade.",
+    ],
+  },
+  {
+    version: "1.465.57",
+    date: "2026-09-25",
+    changes: [
+      "On the Nutrition screen, \"kcal left\" now updates on its own after you log or delete a food, instead of holding the old number until you switch tabs and come back.",
+    ],
+  },
+  {
+    version: "1.465.56",
+    date: "2026-09-25",
+    changes: [
+      "On the Health screen, the ring around your readiness score now sweeps to its new position as the number counts up, instead of jumping there first.",
+    ],
+  },
+  {
+    version: "1.465.55",
+    date: "2026-09-25",
+    changes: [
+      "The Nutrition screen stops re-downloading your calorie and macro targets every time you open it. Editing them still updates everywhere immediately \u2014 it just no longer asks the server for numbers it already has.",
+    ],
+  },
+  {
+    version: "1.465.54",
+    date: "2026-09-25",
+    changes: [
+      "Ticking a supplement now shows the tick straight away. It used to wait for the save to finish, which is instant most of the time but can take much longer if the app happens to be syncing \u2014 so the tap looked like it had not registered.",
+    ],
+  },
+  {
+    version: "1.465.53",
+    date: "2026-09-25",
+    changes: [
+      "Opening the meal-type list \u2014 when logging food, assigning a meal, or reviewing a plan \u2014 no longer re-downloads it every time. It is the same list; it just stops asking for it again when it already has a recent copy.",
+    ],
+  },
+  {
+    version: "1.465.52",
+    date: "2026-09-25",
+    changes: [
+      "The muscle map now comes with a key, and its lightest shades are brighter. A muscle you had barely trained this week was almost the same colour as one you had not trained at all, so the map under-reported the very muscles it is there to flag.",
+    ],
+  },
+  {
+    version: "1.465.51",
+    date: "2026-09-25",
+    changes: [
+      "Every screen that shows your heart-rate zones \u2014 the Cardio hub, Baselines, the guided walk, and the zone bands during a workout \u2014 now asks the database for the three numbers it needs instead of downloading ninety days of raw heart rate and working them out on the phone. Same numbers, less waiting, and it no longer competes with logging a set for the same database connections.",
+    ],
+  },
+  {
+    version: "1.465.50",
+    date: "2026-09-25",
+    changes: [
+      "On the workout screen, a finished warmup set and the finished \u201cReady\u201d bar above it were two slightly different greens for the same thing. They match now.",
+    ],
+  },
+  {
+    version: "1.465.49",
+    date: "2026-09-25",
+    changes: [
+      "When several changes fail to sync, the card listing them now has a single \u201cRetry all\u201d instead of making you tap Retry on each one. It also tells you honestly if only some of them went through.",
+    ],
+  },
+  {
+    version: "1.465.48",
+    date: "2026-09-25",
+    changes: [
+      "The AI Coach now follows the same writing rules as every other part of the app that talks about your numbers: quote what it was given rather than recomputing it, metric units only, and no calling anything \u201cperfect\u201d. It was the one place that streams free text about your own data without them \u2014 which is exactly how you previously got advice in Fahrenheit and a score of 80 described as perfect.",
+    ],
+  },
+  {
+    version: "1.465.47",
+    date: "2026-09-25",
+    changes: [
+      "Today's Timeline on Home now tells you when it could not load, instead of simply not being there \u2014 a failed load and a genuinely empty day looked identical.",
+      "The Oura card under More shows when the ring last synced straight away rather than after a pause, and a friend's profile opens from what is already on the phone instead of a spinner. A profile you cannot see now says why.",
+      "Cloning a phase set twice by double-tapping made two copies; it now makes one. Tapping Refresh on an AI insight repeatedly no longer spends the day's allowance on one card.",
+    ],
+  },
+  {
     version: "1.465.46",
     date: "2026-09-25",
     changes: [

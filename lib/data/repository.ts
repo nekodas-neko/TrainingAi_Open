@@ -2,7 +2,7 @@ import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, MoodLog,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, MoodLog,
   NextSessionRecommendation, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -23,6 +23,7 @@ import type {
 } from '@trainingai/shared/types/ai-periodization'
 import type { TimeseriesCursor, TimeseriesPage, OuraHrDeltaRow, OuraBucketDeltaRow } from './postgres/slices/oura'
 import type { BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
+import type { ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Result of an upsert-by-client-id workout session write. `wasInserted` is false when a
 // session with that id already existed — in that case the phase fields reflect what was
@@ -720,6 +721,13 @@ export interface WorkoutRepository {
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
+
+  // TN-81 — the app's announced sleep verdict. `upsertSleepVerdict` is idempotent per
+  // (user, date) and deliberately does NOT touch `response_state`: re-announcing the same night
+  // must never erase the fact that he already answered it.
+  getSleepVerdict(userId: string, date: string): Promise<SleepVerdictRecord | null>
+  upsertSleepVerdict(userId: string, record: Omit<SleepVerdictRecord, 'responseState'>): Promise<void>
+  setSleepVerdictResponse(userId: string, date: string, state: 'acknowledged' | 'corrected'): Promise<boolean>
   /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
    *  when no session for that date exists; this never creates one. Read only by the bedtime
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
@@ -1126,6 +1134,9 @@ export interface WorkoutRepository {
    *  the observation nearest *it*, which bounds the lag to one drain interval instead of
    *  "time since the last sync" — see `resolveDsToMs` in lib/oura-ble/clock.ts. */
   getOuraClockAnchors(userId: string): Promise<import('@/lib/oura-ble/clock').ClockAnchor[]>
+  /** Each epoch's robust clock offset, aggregated in the database — what a caller needs when it
+   *  only converts timestamps, rather than the whole anchor log (RV-182 ②). */
+  getOuraClockOffsets(userId: string): Promise<import('@/lib/oura-ble/clock').ClockOffsets>
   /** How far in wall-clock time the BLE rollup's derivation has reached — the rollup watermark
    *  resolved through the clock anchors, or null when no watermark applies to the current epoch.
    *  A night ending within `PROVISIONAL_COVERAGE_MARGIN_MS` of this can still grow (BF-83); see
@@ -1267,6 +1278,10 @@ export interface WorkoutRepository {
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
+  /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
+   *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them
+   *  (RV-181). */
+  getObservedHrProfile(userId: string, from: Date, to: Date): Promise<ObservedHrProfile>
   /** Per-day time-in-HR-zone (seconds per zone) over a local-date range, reconcile-on-read cached
    *  in daily_zone_minutes. `today` is always recomputed (partial day). Server-derived, not synced. */
   getZoneMinutesRange(

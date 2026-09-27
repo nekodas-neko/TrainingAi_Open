@@ -37,6 +37,10 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
     // a lifting session's HR feeds the same whole-day zone series as any cardio activity
     invalidateCache('cardio-week'),
     invalidateCache('calendar-data:'),
@@ -167,6 +171,9 @@ export async function invalidateBiometrics(): Promise<void> {
     invalidateCache('energy-balance:'),
     invalidateCache('body-metadata'),
     invalidateCache('sleep-sessions'),
+    // RV-201 — the weekly recap reads sleep hours, sleep score and overnight HRV, and a pull-delta
+    // is how those rows arrive on a device that did not sync them itself.
+    invalidateCache('weekly-digest:'),
     invalidateCache('readiness-score'),
     invalidateCache('weekly-stats'),
     invalidateCache('progress-summary'),
@@ -216,9 +223,18 @@ export async function invalidateOuraSync(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
+    // RV-178 — `lastMeasuredAt` is what a drain moves, so "Ring synced 4m ago" is wrong the
+    // instant one lands. Registered with the key rather than after it: the seed only ever paints
+    // briefly (a plain `cachedFetch` always revalidates), but an unregistered key is how this
+    // becomes a real staleness bug the moment someone adds `freshWithinTtl` to it.
+    invalidateCache('oura-ble-freshness'),
     // prefix-invalidate every `oura-hr-day:<date>` entry
     invalidateCache('oura-hr-day:'),
     // per-day HR zone rollups (an Oura sync brings new oura_heartrate rows)
@@ -354,6 +370,10 @@ export async function invalidateBodyMetricWrite(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
   ])
 }
 
@@ -377,7 +397,14 @@ export async function invalidateHealthTrends(): Promise<void> {
  *  /api/user/profile cache key after the nutrition-user-profile/more-user-profile
  *  key collapse (CACHE-F13). */
 export async function invalidateUserProfile(): Promise<void> {
-  await invalidateCache('more-user-profile')
+  await Promise.all([
+    invalidateCache('more-user-profile'),
+    // RV-178 — `/profile/[userId]` renders the same name, avatar and equipped title. Usually it is
+    // someone ELSE's profile, which nothing on this device can change; the case this covers is
+    // viewing your own through a shared link after editing it. Prefix-invalidated, one entry per
+    // viewed user.
+    invalidateCache('public-profile:'),
+  ])
 }
 
 /** A Coach conversation was saved, or a suggested change applied — both change the

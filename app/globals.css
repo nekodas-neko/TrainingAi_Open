@@ -5,6 +5,17 @@
 
 @theme {
   --color-brand: oklch(0.723 0.219 149.579); /* overridden at runtime via --brand */
+
+  /* RV-209 — the floor of the type scale, and the reason it exists.
+     The tree had 42 font sizes: 13 named plus 29 arbitrary ones (`text-[10.5px]`, `[11.5px]`,
+     `[12.5px]`…), from 7 px to 34 px, with 1,035 uses UNDER 12 px — 583 at 10, 287 at 11, 128 at
+     9, down to 7. There was no token below `text-xs`, so every one of those was a per-site
+     decision written as a literal, which is how a scale ends up with half-pixel steps in it.
+     11 px because that is where the existing mass sits and it is reachable without re-laying out
+     the cards a 12 px floor would; the workout screens are read at arm's length mid-set, which is
+     why the entry starts there. Uppercase eyebrow labels may sit here deliberately. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: calc(16 / 11);
 }
 
 @theme inline {
@@ -24,11 +35,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -108,11 +114,6 @@ html, body {
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -182,11 +183,6 @@ html, body {
   --border: oklch(1 0 0 / 7%);
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.185 0.028 var(--brand-hue, 149));
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -448,7 +444,25 @@ body {
   .bottom-fab-safe {
     bottom: calc(3.5rem + 0.75rem + var(--safe-bottom));
   }
+  /* Scrollable page content on a screen that ALSO mounts a FAB. pb-nav-safe reserves the nav and
+     nothing else, so a `bottom-fab-safe` h-14 button covers the bottom 56px of the scroll on the
+     right — BF-206, where the day timeline's last row sat behind the Coach button and no amount
+     of scrolling could clear it. This is pb-nav-safe plus the FAB's own height. Use it on the
+     scroll container of any screen that mounts one; Home is currently the only one. */
+  .pb-fab-safe {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.75rem + 3.5rem);
+  }
 }
+
+/* RV-74: the health hero's ring, eased to match its own number. `useCountUp` animates the digits
+   over 600 ms with `1 - (1-t)^3`; the arc set `strokeDashoffset` inline with no transition, so it
+   was already parked at its final position while the number was still counting — an inconsistency
+   inside one component, on the app's most prominent element.
+   `cubic-bezier(0.333, 1, 0.667, 1)` is not a taste call: it is the EXACT CSS form of that cubic
+   ease-out (x(t) = t, y(t) = 1-(1-t)^3, verified to 1e-16), so ring and number share one curve as
+   well as one duration. Matching only the duration leaves the ring 11 points of progress behind the
+   digits at the halfway mark, which still reads as two gestures. */
+.score-ring { transition: stroke-dashoffset 600ms cubic-bezier(0.333, 1, 0.667, 1); }
 
 /* W2: border-run animation for active set indicator (uses pathLength=1000 normalisation) */
 @keyframes border-run {
@@ -545,6 +559,7 @@ body {
   .pr-pulse-badge,
   .shimmer-sweep::after { animation: none !important; }
   .border-run { animation: none !important; stroke-dashoffset: 0 !important; }
+  .score-ring { transition: none !important; }
   .content-fade-in { animation: none !important; }
 }
 .shimmer-sweep::after {
@@ -841,4 +856,33 @@ html[data-app-hidden="true"] .meteor-particle {
 .tab-panel-idle,
 .tab-panel-idle * {
   animation-play-state: paused !important;
+}
+
+/* The collection pen (BF-126 follow-up). Each cat walks between two points and back,
+   idling at both ends, and shrinks slightly as it moves up the pen (further away). Its
+   face flips halfway through a double-length cycle, which is exactly when the
+   alternating walk turns round. Transform only, so it composites. The per-cat points
+   and timings arrive as custom properties from collection-pen.tsx; the tail, paws and
+   blink are animated inside each sprite's own SVG. */
+@keyframes ta-pen-walk {
+  0%, 12%   { transform: translate(var(--pen-x0), var(--pen-y0)) scale(var(--pen-s0)); }
+  88%, 100% { transform: translate(var(--pen-x1), var(--pen-y1)) scale(var(--pen-s1)); }
+}
+@keyframes ta-pen-face {
+  0%, 49.99% { transform: scaleX(1); }
+  50%, 100%  { transform: scaleX(-1); }
+}
+.pen-cat { transform-origin: bottom center; animation: ta-pen-walk var(--pen-dur) ease-in-out var(--pen-delay) infinite alternate both; will-change: transform; }
+.pen-cat-face { animation: ta-pen-face calc(var(--pen-dur) * 2) linear var(--pen-delay) infinite both; }
+/* T5 and T6 fly: a slow bob above their shadow, so the rarest cats are the ones that catch the eye. */
+@keyframes ta-pen-fly {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.pen-fly { animation: ta-pen-fly 2.6s ease-in-out infinite; }
+.pen[data-paused="true"] *,
+html[data-app-hidden="true"] .pen * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  .pen-cat, .pen-cat-face, .pen-fly { animation: none !important; }
+  .pen-cat { transform: translate(var(--pen-x0), var(--pen-y0)) scale(var(--pen-s0)); }
 }

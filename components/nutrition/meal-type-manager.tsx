@@ -75,6 +75,11 @@ export function MealTypeManager() {
     if (seeded) { setMealTypes(Array.isArray(seeded) ? seeded : []); setLoading(false) }
   }, [])
 
+  // Deliberately NOT `freshWithinTtl` (RV-67), though the other read sites of this key are. This is
+  // the screen that WRITES meal types, it is visited rarely, and a network read here costs nothing
+  // anyone notices — whereas being wrong about the writer set costs six hours of a stale list on the
+  // one screen where that is obvious. Every write below does invalidate before reloading, so the
+  // flag would in fact be safe; this is defence in depth, not a gap.
   function load() {
     return cachedFetch<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG,
       d => setMealTypes(Array.isArray(d) ? d : [])).finally(() => setLoading(false))

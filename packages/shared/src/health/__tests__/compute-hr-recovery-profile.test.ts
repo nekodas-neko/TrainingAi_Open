@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { computeHrRecoveryProfile } from '../compute-hr-recovery-profile'
 import type { WorkoutRepository, SetHrStatsRow } from '@/lib/data/repository'
 import type { HrReading } from '@trainingai/shared/workout/hr-analysis'
@@ -22,6 +23,7 @@ function stubRepo(over: Partial<WorkoutRepository>): WorkoutRepository {
     getUserById: async () => null,
     listBodyMetrics: async () => [],
     getHrForWindow: async () => [],
+    getObservedHrProfile: async () => computeObservedHr([]),
     ...over,
   } as unknown as WorkoutRepository
 }

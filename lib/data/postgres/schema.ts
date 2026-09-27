@@ -456,6 +456,41 @@ export const prescribedRuns = pgTable('prescribed_runs', {
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.userId, t.planId, t.date)])
 
+/**
+ * TN-81 — the app's announced verdict on a night, with the evidence frozen beside it.
+ *
+ * The bands and component values are stored, not just the word: `sleep_score` is computed on read
+ * and persisted nowhere (non-null on 0 of 119 rows, measured 2026-09-26), so an outcome-only row
+ * would let a later scoring change rewrite what each correction disagreed with. A correction whose
+ * paired verdict is not pinned is not evidence.
+ *
+ * Server-side only — not mirrored into the device's SQLite. The verdict needs 28 nights of history
+ * and per-component medians, which makes it a server-assembled aggregate like `weekly-stats`.
+ */
+export const sleepVerdicts = pgTable('sleep_verdicts', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  userId:          uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date:            date('date', { mode: 'string' }).notNull(),   // wake-up date
+  verdict:         text('verdict').notNull(),                    // normal | poor | good
+  triggered:       text('triggered').array().notNull().default(sql`'{}'`),
+  durationHours:   doublePrecision('duration_hours'),
+  onsetMinutes:    doublePrecision('onset_minutes'),
+  efficiency:      doublePrecision('efficiency'),
+  durationLow:     doublePrecision('duration_low'),
+  durationHigh:    doublePrecision('duration_high'),
+  onsetLow:        doublePrecision('onset_low'),
+  onsetHigh:       doublePrecision('onset_high'),
+  efficiencyLow:   doublePrecision('efficiency_low'),
+  efficiencyHigh:  doublePrecision('efficiency_high'),
+  baselineNights:  integer('baseline_nights').notNull(),
+  modelVersion:    integer('model_version').notNull(),
+  responseState:   text('response_state').notNull().default('none'), // none | acknowledged | corrected
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ([
+  unique('sleep_verdicts_user_date_key').on(t.userId, t.date),
+]))
+
 export const sleepSessions = pgTable('sleep_sessions', {
   id:               uuid('id').primaryKey().defaultRandom(),
   userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

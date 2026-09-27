@@ -18,6 +18,7 @@
 // reproduces its own score**: the components reproduce `preTaper` under the model's weights
 // renormalised over whichever keys are present, and `acwr` is the taper's only input.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { ACTIVITY_MODEL } from '@trainingai/shared/health/activity-score'
 
 const TZ = 'Australia/Brisbane'
@@ -38,6 +39,7 @@ const repoStub = () => ({
     getOuraDaily:             async () => [],
     getActiveProgram:         async () => repo.program,
     getHrForWindow:           async () => [],
+    getObservedHrProfile: async () => computeObservedHr([]),
     getOuraDailySummary:      async () => [],
     getOuraDailyDerived:      async () => [],
     getLatestOuraCloudVitals: async () => null,

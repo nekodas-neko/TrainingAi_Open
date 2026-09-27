@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { reconcileRehydratedActivity, clearActivitySetup } from '@/lib/stores/activity-store'
 import type { ActivityState } from '@/lib/stores/activity-store'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-108 — a finished walk's name no longer arms the Start screen.
@@ -132,8 +133,7 @@ describe('clearActivitySetup', () => {
 
 describe('the walk no longer ends on a Start button', () => {
   it('Done leaves for a screen that shows the walk, not one that begins another', () => {
-    const src = readFileSync(path.join(path.resolve(__dirname, '..', '..'), 'components/guided-walk/walk-summary.tsx'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    const src = stripComments(readFileSync(path.join(path.resolve(__dirname, '..', '..'), 'components/guided-walk/walk-summary.tsx'), 'utf8'))
     // RV-110 converted the mechanism from `router.push` to `navigateToTab` (a tab href must flip
     // the shell rather than tear it down). The DESTINATION is what this test is about, so it is
     // asserted independently of how the navigation is performed — the previous version pinned

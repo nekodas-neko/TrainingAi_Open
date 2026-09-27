@@ -22,7 +22,8 @@ import {
   GROCERY_STORES, PROTEIN_STAPLES, CARB_STAPLES, FAT_STAPLES, VEG_STAPLES,
 } from '@trainingai/shared/nutrition/grocery-catalogue'
 import type { DietaryRestriction, MealPlan, SavedMeal } from '@trainingai/shared/types/nutrition'
-import { readCacheSync } from '@/lib/sqlite/cache'
+import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import type { DietaryRestrictionsResponse } from '@/app/api/nutrition/dietary-restrictions/route'
 
 // The five lists moved to `@trainingai/shared/nutrition/grocery-catalogue` when `/api/coach/options`
@@ -94,9 +95,15 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
     if (!open) return
     setStep(0); setDraft(null); setKeepMealIds([]); setTypedMeals([]); setUseLibrary(false)
     setLoadedRestrictions(null); setRestrictionsFailed(false); setRestrictions([])
-    fetch('/api/nutrition/dietary-restrictions')
-      .then(r => r.ok ? r.json() as Promise<DietaryRestrictionsResponse> : null)
-      .then(d => {
+    // `cachedFetch` on the `dietary-restrictions` key (LB-155). `invalidateMealPlans()` has always
+    // cleared that key — it was written for a reader that did not exist, and this is it.
+    //
+    // `onError` is not optional here: `cachedFetch` swallows `!res.ok`, and `restrictionsFailed`
+    // gates the one thing this screen must never do quietly — start a plan from a blank restriction
+    // set and forget an allergy. Without it the failure would read as "you have none".
+    cachedFetch<DietaryRestrictionsResponse>(
+      'dietary-restrictions', '/api/nutrition/dietary-restrictions', TTL_LONG,
+      d => {
         if (!d) { setRestrictionsFailed(true); return }
         setCatalogue(d.catalogue)
         // Seeded from what the user already has — restrictions are a property of the person, so a
@@ -104,8 +111,9 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
         const mine = d.mine.map(m => ({ restrictionId: m.restrictionId, severity: m.severity }))
         setRestrictions(mine)
         setLoadedRestrictions(mine)
-      })
-      .catch(() => setRestrictionsFailed(true))
+      },
+      { onError: () => setRestrictionsFailed(true) },
+    ).catch(() => setRestrictionsFailed(true))
   }, [open])
 
   /**
@@ -174,6 +182,11 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
           toast.error('Your dietary restrictions could not be saved — the plan uses your saved ones')
         } else {
           setLoadedRestrictions(restrictions)
+          // Required by the conversion above, and it did not exist before it: this PUT is the only
+          // writer of `dietary-restrictions`, and until this read was cached there was no key for it
+          // to make stale. `handleSave`'s `invalidateMealPlans()` is a different function and does
+          // not run when the user abandons the plan after editing an allergy.
+          await invalidateMealPlans().catch(() => {})
         }
       }
 

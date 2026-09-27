@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { localSupplementsToStatus } from '../local-status'
 import type { LocalSupplement, LocalSupplementLog } from '@/lib/local-store/types'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const code = (rel: string) =>
-  readFileSync(path.join(ROOT, rel), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 function def(over: Partial<LocalSupplement> = {}): LocalSupplement {
   return {

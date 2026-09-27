@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronLeft, Sparkles, TrendingUp, Trophy } from "lucide-react";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { formatInTimeZone } from "date-fns-tz";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { WEEKLY_DIGEST_TTL } from "@trainingai/shared/cache-ttl";
 import type { WeeklyDigestMetrics } from "@trainingai/shared/health/weekly-digest-metrics";
 import { WeekVolumeChart } from "@/components/health/week/week-volume-chart";
 import { WeekMetricCard } from "@/components/health/week/week-metric-card";
@@ -28,35 +30,29 @@ function dayLabel(dateStr: string, withYear = false): string {
 
 export function WeekDetailContent({ initialWeek }: { initialWeek: string }) {
   const router = useTransitionRouter();
-  const [data, setData] = useState<DigestResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const hasFetched = useRef(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  // A POST that runs an LLM server-side, so `cachedFetch` does not apply — it is for `/api/*` GETs.
-  // The route caches the prose per ISO week and returns the metrics on the cached path too, which is
-  // what makes opening this page cheap after the banner has already fetched once.
+  // RV-201 — a cached GET, where this was a bare POST through an LLM. The charts are the reason:
+  // with the radio off there was nothing stored to paint them from, so the whole screen fell to
+  // its error state. The key carries the recap week's Monday, and the Home banner reads the same
+  // one, so whichever of the two opens first pays for the request.
+  //
+  // `onError` is mandatory, not defensive: `cachedFetch` swallows `!res.ok` silently, and without
+  // it a failed recap renders as an empty page rather than the retry below (Q-499).
+  const cacheKey = `weekly-digest:${initialWeek}`;
+  const data = useCachedValue<DigestResponse>(cacheKey, "/api/weekly-digest", WEEKLY_DIGEST_TTL, {
+    onError: () => setError(true), reloadToken,
+  });
+
+  // The retry re-runs the hook's own fetch rather than adding a second one beside it, so there is
+  // no path here that could drift from the one the first paint took.
   const load = useCallback(() => {
     setError(false);
-    setLoading(true);
-    fetch("/api/weekly-digest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // The route takes no week: it computes the recap week itself. An empty body is the whole
-      // contract, and the banner sends the same one.
-      body: "{}",
-    })
-      .then(res => { if (!res.ok) throw new Error("failed"); return res.json(); })
-      .then((d: DigestResponse) => setData(d))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    setReloadToken(t => t + 1);
   }, []);
 
-  useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-    load();
-  }, [load]);
+  const loading = data === null && !error;
 
   const m = data?.metrics;
   const weekStart = m?.weekStart ?? initialWeek;

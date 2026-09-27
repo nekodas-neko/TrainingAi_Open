@@ -5,6 +5,7 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ActivityTypeGrid } from '@/components/activity/activity-type-grid'
 import { useActivityStore } from '@/lib/stores/activity-store'
+import { releaseTopSurfaceEntry } from '@/lib/hooks/sheet-back-stack'
 import type { ActivityType } from '@trainingai/shared/types'
 
 interface LogActivitySheetProps {
@@ -24,10 +25,23 @@ export function LogActivitySheet({ open, onOpenChange }: LogActivitySheetProps) 
     router.prefetch('/activity')
   }, [open, router])
 
+  // BF-165 — the owner's *"when I try click the treadmill; or any Other activity nothing actually
+  // happens"*. The push always happened and was then undone: this sheet's own history entry was popped
+  // by its close **7 ms after** the navigation on the S25, so `/cardio` came straight back, scrolled
+  // to the top because its scroller is a nested div no restoration covers. See
+  // `releaseTopSurfaceEntry` for the three cheaper fixes that were built and failed.
   function selectType(type: ActivityType) {
     startActivity(type.id, type.label, type.icon, type.isDistanceBased)
+    // Before `onOpenChange`, and before the navigation: the release has to happen while this sheet is
+    // still the top of the stack, and the close is what would otherwise pop it.
+    const tookSheetEntry = releaseTopSurfaceEntry()
     onOpenChange(false)
-    router.push('/activity')
+    // `replace` when the entry was ours, because the current entry IS that sheet entry and the
+    // navigation should overwrite it. A `push` here would leave a dead entry at `/cardio` underneath
+    // `/activity`, so backing out of the activity screen would take two presses with the first one
+    // visibly doing nothing.
+    if (tookSheetEntry) router.replace('/activity')
+    else router.push('/activity')
   }
 
   return (

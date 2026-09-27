@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SparklesIcon } from "lucide-react";
 import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { useTransitionRouter } from "@/lib/view-transition";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { WEEKLY_DIGEST_TTL } from "@trainingai/shared/cache-ttl";
 
 const DISMISSED_KEY_PREFIX = "ta_weekly_recap_dismissed_";
-const CONTENT_CACHE_PREFIX = "ta_weekly_recap_v1_";
 
-interface CachedRecap {
-  content: string;
+interface DigestResponse {
+  digest: string;
   weekStart: string;
 }
 
@@ -24,81 +25,67 @@ interface CachedRecap {
 // `/health/week`, which holds the paragraph, the charts and the trends together.
 //
 // **The fetch stays, and it is not wasted.** It is what makes "is ready" a true statement rather
-// than a guess, it distinguishes a quiet week from a broken one, and it warms the route's per-week
-// server cache so the page opens on the cached path. `tabs-instant-paint.spec.ts` records that this
-// POST fires on every Home mount.
+// than a guess, and it distinguishes a quiet week from a broken one. Since RV-201 it also warms
+// the shared `weekly-digest:<weekStart>` cache entry that `/health/week` reads, so tapping through
+// paints from cache instead of waiting on the network — the reason the two must spell that key the
+// same way.
 //
 // `forceOpen` is gone with the expansion: the weekly reminder now deep-links to `/health/week`
 // itself, so there is no longer a banner state for it to override.
 export function WeeklyRecapBanner() {
-  const router = useTransitionRouter();
   const weekStart = shiftDateStr(startOfWeekInTz(), -7);
   const dismissKey = DISMISSED_KEY_PREFIX + weekStart;
-  const cacheKey = CONTENT_CACHE_PREFIX + weekStart;
 
+  // `true` until the effect has read localStorage, so a dismissed banner never flashes. The fetch
+  // lives in the child for the same reason it cannot live here: a hook cannot be skipped, so a
+  // `useCachedValue` in this component would fetch the recap for a week the user has already
+  // dismissed, on every Home mount. Not mounting the child is the only way to not ask.
   const [dismissed, setDismissed] = useState(true);
-  const [content, setContent] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => { setDismissed(!!localStorage.getItem(dismissKey)); }, [dismissKey]);
+
+  if (dismissed) return null;
+  return (
+    <WeeklyRecapBannerContent
+      weekStart={weekStart}
+      onDismiss={() => { localStorage.setItem(dismissKey, "1"); setDismissed(true); }}
+    />
+  );
+}
+
+function WeeklyRecapBannerContent(
+  { weekStart, onDismiss: handleDismiss }: { weekStart: string; onDismiss: () => void },
+) {
+  const router = useTransitionRouter();
   const [error, setError] = useState(false);
-  const hasFetched = useRef(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  // Held in a ref so the effect below does not depend on it — `cacheKey` is derived from
-  // `weekStart`, which the effect already tracks.
-  const cacheKeyRef = useRef(cacheKey);
-  cacheKeyRef.current = cacheKey;
+  // RV-201 — the shared cache, replacing a hand-rolled `ta_weekly_recap_v1_<week>` localStorage
+  // entry this component wrote and read itself. That entry was a second cache under the app's own:
+  // nothing invalidated it, so a recap fetched before a late-logged Sunday session stood until the
+  // week rolled over. The shared key is cleared by the three write groups that can change what it
+  // says, and `/health/week` reads the very same entry.
+  const cacheKey = `weekly-digest:${weekStart}`;
+  const data = useCachedValue<DigestResponse>(
+    cacheKey, "/api/weekly-digest", WEEKLY_DIGEST_TTL,
+    { onError: () => setError(true), reloadToken },
+  );
+  const content = data?.digest ?? null;
+  const isLoading = data === null && !error;
 
+  // The retry re-runs the hook's own fetch rather than adding a second one beside it, so there is
+  // no path here that could drift from the one the first paint took.
   const load = useCallback(() => {
     setError(false);
-    setIsLoading(true);
-    fetch("/api/weekly-digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
-      .then(res => { if (!res.ok) throw new Error("failed"); return res.json(); })
-      .then((data: { digest: string; weekStart: string; degraded?: boolean }) => {
-        setContent(data.digest);
-        // RV-69: `degraded` is a deterministic readout of the week, returned because the model
-        // failed. It is worth showing and not worth keeping — this cache is keyed on the week, and
-        // the effect below returns early on a hit, so storing it would stand in for the real recap
-        // until the week rolls over.
-        if (!data.degraded) {
-          localStorage.setItem(cacheKeyRef.current, JSON.stringify({ content: data.digest, weekStart: data.weekStart }));
-        }
-      })
-      .catch(() => setError(true))
-      .finally(() => setIsLoading(false));
+    setReloadToken(t => t + 1);
   }, []);
 
-  useEffect(() => {
-    const alreadyDismissed = !!localStorage.getItem(dismissKey);
-    setDismissed(alreadyDismissed);
-    if (alreadyDismissed || hasFetched.current) return;
-    hasFetched.current = true;
-
-    try {
-      const raw = localStorage.getItem(cacheKey);
-      if (raw) {
-        const cached: CachedRecap = JSON.parse(raw);
-        if (cached.weekStart === weekStart) {
-          setContent(cached.content);
-          return;
-        }
-      }
-    } catch { /* fall through to fetch */ }
-
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart]);
-
-  function handleDismiss() {
-    localStorage.setItem(dismissKey, "1");
-    setDismissed(true);
-  }
-
-  if (dismissed || (!isLoading && !content && !error)) return null;
+  if (!isLoading && !content && !error) return null;
 
   // A failed recap used to return null, so the request simply never produced anything and the user
   // had no way to tell a quiet week from a broken one (Q-499's class; the plan calls for the same
   // fix the daily digest got in Q-112a). It says so instead, and the tap retries rather than making
-  // the user relaunch the app — the fetch runs once per week behind a `hasFetched` guard, so
-  // without a retry a single failure costs the whole week's recap.
+  // the user relaunch the app — a failed entry is not cached, so without a retry the banner would
+  // sit on its error until something else invalidated the key.
   if (error) {
     return (
       <DismissibleBanner

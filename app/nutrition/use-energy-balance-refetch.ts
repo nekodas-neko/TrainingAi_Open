@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { fetchWithRetry } from '@trainingai/shared/fetch-with-retry'
 import { ENERGY_BALANCE_TTL } from '@trainingai/shared/cache-ttl'
+import { useInvalidationRefetch } from '@/lib/hooks/use-invalidation-refetch'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
 export interface EnergyBalanceRefetch {
@@ -56,14 +57,28 @@ export interface EnergyBalanceRefetch {
  * band and a bar that had not moved — one visible disagreement traded for a subtler one.
  * `calorie-balance.ts:111` is explicit that every "left"/"over" reading comes off one number.
  *
- * **Accepted:** the ring updates instantly and "kcal left" lands a round trip later. The budget
- * half genuinely comes from the server, and that gap is far smaller than waiting for a tab change.
+ * **⚠ "Accepted: the ring updates instantly and 'kcal left' lands a round trip later" — it did not,
+ * and that sentence stood here through three fixes.** On the APK the round trip arrived before the
+ * outbox push and therefore carried the pre-log figure; the number then sat wrong indefinitely,
+ * which is the owner's report rather than a gap "far smaller than waiting for a tab change". What
+ * makes the sentence true now is the subscription at the foot of this file, not the refetch above
+ * it. The honest statement of the remaining gap: the ring updates instantly, and "kcal left" lands
+ * once the server has the write — one push, not one round trip.
  *
  * Extracted rather than inlined because `nutrition-content.tsx` sits against the hard 800-line
  * limit — appending this reasoning to it took the file to 811.
  */
 export function useEnergyBalanceRefetch(
   setBalance: (b: EnergyBalanceResponse) => void,
+  /**
+   * The day currently on screen. Required, not optional, and NOT defaulted to `lastDateRef` — the
+   * subscription below has to work before this hook has ever fetched anything, which is exactly the
+   * case `lastDateRef` cannot cover: it is only set by `refetch`, so a write made from another
+   * surface (Home's quick-add, the wrap-up sheet) while the Nutrition tab sits mounted in the
+   * persistent shell would find it null and do nothing. A second caller that forgets this argument
+   * would get a subscription that silently never fires, which is the defect this hook is fixing.
+   */
+  dateRef: { readonly current: string },
 ): EnergyBalanceRefetch {
   const [failed, setFailed] = useState(false)
   // **RV-103's device FAILURE was a timing gap, not a missing channel.** Sweep 2 blocked the balance
@@ -130,6 +145,21 @@ export function useEnergyBalanceRefetch(
   const retry = useCallback(() => {
     if (lastDateRef.current) refetch(lastDateRef.current)
   }, [refetch])
+
+  // **BF-177's device failure: the one-shot refetch races the outbox push and loses.** On the web
+  // the write is an awaited POST, so the refetch that follows it sees the new intake — which is why
+  // the e2e spec is green. On the APK the write is local-first + outbox, and the refetch fires at
+  // the LOCAL write, reaching the server ~60-70 ms before `POST /api/sync/push` does. Traced on the
+  // S25: the card's own GET answered `remainingKcal=857`, the push landed, and a later GET answered
+  // 846 — correct, and not the card's request. "kcal left" then sat wrong until the user left the
+  // tab and came back. A second timing guess would not close a 60 ms gap.
+  //
+  // `log-food.ts` already fires `invalidateNutritionWrite()` TWICE on purpose — at the local write
+  // and again once the server has it, "otherwise the refetch this triggers re-caches the pre-log
+  // figures". The post-push one was always arriving; nothing here was listening. Subscribing is
+  // what makes this hold for the NEXT write path too, which is the whole argument of RV-104's
+  // sibling hook: BF-177 was patched site-by-site three times and a fourth site kept appearing.
+  useInvalidationRefetch('energy-balance:', () => { refetch(dateRef.current) })
 
   return { refetch, failed, retry, refreshing }
 }

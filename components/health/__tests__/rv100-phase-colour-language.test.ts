@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { SESSION_PALETTE } from '@trainingai/shared/session-palette'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** RV-100. A periodization phase is a CATEGORY; green, amber and red are the app's STATE language.
  *  `PHASE_COLORS` mixed them: `realisation` — the peak-output phase — was `text-red-500`, and
@@ -16,7 +17,7 @@ const CARD = 'components/health/ai-periodization-status-card.tsx'
 const BANNER = 'app/session-select/components/deload-banner.tsx'
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 const code = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(src)
 
 /** The `PHASE_COLORS` object body, so the assertions cannot be satisfied by an unrelated class. */
 function phaseColours(): Record<string, string> {

@@ -175,8 +175,8 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     slack.push(
       `${rel} is ${lines} lines against a ${limit}-line baseline — ${gap} line${gap === 1 ? '' : 's'} of slack, over its ${slackBand(limit)}-line band.\n` +
         `      Run \`node scripts/check-doc-index-size.js --tighten\` to write ${lines}, or set it by\n` +
-        `      hand in ${baselinePathFor(rel)}, in this PR, with a note in\n` +
-        `      docs/doc-size-baseline-history.md. Left as it is, the document can regrow into that\n` +
+        `      hand in ${baselinePathFor(rel)}, in this PR, with a note in its own file under\n` +
+        `      docs/doc-size/history/. Left as it is, the document can regrow into that\n` +
         `      slack without the ratchet saying anything.`,
     );
     continue;
@@ -196,7 +196,7 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
       (grew === null ? '.' : ` — ${grew} of which this branch added.`) + `\n` +
       `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
       `      doc — or, if the growth is genuinely part of the index, raise the baseline in the same\n` +
-      `      PR with a note in docs/doc-size-baseline-history.md. To raise it, run\n` +
+      `      PR with a note in its own file under docs/doc-size/history/. To raise it, run\n` +
       `      \`node scripts/check-doc-index-size.js --fix\` rather than editing\n` +
       `      ${baselinePathFor(rel)} by hand — the file's own line count and this check's count\n` +
       `      differ by one, so a hand-set number usually needs a second round to land.`,
@@ -252,7 +252,7 @@ if (FIX) {
   if (fixed.length) {
     console.log('check-doc-index-size --fix: rewrote');
     fixed.forEach((f) => console.log('  • ' + f));
-    console.log('  Add a note to docs/doc-size-baseline-history.md saying WHY the document moved —');
+    console.log('  Add a note in docs/doc-size/history/<YYYY-MM-DD-branch-slug>.md saying WHY it moved —');
     console.log('  the number is arithmetic, the reason is not, and the reason is the point.');
   } else if (!withheld.length) {
     console.log('check-doc-index-size --fix: every baseline already matches its document.');
@@ -272,7 +272,35 @@ if (failures.length) {
   process.exit(1);
 }
 
+// LA-129: the backlog is REPORTED, never ratcheted — printed on every run, failing on nothing.
+//
+// It is not one of "the documents every session reads before it can start", which is the membership
+// rule in this file's own first line: CLAUDE.md sends an implementer to `node scripts/next-item.js`,
+// and nobody reads 32,000 lines to orient. Its size is already governed by the protocol that removes
+// a finished entry and by the compaction sweep.
+//
+// What a baseline on it actually bought was collisions. Measured 2026-09-25: **54 of the last 63
+// `.size` changes on `main` were this one file**, against 7 for projectOverview.md and 1 each for
+// three others — because every agent edits the backlog and it genuinely grows, so two open PRs raise
+// the same number and conflict by construction. RV-134's slack band did not end that; a band cannot
+// help a file that really does grow past it. One session hit this single line in four separate merge
+// conflicts in one evening.
+//
+// Reporting keeps the number visible in every CI log, which is what anyone watching the trend
+// actually wanted, without a committed integer for two branches to disagree about. Deliberately NOT
+// generalised to the other nine: a derived or absent baseline removes the CEILING, and the ceiling is
+// the point — projectOverview.md once reached 9,647 lines while its own opening line called it a lean
+// index. Owner approved 2026-09-25, on the narrow fix over generating all baselines in CI.
+const REPORT_ONLY = ['docs/implementation-backlog.md'];
+
 const sizes = Object.keys(BASELINE)
   .map((r) => `${r} ${fs.readFileSync(path.join(root, r), 'utf8').split('\n').length}`)
   .join(' · ');
 console.log(`check-doc-index-size: OK — ${sizes}`);
+
+for (const rel of REPORT_ONLY) {
+  const abs = path.join(root, rel);
+  if (!fs.existsSync(abs)) continue;
+  const lines = fs.readFileSync(abs, 'utf8').split('\n').length;
+  console.log(`check-doc-index-size: UNRATCHETED — ${rel} ${lines} lines (reported, not enforced; LA-129).`);
+}

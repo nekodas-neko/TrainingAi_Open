@@ -37,6 +37,9 @@ export interface LocalStore {
   // Local-first food-library search: matches previously-logged/created items in the
   // local food_items table by name/brand. Empty query returns the most recent items.
   searchFoodItems(query: string): Promise<FoodItem[]>;
+  /** LB-158. The user's own saved food for this scanned code, or null. The one exact identifier a
+   *  food row has, so a re-scan of a product already in the library resolves with no network. */
+  getFoodItemByBarcode(barcode: string): Promise<FoodItem | null>;
   /** BF-38. Every local row at this exact calorie count — the candidate set the create-time
    *  duplicate check runs over, mirroring the server's prefilter so the two agree. */
   findFoodItemsByCalories(calories: number): Promise<FoodItem[]>;
@@ -190,6 +193,15 @@ export interface LocalStore {
   // food_item (from the local row) ordered before the log, then reset the log to
   // pending. Idempotent and bounded. Returns the number of logs healed.
   requeueStrandedFoodItems(userId: string): Promise<number>;
+  /**
+   * DV-8 heal: re-queue food-log DELETE tombstones left `pending` with no outbox entry.
+   *
+   * Re-queues rather than marking synced. A stranded tombstone is indistinguishable from one
+   * whose mutation never got queued at all, so flipping it to `synced` would silently drop a
+   * delete that never reached the server. Re-pushing is idempotent — the server arm soft-deletes
+   * by id — so the safe move is to re-queue and let the normal confirm path settle it.
+   */
+  requeueStrandedFoodTombstones(userId: string, cutoffIso: string): Promise<number>;
   deleteMutations(ids: string[]): Promise<void>;
 
   // Sync meta

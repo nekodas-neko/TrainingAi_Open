@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stripComments } from '../../../scripts/lib/strip-comments.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8');
 const code = (s: string) =>
-  s.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  stripComments(s);
 
 /**
  * BF-112 stage 2. Supplements are offline-first, so one save writes through FOUR consumers: the

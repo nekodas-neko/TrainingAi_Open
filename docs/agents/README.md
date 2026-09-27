@@ -225,9 +225,19 @@ be awake — **the queue is the channel, and an entry outlives the session that 
 | `A` / `B` | Implementation | code, decided by §3's path rule |
 | `O` | Orchestrator | the queue and docs themselves, CI config, repo settings — **and anything needing the owner or a round of thinking before it can be built** |
 | `DV` | Device Verification | work whose *deliverable* needs the phone |
+| `T` | Tuning | a scoring change that owes a PROPOSAL before anyone may build it |
 | `?` | nobody yet | "I could not tell" — surfaces to a human rather than being guessed |
 
-**`O` and `DV` see only what is tagged for them; `A` and `B` also see the untagged.** An unstated
+**`T` was added 2026-09-26 (OR-178) because a correct triage could not act on itself.** Fifteen
+scoring entries owed a Tuning proposal, not the owner's signature — three separate sweeps reached
+that conclusion and none could record it. Removing their wrong `Gate: owner` would have released
+them into Lane A's READY list, and a scoring change with no proposal is precisely what Lane A must
+not pick up, so the wrong field was also the only brake in reach. They were parked on a placeholder
+`Needs: OR-150` instead, which stated a dependency that did not exist. `T` is the brake that says
+the true reason. **A `T` entry names its implementation lane in prose**; Tuning re-lanes it to `A`
+or `B` when the proposal exists, so the lane still answers *who acts next*.
+
+**`O`, `DV` and `T` see only what is tagged for them; `A` and `B` also see the untagged.** An unstated
 lane means *"§3's path rule answers it"*, and that rule only ever resolves to an implementer — so
 showing untagged work to both implementer lanes is the safe failure it was designed as, while
 showing the same 400 entries to the Orchestrator or the device agent would bury the few genuinely

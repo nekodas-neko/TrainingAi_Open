@@ -217,8 +217,13 @@ describe.skipIf(!canRun)('friends leaderboard — who appears and what they are 
     const weekly = await streakFor('weekly', [1, 2])     // widest hole Tue→Mon = 5 rest days
     const rotation = await streakFor('rotation', [])     // one rest day, whatever restAfterN says
 
-    expect(weekly).toBe(2)     // the two days join into one streak
-    expect(rotation).toBe(1)   // …and break into two
+    // RV-216 changed the UNIT, not this rule. `allTimeStreak` is calendar days now, not a count
+    // of sessions, so a joined streak reads as its span rather than as 2 — here the last trained
+    // day is 4 days ago, inside the weekly plan's allowance of 5, so the streak is still running
+    // and spans day -8 through today: 9. What this case exists to discriminate is untouched, and
+    // both halves still carry it: the weekly plan JOINS the two days and the rotation BREAKS them.
+    expect(weekly).toBe(9)     // the two days join into one streak, measured in days to today
+    expect(rotation).toBe(1)   // …and break into two, so the best span is a single day
   })
 
   /**

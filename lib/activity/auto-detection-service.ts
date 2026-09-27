@@ -1,6 +1,7 @@
 'use client'
 
 import type { RoutePoint } from './route-encoding'
+import { median } from '@trainingai/shared/stats'
 import { haversineDistanceKm, computeTotalDistanceKm } from './activity-metrics'
 import { startGpsWatcher, type GpsWatcher } from './gps-tracking'
 import { armMotionTrigger, disarmMotionTrigger, isMotionDetectionAvailable } from './motion-detection'
@@ -177,11 +178,22 @@ let gaitConfirmCtx: GaitConfirmContext = initGaitConfirm()
 const probeBuffer: RoutePoint[] = []
 const PROBE_BUFFER_CAP = 400 // generous vs. the ~3-min probe timeout at typical GPS point rates
 
-function median(values: number[]): number {
-  const finite = values.filter(Number.isFinite).sort((a, b) => a - b)
-  if (!finite.length) return NaN
-  const mid = Math.floor(finite.length / 2)
-  return finite.length % 2 ? finite[mid] : (finite[mid - 1] + finite[mid]) / 2
+/**
+ * The decoded column's middle FINITE value, as a plain number for `classifyGait`.
+ *
+ * A thin adapter over the shared `median` rather than another implementation of it (LA-151).
+ * Two things here are this file's own and are kept: it drops non-finite values before taking the
+ * middle, and its empty contract is NaN rather than 0 — a 0 would be a plausible wrong cadence,
+ * which is the failure Q-221 already cost this file once.
+ *
+ * **The sibling in `cadence-tracker.ts` does NOT filter, and that is not a bug to unify.**
+ * `classifyGait` guards `Number.isFinite` on all three features itself and answers `idle`, so a
+ * NaN or Infinity cannot reach a classification either way; the filter here is belt-and-braces.
+ * Verified 2026-09-26 while consolidating (LA-151), because a mutation that removed it killed no
+ * test — the behaviour it changes is unobservable through every caller.
+ */
+function medianFinite(values: number[]): number {
+  return median(values.filter(Number.isFinite)) ?? NaN
 }
 
 // Publishes a diagnostics snapshot for the profile screen's background-location
@@ -507,9 +519,9 @@ export async function startAutoDetection(): Promise<void> {
       if (gate.state !== 'idle' && hasStepsDecoderConstants()) {
         const decoded = runStepsMotionDecoder({ timestamps: [now], data: [ev.columns] })
         const classification = classifyGait({
-          strideHz: median(decoded.data.map(row => row[STRIDE_FREQUENCY_COLUMN])),
-          strideAmpFrac: median(decoded.data.map(row => row[STRIDE_AMPLITUDE_FRAC_COLUMN])),
-          totalAmplitudeMg: median(decoded.data.map(row => row[TOTAL_AMPLITUDE_MG_COLUMN])),
+          strideHz: medianFinite(decoded.data.map(row => row[STRIDE_FREQUENCY_COLUMN])),
+          strideAmpFrac: medianFinite(decoded.data.map(row => row[STRIDE_AMPLITUDE_FRAC_COLUMN])),
+          totalAmplitudeMg: medianFinite(decoded.data.map(row => row[TOTAL_AMPLITUDE_MG_COLUMN])),
         })
         const result = pushGaitWindow(gaitConfirmCtx, { state: classification.state, atMs: now })
         gaitConfirmCtx = result.ctx

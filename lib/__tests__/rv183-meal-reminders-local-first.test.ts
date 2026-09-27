@@ -4,6 +4,7 @@ import path from 'node:path'
 import { computeMealReminderActions, type MealTypeForReminders } from '../meal-reminders'
 import type { LocalMealType } from '@/lib/local-store/types'
 import { fromZonedTime } from 'date-fns-tz'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 // Fixtures are wall-clock times in the USER's zone, not the device's. A bare
 // `new Date('2026-06-17T09:00:00')` is parsed device-local, which is how these tests used to agree
 // with a `setHours` implementation that had the same bug (LB-148).
@@ -12,7 +13,7 @@ const bne = (iso: string) => fromZonedTime(iso, TZ)
 
 const ROOT = path.resolve(__dirname, '../..')
 const code = (rel: string) =>
-  readFileSync(path.join(ROOT, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 function localType(over: Partial<LocalMealType> = {}): LocalMealType {
   return {

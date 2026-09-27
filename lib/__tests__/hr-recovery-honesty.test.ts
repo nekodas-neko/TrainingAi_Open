@@ -4,6 +4,7 @@ import path from 'node:path'
 import { informativeShareNote, MINORITY_MAX_PCT } from '@/components/health/hr-recovery-honesty'
 import { aggregateHrRecoveryProfile } from '@trainingai/shared/health/hr-recovery-profile'
 import type { RecoveryEpisode } from '@trainingai/shared/health/hr-recovery-profile'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * Q-516's honesty half — `informativeShare` was computed and rendered nowhere.
@@ -14,8 +15,7 @@ import type { RecoveryEpisode } from '@trainingai/shared/health/hr-recovery-prof
  */
 
 const ROOT = path.resolve(__dirname, '..', '..')
-const card = () => readFileSync(path.join(ROOT, 'components/health/hr-recovery-profile-card.tsx'), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const card = () => stripComments(readFileSync(path.join(ROOT, 'components/health/hr-recovery-profile-card.tsx'), 'utf8'))
 
 describe('when the caveat is worth showing', () => {
   it('says nothing when every rest carries signal', () => {

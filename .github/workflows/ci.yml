@@ -73,10 +73,29 @@ jobs:
   # any type error already fails Build. A separate `tsc --noEmit` job was redundant
   # enforcement. Type errors are caught faster and more precisely by `pnpm ci:local`
   # (runs `tsc --noEmit` directly) before pushing.
-  test:
-    name: Tests
+  # OR-165. Sharded four ways: the suite is 844 files and ~7 minutes, and it is the ONLY job on
+  # CI's critical path — everything except Build finishes inside 70 seconds, so nothing else's
+  # duration is visible in the wall clock.
+  #
+  # ⚠ THE AGGREGATOR BELOW IS LOAD-BEARING, NOT TIDINESS. A matrix reports its checks as
+  # `Tests (1)`, `Tests (2)`… and the `ProtectMain` ruleset requires a check named exactly `Tests`.
+  # Shard without the aggregator and that required check NEVER REPORTS, which does not fail a PR —
+  # it leaves every PR in the repository permanently unmergeable. The `test` job below exists to
+  # publish that one name.
+  #
+  # Every shard gets its own Postgres rather than segregating the ~20 DB-backed files into one.
+  # Shards run in parallel, so four container starts cost nothing in wall clock, and a database per
+  # shard means FEWER files share one — which is the LA-32 collision class, not more of it.
+  test-shard:
+    name: Tests shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      # Without this, one shard failing cancels the rest and the log shows a single failure where
+      # there may be four. Diagnosing a red suite needs all of them.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # A real Postgres lets the DB integration tests run — without DATABASE_URL they
     # skipIf-skip (~20 files), leaving the rollup/repo DB behaviour with no CI coverage.
     services:
@@ -116,7 +135,31 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply all migrations
         run: node scripts/local-db/migrate.js
-      - run: pnpm test
+      # Not `pnpm vitest run` directly: the wrapper re-runs this shard ONCE, and only when the
+      # run failed with vitest's own worker-teardown race (vitest#11153 — open, and present in
+      # 4.1.11 and 5.0.0 alike) while every test passed. `Tests` became a required check on
+      # 2026-09-25, so that flake stopped costing a re-run and started blocking the merge. Any
+      # real failure, and any second occurrence in the same job, still fails here — see the
+      # script's header for what else was measured and rejected (LA-146).
+      - run: node scripts/ci/vitest-retry-teardown-flake.js --shard=${{ matrix.shard }}/4
+
+  # The name the ruleset requires. Publishes one pass/fail for the four shards above; it installs
+  # nothing and runs in seconds.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-shard
+    # `always()` so this still reports when a shard fails — without it the job is SKIPPED, the
+    # required check never arrives, and the PR hangs exactly as it would with no aggregator at all.
+    # Deliberately NOT guarded on `schedule`: LB-31's nightly runs the suite and nothing else, so
+    # this is the only job that can report its result.
+    if: always()
+    steps:
+      - name: Every shard passed
+        run: |
+          echo "shards: ${{ needs.test-shard.result }}"
+          test "${{ needs.test-shard.result }}" = "success"
 
   build:
     name: Build
@@ -151,6 +194,20 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      # OR-165. `cache: 'pnpm'` on setup-node caches the dependency STORE, not Next's compilation
+      # output, so every CI build recompiled from cold — `pnpm build` is ~4m45s of this ~5m job
+      # while `pnpm install` is ~5s. Next documents `.next/cache` as the artefact to carry over.
+      # Keyed on the lockfile plus source, so a dependency bump or a source change reuses the
+      # nearest previous build rather than starting over; `restore-keys` is what makes a miss
+      # partial instead of total.
+      - name: Cache the Next build
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'lib/**', 'packages/**') }}
+          restore-keys: |
+            next-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-
       - run: pnpm build
       # LB-37. `tsconfig.json` excludes `**/__tests__/**`, so no spec has ever been typechecked and
       # a clean `tsc` said nothing about any of them. Shrink-only per-file baseline: every NEW spec
@@ -428,6 +485,9 @@ jobs:
       - name: memo() call sites pass stable props
         run: node scripts/check-memo-prop-stability.js
 
+      - name: No test file hand-rolls a comment stripper
+        run: node scripts/check-test-comment-strippers.js
+
       - name: No new fetch-once effects
         run: node scripts/check-fetch-once-effects.js
 
@@ -436,6 +496,9 @@ jobs:
 
       - name: Hex colour literals do not increase
         run: node scripts/check-hex-literals.js
+
+      - name: Bare fetch of an /api/ GET does not increase
+        run: node scripts/check-bare-api-fetch.js
 
       - name: No two DB test files share a TEST_USER_ID
         run: node scripts/check-test-user-ids.js
@@ -671,7 +734,9 @@ jobs:
       # its expensive half when nothing it can test has changed. That makes it safe to require.
       #
       # A non-UI PR still pays for checkout and the Postgres service (~20 s) rather than the full
-      # ~10 min. On a push to main there is no base to diff against, so everything runs.
+      # run — which is ~29 min, not the ~10 this line claimed until 2026-09-25 (LB-149, measured
+      # on run 3069: `pnpm e2e` 10:15:36 → 10:44:29 across 124 specs). On a push to main there is
+      # no base to diff against, so everything runs.
       - name: Does this change touch the UI?
         id: ui
         run: |
@@ -761,6 +826,28 @@ jobs:
         run: npx playwright install --with-deps chromium
       - run: pnpm e2e
         if: steps.ui.outputs.changed == 'true'
+      # LB-149. Twice now the browser has simply vanished mid-run — two specs failing in 1.0s each
+      # with `browser.newContext: Target page, context or browser has been closed`, which means the
+      # process was already gone when the spec started. The run recorded NOTHING about why, so three
+      # sessions could only guess. What was ruled out by reading rather than measuring: `workers: 1`
+      # is already the standing config so there is no parallelism to reduce; nothing in `e2e/` closes
+      # the browser; and the two specs that died sat at #20 and #28 of 124 in alphabetical order,
+      # preceded by two of the LIGHTEST files in the suite, so "a heavy spec killed it" does not hold.
+      # That leaves the runner, and the kernel is the only witness. `dmesg` settles it in one line —
+      # an OOM kill names the process and its RSS; an empty dmesg eliminates OOM, which is just as
+      # useful and is what nobody has been able to say. Runs only on failure, so a green run pays
+      # nothing.
+      - name: If the browser died, say why
+        if: failure() && steps.ui.outputs.changed == 'true'
+        run: |
+          echo "::group::kernel OOM kills"
+          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom-kill" | tail -20 \
+            || echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+          echo "::endgroup::"
+          echo "::group::memory and the largest processes still alive"
+          free -m
+          ps -eo pid,rss,comm --sort=-rss | head -12
+          echo "::endgroup::"
       # Both directories, because they carry different halves and only one of them ever existed:
       # `playwright-report/` needs the `html` reporter (added in playwright.config.ts for LA-63) and
       # `test-results/` is where `trace: 'retain-on-failure'` and the failure screenshots land.

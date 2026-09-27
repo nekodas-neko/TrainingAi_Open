@@ -1,7 +1,7 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
-import { computeObservedHr, resolveMaxHr, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
+import { resolveMaxHr, EMPTY_OBSERVED_HR, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 /** Trailing window the observed max/min is corroborated over. */
 export const OBSERVED_WINDOW_DAYS = 90
@@ -41,64 +41,48 @@ export interface HrProfile {
 const RESTING_HR_WINDOW_DAYS = 28
 const RESTING_HR_DEFAULT = 60
 
+
 /**
  * The canonical HR profile — the single resolver for max HR, target anchor and resting HR.
  *
  * This replaces three resolvers that disagreed: `hrMaxFromAge` (age only), `resolveMaxHr`
- * (observed only if ≥ age-predicted) and `estimateHrMax` (observed always, *ungated*). They
+ * (observed only if >= age-predicted) and `estimateHrMax` (observed always, *ungated*). They
  * agreed only by accident — the observed max sat below the age prediction, masking the
  * divergence; the first reading above it would have split them silently.
  *
- * Every observed value now comes from `computeObservedHr`, so a stray spike can never move
- * the max: readings outside 30–220 bpm are dropped as sensor errors, and the max is the
- * k-th highest reading rather than the highest, so several corroborating readings are
- * needed to move it. Before this, two producers took a bare `Math.max` over raw readings
- * and one of them persisted the result, making a single artefact a permanent ceiling.
+ * Every observed value comes from the corroboration rules in `observed-hr.ts`, so a stray spike
+ * can never move the max: readings outside 30-220 bpm are dropped as sensor errors, and the max
+ * is the k-th highest reading rather than the highest, so several corroborating readings are
+ * needed to move it. Before this, two producers took a bare `Math.max` over raw readings and one
+ * of them persisted the result, making a single artefact a permanent ceiling.
+ *
+ * **Those rules now run in SQL, not here** (RV-181). `repo.getObservedHrProfile` returns one row
+ * where this used to pull the whole 90-day window — 133,041 rows after the strap merge, on the
+ * query that was 51% of all database time. `getObservedHrProfile`'s own comment carries the
+ * measurements and the equivalence argument; `observed-hr-sql-equivalence.test.ts` holds the two
+ * paths to the same answer.
  *
  * Resting HR is averaged over a FIXED 28-day window, deliberately not the caller's query
  * range — deriving it from a caller-controlled window shifts the zone boundaries with the
  * range and bakes the shifting bands into the `daily_zone_minutes` cache (review J-2).
+ *
+ * **`resolveHrProfileWithWindow` is gone with the row fetch.** It existed so `/api/cardio-week`
+ * could slice its two 30-day windows out of the 90 days this resolver had already pulled (RV-73),
+ * and carried a boundary caveat because slicing a merged 90-day set is not quite the same as
+ * merging each window. With no rows to share, that route queries each window directly and the
+ * caveat goes with it.
  */
 export async function resolveHrProfile(repo: WorkoutRepository, userId: string, tz: string): Promise<HrProfile> {
-  return (await resolveHrProfileWithWindow(repo, userId, tz)).profile
-}
-
-/**
- * The same resolver, also handing back the HR rows it already fetched and the window they cover.
- *
- * RV-73 — `/api/cardio-week` needs order statistics over a rolling 30-day window and the 30 days
- * before it, and was issuing two more `getHrForWindow` calls for them. Both windows are **wholly
- * contained** in the 90 days this resolver has already pulled, so the rows were being fetched,
- * materialised and thrown away twice over: a second and third pass of the heaviest query in the app
- * for data already in memory.
- *
- * The rows are returned from a SEPARATE export rather than added to `HrProfile`, deliberately.
- * `/api/hr-profile` serialises that interface straight into its response and ten other call sites
- * read it — putting a 130,000-row array on it would ship the whole window to the client.
- *
- * **Slicing this is equivalent to re-querying, with one boundary caveat worth stating rather than
- * discovering.** `getHrForWindow` applies `preferStrapBuckets`, which drops a ring row when a chest
- * strap row shares its 10-second bucket. Merging over 90 days and then cutting can therefore drop a
- * ring row whose bucket-mate sits just outside the caller's window, where a fresh 30-day query
- * would have kept it — at most the rows in the single bucket straddling each boundary, and always
- * in the direction of dropping a ring reading the strap already covered. Measured against
- * production on 2026-09-21 over the owner's current 30-day window, both paths return **57,998 rows,
- * mean 86, k-th highest 175, k-th lowest 37** — identical.
- */
-export async function resolveHrProfileWithWindow(
-  repo: WorkoutRepository, userId: string, tz: string,
-): Promise<{ profile: HrProfile; hrRows: { timestamp: Date; bpm: number; source: string | null }[]; from: Date; to: Date }> {
   const todayIso = todayInTz(tz)
   const midnight = todayMidnightUtc(tz)
   const from28dIso = toAestDay(new Date(midnight.getTime() - RESTING_HR_WINDOW_DAYS * 86_400_000), tz)
   const observedFrom = new Date(midnight.getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
-
   const observedTo = new Date()
 
-  const [user, bodyMetrics, hrRows] = await Promise.all([
+  const [user, bodyMetrics, observed] = await Promise.all([
     repo.getUserById(userId),
     repo.listBodyMetrics(userId, from28dIso, todayIso),
-    repo.getHrForWindow(userId, observedFrom, observedTo).catch(() => []),
+    repo.getObservedHrProfile(userId, observedFrom, observedTo).catch(() => EMPTY_OBSERVED_HR),
   ])
 
   const rhrRows = bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
@@ -107,23 +91,17 @@ export async function resolveHrProfileWithWindow(
     : RESTING_HR_DEFAULT
 
   const estimatedMax = hrMaxFromAge(ageFromDob(user?.dateOfBirth, new Date()))
-  const observed = computeObservedHr(hrRows.map(r => r.bpm))
   const resolved = resolveMaxHr(observed, estimatedMax)
   const observedMax = observed.isReliable ? observed.max : null
 
   return {
-    profile: {
-      maxHr: resolved.maxUsed,
-      targetAnchorMax: observedMax ?? estimatedMax,
-      restingHr,
-      restingHrSource: rhrRows.length ? 'measured' : 'default',
-      estimatedMax,
-      observedMax,
-      maxHrSource: resolved.source,
-      observed,
-    },
-    hrRows,
-    from: observedFrom,
-    to: observedTo,
+    maxHr: resolved.maxUsed,
+    targetAnchorMax: observedMax ?? estimatedMax,
+    restingHr,
+    restingHrSource: rhrRows.length ? 'measured' : 'default',
+    estimatedMax,
+    observedMax,
+    maxHrSource: resolved.source,
+    observed,
   }
 }

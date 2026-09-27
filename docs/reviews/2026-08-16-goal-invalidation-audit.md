@@ -3,6 +3,14 @@
 **Answer: no, for all six of its keys, in the sense that matters.** None of them can render a stale
 value that the invalidation prevents. The audit below is per-key and reproducible.
 
+> **⚠ NO LONGER TRUE OF `nutrition-targets`, as of 2026-09-25 (RV-67).** That key now carries
+> `freshWithinTtl: true` at its read path, which is precisely the first of the two conditions below —
+> so its invalidation is **load-bearing** and deleting it would leave a stale target for the full
+> six-hour TTL. This is the Q-262 caveat arriving in practice rather than a flaw in the audit: *a key
+> that is inert today becomes load-bearing the moment someone adds `freshWithinTtl` to it.* The other
+> five keys are unaffected and the method below still holds — re-run it per key rather than trusting
+> the headline, which is now five-of-six.
+
 This started from a measurement in Q-259: deleting the invalidation changed neither the settled
 value nor the transient paint of the water goal on Health. The reason looked general rather than
 specific to that key, which is what this checks.

@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, memo } from "react";
+import { Fragment, memo, useState } from "react";
+import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import {
   Sunrise, Moon, Dumbbell, Footprints, Utensils,
   BedDouble, Flame, Clock, Zap, Tag,
@@ -36,11 +37,11 @@ const TYPE_ICON_COLOR: Record<string, string> = {
   tag:     "text-muted-foreground",
 };
 
-function fmt(h: number): string {
-  const hrs = Math.floor(h);
-  const mins = Math.round((h - hrs) * 60);
-  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-}
+// RV-208: a fourth copy, and the one that was wrong — under an hour it floored to `0h` and threw
+// the minutes away, so a 45-minute nap read as `0h` on the timeline. `formatHoursMinutes` takes
+// MINUTES and returns `45m` there, which is why importing it fixes the bug rather than just the
+// inconsistency. An exact hour now reads `7h 00m`.
+const fmt = (h: number): string => formatHoursMinutes(h * 60);
 
 function WakeupCard({ ev }: { ev: TimelineEvent }) {
   return (
@@ -87,11 +88,11 @@ function WorkoutCard({ ev }: { ev: TimelineEvent }) {
         {ev.sets != null && (
           <span className="flex items-center gap-1">
             <Dumbbell className="h-3 w-3" />
-            {ev.sets} sets
+            {ev.sets} {ev.sets === 1 ? 'set' : 'sets'}
           </span>
         )}
         {ev.exerciseCount != null && (
-          <span>{ev.exerciseCount} exercises</span>
+          <span>{ev.exerciseCount} {ev.exerciseCount === 1 ? 'exercise' : 'exercises'}</span>
         )}
       </div>
     </div>
@@ -234,8 +235,10 @@ function EventRow({ ev, isLast }: { ev: TimelineEvent; isLast: boolean; isFirst?
 function HomeDayTimelineComponent() {
   // `today: true` because 'home-day-timeline' is a date-less today key — one canonical variant per
   // key, and `sync-provider`'s warm list agrees.
+  const [failed, setFailed] = useState(false);
   const payload = useCachedValue<{ events: TimelineEvent[] }>(
-    "home-day-timeline", "/api/day-timeline", TTL_SHORT, { today: true },
+    "home-day-timeline", "/api/day-timeline", TTL_SHORT,
+    { today: true, onError: () => setFailed(true) },
   );
   const events = payload?.events ?? null;
 
@@ -248,7 +251,17 @@ function HomeDayTimelineComponent() {
   // before the event, and `lib/__tests__/cache-groups.test.ts` asserts that group clears this key —
   // so the dependency this now leans on is guarded, not assumed.
 
-  if (!events) return null;
+  // RV-178. `cachedFetch` swallows `!res.ok`, so without the `onError` above a failed cold load and
+  // an empty day were the same `null` and the timeline just was not there. An empty day is still
+  // nothing — there is genuinely no timeline — but a failure says so.
+  if (!events) {
+    if (!failed) return null;
+    return (
+      <section className="mx-4 mb-3 rounded-xl border border-border bg-muted/20 p-4">
+        <p className="text-xs text-muted-foreground">Couldn&apos;t load today&apos;s timeline.</p>
+      </section>
+    );
+  }
   if (events.length === 0) return null;
 
   const firstYesterdayIdx = events.findIndex(e => e.day === "yesterday");

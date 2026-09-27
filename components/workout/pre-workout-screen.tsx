@@ -171,7 +171,7 @@ export function PreWorkoutScreen({
   return (
     <div className="flex h-full flex-col bg-page">
       <header className="flex items-center gap-3 border-b px-4 pb-4 pt-safe">
-        <button onClick={handleBackClick} aria-label="Back to sessions" className="rounded-lg p-2.5 hover:bg-muted transition">
+        <button onClick={handleBackClick} aria-label="Back to sessions" className="rounded-lg p-2.5 transition-[transform,background-color] duration-100 active:scale-95 active:bg-muted motion-reduce:active:scale-100 motion-reduce:transition-none">
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
         <div className="flex-1 min-w-0">

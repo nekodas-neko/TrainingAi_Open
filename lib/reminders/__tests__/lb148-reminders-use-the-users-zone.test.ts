@@ -4,10 +4,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { instantAtLocalTime } from '../local-instant'
 import { computeWorkoutReminderAction } from '@/lib/workout-reminders'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const code = (rel: string) =>
-  readFileSync(path.join(ROOT, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 /**
  * The argument text of each call to `name`, paren-balanced.

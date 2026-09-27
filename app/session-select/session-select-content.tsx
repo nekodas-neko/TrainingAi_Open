@@ -18,6 +18,8 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { toast } from "sonner";
 import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
+import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
+import { useHomeSectionDrag } from "@/lib/hooks/use-home-section-drag";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import dynamic from "next/dynamic";
 import { CoachFab } from "@/components/coach/coach-fab";
@@ -57,6 +59,7 @@ import { OuraScoreChipRow } from "@/components/oura-score-chip-row";
 import { IllnessAdvisoryBanner } from "@/components/home/illness-advisory-banner";
 import { BodyBatteryCard } from "@/components/body-battery-card";
 import { HomeDayTimeline } from "@/components/home-day-timeline";
+import { initialsOf } from '@/lib/initials';
 const ExerciseDetectedCard = dynamic(
   () => import("@/components/activity/exercise-detected-card").then(m => ({ default: m.ExerciseDetectedCard })),
   { ssr: false },
@@ -441,6 +444,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const handleNavigateStats = useCallback(() => navigateToTab(router, "/health?tab=training"), [router]);
   const handleNavigateHealthBody = useCallback(() => navigateToTab(router, "/health?tab=body"), [router]);
   const handleOpenWaterLog = useCallback(() => setWaterLogOpen(true), []);
+  // TN-85 — a correction has to land somewhere it can be acted on, and the value lives on the
+  // morning check-in's sleep scale (TN-57 owns writing it). `useCallback` because `HomeCardWidget`
+  // is memoised and an inline arrow would defeat it on every render of the section list.
+  const handleCorrectSleepVerdict = useCallback(() => setMorningCheckinOpen(true), []);
+
+  // BF-205 — the drag that the "Reorder sections" button was always missing.
+  const sectionDrag = useHomeSectionDrag(sectionOrderRef, setSectionOrder);
   const hrData = useMemo(
     () => (ouraHrReadings.length > 0 ? { readings: ouraHrReadings, workoutSessions: ouraWorkoutSessions, sleep: ouraSleepWindow } : null),
     [ouraHrReadings, ouraWorkoutSessions, ouraSleepWindow],
@@ -621,16 +631,23 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       } catch { /* store not ready — fall through to the API */ }
     }
     try {
-      const res = await fetch(`/api/mood?date=${today}`);
-      if (!res.ok) return;
-      const d = await res.json() as import('@trainingai/shared/types/mood').MoodLog | null;
-      if (d !== null) {
-        setMoodLog(d);
-        setCached(key, d, MOOD_TTL).catch(() => {});
-      } else {
-        const cached = readCacheSync<import('@trainingai/shared/types/mood').MoodLog | null>(key);
-        if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
-      }
+      // RV-79: through `cachedFetch`, per the standing rule, so this read joins the in-flight dedup
+      // the mood sheet's reads of the same key already use rather than firing a second request.
+      //
+      // `shouldCache` is what makes the conversion safe, and it is not optional here. A plain
+      // `cachedFetch` writes the response unconditionally after any 2xx — measured — so a server
+      // `null` would overwrite an optimistic local log, and `readCacheSync` parses a stored "null"
+      // back as a value rather than a miss. The seeds below would then paint `null` and the
+      // check-in card would re-prompt: the session-167 bug, reintroduced by the fix for a rule.
+      await cachedFetch<import('@trainingai/shared/types/mood').MoodLog | null>(
+        key, `/api/mood?date=${today}`, MOOD_TTL,
+        d => {
+          if (d !== null) { setMoodLog(d); return; }
+          const cached = readCacheSync<import('@trainingai/shared/types/mood').MoodLog | null>(key);
+          if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
+        },
+        { shouldCache: d => d != null },
+      );
     } catch { /* offline — keep the seeded value */ }
   }, [userId, tz]);
 
@@ -1039,7 +1056,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       <PullToSync
         onSync={handlePullSync}
         scrollKey="home"  // RV-112 — Home and More shared one scroll slot; see more-content.tsx.
-        scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-nav-safe"
+        // BF-206: `pb-fab-safe`, not `pb-nav-safe` — this screen mounts `CoachFab`, whose 56 px sits
+        // above everything pb-nav-safe reserves, so the last row of the scroll could never clear it.
+        scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-fab-safe"
         className="flex-1 flex flex-col overflow-hidden"
       >
         <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-30"><Meteors number={10} /></div>
@@ -1080,7 +1099,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             <div className="relative flex-none">
               <button
                 onClick={() => navigateToTab(router, "/more")}
-                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border hover:border-brand transition"
+                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border transition-[transform,border-color] duration-100 active:scale-95 active:border-brand motion-reduce:active:scale-100 motion-reduce:transition-none"
                 style={{ background: "var(--brand-card-bg)" }}
                 aria-label="Profile"
               >
@@ -1089,7 +1108,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                     unoptimized={userAvatar.startsWith('data:')} className="object-cover" />
                 ) : (
                   <span className="text-xs font-bold" style={{ color: "var(--color-brand)" }}>
-                    {displayName ? displayName.slice(0, 2).toUpperCase() : "?"}
+                    {initialsOf(displayName)}
                   </span>
                 )}
               </button>
@@ -1168,6 +1187,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">
+          <DragDropProvider sensors={[PointerSensor]} onDragOver={sectionDrag.onDragOver} onDragEnd={sectionDrag.onDragEnd}>
           {sectionOrder.filter(key => !hiddenSections.has(key)).map((key, idx) => {
             const content = (() => {
               // Every `card_*` key routes to the one component, which no-ops on a key the user has
@@ -1196,6 +1216,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   muscleData={muscleRecovery}
                   hrData={hrData}
                   setMoodSheetOpen={setMoodSheetOpen}
+                  onCorrectSleepVerdict={handleCorrectSleepVerdict}
                 />
               );
               switch (key) {
@@ -1304,11 +1325,12 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             })();
             if (content === null) return null;
             return (
-              <HomeSortableSection key={key} id={key} editMode={sectionEditMode} onHide={handleHideSection}>
+              <HomeSortableSection key={key} id={key} index={idx} editMode={sectionEditMode} onHide={handleHideSection}>
                 {content}
               </HomeSortableSection>
             );
           })}
+          </DragDropProvider>
         </div>}
 
         {/* ── Hidden sections restore panel (edit mode only) ── */}

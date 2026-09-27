@@ -161,7 +161,7 @@ describe('buildActivityAudit', () => {
     const direct = computeActivityScore({
       steps: base.steps, activeCalories: base.activeCalories, zoneMinutes: base.zoneMinutes,
       moveHours: base.moveHours, moveHoursGoal: 14, sessions7d: base.sessions7d,
-      volume7dKg: base.volume7dKg, typicalSessionVolumeKg: base.typicalSessionVolumeKg, goals, acwr: null,
+      volume7dKg: base.volume7dKg, goals, acwr: null,
     })!
     const total = audit.contributors.reduce((s, c) => s + (c.contribution ?? 0), 0)
     expect(Math.abs(total - direct.preTaperScore)).toBeLessThanOrEqual(1)
@@ -359,7 +359,7 @@ describe('model specs are exported whole', () => {
     const goals = getDailyGoals({ weightKg: 82, heightCm: 180, ageYears: 36, sex: 'male', activityLevel: null })
     const result = computeActivityScore({
       steps: 9000, activeCalories: 500, zoneMinutes: 30, moveHours: 10, moveHoursGoal: 14,
-      sessions7d: 3, volume7dKg: 18000, typicalSessionVolumeKg: 6000, goals, acwr: null,
+      sessions7d: 3, volume7dKg: 18000, goals, acwr: null,
     })!
     for (const key of Object.keys(result.components)) {
       expect(ACTIVITY_MODEL.weights).toHaveProperty(key)

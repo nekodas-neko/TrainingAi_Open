@@ -81,7 +81,19 @@ export interface RollupIO {
   // ── heart rate ───────────────────────────────────────────────────────────────────────────────
   /** Workout windows starting at or after `since`, excluding soft-deleted sessions. */
   readWorkoutWindows(since: Date): Promise<RollupWorkoutWindow[]>
-  deleteBleHeartrateFrom(since: Date): Promise<void>
+  /**
+   * Remove the BLE heart-rate rows at or after `since` whose timestamps are NOT in `keep`.
+   *
+   * RV-182 ③ — this replaced a blanket `DELETE … WHERE source = 'ble' AND timestamp >= since`
+   * that ran immediately before the upsert. The end state was the same, but the delete removed
+   * every row the upsert was about to write, so `upsertOuraHeartrate`'s conflict target never
+   * matched: its `setWhere` exists precisely so an unchanged point does not bump `updated_at` and
+   * churn the Track-B timeseries sync, and the delete defeated it on every pass. Measured on
+   * production: 628,197 inserts and 574,974 deletes against 140,181 live rows, with 95 updates.
+   *
+   * Non-`ble` rows in the window (the chest strap) are never touched by either side.
+   */
+  deleteBleHeartrateNotIn(since: Date, keep: Date[]): Promise<void>
   upsertHeartrate(rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   /** Drop the derived zone-minutes cache from `fromDay` forward — it owns rows we just rewrote. */
   deleteZoneMinutesFrom(fromDay: string): Promise<void>

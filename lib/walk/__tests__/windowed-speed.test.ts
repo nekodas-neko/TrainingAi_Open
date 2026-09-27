@@ -4,6 +4,7 @@ import path from 'node:path'
 import { windowedSpeedKmh, SPEED_WINDOW_SEC, STOPPED_KMH, readPacer, bandFor } from '../walk-pacer'
 import { computeAvgPaceSecPerKm } from '@/lib/activity/activity-metrics'
 import type { RoutePoint } from '@/lib/activity/route-encoding'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * LA-52 — the speed rung read the average speed of the whole walk, so it could not track effort.
@@ -119,8 +120,7 @@ describe('windowedSpeedKmh reads now, not the whole walk', () => {
  * windowed function reachable from nowhere would leave the bug exactly where it was.
  */
 const ROOT = path.resolve(__dirname, '../../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('the screen and the store are wired to the windowed reading', () => {
   it('walk-active pacer input is recentSpeedKmh, and the cumulative pace reaches no speed', () => {

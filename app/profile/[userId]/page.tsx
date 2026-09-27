@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, UserIcon, Flame } from 'lucide-react'
@@ -8,6 +8,8 @@ import { TITLES } from '@trainingai/shared/types/friends'
 import type { PublicProfile } from '@trainingai/shared/types/friends'
 import { TrophyCase } from '@/components/more/trophy-case'
 import { useTransitionRouter } from "@/lib/view-transition";
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 
 function formatVolume(kg: number): string {
   const tons = kg / 1000
@@ -19,17 +21,25 @@ function formatVolume(kg: number): string {
 export default function PublicProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const router = useTransitionRouter()
-  const [profile, setProfile] = useState<PublicProfile | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch(`/api/profile/${userId}`)
-      .then(r => r.ok ? r.json() : r.json().then((e: { error: string }) => Promise.reject(e.error)))
-      .then(setProfile)
-      .catch((e: string) => setError(typeof e === 'string' ? e : 'Could not load profile'))
-      .finally(() => setLoading(false))
-  }, [userId])
+  // RV-178: was a bare `fetch` in a useEffect — a spinner on every open even for a profile seen a
+  // minute ago, and the shape the fetch-once ratchet exists to stop. `useCachedValue` seeds from
+  // cache, revalidates, and refetches when `public-profile:` is invalidated.
+  const profile = useCachedValue<PublicProfile>(
+    `public-profile:${userId}`, `/api/profile/${userId}`, TTL_MEDIUM,
+    {
+      // Only the status reaches here — `cachedFetch` never surfaces the body — but these two are
+      // the cases a reader can act on, and one generic line for both would be a regression on what
+      // the bare fetch showed.
+      onError: ({ status }) => setError(
+        status === 403 ? 'This profile is visible to friends only'
+        : status === 404 ? 'That profile does not exist'
+        : 'Could not load profile',
+      ),
+    },
+  )
+  const loading = profile == null && error == null
 
   const titleDef = profile?.equippedTitle ? TITLES[profile.equippedTitle] : null
   const TitleIcon = titleDef?.Icon
@@ -58,7 +68,10 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {error && (
+        {/* `!profile` because `onError` fires on a REVALIDATION failure too, not only the first load.
+            A profile that painted from cache and then failed a background refresh should keep
+            showing the profile, not an error banner stacked on top of good data. */}
+        {error && !profile && (
           <div className="flex flex-col items-center gap-2 pt-12 text-center">
             <UserIcon className="h-12 w-12 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">{error}</p>

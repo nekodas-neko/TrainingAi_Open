@@ -29,11 +29,20 @@ interface StatsGridProps {
   user: User | null
 }
 
+/**
+ * RV-207 ⑦ — `13.0T` read as thirteen trillion.
+ *
+ * Uppercase `T` is the SI symbol for the TESLA; the tonne is a lowercase `t`, and `kT` was a
+ * kilotesla where a kilotonne is `kt`. The entry offered `13,000 kg` instead, to match Health's
+ * `4,320 kg` — not taken, because Health shows a period total while this is LIFETIME volume, which
+ * reaches seven digits and stops being readable in kilograms. One unit across the app is the
+ * weaker argument when the magnitudes differ by three orders.
+ */
 function formatVolume(kg: number): string {
   const tons = kg / 1000
-  if (tons >= 1000) return `${(tons / 1000).toFixed(1)}kT`
-  if (tons >= 1) return `${tons.toFixed(1)}T`
-  return `${Math.round(kg)}kg`
+  if (tons >= 1000) return `${(tons / 1000).toFixed(1)} kt`
+  if (tons >= 1) return `${tons.toFixed(1)} t`
+  return `${Math.round(kg)} kg`
 }
 
 function formatDistance(km: number): string {

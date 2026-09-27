@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useGuardedAction } from '@/lib/hooks/use-guarded-action'
 import { RefreshCw, Sparkles } from 'lucide-react'
 import { getCached, setCached, readCacheSync } from '@/lib/sqlite/cache'
 
@@ -54,6 +55,15 @@ export function AiInsightCard({ section, date, hasData }: Props) {
     }
   }
 
+  // RV-178: Refresh had no in-flight guard, and `/api/ai/health-insight` allows 10 an hour, so five
+  // impatient taps spent half the day's budget on one card.
+  //
+  // Only the TAP is guarded. Wrapping `fetchInsight` itself also guarded the effect below, and that
+  // is a different thing: switching Health section while a load is in flight would have had the new
+  // section's fetch dropped, leaving the previous section's insight on screen with no retry queued.
+  // The effect is driven by its deps, not by how fast someone can tap.
+  const refreshInsight = useGuardedAction(() => fetchInsight(true))
+
   // Seed synchronously from cache so a repeat open paints the insight instantly
   // (async getCached always misses the first frame → the old full-card spinner
   // flashed on every Health detail open). Then revalidate. No skeleton: while a
@@ -90,7 +100,7 @@ export function AiInsightCard({ section, date, hasData }: Props) {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">AI Insight</span>
         </div>
         <button
-          onClick={() => fetchInsight(true)}
+          onClick={() => void refreshInsight()}
           className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
           aria-label="Refresh insight"
         >

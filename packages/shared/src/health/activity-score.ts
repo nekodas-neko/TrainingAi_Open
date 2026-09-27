@@ -104,10 +104,6 @@ export interface ActivityScoreInput {
   /** Rolling 7-day window (inclusive of today): number of logged strength sessions and total tonnage. */
   sessions7d: number
   volume7dKg: number
-  /** Median single-session tonnage. **No longer sets the volume target** (Q-190), and no longer
-   *  scored against either — `blend-activity` was deleted with Q-284. Kept because the audit view
-   *  displays it. */
-  typicalSessionVolumeKg: number
   /** The user's daily goals (single source — `getDailyGoals`). */
   goals: DailyGoals
   /** Acute:chronic workload ratio for the over-exertion taper. Null skips the taper. */

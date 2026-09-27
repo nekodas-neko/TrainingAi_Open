@@ -38,6 +38,14 @@ export interface NewFoodItem {
   satFatG?: number
   source: FoodItem['source']
   /**
+   * LB-158. The scanned product code, when this came from a barcode. The column, the Zod schema,
+   * the push branch and `rowToFoodItem` have all handled it since the feature shipped — nothing
+   * ever SET it, so production held 341 food items and zero barcodes, 42 of them `source:
+   * 'barcode'`. Supplied by the caller, like `imageDataUri` below and for the same reason: the
+   * code is known at the scan, and nothing downstream of here can recover it.
+   */
+  barcode?: string
+  /**
    * BF-35's thumbnail, when the scan came from a lookup that carried one. Supplied by the CALLER —
    * it used to be read off `sanitiseNutrition`'s return, whose `RawNutrition` is numeric-only, so
    * that line resolved to `undefined` on every call and the image was dropped here for as long as
@@ -68,6 +76,7 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
     sodiumMg: s.sodiumMg,
     satFatG: s.satFatG,
     source: input.source,
+    barcode: input.barcode,
     region: 'AU',
     // BF-35. Present when the scan came from a barcode/search lookup whose Open Food Facts product
     // carried a thumbnail. Never blocks the save: `fetchOffThumbDataUri` returns null on every
@@ -101,6 +110,7 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
     proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG,
     fiberG: item.fiberG, sugarG: item.sugarG, sodiumMg: item.sodiumMg, satFatG: item.satFatG,
     source: item.source,
+    barcode: item.barcode,
     // Rides the outbox payload too — the offline rule is that adding a route field means updating
     // the local table, the queued payload, the push branch and the pull mapping in ONE change.
     imageDataUri: item.imageDataUri ?? null,
@@ -114,7 +124,8 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
       proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG,
       fiberG: item.fiberG ?? null, sugarG: item.sugarG ?? null,
       sodiumMg: item.sodiumMg ?? null, satFatG: item.satFatG ?? null,
-      source: item.source, imageDataUri: item.imageDataUri ?? null, updatedAt: now,
+      source: item.source, barcode: item.barcode ?? null,
+      imageDataUri: item.imageDataUri ?? null, updatedAt: now,
     })
     // Same domain and same client-minted id as logFoodEntries' branch, so a replay lands in place
     // rather than duplicating.

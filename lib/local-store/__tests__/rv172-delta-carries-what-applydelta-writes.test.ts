@@ -20,6 +20,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const backend = readFileSync(join(process.cwd(), 'lib/local-store/sqlite-backend.ts'), 'utf8')
 const engine = readFileSync(join(process.cwd(), 'lib/local-store/sync-engine.ts'), 'utf8')
@@ -34,7 +35,7 @@ const adapter = readFileSync(join(process.cwd(), 'lib/data/postgres/adapter.ts')
  * (TN-66's prompt guard, RV-143's entry parser, and this file). Stripping comments is the fix;
  * rewording around the guard is not, because the next comment will not know to.
  */
-const code = (src: string) => src.replace(/^\s*\/\/.*$/gm, '')
+const code = (src: string) => stripComments(src)
 
 /**
  * `applyDeltaBody` only — the pull path. Every table below ALSO has a local-write upsert with its

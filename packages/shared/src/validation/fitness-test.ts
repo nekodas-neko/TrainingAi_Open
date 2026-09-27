@@ -3,12 +3,13 @@
 // an outbox payload can never write through unvalidated (SYNC-P3 discipline).
 import { z } from 'zod'
 import { activityImplausibleReason } from './plausibility'
+import { isCalendarDate } from '../date-utils'
 
 const FitnessTestFields = z.object({
   testType:    z.enum(['6mwt', 'cooper12', 'resting_hrr']),
   // Both separators: the client fills date params from localDateString(), which emits
   // slashes — a dash-only regex rejects every real request before the handler runs (Q-130).
-  date:        z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
+  date:        z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
   durationSec: z.number().int().positive().max(7200).optional(),
   distanceM:   z.number().nonnegative().max(100000).optional(),
   avgHr:       z.number().int().positive().max(250).optional(),

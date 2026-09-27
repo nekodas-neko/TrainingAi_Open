@@ -90,7 +90,12 @@ const setBackfillReq = (body?: unknown) =>
     ? { method: 'POST' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
 
-const COMPLETED = { id: 'ws-1', startedAt: new Date('2026-09-01T10:00:00Z'), completedAt: new Date('2026-09-01T11:00:00Z') }
+// `workout_sessions.id` is a `uuid` column, and the route refuses anything else at the boundary
+// now rather than letting the driver's 22P02 surface as a 500 (RV-177). The repository is mocked
+// here, so the value is never looked up — what matters is that it is a well-formed id.
+const WS_ID = '3f1b9c20-6b1e-4a7d-9f2a-1c0d5e8a4b77'
+
+const COMPLETED = { id: WS_ID, startedAt: new Date('2026-09-01T10:00:00Z'), completedAt: new Date('2026-09-01T11:00:00Z') }
 
 beforeEach(() => {
   for (const m of [getUserById, rateLimit, reportServerError, getBodyBatteryHistory, listDayCheckins,
@@ -128,7 +133,7 @@ describe('the gate — and the one that deliberately has none', () => {
     // so an admin gate there would break completion for every non-admin. Its ownership check is
     // the repository lookup being user-scoped, asserted below.
     getUserById.mockResolvedValue({ isAdmin: false })
-    expect((await hrSyncReq({ workoutSessionId: 'ws-1' })).status).toBe(200)
+    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(200)
   })
 
   it('answers 503 when the CHECK could not run, not 403 (Q-548)', async () => {
@@ -142,7 +147,7 @@ describe('the gate — and the one that deliberately has none', () => {
 
   it('answers 401 with no session on all three', async () => {
     sessionUser = null
-    for (const [name, call] of [...ADMIN_ONLY, ['hr-sync', () => hrSyncReq({ workoutSessionId: 'ws-1' })]] as [string, () => Promise<Response>][]) {
+    for (const [name, call] of [...ADMIN_ONLY, ['hr-sync', () => hrSyncReq({ workoutSessionId: WS_ID })]] as [string, () => Promise<Response>][]) {
       expect((await call()).status, name).toBe(401)
     }
     expect(getUserById).not.toHaveBeenCalled()
@@ -154,14 +159,14 @@ describe('POST /api/oura/hr-sync', () => {
   it('scopes the session lookup to the caller, which is the ownership check', async () => {
     // There is no separate ownership branch: `getWorkoutSessionById(userId, id)` is user-scoped, so
     // another user's session id simply does not resolve and answers 404.
-    await hrSyncReq({ workoutSessionId: 'ws-1' })
-    expect(getWorkoutSessionById).toHaveBeenCalledWith('u-1', 'ws-1')
+    await hrSyncReq({ workoutSessionId: WS_ID })
+    expect(getWorkoutSessionById).toHaveBeenCalledWith('u-1', WS_ID)
   })
 
   it('runs the attribution pipeline with the caller’s timezone and reports the readings', async () => {
     sessionUser = { id: 'u-1', isAdmin: true, timezone: 'Europe/Berlin' }
-    const body = await (await hrSyncReq({ workoutSessionId: 'ws-1' })).json()
-    expect(syncAndAttributeSessionHr).toHaveBeenCalledWith('u-1', 'ws-1', 'Europe/Berlin')
+    const body = await (await hrSyncReq({ workoutSessionId: WS_ID })).json()
+    expect(syncAndAttributeSessionHr).toHaveBeenCalledWith('u-1', WS_ID, 'Europe/Berlin')
     expect(body).toEqual({ success: true, readings: 7 })
   })
 
@@ -171,7 +176,7 @@ describe('POST /api/oura/hr-sync', () => {
     // coverage-aware backfill catches whatever this pass misses. `readings: 0` carries the truth;
     // the flag does not. Worth knowing before reading `success` as "HR was attributed".
     syncAndAttributeSessionHr.mockRejectedValue(new Error('oura_heartrate read failed'))
-    const res = await hrSyncReq({ workoutSessionId: 'ws-1' })
+    const res = await hrSyncReq({ workoutSessionId: WS_ID })
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ success: true, readings: 0 })
   })
@@ -180,9 +185,9 @@ describe('POST /api/oura/hr-sync', () => {
     // Two different causes behind one 404, and both must be refused: attributing HR to a workout
     // still in progress would snapshot a partial session as if it were done.
     getWorkoutSessionById.mockResolvedValue(null)
-    expect((await hrSyncReq({ workoutSessionId: 'ws-1' })).status).toBe(404)
+    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(404)
     getWorkoutSessionById.mockResolvedValue({ ...COMPLETED, completedAt: null })
-    expect((await hrSyncReq({ workoutSessionId: 'ws-1' })).status).toBe(404)
+    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(404)
     expect(syncAndAttributeSessionHr).not.toHaveBeenCalled()
   })
 
@@ -205,7 +210,7 @@ describe('POST /api/oura/hr-sync', () => {
 
   it('rate-limits generously, because it was fired per completion', async () => {
     rateLimit.mockReturnValue(false)
-    expect((await hrSyncReq({ workoutSessionId: 'ws-1' })).status).toBe(429)
+    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(429)
     expect(rateLimit.mock.calls[0].slice(1)).toEqual([20, 60_000])
     expect(getWorkoutSessionById).not.toHaveBeenCalled()
   })

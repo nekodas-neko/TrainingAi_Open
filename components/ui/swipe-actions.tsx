@@ -82,7 +82,10 @@ export function SwipeActions({ actions, itemLabel, children, className, surfaceC
     { axis: 'x', filterTaps: true, pointer: { touch: true } },
   )
 
-  const isOpen = offset <= -width
+  // **Any displacement at all, not the resting-open state (BF-61, sweep 3).** The tray becomes visible
+  // the moment the row starts moving, so from that moment it is what a tap over its rect is aimed at.
+  // The `offset <= -width` this replaced was true only once the row had travelled the FULL tray width.
+  const displaced = offset < 0
 
   return (
     // `data-swipe-actions` marks the row as owning horizontal gestures that start on it, the way
@@ -91,19 +94,31 @@ export function SwipeActions({ actions, itemLabel, children, className, surfaceC
     // opening a tray also moves the list out from under itself.
     <div data-swipe-actions className={cn('relative overflow-hidden', className)}>
       {/*
-        `z-10` while open is what makes the FIRST tap land on Delete (BF-61). The row is a later
-        sibling, so it paints above the tray, and hit-testing follows the *animated* transform —
-        for the 220 ms the row spends sliding out it is still physically over part of the tray, so
-        a tap in that window hits the row, which swallows it. The owner reported it as needing two
-        presses and confirmed the cause by waiting a second, at which point one press works.
-        Shortening the animation would only make the window rarer to hit, not close it.
+        `z-10` whenever the row is DISPLACED is what makes the FIRST tap land on Delete (BF-61). The
+        row is a later sibling, so it paints above the tray, and hit-testing follows the *animated*
+        transform — while the row is over the tray a tap there hits the row, which swallows it. The
+        owner reported needing two presses and confirmed the cause by waiting a second.
+
+        **⚠ Gating this on `isOpen` was not enough, and the device said so twice.** `isOpen` is
+        `offset <= -width`, which is only true once the row has travelled the FULL tray width — so
+        the raise arrived at the end of the journey rather than the start of it, and everything
+        before that was still the old bug. Sweep 3 tapped in the same `adb shell` call as the swipe,
+        so the tap landed before React had committed the rest-open state at all: **no confirmation,
+        2 of 2**, while the slow tap worked 3 of 3. `offset < 0` raises the tray for the whole of the
+        window in which it is visible, which is the invariant that actually matters — *if you can see
+        it, you can hit it.* Shortening the animation would only have made the window rarer.
+
+        `aria-hidden` and `tabIndex` follow the same flag rather than `isOpen`: a visible button that
+        is `aria-hidden` yet clickable is the shape a11y tooling flags, and the tray is genuinely
+        exposed from the moment it can be seen. Closed (`offset === 0`) it is hidden and unfocusable,
+        which is what the component's own doc comment promises a screen reader.
       */}
-      <div className={cn('absolute inset-y-0 right-0 flex', isOpen && 'z-10')} aria-hidden={!isOpen}>
+      <div className={cn('absolute inset-y-0 right-0 flex', displaced && 'z-10')} aria-hidden={!displaced}>
         {actions.map(a => (
           <button
             key={a.key}
             type="button"
-            tabIndex={isOpen ? 0 : -1}
+            tabIndex={displaced ? 0 : -1}
             aria-label={`${a.label} ${itemLabel}`}
             onClick={() => { openRows.delete(close); close(); a.onPress() }}
             style={{ width: ACTION_WIDTH }}

@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => {
   const src = readFileSync(path.join(ROOT, rel), 'utf8')
   // The comments quote the retired formula while explaining the bug, so a raw-source match would
   // pass on prose — the failure mode already on this repo's record.
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  return stripComments(src)
 }
 
 const CARD = read('components/nutrition/energy-card.tsx')

@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../../..')
+/** The shared stripper, not the regex pair the other source-scan tests copy: that pair reads the
+ *  `/*` inside an `accept="image/*"` string as a comment opener and deletes everything to the
+ *  next closer. Measured on this file's own inputs, it discarded more than half of them, which
+ *  makes a `.not.toMatch` pass over source it never saw (LB-160). */
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-const code = (rel: string) =>
-  read(rel)
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+const code = (rel: string) => stripComments(read(rel))
 
 /**
  * BF-5 PR 2b — the week in review is a page, not a banner that expands.
@@ -84,11 +85,22 @@ describe('BF-5 — the banner becomes the entry point', () => {
     expect(banner).not.toMatch(/href=/)
   })
 
-  it('keeps the once-per-week fetch and the dismissal, which are what make it a banner', () => {
-    expect(banner).toContain('hasFetched')
+  it('keeps the dismissal, and asks nothing at all once dismissed', () => {
     expect(banner).toContain('localStorage.setItem(dismissKey')
-    // `tabs-instant-paint.spec.ts` records that this POST fires on every Home mount.
     expect(banner).toContain('/api/weekly-digest')
+
+    // RV-201 replaced the `hasFetched` ref and the bespoke `ta_weekly_recap_v1_` localStorage
+    // entry with the shared cache. A hook cannot be skipped, so the fetch had to move into a
+    // child the dismissed branch never mounts — without that split, dismissing the banner would
+    // have turned "no request per week" into a request on every Home mount.
+    expect(banner).not.toContain('hasFetched')
+    expect(banner).not.toContain('ta_weekly_recap_v1_')
+    // The dismissed branch returns before the child exists; the fetch is inside the child. Stated
+    // as positions against the child's own declaration rather than against the import above it.
+    const split = banner.indexOf('function WeeklyRecapBannerContent')
+    expect(split).toBeGreaterThan(-1)
+    expect(banner.indexOf('if (dismissed) return null')).toBeLessThan(split)
+    expect(banner.indexOf('useCachedValue<')).toBeGreaterThan(split)
   })
 
   it('and still says so when it fails, rather than vanishing', () => {

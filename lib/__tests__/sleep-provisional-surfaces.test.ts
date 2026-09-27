@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { isQualified, qualifierPhrase } from '@/components/health/score-qualifier'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * Q-529 — a still-syncing night's score was rendered exactly like a settled one.
@@ -16,8 +17,7 @@ import { isQualified, qualifierPhrase } from '@/components/health/score-qualifie
 
 const ROOT = path.resolve(__dirname, '..', '..')
 const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-const stripped = (rel: string) => source(rel)
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const stripped = (rel: string) => stripComments(source(rel))
 
 describe('when a score cell is qualified', () => {
   it('treats provisional as a qualifier in its own right', () => {
@@ -67,7 +67,13 @@ describe('the chip row uses the shared predicate at every site', () => {
   it('marks the sleep cell from the night, not from the readiness payload', () => {
     // Pinned as one pattern: asserting the prop name and the field separately would pass against a
     // cell that reads the flag and never uses it.
-    expect(chip()).toMatch(/href: "\/health\/sleep",[\s\S]{0,120}?provisional: sleepProvisional,/)
+    //
+    // Whitespace is collapsed first, and that is load-bearing (LB-160). The window bounds how much
+    // CODE may sit between the two, and the shared stripper blanks a comment to spaces rather than
+    // deleting it — it preserves byte offsets so line numbers survive. Without the collapse, the
+    // three-line comment that already sits between these two fields spends the whole budget, and
+    // the guard fails on source it should accept.
+    expect(chip().replace(/\s+/g, ' ')).toMatch(/href: "\/health\/sleep", [\s\S]{0,120}?provisional: sleepProvisional,/)
   })
 })
 

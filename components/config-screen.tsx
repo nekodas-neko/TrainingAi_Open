@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useRef } from "react";
+import { useGuardedAction } from "@/lib/hooks/use-guarded-action";
 import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, CheckIcon, Wand2, SlidersHorizontal } from "lucide-react";
 import BuilderWizard from "@/components/workout-builder/builder-wizard";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -8,8 +9,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { toast } from "sonner";
 import { cn } from "@trainingai/shared/utils";
 import type { ProgressionStyle, Program } from "@trainingai/shared/types";
-import type { PhaseSetWithPhases } from "@trainingai/shared/types/program";
-import type { ExerciseLibraryEntry } from "@trainingai/shared/types/program";
+import type { PhaseSetWithPhases, ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { type EditablePhase } from "@/components/config/phase-editor";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { invalidateProgramStructure } from "@/lib/cache-groups";
@@ -306,7 +306,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
     }
   }
 
-  async function clonePhaseSet(ps: PhaseSetWithPhases) {
+  const clonePhaseSet = useGuardedAction(async (ps: PhaseSetWithPhases) => {
     const res = await fetch('/api/phase-sets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -320,7 +320,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
     setPhaseSets(prev => [...prev, data.phaseSet]);
     await invalidateProgramStructure();
     toast.success('Cloned — tap the pencil to customise');
-  }
+  }, () => toast.error('Failed to clone phase set'));
 
   async function deletePhaseSetById(ps: PhaseSetWithPhases) {
     const res = await fetch(`/api/phase-sets/${ps.id}`, { method: 'DELETE' });

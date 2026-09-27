@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { movementParts, movementSummary } from '../movement-breakdown'
 import { computeActiveEnergy } from '@trainingai/shared/health/daily-energy'
 import { STEP_BASE_CREDIT } from '@trainingai/shared/health/energy-baseline'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-87 — the breakdown under the calorie bar, and the threshold that explains a zero.
@@ -17,8 +18,7 @@ import { STEP_BASE_CREDIT } from '@trainingai/shared/health/energy-baseline'
 const ROOT = join(__dirname, '..', '..', '..')
 
 /** Source with comments and imports stripped, so a guard cannot pass on the prose describing it. */
-const code = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+const code = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'))
   .replace(/\/\/.*/g, '')
   .split('\n')
   .filter(l => !l.trimStart().startsWith('import '))
@@ -32,8 +32,7 @@ const code = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
  * could not fail, because the import it was looking for was the first thing removed. Found by
  * mutation, which is the only thing that finds this.
  */
-const codeWithImports = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+const codeWithImports = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'))
   .replace(/\/\/.*/g, '')
 
 /**

@@ -113,6 +113,45 @@ describe('resolveMsToDs', () => {
     }
   })
 
+  // **The case above could not fail, and that is why this one exists (LA-141).** Its anchors span
+  // 10,000 ds over exactly 1,000,000 ms — a slope of exactly 100 ms/ds — so the bracket
+  // interpolation `resolveMsToDs` used to do and the fixed-slope model `resolveDsToMs` uses give the
+  // same answer on it. The property was the right one; the fixture made it unfalsifiable.
+  //
+  // A drain is where they part. Q-139 measured 17,094 ds — 28.5 minutes of ring time — arriving in
+  // 95 s of wall clock, because the ring emits buffered history far faster than real time. Against
+  // that shape the old inverse put a ds **16,144 ds (26.9 minutes of ring time) away from itself**
+  // on a round trip, while its comment called it symmetric with the forward direction.
+  it('round-trips through a history drain, where the derived slope collapses', () => {
+    const anchors = [a(0, 1_000_000, T0), a(0, 1_017_094, T0 + 95_000)]
+    for (const ds of [1_000_000, 1_004_000, 1_008_000, 1_017_094, 1_020_000]) {
+      expect(resolveMsToDs(resolveDsToMs(ds, anchors)!, anchors)).toBeCloseTo(ds, 6)
+    }
+  })
+
+  // A backlog drain mints several anchors seconds apart, each covering a very different ds range.
+  // Anchors that agree about the clock must not move the mapping however many of them arrive — that
+  // is what "robust" has to mean here, and it is the property the bracket interpolation lacked: it
+  // read a pair from the same burst as a slope and compressed ring time between them.
+  //
+  // **Note what this does NOT claim.** Adding anchors that imply a *different* offset does move the
+  // answer, by design — the estimator is over every anchor in the epoch, so a new observation
+  // refines it. An earlier version of this case added inconsistent anchors and expected no movement;
+  // that expectation was wrong, not the code.
+  it('is unmoved by a burst of anchors that agree about the clock', () => {
+    const steady = [a(0, 1_000_000, T0), a(0, 1_864_000, T0 + 86_400_000)]
+    // Same implied lag as both of the above, arriving 500 ms apart mid-window.
+    const lag = T0 - 1_000_000 * 100
+    const burst = [
+      ...steady,
+      a(0, 1_432_000, 1_432_000 * 100 + lag),
+      a(0, 1_432_005, 1_432_005 * 100 + lag),
+    ]
+    for (const utcMs of [T0 + 10_000_000, T0 + 43_200_250, T0 + 80_000_000]) {
+      expect(resolveMsToDs(utcMs, burst)).toBeCloseTo(resolveMsToDs(utcMs, steady)!, 6)
+    }
+  })
+
   it('returns null with no observations', () => {
     expect(resolveMsToDs(T0, [])).toBeNull()
   })

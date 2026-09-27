@@ -285,6 +285,64 @@ if (opacityBad.length) {
   process.exit(1);
 }
 
+// ---- RV-101: the muscle heatmap's volume ramp ----
+//
+// WCAG 1.4.11 puts the floor for a graphical object at 3:1 against what sits next to it. For this
+// ramp the neighbour is NOT `--card`: it is the heatmap's own `defaultFill`, a grey composited over
+// the card, which is what an untouched muscle is painted with. Measured against `--card` the bottom
+// two stops read 2.04:1 and 2.60:1; against the fill they are worse, 1.65:1 and 2.11:1 — so a muscle
+// trained to a fifth of its target was indistinguishable from one never trained at all.
+//
+// Both operands are read out of the component rather than restated here, so editing either the ramp
+// or the fill is what re-runs this check.
+const HEATMAP = path.join(__dirname, '..', 'components', 'muscle-heatmap.tsx');
+const NON_TEXT_FLOOR = 3;
+
+function compositeLum(rgb255, a, bgOklch) {
+  const b = oklchToLinearSrgb(...bgOklch).map(clamp).map(toGamma);
+  const f = rgb255.map(v => v / 255);
+  return relLum(f.map((v, i) => v * a + b[i] * (1 - a)).map(toLinear));
+}
+
+const heatmapSrc = fs.readFileSync(HEATMAP, 'utf8');
+const rampSrc = /const VOLUME_TINT_STEPS = \[([^\]]*)\]/.exec(heatmapSrc);
+const fillSrc = /defaultFill="rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)"/.exec(heatmapSrc);
+const ramp = rampSrc ? [...rampSrc[1].matchAll(/"(#[0-9a-fA-F]{6})"/g)].map(m => m[1]) : [];
+
+// A regex that stops matching is the failure this whole file is written to avoid — it would report
+// a clean ramp while measuring nothing.
+if (!ramp.length || !fillSrc || !dark.card) {
+  console.error('check-contrast: could not read the volume ramp, the default fill, or --card from');
+  console.error(`  ${path.relative(path.join(__dirname, '..'), HEATMAP)} / app/globals.css.`);
+  console.error('  Refusing to report the ramp as passing when nothing was measured.');
+  process.exit(1);
+}
+
+const fillRgb = [Number(fillSrc[1]), Number(fillSrc[2]), Number(fillSrc[3])];
+const fillAlpha = Number(fillSrc[4]);
+// `--card` takes the user's brand hue, so score the ramp at its WORST hue rather than at the
+// `var()` fallback — the same rule the token pairs above are held to.
+const hues = dark.card.hueVaries ? Array.from({ length: 360 / HUE_STEP }, (_, i) => i * HUE_STEP) : [dark.card[2]];
+const rampBad = [];
+for (const tint of ramp) {
+  let worst = Infinity, at = null;
+  for (const h of hues) {
+    const r = ratioFromLum(hexLum(tint), compositeLum(fillRgb, fillAlpha, [dark.card[0], dark.card[1], h]));
+    if (r < worst) { worst = r; at = h; }
+  }
+  if (worst < NON_TEXT_FLOOR) rampBad.push({ tint, r: worst, hue: at });
+}
+if (rampBad.length) {
+  console.error(`Volume-ramp stops below the ${NON_TEXT_FLOOR}:1 non-text floor against an untouched muscle:`);
+  for (const b of rampBad) {
+    console.error(`  ${b.tint} — ${b.r.toFixed(2)}:1 at brand hue ${b.hue}`);
+  }
+  console.error('A stop below the floor cannot be told from a muscle with no sets logged, which is the');
+  console.error('one distinction the heatmap exists to draw. Lift the ramp — note that lifting only the');
+  console.error('bottom stops does not work, there is not enough room beneath the next one.');
+  process.exit(1);
+}
+
 const staleExempt = [...OPACITY_EXEMPT.keys()].filter(f => !fs.existsSync(f));
 if (staleExempt.length) {
   console.error('OPACITY_EXEMPT names files that no longer exist — delete the rows:');
@@ -292,4 +350,4 @@ if (staleExempt.length) {
   process.exit(1);
 }
 
-console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt).`);
+console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt); all ${ramp.length} volume-ramp stops clear ${NON_TEXT_FLOOR}:1 against an untouched muscle.`);

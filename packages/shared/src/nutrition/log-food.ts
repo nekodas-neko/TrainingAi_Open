@@ -48,6 +48,8 @@ export interface NewFoodEntry {
   quantityMultiplier: number
   /** BF-35's thumbnail, when the entry came from a lookup that carried one (BF-70). */
   imageDataUri?: string | null
+  /** LB-158's product code, when the entry came from a barcode scan. */
+  barcode?: string
 }
 
 function r1(n: number) { return Math.round(n * 10) / 10 }
@@ -256,7 +258,11 @@ export async function logFoodEntries(
           sodiumMg: entry.sodiumMg ?? null, satFatG: entry.satFatG ?? null,
           // BF-35/BF-70. A barcode or search lookup carries a thumbnail; a typed entry does not,
           // and absent stays absent rather than becoming a placeholder written into the row.
-          source: entry.source, imageDataUri: entry.imageDataUri ?? null, updatedAt: now,
+          // LB-158. Null on every path but a scan, and a food logged again from Recent comes
+          // through here with an id that may already carry a code. The upsert COALESCEs rather
+          // than overwrites for exactly that reason.
+          source: entry.source, barcode: entry.barcode ?? null,
+          imageDataUri: entry.imageDataUri ?? null, updatedAt: now,
         })
         if (isNew) {
           await store.queueMutation({
@@ -269,6 +275,7 @@ export async function logFoodEntries(
               proteinG: entry.proteinG, carbsG: entry.carbsG, fatG: entry.fatG,
               fiberG: entry.fiberG, sugarG: entry.sugarG,
               sodiumMg: entry.sodiumMg, satFatG: entry.satFatG, source: entry.source,
+              barcode: entry.barcode,
             },
           })
         }

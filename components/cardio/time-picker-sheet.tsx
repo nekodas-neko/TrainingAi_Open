@@ -5,6 +5,7 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { hapticLight } from '@/lib/haptics'
+import { releaseTopSurfaceEntry } from '@/lib/hooks/sheet-back-stack'
 import { Info } from 'lucide-react'
 import { recommendSession, type RunningPlanForRecommend, type SessionModality } from '@trainingai/shared/health/session-picker'
 import type { ZoneQuota } from '@trainingai/shared/health/zone-quota'
@@ -41,12 +42,19 @@ export function TimePickerSheet({ open, onOpenChange, quota, runningPlan, onLogA
     router.prefetch('/activity/guided-walk')
   }, [open, router])
 
+  // BF-165's sibling, swept in with it: the identical close-then-push shape. **Not device-checked** —
+  // this sheet's trigger renders only `!hasRunningPlan` and the owner has one, so it was COULD NOT
+  // CHECK on the S25 sweep. `onLogActivity` opens another sheet rather than navigating, so it needs
+  // no release: the entry stays useful for the sheet that replaces this one.
   function start(modality: SessionModality) {
     hapticLight()
+    const navigating = modality === 'run' || modality === 'walk'
+    const tookSheetEntry = navigating && releaseTopSurfaceEntry()
     onOpenChange(false)
-    if (modality === 'run') router.push('/running')
-    else if (modality === 'walk') router.push('/activity/guided-walk')
-    else onLogActivity()
+    if (!navigating) { onLogActivity(); return }
+    const href = modality === 'run' ? '/running' : '/activity/guided-walk'
+    if (tookSheetEntry) router.replace(href)
+    else router.push(href)
   }
 
   return (

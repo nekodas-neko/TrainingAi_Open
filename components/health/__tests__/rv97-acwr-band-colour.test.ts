@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { acwrBand, acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** RV-97. The ACWR headline was `style={{ color: '#f59e0b' }}` — a literal that is exactly what
  *  `acwrBand()` reserves for the **high** band. The band WORD beside it came from the real
@@ -19,7 +20,7 @@ import { acwrBand, acwrBandByKey } from '@trainingai/shared/ai-periodization/acw
 const ROOT = path.resolve(__dirname, '../../..')
 const CARD = 'components/health/training-load-card.tsx'
 const code = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(src)
 
 describe('RV-97 — the ACWR value is painted by its own band', () => {
   it('the headline takes no hard-coded colour', () => {

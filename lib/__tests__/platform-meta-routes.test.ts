@@ -99,6 +99,42 @@ describe('GET /api/version', () => {
     })
   })
 
+  /**
+   * OR-168. `webBuildSha` is the WEB deploy's commit, and it is the only field here that can
+   * identify a deploy: `version` moves only when a PR bumps the changelog — most merges do not —
+   * and `nativeBuildSha` above is the APK's, a different artefact. The post-merge deploy check
+   * polls for exactly this, so a rename or a drop here silently blinds it.
+   */
+  it('reports the web deploy commit, separately from the APK build sha', async () => {
+    const previous = process.env.RAILWAY_GIT_COMMIT_SHA
+    process.env.RAILWAY_GIT_COMMIT_SHA = 'deadbeefcafe0123456789abcdef0123456789ab'
+    try {
+      lookupLatestApkRelease.mockResolvedValue({
+        release: { version: NATIVE_VERSION, sha: 'abc1234', publishedAt: '2026-09-01T00:00:00Z', apkUrl: APK_URL },
+        status: 'ok',
+      })
+      const body = await (await getVersion()).json()
+      expect(body.webBuildSha).toBe('deadbeefcafe0123456789abcdef0123456789ab')
+      expect(body.webBuildSha).not.toBe(body.nativeBuildSha)
+    } finally {
+      if (previous === undefined) delete process.env.RAILWAY_GIT_COMMIT_SHA
+      else process.env.RAILWAY_GIT_COMMIT_SHA = previous
+    }
+  })
+
+  // Locally and in CI the variable is unset. `null` is the honest answer, and the check's own
+  // diagnosis distinguishes it from a stale deploy — it must not become the empty string.
+  it('answers null for the web deploy commit when the variable is unset', async () => {
+    const previous = process.env.RAILWAY_GIT_COMMIT_SHA
+    delete process.env.RAILWAY_GIT_COMMIT_SHA
+    try {
+      lookupLatestApkRelease.mockResolvedValue({ release: null, status: 'ok' })
+      expect((await (await getVersion()).json()).webBuildSha).toBeNull()
+    } finally {
+      if (previous !== undefined) process.env.RAILWAY_GIT_COMMIT_SHA = previous
+    }
+  })
+
   it('says WHY there is no native version rather than answering a bare null', async () => {
     // A null on its own reads as "up to date" to anyone debugging, which is the opposite of what it
     // means. The status is what makes an unconfigured integration distinguishable from a failed

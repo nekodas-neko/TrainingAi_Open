@@ -12,6 +12,7 @@ import type { MealPlanDayType } from '@trainingai/shared/types/nutrition'
 import type { MealPlanVariantInput } from '@/lib/data/postgres/slices/meal-plans'
 import { invalidBodyResponse, invalidUuidResponse, routeErrorResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { macrosForDayType } from '@trainingai/shared/nutrition/rest-day-macros'
 
 // Meal counts and a reorder.
 const MAX_BODY_BYTES = 32 * 1024
@@ -42,9 +43,6 @@ const PatchSchema = z.object({
    */
   order: z.array(z.number().int().min(0).max(MEAL_COUNT_MAX - 1)).max(MEAL_COUNT_MAX).optional(),
 }).strict()
-
-/** Carbohydrate difference between a training day and a rest day — matches the generate route. */
-const REST_DAY_CARB_REDUCTION = 0.15
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -126,20 +124,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const existingNames = plan.variants[0]?.meals ?? []
 
   const variants: MealPlanVariantInput[] = dayTypes.map(dayType => {
-    const carbShift = dayType === 'rest' ? Math.round(daily.carbsG * REST_DAY_CARB_REDUCTION) : 0
-    const carbsG = daily.carbsG - carbShift
-    const calories = daily.calories - carbShift * 4
+    const target = macrosForDayType(daily, dayType)
     const slots = splitMacrosAcrossMeals(
-      { calories, proteinG: daily.proteinG, carbsG, fatG: daily.fatG },
+      target,
       mealsPerDay,
       { trainingTime: dayType === 'rest' ? null : trainingTime },
     )
     return {
       dayType,
-      targetCalories: calories,
-      targetProteinG: daily.proteinG,
-      targetCarbsG: carbsG,
-      targetFatG: daily.fatG,
+      targetCalories: target.calories,
+      targetProteinG: target.proteinG,
+      targetCarbsG: target.carbsG,
+      targetFatG: target.fatG,
       meals: slots.map((slot, i) => {
         // With an order, slot i takes whatever was at order[i]; without one, position is identity.
         const from = input.order ? input.order[i] : i

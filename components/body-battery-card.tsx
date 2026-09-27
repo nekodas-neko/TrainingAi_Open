@@ -12,6 +12,7 @@ import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/heal
 import { StressStrip } from '@/components/body-battery/stress-strip'
 import { StressDayChart } from '@/components/body-battery/stress-day-chart'
 import type { BodyBatteryResponse } from '@/app/api/body-battery/route'
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 const BATTERY_ICON: Record<BodyBatteryLabel, LucideIcon> = {
   Charged: BatteryFull,
@@ -149,10 +150,7 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
 
         {/* progress bar — fill anchored right so the tank empties from the left */}
         <div className="h-2 rounded-full overflow-hidden bg-muted/60 flex justify-end">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${battery.current}%`, background: color }}
-          />
+          <ProgressFill pct={battery.current} color={color} origin="right" />
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { displayOneRm } from '@trainingai/shared/1rm'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** RV-89. One stored 1RM rendered four different numbers in a single session. For a stored 92.25:
  *  the ready screen said 92.5 kg (`mround125`, a PRESCRIPTION rounder — the one that told the owner
@@ -35,7 +36,7 @@ const SURFACES = [
 const ONE_RM = ['estimated1rm', 'prevEst1rm', 'newEst1rm', 'allTime1rm', 'currentRm', 'peakRm', 'projectedRm']
 
 const code = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(src)
 
 describe('RV-89 — a stored 1RM is rendered by the shared helper, never rounded at the call site', () => {
   for (const file of SURFACES) {

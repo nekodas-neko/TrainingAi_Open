@@ -35,6 +35,7 @@ const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null a
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
+const refitPrescriptionToBudget = vi.fn(async (..._a: unknown[]) => ({ ok: false, reason: 'no_baseline' }) as Row)
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -51,6 +52,9 @@ vi.mock('@/lib/data', () => {
 })
 vi.mock('@trainingai/shared/ai-periodization/generate-prescription', () => ({
   generatePrescriptionForSession: (...a: unknown[]) => generatePrescriptionForSession(...a),
+}))
+vi.mock('@trainingai/shared/ai-periodization/refit-prescription', () => ({
+  refitPrescriptionToBudget: (...a: unknown[]) => refitPrescriptionToBudget(...a),
 }))
 
 import { POST as prescribe } from '@/app/api/ai-periodization/session/[sessionId]/prescribe/route'
@@ -119,6 +123,7 @@ beforeEach(() => {
     setBaselineComplete, advancePhase, storePrescription, updatePrescriptionStatus,
     getLastExerciseLogsBatch, wasProgramSessionTrainedSince,
     listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
+    refitPrescriptionToBudget,
     revertAutoAdoptedBaseline]) m.mockClear()
   getActiveProgram.mockResolvedValue(program())
   ensureSessionPeriodization.mockResolvedValue(state())
@@ -129,6 +134,9 @@ beforeEach(() => {
   listPersonalRecords.mockResolvedValue(new Map())
   listPrevious1rm.mockResolvedValue(new Map())
   generatePrescriptionForSession.mockResolvedValue(generated())
+  // Declines by default, so every pre-existing case still exercises the generation path —
+  // which is also what production does until a prescription carrying a baseline exists.
+  refitPrescriptionToBudget.mockResolvedValue({ ok: false, reason: 'no_baseline' } as Row)
   freshUser()
 })
 
@@ -228,6 +236,99 @@ describe('POST …/session/[sessionId]/prescribe', () => {
   it('rate-limits the twenty-first generation in the hour', async () => {
     for (let i = 0; i < 20; i++) expect((await prescribePost()).status).toBe(200)
     expect((await prescribePost()).status).toBe(429)
+  })
+})
+
+/**
+ * LA-147 — two buckets, because two very different things arrive at this route.
+ *
+ * RV-202 ② stopped a duration change from calling the model but left it spending the model's
+ * allowance, so twenty preset switches in an hour produced "Too many requests" for work the AI
+ * never saw. The limit's own comment cited preset-switching as the reason it was 20 rather than
+ * 10 — the justification had outlived the behaviour.
+ */
+describe('a re-fit does not spend the model\'s budget (LA-147)', () => {
+  const refittedOk = () => ({
+    ok: true,
+    prescription: { ...generated().prescription as Row, durationPreset: 'short' },
+    prescriptionStatus: 'pending',
+    estimatedSessionDurationMin: 25,
+  }) as Row
+
+  it('allows more re-fits than the model\'s limit would', async () => {
+    // THE case. Twenty-one preset switches used to 429 on the twenty-first; none of them reaches
+    // the model, so none of them should be charged to it.
+    refitPrescriptionToBudget.mockResolvedValue(refittedOk())
+    for (let i = 0; i < 25; i++) {
+      expect((await prescribePost({ durationPreset: 'short' })).status, `switch ${i + 1}`).toBe(200)
+    }
+    expect(generatePrescriptionForSession).not.toHaveBeenCalled()
+  })
+
+  it('still bounds them — the re-fit runs ~30 repository reads, so it is not free', async () => {
+    refitPrescriptionToBudget.mockResolvedValue(refittedOk())
+    for (let i = 0; i < 60; i++) expect((await prescribePost({ durationPreset: 'short' })).status).toBe(200)
+    expect((await prescribePost({ durationPreset: 'short' })).status).toBe(429)
+  })
+
+  it('leaves the model\'s own budget intact after a run of re-fits', async () => {
+    // The two buckets are independent: spending the cheap one must not consume the model's.
+    refitPrescriptionToBudget.mockResolvedValue(refittedOk())
+    for (let i = 0; i < 25; i++) await prescribePost({ durationPreset: 'short' })
+
+    refitPrescriptionToBudget.mockResolvedValue({ ok: false, reason: 'no_baseline' } as Row)
+    expect((await prescribePost()).status).toBe(200)
+    expect(generatePrescriptionForSession).toHaveBeenCalled()
+  })
+
+  it('CHARGES the model bucket when a preset request falls through to a real generation', async () => {
+    // A preset with no stored plan to re-fit reaches the generator, so it is about to spend
+    // tokens and must be charged like any other generation.
+    refitPrescriptionToBudget.mockResolvedValue({ ok: false, reason: 'no_baseline' } as Row)
+    for (let i = 0; i < 20; i++) {
+      expect((await prescribePost({ durationPreset: 'long' })).status).toBe(200)
+    }
+    expect((await prescribePost({ durationPreset: 'long' })).status).toBe(429)
+  })
+
+  it('refuses before reading the body, so an unparsed request cannot be free', async () => {
+    // The outer ceiling is checked first precisely so the branch-deciding field cannot be omitted
+    // to get a free parse. Past it, even a malformed body is refused by the limiter, not the schema.
+    for (let i = 0; i < 60; i++) await prescribePost({ durationPreset: 'short' })
+    expect((await prescribePost({ durationPreset: 'nonsense-not-a-preset' })).status).toBe(429)
+  })
+})
+
+describe('a duration change re-fits instead of re-generating (RV-202 ②)', () => {
+  const refitted = () => ({
+    ok: true,
+    prescription: { ...generated().prescription as Row, durationPreset: 'short' },
+    prescriptionStatus: 'pending',
+    estimatedSessionDurationMin: 25,
+  }) as Row
+
+  it('does not reach the model at all when the stored plan can answer', async () => {
+    refitPrescriptionToBudget.mockResolvedValue(refitted())
+    const res = await prescribePost({ durationPreset: 'short' })
+    expect(res.status).toBe(200)
+    expect(generatePrescriptionForSession).not.toHaveBeenCalled()
+    const [, , , tz, preset] = refitPrescriptionToBudget.mock.calls[0]
+    expect(tz).toBe('Australia/Brisbane')
+    expect(preset).toBe('short')
+    expect((await res.json()).durationPreset).toBe('short')
+  })
+
+  it('is never consulted when no preset was asked for', async () => {
+    await prescribePost()
+    expect(refitPrescriptionToBudget).not.toHaveBeenCalled()
+    expect(generatePrescriptionForSession).toHaveBeenCalled()
+  })
+
+  it('falls through to a full generation when the stored plan cannot answer', async () => {
+    const res = await prescribePost({ durationPreset: 'long' })
+    expect(res.status).toBe(200)
+    expect(refitPrescriptionToBudget).toHaveBeenCalled()
+    expect(generatePrescriptionForSession.mock.calls[0][5]).toBe('long')
   })
 })
 

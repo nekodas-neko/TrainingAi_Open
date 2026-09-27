@@ -3,6 +3,7 @@ import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { COACH_MODEL_ID, coachModel, loggedStreamText } from '@/lib/ai/instrument'
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
@@ -41,6 +42,10 @@ const BodySchema = z.object({
   scope: z.string().max(40).optional(),
 })
 
+// RV-173: the guards belong here for the same reason they belong on every other prose route —
+// this one streams free text ABOUT the owner's own numbers. Q-292's failures (Fahrenheit, a score
+// of 80 called "perfect") are exactly what an unguarded prompt over his data produces, and Coach
+// had none of them while the six listed prose routes did.
 const SYSTEM = `
 You are AI Coach in a personal training app. You can look at the user's data, explain things, and
 propose changes to their program. You never change anything yourself — every change goes through a
@@ -167,6 +172,8 @@ Never describe what a change will cost — no set counts, no percentages of anyt
 consequences itself and shows them under your proposal. Anything you assert about the user's data
 must come from a tool result, never from memory of earlier in the conversation.
 
+${PROSE_GUARDS}
+
 Today's date: TODAY_ISO.
 `.trim()
 
@@ -178,7 +185,9 @@ Today's date: TODAY_ISO.
  * UI message protocol so widgets reach the client. Both exist until Phase 2 repoints the four
  * live entry points, at which point the old pair is deleted.
  *
- * This route has no user-facing entry point yet — Phase 1 ships the protocol only.
+ * `app/coach/coach-content.tsx` drives this route (it is the chat transport's `api`), so its
+ * output reaches the owner. It said "no user-facing entry point yet" until RV-173, which is part
+ * of why it was never added to the prose-guard list.
  */
 export async function POST(req: Request) {
   try {

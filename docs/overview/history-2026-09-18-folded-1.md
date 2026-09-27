@@ -1609,6 +1609,23 @@ three existing tests failed loudly on the un-updated call, which is what a defau
 so stored days inside that window are corrected by the next pass. Days older than that keep their old
 values until a wide pass covers them.
 
+> **⚠ CORRECTION, 2026-09-25 (RV-169, Lane A) — the paragraph above is WRONG and no self-healing
+> happened.** `RESILIENCE_MAX_DAYS` is not a lookback. The loop runs
+> `startI = Math.max(1, summaryRows.length - 21)`, and `summaryRows` holds only the days the
+> *current pass* covers — a routine incremental pass covers about one night, so `startI` is 1 and
+> the pass rewrites its own night and nothing else. The 21 **caps** a wide pass; it never extends a
+> narrow one.
+>
+> Measured in production on 2026-09-25, 7 days after this shipped:
+> `oura_daytime_stress_buckets` begins **2026-08-24**, and **every day from 08-24 to 09-16 still
+> carries 9–12 sleeping (pre-06:00) buckets** — 24 days, plus 09-18, whose night is missing for the
+> separate reason in RV-163/PS-17. From 09-17 on the count is **0**. Across the whole table that is
+> **253 of 774 buckets (32.7%)** still scoring sleep as daytime stress.
+>
+> The cliff at 09-17 is this change taking effect going forward. Nothing behind it moved, and
+> nothing will: those days age out of every window without ever being recomputed. Tracked as
+> **RV-169**.
+
 **The size of the change could not be predicted before shipping.** Only `level` is persisted, never
 `dhrv`, so the corrected levels cannot be recomputed from stored data — the median has to be rebuilt
 from the raw inputs. The direction is certain (fewer waking buckets scored below baseline on

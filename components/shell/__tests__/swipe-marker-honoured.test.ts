@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-95 — a declared contract that nothing honoured, and BF-96's sibling asymmetry.
@@ -20,7 +21,7 @@ import { join } from 'node:path'
 const ROOT = join(__dirname, '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 /** Comments stripped: the entries and the fixes are both described in prose in these files. */
-const code = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+const code = (rel: string) => stripComments(read(rel)).replace(/\/\/.*/g, '')
 
 describe('BF-95 — the swipe marker is read by the navigator', () => {
   it('every surface that declares the marker is excluded from the tab swipe', () => {
