@@ -8758,24 +8758,6 @@ drift.
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
 
-### [platform] LB-151 — `pushMutations` has no in-flight guard, and several surfaces can call it at once
-
-- **Lane: A** — `lib/local-store/sync-engine.ts` (Lane B found it while shipping RV-122).
-- **Added:** 2026-09-25 · from RV-122's *"do not double-fire against `handlePullSync`"* note, which
-  turned out to describe a gap in the engine rather than in the card.
-- **Measured:** `pushMutations` (`sync-engine.ts:839`) holds **no concurrency guard** — the only
-  gate is `push5xxUntil`, a server-error backoff — so two overlapping calls both drain the outbox.
-  Eleven call sites reach it (`more-content.tsx:118`, `sync-provider.tsx:165`/`:220`,
-  `push-then-revalidate.ts:33`, `sync-health-card.tsx`, per-domain writes); the More tab alone has
-  two on one screen, the pull gesture and the card.
-- **⚠ NOT established, and must be before this is sized:** whether a double drain actually
-  double-WRITES. The push endpoint shows no dedup on a mutation id, but the per-domain handlers may
-  be upserts, which makes it wasteful rather than wrong. **Read a couple of the domain writers
-  first** — that decides whether this is a correctness bug or a bandwidth one.
-- **RV-122 slightly improves it:** "Retry all" sends one push for N failures where N taps sent N.
-- **Fix if real:** a module-level in-flight promise later callers await, the shape `cachedFetch`'s
-  in-flight map already uses for reads.
-
 ### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
 
 - **✅ ANSWERED BY THE OWNER, 2026-09-26: RETUNE THE TOKEN FIRST, THEN MIGRATE — option (b).** Set the token
