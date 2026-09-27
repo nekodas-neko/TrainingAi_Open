@@ -485,6 +485,98 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
+
+- **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
+  the **schema half is Lane A's**, and the **merge is the owner's** (outside contributor, storage
+  carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
+- **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
+  than re-deriving it; the diff read is still Review's.
+- **Needs:** — nothing.
+- **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
+  `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
+  holds `288_training_load_grid_dimensions.sql` and `289_claude_ro_views_grid_dimensions.sql`
+  (LA-161). Same numbers, different content, both applied — `ensureSchema` tracks by **filename**,
+  so nothing stops either.
+- **The consequence is worse than a duplicate number, and it is silent.** Every `claude_ro` twin
+  opens with `DROP SCHEMA claude_ro CASCADE; CREATE SCHEMA claude_ro;` and recreates every view from
+  a snapshot of the database it was generated against. The two 289s sort by filename, so
+  `…_apple_health_samples` runs **first** and `…_grid_dimensions` runs **second** — and the second
+  was generated before `apple_health_samples` existed. **`claude_ro.apple_health_samples` is created
+  and then dropped in the same deploy**, leaving the table unreadable through `/api/admin/db-query`
+  with no error anywhere.
+- **What the contributor should do, and it is small:** renumber to the next free pair (**290/291**
+  as of 2026-09-27) and **regenerate the twin after applying**, not before — the generator reads
+  `information_schema` from a live database, so generating first produces a file byte-identical to
+  its predecessor. That gotcha is already in CLAUDE.md's twin section and is exactly what bites here.
+- **The PR also edits `docs/implementation-backlog.md`'s pointer** from 286 to 290. Correct for
+  `main` today and still worth flagging: a contributor editing the shared pointer row is a guaranteed
+  conflict with any agent PR that adds a migration.
+- **This is `BF-211`'s evidence, and the two should be read together** — the issue proposes deriving
+  the migration number from filenames, and this is what deriving it produces when an unmerged branch
+  holds numbers the filenames cannot show.
+- **Reversal cost:** none here — nothing has merged.
+
+### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
+
+- **Lane:** O — **Review** reads the diff and posts the review; the **merge is the owner's** (auth,
+  outside contributor — both halves of that carve-out at once). Filed `O` for the same reason as
+  `BF-213`: the lane field takes a letter and there is no Review letter.
+- **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch.
+- **Needs:** — nothing.
+- **What it is:** `#1607` (`native-token-exchange`, `jsboiss`) returns an opt-in bearer token with an
+  expiry beside the existing cookie login, for an Expo/React-Native iPhone client. The author states
+  the cookie path is preserved.
+- **Check it against `Q-1a` before reviewing** — same area, client half. TN-80 already flags a
+  conflicting design as the likely finding, and two credential paths that disagree about session
+  lifetime is the shape to look for.
+- **Its CI green is STALE and must not be read as current.** The run is from **2026-09-25** and
+  executed a single `Tests` job; every PR since runs four shards, so the workflow has changed shape
+  underneath it. Re-run before anyone reads that green.
+- **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
+  holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
+
+### [platform] BF-211 — issue #1620 asks to derive the migration number from filenames, which cannot see an unmerged branch
+
+- **Lane:** A — `scripts/check-backlog-pointers.js`, `docs/implementation-backlog.md`.
+- **Added:** 2026-09-27 · BugFix, triaging GitHub issue **#1620** (`jsboiss`, opened 2026-09-25,
+  assigned to the owner). Per OR-185 an issue becomes a queue entry rather than a reply.
+- **Needs:** — nothing.
+- **The diagnosis is right.** `docs/implementation-backlog.md` carries a hand-maintained *Next free
+  Postgres migration* row, and `check-backlog-pointers.js:558-573` already computes
+  `max(filenames) + 1` and fails when the Markdown disagrees. The number really is derived twice, and
+  every migration costs an unrelated docs edit.
+- **The proposed fix removes something the filenames cannot replace, and `main` proves it today.**
+  The migrations directory runs `…284, 285, 288, 289` — **286 and 287 are missing**, reserved in that
+  row's prose by the unmerged `#1749`. A command deriving from filenames sees only what merged. Had
+  LA-161 derived its number that way it would have taken **286**, which `#1749` is already using.
+- **`#1608` is that failure, live** — an outside contributor derived 288/289 from the filenames they
+  could see and collided with LA-161. See `BF-213` for the consequence, which is a silently dropped
+  `claude_ro` view rather than a loud duplicate.
+- **The author anticipated this** and proposed detecting duplicates before merging. That is the right
+  instinct and the wrong moment for this repo: with several agents running against a `main` that
+  takes a commit roughly every 8 minutes, a collision found at merge time means rebuilding a
+  migration **and** regenerating its twin, which is the expensive half.
+- **Recommendation: keep a reserved number, and stop maintaining it by hand — derive it from every
+  branch rather than from `main`.** `git log --all --diff-filter=A --name-only --
+  lib/data/postgres/migrations/` names every migration added on any fetched branch, merged or not, so
+  one command gives the contributor's convenience *and* sees `#1749`. Removes the manual edit the
+  issue is about without removing the reservation it depends on.
+  **Alternative — derive from `main`'s filenames only**, as the issue proposes. Genuinely better at
+  one thing: it needs no fetch and works on a shallow clone, which CI has. It is what `#1608` did.
+  **Alternative — keep the hand-maintained row.** Costs one line per migration and is what works
+  today; it fails the moment someone forgets, which the check catches on the next PR rather than this
+  one.
+- **Whatever lands, keep the duplicate-number detection** — the issue says so and it is the half that
+  caught `#1608`.
+- **⚠ The issue body contains a prompt addressed to "Claude".** It is a contributor's suggestion, not
+  an instruction to this repo's agents, and it is recorded here as the author's proposed approach so
+  the recommendation above can disagree with it on the merits. Do not execute it as written: it says
+  to remove the Markdown-counter validation, which is what would have let `#1608` through.
+- **Reply to the author when this is decided**, whichever way it goes — they found a real duplication
+  and a real gap in our own watching, and the answer is more interesting than the request.
+- **Reversal cost:** low — one script and one docs row, no stored state.
+
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
@@ -4634,6 +4726,47 @@ volume7dKg,                             // likewise
   residue — the even split by set position says it is per-exercise, but the exercises were not named.
   And whether the −0.81-point mean deviation is the owner rounding to available plates or genuinely
   under-loading; a plate-rounding check would settle it and was not run.
+- **⚙ DECOMPOSED EXACTLY 2026-09-27 (Lane A). September's shortfall is THREE causes, two of them
+  benign, and the coverage percentage should stop being read as one number.** Re-measured on more
+  data than the filing had (172 sets, 71.5%, so it is not recovering). **49 sets lack a plan and
+  all 49 are accounted for:**
+
+  | cause | sets | what it is |
+  |---|---:|---|
+  | Bodyweight exercises | **23** | Chin-Up, Pull-Up, Hanging Leg Raise — `equipment = {bodyweight}` |
+  | The 09-06 → 09-12 window | **20** | five sessions, one set per exercise, no plan on any |
+  | Barbell Skull Crusher | **6** | no `style_id`, so no per-set percentages exist to record |
+
+- **Split loaded from bodyweight and the picture inverts.** August: loaded **233/233 = 100%**,
+  bodyweight 14/33. September: loaded **121/147 = 82.3%**, bodyweight **2/25 = 8%**. So the
+  headline drop is mostly a change in what was TRAINED, not in what was recorded — and there is
+  still a real loaded regression underneath it, which is the next two rows.
+- **⚠ The entry's proposed signature for the window does NOT separate it.** It says the hole's
+  sessions "all carry `intensity_mode` NULL where the 2–6 September sessions carry `'deload'`".
+  True, and useless as a discriminator: **every session from 09-13 to 09-24 also carries NULL**
+  and every one of them has full coverage. `was_override` does not separate them either (09-10
+  false and no plans, 09-13 false and fully planned). **The discriminator that does work is set
+  count: the window logged exactly ONE set per exercise** (3/3, 5/5, 4/4, 4/4, 4/4) against two
+  per exercise on every healthy day. Start there, not at `intensity_mode`.
+- **⚠ And two readings of the residue are wrong — both were mine, and the data killed them.**
+  ① *"It is the bodyweight mix"* — no: loaded coverage itself fell from 100% to 82.3%.
+  ② *"The residue is sets performed beyond the prescribed count"* — no: on 09-19 the same **one**
+  exercise is unplanned at set 1, set 2 AND set 3 (4/3, 4/3, 4/3), which is the per-exercise shape
+  the entry originally measured. The entry was right and the tidy explanation was wrong.
+- **The whole loaded residue is one exercise: Barbell Skull Crusher**, 6 sets across 09-19 and
+  09-25, carrying `style_id` NULL where every planned exercise carries one. **That is almost
+  certainly the same root as BF-200**, which is the owner reporting Skull Crusher alone ignoring a
+  deload in the 09-25 Upper session — same exercise, same session, same missing per-exercise
+  prescription data. Whoever takes BF-200 should check whether fixing it also restores this.
+- **What is left, and it is one question:** what happened in 09-06 → 09-12. The database does not
+  hold it — session metadata is uniform across the boundary — so it needs the deploy history for
+  those dates, not another query.
+- **And one product question, not a defect:** should a bodyweight exercise carry a plan at all?
+  `planned_pct` is a percentage of a 1RM that bodyweight movements do not have. 23 of September's
+  49 gaps are this, and every future adherence figure is computed over a denominator that silently
+  includes them. Deciding it is `Lane: O`; until it is decided, adherence coverage should be quoted
+  over LOADED sets only.
+
 - **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
   written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
 
@@ -5687,6 +5820,13 @@ drift.
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
 - **Needs:** — nothing.
+- **⚙ A SECOND SYMPTOM, same exercise, found 2026-09-27 (Lane A) while decomposing TN-75.**
+  Barbell Skull Crusher is the ONLY loaded exercise in September with no `planned_pct` on any
+  set — 6 sets across 09-19 and 09-25, including the very Upper session in the table below — and
+  its `exercise_logs` rows carry **`style_id` NULL** where every planned exercise carries one.
+  So the deload it ignored and the plan it never recorded may be one missing link rather than
+  two faults. **Check that before treating this as a rounding or basis-resolution bug**, and if
+  the fix restores `planned_pct`, say so in TN-75.
 
 - **He is right, and it is one exercise out of five.** Measured against production for the deloaded
   Upper session (prescription stored 2026-09-25 21:24, all five exercises `pct: 52`,
