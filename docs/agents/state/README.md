@@ -18,7 +18,7 @@ session reads its own baton first and continues from it under the same name.
 blocked. A successor should be able to act from it within a minute of reading.
 
 The narrative — why decisions were made, what dead ends were hit, what a cluster of work amounted
-to — goes in a dated `docs/handoff-YYYY-MM-DD-<domain>-<title>.md` written with the `handoff` skill.
+to — goes in a dated `docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md` written with the `handoff` skill.
 Batons are always current and always overwritten; handoffs are dated and never edited after the
 fact. Keeping them separate is what stops the baton growing into another accreted document.
 

@@ -1117,7 +1117,7 @@ is outstanding, which is what makes this archivable rather than resident.
 
 <!-- Struck 2026-08-20 by Review (session wrap-up, sweeps 29-39). Each verified fixed in
      source on main before moving -- not inferred from the queue's silence. Evidence per entry
-     in docs/handoff-2026-08-20-platform-review-sweeps-29-39.md. -->
+     in docs/handoffs/handoff-2026-08-20-platform-review-sweeps-29-39.md. -->
 
 ### [platform] ✅ Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
 
@@ -1809,7 +1809,7 @@ doubt.
 - **The `FATAL: role "root" does not exist` lead was not the cause** and was not pursued further. It
   is present while the suite passes, so it is noise for this purpose rather than a finding — but
   nobody has explained it, and it should not be re-chased as an E2E failure cause.
-- Context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](../handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
+- Context: [`docs/handoffs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](../handoffs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
 
 ### [platform] ✅ RESOLVED 2026-08-30 — the module map points at `lib/` for modules that live in `packages/shared/` (LA-35)
 

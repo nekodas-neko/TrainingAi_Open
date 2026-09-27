@@ -128,7 +128,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   structural and **not observed** (the fixture had nothing to scroll). §5 records two lenses that came
   back clean: all seven `freshWithinTtl` sites have every writer in a group, and the fetch-once
   CAN-BITE group is empty.
-- [`docs/handoff-phase-3-bundled-shell.md`](../../handoff-phase-3-bundled-shell.md) — the live
+- [`docs/handoffs/handoff-phase-3-bundled-shell.md`](../../handoffs/handoff-phase-3-bundled-shell.md) — the live
   Phase 3 baton (bundling the shell into the APK). Task 4 is now **decided** (option B).
 - [`2026-08-19-cache-invalidation-signal`](../../overview/history-2026-09-10-folded-1.md#2026-08-19-cache-invalidation-signal)
   — **Q-402: the shell has no unmount, so a fetch-once effect in it never fetches again.** All six
@@ -144,7 +144,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`docs/superpowers/plans/2026-07-30-phase-3-workspace-split.md`](../../superpowers/plans/2026-07-30-phase-3-workspace-split.md)
   — the Task 4 (option B) workspace-restructuring plan: workspace + shared `lib/` package → app
   split (`shell/` + `api/`) → the export flip.
-- [`docs/handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md`](../../handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md)
+- [`docs/handoffs/handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md`](../../handoffs/handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md)
   — navigation perf audit, two auth-boundary fixes, the Task 4 = option B decision (superseded on
   content by the 2026-07-30 consolidation handoff, kept for the gotchas it recorded).
 - The **`mobile-app-design-standards`** and **`mobile-app-ui-design`** skills.
@@ -193,7 +193,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   `components/more/__tests__/more-row-group-arity.test.ts` holds it. **Still owed:** the owner's
   answer on §2(c), and one look on the S25.
 - Reviews: [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](../../reviews/2026-08-14-app-ui-flow-ia-review.md) — **UI / flow / information-architecture + caching review, 2026-08-14** (owner-requested; the full navigation map with a reachability count for all 39 page routes, the proposed target structure for More/Settings/Devices/Program/Admin, and 13 findings queued as Q-232…Q-244). Its prompt is [`2026-08-14-app-ui-flow-ia-review-prompt.md`](../../reviews/2026-08-14-app-ui-flow-ia-review-prompt.md). **§7 is the separate testing-capability measurement** — the 81 "NOT verified on device" rows split into five gates, only 25 of which need the device, queued as Q-249…Q-254.
-- Handoff: [`docs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
+- Handoff: [`docs/handoffs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoffs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
 - [`docs/reviews/2026-08-18-offline-read-surfaces.md`](../../reviews/2026-08-18-offline-read-surfaces.md) — **offline read surfaces, driven for real, 2026-08-18** (**both paths work** once the SW controls the page: a reload serves the precached offline document, and an offline tab tap paints **2515 chars vs 2486 online, ~101%**. Q-555 — in the **uncontrolled** state, which is the first-ever load, the same tap is a **silent no-op**: no navigation, no offline page, no feedback). **Web only** — `cachedFetch` falls back to `localStorage` there, so the seed path was verified, not the native SQLite store.
@@ -342,7 +342,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- **[`docs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
+- **[`docs/handoffs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoffs/handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
 
 - **[`2026-08-30-apk-banner-tap-target`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-apk-banner-tap-target)**
   — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
@@ -380,7 +380,7 @@ Live at the time of writing (2026-07-30):
   closed on the frame it opened.
   [`2026-08-26-sibling-sheet-back-dismiss.md`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-sibling-sheet-back-dismiss).
 
-- **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
+- **[`docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
   — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
   StrictMode-safe, so a sheet mounted already-open closed itself on the frame it opened and five
   sheets looked unopenable in `pnpm dev` while production was fine. **Q-477 completed** — the
@@ -429,7 +429,7 @@ Live at the time of writing (2026-07-30):
   was being labelled. Guarded by `e2e/profile-group-labelling.spec.ts`, whose two assertions were
   each proven lethal by mutation. Left open as **Q-350**: none of the app's eight radiogroups
   implements arrow-key navigation, which wants one shared primitive rather than eight copies.
-- **[`docs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md`](../../handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md)**
+- **[`docs/handoffs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md`](../../handoffs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md)**
   — 🆕 what came after the IA cluster: 6 PRs closing Q-255, Q-232-followup, Q-258, Q-259, Q-260 and
   Q-262. **Q-260 is the substantive fix** — `user-goals` was fetched by the Progress tab's group
   while the water goal renders on a `BODY_GROUPS` card, and because every tab stays mounted for the
@@ -439,7 +439,7 @@ Live at the time of writing (2026-07-30):
   (Playwright's `:visible` is not "on screen"), three attempts at one guard of which none is one, and
   the parallel-lane trap that cost two complete pieces of work.
 
-- **[`docs/handoff-2026-08-15-app-shell-ia-cluster-complete.md`](../../handoff-2026-08-15-app-shell-ia-cluster-complete.md)**
+- **[`docs/handoffs/handoff-2026-08-15-app-shell-ia-cluster-complete.md`](../../handoffs/handoff-2026-08-15-app-shell-ia-cluster-complete.md)**
   — 🆕 the 2026-08-14 UI/flow/IA cluster worked to completion: 11 PRs, v1.307.2→v1.314.0, closing
   Q-232/233/234/235/236/237/238/239/242/244 and Q-256. `profile-tab.tsx` 845 → 465 lines and off the
   size baseline; Custom Rules 33 → 35 steps. Records the decisions (why Q-238 was deleted rather than
@@ -448,7 +448,7 @@ Live at the time of writing (2026-07-30):
   `pnpm build` corrupting a running dev server's `.next`, checks firing on comments, and an assertion
   that passed while the behaviour it guarded was broken.
 
-- **[`docs/handoff-2026-08-08-app-shell-review-backlog-ui-batch.md`](../../handoff-2026-08-08-app-shell-review-backlog-ui-batch.md)**
+- **[`docs/handoffs/handoff-2026-08-08-app-shell-review-backlog-ui-batch.md`](../../handoffs/handoff-2026-08-08-app-shell-review-backlog-ui-batch.md)**
   — 🆕 the Agent-2 half of that dispatch, worked to completion: 16 PRs (v1.270.x→v1.270.30) closing
   Q-119/120/121/123/125/126/127/132/133/135/136-pt1 and the Q-95/Q-97/Q-109 follow-ups, plus Q-148
   (client components could not read the user's timezone at all) and Q-111's ring half. Records four
@@ -456,7 +456,7 @@ Live at the time of writing (2026-07-30):
   was silently miscolouring **26 shipped sites** — with `scripts/check-color-mix-hue.js` as its
   ratchet. Also the git/tooling traps that cost time: version collisions under a parallel agent,
   `reset --soft` leaving rebased copies of `main`, and `pkill -f "next dev"` killing its own shell.
-- **[`docs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](../../handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md)**
+- **[`docs/handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](../../handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md)**
   — 🆕 wrap-up for the 2026-08-07 full-app-review backlog drain (9 PRs merged this session,
   including Q-73's home hydration-mismatch fix and Q-118's navless safe-area sweep). Splits the
   remaining ~18 ready items into two parallel-agent pickup prompts by file territory; Agent 2 owns
@@ -497,7 +497,7 @@ Live at the time of writing (2026-07-30):
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
   casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
   collides with `SESSION_PALETTE` because that palette is indexed by POSITION, not by name.
-- Handoffs: `ls docs/handoff-*-app-shell-*.md`
+- Handoffs: `ls docs/handoffs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-73 — the home header's date string mismatched between server (UTC) and client (Australia/Brisbane)

@@ -341,7 +341,7 @@ Live at the time of writing (2026-07-30):
   the 0.933 h gap (52%)**; the ratio reaches **0.875, not ~1.0**. **Do not ship a wider
   `MEDIAN_WINDOW` as the fix, and do not move `RECOVERY_INDEX_OPTIMAL_HOURS`.** Re-confirms the
   level shift at n=57 (mean 2.653 h) and the 2.00 median |Δbpm|. Half the shift is still unexplained.
-- [`docs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoff-2026-08-24-readiness-scores-owner-batch.md)
+- [`docs/handoffs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoffs/handoff-2026-08-24-readiness-scores-owner-batch.md)
   — **the owner's readiness/battery batch, 2026-08-24.** Four owner questions in one session
   (daytime stress, Body Battery flooring, score volatility, the temperature deload trigger) →
   **TN-2** … **TN-7**. Carries the method rules that cost time: a per-sample percentile on the BLE
@@ -350,8 +350,8 @@ Live at the time of writing (2026-07-30):
 
 
 
-- Handoffs: `ls docs/handoff-*-readiness-*.md` — plus
-  [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+- Handoffs: `ls docs/handoffs/handoff-*-readiness-*.md` — plus
+  [`docs/handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-39 — the Body Battery anchor flipping source mid-day, **fixed in #996**), filed under `cross`
   because it spans five pillars and so is not matched by the glob above.
 - Journal: `grep -rl 'readiness\|body.battery\|resilience' docs/overview/entries/` — including

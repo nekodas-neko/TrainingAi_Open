@@ -218,15 +218,15 @@ cause of one class was a posted step window coming from a *different stream* tha
   400s and the activity is lost behind a generic toast — the outbox parses the same schema.
 
 - Cross-domain, but the Activity Score change lives here:
-  [`docs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
+  [`docs/handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
   (Q-183 — a lifting day's zero zone-minutes is no longer scored as a missed cardio target; carries
   the 45-day measurement that chose the trigger, and the finding that **40 of 45 days were exactly
   zero**, which bears on any re-anchoring of that goal).
-- Handoffs: `ls docs/handoff-*-activity-*.md` — including
-  [`docs/handoff-2026-08-07-activity-ring-clock-compression.md`](../../handoff-2026-08-07-activity-ring-clock-compression.md)
+- Handoffs: `ls docs/handoffs/handoff-*-activity-*.md` — including
+  [`docs/handoffs/handoff-2026-08-07-activity-ring-clock-compression.md`](../../handoffs/handoff-2026-08-07-activity-ring-clock-compression.md)
   (Q-139 — why the ring's step timeline is distorted, why the Samsung-Health gap is *not* the bug,
   and the measurement traps that make this expensive to re-derive) — plus
-  [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+  [`docs/handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-36 — the guided walk that could never sync, and the calendar blind spot behind it), filed under `cross` because it spans five pillars and so is not matched by the glob above.
 - Journal: `grep -rl 'step\|activity.score' docs/overview/entries/` — plus
   [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)

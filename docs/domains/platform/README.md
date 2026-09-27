@@ -55,7 +55,7 @@ layer**) through §16. Read it before building any shared helper.
 - [`docs/reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md`](../../reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md) — **the FK edges into user-scoped tables, 2026-09-03** (sweep 45, RV-42). The inventory is **31 edges, not the 27** sweep 40 counted, 20 with no `user_id` on the child — re-run the query in §2 rather than the remembered number. **Four nutrition edges hold, each proven with a control**: `food_logs.food_item_id`, `.meal_type_id`, `.saved_meal_id` (400, against a 201 control) and `supplement_logs.supplement_id` (404, against a 200). **RV-42**: `meal_plan_meals.saved_meal_id` and `.meal_type_id` take client ids with no ownership check through two routes. No name leaks — the read joins neither table — but both are `ON DELETE SET NULL`, so the referenced row's owner deleting their own saved meal silently nulled the other account's plan row, driven end to end. The workout and device edges are **untouched, not clean**.
 - [`docs/reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md`](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md) — **ownership rule (a) audited, and the id guard's blind spot, 2026-09-03** (sweep 43). **Rule (a) is CLEAN and now has the evidence it lacked** — all 21 unscoped child deletes across 12 functions are guarded, and both incidents the rule was written from are verified fixed end to end with the child rows counted: B forging A's progression-style id gets 404 and A's 3 `style_sets` survive; B forging A's saved-meal id gets 404 and A's item survives. Nothing outside `lib/data/postgres/` has the shape. **RV-40** is the defect one layer out: `invalidUuidResponse` is used by 27 route files, **27 of 27 dynamic `[id]` routes and zero body-id routes**, so `POST /api/progression-styles` answers a malformed body id with a **zero-byte 500** (on a route RV-33 already fixed for the ownership path) and `POST /api/workout-templates` with `500 Save failed`, while three siblings say `400 Invalid id`. Both also store the raw SQL in `error_events`. §6 records the probe traps, including a near-miss that read as a cross-user hijack and was not one.
 - [`docs/reviews/2026-09-02-db-growth-archive-attribution.md`](../../reviews/2026-09-02-db-growth-archive-attribution.md) — **the DB growth is partly the archive the baseline predates, 2026-09-02 (BF-55, Q-283).** Total re-read at **200 MB** (down from 206 — migration 249 took the 21 MB index). `oura_raw_packed`'s **first pack is dated 2026-08-18, the same day as the 171 MB baseline**, and it has grown **18 MB / ~1.2 MB/day** since, never pruned — **~62% of the excess, and the ~0.4 MB/day expectation cannot have included it.** **Q-283 is stale by ~14×**: its one real candidate was already dropped, and excluding PKs/unique constraints the droppable remainder is **30 indexes / 800 kB**, 0.4% of the database. `stats_reset` is NULL, so the counters are lifetime — which strengthens "never scanned" and still does not make a constraint droppable. Records a fresh recurrence of the `n_live_tup` trap (**76** vs **1,072** real).
-- [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md)
+- [`docs/handoffs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoffs/handoff-2026-08-18-platform-database-reclaim.md)
   — **the database reclaim, 2026-08-18.** 819 MB against a 500 MB target with an end-of-week deadline.
   Everything is built and merged — migration 193's index drop (136 MB, needs no press), the Q-541
   frame packer (~630 MB) and a `VACUUM FULL` route for `error_events` (49 MB) — but **the last two
@@ -71,7 +71,7 @@ layer**) through §16. Read it before building any shared helper.
   caveat to carry forward: **the energy numbers a sandbox now shows are arbitrary**, so they verify
   plumbing and never a value.
 
-- [`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
+- [`docs/handoffs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoffs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
   — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
   the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did
   not make the public-repo migration** and how to port it.
@@ -158,12 +158,12 @@ layer**) through §16. Read it before building any shared helper.
   the owner's offline-first destination (2026-07-30): device-primary compute, Railway holds
   calculated data only. Sequences Phase 3, the Oura on-device program, the DB volume fix and the
   public-repo migration against each other.
-- **[`docs/handoff-2026-08-02-platform-offline-architecture-review.md`](../../handoff-2026-08-02-platform-offline-architecture-review.md)**
+- **[`docs/handoffs/handoff-2026-08-02-platform-offline-architecture-review.md`](../../handoffs/handoff-2026-08-02-platform-offline-architecture-review.md)**
   — 🆕 open question, not yet resolved: whether Next.js+Capacitor is the right architecture at all
   (prompted by #952 breaking production during the Phase 3 workspace split), vs a from-scratch
   native rewrite. Has a stress-test-me opinion and a ready-to-run research prompt for the next
   session. Read before resuming the Phase 3 workspace-split infra blocker below.
-- [`docs/handoff-2026-07-30-platform-public-repo-migration-gated-on-apk-offline-build.md`](../../handoff-2026-07-30-platform-public-repo-migration-gated-on-apk-offline-build.md)
+- [`docs/handoffs/handoff-2026-07-30-platform-public-repo-migration-gated-on-apk-offline-build.md`](../../handoffs/handoff-2026-07-30-platform-public-repo-migration-gated-on-apk-offline-build.md)
   — the public-repo/Oura-IP audit: what's vendored, what's live vs dormant, why the release is
   gated on Phase 3 + the DB volume fix. Backlog Q-30–Q-32.
 - [`docs/data-quality-review-charter.md`](../../data-quality-review-charter.md) — the charter the
@@ -296,7 +296,7 @@ Live at the time of writing (2026-07-30):
   away: a gate whose condition is satisfied by the state it is waiting to replace.** Both specs in
   that entry were it. Fixed with a style-derived signal (the `mm at N×N modules` figure) plus a
   *settled* canvas read; canvas dimensions are identical across styles and are not usable.
-- **[`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](../../handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)**
+- **[`docs/handoffs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](../../handoffs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)**
   — the CI job named **Migration Check** could not fail on a broken migration: `migrate.js` exited 0
   whatever happened, and it had no error classifier, so it also called four already-applied
   migrations "failed" where `ensureSchema()` calls them benign. Fixing the gate immediately caught a
@@ -305,7 +305,7 @@ Live at the time of writing (2026-07-30):
   carries the CSP work (`'wasm-unsafe-eval'`, and two dead Oura Cloud hosts removed) and the
   body-weight source fix behind the done screen's calorie figure.
 
-- **[`docs/handoff-2026-08-13-cross-combined-backlog-handover.md`](../../handoff-2026-08-13-cross-combined-backlog-handover.md)**
+- **[`docs/handoffs/handoff-2026-08-13-cross-combined-backlog-handover.md`](../../handoffs/handoff-2026-08-13-cross-combined-backlog-handover.md)**
   — ⭐ **START HERE for backlog work.** Reconciles the two sessions that ran in parallel on 2026-08-13
   (the queue drain and the production outage) into one queue and one pickup prompt, and corrects two
   places where they disagreed: the outage cause is **event-loop starvation, not pool contention**, and
@@ -314,14 +314,14 @@ Live at the time of writing (2026-07-30):
   waiting on the owner.
 
 
-- **[`docs/handoff-2026-08-13-platform-queue-drain-owner-decisions.md`](../../handoff-2026-08-13-platform-queue-drain-owner-decisions.md)**
+- **[`docs/handoffs/handoff-2026-08-13-platform-queue-drain-owner-decisions.md`](../../handoffs/handoff-2026-08-13-platform-queue-drain-owner-decisions.md)**
   — a queue drain that ran out of implementer-takeable items, put five decisions to the owner, and
   built four of them (Q-202, Q-185, Q-189, Q-72-partial) plus Q-155's ownership coverage. Read it
   for two standing traps: **"custom rules pass" locally means 4 of 35 checks** (Q-206), and **a Q
   number in an unmerged PR is provisional**. Also records that Q-72's filed premise was wrong on
   two counts, and that its correlation target is unusable as an acceptance measure.
 
-- **[`docs/handoff-2026-08-13-platform-production-event-loop-starvation.md`](../../handoff-2026-08-13-platform-production-event-loop-starvation.md)**
+- **[`docs/handoffs/handoff-2026-08-13-platform-production-event-loop-starvation.md`](../../handoffs/handoff-2026-08-13-platform-production-event-loop-starvation.md)**
   — 🔴 **live, diagnosed, unfixed.** The follow-up that confirmed the outage below. It is **event-loop
   starvation, and the pool exhaustion is a symptom**: `aggregateOuraRawSamples` decodes a 35-day
   window of `oura_raw_samples` (984,862 rows against ~37 days of history) in main-thread JS on every
@@ -341,7 +341,7 @@ Live at the time of writing (2026-07-30):
   for the worker-bundle constraint (`onnxruntime-node` cannot be webpack-bundled, so it needs its own
   esbuild output) and the in-process fallback that keeps a broken bundle harmless.
 
-- **[`docs/handoff-2026-08-13-platform-production-connection-starvation.md`](../../handoff-2026-08-13-platform-production-connection-starvation.md)**
+- **[`docs/handoffs/handoff-2026-08-13-platform-production-connection-starvation.md`](../../handoffs/handoff-2026-08-13-platform-production-connection-starvation.md)**
   — the session that found the outage and scoped it. Superseded on cause by the handoff above, but
   its measurements stand and two carry-forwards outlive the incident: **`claude_ro.error_events`
   cannot see an outage of this shape**, because the app must reach the DB to write an error row (13
@@ -349,7 +349,7 @@ Live at the time of writing (2026-07-30):
   `getLocalStore()` hands out a **live store while the DB is still opening**, which silently
   swallowed a check-in behind a success toast until #1292. Queued as Q-213…Q-217.
 
-- **[`docs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)**
+- **[`docs/handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)**
   — 🆕 an eight-PR queue drain that **closed the soft-delete burn-down** the mutation-testing session
   below opened (all 35 remaining filters, each verified individually). Three carry-forwards worth
   more than the tests: a mutation's substitute predicate must name a table the query already joins,
@@ -360,7 +360,7 @@ Live at the time of writing (2026-07-30):
   re-verified (one targeting a route no UI links to, one already shipped and resurrected by a
   stale-base merge), so **re-verify before implementing** is now load-bearing, not advice.
 
-- **[`docs/handoff-2026-08-09-platform-mutation-testing-invariants.md`](../../handoff-2026-08-09-platform-mutation-testing-invariants.md)**
+- **[`docs/handoffs/handoff-2026-08-09-platform-mutation-testing-invariants.md`](../../handoffs/handoff-2026-08-09-platform-mutation-testing-invariants.md)**
   — 🆕 a review-only session that changed almost no application code and merged 10 PRs of tests, CI
   checks and audits. Its method is the carry-forward: **mutation testing** — break an invariant on
   purpose and count what notices. Ownership scoping: 246 predicates neutralised left **286 of 317
@@ -372,7 +372,7 @@ Live at the time of writing (2026-07-30):
   and three scanners reported wrong counts, one of them zero. Verify a test by watching it fail, and
   cross-check every scanner against a cruder grep.
 
-- **[`docs/handoff-2026-08-09-platform-single-agent-queue-drain.md`](../../handoff-2026-08-09-platform-single-agent-queue-drain.md)**
+- **[`docs/handoffs/handoff-2026-08-09-platform-single-agent-queue-drain.md`](../../handoffs/handoff-2026-08-09-platform-single-agent-queue-drain.md)**
   — 🆕 first session with no territory split. Q-150, Q-152, Q-143 and Q-145 fixed; **Q-151 refuted**
   and downgraded to a dated re-check; Q-159 filed. Its theme is worth carrying: **three entries had
   premises that were factually wrong** — Q-151 did not reproduce and its production count belonged
@@ -388,7 +388,7 @@ Live at the time of writing (2026-07-30):
   measurement), found while diagnosing an unrelated `[sleep]` bug (Q-225) via a full local
   reproduction of `aggregateOuraRawSamples`. Candidate but unconfirmed link between the two.
 
-- **[`docs/handoff-2026-08-08-platform-review-backlog-drain-and-production-audit.md`](../../handoff-2026-08-08-platform-review-backlog-drain-and-production-audit.md)**
+- **[`docs/handoffs/handoff-2026-08-08-platform-review-backlog-drain-and-production-audit.md`](../../handoffs/handoff-2026-08-08-platform-review-backlog-drain-and-production-audit.md)**
   — 🆕 the Agent-1 half of the 2026-08-07 review dispatch, cleared (Q-122, Q-123a, Q-124, Q-128,
   Q-129, Q-130, Q-131, Q-134), plus Q-139 and Q-149, plus a **production data audit** that found two
   bugs the queue did not know about. Its three carry-forward lessons: a stored sentinel is not a null
@@ -396,7 +396,7 @@ Live at the time of writing (2026-07-30):
   absence (`rest_adequate` was true for all 278 verdicts); and check a derived column's distribution
   before trusting it. Also records why Q-107 has no evidence yet and exactly what to look for.
 
-- **[`docs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](../../handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md)**
+- **[`docs/handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](../../handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md)**
   — 🆕 wrap-up for the 2026-08-07 full-app-review backlog drain (9 PRs merged: Q-108, Q-106, Q-105,
   Q-103, Q-73, Q-117, Q-118, Q-140, plus the review itself). Splits the remaining ~18 ready items
   (Q-119–Q-136) into two parallel-agent pickup prompts by file territory — Agent 1 (platform/sync/
@@ -404,7 +404,7 @@ Live at the time of writing (2026-07-30):
   UI/cache: `lib/cache-groups.ts`, `components/*`) — to minimise cross-agent merge conflicts. Filed
   under `cross` because it spans both pillars; linked here and from `app-shell`.
 
-- **[`docs/handoff-2026-08-04-platform-observability-and-measure-first-drain.md`](../../handoff-2026-08-04-platform-observability-and-measure-first-drain.md)**
+- **[`docs/handoffs/handoff-2026-08-04-platform-observability-and-measure-first-drain.md`](../../handoffs/handoff-2026-08-04-platform-observability-and-measure-first-drain.md)**
   — 🆕 PRs #1062–#1071. **Q-58 complete** (`onRequestError` + the 21 self-handled 500s: 30 of 31
   routes that can return a 500 now report it), **Q-56** (step rollup can no longer date frames into
   the future), **Q-59** (update banner tracks the APK; `package.json` removed from the Android path
@@ -417,7 +417,7 @@ Live at the time of writing (2026-07-30):
   work and More → Download APK has been failing.
 
 
-- **[`docs/handoff-2026-08-02-platform-model-assets-to-bucket-and-home-perf.md`](../../handoff-2026-08-02-platform-model-assets-to-bucket-and-home-perf.md)**
+- **[`docs/handoffs/handoff-2026-08-02-platform-model-assets-to-bucket-and-home-perf.md`](../../handoffs/handoff-2026-08-02-platform-model-assets-to-bucket-and-home-perf.md)**
   — 🆕 Q-49 A0/A1 and Q-51 Tasks 1–2. The models now live in the app's **existing Railway bucket**
   (`oura-model-onnx/`), read bucket-first with the repo tree as a fallback. ⚠️ **Its "A1 finishes on
   the first deploy's `[oura-models]` logs" step is superseded** — the loaders are lazy, so those
@@ -428,22 +428,22 @@ Live at the time of writing (2026-07-30):
   because it is statically imported — so the repo cannot go fully public on the `.onnx` move
   alone — and that ~14 kB is close to the home screen's bundle ceiling.
 
-- **[`docs/handoff-2026-08-02-platform-native-roadmap-review-and-public-repo-plan.md`](../../handoff-2026-08-02-platform-native-roadmap-review-and-public-repo-plan.md)**
+- **[`docs/handoffs/handoff-2026-08-02-platform-native-roadmap-review-and-public-repo-plan.md`](../../handoffs/handoff-2026-08-02-platform-native-roadmap-review-and-public-repo-plan.md)**
   — 🆕 why the public-repo cut jumped the queue (the private repo's daily cost), why its real
   blocker is server-side **model delivery** rather than Phase 3, and where the review + plan live.
   Read before taking **Q-49**. Does not change the queue-drain run-list or the device checklist.
-- [`docs/handoff-2026-08-02-platform-batch-queue-drain-run-1.md`](../../handoff-2026-08-02-platform-batch-queue-drain-run-1.md)
+- [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain-run-1.md`](../../handoffs/handoff-2026-08-02-platform-batch-queue-drain-run-1.md)
   — run 1 of the batch queue drain (items 1–7): Q-43/Q-38/Q-39/Q-40 shipped, Q-35 and Q-28 retired
   after measuring them against production, Q-31 re-scoped. Read it before taking run-list items 8+.
-- **[`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../../handoff-2026-08-02-platform-batch-queue-drain.md)**
+- **[`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md)**
   — the owner's four unblocking decisions of 2026-08-02 (Phase 3 deferred not cancelled; device
   access available on one consolidated checklist; production read-only SQL verified reachable from
   a session; the `body_hex` bytea migration declined in favour of Q-35) plus the ordered run-list
   they produced. Read this before taking anything off the queue.
-- Handoffs: `ls docs/handoff-*-platform-*.md` — plus
-  [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+- Handoffs: `ls docs/handoffs/handoff-*-platform-*.md` — plus
+  [`docs/handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-37 — the local SQLite open path failing on every launch), filed under `cross` because it spans five pillars and so is not matched by the glob above.
-  Also [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+  Also [`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md)
   (Q-67 — the scale's persistent "listening" notification is unwanted noise), same reason.
 - Journal: `grep -rl 'sync\|migration\|cache\|auth' docs/overview/entries/`
 
@@ -476,7 +476,7 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
-- [`handoff-2026-08-24-platform-implementation-lane-a-engine-run.md`](../../handoff-2026-08-24-platform-implementation-lane-a-engine-run.md)
+- [`handoff-2026-08-24-platform-implementation-lane-a-engine-run.md`](../../handoffs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md)
   — **Implementation Lane A, 2026-08-24** (fifteen PRs): the raw-frame packer made automatic and its
   phase-3 delete moved from the bucket's ds range to **row ids** (automating it is what made the race
   reachable), `claude_ro` scoped on a boot-set setting rather than a baked user id, the fixture MET
@@ -488,7 +488,7 @@ Live at the time of writing (2026-07-30):
   including **a concurrent PR linking an entry you already folded**. The database reclaim is now
   three-quarters done — only `VACUUM FULL error_events` (Q-315, ~49 MB) is still owed.
 
-- [`handoff-2026-08-24-platform-orchestrator-first-run.md`](../../handoff-2026-08-24-platform-orchestrator-first-run.md)
+- [`handoff-2026-08-24-platform-orchestrator-first-run.md`](../../handoffs/handoff-2026-08-24-platform-orchestrator-first-run.md)
   — the Orchestrator role's first session: cleared the 17-entry completed-work baseline (only 7 were
   actually finished), assigned the first real `Batch:`, split a 269-line nutrition rework into a
   phased chain, and walked the owner through seven `Gate: owner` entries one question at a time.
@@ -496,13 +496,13 @@ Live at the time of writing (2026-07-30):
   for workout energy, measured at `corr(avgBpm, mean set RPE) = +0.083` across 44 real sessions.
   Carries three mechanical gotchas: a shallow-clone merge trap, a squash-merge diff that shows a
   whole file as new, and a backlog conflict that looked like an ID collision and wasn't.
-- [`handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md) — **Review sweeps 29–39, 2026-08-20** (11 PRs, Q-492…Q-499 + Q-552…Q-556; three CI checks added for documentation facts nothing was checking). **10 of 13 findings have since shipped**, verified in source. Its most transferable output is the method section: **five measurements were wrong, each producing a plausible result in the expected direction** — and the keeper, *corroboration between two weak signals is not evidence when they can fail for the same reason*.
-- [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoff-2026-08-18-platform-decision-brief-rule.md)
+- [`handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoffs/handoff-2026-08-20-platform-review-sweeps-29-39.md) — **Review sweeps 29–39, 2026-08-20** (11 PRs, Q-492…Q-499 + Q-552…Q-556; three CI checks added for documentation facts nothing was checking). **10 of 13 findings have since shipped**, verified in source. Its most transferable output is the method section: **five measurements were wrong, each producing a plausible result in the expected direction** — and the keeper, *corroboration between two weak signals is not evidence when they can fail for the same reason*.
+- [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoffs/handoff-2026-08-18-platform-decision-brief-rule.md)
   — the `CLAUDE.md` rule governing how a decision is brought to the owner (#69), and the merge
   friction that shipping it exposed: **three of four CI rounds were base collisions on the doc-index
   BASELINE object**, none on the content being changed. Filed as **Q-543**, with the resolution
   method that avoids silently reverting another lane's raise.
-- [`handoff-2026-08-17-platform-prod-snapshot-endpoint-plan.md`](../../handoff-2026-08-17-platform-prod-snapshot-endpoint-plan.md)
+- [`handoff-2026-08-17-platform-prod-snapshot-endpoint-plan.md`](../../handoffs/handoff-2026-08-17-platform-prod-snapshot-endpoint-plan.md)
   — Q-530, the designed half of Q-251: a prod-shaped DB snapshot built by paginating the **existing**
   `claude_ro` views rather than writing a second scoping map. Carries the measurement that inverts
   the intuition Q-251 was written on (**the owner owns 99.98% of `oura_raw_samples`, so scoping to
@@ -510,16 +510,16 @@ Live at the time of writing (2026-07-30):
   read `pg_catalog` rather than `information_schema` from the read-only role, and the two traps in
   `/api/export` that make Q-288's coverage fix unsafe on its own.
 
-- [`handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](../../handoff-2026-08-17-platform-agent-model-and-device-session-findings.md) — the standing-agent model (roles, lane contract, Q bands, batons, prompts), the documentation reorganisation and its two CI guards, and six findings from a live APK reinstall + Oura re-sync: the ring key an uninstall destroys, the emulator job that could not pass, `disk_full` in production, and the clock-epoch collision behind 43 wrong sleep windows (Q-536).
-- [`handoff-2026-08-17-platform-context-warning-window.md`](../../handoff-2026-08-17-platform-context-warning-window.md)
+- [`handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](../../handoffs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md) — the standing-agent model (roles, lane contract, Q bands, batons, prompts), the documentation reorganisation and its two CI guards, and six findings from a live APK reinstall + Oura re-sync: the ring key an uninstall destroys, the emulator job that could not pass, `disk_full` in production, and the clock-epoch collision behind 43 wrong sleep windows (Q-536).
+- [`handoff-2026-08-17-platform-context-warning-window.md`](../../handoffs/handoff-2026-08-17-platform-context-warning-window.md)
   — the wrap-up warning fired at ~111% while the window was 22% full. It is a `Stop` hook
   (`.claude/hooks/context-usage-warn.mjs`), **not** a CLAUDE.md rule — worth knowing before hunting
   for it in the wrong file. Its window constant was 200k against a real 1M, now corrected so the
   thresholds land at 900k/950k. Records that the transcript exposes no window size, so the hook
   cannot self-calibrate and this constant goes stale silently.
-- [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoff-2026-08-16-platform-public-repo-cut-a4b.md)
-- [`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md) — **Lane B, nineteen PRs, 2026-08-25.** Q-406, LB-10, Q-499, Q-467, Q-315, Q-538, Q-305, Q-281, Q-282, Q-138, Q-477 complete, E2E restored to green, and five queue-tooling fixes (LB-11, LB-12, PS-6). **The lesson worth carrying: five entries were wrong about their own premise** — Q-282 ("no a11y check in CI"; there is one), Q-305 ("never shown"; shown against a made-up band), Q-315 ("just needs a press"; nothing could press it), Q-138 (two rows already done), Q-555 (does not reproduce). A grep count is not a violator list. Nothing device-verified.
-- [`docs/handoff-2026-08-24-platform-lane-b-nine-prs.md`](../../handoff-2026-08-24-platform-lane-b-nine-prs.md) — **Lane B, nine PRs, 2026-08-24.** Q-486, Q-321, Q-357, Q-328, LB-3, LB-6, LB-7 and Q-359's demotion. Carries the two lessons that cost the most: read the CI *server* log before fixing a CI-only failure, and a spec stubbing an `/api/` route needs `serviceWorkers: 'block'`. **Q-555's fix is written, unmerged and unverified** on `fix/offline-tab-tap-native-fallback`.
+- [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md)
+- [`docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md) — **Lane B, nineteen PRs, 2026-08-25.** Q-406, LB-10, Q-499, Q-467, Q-315, Q-538, Q-305, Q-281, Q-282, Q-138, Q-477 complete, E2E restored to green, and five queue-tooling fixes (LB-11, LB-12, PS-6). **The lesson worth carrying: five entries were wrong about their own premise** — Q-282 ("no a11y check in CI"; there is one), Q-305 ("never shown"; shown against a made-up band), Q-315 ("just needs a press"; nothing could press it), Q-138 (two rows already done), Q-555 (does not reproduce). A grep count is not a violator list. Nothing device-verified.
+- [`docs/handoffs/handoff-2026-08-24-platform-lane-b-nine-prs.md`](../../handoffs/handoff-2026-08-24-platform-lane-b-nine-prs.md) — **Lane B, nine PRs, 2026-08-24.** Q-486, Q-321, Q-357, Q-328, LB-3, LB-6, LB-7 and Q-359's demotion. Carries the two lessons that cost the most: read the CI *server* log before fixing a CI-only failure, and a spec stubbing an `/api/` route needs `serviceWorkers: 'block'`. **Q-555's fix is written, unmerged and unverified** on `fix/offline-tab-tap-native-fallback`.
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
   still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-313), the
