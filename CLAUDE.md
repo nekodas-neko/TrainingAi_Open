@@ -33,6 +33,7 @@
   (owner decision 2026-09-23: a watermark, deliberately no status column and nothing the reporter
   sees in the app). A report is never answered by replying to it — it becomes a queue entry, or it
   is recorded as not-a-defect with the reason, per **No orphaned findings**.
+  **⚑ A THIRD CHANNEL NOTHING READ UNTIL 2026-09-27 (OR-183): GitHub ISSUES — BugFix reads `list_issues` (OPEN) at session start and runs the same loop.** **Inbound PULL requests are REVIEW's**, which reads `list_pull_requests` (open), reviews every PR not authored by the agent account, and **never merges one** — outside code entering the app, with the auth/storage carve-outs live. A collaborator found this before we did (*"it's also not picking up the issues and PRs I raise"*): `#1620` sat two days unreferenced, `#1607`/`#1608` were caught only sideways by `TN-80`. **The CI/CD section below is written for OUR OWN PRs**, which is why an inbound one had no reader. Details: `docs/agents/README.md`.
   **Two things this read cannot tell you.** The view is **row-scoped to the owner**, so a zero means
   *none of the owner's*, never *nobody has reported anything*. And **`screenshot_bytes` is a size,
   not an image** — the view withholds `screenshot_data`, so a UI bug arrives with its most

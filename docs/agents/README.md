@@ -40,10 +40,24 @@ causes merge conflicts. §3 is the contract.
 
 ### BugFix
 
-The owner's intake channel. Takes a screenshot, a description, a "why is this doing that", and
-turns it into a backlog entry good enough to implement from: what was observed, on what surface,
+The intake channel — **for the owner AND for anyone else who files something.** Takes a screenshot,
+a description, a "why is this doing that", and turns it into a backlog entry good enough to
+implement from: what was observed, on what surface,
 the code path it traces to, and what evidence would confirm it. Then it merges the docs-only PR and
 waits for the next report.
+
+**Three channels, not one (added 2026-09-27, OR-183).** Spoken reports from the owner;
+`claude_ro.feedback_submissions`, written by *Report an Issue* on `/more`; and **GitHub issues**,
+which nothing read until this was written. A collaborator noticed before we did: *"it's also not
+picking up the issues and PRs I raise … so they're never getting touched/reviewed either"*, and
+`#1620` had sat two days with nothing in the repo referencing it. Read them at session start with
+`list_issues` (state OPEN) and run the same loop — **read → triage → file a backlog entry at a
+priority with a lane → move the watermark** in the baton. **An issue is never answered by replying
+to it**; it becomes a queue entry, or it is recorded as not-a-defect with the reason.
+
+**PULL requests from outside are REVIEW's, not BugFix's** — reviewing a diff against this repo's
+rules is what that role does, and an inbound PR is a code review with an author attached. BugFix
+takes the report; Review takes the patch.
 
 **It does not fix.** The temptation to fix a one-line bug in the intake session is exactly how
 intake stops being reliable — the queue is the record, and a fix that skipped the queue is a fix
@@ -80,6 +94,21 @@ Runs on a weekly cadence rather than on demand. Sweeps the app for bugs, inconsi
 writes the findings up in `docs/reviews/YYYY-MM-DD-<topic>.md`, and files each one as a backlog
 entry. Findings without a backlog entry do not count — `CLAUDE.md`'s **No orphaned findings** rule
 is the whole point of this role.
+
+**Review also owns INBOUND pull requests — PRs opened by anyone other than an agent (added
+2026-09-27, OR-183).** Nothing owned them before: the CI/CD section of `CLAUDE.md` is written
+end-to-end for *our own* PRs (*"when the user pushes a feature branch and opens a PR"*), so a
+collaborator's PR arrived into a channel with no reader. Two sat from 2026-09-25 and were noticed
+only sideways, by `TN-80`, while it was doing something else.
+
+**The loop, at session start:** `list_pull_requests` (state open), take the ones whose author is not
+the agent account, and for each **read the diff against this repo's rules and leave a review**. Then
+file what it needs as a backlog entry, the same as any other finding.
+
+**What Review may NOT do with one:** merge it. An inbound PR is somebody else's code entering the
+owner's app, and two of the standing carve-outs bite immediately — `#1607` is **auth** (bearer
+tokens) and `#1608` adds **storage**. Review's authority is docs-only and a posted review; the merge
+is the owner's, and the entry says so.
 
 The failure mode to design against is a review that reads source and reports what *should* happen.
 This repo has paid for that repeatedly; the 2026-08-08 review that actually ran the app found two
