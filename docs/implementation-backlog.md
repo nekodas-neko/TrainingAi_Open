@@ -5301,14 +5301,23 @@ volume7dKg,                             // likewise
   certainly the same root as BF-200**, which is the owner reporting Skull Crusher alone ignoring a
   deload in the 09-25 Upper session — same exercise, same session, same missing per-exercise
   prescription data. Whoever takes BF-200 should check whether fixing it also restores this.
-- **What is left, and it is one question:** what happened in 09-06 → 09-12. The database does not
-  hold it — session metadata is uniform across the boundary — so it needs the deploy history for
-  those dates, not another query.
-- **And one product question, not a defect:** should a bodyweight exercise carry a plan at all?
-  `planned_pct` is a percentage of a 1RM that bodyweight movements do not have. 23 of September's
-  49 gaps are this, and every future adherence figure is computed over a denominator that silently
-  includes them. Deciding it is `Lane: O`; until it is decided, adherence coverage should be quoted
-  over LOADED sets only.
+- **~~What is left, and it is one question~~ — ANSWERED 2026-09-28 (Lane A): the window is the
+  BASELINE CALIBRATION ROUND, by design.** 09-07 to 09-12 is exactly **one workout for each of the
+  five sessions** (Pull, Push, Legs, Upper, Lower), the first after the 09-02 → 09-06 deload. Each
+  logged one set per exercise at up to **20 reps**, which is an AMRAP. Every session after it returns
+  to 10 planned sets. In the baseline phase `session-data.ts:215-216` sets `defaultSets = 1` and no
+  progression style, so there are no per-set percentages to write. Those 20 sets are a calibration
+  pass, not lost plans. **The deploy history was not needed.** BF-143 (09-12) touched the same
+  code, but it only stopped a *rebuilt* session skipping calibration.
+- **So TN-75's remaining work is small.** ① The loaded residue is Barbell Skull Crusher with no
+  `style_id`. That is BF-200's residue: the engine now deloads it (#1814), but it still records no
+  per-set plan until a style is assigned in Config, which is an owner action. ② The acceptance
+  criterion *"a set with no available plan is distinguishable from one never asked"* still holds.
+  Baseline sets cannot be told apart at read time, because `workout_sessions` stores no baseline
+  marker (`phase_type` is NULL across the boundary). It needs a column, so a migration, and it
+  waits behind BF-214's numbering. **Until then, quote adherence over loaded, non-baseline sets.**
+- **The bodyweight product question is split out as LA-169 (`Lane: O`)**, per the rule that an owner
+  decision must not sit inside a Lane A body.
 
 - **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
   written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
@@ -6294,6 +6303,24 @@ drift.
 - **Verification that gates the ship:** replay the corrector over ~120 days of the owner's history and
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
+
+### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
+- **Lane: O** — a product preference: what the app should prescribe, not how.
+- **Ask** — owner: for Chin-Up, Pull-Up, Hanging Leg Raise and other bodyweight movements, should the
+  workout screen prescribe a target (reps per set) the way it does for loaded lifts, or only record
+  what you did?
+- **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
+- **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
+  rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
+  `planned_pct` stays empty because it is a percentage of a lifted 1RM. Over time this makes adherence
+  measurable on those exercises too, with no new column.
+- **Alternatives.** *Record only, no plan:* the simplest, and honest if you never follow a target on
+  these, but they stay outside every adherence figure. *A load-style plan through added weight:*
+  better if you mostly train them weighted, but it misstates an unweighted set.
+- **Why it matters:** 23 of September's 49 sets with no plan are bodyweight. Until this is decided,
+  Tuning quotes adherence over loaded sets only.
+- **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
+  already stored changes.
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
