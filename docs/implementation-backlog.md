@@ -5122,6 +5122,20 @@ volume7dKg,                             // likewise
   admin re-derive** for `body_battery_daily`, snapshot first, affected rows against prediction.
   This keeps his 2026-08-26 decision intact rather than reversing it. **State how many days move
   and by how much in the PR** — it is a stored number he reads.
+- **⚙ THE TOOL SHIPPED 2026-09-28 (Lane A); THE PRODUCTION RUN HAS NOT HAPPENED.**
+  `POST /api/admin/rederive-body-battery?from=&to=` (admin session, **dry-run unless `dryRun=false`**,
+  31 days a call) recomputes each finished day through `computeBodyBatteryDay`
+  (`lib/health/body-battery-day.ts`). That is the function the live route now calls, so there is one
+  walk, not two. It walks midnight to midnight, **keeps each day's frozen anchor**, skips today and
+  any day with no stored row, and its summary reports `written`, the end-value delta (mean,
+  mean-absolute, min, max) and the recomputed end distribution (mean, at 0, at 100). **So "how many
+  days move and by how much" is the dry-run's output.** It could not be stated in the PR: the
+  sandbox has no admin session against production, and the read-only endpoint cannot run the walk.
+- **Keep:** the run. Snapshot `body_battery_daily` first, dry-run each 31-day page and read the
+  summary, then re-run with `dryRun=false` and check `written` matches the dry run. Three pages
+  cover the 84 days. The stress term uses today's daytime-HRV model for every day, because a
+  per-day model is not stored. It carries 0.020 of drain, so its effect is small, but it is not
+  zero.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, verifying TN-55's own acceptance test after
   the fix shipped. **This corrects my own plan**, not Lane A's implementation — the constants landed

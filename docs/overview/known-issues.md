@@ -7436,7 +7436,7 @@ in [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff
    the bounded poll and the regeneration triggers; the unreliable server self-fetch is replaced by
    a client-fired one. Verified end to end at the S25 viewport on the dev server.
 4. ✅ **[readiness] The Body Battery anchor flips between readiness and sleep mid-day (Q-39).**
-   Fixed in **#996** (v1.250.2). The decision moved into `app/api/body-battery/anchor.ts` and a
+   Fixed in **#996** (v1.250.2). The decision moved into `lib/health/body-battery-anchor.ts` and a
    readiness-derived anchor is now frozen for the rest of the day; a sleep anchor is labelled
    provisional and upgrades exactly once. Reproduced on the dev DB (82 → 54 → held at 54) and the
    provisional copy checked at 360px in both themes.

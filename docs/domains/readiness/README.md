@@ -217,7 +217,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
   the Body Battery anchor was re-picked on every read, so it flipped from the sleep score to the
   readiness score part-way through the morning and shifted the whole day's curve. The rule now
-  lives in `app/api/body-battery/anchor.ts` — a readiness anchor is frozen for the day, a sleep
+  lives in `lib/health/body-battery-anchor.ts` — a readiness anchor is frozen for the day, a sleep
   anchor is provisional and upgrades exactly once. The shared-composite refactor that would remove
   the fallback entirely is still open as Q-42.
 
@@ -458,7 +458,7 @@ Live at the time of writing (2026-07-30):
   snapshot a value the table already writes down with a date on it. Nothing prunes this table —
   `shouldPrune` is `error_events`.
   ([`2026-09-17-lane-a-tn46-baseline-already-retained.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-lane-a-tn46-baseline-already-retained))
-- **The Body Battery anchor is frozen once readiness-derived** (`app/api/body-battery/anchor.ts`).
+- **The Body Battery anchor is frozen once readiness-derived** (`lib/health/body-battery-anchor.ts`).
   Re-picking it on every read is what made the whole day's curve jump mid-morning; a later
   readiness *recompute* must not move it either, or the same bug returns through a smaller door.
 - **An evening nap once threw away the whole day's Body Battery** — nap-vs-night resolution is a
