@@ -6,10 +6,45 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.19",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: the same moment read \"6:40 AM\" on Home's timeline, \"6:40am\" on a day's workout card and \"6:40 am\" on the activity list. All three, and the Body Battery card's time axis, now read \"6:40 am\".",
+    ],
+  },
+  {
+    version: "1.477.18",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: on screens opened from a tab \u2014 a night's sleep detail, for instance \u2014 cards scrolled up under the clock with nothing behind them. They now get the same gradient the main tabs have had, fading in as you scroll.",
+    ],
+  },
+  {
+    version: "1.477.17",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: pressing back during an interval walk threw the walk away without asking, however long you had been walking. It now asks \u2014 save it to your history, discard it, or keep walking. A walk under a minute still just offers to discard, as before.",
+    ],
+  },
+  {
+    version: "1.477.16",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a chin-up on a day's workout card read \"0kg\", as if you had lifted nothing. Bodyweight lifts now read \"BW\", and \"BW +10kg\" when you add weight.",
+    ],
+  },
+  {
+    version: "1.477.15",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: Home's streak allowed a fixed two rest days, so if you train on a fixed weekly pattern with a longer gap \u2014 Monday and Tuesday, say \u2014 Home broke your streak while the achievements page kept it. Home now reads your schedule the same way, and the two agree.",
+    ],
+  },
+  {
     version: "1.477.14",
     date: "2026-09-27",
     changes: [
-      "Fixed: the same moment read \"6:40 AM\" on Home's timeline, \"6:40am\" on a day's workout card and \"6:40 am\" on the activity list. All three, and the Body Battery card's time axis, now read \"6:40 am\".",
+      "Changed: when you build a meal plan step by step, \"Use my saved meals\" now starts switched on if you have saved meals \u2014 so a plan is built around food you already cook, with your real macros. It stays off when your library is empty, where it would change nothing.",
     ],
   },
   {
