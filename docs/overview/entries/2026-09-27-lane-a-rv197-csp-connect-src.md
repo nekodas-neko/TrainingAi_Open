@@ -45,6 +45,22 @@ That fell out of the equivalent control, which is exactly what an equivalent con
   of the two ws schemes — which killed the test until the test was loosened, and survives now.
 - `tsc` 0 · `lint` 0 · `build` 0 · Custom Rules **83 of 83** · full suite below.
 
+## Local run (2026-09-27, second session)
+
+- **`pnpm dev`:** signed in and loaded Sign-in, Home, Health and Nutrition with the console
+  filtered for `Content Security Policy`/`Refused`: **no violations**. The dev header's
+  `connect-src` still ends in `ws: wss:` (hot reload needs them) and has no
+  `generativelanguage.googleapis.com`, as intended.
+- **Client code opens no WebSocket and calls no Gemini host directly.** A repo-wide search for
+  `new WebSocket`, `EventSource(` and the Gemini hostname finds only `scripts/device/cdp.js`, a
+  Node-side DevTools script outside the page.
+- **The production header is still not read off the wire.** `next build` succeeded locally, but
+  `next start` refuses to boot: the storage keys in the local `.env.local` are rejected by the
+  bucket (`SignatureDoesNotMatch (403)`), the same failure the cloud container hit. That refusal is
+  the instrumentation hook failing closed on purpose, so the fix is fresh keys, not a code change.
+  (On Windows the `build` script's `NODE_OPTIONS=…` prefix does not run under `cmd`, so its two
+  steps were run directly.)
+
 ## Not exercised
 
 - **The header was never read off the wire.** `pnpm start` cannot boot in this container — the
