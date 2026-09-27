@@ -852,6 +852,38 @@ below threshold and left in place for next time.
   ever shown to matter, with a measurement rather than an argument.
 
 
+### [readiness] OR-200 — the owner's own check-in is 10% of the readiness score, and he has said it must not be
+
+- **Lane: T** — a scoring change, so a Tuning **proposal** is owed before anyone builds it (OR-178).
+  Implementation is then Lane A (`packages/shared/src/health/**`). **Added:** 2026-09-27 ·
+  Orchestrator, from the owner's answer on `TN-67`.
+- **His instruction, verbatim:** *"I dont want the rated score by me to affect the score derived for
+  the day. It should be used to post tuning only. We hit this issue before where nothing was usable
+  till after my checkin; I dont like that."*
+- **⚠ THAT IS NOT WHAT THE CODE DOES.** `packages/shared/src/health/readiness-composite.ts:30` sets
+  `checkin: 0.10`, and `checkinScoreFromEnergy` (line 153) turns his energy pick into that
+  contributor. His self-report is **10% of the readiness score today**, on every day he answers.
+- **Why this is worth doing beyond the instruction.** A score that eats its own self-report cannot
+  be validated against that self-report — the `2026-09-18` review already found the `checkin`
+  contributor share was not independent of readiness, and `TN-67` found the r = +0.62 was largely
+  the app agreeing with itself. Removing the input is what makes the 2026-10-20 re-measurement mean
+  anything.
+- **What the proposal must state before anyone builds it.** ① **How many stored days move, and by
+  how much** — dropping a 0.10 contributor re-weights every other one, so this re-scores history on
+  every day he checked in. ② Whether the remaining nine weights are renormalised or the score simply
+  loses up to 10 points — those are different products and the second is not acceptable silently.
+  ③ What the contributor row shows instead, since `contributor-guide.ts:177` documents `checkin` to
+  the user.
+- **Keep the signal, move it.** He asked for it *"post tuning only"*, not deleted — `day_checkins`
+  keeps storing it, and Tuning reads it as a validation target. Nothing about the collection
+  changes; `TN-67`'s outlier-only prompting is a separate, already-answered decision.
+- **⚠ It does NOT make the rating a clean validation target.** He still sees the score before
+  rating, and he has refused hiding it (also `TN-67`). So the anchoring is halved, not removed, and
+  any future correlation must be reported with that caveat attached.
+- **Reversal cost: one weight constant and a renormalisation** — but the re-scored history is a
+  write, so it follows the snapshot-and-predicted-rows rule.
+
+
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
@@ -2857,6 +2889,20 @@ which is the right shape for something that can only be validated by living with
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
+- **✅ ANSWERED 2026-09-27 — do NOT hide the score, and the answer goes further than the question asked.**
+  Verbatim: *"I dont want the rated score by me to affect the score derived for the day. It should
+  be used to post tuning only. We hit this issue before where nothing was usable till after my
+  checkin; I dont like that."*
+  **Two instructions, and the second is a live defect.** ① The score is **never** hidden pending a
+  check-in — he has had that before and rejected it. ② **His rating must not be an INPUT to the
+  readiness score at all** — it is a post-hoc tuning and validation signal only.
+  **⚠ ② IS NOT THE CURRENT BEHAVIOUR.** `packages/shared/src/health/readiness-composite.ts:30`
+  gives `checkin` a weight of **0.10** — his self-report is 10% of the score today. Removing it is a
+  scoring change, filed as **`OR-200`** (`Lane: T`).
+  **And it changes what this entry can claim.** Once the rating is out of the composite, the
+  anchoring this entry documents is halved but NOT gone: he still SEES the score before rating, so
+  the rating remains a contaminated validation target. Say that plainly at the 2026-10-20
+  re-measurement rather than reporting a clean correlation.
 - **✅ ANSWERED 2026-09-27 — outlier-only prompting. He will not rate daily again.**
   Ask for a rating only on days the score is unusual, the same shape he approved for a different
   prompt in `OR-171`. He answered maybe-twice-a-week over daily and over retiring it entirely.
@@ -5117,6 +5163,12 @@ volume7dKg,                             // likewise
   the composite's output is wrong by that much — `prevDayActivity` is 9% of it.
 
 ### [readiness][heart-rate] TN-72 — v6 will never re-score a single stored day, and TN-55's plan said it would. That claim was mine and is retracted here
+- **✅ APPROVED 2026-09-27 — RE-DERIVE the 84 days. Covers `TN-74`.**
+  Not freeze-and-label. It is a **recompute from stored inputs**, limb (a) of the history-row
+  policy he already answered YES to, so it is deterministic and repeatable. Run it as a **bounded
+  admin re-derive** for `body_battery_daily`, snapshot first, affected rows against prediction.
+  This keeps his 2026-08-26 decision intact rather than reversing it. **State how many days move
+  and by how much in the PR** — it is a stored number he reads.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, verifying TN-55's own acceptance test after
   the fix shipped. **This corrects my own plan**, not Lane A's implementation — the constants landed
@@ -7354,6 +7406,17 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
+- **✅ ANSWERED 2026-09-27 — and the answer is a DESIGN INSTRUCTION, not the yes/no that was asked.**
+  Verbatim: *"the walk/run section should be combined in the cardio hub; and would require one or
+  the other to be done."*
+  So: **merge walk and run into one section in the cardio hub, and completing EITHER satisfies the
+  prescription.** That resolves the finding — no prescribed run has ever been marked done while he
+  does most of them as walks — by removing the distinction rather than by ruling on it.
+  **⚠ This is an information-architecture change to a screen he uses, so it OWES A MOCKUP FIRST**
+  (CLAUDE.md: merging sections on a daily screen gets a mockup at 384 px dark and a yes before any
+  code). **Show it in the same sitting as `LA-136`, `LB-163` and `RV-213`** — that makes four.
+  The compliance/streak consequences need naming in the mockup: every past run day becomes
+  completable, so adherence figures move.
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
 - **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
@@ -11841,6 +11904,11 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
   is not.
 
 ### [workouts] BF-168 — "Leave workout?" fires on the session-select tab after the workout is finished (fixed; device look owed)
+- **✅ ANSWERED 2026-09-27 — *Start Again* had NOT been pressed. This is STALE STATE, and the entry's
+  assumption is confirmed rather than refuted.** So it is not a labelling problem and the smaller
+  fix does not apply: the store still believed a workout was active after completion, and the fix
+  belongs in the **completion path clearing it**. Build it; the question that was blocking it is
+  answered.
 
 - **Batch:** `workout-completion-surface` — shipped with **BF-169** and **BF-167**.
 - **Verify:** device — on the S25, complete a session, return to the tab **without** tapping Start
@@ -13533,6 +13601,11 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Needs:** nothing.
 
 ### [app-shell] BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision
+- **✅ ANSWERED 2026-09-27 — the wallpaper tint stays OPT-IN.** Not on by default, and not removed.
+  It now reaches all 46 sheets through `--background`, so defaulting it on would change the look of
+  the whole app from a phone setting he may not even have enabled. Opt-in means one tap in and one
+  tap out. **Nothing further is owed here** — strike this entry once the opt-in state is confirmed
+  as what ships.
 
 - **Lane:** B
 - **Keep:** ② only — the sheet question below, which is a decision rather than an implementation.
@@ -13576,6 +13649,14 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
     reaches all 46 sheets through `--background` and the wallpaper may not even be on for him.
 - **Needs:** nothing.
 ### [workouts] BF-144 — the dead `program_session_id` column that misled BF-143, and whether to drop it
+- **✅ APPROVED 2026-09-27 — the whole `destructive-migration` group (`BF-144`, `LA-71`, `LB-42`), snapshot first.**
+  One yes covers all three. **Conditions, and they are not optional:** each takes a **verified
+  snapshot — taken AND restored, not merely taken** — before it runs, and prints its affected-row
+  count against what it predicted, **stopping on a mismatch** rather than writing it up afterwards
+  (owner policy, OR-182). **Ship them as THREE separate PRs, never batched**: CLAUDE.md forbids
+  batching a migration because its revert is a corrective migration. Each also ships its regenerated
+  `claude_ro` twin, with the number from `node scripts/next-schema-number.js` — `#1608` is holding
+  288/289 against `main`'s own, so `ls | tail -1` is wrong right now.
 
 - **⚠ PRESENT WITH THE OTHER DATA-LOSING SCHEMA CHANGES — `destructive-migration` (grouped
   2026-09-16, OR-118): BF-144, LA-71, LB-42.** All three ask the owner to approve a migration that
@@ -15144,6 +15225,11 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   must never feed the replay.
 
 ### [app-shell] PS-51 — titles that unlock the collection pen's backdrop scenes
+- **✅ APPROVED 2026-09-27 — take the proposed mapping.**
+  forest ← first Ranger T4 · house ← first Health-cat T3 · castle ← first Tank T4. Each scene hangs
+  off a different ladder, so no single line of play unlocks all three. It is a lookup table, so it
+  is cheap to change later. **⚠ `PS-49` (v2) moves the tier count from three to six** — write the
+  mapping so it survives that, or expect to revisit it.
 
 - **Lane:** A for the titles (derived in `packages/shared/src/collection/`, returned by
   `/api/collection`), then B for a scene picker on `/collection`.
@@ -17655,6 +17741,13 @@ two screens, and a user who sets one has no way to know the other exists.
   a small button for each session to choose 'rest'."*
 
 ### [app-shell] BF-96 — the temperature/UV pill wrapped (the fix FAILED on device; open work)
+- **✅ ANSWERED 2026-09-27 — ABBREVIATE THE DATE. Covers `BF-139`.**
+  `Wednesday 30 September` becomes `Wed 30 Sep`. That buys ~11 characters, more than any other
+  lever, and the date is the one item also readable from the phone's own status bar and lock
+  screen — so nothing the app uniquely shows is lost. **The temperature and the UV reading both
+  STAY.** **Acceptance is unchanged and is the part that failed last time:** on the S25, the pill
+  is one line on a **long** date **with `· UV n` present** — not on today's date. Ships with
+  `BF-139` per the existing `header-row-width` batch, because one device look settles both.
 
 - **Batch:** `header-row-width` — ships with **BF-139**. Batched on the VERIFICATION, per this file's rule: both are settled by one look at the longest real date with `· UV n` present, and fixing either alone re-breaks the other.
 - **Needs: LB-157**
@@ -24793,6 +24886,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 
 ### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
+- **✅ APPROVED 2026-09-27 — drop `event_name`, with the dead-object evidence shown.**
+  This is the owner's 2026-09-27 standing policy exactly: an object **proved dead** — no reader in
+  `app/**`, `lib/**`, `packages/**`, and nothing selecting a value in production — may be dropped
+  **with that evidence printed in the PR**. Prove it first; do not rely on this entry's claim.
+  Verified snapshot before the run, affected rows against prediction, stop on mismatch.
+  **Its own PR, not folded into the `destructive-migration` group** — one migration per PR.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
 - **Branch:** `perf/oura-raw-row-narrowing`
@@ -28934,6 +29033,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
 ### [platform] Q-297 — cover Nutrition's day navigation (done; two residues, one of them owner's)
+- **✅ ANSWERED 2026-09-27 — E2E stays ADVISORY. Not a required check.**
+  Since 2026-09-25 the required checks genuinely block a merge, so a flaky required job stops the
+  queue with no path to push the fix. E2E is the flakiest job here. **Revisit only with a measured
+  pass rate over ~50 runs** — not on the argument that an advisory check nobody reads is a check
+  nobody has, which is `LB-149`'s complaint and is fair but is not a number. `LB-56` stays the
+  placeholder.
 
 - **Batch:** `owner-branch-protection` — **LB-52 and Q-297's second residue are the same settings
   page** (marked 2026-09-16, OR-117). LB-52 wants a classic branch-protection rule added beside the
@@ -29217,6 +29322,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Added:** 2026-08-31 · Lane B, from a red `Tests` check that took an hour to place.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
+- **⏸ NOT YET 2026-09-27 — revisit after `OR-195`, do not close.**
+  He declined to authorise a second Railway service now. The reason is sequencing rather than cost:
+  `OR-195` is about to give Lane A a **persistent local environment with its own database**, which
+  covers most of what staging would catch at no monthly cost, and the migrations this entry worries
+  about are Lane A's. **Re-ask once that has run for a while and it is visible what still slips
+  through.** Do not strike this entry; it is deferred, not refused.
 
 - **✅ ANSWERED 2026-09-27 (OR-182): NOT YET, and the trigger is named.** He declined the second Railway service for now — the snapshot endpoint shipped as Q-530 already gives agents a real copy of the data to test against, which was most of the value, and the remaining half is a recurring cost against a risk that has not yet bitten. **The trigger: the first migration that damages production authorises it immediately, without asking again.** The gate is removed because nothing is waiting on him; this entry now waits on an event. Original text: shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
   service**, which costs money to run and is the owner's call to authorise, not an implementation.
@@ -33068,6 +33179,12 @@ adopted.
   precisely the thing that looks fixed for weeks.
 
 ### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
+- **✅ APPROVED 2026-09-27 — DELETE `oura/hr-sync`.**
+  A route whose name claims something untrue is worse than no route: it is what misdirects the next
+  investigation, exactly as the dead `program_session_id` column already did once (`BF-143`).
+  **Prove it dead first and show the evidence** — no callers in `app/**`, `lib/**`, `packages/**`,
+  and nothing reaching it in production — per the 2026-09-27 standing policy. Removing the tests
+  pinned to it goes in the same PR.
 
 - **Lane:** A — `app/api/oura/hr-sync/route.ts`.
 - **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
@@ -33220,6 +33337,14 @@ patch.
   it had never imported and still passed `tsc`.
 
 ### [platform][nutrition] LB-38 — the share-code e2e "flake" was a zxing decoder bug (shipped; device owed)
+- **✅ DECIDED 2026-09-27 by the Orchestrator, NOT put to the owner — keep `@zxing/browser`.**
+  This entry flagged the scanner choice as *"the owner's call"*. It is not: which library decodes a
+  barcode is **tooling**, which the 2026-09-22 narrowing puts on the agent
+  (*"architecture, tooling, process … decide them, state the call in one line, and continue"*).
+  **Keeping it:** it is already the app's scanner, it works, and the entry offers no defect that
+  changing it would fix — a swap would be a rewrite in search of a reason. **What would reopen
+  this** is a measured decode-failure rate on real barcodes, which nobody has taken. Reversal cost
+  is one dependency and one call site.
 
 - **Lane:** B — `e2e/qr-decode.ts`, `e2e/meal-label.spec.ts`, `lib/__tests__/qr-decode-rotations.test.ts`.
 - **Verify:** device — nothing in this diff is app code, but see the product note below: the app's own
