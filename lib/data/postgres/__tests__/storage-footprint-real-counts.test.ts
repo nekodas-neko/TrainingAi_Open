@@ -75,13 +75,16 @@ describe.skipIf(!canRun)('the DB footprint counts rows rather than estimating th
     const estimate = Number((await pool.query(
       `SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = 'oura_raw_samples'`)).rows[0]?.n_live_tup ?? 0)
     const real = Number((await pool.query(`SELECT count(*)::int AS n FROM oura_raw_samples`)).rows[0].n)
-    expect(real).toBe(before + 9)
+    // `>=`, not `toBe`: vitest runs other files against this database at the same time, and one of
+    // them inserting a raw sample between these reads made both assertions miss by one (2026-09-28).
+    // An estimate-based count is stale and BELOW the real one, so `>=` still fails the bug.
+    expect(real).toBeGreaterThanOrEqual(before + 9)
     // If this ever stops holding, autovacuum ran mid-test and the case proved nothing — which is
     // itself worth knowing, so it asserts rather than skipping.
     expect(estimate, 'the estimate went stale, which is the premise').toBeLessThan(real)
 
     const stats = await getOuraStorageStats(db)
-    expect(stats.tables.find(t => t.table === 'oura_raw_samples')!.rows).toBe(real)
+    expect(stats.tables.find(t => t.table === 'oura_raw_samples')!.rows).toBeGreaterThanOrEqual(real)
   })
 
   it('still reports exact sizes, which were never the problem', async () => {

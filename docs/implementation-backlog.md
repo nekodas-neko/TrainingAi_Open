@@ -7543,6 +7543,26 @@ drift.
 - **Why it cannot be diagnosed today:** the fingerprint is only `{programSessionId, today}`. It
   leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
 - **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
+- **⚠ RE-VERIFIED 2026-09-28 (Lane A): the premise is out of date, and the fix above would not find
+  anything.** Three facts against current `main`:
+  ① **Completion no longer generates a prescription.** `packages/shared/src/workout/complete-workout.ts`
+  only marks the slot `consumed`; the old `lib/workout/complete-workout.ts` that regenerated in-process
+  is gone. So the next open MUST regenerate, and "an open-time generation after the completion
+  produced one" describes a design that no longer exists. The only generators today are
+  `workout-data` at open (two call sites, `route.ts:552` and `:572`) and baseline completion.
+  ② **`excludeSessionId` is passed by nothing.** The `/prescribe` route accepts it and no client or
+  server caller sends it, so "which trigger fired" cannot be recovered from it either.
+  ③ **`ai_call_log.fingerprint` is stored as a 16-hex hash.** Adding fields splits the hashes; it
+  cannot make a trigger readable.
+- **What production actually shows (owner's rows, last 14 days, 19 calls):** one call per workout day,
+  plus a second for the same session 35-60 min later on 09-14, 09-15, 09-16 and 09-22, which fits
+  "open, train, reopen", now by design. **The one real anomaly is 09-16: two identical calls 7 s
+  apart**, which the 30 s cooldown exists to collapse. Candidates, unexamined: both `workout-data`
+  call sites firing in one request, or two replicas each missing the other's per-process cache.
+- **Revised next step:** find the 7-second pair's cause before instrumenting. If trigger names are
+  still wanted, they need a plain column (a schema change, so Lane A and after BF-214), not the
+  hashed fingerprint. Separately, `excludeSessionId` is a dead parameter: either wire it to a real
+  completion trigger or delete it with the comments that still describe one.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
