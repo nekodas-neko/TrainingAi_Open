@@ -3198,7 +3198,7 @@ which is the right shape for something that can only be validated by living with
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 
-- **✅ PART ONE SHIPPED (#PR, 2026-09-27) — numbers and durations. The rest is below, with who owns each.**
+- **✅ PART ONE SHIPPED (#1743, 2026-09-27) — numbers and durations. The rest is below, with who owns each.**
   **Thousands separators** at the three device-confirmed sites: Home's metric tile (`11900` →
   `11,900`, value and `aria-label`), Home's nutrition card (`0 / 1534 kcal`), More's profile
   (`2815 XP total`, one line above its own `2,815 XP`). They now match the `toLocaleString()` their
