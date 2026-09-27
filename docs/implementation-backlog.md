@@ -2983,6 +2983,19 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
+  Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
+  and `RV-213` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>. The after reads
+  *"You rated last night's sleep **Good** this morning."* under the readiness card.
+- **Gate: owner** — the mockup has been shown; the code waits on his yes to that picture.
+- **Ask** — owner: does he want his morning sleep-feel back on Home, in the wording the mockup
+  shows? `Ask:` rather than position, because `Gate: owner` alone would sink this into PARKED
+  beside 35 device gates and nobody would see that an answer is the deliverable.
+- **The WORDING is part of what he is being asked to approve**, not an implementation detail. Naming
+  whose judgement it is — *"you rated"* — is precisely what the dead `sleep_quality` line got wrong,
+  so if he takes this, keep the phrasing. The `useCachedValue`/TTL/write-group cost is stated on the
+  page too, because it is the one part of this that a picture cannot show.
+
 - **✅ ANSWERED 2026-09-27 — yes, put his morning sleep-feel back on Home, but SHOW HIM A MOCKUP FIRST.**
   He picked the mockup-gated variant over building it straight. So the next act is to produce a
   before/after at **384 px dark** and put it to him; the code waits on his yes to that picture.
@@ -3552,12 +3565,25 @@ which is the right shape for something that can only be validated by living with
   bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
-- **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added, and the lane moved `O` → `B`**: the remaining
+  work after his answer is `app/session-select/components/metric-tiles-card.tsx`, which the path rule
+  puts in Lane B. Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting
+  with `LA-136` and `RV-213`: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
+- **Gate: owner** — the mockup has been shown; the layout answer is the only outstanding thing.
+- **Two corrections to the figures below, measured at 384 px while capturing the after.** The tiles
+  occupy about **62%** of the row, not 58% — that reading was taken at 412 px. And the trade is not
+  "each tile is narrower": on a three-column grid the tiles come out **wider**. The real cost is that
+  moving `Log` out of the overlay and into the flow as a genuine 44 px target roughly **doubles the
+  row's height**, pushing everything below it down. That is what the page asks him to weigh.
+
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.
 - **Deliberately NOT `Gate: owner`.** The mockup does not exist yet, so the next act is to PRODUCE
   one and put it to him — that is work, and work is ungated `Lane: O`. A gate here would park the
   entry and nobody would be tasked with asking. `Gate: owner` belongs on it once a mockup has been
   shown and the answer is what is outstanding.
-- **Ask: owner — a mockup before this is built.** RV-207 ⑥ asks to move the "Log" label beside or
+- **Ask: owner — three columns with `Log` below the value, accepting a roughly doubled row height?**
+  The mockup exists now (see the top of this entry); what is outstanding is his answer to it.
+  RV-207 ⑥ asks to move the "Log" label beside or
   below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
   of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
   is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
@@ -3977,6 +4003,21 @@ which is the right shape for something that can only be validated by living with
    - **The definition is the owner's call. The copy is not.**
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
+  Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
+  and `LA-136` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
+- **Gate: owner** — the mockup has been shown; the collapse is his pick, as the entry says.
+- **Ask** — owner: collapse an empty meal to one row with its name and a single `+`, accepting
+  that the `+` must grow to 48 px as part of it? `Ask:` for the same reason as `LA-136`.
+- **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
+  Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
+  goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
+- **⚠ One thing the recommendation below misses, and it is a rule violation rather than a taste
+  call.** Once the "Add food" card goes, the header `+` is the ONLY way into an empty meal — and it
+  is `h-9 w-9`, a **36 px** target, under the 48 px floor the rest of the app holds to. Enlarging it
+  is part of this change, not a follow-up, so the page presents it that way rather than offering the
+  collapse alone and leaving him to approve a regression.
+
 - **Lane: B**
 - **UNGATED 2026-09-27 — the mockup does not exist yet, so the next act is to PRODUCE one, and that
   is work. `Gate: owner` PARKED this entry, which meant nobody was tasked with drawing the picture
