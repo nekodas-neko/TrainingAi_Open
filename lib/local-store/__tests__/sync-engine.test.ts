@@ -23,6 +23,7 @@ const { fakeStore } = vi.hoisted(() => ({
     getLastSyncAt:          vi.fn().mockResolvedValue(new Date('2026-07-01T00:00:00.000Z')),
     setLastSyncAt:          vi.fn().mockResolvedValue(undefined),
     applyDelta:             vi.fn().mockResolvedValue(undefined),
+    pruneProgramStructure:  vi.fn().mockResolvedValue(0),
     markSleepSessionSynced:     vi.fn().mockResolvedValue(undefined),
     markOuraDailySummarySynced: vi.fn().mockResolvedValue(undefined),
     markOuraDailyDerivedSynced: vi.fn().mockResolvedValue(undefined),
@@ -330,6 +331,34 @@ describe('pullDelta', () => {
     vi.stubGlobal('fetch', fetchMock2)
     await pullDelta('u1', true)
     expect(String(fetchMock2.mock.calls[0][0])).not.toContain('mode=restore')
+  })
+
+  // RV-174. The roster is what lets a deleted program leave the device; an absent one must NOT be
+  // read as an empty one, which would wipe the mirror.
+  it('prunes the program mirror to the roster the server sent', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({
+      ...emptyDelta(false), programRoster: ['prog-B'], progressionStyleRoster: ['style-2'],
+    })))
+    await pullDelta('u1', true)
+    expect(fakeStore.pruneProgramStructure).toHaveBeenCalledWith(['prog-B'], ['style-2'])
+  })
+
+  it('passes undefined, not [], when the server sent no roster', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(emptyDelta(false))))
+    await pullDelta('u1', true)
+    expect(fakeStore.pruneProgramStructure).toHaveBeenCalledWith(undefined, undefined)
+  })
+
+  it('reports the programs domain as changed when a prune removed something, and not otherwise', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ ...emptyDelta(false), programRoster: [] })))
+    fakeStore.pruneProgramStructure.mockResolvedValueOnce(2)
+    const pruned = await pullDelta('u1', true)
+    expect(pruned!.domains.programs).toBe(true)
+
+    _resetSyncBackoff()
+    fakeStore.pruneProgramStructure.mockResolvedValueOnce(0)
+    const quiet = await pullDelta('u1', true)
+    expect(quiet!.domains.programs).toBe(false)
   })
 
   it('surfaces hasMore on the outer return so a restore loop can drain past the page cap', async () => {
