@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.475.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: Workout Review now answers straight away instead of waiting on the AI. It works out what to trim the same way your workout prescription already does, so the two can no longer suggest different things about the same session. The only thing lost is the written sentence explaining each dropped exercise.",
+    ],
+  },
+  {
     version: "1.474.1",
     date: "2026-09-26",
     changes: [

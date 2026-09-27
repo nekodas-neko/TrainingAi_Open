@@ -45,6 +45,50 @@ export interface BudgetStageResult {
   budgetNote: string
 }
 
+/**
+ * Weekly volume state keyed by muscle — what `trimPriority` weighs a cut against.
+ *
+ * Exported (RV-204) because the Workout Review runs the SAME trim on the same inputs and a
+ * second construction of this map is a second place for the two to disagree.
+ */
+export function buildBudgetMuscleVolume(signals: PrescriptionSignals): Map<string, MuscleVolumeState> {
+  return new Map<string, MuscleVolumeState>(
+    Object.entries(signals.weeklyTargets).map(([muscle, mav]) => [
+      muscle,
+      { loggedBeforeSession: signals.weeklyLogged[muscle] ?? 0, mav },
+    ]),
+  )
+}
+
+/**
+ * The pre-budget `TimedExercise[]` — each exercise's shape joined to its signal's transition
+ * cost, muscle assignments and measured time profile. Exported for the same reason as above.
+ */
+export function buildTimedExercises(
+  exercises: BudgetStageExercise[],
+  signals: PrescriptionSignals,
+) {
+  const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
+  return exercises.map(ex => {
+    const sig = sigById.get(ex.sessionExerciseId)
+    const muscleGroups: MuscleContribution[] = (sig?.muscleAssignments ?? []).map(ma => ({
+      muscle: normalizeMuscle(ma.muscle),
+      weight: ma.role === 'main' ? 1.0 : 0.5,
+    }))
+    return {
+      sessionExerciseId: ex.sessionExerciseId,
+      role: sig?.role ?? 'primary',
+      sets: ex.sets,
+      reps: ex.reps,
+      restSec: ex.restSec,
+      transitionSec: sig?.transitionSec ?? 240,
+      muscleGroups,
+      measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
+      measuredRestSec: sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, ex.pct) : null,
+    }
+  })
+}
+
 export function applyBudgetStage(
   exercises: BudgetStageExercise[],
   signals: PrescriptionSignals,
@@ -64,31 +108,9 @@ export function applyBudgetStage(
   // of a higher-priority role instead. Role floors are absolute either way — a primary is
   // never touched below 2 sets. Duration is estimated from the prescribed reps and rest, so
   // it reflects the actual longest-case session.
-  const muscleVolume = new Map<string, MuscleVolumeState>(
-    Object.entries(signals.weeklyTargets).map(([muscle, mav]) => [
-      muscle,
-      { loggedBeforeSession: signals.weeklyLogged[muscle] ?? 0, mav },
-    ]),
-  )
+  const muscleVolume = buildBudgetMuscleVolume(signals)
   const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
-  const timedExercises = exercises.map(ex => {
-    const sig = sigById.get(ex.sessionExerciseId)
-    const muscleGroups: MuscleContribution[] = (sig?.muscleAssignments ?? []).map(ma => ({
-      muscle: normalizeMuscle(ma.muscle),
-      weight: ma.role === 'main' ? 1.0 : 0.5,
-    }))
-    return {
-      sessionExerciseId: ex.sessionExerciseId,
-      role: sig?.role ?? 'primary',
-      sets: ex.sets,
-      reps: ex.reps,
-      restSec: ex.restSec,
-      transitionSec: sig?.transitionSec ?? 240,
-      muscleGroups,
-      measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
-      measuredRestSec: sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, ex.pct) : null,
-    }
-  })
+  const timedExercises = buildTimedExercises(exercises, signals)
 
   // Role plausibility on volume runs BEFORE the budget passes, so every preset gets it and the
   // plan is already the right shape when trimming/expansion start — rather than relying on them

@@ -6,17 +6,15 @@ import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { rateLimit } from '@/lib/rate-limit'
-import { generateObject } from 'ai'
-import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
-import { WorkoutReviewSchema } from '@trainingai/shared/workout/review/schema'
-import { buildReviewSystemPrompt, buildReviewUserPrompt } from '@trainingai/shared/workout/review/prompt'
+import { buildRulesReview } from '@trainingai/shared/workout/review/rules-review'
 import { reconcileReview, type ReviewSignalExercise, type SetShape } from '@trainingai/shared/workout/review/reconcile'
 import type { ProgressionStyle } from '@trainingai/shared/types/progression'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 
-export const maxDuration = 30
+// RV-204: no model call any more, so this is ordinary repository work. Left explicit rather than
+// deleted — `aggregateSignals` is ~30 repository reads and the default is not generous.
+export const maxDuration = 15
 
 const ROLE_DEFAULT: Record<string, SetShape> = {
   primary: { sets: 3, reps: 5, pct: 80, restSec: 180 },
@@ -97,55 +95,47 @@ export async function POST(
     timeProfile: ex.timeProfile,
   }))
 
-  const systemPrompt = buildReviewSystemPrompt(signals.trainingGoal, signals.phase)
-  const userPrompt = buildReviewUserPrompt(signals, currentParams, today)
+  // RV-204. The model chose which exercises to drop and how to resize the rest, and
+  // `reconcileReview` below then clamped, guarded and recomputed all of it — so what survived
+  // the model was the choice plus a sentence per drop. That choice is already made
+  // deterministically on every prescription, by the same trim ordering; making the review use
+  // it is what stops a review proposing a shape the prescription would never generate.
+  const rules = buildRulesReview({
+    exercises: signalExercises.map(ex => {
+      const shape = currentParams.get(ex.sessionExerciseId)
+      return {
+        sessionExerciseId: ex.sessionExerciseId,
+        name: ex.name,
+        sets: shape?.sets ?? 3,
+        reps: shape?.reps ?? 8,
+        pct: shape?.pct ?? 72,
+        restSec: shape?.restSec ?? 120,
+      }
+    }),
+    signals,
+    budgetMin: signals.effectiveTimeBudgetMin,
+  })
 
-  let parsed: Awaited<ReturnType<typeof generateObject<typeof WorkoutReviewSchema>>>['object']
-  try {
-    const result = await loggedGenerateObject(
-      { section: 'workout-review', userId, fingerprint: { programSessionId, today } },
-      signal => generateObject({
-        model: aiModel(),
-        schema: WorkoutReviewSchema,
-        system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
-        prompt: userPrompt,
-        maxRetries: 0,
-        abortSignal: signal,
-      }),
-    )
-    parsed = result.object
-  } catch (err) {
-    console.error('Gemini workout-review generation failed:', err)
-    return NextResponse.json({ error: 'AI review failed — try again in a moment.' }, { status: 502 })
-  }
-
+  // Unchanged: every guard, the duration estimate and the weekly-volume impact still run here,
+  // over a proposal that now cannot contain an invented id.
   const proposal = reconcileReview({
     signalExercises,
-    modelExercises: parsed.exercises.map(ex => ({
-      sessionExerciseId: ex.session_exercise_id,
-      name: ex.name,
-      action: ex.action,
-      sets: ex.sets,
-      reps: ex.reps,
-      pct: ex.pct,
-      restSec: ex.rest_sec,
-      dropReason: ex.drop_reason,
-    })),
+    modelExercises: rules.modelExercises,
     currentParams,
     weeklyTargets: signals.weeklyTargets,
     weeklyLogged: signals.weeklyLogged,
     budgetMin: signals.effectiveTimeBudgetMin,
   })
-  if (proposal.invalidIds.length > 0) {
-    console.warn('[workout-review] ignored invented session_exercise_id(s):', proposal.invalidIds)
-  }
 
   return NextResponse.json({
     sessionId: programSessionId,
     sessionName: programSession.name,
     totalBudgetMin: programSession.timeBudgetMinutes,
-    reasoning: parsed.reasoning,
-    confidence: parsed.confidence,
+    reasoning: rules.reasoning,
+    // Deterministic arithmetic, not an estimate of its own reliability. A number here at all is
+    // the shape the sheet already reads; CLAUDE.md forbids showing a MODEL's self-reported
+    // confidence as fact, and this is the opposite of one — it is always exactly this.
+    confidence: 1,
     proposal,
   })
 }

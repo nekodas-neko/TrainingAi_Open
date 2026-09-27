@@ -2978,16 +2978,50 @@ which is the right shape for something that can only be validated by living with
   way, so a wrong answer is visible on the next plan and undone in the next PR. This is cheap
   enough that "try it for a month" is a legitimate answer.
 
-### [workouts] RV-204 — workout-review and the recap have code that already does their job; neither ran in 30 days
-- **Lane: A.** Low priority: zero calls in 30 days.
-- **Added:** 2026-09-25 · Review sweep 61.
-- **workout-review** (runs automatically when its sheet opens from Config):
-  - `reconcileReview` already clamps every adjustment, refuses unsafe drops, back-fills what the model omitted, and recomputes duration and weekly volume (`reconcile.ts:104-220`).
-  - `dropToBudget`/`fitToBudget` already fit a session to its budget.
-  - **Fix:** run those directly, losing only the free-text drop reasons (a fallback string already exists, `:177`). Size M.
-- **Recap:**
-  - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
-  - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
+### [workouts] RV-204 — the recap half, once LA-155 says why the screen is never reached
+- **Lane: A** · **Branch:** `feat/rv204-rules-workout-review` (workout-review half) · **Added:** 2026-09-25 · Review sweep 61.
+- **Needs: LA-155** — ② cannot be built until that answers why the screen is never reached.
+- **✅ workout-review SHIPPED 2026-09-26.** Its `generateObject` call is gone; the proposal is
+  `buildRulesReview` → `reconcileReview`, running `applyRoleSetPlausibility` → `dropToBudget` —
+  the same trim ordering the prescription path uses, so a review can no longer propose a shape
+  the prescription would never generate. Free-text drop reasons are the one loss and
+  `reconcileReview` already carried the fallback string. `review/prompt.ts` and `review/schema.ts`
+  were deleted with it.
+  - The entry's measurement was right and **understated**: `workout-review` has **zero** calls in
+    the owner's `ai_call_log` over **60** days, not 30.
+- **② The recap is NOT an unused feature — it is a broken one, and this half is blocked on knowing
+  why (LA-155).** The entry reads as disuse; the recap fires **automatically** from
+  `done-screen.tsx` whenever a workout completes. Measured 2026-09-26: `ai_health_insights` holds
+  **4** `session-recap` rows, the last on **2026-07-23**, against **43** workouts completed
+  2026-07-30 → 2026-09-25, and no `error_events` row implicates the route. So it is never called.
+  **Making the stat block the default on a screen nobody reaches fixes nothing**, which is why
+  this is parked behind LA-155 rather than built.
+  - The fix as written is also partly already there: `degradedFromFacts` ships and the done screen
+    renders it (RV-69), with `shouldCache` keeping it out of the 24 h key. What ② actually adds is
+    *default* rather than *fallback*, and *on the device* rather than server-side.
+
+### [workouts][app-shell] LA-155 — the workout recap has not run since July, across 43 completed workouts
+- **Lane: DV** — the question is what the app does after the last set, which only the phone can answer.
+- **Branch:** _unassigned_ · **Added:** 2026-09-26 · found verifying RV-204 against production.
+- **What:** `GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx`
+  whenever a workout is completed. Measured 2026-09-26 against production:
+  - `claude_ro.ai_health_insights` — **4** rows with `section` beginning `session-recap`, newest
+    **2026-07-23**.
+  - `claude_ro.workout_sessions` — **43** rows with `completed_at` in the last 60 days, spanning
+    **2026-07-30 → 2026-09-25**.
+  - `claude_ro.ai_call_log` — **no** `workout-recap` section in 60 days.
+  - `claude_ro.error_events` — nothing implicating the route; the whole 30-day window is BF-110's
+    own instrumentation.
+- **So the route is not failing, it is not being reached.** Both readings are row-scoped to the
+  owner, so this is his workouts against his recaps — the right comparison.
+- **What could not be settled from the sandbox** (and is why this is `Lane: DV`): whether
+  `mode === 'done'` is reached at all after the last set, or whether it is reached with
+  `store.workoutSessionId` null — every recap/energy/HR loader on that screen is guarded by
+  `if (!workoutSessionId) return`, so a null id silently disables all three at once.
+- **Pass test:** complete a workout on the S25, reach the done screen, and report whether the
+  recap card renders, shows its skeleton, or is absent — and whether the energy and HR cards
+  beside it are there. A recap row appearing in `ai_health_insights` is the confirmation.
+- **Blocks: RV-204 ②**, which proposes building a stat block into that same screen.
 
 ### [app-shell] LB-162 — the three `height: auto` collapses; the three bars are done
 - **Lane: B** · **Branch:** `lane-b/lb162-remaining-bars` · **Added:** 2026-09-26.

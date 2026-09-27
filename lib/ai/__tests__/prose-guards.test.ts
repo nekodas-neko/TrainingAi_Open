@@ -27,6 +27,11 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8')
 // landed — and RV-201 removed it by removing the model: the insight is now assembled from the
 // numbers by `insight-text.ts`, which cannot pick a unit or a superlative at all. A route leaves
 // this list when its model call goes, never because the guards became inconvenient.
+//
+// `app/api/workout-review/session/[sessionId]/route.ts` left the field list the same way
+// (RV-204): its `generateObject` call is gone and the `reasoning` it returns is now assembled by
+// `buildRulesReview` from the budget arithmetic, so there is no model text to guard and
+// `review/prompt.ts` has been deleted.
 const PROSE_ROUTES = [
   'app/api/daily-digest/route.ts',
   'app/api/workout-sessions/[id]/recap/route.ts',
@@ -39,7 +44,6 @@ const PROSE_FIELD_ROUTES = [
   'app/api/nutrition-goals/recommend/route.ts',
   'app/api/generate-program/route.ts',
   'app/api/builder-chat/route.ts',
-  'app/api/workout-review/session/[sessionId]/route.ts',
 ]
 
 describe('the prose guards reach every route that writes prose (Q-292, PS-32)', () => {
