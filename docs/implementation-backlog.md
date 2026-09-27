@@ -4084,6 +4084,41 @@ unverified"* is now answered: it persists.
   and every read re-decodes from `body_hex` via the adapter's `r.decoded ?? decodeEventBody(...)`
   fallback. Correct today; it does mean a decoder edit retroactively changes historical reads with
   nothing recording that it did.
+- **⚙ THE READ THIS ENTRY ASKED FOR IS DONE (2026-09-27, Lane A) — and it REFUTES the prediction.**
+  The entry said: *"after this deploys, check whether the 21 days read `scorer_no_output`. If they
+  do, the question is whether the constants are loaded."* **They do not.** Measured in production:
+
+  | day | gate | written |
+  |---|---|---|
+  | 2026-09-16 → 09-24 | `insufficient_met` | 09-27 03:21 |
+  | 2026-09-25, 09-26 | `scorer_no_output` | 09-27 03:21 |
+  | 2026-09-27 | `insufficient_met` | 09-27 03:21 |
+
+  - **None of these rows is stale** — all twelve carry the same `updated_at`, so every one is a
+    fresh verdict from the split, not a leftover label. The `scorer_no_output` string is live and
+    reaching the table.
+  - **So the constants hypothesis is NOT the next step.** `scorer_no_output` fires on only 2 of 12
+    days. On the other ten the MET floors themselves are firing — and 09-18 → 09-24 are exactly the
+    days this entry's own replay proved clear BOTH floors with room (09-23: a 1421-minute grid,
+    1073 valid minutes, against 720 and 360).
+  - **That is now a flat contradiction with one side inside the serving process.** The replay reads
+    frames straight from `oura_raw_samples`; production reaches them through
+    `getOuraDaytimeSignals`. Same frames, same `metGridFromDaytimeSamples`, opposite verdicts — so
+    the loss is in that method, which is where this entry already suspected it.
+  - **⚠ Two more hypotheses formed and KILLED here — do not re-run them.**
+    ① *Every MET value in a `0x50` frame is pushed with the same `tsMs`, so a day collapses to ~100
+    minutes.* The timestamps really are shared, and it is **not** the cause:
+    `metGridFromDaytimeSamples` regroups consecutive equal-timestamp bins into their source event
+    and lays them back out one minute apart, which is exactly what that code is for.
+    ② *`readRawFrames` truncates.* It does not — there is no `LIMIT` anywhere in it, hot or cold.
+  - **What is left, and it is two candidates, both inside `getOuraDaytimeSignals`:** the ds window
+    (`msToDs` on the day bounds — LA-139/RV-182 ② moved this to a robust offset across the whole
+    anchor series, and the window is only as good as that fit), or **rows silently dropped by
+    `dsToMs` returning null** (`if (tsMs == null) continue`), which discards a frame with no signal
+    of any kind.
+  - **The next step is instrumentation, not another read — filed as LA-161.** Nothing persisted
+    says how long the grid actually was, so the two candidates cannot be separated from outside.
+
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
   `reason: 'insufficient_met'` (`training-stress.ts:82`), and that model returns null down **seven**
@@ -4191,6 +4226,24 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
+
+### [readiness][devices] LA-161 — persist the MET grid's dimensions, so the training-load gate can be diagnosed from data
+- **Lane: A** · **Added:** 2026-09-27 · split out of TN-79 when its prescribed read refuted its own prediction.
+- **Why:** production gates `insufficient_met` on days whose stored frames replay to a 1421-minute
+  grid with 1073 valid minutes. One of those two is wrong and **nothing persisted says which**, so
+  the difference can only be guessed at from outside. TN-79 has now spent several sessions on
+  inference; two integers would end it.
+- **What:** persist, beside `training_load_gate`, the grid length and the valid-minute count that
+  `computeTrainingStress` actually gated on — the two numbers in
+  `i.metsPerMinute.length < 720 || validMin < 360`.
+- **Shape:** one migration adding two nullable integer columns to `oura_daily_derived`, its
+  regenerated `claude_ro` twin in the same PR, the row mapper, and the route's persist call.
+  **Ships alone** (migration). Additive and nullable, so it is not data-dropping.
+- **Done when:** one day of production says whether the grid production builds is short, and by how
+  much. If it is short, the cause is the ds window or `dsToMs` dropping rows; if it is not, the
+  floors are being evaluated on something other than what is stored.
+- **Do NOT lower the floors to make the gate pass.** 720 and 360 are the model's own, and the
+  question is why a day with 1073 valid minutes reads as insufficient.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
