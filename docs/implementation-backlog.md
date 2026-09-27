@@ -6593,6 +6593,20 @@ drift.
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts` (the session-level deload builder).
 - **Added:** 2026-09-26 · BugFix intake. Owner, on a Saturday Upper reading *"AI Prescription · Deload"* with `Full` selected: *"How am I supposed to select a full workout when the prescription is deload?"*
 - **Needs:** — nothing.
+- **⚙ SHIPPED 2026-09-28 (Lane A), as recommended below.** `buildWholeSessionDeloadPrescription`
+  (`packages/shared/src/ai-periodization/generate-prescription.ts`) now records `preDeload` on every
+  exercise that has a base style. The numbers are the program's own, fitted to today's budget: the
+  plan `buildRulesPrescription` builds, since a whole-session deload has no model numbers to keep.
+  `session-data` already turns `preDeload` into `preDeloadStyle`, and `applyDeloadReverts` already
+  clears `deloaded` on revert, so `Full` now restores the session and its sets count toward the 1RM.
+  No client, route or schema change. An exercise with no base style gets no `preDeload` and stays
+  deloaded under `Full`, which is how the per-exercise path behaves without a record.
+  **Applies to prescriptions generated after deploy.** The stored Upper and Pull prescriptions keep
+  their dead toggle until they are next regenerated.
+- **Keep:** two things this does not touch. ① `ai-prescription-card.tsx:260`'s *"you would need a
+  new prescription for that"* still names a remedy that does not exist. It now shows only for an
+  exercise with no base style, and is Lane B's copy. ② `deloadReason` is NULL on every stored
+  prescription, so neither the card nor anyone reading the data can say why a session was deloaded.
 
 - **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
   REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,
