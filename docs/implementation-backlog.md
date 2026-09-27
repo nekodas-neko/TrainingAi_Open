@@ -714,6 +714,91 @@ below threshold and left in place for next time.
   a pruned raw row cannot be re-drained from the ring.
 
 
+### [platform] OR-194 — a persistent local agent environment needs three guards first, or it trades a token saving for a correctness one
+
+- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, from an outside review of the agent
+  architecture (jsboiss, relayed by the owner) and the owner's offer to run Lane A locally.
+- **Ships BEFORE `OR-195`.** These are the things a fresh clone currently guarantees for free.
+- **① Separate working copies.** Two agents in one clone stomp each other. `CLAUDE.md` already
+  records the failure: a `git checkout` with a dirty tree carried two files across and shipped them
+  inside an unrelated PR (#1140, 2026-08-08), which took a revert plus corrections in three
+  documents to make honest. Use a git worktree or a second clone per lane.
+- **② Separate databases.** `scripts/local-db/setup.sh` hardcodes `PGDATA=/var/lib/postgresql/local-dev`,
+  `PGPORT=5433` and `DBNAME=trainingai_dev`. Two lanes on one machine share one cluster and one
+  database and will corrupt each other's test state. Parameterise the name and port per lane.
+- **③ A re-create-from-migrations rule at session start — this is the one that actually bites.**
+  A long-lived dev database accumulates hand-applied changes, and `scripts/generate-claude-ro-views.js`
+  reads `LOCAL_DATABASE_URL`. `CLAUDE.md` already states the consequence: generating against a
+  drifted database *silently* drops real columns from the read-only security views. **Today the
+  fresh clone is what makes that impossible.** Persisting the environment removes that guarantee, so
+  it has to be replaced by an explicit rebuild, not by care.
+- **Not a token saving, and do not sell it as one.** This buys wall-clock and capability. The ~120 KB
+  fixed orientation read is identical on a warm machine.
+- **Reversal cost:** low — the guards are useful whether or not the move happens.
+
+### [platform] OR-195 — move Lane A to a persistent local session, where it can finally build the Kotlin it owns
+
+- **Lane: O** · **Added:** 2026-09-27 · Orchestrator. The owner offered this outright:
+  *"I can turn agent A + B in to local agents so their environment is persisted."*
+- **Needs:** OR-194
+- **The argument is capability, not speed.** Lane A owns `android/**` — the Kotlin BLE foreground
+  service and the ring pipeline — and the sandbox has no Android SDK with Gradle's download
+  proxy-blocked. [`docs/canonical-runtime-android.md`](canonical-runtime-android.md) line 124 says a
+  local build *"is yours to do"*, meaning the owner's personally. So Lane A today writes Kotlin it
+  can only compile-check, then waits a CI cycle or hands the owner an APK. Locally, with the SDK
+  present, it builds and signs its own.
+- **Recommendation: move Lane A ONLY, and keep Lane B in the cloud.** Lane B gains wall-clock and
+  nothing else, and a cloud lane is the control group — a fresh clone each session is what
+  guarantees an agent sees exactly what CI sees. Moving both at once makes "works on my machine"
+  possible for the first time with nothing to compare against.
+- **What the owner should know before flipping it:** a local agent runs only while his machine is
+  awake. That is already true of Device Verification and is fine for driven work, but it ends
+  "a lane can pick something up overnight".
+- **Then re-measure.** If per-session cost is still the bottleneck after `OR-197`'s compaction, the
+  case for consolidating roles gets stronger and deserves an honest second look rather than a defence
+  of the current shape.
+- **Reversal cost: none** — it is where a session is started from.
+
+### [platform] OR-196 — docs-only PRs run the full suite, and the obvious fix would block every merge
+
+- **Lane: A** · **Added:** 2026-09-27 · Orchestrator. Lane assignment is by the residual rule rather
+  than a path list — CI config is neither lane's named territory; Lane A claims it as platform.
+- **The waste is real.** `.github/workflows/ci.yml` has no `paths-ignore`, so a markdown-only PR runs
+  Lint, Tests, Build, Migration Check and Custom Rules. Most Orchestrator, Review, BugFix and Tuning
+  PRs are markdown-only, which is most PRs.
+- **⚠ THE OBVIOUS FIX IS A TRAP, AND THE WORKFLOW ALREADY SAYS SO.** Its own comment records it:
+  every job is a required status check, so skipping CI leaves them reading *"Expected"* forever and
+  the PR can never merge. `paths-ignore` alone converts a 6-minute cost into a permanently stuck PR.
+- **Recommendation: a second workflow, triggered on the inverse path filter, publishing jobs with
+  the SAME names** that do nothing and pass. The required checks report either way; only the
+  expensive ones are conditional. Alternative — leave it, which is what the comment chose
+  (*"correctness over a few saved minutes"*) and is still defensible; the reason to revisit is
+  volume, not principle.
+- **Prior art in the same file:** the `push: main` trigger was already deleted for this reason,
+  saving ~11 billed minutes per merge.
+- **Measure before and after.** Do not merge this on the argument alone — state billed minutes per
+  docs PR now and after, or it is a change with no evidence it helped.
+- **Reversal cost: one workflow file.**
+
+### [platform] OR-198 — the journal fold breaks `Detail:` pointers, and no check can see it
+
+- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, found while relocating `Current Status` (OR-197).
+- **Measured:** of 281 narrative paragraphs, 152 cite a journal file. One — `LB-158`'s — pointed at
+  `docs/overview/entries/2026-09-26-lb158-local-barcode.md`, which `scripts/fold-journal-entries.js`
+  had already folded into `docs/overview/history-2026-09-27-folded-2.md`. The fold moves the file and
+  does not rewrite anything citing it.
+- **Why nothing caught it:** these are bare paths inside backticks, not markdown links, so
+  `check-doc-links.js` structurally cannot see them. It reported OK on the same file.
+- **1 of 152 is a low rate and that is the danger** — it is rare enough to be trusted and silent
+  enough to spread. Every fold sweep can add more.
+- **Recommendation: have the fold rewrite the pointers it invalidates**, in the same commit as the
+  move — the script knows both paths, which nothing downstream does. Alternative: teach a checker to
+  resolve backticked `docs/**.md` paths; useful anyway, but it reports a break after the fact rather
+  than preventing it.
+- **The one instance is already fixed** in the relocated file; this is about the mechanism.
+- **Reversal cost:** low — one script.
+
+
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
