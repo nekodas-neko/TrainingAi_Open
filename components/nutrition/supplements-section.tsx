@@ -253,7 +253,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
           <p className="text-xs text-muted-foreground text-center -mt-2 mb-4">How much did you take?</p>
           <div className="grid grid-cols-[1fr_auto] items-center gap-2">
             <input
-              type="number"
+              type="number" enterKeyHint="done"
               inputMode="decimal"
               step="any"
               min="0"

@@ -100,7 +100,7 @@ export function PersonalDetailsSection({
         <Label htmlFor="pd-birthYear" className="text-xs text-muted-foreground">Birth Year</Label>
         <Input
           id="pd-birthYear"
-          type="number"
+          type="number" enterKeyHint="done"
           value={values.birthYear}
           onChange={e => onChange('birthYear', e.target.value)}
           placeholder="1990"
@@ -115,7 +115,7 @@ export function PersonalDetailsSection({
         <Label htmlFor="pd-height" className="text-xs text-muted-foreground">Height (cm)</Label>
         <Input
           id="pd-height"
-          type="number"
+          type="number" enterKeyHint="done"
           value={values.heightCm}
           onChange={e => onChange('heightCm', e.target.value)}
           placeholder="175"

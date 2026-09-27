@@ -231,7 +231,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
           </Button>
           <div className="flex items-center gap-3">
             <input
-              type="number"
+              type="number" enterKeyHint="done"
               inputMode="decimal"
               value={logValue}
               onChange={(e) => setLogValue(e.target.value)}

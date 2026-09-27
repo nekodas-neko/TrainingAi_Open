@@ -125,6 +125,12 @@ export const viewport: Viewport = {
   // that gesture entirely so the view can never get stuck zoomed.
   maximumScale: 1,
   userScalable: false,
+  // Let the soft keyboard shrink the LAYOUT viewport, not just the visual one (RV-210). The
+  // Android default is `resizes-visual`: the page keeps its full height and the keyboard is
+  // drawn over it, so a bottom sheet sized in viewport units keeps a height that no longer
+  // fits, and its submit button sits underneath the keyboard. `resizes-content` resizes both,
+  // which is what makes `dvh` sheet heights and `pb-safe-action` clearances respond at all.
+  interactiveWidget: "resizes-content",
   viewportFit: "cover",
   themeColor: "#09090b",
 };

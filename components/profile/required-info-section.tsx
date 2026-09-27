@@ -78,7 +78,7 @@ export function RequiredInfoSection({
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground flex-none" />
           <div className="flex items-center gap-1 flex-none">
             <Input
-              type="number"
+              type="number" enterKeyHint="done"
               id="goals-weight"
               value={targetWeightStr}
               onChange={e => onTargetWeightChange(e.target.value)}
@@ -117,7 +117,7 @@ export function RequiredInfoSection({
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground flex-none" />
           <div className="flex items-center gap-1 flex-none">
             <Input
-              type="number"
+              type="number" enterKeyHint="done"
               id="goals-bodyFat"
               value={targetBfStr}
               onChange={e => onTargetBfChange(e.target.value)}

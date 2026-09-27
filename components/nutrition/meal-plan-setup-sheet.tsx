@@ -305,7 +305,7 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       {/* side="bottom" bakes in the bottom inset — never add pb-safe* inside. */}
-      <SheetContent side="bottom" className="h-[88vh] flex flex-col">
+      <SheetContent side="bottom" className="h-[88dvh] flex flex-col">
         <SheetHeader>
           <SheetTitle>{draft ? 'Check this over' : 'New meal plan'}</SheetTitle>
         </SheetHeader>

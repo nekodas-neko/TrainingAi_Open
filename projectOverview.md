@@ -2658,6 +2658,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The keyboard can now resize the sheets it covers, and not one part of that has been seen on a phone (RV-210, 2026-09-27)
+
+`interactiveWidget: "resizes-content"` is on the viewport (verified in the **built** HTML, not just source), all 23 `vh` sheet heights are `dvh`, and all 42 numeric inputs carry `enterKeyHint="done"`. **A headless Chromium has no soft keyboard**, so `interactive-widget` is inert there and `dvh` resolves exactly as `vh` — measured, a `max-h-[90dvh]` sheet computes 823.5 px at a 915 px viewport, 90% to the decimal. The harness change is a no-op **by construction**; that is correct and it is not evidence the fix works. `scripts/check-keyboard-viewport.js` holds both source conditions at zero. **Watch also `components/ui/weight-dial.tsx`**, which sizes from `window.innerHeight` and will now shrink when a keyboard opens — it re-snaps on `resize` and is capped, so it should degrade rather than break. **Pass test (RV-205's P26):** on the S25, open food review and the weigh-in sheet with the keyboard up and confirm no input or submit button is covered, and that the weight dial still reads correctly.
+
 ### [app-shell] ⚠️ The workout screens' smallest text moved up; nobody has read it mid-set (RV-209, 2026-09-27)
 
 `--text-2xs: 11px` is the floor of the type scale, and the nine sites the audit named on the workout screens are on it — five of them moved up from 9–10 px. The other **103 sub-11 px literals across 24 workout files are frozen, not fixed**: a per-file shrink-only ratchet, so every future touch pays some down. Rendered at 412 px dark and nothing overflows, but **two of the nine were not on screen in that state** (the last-session panel) and none of it has been read at arm's length on the S25, which is the whole point of the change. **Pass test:** on the S25 mid-set, the set card and clock captions are readable without leaning in, and nothing has reflowed. Untouched: the 26 small sites that also sit at 40–70% opacity.

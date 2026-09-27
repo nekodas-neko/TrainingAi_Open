@@ -225,7 +225,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
     <Sheet open={open} onOpenChange={o => !o && onClose()}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl max-h-[92vh] flex flex-col p-0 border-t border-border/70"
+        className="rounded-t-2xl max-h-[92dvh] flex flex-col p-0 border-t border-border/70"
         style={{ background: pageGradient }}
         hideCloseButton
       >

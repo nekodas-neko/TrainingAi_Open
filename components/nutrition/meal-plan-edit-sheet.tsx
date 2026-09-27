@@ -201,7 +201,7 @@ export function MealPlanEditSheet({ plan, onOpenChange, onChanged }: Props) {
 
   return (
     <Sheet open={plan != null} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[88vh] flex flex-col">
+      <SheetContent side="bottom" className="h-[88dvh] flex flex-col">
         <SheetHeader>
           <SheetTitle>Edit meals</SheetTitle>
         </SheetHeader>

@@ -161,7 +161,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       {/* SheetContent side="bottom" owns the bottom inset — never add pb-safe* inside one. */}
-      <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto">
+      <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{meal ? `${meal.name} label` : 'Label'}</SheetTitle>
         </SheetHeader>

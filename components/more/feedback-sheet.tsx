@@ -75,7 +75,7 @@ export function FeedbackSheet({ open, onOpenChange }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90dvh] flex flex-col">
         <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
           <SheetTitle>Submit Feedback</SheetTitle>
         </SheetHeader>

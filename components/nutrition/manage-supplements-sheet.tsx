@@ -241,7 +241,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
   if (editTarget !== null) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
           <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
             <SheetTitle>{editTarget === 'new' ? 'Add Supplement' : 'Edit Supplement'}</SheetTitle>
           </SheetHeader>
@@ -264,7 +264,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1.5">Amount <span className="font-normal">(optional)</span></p>
                 <input
-                  type="number"
+                  type="number" enterKeyHint="done"
                   inputMode="decimal"
                   step="any"
                   min="0"
@@ -375,7 +375,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
         <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
           <SheetTitle>Manage Supplements</SheetTitle>
         </SheetHeader>

@@ -49,7 +49,7 @@ export function DaytimeCoverageConsole() {
       </p>
       <div className="flex items-center gap-2">
         <input
-          type="number"
+          type="number" enterKeyHint="done"
           min={1}
           max={30}
           value={days}

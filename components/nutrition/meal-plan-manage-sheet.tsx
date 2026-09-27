@@ -122,7 +122,7 @@ export function MealPlanManageSheet({ plan, onOpenChange, onChanged, onRebuild, 
 
   return (
     <Sheet open={plan != null} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[88vh] flex flex-col">
+      <SheetContent side="bottom" className="h-[88dvh] flex flex-col">
         <SheetHeader>
           <SheetTitle>Manage plan</SheetTitle>
         </SheetHeader>
