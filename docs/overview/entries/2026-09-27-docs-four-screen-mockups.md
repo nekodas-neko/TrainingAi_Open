@@ -101,3 +101,20 @@ implementer taking `RV-166` without `TN-78` would ship a target the owner cannot
 **One small decision left open:** whether a treadmill walk logged with no heart-rate data counts.
 Recommended on the mockup — count the minutes, mark the day `estimated`, because refusing to
 complete a walk he actually did is the worse failure. Not yet answered.
+
+## The last open question, and the convention it reuses
+
+A treadmill walk with **no heart-rate data does count** — the logged minutes go toward the target
+and the day is marked `estimated`. Refusing to complete a walk he actually did is the worse failure.
+
+**The app already models this distinction**, so it is reuse rather than a new mechanism:
+`packages/shared/src/health/observed-hr.ts:125` carries `source: 'observed' | 'estimated'` on
+`MaxHrResolution`, and `body-battery-inputs.ts` and `hr-profile.ts` use the same shape. A
+discriminator beats a boolean for the reason that file demonstrates — it records *where the number
+came from* rather than *whether to trust it*, so a third source can be added later without
+rewriting every reader. Written into `RV-166` as an instruction, because the obvious
+implementation is an `isEstimated` flag and that would be a second way of saying something the
+codebase already says.
+
+**`RV-166` is now fully specified.** All three approved changes are released to Lane B with their
+acceptance criteria; nothing on this batch is waiting on the owner.

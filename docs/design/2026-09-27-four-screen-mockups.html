@@ -430,7 +430,7 @@
     </div>
     <p class="note"><b>Why the criterion can be stated in zones now, and could not last week.</b> You moved the moderate floor from 60% to <b>40% of heart-rate reserve</b> this morning (TN-78, shipped in #1774). At 60% the floor was <b>134 bpm</b>, which you hit on 3 days out of 31 &mdash; a treadmill walk earned zero zone minutes, so &ldquo;25 min in Zone 2&rdquo; would have been unreachable on foot. At 40% it is <b>107 bpm</b>, hit on 24 of 31. The two changes only work together.</p>
     <p class="note"><b>Two taps for the common case.</b> Walk it &rarr; a duration chip. The presets are yours to set; 30 min is drawn as the default because it is the one that clears a 25-minute target outright.</p>
-    <p class="note cost"><b>What still needs deciding, and it is small:</b> whether a treadmill walk logged with no heart-rate data counts. With the ring on your finger it will have HR; without it the app has minutes but no zones. <b>Recommendation: count logged minutes toward the target when no HR exists, and mark the day <i>estimated</i></b> &mdash; refusing to complete a walk you actually did is the worse failure. Say if you would rather it not count.</p>
+    <p class="note"><b>Answered:</b> a treadmill walk with no heart-rate data <b>does</b> count &mdash; the logged minutes go toward the target and the day is marked <b>estimated</b>. Refusing to complete a walk you actually did is the worse failure. The app already models this exactly, as <code>source: 'observed' | 'estimated'</code> in <code>observed-hr.ts</code>, so it reuses that rather than adding a flag.</p>
   </section>
 
   <footer>

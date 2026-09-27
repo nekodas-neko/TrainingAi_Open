@@ -7410,7 +7410,16 @@ drift.
   zone-stated criterion would have been unreachable on foot. At 40% it is **107 bpm**, hit on
   **24 of 31**. A zone-worded target on the pre-TN-78 floor would have been a target he could not
   meet by walking.
-- **⚠ ONE SMALL DECISION IS STILL OPEN and is flagged on the mockup:** whether a treadmill walk
+- **✅ FULLY SPECIFIED 2026-09-27 — the last open question is answered: a treadmill walk with NO
+  heart-rate data DOES count.** Count the logged minutes toward the target and mark the day
+  **estimated**. Refusing to complete a walk he actually did is the worse failure, and he took that
+  recommendation.
+  **⚑ REUSE THE EXISTING CONVENTION — do not invent a flag.** `packages/shared/src/health/observed-hr.ts:125`
+  already models this exact distinction as **`source: 'observed' | 'estimated'`** on
+  `MaxHrResolution`, and `body-battery-inputs.ts` and `hr-profile.ts` use the same shape. A
+  discriminator beats a boolean here for the reason that file demonstrates: it says *where the
+  number came from* rather than *whether to trust it*, so a third source can be added later without
+  rewriting every reader. Check `docs/module-map.md` before adding anything new.
   logged with **no heart-rate data** counts. With the ring on he has HR; without it there are
   minutes and no zones. **Recommendation: count the logged minutes and mark the day `estimated`** —
   refusing to complete a walk he actually did is the worse failure. Not yet answered.
