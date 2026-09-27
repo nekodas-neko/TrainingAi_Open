@@ -3760,14 +3760,57 @@ which is the right shape for something that can only be validated by living with
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
 
 ### [workouts] RV-214 — the session card leads with the equipment, not the session; the recovery chips slide under their label
-- **Lane: B** — `app/workout/**` session card.
+- **✅ ①③④ SHIPPED 2026-09-27 (#PR), rendered at 412 px dark. ② DOES NOT REPRODUCE, ⑤ is a design pick — both below.**
+- **Lane: B** — the card is `app/workout-select/workout-select-content.tsx`, **not** `app/workout/**`.
 - **Added:** 2026-09-26 · Review sweep 63.
-1. **"Dumbbell" is set at about twice the size of "Push".** The largest text on the card is not the thing being chosen. Make the session name the title, and the equipment or program a subtitle.
+1. ~~**"Dumbbell" is set at about twice the size of "Push".**~~ — **SHIPPED, and the device note's
+   diagnosis was close but not the cause.** It guessed *"an icon name rendered as text when the
+   icon does not resolve … check the session-icon map's FALLBACK"*. The fallback is fine. **The
+   surface never consulted the map at all**: the slot was
+   `<span className="text-3xl">{currentSession?.icon ?? p.emoji}</span>`, and `program_sessions.icon`
+   is a free-text column, so a non-emoji value prints as a 30 px WORD beside a 20 px session name.
+   - **`getSessionIcon` already existed** (`lib/session-icon.tsx`) with the whole chain —
+     emoji→Lucide, then palette position, then `Dumbbell`. **A-7 had already converted one surface
+     and left a comment claiming *"every other session surface uses getSessionIcon"*. Three did
+     not**: this card, `components/stats/program-exercise-list.tsx`, and
+     `components/workout-builder/builder-review.tsx`. A claim in a comment is not a guarantee.
+   - **No hierarchy change was needed.** With a component in the slot the session name is already
+     the largest text on the card — confirmed in the render. The entry's proposed fix (retitle the
+     card) would have treated the symptom and left the word printing elsewhere.
+   - **Guarded by `scripts/check-session-icon-render.js`** (Custom Rules, now **83** steps) plus
+     `SessionGlyph`. The check is deliberately keyed on a SESSION-shaped identifier rather than on
+     `.icon`: the broad version was written first and flagged four more sites — `swipe-actions`,
+     `capture-actions`, `activity-secondary-metrics`, `deload-explanation` — **every one of which
+     declares `icon: React.ReactNode`**, where rendering it is correct. Exempting four correct
+     files by name would have taught the next person that an exemption is how you satisfy it.
    - **🔎 On the device (sweep 64, `p23-workout-warm-01`):** the slot holds an **icon** (a red triangle) beside "Upper", not a word. So the web build's "Dumbbell" is most likely **an icon name rendered as text** when the icon does not resolve. Check the session-icon map's fallback; that is the fix, not a hierarchy change. **Item 4 (recovery chips clipped under their label) is confirmed on the device.**
-2. **The "Recommended today" pill wraps onto two lines** at 412 px. Shorten it to "Today", or let it sit on its own line.
-3. **"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous. Write "Last done yesterday".
-4. **The recovery chips scroll under the "RECOVERY" label,** so the first chip shows clipped at the label's edge. Start the scroller after the label, or give it a fading mask.
-5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. Use the same variant.
+2. **The "Recommended today" pill wraps onto two lines** at 412 px. — **DOES NOT REPRODUCE
+   (2026-09-27).** Rendered at exactly 412 px dark with the seeded program: the pill sits on one
+   line. **Not closed**, because the seeded session is named "Push" and a long name would take the
+   width the pill needs — the sweep may have seen it beside one. **What would settle it:** the
+   owner's own session names at 412 px, or a render with a deliberately long name. Do not "fix" a
+   wrap nobody can currently produce.
+3. ~~**"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous.~~ —
+   **SHIPPED, and widened.** The ambiguity is not specific to "Yesterday": **"9 days ago" reads
+   just as easily as when the session is next DUE**. Both elapsed branches of
+   `getLastTrainedLabel` now say what the number measures ("Last done yesterday", "Last done 9
+   days ago"). `"Trained today"` is untouched — `trainedToday` compares against that exact string,
+   and the test pins that pairing.
+4. ~~**The recovery chips scroll under the "RECOVERY" label.**~~ — **SHIPPED, reproduced first.**
+   The render showed `RECOVERY | t | 100% Shoulders` — a lone "t", the tail of "Chest", cut dead at
+   the container edge.
+   - **The scroller already started after the label**; they are siblings in a flex row, so the
+     entry's first suggestion was already true. The cut came from `overflow-hidden` ending flush
+     against the label, which reads as the label clipping it.
+   - Took the second suggestion: a 12 px `mask-image` fade at both ends, so a chip reads as moving
+     out of view rather than being severed. `-webkit-` included — Samsung's WebView is the
+     canonical runtime. Verified in the **emitted** CSS and in a second render.
+5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. —
+   **CONFIRMED, NOT FIXED: it is a pick, not a defect.** Measured 2026-09-27 — the card's button is
+   full-width green with **no** icon; the pre-workout screen's carries a dumbbell. **"Use the same
+   variant" does not say WHICH**, and both are on daily paths, so choosing arbitrarily is a visible
+   change to the owner's screen on no grounds. Cheap either way. Decide the direction (add the icon
+   to the card, or drop it from the pre-workout screen) and it is a two-line change.
 
 ### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
 - **Lane: B.**
