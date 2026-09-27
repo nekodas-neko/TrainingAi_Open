@@ -3909,16 +3909,21 @@ which is the right shape for something that can only be validated by living with
   is relative age, a different idiom from a duration. Control-run: reinstating the timeline's own
   helper fails it.
 - **STILL OPEN, and two of them are NOT Lane B:**
-  ① **Time-of-day casing is Lane A.** `formatTimeOfDay` emits `6:40am` (`h:mm aaa`); the uppercase
-  `6:40 AM` comes from **`app/api/day-timeline/route.ts:44`**, which formats `h:mm a` server-side.
-  That is `app/api/**`. **Lane: A** — one format string, and the route returning a display string
-  at all is worth a second look while it is open.
-  ② **Unit spacing (`7 × 68kg` against `98 kg`) needs a `formatKg` that emits decimals AS NEEDED.**
-  The default is one decimal, so routing the lift sites through it turns `68kg` into `68.0 kg`,
-  which is worse. `packages/shared/**` is **Lane A**: either an option on `formatKg` or a sibling.
-  Sites waiting on it: `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`,
-  `weights-summary:93`, `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**`
-  is deliberately excluded, as it is for the timezone rules.
+  ① ~~**Time-of-day casing is Lane A.**~~ **✅ SHIPPED 2026-09-27 (Lane A).** The entry's premise was
+  half-wrong, measured: `formatTimeOfDay` emits `6:40 am` WITH a space, and there were THREE forms,
+  not two. `app/api/day-timeline/route.ts` formatted `h:mm a` itself (Home's `6:40 AM`), and a
+  second shared helper, `fmtAest` (`h:mmaaa`, `6:40am`), fed `/api/day-log` (Health → Day) and
+  the Body Battery card. The route now calls `formatTimeOfDay`, and `fmtAest` delegates to it, so
+  all four surfaces read `6:40 am`. **Still their own form, and Lane B's:**
+  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both format minutes-of-day rather than
+  an instant, so they need a minutes-based sibling of `formatTimeOfDay`, not a straight swap.
+  ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
+  SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
+  `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
+  one decimal. `formatKg` also takes `trim`. **The six sites are Lane B's and still to convert:**
+  `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`, `weights-summary:93`,
+  `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**` stays excluded.
   ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
   is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
   Legs purple" is the owner's session *order*, not a name map. Movement Balance uses

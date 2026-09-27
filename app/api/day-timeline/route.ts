@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { DEFAULT_TZ, todayInTz, shiftDateStr, normalizeDateParam } from '@trainingai/shared/date-utils'
-import { formatInTimeZone } from 'date-fns-tz'
+import { DEFAULT_TZ, todayInTz, shiftDateStr, normalizeDateParam, formatTimeOfDay } from '@trainingai/shared/date-utils'
 import { startOfDay, endOfDay } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
 import {
@@ -16,7 +15,7 @@ export type TimelineEventType = 'wakeup' | 'sleep' | 'workout' | 'meal' | 'walk'
 
 export interface TimelineEvent {
   type: TimelineEventType
-  time: string          // "h:mm a"
+  time: string          // formatTimeOfDay: "6:40am"
   timeMs: number        // for sorting
   title: string
   subtitle?: string
@@ -26,7 +25,7 @@ export interface TimelineEvent {
    *  navigate to a date-scoped detail screen without re-deriving it from timeMs client-side. */
   date?: string
   // rich card fields
-  endTime?: string       // walk "12:21 - 12:27 PM"
+  endTime?: string       // formatTimeOfDay: "12:27pm"
   durationMin?: number
   distanceKm?: number
   calories?: number
@@ -40,8 +39,10 @@ export interface TimelineEvent {
   tagSource?: string
 }
 
+// Through the one formatter every other clock time uses (RV-208 ①). This route formatted `h:mm a`
+// itself, which is why Home read "6:40 AM" while Health read "6:40am" for the same moment.
 function fmtTime(d: Date, tz: string): string {
-  return formatInTimeZone(d, tz, 'h:mm a')
+  return formatTimeOfDay(d, tz)
 }
 
 interface WalkLike {
