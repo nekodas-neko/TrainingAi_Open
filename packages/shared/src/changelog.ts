@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.11",
+    version: "1.477.12",
     date: "2026-09-27",
     changes: [
       "Security: being invited no longer lets someone else claim your account. Registering with an invited email address used to activate the account straight away, with nothing checking that the person registering could actually read that inbox \u2014 so whoever got there first held the password. A new email-and-password account now waits for approval, and signing in with Google clears any password set on it beforehand. Signing in with Google is unaffected: Google has already proved the address, so an invite is honoured there as before.",
+    ],
+  },
+  {
+    version: "1.477.11",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when your weekly stats fail to load, the card now says so and offers a retry. It used to show its loading shimmer forever \u2014 until the app was killed \u2014 because a failed request looked exactly like one that had not finished.",
     ],
   },
   {

@@ -487,6 +487,11 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
+- **[`docs/overview/entries/2026-09-27-rv215-loading-states.md`](../../overview/entries/2026-09-27-rv215-loading-states.md)**
+  — RV-215 ①. Weekly stats' skeleton could not end on a failed fetch (`cachedFetchToday` swallows
+  `!res.ok` without `onError`); the error branch must be checked BEFORE `loading`, because a
+  failure leaves `data` null and the skeleton would otherwise still win. Also why item ②'s "12
+  components" count is unreliable — a `return null` while loading is a defer, not a vanish.
 - **[`docs/overview/entries/2026-09-27-rv211-empty-account-claims.md`](../../overview/entries/2026-09-27-rv211-empty-account-claims.md)**
   — RV-211 ①②③. Home's empty-account states: no week-in-review banner for an empty week, Body
   Battery's "No data yet" instead of a band, "—" instead of "rest" with no program. Also why item ⑤

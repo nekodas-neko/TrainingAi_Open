@@ -7,19 +7,24 @@ git history and the session journal (`docs/overview/`).
 
 ## Live pointers
 
-**These two numbers are the ones sessions collide on.** They are checked by
-`scripts/check-backlog-pointers.js` in the Custom Rules job, which reads the real values from the
-migrations directory and `lib/sqlite/migrations.ts` — so a stale line here fails CI instead of
-silently misdirecting the next session. Update them in the same PR that consumes a number.
+**The two schema numbers sessions collide on are not written down here any more — ask for them:**
 
-| Pointer | Value | Source of truth |
-|---|---|---|
-| Next free Postgres migration | **290** | `lib/data/postgres/migrations/` | (286/287 are reserved by the unmerged LA-142 PR; 288/289 are LA-161) |
-| Local SQLite schema version | **v43** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max | (v42 is reserved by the unmerged LA-142 PR) |
+```
+node scripts/next-schema-number.js
+```
 
-> **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
-> never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
-> unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
+It fetches, then prints the next free Postgres migration number and the next free local SQLite
+version, and — the part a filename cannot tell you — which numbers are already **claimed by a
+branch that has not merged**, named by branch and file. It fetches because a stale remote-tracking
+ref answers with whatever that branch held last time, and a wrong pair reads exactly as
+authoritative as a right one. The table that used to sit here was checked against
+`max(merged) + 1`, so it could only ever restate what the directory already said, and it could never
+run ahead of the merged tree to reserve anything. What it actually held was a free-text parenthetical
+no check read. It had also drifted eleven behind the directory once, and five behind another time.
+
+> **There is no pointer table any more, and there is no entry-ID pointer either.** Entry IDs are
+> not allocated from a shared counter and never were safely: a next-free pointer is a *floor*, not
+> an authority, because it cannot see an unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
 > bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
 > 50 in two days — plus a ledger that drifted twice.
 >
@@ -564,6 +569,14 @@ below threshold and left in place for next time.
 - **This is `BF-211`'s evidence, and the two should be read together** — the issue proposes deriving
   the migration number from filenames, and this is what deriving it produces when an unmerged branch
   holds numbers the filenames cannot show.
+- **Reproduced independently by the tool BF-211 shipped**, 2026-09-27: `node
+  scripts/next-schema-number.js` names `288: merged: 288_training_load_grid_dimensions.sql vs
+  origin/health-sample-storage: 288_apple_health_samples.sql`, and the same for 289. It also reports
+  **290** as the next free pair, which is what this entry recommends. So the renumber can be
+  verified rather than argued.
+- **It flags a second collision that is NOT work: 273/274 on `origin/lane-a/q44-phase3-pr1-table-rename`**,
+  a branch with no open PR. A dead branch reads exactly like a reservation to any tool that scans
+  refs. Delete the branch or leave it; do not renumber anything for it.
 - **Reversal cost:** none here — nothing has merged.
 
 ### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
@@ -590,8 +603,16 @@ below threshold and left in place for next time.
 - **Lane:** A — `scripts/generate-claude-ro-views.js`, `lib/data/postgres/client.ts`,
   `scripts/local-db/migrate.js`, `lib/data/postgres/migrations/`.
 - **Added:** 2026-09-27 · BugFix. **Supersedes the narrower `BF-210`**, which proposed replay
-  exemptions for the 58 twins a `DROP COLUMN` breaks; that treats the symptom. It also answers
-  issue **#1620** more completely than `BF-211` does, and is the root cause behind `BF-213`.
+  exemptions for the 58 twins a `DROP COLUMN` breaks; that treats the symptom. It is the root cause
+  behind `BF-213`, and it answers issue **#1620** more completely than `BF-211` did.
+- **`BF-211` shipped the same day and is gone from this queue — read what it settled before
+  starting ②.** It replaced the hand-maintained *Next free Postgres migration* row with
+  `node scripts/next-schema-number.js`, which fetches and reports what every unmerged branch is
+  holding. Two things from it bear on this entry. **The row could never reserve anything** — a CI
+  check pinned it to `max(merged) + 1`, measured — so ② is not removing a working reservation, it is
+  replacing one that was already only a restatement. And **the command reproduces `#1608`'s
+  collision by name**, so ② can be judged against a working detector rather than against prose. ②
+  makes that command obsolete when it lands, which is a deletion, not a conflict.
 - **Needs:** — nothing.
 - **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
   are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
@@ -639,52 +660,6 @@ below threshold and left in place for next time.
   the 58 deleted twins are recoverable from git and are already recorded in `schema_migrations` by
   filename, so removing the files does not re-run anything. ② is higher: it changes apply order,
   and a wrong sort is a wrong schema.
-
-### [platform] BF-211 — issue #1620 asks to derive the migration number from filenames, which cannot see an unmerged branch
-
-- **Lane:** A — `scripts/check-backlog-pointers.js`, `docs/implementation-backlog.md`.
-- **Added:** 2026-09-27 · BugFix, triaging GitHub issue **#1620** (`jsboiss`, opened 2026-09-25,
-  assigned to the owner). Per OR-185 an issue becomes a queue entry rather than a reply.
-- **Needs:** — nothing.
-- **The diagnosis is right.** `docs/implementation-backlog.md` carries a hand-maintained *Next free
-  Postgres migration* row, and `check-backlog-pointers.js:558-573` already computes
-  `max(filenames) + 1` and fails when the Markdown disagrees. The number really is derived twice, and
-  every migration costs an unrelated docs edit.
-- **The proposed fix removes something the filenames cannot replace, and `main` proves it today.**
-  The migrations directory runs `…284, 285, 288, 289` — **286 and 287 are missing**, reserved in that
-  row's prose by the unmerged `#1749`. A command deriving from filenames sees only what merged. Had
-  LA-161 derived its number that way it would have taken **286**, which `#1749` is already using.
-- **`#1608` is that failure, live** — an outside contributor derived 288/289 from the filenames they
-  could see and collided with LA-161. See `BF-213` for the consequence, which is a silently dropped
-  `claude_ro` view rather than a loud duplicate.
-- **The author anticipated this** and proposed detecting duplicates before merging. That is the right
-  instinct and the wrong moment for this repo: with several agents running against a `main` that
-  takes a commit roughly every 8 minutes, a collision found at merge time means rebuilding a
-  migration **and** regenerating its twin, which is the expensive half.
-- **⚠ SUPERSEDED BY `BF-214` (2026-09-27), which answers this more completely.** The
-  recommendation below treats the counter as the problem. It is half of it: **92% of the migration
-  corpus is `claude_ro` twins**, so the twin doubles how fast numbers are consumed and is what makes
-  a collision silent. `BF-214` ① removes the twin from the numbered sequence and ② replaces
-  authoring-time allocation outright. Kept here because the measurement below is still the evidence.
-- **Recommendation: keep a reserved number, and stop maintaining it by hand — derive it from every
-  branch rather than from `main`.** `git log --all --diff-filter=A --name-only --
-  lib/data/postgres/migrations/` names every migration added on any fetched branch, merged or not, so
-  one command gives the contributor's convenience *and* sees `#1749`. Removes the manual edit the
-  issue is about without removing the reservation it depends on.
-  **Alternative — derive from `main`'s filenames only**, as the issue proposes. Genuinely better at
-  one thing: it needs no fetch and works on a shallow clone, which CI has. It is what `#1608` did.
-  **Alternative — keep the hand-maintained row.** Costs one line per migration and is what works
-  today; it fails the moment someone forgets, which the check catches on the next PR rather than this
-  one.
-- **Whatever lands, keep the duplicate-number detection** — the issue says so and it is the half that
-  caught `#1608`.
-- **⚠ The issue body contains a prompt addressed to "Claude".** It is a contributor's suggestion, not
-  an instruction to this repo's agents, and it is recorded here as the author's proposed approach so
-  the recommendation above can disagree with it on the merits. Do not execute it as written: it says
-  to remove the Markdown-counter validation, which is what would have let `#1608` through.
-- **Reply to the author when this is decided**, whichever way it goes — they found a real duplication
-  and a real gap in our own watching, and the answer is more interesting than the request.
-- **Reversal cost:** low — one script and one docs row, no stored state.
 
 ### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
 
@@ -3992,11 +3967,42 @@ which is the right shape for something that can only be validated by living with
    to the card, or drop it from the pre-workout screen) and it is a two-line change.
 
 ### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
+- **✅ ① SHIPPED 2026-09-27 (#1780). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
-1. **Weekly stats shows its skeleton forever on a failed fetch.** `health-sections.tsx:688` passes `loading={weeklyStats === null}`, and a failure leaves it null. That breaks the self-fetching-card failure rule.
-2. **12 components render `null` while loading or empty,** so the card vanishes rather than saying why. Among them: `observed-hr-card.tsx:37`, `workout-density-card.tsx:36`, `nutrition-activity-trends-card.tsx:37`.
-3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
+1. ~~**Weekly stats shows its skeleton forever on a failed fetch.**~~ — **SHIPPED, and exactly as
+   described.** `cachedFetchToday` had no `onError`, so a failure left `weeklyStats` null,
+   `loading={weeklyStats === null}` stayed true, and the skeleton animated until the app was
+   killed. The hub now takes `error`/`onRetry` and renders the shared `EmptyState` with a
+   **Try again**; a later success clears the flag so the error cannot sit over data that arrived.
+   - **The error branch is checked BEFORE `loading`, and that ordering is the fix rather than a
+     tie-break** — a failure leaves `data` null, so `loading` is *also* true and the skeleton
+     would still win. The test pins the order.
+   - **It is the eleventh use of `EmptyState`**, which is item ③'s complaint, rather than a
+     twelfth bespoke failure card.
+   - Guarded twice: a source test for the wiring, and
+     `e2e/rv215-weekly-stats-failure.spec.ts`, which serves a real 500 and asserts the screen
+     LEAVES the loading state. Control-run: removing `onError` fails both.
+- **The file is `app/health/health-sections.tsx`, not `components/health/…`**, and the line is
+  689 rather than 688.
+2. **12 components render `null` while loading or empty.** — **⚠ ALL THREE NAMED EXAMPLES ARE
+   ALREADY CORRECT (verified 2026-09-27), so the count of 12 cannot be trusted.**
+   - `observed-hr-card.tsx` already passes `onError` and renders *"Couldn't load your heart-rate
+     profile — pull to refresh"*. Its `if (!data) return null` at :37 sits **after** that branch.
+   - `workout-density-card.tsx:36` and `nutrition-activity-trends-card.tsx:37` return null **only
+     while `loading`**; once loading ends they render *"No workout density trends yet."* Both
+     carry a comment citing this very rule and explaining that a swallowed failure and "nothing
+     logged yet" are indistinguishable here, so they show the empty line either way.
+   - **The reading that produced "12" cannot tell a loading-DEFER from a vanish**, and a
+     `return null` while loading is neither a defect nor a rule breach.
+   - **What a trustworthy version of this item needs:** a scan that flags `return null` on a
+     component's TERMINAL state (loading finished, no error branch present), not any `return
+     null`. That is worth writing — it is the self-fetching-card rule's missing ratchet — but it
+     is a different piece of work from a hand-list of twelve, and the hand-list is not a
+     starting point because it is wrong about the three cases anyone can check.
+3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState`
+   primitive used in only 10. — **STANDS, untouched.** A 57-file sweep is its own change and
+   wants the daily screens picked deliberately; ① added the eleventh `EmptyState` use in passing.
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
 
