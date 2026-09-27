@@ -643,7 +643,7 @@ reading a running session's full transcript. This is the first thing a successor
 answers only: where am I, what is in flight, what is next, what is blocked.
 
 It is deliberately not a narrative. The narrative goes in a dated handoff doc
-(`docs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
+(`docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
 closes a cluster of related work. The two have different jobs — the baton is *state* and is always
 current; the handoff is *history* and is never edited after the fact.
 

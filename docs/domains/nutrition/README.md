@@ -351,7 +351,7 @@ Live at the time of writing (2026-07-30):
   case. The e2e drives cancel *then* confirm — cancel first, because a confirm that removes anyway
   passes every happy-path assertion. Device check owed.
 
-- **[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoff-2026-09-02-nutrition-lane-a-session.md)**
+- **[`docs/handoffs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoffs/handoff-2026-09-02-nutrition-lane-a-session.md)**
   — 🆕 **Lane A session, 2026-09-02: ten PRs.** BF-69 stage 1 (supplement contributions, migrations
   254/255, local SQLite v34), LB-48, LB-49's meal-log `scale`, LB-50's prompt fix, LB-18's unscoped
   `Recent` source, plus three CI ratchets and the journal ceiling raise. **Read its Gotchas before
@@ -397,7 +397,7 @@ Live at the time of writing (2026-07-30):
   alongside a name**, and both negatives are what stop the fix rebuilding the bug one layer down.
   **Nothing renders differently yet** — `groupDiaryEntries` still requires a `savedMealId`, and
   changing that is Lane B's half.
-- **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
+- **[`docs/handoffs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoffs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
   — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
   `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
@@ -490,7 +490,7 @@ Live at the time of writing (2026-07-30):
   flip** on identical meal-prep containers (5, 5, 1, 1, 5, 1) and the shipped one is 30 of 30.
 
 
-- **[`docs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
+- **[`docs/handoffs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoffs/handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
   — 🆕 the Meal Plan build-out, Phase 1 through one-tap "I ate this" (v1.282.0 → v1.299.0, fifteen
   merged PRs, migrations 177–183, local SQLite v23–v25). **Start here for anything meal-plan.**
   What it left: **Q-187**, whose four steps have now all shipped — the last on 2026-08-31 (v1.412.0),
@@ -516,7 +516,7 @@ Live at the time of writing (2026-07-30):
   — BF-61. The swipe tray's Delete works on the web at 0/100/300/500 ms after the release, so the
   cause of the device's swallowed press is not in the shared JS. Re-laned to Device Verification
   with a three-step instrumented probe instead of a third speculative fix.
-- Handoffs: `ls docs/handoff-*-nutrition-*.md`
+- Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
 
 ## Decided, and deliberately not built

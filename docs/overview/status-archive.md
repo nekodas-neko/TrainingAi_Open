@@ -686,7 +686,7 @@ fraction of the checks** (filed as **Q-206** — its "4 of 35" was measured wron
 corrected when it was built, see the entry above), and **a Q number in an unmerged PR is provisional** — one entry was
 renumbered twice. **Nothing from that session is device-verified**; four checks are written up and
 waiting. Full record, including the pickup prompt:
-[`docs/handoff-2026-08-13-platform-queue-drain-owner-decisions.md`](../handoff-2026-08-13-platform-queue-drain-owner-decisions.md).
+[`docs/handoffs/handoff-2026-08-13-platform-queue-drain-owner-decisions.md`](../handoffs/handoff-2026-08-13-platform-queue-drain-owner-decisions.md).
 
 **🆕 2026-08-13 — the Sleep Score's HRV/HR baselines stop averaging away real progress (Q-72
 partial, v1.304.0).** Measuring Q-72 first corrected its diagnosis twice. **It is three stuck
@@ -1101,7 +1101,7 @@ test. Verified live: `GET /api/mood` → **null** after a hand-stamped `deleted_
 
 **2026-08-09/10 — a review-only session mutation-tested the data layer's invariants (10 PRs, almost
 no application code).** Handoff:
-[`docs/handoff-2026-08-09-platform-mutation-testing-invariants.md`](../handoff-2026-08-09-platform-mutation-testing-invariants.md).
+[`docs/handoffs/handoff-2026-08-09-platform-mutation-testing-invariants.md`](../handoffs/handoff-2026-08-09-platform-mutation-testing-invariants.md).
 Method: break an invariant on purpose, count what notices. **Ownership scoping** — 246 predicates
 neutralised left **286 of 317 tests passing**; burned down to no slice and no quartile at zero.
 **Soft-delete filtering** — 113 filters neutralised left **371 of 372 passing**, every slice but one
@@ -2585,7 +2585,7 @@ persistent "listening" notification, auto walk/run detection still false-positiv
 distinct from the already-tracked Hz-band calibration issue), and the scale weight trend should use
 the day's lowest confirmed reading instead of the first. Full root causes, decisions and a plan per
 item in
-[`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+[`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md)
 and `docs/implementation-backlog.md`. **Renumbered twice** (an original Q-52…Q-58, briefly Q-57…Q-62,
 now finally Q-63…Q-69) to resolve two separate collisions: a "per-exercise phase hold" plan already
 held Q-52, and the cross-domain bug review below already held Q-53…Q-56 — both landed on `main`
@@ -2673,7 +2673,7 @@ option B, two apps in a workspace** (owner-delegated 2026-07-30). Task 3 (move a
 ~21 sites) is ready to implement, sequenced around the workspace split (see below) rather than
 strictly before or after it. Both adjacent auth fixes are now done — nothing auth-side blocks
 Task 3 anymore. See backlog Q-1, the plan's Task 2b/Task 4, and
-[`docs/handoff-phase-3-bundled-shell.md`](../handoff-phase-3-bundled-shell.md) (keep until Phase 3
+[`docs/handoffs/handoff-phase-3-bundled-shell.md`](../handoffs/handoff-phase-3-bundled-shell.md) (keep until Phase 3
 fully lands — carries negative results not recorded elsewhere).
 
 **⚠️ Task 4 Step 3 (the actual `shell/`+`api/` app split) was attempted 2026-07-31 (#952) and broke
@@ -2697,7 +2697,7 @@ sideloaded, no Play Store, no iOS), and already committed to offline-first — a
 fresh on a new repo if a design change is warranted. This session gave a stress-test-me opinion
 (full native rewrite: Kotlin + Jetpack Compose + Room + WorkManager, Postgres/Railway kept only as
 a thin sync/AI-proxy backend) but **no decision was made** — see
-[`docs/handoff-2026-08-02-platform-offline-architecture-review.md`](../handoff-2026-08-02-platform-offline-architecture-review.md)
+[`docs/handoffs/handoff-2026-08-02-platform-offline-architecture-review.md`](../handoffs/handoff-2026-08-02-platform-offline-architecture-review.md)
 for the full reasoning and a ready-to-paste research prompt for a follow-up session to
 independently validate or refute it. **This is upstream of Phase 3 and the workspace-split infra
 blocker above** — worth resolving before spending the owner's Railway-service-provisioning effort
@@ -2748,7 +2748,7 @@ workspace-split plan (backlog Q-1, new 2026-07-30 — Steps 1 and 2 have merged,
 `lib/` code into `@trainingai/shared`), a Postgres volume fix whose recommended `bytea` migration is
 in tension with the Oura program's own D4 decision (backlog Q-30), and a public-GitHub-repo
 migration gated on both (backlog Q-31/Q-32). Full picture:
-[`docs/handoff-2026-07-30-platform-offline-first-consolidation.md`](../handoff-2026-07-30-platform-offline-first-consolidation.md).
+[`docs/handoffs/handoff-2026-07-30-platform-offline-first-consolidation.md`](../handoffs/handoff-2026-07-30-platform-offline-first-consolidation.md).
 
 **Latest feature:** (v1.246.9) **Scale: faster advertisement detection + speculative
 stored-measurement drain.** Final iteration of tonight's scale reliability arc — owner asked to
