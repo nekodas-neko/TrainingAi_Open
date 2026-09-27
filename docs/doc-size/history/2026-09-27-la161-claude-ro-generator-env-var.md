@@ -15,4 +15,4 @@ follows the snippet there and never opens the reference doc is exactly the perso
 wrong output. The narrative is in the journal entry
 (`docs/overview/entries/2026-09-27-la161-grid-dimensions.md`); only the operative warning is here.
 
-1060 → 1067.
+1061 → 1068 (rebased onto a parallel raise of the same baseline).
