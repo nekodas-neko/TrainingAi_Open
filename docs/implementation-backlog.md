@@ -7540,10 +7540,44 @@ drift.
   the aggregate because it needs a freshness call, not a mechanism — `use-hr-profile.ts` argues at
   length against pinning this key and that argument has to be answered. **Re-measure first:** with
   the row fetch gone, `pg_stat_statements` now reports the small-window callers only.
-- **STILL OPEN — same shape, smaller.** `/api/health/trends` (`route.ts:73-84`) re-derives HR
-  recovery from raw HR, 2 queries per completed session over 14 days (~20), though
-  `workout_hr_stats.hrr1_best` is stored for **10 of 10**. Read the column — after a per-day
-  agreement check against production, which has not been done.
+- **~~STILL OPEN — same shape, smaller~~ — REFUTED 2026-09-28 by the agreement check it asked for.**
+  `/api/health/trends` re-derives HR recovery from raw HR, about 20 queries a call. This proposed
+  reading `workout_hr_stats.hrr1_best` instead. **The two are different statistics:** the trend plots
+  each session's **median** set HRR1 (`sessionHrr1Median`), and `hrr1_best` is the session's **max**
+  (`summariseWorkoutHr`). Measured against production for all 32 completed sessions in 45 days, they
+  disagree on **32 of 32 days**, with the column higher by 3 to 36 bpm/min. Reading it would redraw
+  the chart as a different metric, not make the same chart cheaper. A cheaper route would need a
+  stored per-session *median*, which is a migration. Nothing measured says the route's cost is worth
+  one: it is rate-limited to 10 a minute, and its query cost was never measured. **Not done, on
+  purpose.** The check also turned up LA-168: the raw HR under ring-only workouts has thinned since
+  the snapshots were taken, so this route's live re-derivation and the recap's stored number have
+  drifted apart.
+
+
+### [heart-rate][devices] LA-168 — ring-only workouts lose most of their stored heart rate after the fact
+
+- **Lane: A** — `lib/oura-ble/rollup/`, `lib/data/postgres/rollup-io.ts` (`deleteBleHeartrateNotIn`).
+- **Added:** 2026-09-28 · Lane A, found while measuring RV-181's HRR column against production.
+- **Measured (production, owner's rows, 2026-09-28).** `workout_hr_stats.readings_count` is the HR
+  row count when the recap first rendered. Compared with the `oura_heartrate` rows in the same
+  session now, **strap sessions are intact and ring-only sessions are not:**
+  08-21 **103 → 12** · 08-24 **110 → 31** · 09-05 **32 → 5** · 09-06 **180 → 13** · 09-17 **87 → 52** ·
+  09-20 **164 → 99**. 09-08, 09-12, 09-22 and 09-24 held steady. (The snapshot counts ±10 min
+  around the session and "now" counts the session only, which explains a few rows of difference but
+  not 180 → 13.)
+- **Why it matters.** Anything that re-derives from raw HR now disagrees with the recap's frozen
+  snapshot. That includes the Health trends HRR line (09-05 shows 0 from 5 readings; the recap
+  says 11), zone minutes and training load. And CLAUDE.md treats the raw series as recoverable only
+  while the server's `body_hex` survives.
+- **Lead, not established.** The rollup upserts the `ble` HR it regenerates for its window, then
+  `deleteBleHeartrateNotIn` deletes every `ble` row in that window it did not regenerate (RV-182 ③).
+  If a later pass covers a day whose raw frames it can no longer fully read, that delete removes
+  rows the pass could not recreate. Candidates: a packed or pruned raw span (Q-30 / D4), a decoder
+  or quality-gate change that now rejects frames it used to keep, or a window reaching past the
+  frames it reads. **First step:** for 09-06, count `oura_raw_samples` HR frames in the session
+  window and compare with what one rollup pass emits for it.
+- **Done when:** a re-roll never leaves fewer `ble` HR rows for a past span than its raw frames
+  support. A test should pin a pass whose input for an older span is incomplete.
 
 ### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
 
