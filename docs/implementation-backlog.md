@@ -3687,7 +3687,7 @@ which is the right shape for something that can only be validated by living with
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
 ### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
-- **✅ ①② SHIPPED 2026-09-27 (#PR). ③⑤ were already struck by sweep 64. ④ IS THE OWNER'S AND IS NOW `LB-167` — do not implement it from this entry.** Nothing is left here for a lane.
+- **✅ ①② SHIPPED 2026-09-27 (#1773). ③⑤ were already struck by sweep 64. ④ IS THE OWNER'S AND IS NOW `LB-167` — do not implement it from this entry.** Nothing is left here for a lane.
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63.
 1. ~~**"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.~~ —
