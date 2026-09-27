@@ -15,7 +15,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
-import { displayBodyFat, latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
+import { latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
@@ -134,6 +134,9 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const [sleepCorr, setSleepCorr] = useState<import('@/app/api/sleep-performance-correlation/route').SleepCorrelationResponse | null>(null);
 
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStatsResponse | null>(null);
+  // `cachedFetchToday` swallows `!res.ok`, so without this the hub's `data === null` reads as
+  // "still loading" and its skeleton runs forever on a failure (RV-215 ①).
+  const [weeklyStatsError, setWeeklyStatsError] = useState(false);
   // Fetched once here and passed down to OuraSection/WorkoutDensityCard/NutritionActivityTrendsCard
   // (PERF-4) — those three previously each independently fetched the same key, and their
   // staggered dynamic-import mount times defeated cachedFetch's in-flight dedup.
@@ -408,7 +411,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     await runWithConcurrency([
       () => cachedFetchToday<WeeklyStatsResponse>(
         'weekly-stats', '/api/weekly-stats', TTL_MEDIUM,
-        d => { if (d) setWeeklyStats(d) },
+        d => { if (d) { setWeeklyStats(d); setWeeklyStatsError(false) } },
+        { onError: () => setWeeklyStatsError(true) },
       ),
       () => cachedFetch<{ muscles: MuscleSetsEntry[] }>(
         'weekly-muscle-sets', '/api/weekly-muscle-sets', TTL_MEDIUM,
@@ -574,7 +578,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
-    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
+    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError,
+    retryWeeklyStats: () => { setWeeklyStatsError(false); void fetchTrainingHealthData() },
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
     progressSummary, bodyBaseline, healthTrends, bodyFatCalibration,
   });
