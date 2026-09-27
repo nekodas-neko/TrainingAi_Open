@@ -80,6 +80,11 @@ function resizeToDataUrl(file: File, size = 128): Promise<string> {
 
 interface ProfileTabProps {
   user: User | null
+  /**
+   * The profile load failed, rather than the account being empty (RV-150). Without it this tab
+   * renders every field blank on a failure and reads as a brand-new account.
+   */
+  profileFailed?: boolean
   seasons: Season[]
   equippedTitle?: string | null
   friendCode?: string | null
@@ -87,7 +92,7 @@ interface ProfileTabProps {
   onTitleChange?: (titleId: string | null) => void
 }
 
-export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSaved, onTitleChange }: ProfileTabProps) {
+export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friendCode, onUserSaved, onTitleChange }: ProfileTabProps) {
   const router = useTransitionRouter()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -234,7 +239,12 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
 
         <div className="text-center">
-          <p className="text-xl font-bold">{displayName ?? 'No name set'}</p>
+          {/* RV-150, and the same reasoning as `statsKnown` above: with no user loaded every field
+              here is a `??` default, so a failed profile read renders "No name set" and a blank
+              email as fact — indistinguishable from a brand-new account. */}
+          <p className="text-xl font-bold">
+            {user == null && profileFailed ? 'Couldn\u2019t load your profile' : displayName ?? 'No name set'}
+          </p>
           <button
             onClick={() => setShowTitlePicker(true)}
             className="inline-flex items-center gap-1 mt-0.5 rounded-lg px-2 py-0.5 active:opacity-70 transition"
@@ -248,7 +258,9 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
               <span className="text-xs text-muted-foreground">Tap to set title</span>
             )}
           </button>
-          <p className="text-sm text-muted-foreground mt-0.5">{user?.email}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {user == null && profileFailed ? 'Check your connection and reopen this tab.' : user?.email}
+          </p>
           {friendCode && (
             <button
               type="button"

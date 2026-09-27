@@ -8182,26 +8182,28 @@ drift.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
 
-### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
+### [app-shell][activity] LB-175 — two surfaces still read as an empty account when their reads fail cold
 
-- **📱 ANSWERED for warm revisits (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Blocking each of 24 read endpoints in turn (Home 4,
-  Nutrition 6, More 4, Health 10) and revisiting the tab: **nothing visible changed in any case** — no
-  section lost, no error or "may be stale" signal, identical text. A failed refetch is invisible: every
-  card keeps its cached value as if current. Not tested: a failure with no cache (cold start).
-
-- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
-  **Answered: a failed refetch is invisible — no stale signal reaches the user.** This is the
-  `Q-499` shape (`cachedFetch`/`useCachedValue` swallow `!res.ok` unless the caller passes
-  `onError`), so the fix is at the call sites in `components/**`. Lane B.
-- **Added:** 2026-09-24 · Review. Method: **P18**.
-- **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
-  `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
-  a stale number with no failure line, **by hand, on one screen**. `Fetch.enable` can fail any single
-  `GET /api/*` on the phone, so the whole app can be checked in one sitting.
-- **The falsifiable claim:** for each read endpoint, every card that reads it shows an error or
-  offline state when that endpoint returns 500 or never answers. **FAILED** per card that vanishes or
-  shows a stale value as current. Report it as a table (endpoint × card × outcome).
-  - **Never fail a write or `/api/sync/*`.** This probe is read-only by construction.
+- **Lane: B** — `app/session-select/session-select-content.tsx` (Home), then the Health tab.
+- **Added:** 2026-09-27 · Lane B, measured while shipping RV-150's fix.
+- **What:** RV-150's device sweep tested a WARM app and found nothing visible changed anywhere. The
+  case it names as untested — a failure with **no cache** — was measured at 412 px by clearing
+  storage and failing every `GET /api/*`, and it is a different answer. Three surfaces were fixed in
+  that PR; these two are what is left.
+  | surface | under a cold failure | honest? |
+  |---|---|---|
+  | Home | *"Your week in review didn't load"*, *"Couldn't load today's timeline"*, em dashes for the numbers | **yes** — the reference for this class |
+  | Home · body battery | the whole **BODY BATTERY** card and its explainer are absent | no |
+  | Home · greeting | *"Good morning, <name>."* and the avatar initials are absent | no |
+  | Health | 8 honest failure lines, but **GOALS**, **ESTIMATED 1RM** and **AVG DURATION** are absent | partly |
+- **Why it is not a one-line fix:** the leaf cards do not fetch. `body-battery-card.tsx` takes its
+  series as a prop and returns null under two points; `{bodyBattery && <BodyBatteryCard …>}` in the
+  parent is what removes it. The owner of each read is the screen, so the fix is one flag per read in
+  `session-select-content.tsx`, not an `onError` on a card.
+- **Done when:** a cold start with the reads failing names each absent section on Home and Health,
+  the way `/more/details` now does. `e2e/rv150-failed-read-says-so.spec.ts` is the shape to extend —
+  it must keep a healthy-cold-start case, or a component that always renders the line passes.
+- **Not in scope:** Nutrition's cold-start zeros, which are on `RV-103`.
 
 ### [platform] RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
 
@@ -8303,6 +8305,14 @@ drift.
   flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
+- **⚑ A SECOND, MEASURED DEFECT — cold start, 2026-09-27 (Lane B, while shipping RV-150).** With
+  storage cleared and every `GET /api/*` failing at 412 px, the card renders **`0 KCAL`**, *"Set a
+  calorie goal to see what's left"* and **`0 g`** for protein, carbs and fat, and the whole meal list
+  is absent. That is a failure stated as fact — the RV-87 shape — and it is worse than the vanishing
+  RV-150 fixed elsewhere, because the reader has no way to tell it from a day with nothing logged.
+  `energy-card.tsx` takes `breakdown` as a prop and defaults each figure with `?? 0`; the gate
+  belongs beside the `refreshing`/failure slot this entry already built, not in the card's defaults.
+
 - **⚑ REOPENED AS LANE B WORK 2026-09-27 (OR-182) — the `Keep:` filed a live defect as residue.**
   Sweep 4a passed the original fix and found a **new** one, 1 of 1: after using **Retry**, deleting
   that food left the card on 1,454 for 16 s+ while the server's balance said 1,534, and a tab swap
