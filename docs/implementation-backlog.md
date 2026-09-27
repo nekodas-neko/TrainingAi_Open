@@ -6817,44 +6817,30 @@ drift.
   Filed as LB-141.
 
 
-### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
+### [activity][app-shell] LB-174 — the guided walk has no tab bar, so one of the two exits LB-141 fixed cannot fire
 
-- **✅ ANSWERED BY THE OWNER, 2026-09-26: PROMPT ON BOTH.** The back gesture and the tab bar each raise a
-  save-or-discard dialog rather than silently keeping or dropping the walk. **He chose the prompt over
-  the recommended silent save**, so build the prompt — do not re-argue it from the asymmetry argument
-  the recommendation used.
-- **Two things the build must get right, because the prompt is the whole change:** the End button
-  already raises its own dialog, so **the two must not both fire** on any single exit; and a walk
-  under `MIN_WALK_SEC` (60s) already turns End's dialog into a discard confirm (BF-190/BF-191), so
-  the new exits need the same short-walk behaviour rather than a second, differently-worded prompt.
-
-- **Lane: B** — re-laned 2026-09-26 (OR-178) now the decision exists; the three `LeaveWalkDialog` callers are
-  Lane B's by the path rule. It was `O` for a product decision, which has been made.
-  **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
-  written per call site, which is what surfaced it).
-- **Measured in source, three callers of `LeaveWalkDialog`:**
-  | Exit | What it does |
-  |---|---|
-  | **End walk** button (`walk-active.tsx`) | saves the walk at the elapsed time |
-  | **Back gesture** (`mobile-auth-handler.tsx:184`) | `reset()` — keeps nothing |
-  | **Tab bar** (`bottom-nav.tsx:159`) | `reset()` — keeps nothing |
-- **So walking away from a 39-minute walk by tapping another tab discards it**, with no row and
-  nothing in history. Until 2026-09-24 all three showed the same sentence — *"Ending now will stop
-  it early"* — which was false at every one of them.
-- **Shipped alongside: the copy is now honest**, each caller naming its outcome. That is the half
-  that needed no decision. Making the other two exits SAVE is the half that does.
-- **Recommended: make all three save**, on the reading that a walk the lifter actually did is data
-  they did not ask to throw away, and the app now knows the real elapsed time (BF-190) so saving is
-  no longer lossy or wrong.
-- **Alternative: keep discarding.** Better if leaving by the tab bar is meant to read as "I am not
-  doing this" rather than "I am done" — which is a real distinction, and the reason this is his
-  call rather than mine. It also avoids rows he never deliberately ended.
-- **Alternative: make the two paths ASK** (save or discard) rather than assume. Better at never
-  guessing wrong; worse in that it puts a two-option dialog in front of a tab tap, which is the
-  interruption BF-191 just finished removing from the other exit.
-- **Reversal cost: near zero.** Each path is one call — `reset()` or the same finish the End-walk
-  button uses.
-
+- **Lane: O** — an information-architecture call about a screen he uses, with a recommendation
+  attached; nothing to build until it is answered.
+- **Added:** 2026-09-27 · Lane B, measured while shipping LB-141.
+- **What:** LB-141 was filed from a source read of the three `LeaveWalkDialog` callers and recorded
+  that the tab bar discards a walk. **It cannot.** `BottomNav` is mounted by `tab-shell.tsx`;
+  `/activity/guided-walk` is its own route outside that shell, so the component's
+  `pathname.startsWith('/activity/guided-walk')` guard is never true while it is on screen.
+  Measured at 412 px: the walk route renders **zero** `nav` elements, and the only exit it offers is
+  the End button (`e2e/lb141-walk-exit-prompt.spec.ts` pins both). The hardware back gesture is
+  therefore the only silent way out, which is where LB-141's prompt actually landed.
+- **The question:** is the walk meant to be immersive — no tab bar, leave by End or by back — or did
+  it lose the shell by accident?
+- **Recommended: immersive, deliberately.** A timed interval walk is the one screen where a stray
+  tab tap costs the most, and the End button plus the back prompt now cover both exits honestly. The
+  tab-bar wiring stays as written: it is correct if the screen ever moves into the shell, and the
+  spec above fails the day it does, which is the moment someone needs to look at it.
+- **Alternative: give the walk the tab shell.** Better if he expects to check a number mid-walk
+  without ending it — today that costs him the walk screen entirely. It makes the LB-141 wiring live
+  and needs no further code.
+- **Alternative: delete the tab-bar dialog as dead code.** Better at leaving nothing misleading
+  behind, and worse the day the screen moves: the silent discard comes back with it.
+- **Reversal cost: near zero either way** — one route's layout, or one deleted JSX block.
 
 ### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
 
