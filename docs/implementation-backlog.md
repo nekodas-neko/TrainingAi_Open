@@ -491,45 +491,60 @@ below threshold and left in place for next time.
 > temperature-baseline cluster under it keep their order relative to each other.
 
 ### [platform] LB-168 — `pnpm test` exits 1 with ZERO tests failed, about one full run in five
-- **Lane: B** (the vitest config / worker teardown).
+- **✅ FIXED 2026-09-27 — root-caused to ONE emitter and closed in `vitest.setup.ts`. This entry
+  stays queued only for the `Keep:` below.**
+- **Lane: B** (the vitest setup — where the fix landed).
+- **Keep:** the guard is non-fatal on purpose, so nobody is *alerted* if a new emitter starts
+  escaping — it prints `[late-console]` and someone has to read it. Making it fail the run wants more
+  than one week of clean runs behind it, and the judgement is whoever has those runs to look at.
+  (The floating DB write this exposed is split out as **`LB-170`**, Lane A — it is not this defect.)
 - **Added:** 2026-09-27 · hit twice in one session, on two unrelated files.
-- **The signature:** `EnvironmentTeardownError: [vitest-worker]: Closing rpc while
-  "onUserConsoleLog" was pending`, reported as `Errors 1` **beside `1111 passed | 0 failed`**. The
-  process exits non-zero, so `pnpm test` fails and CI's Tests job would go red.
-- **Measured:** twice on 2026-09-27, attributed to `lib/__tests__/user-account-routes.test.ts` the
-  first time and `lib/__tests__/running-plan-routes.test.ts` the second. **Neither reproduces** —
-  re-running the named file alone passes, and re-running the whole suite passes. So it is not
-  file-specific and the attribution is just whichever worker was closing when it happened.
-- **Why it matters more than its rarity suggests:** it is indistinguishable from a real red at a
-  glance, and the correct response (read the failure COUNT, then re-run once) is the exact
-  response that is WRONG for a genuine failure. Every session that meets it pays to work that out.
-- **Where to start:** a worker writing a `console.log` as the run tears down. `vitest`'s
-  `onUserConsoleLog` RPC is still in flight when the worker's channel closes. **`silent: true`
-  would hide it rather than fix it** and would also hide the guard scripts' own output, which
-  several tests assert on.
-- **📏 MEASURED 2026-09-27 — the surface area is 381 RPCs per run, and two hypotheses are dead.**
-  - **`grep -cE '^(stdout|stderr) \| '` on a full `--reporter=default` run gives 381 console
-    emissions from 202 distinct sites.** Every one is an `onUserConsoleLog` round trip, so that is
-    how many chances per run the race gets. Top emitters: `rv177-rate-limits` (24),
-    `oura-ble-step-rollup` (23), `oura-ble-ingest-repro` (18), `feedback-calendar-scale-routes` (8),
-    `bf155-set-end-times-read-fresh` (8).
-  - **Only ONE emitter is application code rather than a test:** `ensureSchema`
-    (`lib/data/postgres/client.ts:122`), 11 times per run. That is the app printing into the test
-    output and is worth silencing under test on its own merits — **Lane A's file**.
-  - **DEAD: "a test spawns a child whose output arrives late."** All the child-process call sites
-    (`base-ref-read-failure`, `dead-repo-methods`, `catalogue-equipment-guard`) use **sync**
-    `execSync`/`spawnSync` with piped stdio, so nothing can arrive after the test returns.
-  - **DEAD: "the guard scripts' fixture output floods it."** `scripts/__tests__/` emits **one**
-    console line in total. The fixture text that looks like flooding is `pnpm check:rules` output,
-    a different command — two logs that are easy to conflate, and I did.
-  - **The run that produced these numbers was CLEAN** (exit 0, no teardown error), which is
-    consistent with ~1 in 5 and means the count above is the ordinary volume, not a bad run's.
-- **What would actually settle it,** in order of cost: (a) silence `ensureSchema` under test — one
-  line, Lane A, and removes the only non-test emitter; (b) cut the top five test emitters, which is
-  ~80 of the 381; (c) if it survives both, it is vitest-internal and the answer is a version bump,
-  not a repo change.
+- **The signature was:** `EnvironmentTeardownError: [vitest-worker]: Closing rpc while
+  "onUserConsoleLog" was pending`, reported as `Errors 1` **beside `1111 passed | 0 failed`**, so
+  `pnpm test` exited 1 and CI's Tests job would have gone red.
+- **🔎 ROOT CAUSE, measured rather than reasoned.** Vitest carries every console call from the worker
+  to the main process over an RPC. A log emitted **after its file's tests have finished** can still be
+  in flight when that worker's channel closes — and the error names whichever worker was closing, not
+  whoever logged, which is exactly why it reproduced on no file and named no cause.
+  A hook in `vitest.setup.ts` that flags any console call after the last `afterAll` found the culprit
+  on the first run: **`ensureSchema`'s informational summary** (`[ensureSchema] 0 applied, 0 already
+  present, 0 failed`), reached from an **unawaited `scheduleFlush`** in `lib/rate-limit.ts` whose
+  `flushKey` awaits `ensureSchema` after the test file has returned. **Across four instrumented full
+  runs: every single escape was that one emitter and that one stack.**
+- **⚠ THE ESCAPING FILES CHANGE BETWEEN RUNS, which is what made this look file-specific and is why
+  there is no list to fix.** The flush races the remainder of its own file: a fast run swallows it,
+  a slow one does not. Three named runs produced **seven distinct files with ZERO overlap** —
+  `nutrition-meal-plan-routes`/`colmi-samples-route`/`oura-ble-battery-poll`, then
+  `nutrition-food-input-routes`/`daily-digest-degrade`/`session-energy-weight-source`, then
+  `recap-route-degrade`. Any file exercising a rate-limited route is a candidate.
+- **The fix: stop forwarding `ensureSchema`'s `info` output under test** (`vitest.setup.ts`). Vitest
+  never carries it, so the race has nothing to lose. **`console.error` is untouched** — a migration's
+  `FAILED`/`DID NOT APPLY` must never be swallowed. Done in the test setup rather than in
+  `lib/data/postgres/client.ts` so the log keeps working in production, where it is the only record of
+  what a boot applied, **and production code gains no knowledge that tests exist** — there is no
+  `process.env.VITEST` anywhere in it today, and this does not add the first one.
+- **Plus a guard that names the next one: `[late-console]`.** The detector stayed in, deduped and
+  reporting each distinct escape once with its stack and its file, straight to `stderr` (the
+  process's own fd, so it cannot join the race it reports). It cannot prevent an escape; it means the
+  next one costs a read instead of a day.
+- **✅ Verified:** two consecutive clean full runs post-fix — **exit 0, zero escapes, zero
+  `[ensureSchema]` noise**, at 352 s against a 348 s pre-fix baseline (no measurable cost).
+- **⛔ TWO FIXES WERE BUILT, MEASURED AND REJECTED — do not re-derive them.** Both are written up in
+  `vitest.setup.ts`'s own comment.
+  - **Draining globally from the setup file.** Right in shape, and it took the suite from **348 s to
+    482 s (+39%)**, because `await import('@/lib/rate-limit')` pulls `pg` into all ~1,100 files'
+    isolated module registries. It also **failed 70 files outright**: they `vi.mock` the module
+    partially, and vitest's mock proxy **THROWS on reading an absent export**, so even `mod.fn?.()`
+    raises — `'fn' in mod` is the only safe probe. Worth knowing well beyond this entry.
+  - **Draining per-file**, as six test files already do: incomplete, per the varies-between-runs
+    finding above. Three files were fixed this way and the next run escaped from three different ones.
+- **This entry's own three "what would actually settle it" options, judged against the measurement.**
+  (a) *"silence `ensureSchema` under test — one line, Lane A"* was **right, and was the whole fix
+  rather than the cheapest of three** — though it belongs in the test setup, not in Lane A's file.
+  (b) *"cut the top five test emitters, ~80 of the 381"* was **beside the point**: not one of those
+  five ever escaped, because a test's own `console` call happens during its test. Volume was never the
+  variable; **reachability from an unawaited promise** was. (c) a vitest bump is unnecessary.
 - **Not the same as `LB-166`** (the E2E 45-minute ceiling) — different job, different mechanism.
-  Both are CI-health, and neither is anyone's feature work, which is why both keep going unowned.
 
 ### [nutrition] LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
 - **Lane: O.** Ungated on purpose: getting the answer IS the work, and `Gate: owner` would park it
@@ -4739,6 +4754,30 @@ which is the right shape for something that can only be validated by living with
   passed either way.
 - **Keep:** the device check. Zone minutes appear on the Activity surfaces, and the new floor
   changes what those read for every past day; nothing here was seen on the phone.
+
+### [platform] LB-170 — the rate limiter's flush outlives the request, and under test it outlived the file
+- **Lane: A** — `lib/rate-limit.ts`. **Added:** 2026-09-27 · split out of `LB-168` once that was root-caused.
+- **Why it is split out rather than a `Keep:` on `LB-168`.** `LB-168` was a CI-health defect and it is
+  fixed; this is a latent behavioural one in Lane A's file with no live symptom. Left inside that
+  entry it would read as verification debt on something already shipped.
+- **What, measured.** `scheduleFlush` fires `(async () => { … })()` and nobody awaits it, so a DB
+  round trip (`ensureSchema` + an upsert on `rate_limits`) continues after the request that started it
+  has been answered. `inFlightFlushes` tracks the promises and **`_awaitRateLimitFlushes()` is already
+  exported for exactly this** — six test files call it. Nothing in the request path does.
+- **How it surfaced:** under vitest the flush landed after its test file had returned, which is how
+  `LB-168`'s teardown race happened. That half is fixed at the logging end, so this is now invisible
+  rather than absent — the write still happens late, it just no longer prints.
+- **Why it may be fine, and why that should be decided rather than assumed.** In production the
+  process is long-lived, so a flush completing after the response is the intended design (the comment
+  at the top of the file says so: the L1 map is the synchronous fast path and the DB is caught up
+  behind it). The question is the **shutdown** case — a Railway deploy replacing the container mid-flush
+  drops that increment silently, which is the same class as the accepted lag already documented there.
+- **What is actually owed:** a judgement, not necessarily a change. Either await the drain on shutdown
+  (there is no cron layer or lifecycle hook here — see `docs/module-map.md` §0, so this may cost more
+  than it saves), or write one line in `lib/rate-limit.ts` recording that a lost increment on deploy
+  is accepted, so the next reader does not re-open it. **Prefer the second unless the first is cheap.**
+- **Do NOT "fix" it by draining in the test setup** — measured on 2026-09-27, that takes the suite
+  from 348 s to 482 s and fails 70 files. `LB-168` has the numbers.
 
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
