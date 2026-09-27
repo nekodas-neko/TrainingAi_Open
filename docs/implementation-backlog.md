@@ -6421,14 +6421,6 @@ drift.
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
 - **Needs:** — nothing.
-- **⚙ NARROWED 2026-09-27 (Lane A), production read of the owner's rows:** the active program
-  Bankai's Upper session has **no progression style on Barbell Skull Crusher**
-  (`session_exercises.style_id` NULL; the other four exercises have one). Its logs have carried no
-  `style_id` since 2026-09-10. On the 09-25 deload session it was logged `exercise_deloaded = false`
-  with `estimated_1rm 36.5` / `target_80 29.25`, i.e. as a normal set. **That points at mechanism
-  (b), with a cause: an exercise with no style gets the plain target-80 (29.25 → 30 kg), and the
-  deload percentage never reaches it.** It would also explain TN-75's missing `planned_pct`.
-  Not yet confirmed in code — find where the prescribed load falls back when `styleId` is null.
 - **⚙ A SECOND SYMPTOM, same exercise, found 2026-09-27 (Lane A) while decomposing TN-75.**
   Barbell Skull Crusher is the ONLY loaded exercise in September with no `planned_pct` on any
   set — 6 sets across 09-19 and 09-25, including the very Upper session in the table below — and
