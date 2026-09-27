@@ -5060,6 +5060,10 @@ volume7dKg,                             // likewise
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
 
 ### [workouts] TN-74 — the zero `estimated_1rm` is mostly BY DESIGN, and the rest is Q-298's already-fixed bug
+- **✅ ANSWERED by `RV-170` 2026-09-24 — and the answer is DO NOT REWRITE.** The zero one-rep-max
+  rows are a **hand-edit**, limb (b): **NO**, per the `BF-81` precedent. **Mark them visibly
+  known-bad instead.** `RV-170` also corrects the count — **15, not 10**; the 08-09 and 08-16 Pull
+  clusters sat on deload sessions. The "the OWNER'S call" sentence below is stale.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. **⚠ Re-measured by Lane A the same day
   against production and the code; the original framing does not survive, and the corrected version
@@ -6199,6 +6203,47 @@ drift.
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
+- **✅ FIRST PASS RUN 2026-09-27 (Orchestrator). The 70 was an upper bound and the real number is
+  smaller — but the sweep found three defect CLASSES the count did not predict.**
+  **Measured with `parseEntries`, not a grep over the file:** **422** Lane A/B entries carry no
+  `Ask:`; **54** of those contain owner-decision language; **13** of the 54 already carry
+  `Gate: owner`. Read individually, they fall into four groups.
+- **① Prose about a decision already MADE — no action, and the phrasing is the trap.** `TN-64`,
+  `OR-138`, `PS-17`, `Q-407`, `BF-81` all say *"the owner's call"* about a call he has since made
+  and that the entry records. A keyword scan cannot tell these from a live question, which is why
+  the 70 was never a finding.
+- **② STALE — the answer exists and the entry does not know it. Corrected this pass.**
+  **`RV-165`** said the scale re-derivation at 158 cm was his call; `RV-170` authorised it on
+  2026-09-24 as a limb-(a) recompute. **`Q-298`** said repairing the zero one-rep-max rows was his
+  call; `RV-170` answered it as a limb-(b) hand-edit — **do not rewrite, mark known-bad** — and
+  corrected the count to **15, not 10**. Both entries now carry the answer.
+- **③ ROUTED BY A SENTENCE, NOT A FIELD — the class worth keeping.** **`Q-422` had no `Lane:` field
+  at all**, and `parseEntries` was reading `A` out of the prose *"Tuning proposes and the owner
+  signs off; Lane A implements"*. A routing decision was being made by a phrase nobody wrote as a
+  field. `RV-38` had a real field AND the same prose, and the checker caught the duplicate when one
+  was added — its `Lane: B` half had already shipped. **Five entries were re-laned to `T`**
+  (`Q-422`, `RV-38`, `Q-306`, `Q-420`, `LA-121`): each is a scoring change, and `Lane: T` is the
+  field that says a Tuning proposal is owed before anyone builds it.
+  **`TN-22` is the same class inverted** — it states it *"carries `Gate: owner` … so it parks
+  honestly"* and carries no `Gate:` field, so it claims to park and is READY. Flagged on the entry,
+  deliberately not "fixed", because adding the gate would hide it rather than resolve it.
+- **④ GENUINELY LIVE AND STILL BURIED — the output of this sweep, and what the next owner round
+  draws from.** Each needs splitting into its own `Lane: O` entry or answering in a batch:
+  hiding the readiness score until the check-in is saved (`TN-67`, `TN-50` — a product change);
+  whether a guided or treadmill walk counts as doing a prescribed run (`RV-166`, an unanswered
+  `RV-170` rider); making the E2E job a required check (`LB-149`, `Q-297` — branch protection, a
+  shared system); the destructive-migration group needing one yes (`BF-144`, `LA-71`, `LB-42`);
+  the `event_name` drop (`Q-540`, data-dropping); a second Railway service (`Q-251` — money);
+  the collection tier mapping (`PS-51`); the wallpaper tint default (`BF-145`, `BF-139`, `BF-96`);
+  removing an HTTP surface (`LA-89`); the scanner choice (`LB-38`); the 84-day re-derive
+  (`TN-72`, `TN-74`); and one plain factual question — was *Start Again* pressed before the back
+  press (`BF-168`).
+- **⚠ `LB-13` says something FALSE and it should not be acted on:** *"Correcting the rule needs the
+  owner (CLAUDE.md is not an implementer's to edit)."* The Orchestrator owns the docs and edits
+  `CLAUDE.md` routinely; the owner's carve-out is data, money, auth and scoring, not documentation.
+- **Still owed on this entry:** group ④ is a list, not yet entries. Splitting each into its own
+  `Lane: O` is the second pass. `LA-122` already tracks six of Lane A's and should be reconciled
+  rather than duplicated.
 - **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
 - **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
 - **Needs:** — nothing.
@@ -7127,6 +7172,10 @@ drift.
 - **Reversal cost:** delete the field and one print block.
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
+- **✅ NO LONGER THE OWNER'S CALL — `RV-170` answered it 2026-09-24 and this entry was not updated.**
+  Re-deriving scale composition at 158 cm is a **recompute from stored inputs**, limb (a) of the
+  history-row policy: **YES, authorised.** `RV-170` names this entry in its (a) list. Nothing is
+  owed from him; what remains is running it. The "the owner's call" sentence below is stale.
 
 - **Branch:** `lane-a/rv165-height-calibration` · **Added:** 2026-09-24 · Review sweep 57.
   **Live half shipped 2026-09-24 (Lane A); the history edit is NOT done and is not this entry's.**
@@ -9640,9 +9689,13 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 
 ### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
+- **↻ RE-LANED TO `T` 2026-09-27 by the `BF-202` sweep** — whether the temperature ladder is ported or superseded by `tempZ` is a scoring decision, as its own step (1) says. `Lane: T` (OR-178) means a
+  scoring change owing a **Tuning proposal before anyone may build it**; Tuning re-lanes it to its
+  implementation lane once the proposal lands. A proposal is incomplete until it states **how many
+  other days the change moves**.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
-- **Lane: A** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
+- **Lane: T** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
 - **✅ OWNER DECIDED 2026-09-22 — DO NOT port the temperature ladder. Let `tempZ` stand.** The gate
   that stood here from 2026-09-20 is lifted and this is startable. Temperature already reaches
   readiness through `computeReadinessComposite`, so nothing is missing; the reason for the answer is
@@ -13552,6 +13605,12 @@ window does not match anything, which is an equally valid result and the one tha
 metric.
 
 ### [readiness] TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
+- **⚠ FIELD DEFECT, found by the `BF-202` sweep 2026-09-27.** This entry says it *"carries `Gate:
+  owner` rather than a prose marker so it parks honestly"* — and carries **no `Gate:` field at
+  all**; `parseEntries` reports `gates=[]`. The sentence was copied from `TN-33`, which does have
+  one. So it claims to park and is READY in Lane A — the exact inversion the sentence was written
+  to prevent. **Left ungated deliberately**: if the decision here is still live it belongs in
+  `Lane: O` as work, not behind a gate that hides it. Establish which before "fixing" this.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"give me the update on our stress reading/calculation… how can we test it works?"*
 - **Lane: A** for the level-2 test harness; the level-3 blocker is an owner action, not code.
@@ -16105,6 +16164,13 @@ job and this closes as understood. Either way the rejection stays — a sample a
 clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [readiness][app-shell] RV-38 — Body Battery printed 50 and called it "Good" for an empty account (treatment fixed; the NUMBER is Tuning's)
+- **Lane: T** — re-laned 2026-09-27 by the `BF-202` sweep. **Its `Lane: B` half has SHIPPED** (the
+  no-data treatment in `components/body-battery-card.tsx`), and what is left is the Body Battery
+  re-fit, which is a scoring change. `Lane: T` (OR-178) means it owes a **Tuning proposal before
+  anyone may build it**; Tuning re-lanes it once the proposal lands, and a proposal is incomplete
+  until it states **how many other days the change moves** — a re-fit silently re-scores history.
+  The old `Lane:` bullet below is demoted to prose so this field is the only one; it is kept
+  because it records which half shipped.
 
 - **📱 Sweep 2: COULD NOT CHECK** — the request is fetched by the service worker, which
   `page.route` cannot intercept. Next attempt: CDP `Network.setBlockedURLs`, which did reach an SW
@@ -16115,7 +16181,7 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   Tuning proposes, the owner signs off, Lane A implements — and a proposal must state how many other
   days it moves, because a Body Battery re-fit silently re-scores months of history. **Nothing below
   touches the number.**
-- **Lane:** B for the no-data *treatment*, `components/body-battery-card.tsx` only. Shipped
+- **Shipped half (was the `Lane: B` field until 2026-09-27):** the no-data *treatment*, `components/body-battery-card.tsx` only. Shipped
   2026-09-15; the route needed no change and got none.
 - **Added:** 2026-09-03, Review sweep 42 —
   [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
@@ -22885,6 +22951,10 @@ lived context.
   past four hours, restarting the app, and logging an exercise.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
+- **↻ RE-LANED TO `T` 2026-09-27 by the `BF-202` sweep** — picking thresholds for a derived intensity value is a calibration, not an implementation. `Lane: T` (OR-178) means a
+  scoring change owing a **Tuning proposal before anyone may build it**; Tuning re-lanes it to its
+  implementation lane once the proposal lands. A proposal is incomplete until it states **how many
+  other days the change moves**.
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
 > evaporated, and the real case is a different one. Read this before starting.**
@@ -22918,7 +22988,7 @@ lived context.
 > place and losing the ability to tell them apart.
 
 
-- **Lane:** B — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
+- **Lane:** T — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
   `sessionEffort()` derives from set RPEs with no stored column, and `app/api/health-trends`'s
   `session-rpe` view already reads it (`effort.source: 'self' | 'derived'`), labelled in the series
   and the insight line. Owner decision items 2–4 below are done. **What remains is item 1 only** —
@@ -23120,6 +23190,14 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 - **Keep:** the derived-scale thresholds and the plausibility check against the 20 paired sessions.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
+- **Lane: T** — set as a FIELD 2026-09-27 by the `BF-202` sweep, because this entry had **none**.
+  Its lane was being inferred from the prose *Tuning proposes and the owner signs off; Lane A implements*: the loose match reads `Lane A` out of a
+  sentence, so a routing decision was being made by a phrase nobody wrote as a field. That prose is
+  the `T` contract written out before the field existed (OR-178) — a scoring change owes a **Tuning
+  proposal before anyone may build it**, and Tuning re-lanes it to its implementation lane once the
+  proposal lands. A proposal is incomplete until it states **how many other days the change moves**.
+  **This bullet sits directly under the heading on purpose** — the field is first-match-wins, so it
+  must precede the sentence it is correcting.
 
 - ⚠ **That owner gate is held as of 2026-08-30, and Q-420 is not yet clear.** The owner signed off the
   tuning batch, and this entry is a legitimate scoring sign-off in principle — but Q-420 sets the
@@ -25131,8 +25209,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **15 zero one-rep-max rows before the fix, not 10** (UTC 08-06 ×5, 08-09 ×5, 08-16 ×5). The 08-09 and 08-16 Pull clusters sit on sessions with `phase_type='deload'`, so they were deliberate deloads; only the `exercise_deloaded` stamp was missing. The history question is now asked once, in **RV-170**.
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
+- **↻ RE-LANED TO `T` 2026-09-27 by the `BF-202` sweep** — moving these numbers changes who gets a deload or a taper. `Lane: T` (OR-178) means a
+  scoring change owing a **Tuning proposal before anyone may build it**; Tuning re-lanes it to its
+  implementation lane once the proposal lands. A proposal is incomplete until it states **how many
+  other days the change moves**.
 
-- **Lane:** A
+- **Lane:** T
 - **Needs:** Q-289
 - **Branch:** `fix/deload-trigger-thresholds`
 - **Plan:** none yet
