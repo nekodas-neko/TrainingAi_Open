@@ -1,6 +1,6 @@
 # The workout list says which day its numbers are from, and a shipped fallback turns out to reach nobody
 
-Implementation Lane B, 2026-09-27. `RV-202 ③`, plus `LA-160` found while building it.
+Implementation Lane B, 2026-09-27. `RV-202 ③`, plus `LB-165` found while building it.
 
 ## What shipped
 
@@ -35,7 +35,7 @@ the one that should have happened anyway: `WorkoutDataSeed` and `freshExercises`
 `components/workout/workout-data-seed.ts` beside the new `seedNumbersSource`, because all three ask
 the same question of the same payload. Net growth on the hotspot: **zero**.
 
-## LA-160 — RV-202 ①'s rules plan reaches no screen
+## LB-165 — RV-202 ①'s rules plan reaches no screen
 
 Item ③ needed to know whether a rules plan is ever on screen, so it could label one. Tracing it
 established that **it never is**, in five code-certain links: the plan is deliberately not
@@ -46,7 +46,7 @@ item ① was written to remove is **still there**.
 
 The entry's own measurement — HTTP 200 where there had been a 502 — was real. It was a measurement
 of the route, and the conclusion drawn from it was about a layer it did not test. The retraction is
-written onto the entry beside it rather than replacing it, and the work is filed as `LA-160`.
+written onto the entry beside it rather than replacing it, and the work is filed as `LB-165`.
 
 ## Not exercised
 

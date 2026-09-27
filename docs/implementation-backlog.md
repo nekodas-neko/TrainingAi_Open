@@ -2896,7 +2896,7 @@ which is the right shape for something that can only be validated by living with
   is an assertion that nothing verifies. Where two writers put different shapes in one column,
   the reader takes `unknown` and narrows.
 
-### [workouts] LA-160 — the rules prescription is built, returned, and reaches no screen at all
+### [workouts] LB-165 — the rules prescription is built, returned, and reaches no screen at all
 - **Lane: A** (`packages/shared/src/ai-periodization/generate-prescription.ts`, plus whichever of
   `app/api/workout-data/route.ts` / the `/prescribe` route carries the answer out).
 - **Added:** 2026-09-27 · found while building `RV-202 ③`, which needed to know whether a rules
@@ -2931,7 +2931,7 @@ which is the right shape for something that can only be validated by living with
   list, where it cost two sessions a re-derivation. (Was: `Lane: A` … plus **B** for the label.)
 - **Keep:** ① the device look at the label — an amber pill on the screen the owner opens before
   every workout, and the sandbox can only prove it renders and does not wrap at 412 px. ② the
-  `LA-160` finding below, which is item ①'s and is NOT closed by this.
+  `LB-165` finding below, which is item ①'s and is NOT closed by this.
 - **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
 - **What:**
   1. **Model failure → 502** (`generate-prescription.ts:316`).
@@ -3002,14 +3002,14 @@ which is the right shape for something that can only be validated by living with
        strip) — but it treats a `dataDate`-less payload as not-today, which is right there and
        wrong as a label trigger: there is no day to name. `cachedNumbersSource` returns null rather
        than guessing one.
-     - **What it deliberately does NOT label: a rules plan.** See `LA-160` — there is no such
+     - **What it deliberately does NOT label: a rules plan.** See `LB-165` — there is no such
        thing on screen to label.
      - **⚠ THE NOTE THAT USED TO SIT HERE WAS WRONG AND IS RETRACTED (2026-09-27).** It said item ①
        "now shows the base numbers immediately where it used to show them after ~30 s", and that
        the `source` field "now exists, so the label no longer has to be inferred". Neither holds:
        the rules plan is never stored, both client `/prescribe` callers ignore the response body,
        and `workout-data` reads the stored state — so `source: 'rules'` reaches no screen and
-       nothing about the ~30 s wait changed. Filed as **`LA-160`**.
+       nothing about the ~30 s wait changed. Filed as **`LB-165`**.
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods

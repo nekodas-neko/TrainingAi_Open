@@ -1,14 +1,14 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-165 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-166 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert** (#1741), **RV-208 part one** (#1743), **RV-209 steps 1–2** (#1748); eighteen more on 2026-09-25 — the journal is the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert** (#1741), **RV-208 part one** (#1743), **RV-209 steps 1–2** (#1748), **RV-202 ③ + LB-165** (#PR); eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Next is **RV-202 ③** (the only half left is Lane B's), then **RV-210**…**RV-215**, review sweep 63. `RV-208` is PART-DONE and stays queued: its time-casing and `formatKg` halves are **Lane A's** (`app/api/day-timeline/route.ts`, `packages/shared/format/units.ts`), and its palette half is design work of its own. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Next is **RV-210**…**RV-215**, review sweep 63. `RV-208` is PART-DONE and stays queued: its time-casing and `formatKg` halves are **Lane A's** (`app/api/day-timeline/route.ts`, `packages/shared/format/units.ts`), and its palette half is design work of its own. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
 
 ## Blocked / owed
 
@@ -16,6 +16,9 @@ Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#
 
 ## Lessons that cost real time
 
+- **TRACE A SHIPPED FIX TO THE PIXEL BEFORE BUILDING ON IT.** RV-202 ③ needed to label a rules prescription; tracing whether one is ever on screen found it never is (`LB-165`) — not stored, response body ignored by both callers, `workout-data` reads stored state. The entry's evidence (HTTP 200 where there was a 502) was a real measurement OF THE ROUTE, and the conclusion drawn from it was about a layer it did not test. That shape — a sound measurement, a conclusion one layer up — is the one to look for, because it reads as verified.
+- **`check-component-size` REFUSES AN APPEND TO A HOTSPOT, AND THE RIGHT ANSWER IS THE EXTRACTION YOU ALREADY OWED.** 19 lines onto `workout-screen.tsx` was refused; moving `WorkoutDataSeed`/`freshExercises` out beside the new helper (all three ask the same question of the same payload) took net growth to ZERO. Do not trim comments to squeeze under — extract, then keep the reasoning.
+- **AGEING A CACHE SEED IN THE HARNESS DOES NOT HOLD:** `readCacheSync` prefers `sessionStorage` but `cachedFetch` reads its own `localStorage` copy and calls `onData` with it, so ageing one leaves the other to overwrite — and `route.abort()` on the API did not stop a fresh payload either. **Serve the aged payload through `route.fulfill`** and `serviceWorkers: 'block'` (the SW's `/api/` branch answers before Playwright's router). Three attempts went into learning that.
 - **A HUNDRED-SITE DEBT IS BETTER FROZEN PER-FILE SHRINK-ONLY THAN SWEPT BLIND.** RV-209 left 103 sub-floor literals across 24 files unconverted on purpose: a hundred class edits nothing verifies is a worse risk than the debt, and one wrong class on a card read mid-set is a real cost. A per-file shrink-only baseline with an EXACT-match assertion makes every future touch pay a little down and makes a stale number visible instead of silently tolerated. Ship the token and the sites the entry actually names; ratchet the rest.
 - **`pnpm test` CAN EXIT 1 WITH ZERO TESTS FAILED** — `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending` is a vitest WORKER-TEARDOWN race, reported as `Errors 1` beside `1105 passed`. It did not reproduce on a re-run of the file or of the suite. Read the failure COUNT, not the exit code alone, then re-run before touching anything — but never call a real red a flake on this precedent.
 - **A SWEEP ENTRY IS NOT ONE LANE'S** — RV-208's five items split across Lane A (`app/api`, `packages/shared`), design work and copy. Ship the half you own COMPLETE and write who owns each of the rest onto the entry; do not half-do all five.

@@ -347,7 +347,7 @@ Live at the time of writing (2026-07-30):
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
   [`docs/overview/entries/2026-09-27-rv202-label-the-numbers-source.md`](../../overview/entries/2026-09-27-rv202-label-the-numbers-source.md)
-  (RV-202 ③ — the pre-workout list names which day its numbers came from; and `LA-160`, the
+  (RV-202 ③ — the pre-workout list names which day its numbers came from; and `LB-165`, the
   five-link trace showing RV-202 ①'s rules fallback reaches no screen at all, so the ~30 s
   "Preparing your AI workout…" wait it was written to remove is still there),
   [`docs/overview/history-2026-07-28.md`](../../overview/history-2026-07-28.md)
