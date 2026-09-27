@@ -28,20 +28,31 @@ function inputs(over: Partial<TrainingStressInputs> = {}): TrainingStressInputs 
 
 describe('computeTrainingStress', () => {
   it('gates on null readiness', () => {
-    expect(computeTrainingStress(inputs({ readiness: null }))).toEqual({ status: 'gated', reason: 'no_readiness' })
+    expect(computeTrainingStress(inputs({ readiness: null })))
+      // LA-161: the dimensions ride on EVERY result, including the gates that never look at the
+      // MET series — a `no_readiness` row with a full grid says something different from one
+      // with an empty grid, and the golden day is a full 1440.
+      .toEqual({ status: 'gated', reason: 'no_readiness', metGridLen: 1440, metValidMin: 1440 })
   })
   it('gates while the readiness baseline is still learning', () => {
-    expect(computeTrainingStress(inputs({ readinessProvisional: true }))).toEqual({ status: 'gated', reason: 'readiness_learning' })
+    expect(computeTrainingStress(inputs({ readinessProvisional: true })))
+      .toEqual({ status: 'gated', reason: 'readiness_learning', metGridLen: 1440, metValidMin: 1440 })
   })
   it('gates on an incomplete profile (missing rhr)', () => {
-    expect(computeTrainingStress(inputs({ rhr: null }))).toEqual({ status: 'gated', reason: 'no_profile' })
+    expect(computeTrainingStress(inputs({ rhr: null })))
+      .toEqual({ status: 'gated', reason: 'no_profile', metGridLen: 1440, metValidMin: 1440 })
   })
   it('gates when the MET series is too short', () => {
-    expect(computeTrainingStress(inputs({ metsPerMinute: new Array(600).fill(1.2) }))).toEqual({ status: 'gated', reason: 'insufficient_met' })
+    expect(computeTrainingStress(inputs({ metsPerMinute: new Array(600).fill(1.2) })))
+      // 600 minutes, all of them valid: short of the 720 floor, past the 360 one. The pair says
+      // which floor closed the gate, which the reason alone never did.
+      .toEqual({ status: 'gated', reason: 'insufficient_met', metGridLen: 600, metValidMin: 600 })
   })
   it('gates when too few MET minutes are valid', () => {
     const mostlyLow = new Array(1440).fill(0.5); for (let i = 0; i < 300; i++) mostlyLow[i] = 1.2
-    expect(computeTrainingStress(inputs({ metsPerMinute: mostlyLow }))).toEqual({ status: 'gated', reason: 'insufficient_met' })
+    expect(computeTrainingStress(inputs({ metsPerMinute: mostlyLow })))
+      // The mirror case: a full-length grid, only 300 valid minutes. Same reason, opposite floor.
+      .toEqual({ status: 'gated', reason: 'insufficient_met', metGridLen: 1440, metValidMin: 300 })
   })
   // The forwarded value is the OTS model's, and the five gate cases above it reject before any
   // constant is read, so only this one needs the vendor's table.

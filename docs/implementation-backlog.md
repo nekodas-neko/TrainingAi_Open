@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **286** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **290** | `lib/data/postgres/migrations/` | (286/287 are reserved by the unmerged LA-142 PR; 288/289 are LA-161) |
 | Local SQLite schema version | **v41** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -4116,8 +4116,12 @@ unverified"* is now answered: it persists.
     anchor series, and the window is only as good as that fit), or **rows silently dropped by
     `dsToMs` returning null** (`if (tsMs == null) continue`), which discards a frame with no signal
     of any kind.
-  - **The next step is instrumentation, not another read — filed as LA-161.** Nothing persisted
-    says how long the grid actually was, so the two candidates cannot be separated from outside.
+  - **⚙ LA-161 SHIPPED 2026-09-27 (Lane A):** `oura_daily_derived.training_load_grid_len` and
+    `training_load_valid_min` now record the two numbers the gate evaluated, on every path
+    including the three gates that never reach the MET floors. **The next step is one read of
+    those columns**, after a day of production: a short grid points at the ds window or at
+    `dsToMs` dropping rows; a full grid means the floors are being evaluated on something other
+    than what is stored.
 
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
@@ -4226,24 +4230,6 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
-
-### [readiness][devices] LA-161 — persist the MET grid's dimensions, so the training-load gate can be diagnosed from data
-- **Lane: A** · **Added:** 2026-09-27 · split out of TN-79 when its prescribed read refuted its own prediction.
-- **Why:** production gates `insufficient_met` on days whose stored frames replay to a 1421-minute
-  grid with 1073 valid minutes. One of those two is wrong and **nothing persisted says which**, so
-  the difference can only be guessed at from outside. TN-79 has now spent several sessions on
-  inference; two integers would end it.
-- **What:** persist, beside `training_load_gate`, the grid length and the valid-minute count that
-  `computeTrainingStress` actually gated on — the two numbers in
-  `i.metsPerMinute.length < 720 || validMin < 360`.
-- **Shape:** one migration adding two nullable integer columns to `oura_daily_derived`, its
-  regenerated `claude_ro` twin in the same PR, the row mapper, and the route's persist call.
-  **Ships alone** (migration). Additive and nullable, so it is not data-dropping.
-- **Done when:** one day of production says whether the grid production builds is short, and by how
-  much. If it is short, the cause is the ds window or `dsToMs` dropping rows; if it is not, the
-  floors are being evaluated on something other than what is stored.
-- **Do NOT lower the floors to make the gate pass.** 720 and 360 are the model's own, and the
-  question is why a day with 1073 valid minutes reads as insufficient.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 

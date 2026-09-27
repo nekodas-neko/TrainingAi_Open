@@ -86,8 +86,12 @@ export async function GET(req: Request) {
   // would leave a morning's 'insufficient_met' standing on a day that scored by afternoon.
   try {
     await repo.upsertOuraDailyDerived(userId, date, result.status === 'ok'
-      ? { trainingLoadOts: result.ots, trainingLoadHigh: result.high, trainingLoadGate: 'ok' }
-      : { trainingLoadGate: result.reason })
+      // LA-161: the grid dimensions go on every path, gated or not — a gate reason without the
+      // numbers it was decided from is what made TN-79 an inference exercise.
+      ? { trainingLoadOts: result.ots, trainingLoadHigh: result.high, trainingLoadGate: 'ok',
+          trainingLoadGridLen: result.metGridLen, trainingLoadValidMin: result.metValidMin }
+      : { trainingLoadGate: result.reason,
+          trainingLoadGridLen: result.metGridLen, trainingLoadValidMin: result.metValidMin })
   } catch (err) {
     console.error('[training-stress] persist failed (read still served):', err)
   }

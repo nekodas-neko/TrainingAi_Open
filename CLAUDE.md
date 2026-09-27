@@ -720,9 +720,16 @@ until the views are rebuilt. Every migration that adds a table or a column there
 regenerated twin **in the same PR**:
 
 ```
-CLAUDE_RO_OWNER_USER_ID=<uuid> node scripts/generate-claude-ro-views.js \
+LOCAL_DATABASE_URL=<tcp url> CLAUDE_RO_OWNER_USER_ID=<uuid> \
+  node scripts/generate-claude-ro-views.js \
   > lib/data/postgres/migrations/<NEXT-FREE>_claude_ro_views_<reason>.sql
 ```
+
+**⚠ It reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (this line omitted it until LA-161,
+2026-09-27). Setting the wrong one does not fail — it silently generates against the session's dev
+database, and if that has had anything hand-applied, the twin drops real columns. Generate against
+a database matching the branch; build a scratch one (`CREATE DATABASE` +
+`node scripts/local-db/migrate.js`) if in doubt.
 
 Always a NEW number (`ensureSchema` tracks by filename, so an edited applied migration is skipped
 forever), and diff it against the previous one to confirm only the intended views moved. **The
