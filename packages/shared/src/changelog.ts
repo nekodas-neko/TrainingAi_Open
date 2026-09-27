@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.11",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when your weekly stats fail to load, the card now says so and offers a retry. It used to show its loading shimmer forever \u2014 until the app was killed \u2014 because a failed request looked exactly like one that had not finished.",
+    ],
+  },
+  {
+    version: "1.477.10",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the session card showed the word \"Dumbbell\" where its icon belongs, in text twice the size of the session name. It draws the icon now, so the session you are choosing is the biggest thing on the card.",
+      "Changed: the card says \"Last done 9 days ago\" rather than \"9 days ago\", which read as when the session was next due.",
+      "Fixed: the recovery chips no longer look cut off against the RECOVERY label \u2014 they fade as they scroll past it.",
+    ],
+  },
+  {
     version: "1.477.9",
     date: "2026-09-27",
     changes: [

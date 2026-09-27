@@ -3847,11 +3847,42 @@ which is the right shape for something that can only be validated by living with
 5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. Use the same variant.
 
 ### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
+- **✅ ① SHIPPED 2026-09-27 (#PR). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
-1. **Weekly stats shows its skeleton forever on a failed fetch.** `health-sections.tsx:688` passes `loading={weeklyStats === null}`, and a failure leaves it null. That breaks the self-fetching-card failure rule.
-2. **12 components render `null` while loading or empty,** so the card vanishes rather than saying why. Among them: `observed-hr-card.tsx:37`, `workout-density-card.tsx:36`, `nutrition-activity-trends-card.tsx:37`.
-3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
+1. ~~**Weekly stats shows its skeleton forever on a failed fetch.**~~ — **SHIPPED, and exactly as
+   described.** `cachedFetchToday` had no `onError`, so a failure left `weeklyStats` null,
+   `loading={weeklyStats === null}` stayed true, and the skeleton animated until the app was
+   killed. The hub now takes `error`/`onRetry` and renders the shared `EmptyState` with a
+   **Try again**; a later success clears the flag so the error cannot sit over data that arrived.
+   - **The error branch is checked BEFORE `loading`, and that ordering is the fix rather than a
+     tie-break** — a failure leaves `data` null, so `loading` is *also* true and the skeleton
+     would still win. The test pins the order.
+   - **It is the eleventh use of `EmptyState`**, which is item ③'s complaint, rather than a
+     twelfth bespoke failure card.
+   - Guarded twice: a source test for the wiring, and
+     `e2e/rv215-weekly-stats-failure.spec.ts`, which serves a real 500 and asserts the screen
+     LEAVES the loading state. Control-run: removing `onError` fails both.
+- **The file is `app/health/health-sections.tsx`, not `components/health/…`**, and the line is
+  689 rather than 688.
+2. **12 components render `null` while loading or empty.** — **⚠ ALL THREE NAMED EXAMPLES ARE
+   ALREADY CORRECT (verified 2026-09-27), so the count of 12 cannot be trusted.**
+   - `observed-hr-card.tsx` already passes `onError` and renders *"Couldn't load your heart-rate
+     profile — pull to refresh"*. Its `if (!data) return null` at :37 sits **after** that branch.
+   - `workout-density-card.tsx:36` and `nutrition-activity-trends-card.tsx:37` return null **only
+     while `loading`**; once loading ends they render *"No workout density trends yet."* Both
+     carry a comment citing this very rule and explaining that a swallowed failure and "nothing
+     logged yet" are indistinguishable here, so they show the empty line either way.
+   - **The reading that produced "12" cannot tell a loading-DEFER from a vanish**, and a
+     `return null` while loading is neither a defect nor a rule breach.
+   - **What a trustworthy version of this item needs:** a scan that flags `return null` on a
+     component's TERMINAL state (loading finished, no error branch present), not any `return
+     null`. That is worth writing — it is the self-fetching-card rule's missing ratchet — but it
+     is a different piece of work from a hand-list of twelve, and the hand-list is not a
+     starting point because it is wrong about the three cases anyone can check.
+3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState`
+   primitive used in only 10. — **STANDS, untouched.** A 57-file sweep is its own change and
+   wants the daily screens picked deliberately; ① added the eleventh `EmptyState` use in passing.
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
 
