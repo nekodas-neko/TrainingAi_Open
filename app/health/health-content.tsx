@@ -15,7 +15,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
-import { displayBodyFat, latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
+import { latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
