@@ -585,6 +585,61 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
+### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
+
+- **Lane:** A — `scripts/generate-claude-ro-views.js`, `lib/data/postgres/client.ts`,
+  `scripts/local-db/migrate.js`, `lib/data/postgres/migrations/`.
+- **Added:** 2026-09-27 · BugFix. **Supersedes the narrower `BF-210`**, which proposed replay
+  exemptions for the 58 twins a `DROP COLUMN` breaks; that treats the symptom. It also answers
+  issue **#1620** more completely than `BF-211` does, and is the root cause behind `BF-213`.
+- **Needs:** — nothing.
+- **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
+  are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
+  SNAPSHOT opening `DROP SCHEMA claude_ro CASCADE` and rebuilding all 98 views. **Only the newest
+  affects the final schema**; the other 58 exist solely to be replayed.
+- **Migrations land at 2 per day, every day for the past week — and that is one real change plus
+  one twin.** So the twin doubles the rate at which numbers are consumed, and half of every
+  collision is a snapshot file that has no business owning a migration number. `#1608` needed 288
+  for its table and 289 for its twin; only 288 is a schema change.
+- **The twin is also what makes the collision SILENT.** Two table migrations with different
+  filenames both apply and both succeed. Two twins both apply, sort by filename, and the later one
+  drops the schema the earlier one just built — so the newer view is created and destroyed in the
+  same deploy with no error. That is `BF-213` exactly.
+- **① Recommendation: the twin stops being a numbered migration.** One checked-in file, regenerated
+  in place (`lib/data/postgres/claude-ro-views.sql`), applied after the migration loop in
+  `ensureSchema` (`client.ts:95`). Halves number consumption, deletes ~86k lines, makes `BF-210`
+  disappear because no historical twins remain to break, and makes `BF-213`'s failure structurally
+  impossible.
+  **⚠ Generate it in CI or at authoring time, NOT at runtime — this was the first draft of this
+  entry and stress-testing killed it.** The generator is **default-deny by construction**: its
+  `DENY` map withholds `password_hash`, the four `oura_tokens` secrets and three image/screenshot
+  blobs, and a table it cannot classify calls `process.exit(1)` rather than emitting an unscoped
+  view (`generate-claude-ro-views.js:214`). Two properties depend on the file being checked in:
+  **what columns are exposed is reviewable in the diff**, and **a classification failure happens
+  where a human sees it** rather than on a production boot with the schema already dropped.
+  **The cost of ① is one real conflict**: two concurrent schema changes now edit one file instead of
+  two. That is the right trade — the resolution is mechanical (re-run the generator), and a loud
+  conflict beats a silently dropped view.
+  **There is no CI check today that the twin matches the schema** — only
+  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`, which **skip unless
+  `DATABASE_URL` is TCP**. ① should add that check; it makes the twin strictly better verified than
+  it is now.
+- **② The remaining half: sort migrations NUMERICALLY, then name them by timestamp.** ① does not fix
+  the collision `#1620` is about — a contributor still picks a number that goes stale before review
+  ends. **A naive timestamp rename is a trap, verified rather than assumed:** both appliers sort
+  lexicographically (`client.ts:95`, `migrate.js:69`), and `"202609270534_x.sql" < "289_y.sql"`
+  because `'0' < '8'` — **every new migration would run before every old one.** Sorting by the
+  leading integer instead (one line in each applier) makes a minute-precision timestamp sort
+  correctly and collide only if two authors pick the same minute.
+- **Sequencing: ① then ②, and ① alone is worth shipping.** ① is self-contained; ② touches the apply
+  order for every migration and wants its own PR and its own careful read.
+- **Reply to `#1620` when this is decided** — the author raised it, and the answer is larger than
+  the request.
+- **Reversal cost:** ① moderate — it changes what runs at deploy, so it wants a careful rollout;
+  the 58 deleted twins are recoverable from git and are already recorded in `schema_migrations` by
+  filename, so removing the files does not re-run anything. ② is higher: it changes apply order,
+  and a wrong sort is a wrong schema.
+
 ### [platform] BF-211 — issue #1620 asks to derive the migration number from filenames, which cannot see an unmerged branch
 
 - **Lane:** A — `scripts/check-backlog-pointers.js`, `docs/implementation-backlog.md`.
@@ -606,6 +661,11 @@ below threshold and left in place for next time.
   instinct and the wrong moment for this repo: with several agents running against a `main` that
   takes a commit roughly every 8 minutes, a collision found at merge time means rebuilding a
   migration **and** regenerating its twin, which is the expensive half.
+- **⚠ SUPERSEDED BY `BF-214` (2026-09-27), which answers this more completely.** The
+  recommendation below treats the counter as the problem. It is half of it: **92% of the migration
+  corpus is `claude_ro` twins**, so the twin doubles how fast numbers are consumed and is what makes
+  a collision silent. `BF-214` ① removes the twin from the numbered sequence and ② replaces
+  authoring-time allocation outright. Kept here because the measurement below is still the evidence.
 - **Recommendation: keep a reserved number, and stop maintaining it by hand — derive it from every
   branch rather than from `main`.** `git log --all --diff-filter=A --name-only --
   lib/data/postgres/migrations/` names every migration added on any fetched branch, merged or not, so
@@ -1586,6 +1646,27 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
   review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
   message.
+- **⚠ THE COUNT IS STALE: SEVEN need him, not three, and two of those are BLOCKED rather than
+  waiting (BugFix, 2026-09-27).** #1592 above **already merged as #1616** before this entry was
+  written. Measured that day with `get_check_runs`, job conclusions read rather than assumed:
+  | PR | what | required checks | verdict |
+  |---|---|---|---|
+  | **#1749** | `LA-142` drop four dead columns | **Migration Check RED** | blocked — not his yet |
+  | **#1499** | `OR-138` db-query user scoping | **Build RED** | blocked — not his yet |
+  | **#1755** | `OR-159`+`RV-196` native security | all green (+ Android green) | **his call** |
+  | **#1672** | `RV-190` read-only session leak | all green | **his call** |
+  | **#1671** | `RV-191` image byte validation | all green | **his call** |
+  | **#1608** | HealthKit storage (external) | all green | **his call** — see `BF-213` |
+  | **#1607** | bearer tokens (external, auth) | green but **from 09-25** | re-run first |
+  **#1755 appeared in this file ZERO times** when that was measured; #1749, #1672 and #1671 appeared
+  once each, inside their own closing entries rather than as items awaiting him.
+- **Both blocked PRs report their gates passing, and both have a red REQUIRED check.** #1749's
+  Migration Check reads `applied 228, skipped 0, **58 failed**`, every one `column
+  t.active_calories_est does not exist` — the general form is `BF-214`. #1499's Build fails at the
+  test-typecheck gate: `or138-readonly-pivot.test.ts: 6 error(s) — this file had none`, while its
+  description reports `npx tsc --noEmit` clean, which is true and is **a different gate**
+  (`tsconfig.json` vs `tsconfig.tests.json`). **A local gate's name is not the CI gate's name** —
+  both reported honestly against the command they ran.
 - **Why this is a defect and not bookkeeping.** `grep -cE '#1607|#1592|#1499'` over this file returns
   **0**. The seven decisions already in `Lane: O` are correctly routed — these are not routed at all.
   A GitHub review request is a channel nobody is watching: #1499 has sat since **2026-09-24** and the
@@ -3837,14 +3918,57 @@ which is the right shape for something that can only be validated by living with
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
 
 ### [workouts] RV-214 — the session card leads with the equipment, not the session; the recovery chips slide under their label
-- **Lane: B** — `app/workout/**` session card.
+- **✅ ①③④ SHIPPED 2026-09-27 (#1775), rendered at 412 px dark. ② DOES NOT REPRODUCE, ⑤ is a design pick — both below.**
+- **Lane: B** — the card is `app/workout-select/workout-select-content.tsx`, **not** `app/workout/**`.
 - **Added:** 2026-09-26 · Review sweep 63.
-1. **"Dumbbell" is set at about twice the size of "Push".** The largest text on the card is not the thing being chosen. Make the session name the title, and the equipment or program a subtitle.
+1. ~~**"Dumbbell" is set at about twice the size of "Push".**~~ — **SHIPPED, and the device note's
+   diagnosis was close but not the cause.** It guessed *"an icon name rendered as text when the
+   icon does not resolve … check the session-icon map's FALLBACK"*. The fallback is fine. **The
+   surface never consulted the map at all**: the slot was
+   `<span className="text-3xl">{currentSession?.icon ?? p.emoji}</span>`, and `program_sessions.icon`
+   is a free-text column, so a non-emoji value prints as a 30 px WORD beside a 20 px session name.
+   - **`getSessionIcon` already existed** (`lib/session-icon.tsx`) with the whole chain —
+     emoji→Lucide, then palette position, then `Dumbbell`. **A-7 had already converted one surface
+     and left a comment claiming *"every other session surface uses getSessionIcon"*. Three did
+     not**: this card, `components/stats/program-exercise-list.tsx`, and
+     `components/workout-builder/builder-review.tsx`. A claim in a comment is not a guarantee.
+   - **No hierarchy change was needed.** With a component in the slot the session name is already
+     the largest text on the card — confirmed in the render. The entry's proposed fix (retitle the
+     card) would have treated the symptom and left the word printing elsewhere.
+   - **Guarded by `scripts/check-session-icon-render.js`** (Custom Rules, now **83** steps) plus
+     `SessionGlyph`. The check is deliberately keyed on a SESSION-shaped identifier rather than on
+     `.icon`: the broad version was written first and flagged four more sites — `swipe-actions`,
+     `capture-actions`, `activity-secondary-metrics`, `deload-explanation` — **every one of which
+     declares `icon: React.ReactNode`**, where rendering it is correct. Exempting four correct
+     files by name would have taught the next person that an exemption is how you satisfy it.
    - **🔎 On the device (sweep 64, `p23-workout-warm-01`):** the slot holds an **icon** (a red triangle) beside "Upper", not a word. So the web build's "Dumbbell" is most likely **an icon name rendered as text** when the icon does not resolve. Check the session-icon map's fallback; that is the fix, not a hierarchy change. **Item 4 (recovery chips clipped under their label) is confirmed on the device.**
-2. **The "Recommended today" pill wraps onto two lines** at 412 px. Shorten it to "Today", or let it sit on its own line.
-3. **"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous. Write "Last done yesterday".
-4. **The recovery chips scroll under the "RECOVERY" label,** so the first chip shows clipped at the label's edge. Start the scroller after the label, or give it a fading mask.
-5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. Use the same variant.
+2. **The "Recommended today" pill wraps onto two lines** at 412 px. — **DOES NOT REPRODUCE
+   (2026-09-27).** Rendered at exactly 412 px dark with the seeded program: the pill sits on one
+   line. **Not closed**, because the seeded session is named "Push" and a long name would take the
+   width the pill needs — the sweep may have seen it beside one. **What would settle it:** the
+   owner's own session names at 412 px, or a render with a deliberately long name. Do not "fix" a
+   wrap nobody can currently produce.
+3. ~~**"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous.~~ —
+   **SHIPPED, and widened.** The ambiguity is not specific to "Yesterday": **"9 days ago" reads
+   just as easily as when the session is next DUE**. Both elapsed branches of
+   `getLastTrainedLabel` now say what the number measures ("Last done yesterday", "Last done 9
+   days ago"). `"Trained today"` is untouched — `trainedToday` compares against that exact string,
+   and the test pins that pairing.
+4. ~~**The recovery chips scroll under the "RECOVERY" label.**~~ — **SHIPPED, reproduced first.**
+   The render showed `RECOVERY | t | 100% Shoulders` — a lone "t", the tail of "Chest", cut dead at
+   the container edge.
+   - **The scroller already started after the label**; they are siblings in a flex row, so the
+     entry's first suggestion was already true. The cut came from `overflow-hidden` ending flush
+     against the label, which reads as the label clipping it.
+   - Took the second suggestion: a 12 px `mask-image` fade at both ends, so a chip reads as moving
+     out of view rather than being severed. `-webkit-` included — Samsung's WebView is the
+     canonical runtime. Verified in the **emitted** CSS and in a second render.
+5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. —
+   **CONFIRMED, NOT FIXED: it is a pick, not a defect.** Measured 2026-09-27 — the card's button is
+   full-width green with **no** icon; the pre-workout screen's carries a dumbbell. **"Use the same
+   variant" does not say WHICH**, and both are on daily paths, so choosing arbitrarily is a visible
+   change to the owner's screen on no grounds. Cheap either way. Decide the direction (add the icon
+   to the card, or drop it from the pre-workout screen) and it is a two-line change.
 
 ### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
 - **✅ ① SHIPPED 2026-09-27 (#PR). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**

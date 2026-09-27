@@ -425,6 +425,9 @@ jobs:
       - name: An e2e stub does not hand the app a literal date
         run: node scripts/check-e2e-stub-dates.js
 
+      - name: A session's stored icon is never rendered as text
+        run: node scripts/check-session-icon-render.js
+
       - name: The soft keyboard can resize the sheets it covers
         run: node scripts/check-keyboard-viewport.js
 

@@ -480,6 +480,17 @@ body {
    static subset (see the reduced-motion block below and muscle-recovery-card.tsx). */
 .recovery-static { display: none; }
 
+/* RV-214 ④ — the chips scroll out of view, they are not clipped by the label.
+   The marquee's `overflow-hidden` cuts a chip dead at the container's left edge, which sits
+   immediately after the "RECOVERY" label — so the first chip read as sliding UNDER the label and
+   being cut off by it. A fade at both ends says "there is more, it is moving" instead. 12px is
+   about half a chip's corner radius: enough to soften the cut, not enough to hide a percentage.
+   `mask-image` is composited, so this costs nothing per frame on a strip that animates forever. */
+.recovery-marquee {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+
 @keyframes xp-pop {
   from { opacity: 0; transform: scale(0.7) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }

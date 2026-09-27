@@ -346,6 +346,9 @@ Live at the time of writing (2026-07-30):
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
+  [`docs/overview/entries/2026-09-27-rv214-session-card.md`](../../overview/entries/2026-09-27-rv214-session-card.md)
+  (RV-214 ①③④ — three surfaces printed `session.icon` as text because they bypassed the map A-7's
+  comment said everyone used; plus why the check is keyed narrowly, and what ②⑤ still need),
   [`docs/overview/entries/2026-09-27-rv202-label-the-numbers-source.md`](../../overview/entries/2026-09-27-rv202-label-the-numbers-source.md)
   (RV-202 ③ — the pre-workout list names which day its numbers came from; and `LB-165`, the
   five-link trace showing RV-202 ①'s rules fallback reaches no screen at all, so the ~30 s
