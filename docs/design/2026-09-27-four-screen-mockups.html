@@ -355,6 +355,84 @@
     <p class="note cost"><b>Still true:</b> this changes stored numbers, not just layout. Every past run day becomes completable, so adherence, streaks and compliance all move once it ships. Both panes here are rebuilt from <code>cardio-content.tsx</code> rather than screenshotted &mdash; the hub needs live data the sandbox lacks.</p>
   </section>
 
+  <!-- ============ 5. RV-166b : the walk flow ============ -->
+  <section>
+    <p class="id">RV-166b — how a walk actually completes the day</p>
+    <h2>Most of them are treadmill walks, so say what counts and make it two taps</h2>
+    <p class="ask">Your note: <b>&ldquo;I will mostly do my treadmill walk; so when I click walk, I&rsquo;d like to set a guided walk &mdash; or just a treadmill walk + time. Or perhaps it could even say x amount of minutes in x zone rate to count as complete.&rdquo;</b> Both, and they fit together: the card states the criterion in zone terms, and tapping <b>Walk it</b> offers the two ways of meeting it.</p>
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip new">The card states what counts</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:12px">
+            <div class="card">
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill">In progress</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">25 min in Zone&nbsp;2</div>
+              <div class="tiny dim" style="margin-top:2px">107&ndash;134 bpm &middot; a run or a walk both count</div>
+              <div class="row sp" style="margin-top:10px">
+                <span class="tiny dim">Counted so far</span>
+                <span class="tiny num" style="color:var(--brand);font-weight:600">18 / 25 min</span>
+              </div>
+              <div class="bar" style="margin-top:6px"><i style="width:72%"></i></div>
+              <div class="seg">
+                <div class="segbtn">Run it</div>
+                <div class="segbtn on">Walk it</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row sp"><span class="lbl">Live</span><span class="pill done">Zone 2</span></div>
+              <div class="row" style="margin-top:6px;gap:10px;align-items:baseline">
+                <span style="font-size:26px;font-weight:700" class="num">118</span>
+                <span class="tiny dim">bpm &middot; treadmill walk &middot; 21:04</span>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="cap"><span class="chip new">Tapping &ldquo;Walk it&rdquo;</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:12px">
+            <div style="opacity:.28" class="card">
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill">To do</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">25 min in Zone&nbsp;2</div>
+            </div>
+            <div class="card" style="border-color:rgba(0,255,135,.22)">
+              <div style="width:36px;height:4px;border-radius:999px;background:rgba(255,255,255,.18);margin:0 auto 12px"></div>
+              <div style="font-weight:600;font-size:15px">How are you walking?</div>
+              <div class="tiny dim" style="margin-top:2px;margin-bottom:12px">Either counts toward the 25 minutes.</div>
+
+              <div class="row sp" style="padding:12px;border:1px solid rgba(0,255,135,.28);background:rgba(0,255,135,.07);border-radius:14px">
+                <div>
+                  <div style="font-weight:600">Guided walk</div>
+                  <div class="tiny dim" style="margin-top:2px">App paces you and counts zone minutes live</div>
+                </div>
+                <span style="color:var(--brand)">&rsaquo;</span>
+              </div>
+
+              <div style="padding:12px;border:1px solid var(--border);border-radius:14px;margin-top:8px">
+                <div class="row sp">
+                  <div style="font-weight:600">Treadmill walk</div>
+                  <span class="tiny dim">just log it</span>
+                </div>
+                <div class="row" style="gap:6px;margin-top:10px">
+                  <div class="segbtn">20 min</div>
+                  <div class="segbtn on">30 min</div>
+                  <div class="segbtn">45 min</div>
+                  <div class="segbtn" style="flex:0 0 44px">&hellip;</div>
+                </div>
+                <div class="tiny dim" style="margin-top:8px">Zone minutes still come from your heart rate while you walk.</div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note"><b>Why the criterion can be stated in zones now, and could not last week.</b> You moved the moderate floor from 60% to <b>40% of heart-rate reserve</b> this morning (TN-78, shipped in #1774). At 60% the floor was <b>134 bpm</b>, which you hit on 3 days out of 31 &mdash; a treadmill walk earned zero zone minutes, so &ldquo;25 min in Zone 2&rdquo; would have been unreachable on foot. At 40% it is <b>107 bpm</b>, hit on 24 of 31. The two changes only work together.</p>
+    <p class="note"><b>Two taps for the common case.</b> Walk it &rarr; a duration chip. The presets are yours to set; 30 min is drawn as the default because it is the one that clears a 25-minute target outright.</p>
+    <p class="note cost"><b>What still needs deciding, and it is small:</b> whether a treadmill walk logged with no heart-rate data counts. With the ring on your finger it will have HR; without it the app has minutes but no zones. <b>Recommendation: count logged minutes toward the target when no HR exists, and mark the day <i>estimated</i></b> &mdash; refusing to complete a walk you actually did is the worse failure. Say if you would rather it not count.</p>
+  </section>
+
   <footer>
     <p><b>What I need from you:</b> a yes, a no, or a change, for each of the four. They are independent — approving one does not commit you to the others.</p>
     <p>Reversal cost is low on the first three: one component each, no stored data. <b>RV-166 is the exception</b> — it changes what counts as a completed session, so the numbers it moves are the part to think about.</p>

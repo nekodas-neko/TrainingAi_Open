@@ -4088,7 +4088,15 @@ which is the right shape for something that can only be validated by living with
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
 - **⛔ DECLINED 2026-09-27 — the owner said no to this one and yes to the other three in the same
-  sitting. Do NOT build it.** No reason was given and none is invented here.
+  sitting. Do NOT build it.**
+- **✅ HIS REASON, given when asked (2026-09-27): *"I like the original look; it shows the grouping
+  nicely with the space."*** So the empty height the finding measured is **doing work** — it is what
+  separates one meal from the next. Collapsing the slots would have saved ~150 px and cost the
+  grouping, which is the thing the screen is for.
+- **⚑ THIS IS A DESIGN PRINCIPLE FOR NUTRITION, NOT A ONE-OFF NO — record it and do not re-file it.**
+  A future sweep measuring blank space on the diary will reach the same finding and should stop
+  here: on this screen, **vertical space between meal cards is the grouping mechanism** and a
+  density change needs a new argument, not a repeat of this one.
 - **The finding itself was not disputed and is left on the record:** four empty meals render a
   header `+` **and** a body `+ Add food` (`meal-card.tsx:73`, `:105`) — two controls for one action
   — across roughly 320 px of mostly empty card. The mockup that was declined is in
@@ -7385,6 +7393,27 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
+- **✅ APPROVED 2026-09-27 — build it, WITH the walk flow below. Mockup:
+  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html),
+  sections RV-166 and RV-166b.**
+- **The owner's added requirement, verbatim:** *"I will mostly do my treadmill walk; so when I click
+  walk; id like to be able set a guided walk - or just a treadmill walk + time. Or perhaps it could
+  even say x amount of minutes in x zone rate to count as complete."*
+  **Take both halves, they are complementary.**
+  **① State the criterion in ZONE terms on the card** — *"25 min in Zone 2 · 107–134 bpm"* with live
+  progress against it, rather than an opaque done/not-done.
+  **② Tapping `Walk it` offers two routes:** a **guided walk** (app paces, counts zone minutes
+  live) or a **treadmill walk + duration** from preset chips. Two taps for the common case.
+- **⚑ THIS ONLY WORKS BECAUSE OF `TN-78`, SHIPPED THE SAME DAY (#1774) — do not build one without
+  the other.** The moderate floor moved from 60% to **40% of heart-rate reserve**: at 60% it was
+  **134 bpm**, which he hit on **3 of 31 days**, so a treadmill walk earned ZERO zone minutes and a
+  zone-stated criterion would have been unreachable on foot. At 40% it is **107 bpm**, hit on
+  **24 of 31**. A zone-worded target on the pre-TN-78 floor would have been a target he could not
+  meet by walking.
+- **⚠ ONE SMALL DECISION IS STILL OPEN and is flagged on the mockup:** whether a treadmill walk
+  logged with **no heart-rate data** counts. With the ring on he has HR; without it there are
+  minutes and no zones. **Recommendation: count the logged minutes and mark the day `estimated`** —
+  refusing to complete a walk he actually did is the worse failure. Not yet answered.
 - **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
   Before/after at the real **384 px dark viewport**, using the app's own tokens from
   `app/globals.css`. **Proposed, to his instruction:** one *Today's cardio* card at the top of the hub holding the prescription and both ways to satisfy it, with either marking the day done.

@@ -75,3 +75,29 @@ the prescription carries a `Plan` chip and the second carries `Extra`.
 the run To do. That is followed literally and flagged on the page as possibly wrong for him — if a
 hard ride should count, the fix is a per-activity "count this as today's cardio" action, not a
 blanket rule.
+
+## `RV-213`'s reason turns a refusal into a rule
+
+Asked why, the owner said: *"I like the original look; it shows the grouping nicely with the space."*
+So the ~150 px the finding measured as waste is **doing work** — it is what separates one meal from
+the next. Recorded on the entry as a **design principle for Nutrition**, not a one-off no: a future
+sweep measuring blank space on the diary will reach the same finding, and should stop at that line
+rather than re-file it.
+
+## `RV-166` gained a walk flow, and it depends on a change shipped the same morning
+
+He added: *"I will mostly do my treadmill walk; so when I click walk, I'd like to be able set a
+guided walk — or just a treadmill walk + time. Or perhaps it could even say x amount of minutes in
+x zone rate to count as complete."* Both halves are taken — the card states the criterion in zone
+terms with live progress, and `Walk it` offers a guided walk or a treadmill walk with duration
+chips. Drawn as **RV-166b** on the mockup.
+
+**It only works because of `TN-78`, shipped the same day in #1774.** The moderate floor moved from
+60% to 40% of heart-rate reserve. At 60% the floor was **134 bpm**, hit on 3 of 31 days — a
+treadmill walk earned zero zone minutes, so a zone-worded target would have been unreachable on
+foot. At 40% it is **107 bpm**, hit on 24 of 31. Neither change makes sense alone, and an
+implementer taking `RV-166` without `TN-78` would ship a target the owner cannot meet by walking.
+
+**One small decision left open:** whether a treadmill walk logged with no heart-rate data counts.
+Recommended on the mockup — count the minutes, mark the day `estimated`, because refusing to
+complete a walk he actually did is the worse failure. Not yet answered.
