@@ -15,7 +15,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 | Pointer | Value | Source of truth |
 |---|---|---|
 | Next free Postgres migration | **290** | `lib/data/postgres/migrations/` | (286/287 are reserved by the unmerged LA-142 PR; 288/289 are LA-161) |
-| Local SQLite schema version | **v41** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Local SQLite schema version | **v43** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max | (v42 is reserved by the unmerged LA-142 PR) |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an

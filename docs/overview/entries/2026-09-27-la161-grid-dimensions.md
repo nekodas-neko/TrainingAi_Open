@@ -65,12 +65,26 @@ baseline that "failed" — the harness was wrong, not the code.
 **No version bump or changelog entry** — nothing user-visible. The API response gains two fields
 that no surface reads.
 
+## The second thing I got wrong, caught by a tripwire
+
+I first shipped these as **server-only**, reasoning that they are diagnostics nothing on-device
+reads. CI disagreed, and it was right: `oura-daily-derived-sync.test.ts` fails if any
+`DERIVED_COLS` key is missing from the offline-sync push payload. `DERIVED_COLS` is what drives
+the server upsert, so a column cannot be in that table and out of sync — the choice was never
+available. Its sibling assertion then caught a second gap, that `pushMutations` has its own
+explicit field list, which is the exact failure its comment records happening before with
+`daytime_stress_coverage_min`.
+
+So they are plumbed the whole way: local type, SQLite CREATE body, `RECONCILE_COLUMNS`, **v43**
+(not v42 — that is taken by the unmerged LA-142 branch, and two branches claiming one local
+version is a silent divergence rather than a conflict), both local upserts, the read mapping, the
+pull delta, and `pushMutations`.
+
 ## Not exercised
 
-No device run; this is a server-side column and a JSON field, with no native, safe-area or
-offline-sync surface. The local SQLite mirror deliberately does **not** carry these columns — they
-are diagnostics for the server, nothing on-device reads them, and Custom Rules' reconcile
-completeness check passes without them.
+No device run. The local table gains two integers per day and no screen reads them; the v43 ALTER
+reaching an upgraded device is the part only the phone can confirm, and `RECONCILE_COLUMNS` is the
+authority if it half-applies.
 
 **And the finding itself is not in yet.** This makes the question answerable; it does not answer
 it. After a day of production, read the two columns: a short grid points at the ds window or at
