@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.474.1",
+    date: "2026-09-26",
+    changes: [
+      "Fixed: the white circle in the corner of the collection card was the moon, not a button. It has moved out of the corner and dimmed, and the \"+N more\" count beside it no longer looks like something to tap.",
+      "The Coach button is back to its plain circle. The label added earlier today was a mistake — it was put there to answer a question about a different button entirely.",
+    ],
+  },
+  {
     version: "1.474.0",
     date: "2026-09-26",
     changes: [

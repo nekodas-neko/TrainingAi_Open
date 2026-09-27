@@ -1,4 +1,11 @@
-// Backdrops for the collection pen. Wide (360x150), drawn dark so the cats stay the brightest thing
+// Backdrops for the collection pen.
+//
+// **Nothing bright, hard-edged and round goes in the upper-right corner (BF-208).** The owner
+// asked what "that button on the widget the white circle" was, and it was meadow's moon: a 28 px
+// solid near-white disc at full opacity, in the one screen position that means "control", 30 px
+// from a count that was styled as a pill. Three of the twelve scenes had that shape. Discs there
+// are softened and moved; `components/home/__tests__/bf208-pen-corner.test.ts` keeps the corner
+// clear for the next one drawn. Wide (360x150), drawn dark so the cats stay the brightest thing
 // on the card, and anchored to the bottom so any card width crops the sky, never the floor.
 // Titles are meant to unlock them (PS-51); until then the pen uses `meadow`.
 
@@ -11,7 +18,7 @@ const stars = pts => pts.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}
 const STARS = stars([[22, 14, 1.2], [70, 30, .9], [118, 10, 1.1], [168, 26, .8], [214, 12, 1.3], [262, 34, .9], [300, 16, 1], [340, 28, 1.2], [44, 44, .7], [236, 48, .7]])
 
 const meadow = wrap('meadow', `${sky('meadow', '#16203a', '#2a3a5c')}${STARS}
-  <circle cx="300" cy="36" r="14" fill="#f3ecd2"/>
+  <circle cx="72" cy="34" r="14" fill="#f3ecd2" opacity=".55"/>
   <path d="M0 96 C60 78 120 82 180 94 C240 106 300 84 360 90 L360 150 L0 150 Z" fill="#26402f"/>
   <path d="M0 112 C70 100 150 104 210 112 C270 120 320 106 360 110 L360 150 L0 150 Z" fill="#2f4d38"/>
   <path d="M0 128 C90 120 200 124 360 126 L360 150 L0 150 Z" fill="#355640"/>
@@ -77,7 +84,7 @@ const bedroom = wrap('bedroom', `<rect width="${W}" height="${H}" fill="#232643"
 const kitchen = wrap('kitchen', `<rect width="${W}" height="${H}" fill="#3a2e2a"/>
   ${range(10, r => range(20, c => `<rect x="${c * 18 + (r % 2) * 9}" y="${r * 9 + 20}" width="16" height="7" fill="#43352f"/>`))}
   <rect x="20" y="16" width="120" height="30" rx="3" fill="#6b4a36"/>${range(5, i => `<rect x="${30 + i * 22}" y="22" width="14" height="18" rx="3" fill="${['#e04848', '#4f9d4c', '#f2c14e', '#8d55e0', '#3aa37a'][i]}"/>`)}
-  <rect x="210" y="30" width="110" height="44" rx="4" fill="#1b2544" stroke="#6b4a36" stroke-width="5"/><circle cx="290" cy="46" r="8" fill="#f3ecd2"/>
+  <rect x="210" y="30" width="110" height="44" rx="4" fill="#1b2544" stroke="#6b4a36" stroke-width="5"/><circle cx="232" cy="46" r="8" fill="#f3ecd2" opacity=".6"/>
   <rect x="0" y="88" width="${W}" height="16" fill="#8a6848"/><rect x="0" y="86" width="${W}" height="4" fill="#a8845c"/>
   <ellipse cx="80" cy="84" rx="20" ry="5" fill="#e9e4df"/><path d="M68 84 C70 72 90 72 92 84 Z" fill="#f2a043"/>
   <rect x="0" y="104" width="${W}" height="46" fill="#4a3428"/>${range(12, i => `<rect x="${i * 30}" y="104" width="30" height="46" fill="#5a4032" opacity="${i % 2 ? 1 : 0}"/>`)}`)
@@ -101,7 +108,7 @@ const snow = wrap('snow', `${sky('snow', '#141b33', '#2a3a5c')}${STARS}
 const space = wrap('space', `<rect width="${W}" height="${H}" fill="#0b0a1c"/>
   <ellipse cx="120" cy="50" rx="140" ry="40" fill="#6d5ae0" opacity=".18"/><ellipse cx="260" cy="70" rx="120" ry="30" fill="#e04890" opacity=".12"/>
   ${range(40, i => `<circle cx="${(i * 71) % 360}" cy="${(i * 43) % 110}" r="${.6 + (i % 4) * .4}" fill="#fff" opacity="${.4 + (i % 3) * .2}"/>`)}
-  <circle cx="300" cy="34" r="16" fill="#f2a043"/><ellipse cx="300" cy="34" rx="28" ry="6" fill="none" stroke="#f3ecd2" stroke-width="2.5" opacity=".7"/>
+  <circle cx="82" cy="40" r="16" fill="#f2a043" opacity=".8"/><ellipse cx="82" cy="40" rx="28" ry="6" fill="none" stroke="#f3ecd2" stroke-width="2.5" opacity=".55"/>
   <path d="M0 114 C80 104 280 104 360 114 L360 150 L0 150 Z" fill="#8a8aa0"/>${range(6, i => `<ellipse cx="${30 + i * 60}" cy="${126 + (i % 2) * 8}" rx="${10 + (i % 3) * 4}" ry="4" fill="#6f6f86"/>`)}`)
 
 // Cherry-blossom garden.

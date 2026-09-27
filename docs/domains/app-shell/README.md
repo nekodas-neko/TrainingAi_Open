@@ -483,6 +483,10 @@ Live at the time of writing (2026-07-30):
   before writing another drag here: `savePreference` PATCHes the server, so it belongs on
   `dragend`; and `PointerSensor` only activates without a delay when the press lands on the handle
   itself, which made the e2e flaky in a way that looked exactly like the defect.
+- **[`docs/overview/entries/2026-09-26-bf208-pen-moon-and-chip.md`](../../overview/entries/2026-09-26-bf208-pen-moon-and-chip.md)**
+  — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
+  `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
+  which the same misread had justified — a guard now keeps the pen's top-right corner clear.
 - **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
   — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
