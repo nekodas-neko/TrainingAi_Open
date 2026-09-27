@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.25",
+    date: "2026-09-28",
+    changes: [
+      "A workout's ring heart-rate trace keeps its 15-second detail. A background pass three days later could re-save part of it at 5-minute resolution and delete the finer points.",
+    ],
+  },
+  {
     version: "1.477.24",
     date: "2026-09-27",
     changes: [
