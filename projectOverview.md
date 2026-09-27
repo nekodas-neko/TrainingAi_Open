@@ -26,8 +26,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.474.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.475.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-26.
+
+**The Workout Review stopped calling a model, and the recap turned out to be broken rather than unused (RV-204, v1.475.0).** The review's `generateObject` call is gone: `reconcileReview` already clamped every number, refused unsafe drops, back-filled omissions and recomputed the totals, so what survived the model was the *choice* — and that choice is already made deterministically on every prescription by the same trim ordering. Running it here is what makes a review and a prescription agree instead of proposing contradicting shapes. **The second half is the finding.** The entry priced both routes as unused ("neither ran in 30 days"); over 60 days both are at zero, but the recap fires **automatically** on the done screen, and against **43 workouts completed 2026-07-30 → 2026-09-25** it has stored **4** rows ever, the last on **2026-07-23**, with nothing in `error_events`. It is never being called — a fault, not disuse — so RV-204 ② is parked behind **LA-155** rather than built into a screen that may not be reached. The mutation pass also deleted a branch this work had written: a trim-before-drop guard that could not change any answer, because `dropToBudget` already is trim-then-drop. Detail: `docs/overview/entries/2026-09-26-rv204-rules-workout-review.md`.
 
 **The barcode column existed everywhere and held nothing (LB-158, v1.474.0).** `food_items.barcode`
 had a column, a Zod schema, a server read mapper, a route that passes it through and a push branch
@@ -2651,6 +2653,19 @@ Last swept **2026-09-03**.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][app-shell] ⚠️ The workout recap has not run since July, across 43 completed workouts (LA-155, 2026-09-26)
+`GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx` whenever a
+workout completes. Measured against production on 2026-09-26: `ai_health_insights` holds **4**
+`session-recap` rows, newest **2026-07-23**; `workout_sessions` holds **43** completions spanning
+**2026-07-30 → 2026-09-25**; `ai_call_log` has no `workout-recap` section in 60 days; and no
+`error_events` row implicates the route — that whole window is BF-110's own instrumentation. So
+the route is not failing, it is never reached. Both reads are row-scoped to the owner, so this is
+his workouts against his recaps. **What the sandbox cannot settle** is whether `mode === 'done'`
+is reached at all after the last set, or reached with `store.workoutSessionId` null — the recap,
+energy and HR loaders on that screen share one `if (!workoutSessionId) return`, so a single null
+disables all three. Filed as **LA-155**, `Lane: DV`; it blocks **RV-204 ②**, which proposes
+building a stat block into the same screen.
 
 ### [app-shell] ⚠️ Home sections can be dragged now, and the scroll interaction has not been tried on the phone (BF-205, 2026-09-26)
 

@@ -94,7 +94,10 @@ describe('the injury prompts splice no user text raw (LA-69)', () => {
   const SITES: Array<[string, string]> = [
     ['packages/shared/src/workout/injury-context.ts', 'muscleName'],
     ['packages/shared/src/ai-periodization/prompt.ts', 'activeInjuredMusclesInSession'],
-    ['packages/shared/src/workout/review/prompt.ts', 'activeInjuredMusclesInSession'],
+    // `workout/review/prompt.ts` was the third site and is GONE — RV-204 removed the Workout
+    // Review's model call, so the prompt it fenced no longer exists to be injected into. Removed
+    // rather than left pointing at a deleted file, which would fail on the read and read as a
+    // broken test rather than a retired surface.
   ]
 
   it.each(SITES)('%s fences %s', (path, field) => {
