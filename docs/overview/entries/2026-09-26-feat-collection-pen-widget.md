@@ -1,7 +1,7 @@
 # The collection becomes a pen of wandering cats; six tiers, shinies, scenes
 
 **Branch:** `feat/collection-pen-widget` · **2026-09-26** · **v1.467.0**
-**Follows:** [`2026-09-26-art-cat-collection-art.md`](2026-09-26-art-cat-collection-art.md) (#1694)
+**Follows:** [`2026-09-26-art-cat-collection-art.md`](../history-2026-09-27-folded-1.md#2026-09-26-art-cat-collection-art) (#1694)
 **Filed:** PS-51 (titles unlock scenes) · **Amended:** PS-48 (③ answered), PS-49 (tier table,
 workout decay rule, rares), BF-126 · **Plan:** [`2026-09-26-cat-collection-rules-v2.md`](../../superpowers/plans/2026-09-26-cat-collection-rules-v2.md)
 
