@@ -734,27 +734,31 @@ below threshold and left in place for next time.
   a pruned raw row cannot be re-drained from the ring.
 
 
-### [platform] OR-194 — a persistent local agent environment needs three guards first, or it trades a token saving for a correctness one
+### [platform] LA-163 — nine tests in six files fail on Windows and pass on Linux, so a local run lies
 
-- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, from an outside review of the agent
-  architecture (jsboiss, relayed by the owner) and the owner's offer to run Lane A locally.
-- **Ships BEFORE `OR-195`.** These are the things a fresh clone currently guarantees for free.
-- **① Separate working copies.** Two agents in one clone stomp each other. `CLAUDE.md` already
-  records the failure: a `git checkout` with a dirty tree carried two files across and shipped them
-  inside an unrelated PR (#1140, 2026-08-08), which took a revert plus corrections in three
-  documents to make honest. Use a git worktree or a second clone per lane.
-- **② Separate databases.** `scripts/local-db/setup.sh` hardcodes `PGDATA=/var/lib/postgresql/local-dev`,
-  `PGPORT=5433` and `DBNAME=trainingai_dev`. Two lanes on one machine share one cluster and one
-  database and will corrupt each other's test state. Parameterise the name and port per lane.
-- **③ A re-create-from-migrations rule at session start — this is the one that actually bites.**
-  A long-lived dev database accumulates hand-applied changes, and `scripts/generate-claude-ro-views.js`
-  reads `LOCAL_DATABASE_URL`. `CLAUDE.md` already states the consequence: generating against a
-  drifted database *silently* drops real columns from the read-only security views. **Today the
-  fresh clone is what makes that impossible.** Persisting the environment removes that guarantee, so
-  it has to be replaced by an explicit rebuild, not by care.
-- **Not a token saving, and do not sell it as one.** This buys wall-clock and capability. The ~120 KB
-  fixed orientation read is identical on a warm machine.
-- **Reversal cost:** low — the guards are useful whether or not the move happens.
+- **Lane: A** · **Added:** 2026-09-27 · found by the first local Lane A session (OR-194).
+- **What:** the full suite on the owner's Windows machine gave 10,566 passed and **9 failed in 6
+  files**, none related to the diff under test. Each is a portability assumption:
+  - **Backslash paths:** `lib/oura-models/__tests__/constants-delivery.test.ts` (expects
+    `__fixtures__/constants` inside a `D:\…` path) and
+    `packages/shared/src/sync/__tests__/mutation-schema.test.ts` (an exclusion keyed on a `/` path
+    lets `lib\export\full-export.ts`'s `'_manifest'` through).
+  - **Probably the same:** `components/profile/__tests__/personal-details-one-editor.test.ts` (four
+    cases, `expected [ Array(1) ] to deeply equal [ Array(1) ]`) and
+    `components/ui/__tests__/rv208-one-duration-form.test.ts`. Both scan source files and compare
+    paths. **Unconfirmed**: read the arrays before assuming.
+  - **Timezone:** `lib/data/postgres/__tests__/user-profile-partial-patch.test.ts` reads a DOB back
+    as `1993-06-14T14:00Z` instead of `06-15T00:00Z`, exactly 10 h off. Node runs in the machine's
+    Brisbane zone here and in UTC on CI. Either pin `TZ=UTC` for the suite or compare dates, not
+    instants.
+  - **Timeout:** `scripts/__tests__/check-comment-blindness.test.ts` (`check-hex-literals` case) at
+    30 s. Process spawns are slow on Windows.
+- **Why it matters:** OR-195 moves a lane onto this machine. A local red that is not the diff costs
+  a debugging session each time, and the only defence today is a list in
+  `docs/local-agent-environment.md`.
+- **Fix shape:** normalise paths with `split(path.sep).join('/')` at each comparison; `TZ=UTC` in the
+  vitest config's `env`, which also matches CI; a longer timeout for the one spawn-heavy case.
+- **Done when:** the six files are green on Windows, and still green on CI.
 
 ### [platform] OR-195 — move Lane A to a persistent local session, where it can finally build the Kotlin it owns
 
