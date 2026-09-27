@@ -59,7 +59,9 @@ describe.skipIf(!canRun)('the DB footprint counts rows rather than estimating th
     const stats = await getOuraStorageStats(db)
     const row = stats.tables.find(t => t.table === 'oura_raw_samples')
     expect(row).toBeDefined()
-    expect(row!.rows).toBe(real)
+    // A lower bound for the same reason as the case below: other test files insert into this table
+    // between the two reads. Measured here too — `expected 350 to be 349` on a full suite (LA-163).
+    expect(row!.rows).toBeGreaterThanOrEqual(real)
     expect(row!.rows).toBeGreaterThanOrEqual(7)
   })
 

@@ -808,31 +808,17 @@ below threshold and left in place for next time.
   a pruned raw row cannot be re-drained from the ring.
 
 
-### [platform] LA-163 — nine tests in six files fail on Windows and pass on Linux, so a local run lies
-
-- **Lane: A** · **Added:** 2026-09-27 · found by the first local Lane A session (OR-194).
-- **What:** the full suite on the owner's Windows machine gave 10,566 passed and **9 failed in 6
-  files**, none related to the diff under test. Each is a portability assumption:
-  - **Backslash paths:** `lib/oura-models/__tests__/constants-delivery.test.ts` (expects
-    `__fixtures__/constants` inside a `D:\…` path) and
-    `packages/shared/src/sync/__tests__/mutation-schema.test.ts` (an exclusion keyed on a `/` path
-    lets `lib\export\full-export.ts`'s `'_manifest'` through).
-  - **Probably the same:** `components/profile/__tests__/personal-details-one-editor.test.ts` (four
-    cases, `expected [ Array(1) ] to deeply equal [ Array(1) ]`) and
-    `components/ui/__tests__/rv208-one-duration-form.test.ts`. Both scan source files and compare
-    paths. **Unconfirmed**: read the arrays before assuming.
-  - **Timezone:** `lib/data/postgres/__tests__/user-profile-partial-patch.test.ts` reads a DOB back
-    as `1993-06-14T14:00Z` instead of `06-15T00:00Z`, exactly 10 h off. Node runs in the machine's
-    Brisbane zone here and in UTC on CI. Either pin `TZ=UTC` for the suite or compare dates, not
-    instants.
-  - **Timeout:** `scripts/__tests__/check-comment-blindness.test.ts` (`check-hex-literals` case) at
-    30 s. Process spawns are slow on Windows.
-- **Why it matters:** OR-195 moves a lane onto this machine. A local red that is not the diff costs
-  a debugging session each time, and the only defence today is a list in
-  `docs/local-agent-environment.md`.
-- **Fix shape:** normalise paths with `split(path.sep).join('/')` at each comparison; `TZ=UTC` in the
-  vitest config's `env`, which also matches CI; a longer timeout for the one spawn-heavy case.
-- **Done when:** the six files are green on Windows, and still green on CI.
+### [platform] LA-167 — every base-comparison ratchet starts one `git` process per file, which is 98% of its runtime
+- **Lane: O** — `scripts/lib/base-ref.js` (`countAtBase`), shared by the ratchet checks in Custom Rules.
+- **Added:** 2026-09-28 · Lane A, while fixing LA-163.
+- **Measured:** `check-hex-literals.js` takes 15 s on the owner's Windows machine, and a CPU profile
+  puts 15,048 of 15,360 ms in `spawnSync`. `countAtBase` runs `git show <base>:<file>` once per
+  scanned file. The script's own test cites ~6 s on Linux, so the same cost is there, just smaller.
+  Every ratchet built on `base-ref.js` pays it, and `pnpm check:rules` runs them in sequence.
+- **Fix shape:** one `git cat-file --batch` process per run, fed every `<base>:<path>` it needs, or
+  a single `git ls-tree`/`git grep` over the base tree. Either turns N spawns into one.
+- **Done when:** `check-hex-literals` runs in well under a second of spawn time, its output is
+  unchanged on `main`, and `check-comment-blindness.test.ts` can return to a 30 s limit.
 
 ### [platform] OR-195 — move Lane A to a persistent local session, where it can finally build the Kotlin it owns
 

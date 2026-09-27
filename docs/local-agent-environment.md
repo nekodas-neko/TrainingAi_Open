@@ -74,6 +74,7 @@ Unsetting `DATABASE_SSL` in the shell is not enough, because `.env.local`'s `tru
   `check-comment-blindness.test.ts` writes fixtures into real files such as
   `components/workout/set-card.tsx` and restores them afterwards. A lint in that window reports a
   parsing error in a file nobody touched. Measured 2026-09-27; lint on its own was clean.
-- **Nine tests in six files fail on Windows and pass on Linux CI** — backslash paths, node running
-  in the machine's timezone rather than UTC, and one spawn timeout. See `LA-163`. Read a local red
-  against that list before debugging it, and treat CI as the authority.
+- **The whole suite passes on Windows** since LA-163 (2026-09-28). Nine tests in six files used to
+  fail here and pass on CI: four compared OS paths against `/` literals, one read a `DATE` column as
+  an instant (node runs in the machine's zone), and one timed out on slow process spawns (LA-167).
+  A new failure that only appears locally is worth one look at those three shapes first.
