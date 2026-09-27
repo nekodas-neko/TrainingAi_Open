@@ -5,6 +5,17 @@
 
 @theme {
   --color-brand: oklch(0.723 0.219 149.579); /* overridden at runtime via --brand */
+
+  /* RV-209 — the floor of the type scale, and the reason it exists.
+     The tree had 42 font sizes: 13 named plus 29 arbitrary ones (`text-[10.5px]`, `[11.5px]`,
+     `[12.5px]`…), from 7 px to 34 px, with 1,035 uses UNDER 12 px — 583 at 10, 287 at 11, 128 at
+     9, down to 7. There was no token below `text-xs`, so every one of those was a per-site
+     decision written as a literal, which is how a scale ends up with half-pixel steps in it.
+     11 px because that is where the existing mass sits and it is reachable without re-laying out
+     the cards a 12 px floor would; the workout screens are read at arm's length mid-set, which is
+     why the entry starts there. Uppercase eyebrow labels may sit here deliberately. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: calc(16 / 11);
 }
 
 @theme inline {

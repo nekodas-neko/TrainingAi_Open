@@ -280,7 +280,7 @@ export function ActiveWorkoutScreen({
             {/* Last session */}
             {exercise?.lastDate && exercise.lastReps.length > 0 && (
               <div className="w-full rounded-xl bg-muted/40 border border-border/60 px-3 py-2">
-                <p className="text-[10px] text-muted-foreground mb-1.5">Last session — {formatSheetDate(exercise.lastDate)}</p>
+                <p className="text-2xs text-muted-foreground mb-1.5">Last session — {formatSheetDate(exercise.lastDate)}</p>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex gap-1.5 flex-wrap">
                     {exercise.lastReps.map((r, i) => {
@@ -303,7 +303,7 @@ export function ActiveWorkoutScreen({
                   </div>
                   {exercise.estimated1rm != null && (
                     <div className="flex-shrink-0 text-center">
-                      <p className="text-[9px] text-muted-foreground font-bold">{isBodyweight ? "REP MAX" : "1RM"}</p>
+                      <p className="text-2xs text-muted-foreground font-bold">{isBodyweight ? "REP MAX" : "1RM"}</p>
                       <p className="text-base font-black" style={{ color: "var(--color-brand)" }}>
                         {/* RV-89: `mround125` is a PRESCRIPTION rounder (1.25 plate grid, clamped
                             5–250) and was rounding the displayed 1RM to 92.5 where the stored value
@@ -399,7 +399,7 @@ export function ActiveWorkoutScreen({
                 {exercise.estimated1rm != null && (() => {
                   const highPct = exercise.progressionStyle!.reduce((a, b) => b.pct > a.pct ? b : a);
                   return (
-                    <p className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground/70 text-center mt-2 pt-2 border-t border-brand/20">
+                    <p className="flex items-center justify-center gap-1 text-2xs text-muted-foreground/70 text-center mt-2 pt-2 border-t border-brand/20">
                       {highPct.reps} reps = maintain 1RM · {highPct.reps + 1}+ reps = beat it <ZapIcon className="w-2.5 h-2.5" />
                     </p>
                   );

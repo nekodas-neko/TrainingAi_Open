@@ -2654,6 +2654,10 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The workout screens' smallest text moved up; nobody has read it mid-set (RV-209, 2026-09-27)
+
+`--text-2xs: 11px` is the floor of the type scale, and the nine sites the audit named on the workout screens are on it — five of them moved up from 9–10 px. The other **103 sub-11 px literals across 24 workout files are frozen, not fixed**: a per-file shrink-only ratchet, so every future touch pays some down. Rendered at 412 px dark and nothing overflows, but **two of the nine were not on screen in that state** (the last-session panel) and none of it has been read at arm's length on the S25, which is the whole point of the change. **Pass test:** on the S25 mid-set, the set card and clock captions are readable without leaning in, and nothing has reflowed. Untouched: the 26 small sites that also sit at 40–70% opacity.
+
 ### [workouts][app-shell] ⚠️ The workout recap has not run since July, across 43 completed workouts (LA-155, 2026-09-26)
 `GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx` whenever a
 workout completes. Measured against production on 2026-09-26: `ai_health_insights` holds **4**

@@ -487,6 +487,11 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
+- **[`docs/overview/entries/2026-09-27-rv209-type-scale-floor.md`](../../overview/entries/2026-09-27-rv209-type-scale-floor.md)**
+  — RV-209 steps 1–2. `--text-2xs: 11px` is the floor of the type scale (42 sizes, 1,035 uses under
+  12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
+  named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
+  than a sweep.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
