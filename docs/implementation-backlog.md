@@ -5694,7 +5694,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [activity][platform] DV-19 — one treadmill walk is three rows on the device, and the list shows it twice
 
-- **Lane:** A — the activity write/sync path; B for the list if the rows are legitimate.
+- **Lane:** A — the activity write/sync path (② shipped); B for ③, the summary saving on every mount.
 - **Added:** 2026-09-26 · Device Verification, sweep 4a (seen while checking BF-107).
 - **Measured (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** The 2026-09-24 treadmill walk (~09:18–09:59) is **three** `activity_logs` rows in
   the local store, all `synced`, none deleted:
@@ -5703,8 +5703,22 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - `4b5c23e0` `09:18`–`09:58` (no seconds), calories NULL (updated 23:19:12.887Z).
   Health → Training → *Activities this week* shows **two** "Treadmill interval walk · 24 Sept · 40 min ·
   133 kcal" rows.
-- **Not established:** what the server holds (my read of `/api/activity-logs?date=` returned an empty list,
-  and its parameters are unverified), and which write created the 09:18 pair 0.4 s apart.
+- **~~Not established~~ — traced 2026-09-28 (Lane A), production read-only.** The server holds **two**
+  rows. `b8083d04` was created **09:18:27, at the walk's start**, with the plan's 40 minutes. `d0231b08`
+  was created 09:59:28, at its end. Three causes, two of them already fixed:
+  ① **The 09:18 row is a walk ended within seconds and saved at the PLAN's duration.** That is
+  BF-190 and BF-191 (#1570), which shipped on 09-25, the day after this walk. It is not reproducible on current code.
+  ② **The third device row is an orphan, fixed 2026-09-28.** The device saved `4b5c23e0` at 09:18.
+  The push merged it into `b8083d04` on the server's `(user, date, start_time)` key and kept the
+  server's id, so `4b5c23e0` was confirmed `synced` and never came back. `applyDelta` now retires a
+  synced row at the same minute as an applied server row. **The same merge also landed a new activity
+  on a TOMBSTONE and left it deleted**, which is fixed with it: a different id now revives the row.
+  ③ **Two saves 45 s apart for one walk** (09:18:27 server, 09:19:12 device). The summary saves on
+  every mount (`savedRef` is per mount), so a remount writes a second row under a new id. **Lane B,
+  not traced further.** Check whether `WalkSummary` can still remount after LB-141 (#1812).
+- **What the owner's data still holds:** `b8083d04` is a genuine server row for a walk that did not
+  happen as recorded. Delete it from the list. `4b5c23e0` stays on this phone until `b8083d04`
+  changes, because the retire runs when the server row is applied. Deleting `b8083d04` does that.
 - **Pass test (device):** one walk produces one row, and the list shows it once.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it

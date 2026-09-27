@@ -31,6 +31,18 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [activity][platform] ⚠️ The phone now retires an activity row the server merged away, and only the phone runs that code (DV-19, 2026-09-28)
+
+A push that lands on an activity already on the server at the same `(date, start_time)` merges into
+that row and keeps its id, so the phone's own row was confirmed and never came back, and the
+activity listed twice. `applyDelta` now deletes a `synced` row at the same second as an applied
+server row. The server half also changed: a new activity landing on a deleted one at the same
+minute is revived instead of staying deleted. Tested against real in-memory SQLite and the local
+Postgres, but `getLocalStore` is null on the web, so **the device path has not run anywhere.**
+**Pass test on the S25:** save an activity offline at the same minute as one the server already
+has, sync, and the list shows one row. The owner's `b8083d04` (24 Sept, 09:18, 40 min, no HR) is a
+bogus pre-BF-190 row. Deleting it also clears the phone's orphan `4b5c23e0`.
+
 ### [workouts][platform] ⚠️ A deleted program now leaves the phone's mirror, and only the phone runs that code (RV-174, 2026-09-28)
 
 Deleting a program or progression style used to leave it in the device's local mirror forever: both
