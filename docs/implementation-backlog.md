@@ -4016,7 +4016,7 @@ which is the right shape for something that can only be validated by living with
 - **Done when:** the ten contributor rows are evenly spaced, or the gap is explained and kept.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
-- **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#PR). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
+- **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
   the reconciliation half goes to A"* — they do, and it does.
 - **Added:** 2026-09-26 · Review sweep 64 (`p23-nutrition-warm-01/02`, `t2-day-01`, `home-nutri` crop).
