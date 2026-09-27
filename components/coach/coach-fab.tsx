@@ -15,21 +15,21 @@ import { SparklesIcon } from "lucide-react";
  * `pb-fab-safe` — `pb-nav-safe` reserves the nav and nothing else, and this sits 56 px above that
  * (BF-206).
  *
- * **It is extended rather than iconic, and that is the fix rather than a style choice.** The owner
- * asked what *"that button on the widget, the white circle"* was. A sparkle is this app's generic
- * AI mark — it is also on the weekly-recap banner, the meal-source row and the profile tab — so it
- * names a category, not a destination. A one-time tooltip was the alternative and it only teaches
- * the person who does not dismiss it.
+ * **It is iconic on purpose — do not add a label without asking first.** #1730 shipped an extended
+ * "Coach" pill on the reading that the owner had asked what this button was. He had not: he was
+ * pointing at the moon in the collection pen's backdrop (`BF-208`), and `BF-206` struck the label
+ * finding as an unrequested restyle of a working control. It is reverted here rather than left,
+ * because a visual change to the screen he opens first is his call and he never made it. The case
+ * for a label is real and is filed as `LB-164` for him to take or leave.
  */
 export function CoachFab() {
   return (
     <Link
       href="/coach"
       aria-label="Open AI Coach"
-      className="fixed bottom-fab-safe right-6 z-50 flex h-14 items-center gap-2 rounded-full bg-foreground pl-4 pr-5 text-background shadow-xl transition active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100"
+      className="fixed bottom-fab-safe right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-xl transition active:scale-95"
     >
-      <SparklesIcon className="h-6 w-6 flex-none" />
-      <span className="text-sm font-semibold">Coach</span>
+      <SparklesIcon className="h-6 w-6" />
     </Link>
   );
 }

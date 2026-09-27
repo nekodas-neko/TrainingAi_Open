@@ -138,8 +138,14 @@ export const CollectionPen = memo(function CollectionPen({ collections, scene = 
           </div>
         )
       })}
+      {/* A caption, not a chip (BF-208). It was `rounded-full bg-background/70 px-1.5` — a pill, in
+          the top-right corner, 30 px from a bright disc that also reads as a control. It is a
+          `<span>` inside an `aria-hidden` subtree and does nothing; the whole card is the link to
+          `/collection`, so making it a real button would put a second tap target for the same
+          destination inside the first. The text shadow replaces the plate the background gave it,
+          since the scene behind it is anything from a night sky to a kitchen wall. */}
       {total > shown.length && (
-        <span className="absolute right-2 top-1.5 rounded-full bg-background/70 px-1.5 text-[10px] font-semibold text-muted-foreground">+{total - shown.length} more</span>
+        <span className="absolute right-2.5 top-2 text-[10px] font-semibold text-white/75 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]">+{total - shown.length} more</span>
       )}
     </div>
   )

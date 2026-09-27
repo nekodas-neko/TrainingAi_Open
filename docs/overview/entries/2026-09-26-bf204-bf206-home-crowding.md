@@ -42,7 +42,7 @@ because the failure arrives by omission — the next screen to mount a FAB will 
 `pb-nav-safe` like every other screen, and nothing will look wrong until something lands under the
 button.
 
-The second half was the owner asking what *"that button on the widget, the white circle"* was. A
+The second half was filed as the owner asking what *"that button on the widget, the white circle"* was. **⚠ That reading was wrong — see the correction at the foot of this entry.** A
 sparkle is this app's generic AI mark — the weekly-recap banner, the meal-source row and the
 profile tab all use it — so it names a category, not a destination, and an `aria-label` is not an
 answer to someone looking at it. It is an extended FAB now: the icon with a **Coach** label beside
@@ -64,3 +64,24 @@ instant is weaker evidence than a look. The sandbox render is the before/after, 
 `pnpm test` · `pnpm build` · `tsc --noEmit` · `check-test-typecheck` none above baseline. Six new
 unit tests on the pen's selection and sizing, four on the FAB. Control run: reverting Home to
 `pb-nav-safe` fails the clearance scan. Both surfaces rendered at 412 px dark and looked at.
+
+## ⚠ Correction, same day — the second half was filed against the wrong button
+
+The owner was not pointing at the Coach FAB. *"No not the ai coach white button; its the one on
+the collection widget."* He meant the **moon in the collection pen's backdrop** — a 28 px
+near-white disc at full opacity in the upper-right corner of a night sky, which is `BF-208`.
+
+Of the two halves shipped here:
+
+- **① the clearance stands.** It was measured from the CSS — `pb-nav-safe` reserves the nav, and
+  the FAB is a further `h-14` above it — not inferred from his words, so it is true whatever he
+  meant.
+- **② the extended label does not, and is reverted** in `BF-208`'s PR. `BF-206` struck the finding
+  as an unrequested restyle of a working control, and that is right: it existed only because the
+  misread made it look like his complaint. Keeping it because it had already merged would be the
+  thing CLAUDE.md's mockup rule exists to prevent. The case for a label is real and is now
+  `LB-164`, an owner preference rather than a defect.
+
+The lesson is narrower than "check the report". The trace *was* plausible; what went wrong is that
+this entry presented it as established, in the same list as a finding measured from the CSS. A
+reading of what somebody meant is a hypothesis and needed to be labelled as one.
