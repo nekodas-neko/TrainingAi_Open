@@ -3374,7 +3374,7 @@ which is the right shape for something that can only be validated by living with
      - **Replace:** a template that names the heaviest-weighted signal.
      - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
   3. **✅ SHIPPED 2026-09-26 — running-plan explain is gone**
-     ([entry](overview/entries/2026-09-26-rv200-running-plan-explain.md)). Claim confirmed exactly:
+     ([entry](overview/history-2026-09-27-folded-3.md#2026-09-26-rv200-running-plan-explain)). Claim confirmed exactly:
      the card rendered the deterministic `rationale` immediately and only swapped in the model's
      sentence when it landed, so the call reworded text already on screen. Route, fetch, cache key
      and TTL deleted.
