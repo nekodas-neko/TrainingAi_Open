@@ -3540,6 +3540,11 @@ which is the right shape for something that can only be validated by living with
   independent comparator.
 - **Lane: A** — the producer is the BLE rollup (`lib/oura-ble/rollup/run.ts`), engine territory, and the
   decisive test below is a re-run rather than a calibration.
+- **Gate: owner** — the one step left is a wide rollup pass over history, which is a **production
+  write**. Everything readable has been read (see the three ⚙ blocks below); the evidence it would
+  overwrite is now captured, so the ask is narrow: may the rollup be re-run across
+  2026-07-24 → 2026-08-29 to fill `night_hrv_baseline_ms` and re-derive those days? A yes answers
+  TN-70's decisive question; a no leaves it permanently unanswerable from stored data.
 - **Measured 2026-09-24 over 129 derived days.**
 
   | regime | days | levels seen | mean `resilience_confidence` |
@@ -3665,6 +3670,24 @@ which is the right shape for something that can only be validated by living with
     - **This does not explain the level-5 regime** and is not offered as doing so. It is a separate,
       later fault on the same metric.
     - **The actionable half is filed as LA-158** — nothing anywhere says the metric has stopped.
+
+  - **⚙ THE PRESCRIBED PASS WOULD DESTROY THIS ENTRY'S OWN EVIDENCE — measured 2026-09-27 (Lane A).
+    Do not run it before reading [`docs/reviews/2026-09-27-tn70-resilience-snapshot.md`](reviews/2026-09-27-tn70-resilience-snapshot.md).**
+    - `upsertDailyDerived` resolves every column as `COALESCE(excluded.<col>, oura_daily_derived.<col>)`
+      (`lib/data/postgres/slices/oura.ts`), so a recompute wins wherever it is non-null. The wide pass
+      fills `night_hrv_baseline_ms` — the point of it — **and in the same statement overwrites
+      `resilience_level`, `resilience_granular` and the three daily indices on every day it
+      publishes one.** The decisive question *"do those 16 July days still come back as 5?"* can
+      therefore be asked exactly once, and only if the before-values were recorded first.
+    - **They now are.** The entire evidentiary base is **30 rows** — of 132 derived days spanning
+      2026-05-07 → 09-27, exactly 30 carry a level (16 July + 14 September). All 30 are captured
+      per-day in the snapshot doc, so the pass is safe to run as far as the comparison goes.
+    - **It is still a production write, so it remains the owner's call** — that is the only blocker
+      left on it, and it is no longer an evidence-destroying one.
+    - **Two of this entry's readings are corrected there.** `confidence` spans the *identical* four
+      values in both regimes (`{5,6,7,8}/14`), so it separates nothing — the 0.464-vs-0.434 means
+      overstate it. And the `resilience_daily_sleep_recovery` finding rests on **5 days against 6**,
+      not 16 against 14: the three daily indices are NULL on the other 19 rows.
 
 ### [readiness][devices] LA-158 — resilience stopped publishing five days ago and nothing says so
 - **Lane: A** for the surfacing; the input collapse behind it may be `DV`.
