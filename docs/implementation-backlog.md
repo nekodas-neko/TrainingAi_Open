@@ -4125,19 +4125,6 @@ which is the right shape for something that can only be validated by living with
 - **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
 
-### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
-- **The labels and chevrons are FIXED** (RV-217, 2026-09-27): `hrv`, `hr` and `schedule` now carry
-  labels and contributor-guide entries, as does readiness's `checkin`, and a test derives the key
-  set from the model so a new component cannot arrive unlabelled.
-- **What is left is the third item of RV-217, which is a layout question:** the sweep saw larger
-  vertical gaps before Timing and Efficiency, "which look like empty rows". That was never
-  diagnosed — it is not the label fall-through, because those two rows always had labels.
-- **Why it needs the device:** the observation is from a screenshot (`t2-sleep-01`), and the two
-  candidate causes look identical in source — a row rendering with an empty value slot, or a
-  container's `gap`/margin applying unevenly. Reproduce at the 384 px dark viewport first.
-- **Done when:** the ten contributor rows are evenly spaced, or the gap is explained and kept.
-
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
