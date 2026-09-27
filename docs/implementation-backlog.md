@@ -3300,6 +3300,31 @@ which is the right shape for something that can only be validated by living with
 - **Brand in food names:** "Uncle Tobys — Rolled oats" (Log Food) against "Rolled oats / Uncle Tobys · …" (diary). Pick one.
 
 ### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
+
+- **✅ STEPS 1 AND 2 SHIPPED (#1748, 2026-09-27); step 3 is a RATCHET rather than a sweep.**
+  `--text-2xs: 11px` (with its line height) is in `@theme`, and the **nine sites the entry names**
+  are on it. Every one of the nine was verified against `main` first and every line number was
+  right — worth saying, because several entries this week were not.
+- **11 px, not 12.** That is where the existing mass sits (287 uses at 11 against 583 at 10), and
+  it is reachable without re-laying out cards that a 12 px floor would. The four `set-card` sites
+  were already at 11 and change nothing visually; what they gain is a place ON the scale, so the
+  next edit cannot reach for `text-[10.5px]`. The five at 9–10 px move up.
+- **Step 3 is frozen, not swept.** `components/workout/**` holds **103 sub-11 px literals across
+  24 files** and 41 more written as `text-[11px]`. A hundred blind edits is a worse risk than a
+  ratchet: `components/workout/__tests__/rv209-type-floor.test.ts` baselines both counts **per
+  file, shrink-only**, so every future touch pays a little of it down and nothing new lands below
+  the floor. To lower a number, convert that file and re-run. Control-run: putting a `text-[9px]`
+  back in `set-card` fails it.
+- **The other two halves of the entry are untouched and stay true.** Uppercase eyebrows may sit at
+  10–11 px — `workout-clocks:202` and `active-workout-screen:306` are eyebrows and went to 11, not
+  12, for that reason. Chart axis text is P36's and is inside the baseline rather than exempted,
+  because "is this string an axis label" is not something a scan can answer.
+- **Keep:** ① the device look. Rendered at 412 px dark on the active workout screen — set cards,
+  the percentage label and the RPE strip all sit clean, nothing overflows. **Two of the nine were
+  NOT on screen in that state** (`active-workout-screen:283/306`, the last-session panel), so they
+  are read from source only. ② the **26 small sites at 40–70 % opacity** that the entry notes: a
+  size floor does not fix a contrast one, and that is a separate decision.
+
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63 (static audit).
 - **What:** there are 13 named sizes plus 29 arbitrary ones (`text-[10.5px]`, `[11.5px]`, `[12.5px]`, `[13.5px]`, `[14.5px]`…), from 7 px to 34 px.

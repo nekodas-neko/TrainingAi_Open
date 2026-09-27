@@ -2658,6 +2658,9 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The workout screens' smallest text moved up; nobody has read it mid-set (RV-209, 2026-09-27)
+
+`--text-2xs: 11px` is the floor of the type scale, and the nine sites the audit named on the workout screens are on it — five of them moved up from 9–10 px. The other **103 sub-11 px literals across 24 workout files are frozen, not fixed**: a per-file shrink-only ratchet, so every future touch pays some down. Rendered at 412 px dark and nothing overflows, but **two of the nine were not on screen in that state** (the last-session panel) and none of it has been read at arm's length on the S25, which is the whole point of the change. **Pass test:** on the S25 mid-set, the set card and clock captions are readable without leaning in, and nothing has reflowed. Untouched: the 26 small sites that also sit at 40–70% opacity.
 ### [app-shell] ⚠️ Durations and counts read the same everywhere now; two daily screens changed what they print and neither has been seen (RV-208, 2026-09-27)
 
 Seven hand-rolled duration formatters went through `formatHoursMinutes`/`formatMinutes`, and one of them was a **defect**: the day timeline floored to the hour and dropped the remainder, so a 45-minute nap read `0h`. Thousands separators added at the three sites the device sweep confirmed. **An exact hour now prints `7h 00m` rather than `7h`** on the day timeline and the sleep sheet — the shared formatter's padded minute, for the `tabular-nums` columns. **Pass test:** on the S25, a sub-hour sleep or nap shows its minutes, and the padded form does not look wrong beside the numbers around it. Still open on RV-208: the time-of-day casing and `formatKg` spacing (both Lane A), the movement-category palette, dates, and brand names.
