@@ -43,9 +43,17 @@ export function movementParts(parts: MovementParts): { label: string; kcal: numb
   ].filter(p => p.kcal > 0)
 }
 
-/** `"320 workouts · 227 steps"` — empty when nothing was earned. */
+/**
+ * `"320 kcal workouts · 227 kcal steps"` — empty when nothing was earned.
+ *
+ * **The unit is not decoration (RV-218).** Without it the line read *"205 workouts · 32 steps"*
+ * under a calorie bar, where both numbers are kcal — so "205 workouts" parsed as a COUNT of
+ * workouts, and "32 steps" as thirty-two steps, which is a different claim about the same day and
+ * a plausible one. Every number in this string is kcal; saying so after each is the only place it
+ * fits, because the labels are what distinguish the addends.
+ */
 export function movementSummary(parts: MovementParts): string {
   return movementParts(parts)
-    .map(p => `${p.kcal.toLocaleString()} ${p.label}`)
+    .map(p => `${p.kcal.toLocaleString()} kcal ${p.label}`)
     .join(' · ')
 }
