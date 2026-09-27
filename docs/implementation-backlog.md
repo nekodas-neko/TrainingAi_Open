@@ -3036,6 +3036,19 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
+  Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
+  and `RV-213` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>. The after reads
+  *"You rated last night's sleep **Good** this morning."* under the readiness card.
+- **Gate: owner** — the mockup has been shown; the code waits on his yes to that picture.
+- **Ask** — owner: does he want his morning sleep-feel back on Home, in the wording the mockup
+  shows? `Ask:` rather than position, because `Gate: owner` alone would sink this into PARKED
+  beside 35 device gates and nobody would see that an answer is the deliverable.
+- **The WORDING is part of what he is being asked to approve**, not an implementation detail. Naming
+  whose judgement it is — *"you rated"* — is precisely what the dead `sleep_quality` line got wrong,
+  so if he takes this, keep the phrasing. The `useCachedValue`/TTL/write-group cost is stated on the
+  page too, because it is the one part of this that a picture cannot show.
+
 - **✅ ANSWERED 2026-09-27 — yes, put his morning sleep-feel back on Home, but SHOW HIM A MOCKUP FIRST.**
   He picked the mockup-gated variant over building it straight. So the next act is to produce a
   before/after at **384 px dark** and put it to him; the code waits on his yes to that picture.
@@ -3622,12 +3635,25 @@ which is the right shape for something that can only be validated by living with
   bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
-- **Lane: O** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added, and the lane moved `O` → `B`**: the remaining
+  work after his answer is `app/session-select/components/metric-tiles-card.tsx`, which the path rule
+  puts in Lane B. Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting
+  with `LA-136` and `RV-213`: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
+- **Gate: owner** — the mockup has been shown; the layout answer is the only outstanding thing.
+- **Two corrections to the figures below, measured at 384 px while capturing the after.** The tiles
+  occupy about **62%** of the row, not 58% — that reading was taken at 412 px. And the trade is not
+  "each tile is narrower": on a three-column grid the tiles come out **wider**. The real cost is that
+  moving `Log` out of the overlay and into the flow as a genuine 44 px target roughly **doubles the
+  row's height**, pushing everything below it down. That is what the page asks him to weigh.
+
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.
 - **Deliberately NOT `Gate: owner`.** The mockup does not exist yet, so the next act is to PRODUCE
   one and put it to him — that is work, and work is ungated `Lane: O`. A gate here would park the
   entry and nobody would be tasked with asking. `Gate: owner` belongs on it once a mockup has been
   shown and the answer is what is outstanding.
-- **Ask: owner — a mockup before this is built.** RV-207 ⑥ asks to move the "Log" label beside or
+- **Ask: owner — three columns with `Log` below the value, accepting a roughly doubled row height?**
+  The mockup exists now (see the top of this entry); what is outstanding is his answer to it.
+  RV-207 ⑥ asks to move the "Log" label beside or
   below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
   of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
   is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
@@ -4047,6 +4073,21 @@ which is the right shape for something that can only be validated by living with
    - **The definition is the owner's call. The copy is not.**
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
+  Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
+  and `LA-136` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
+- **Gate: owner** — the mockup has been shown; the collapse is his pick, as the entry says.
+- **Ask** — owner: collapse an empty meal to one row with its name and a single `+`, accepting
+  that the `+` must grow to 48 px as part of it? `Ask:` for the same reason as `LA-136`.
+- **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
+  Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
+  goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
+- **⚠ One thing the recommendation below misses, and it is a rule violation rather than a taste
+  call.** Once the "Add food" card goes, the header `+` is the ONLY way into an empty meal — and it
+  is `h-9 w-9`, a **36 px** target, under the 48 px floor the rest of the app holds to. Enlarging it
+  is part of this change, not a follow-up, so the page presents it that way rather than offering the
+  collapse alone and leaving him to approve a regression.
+
 - **Lane: B**
 - **UNGATED 2026-09-27 — the mockup does not exist yet, so the next act is to PRODUCE one, and that
   is work. `Gate: owner` PARKED this entry, which meant nobody was tasked with drawing the picture
@@ -4167,6 +4208,26 @@ which is the right shape for something that can only be validated by living with
   is what applies, which is why this is not urgent for him.
 - **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
   deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
+
+### [nutrition][app-shell] LB-169 — the empty meal's header `+` is a 36 px tap target, under the 48 px floor
+- **Lane: B** · **Added:** 2026-09-27 · Lane B, split out of `RV-213` while rendering its mockup.
+- **Deliberately NOT part of `RV-213`, and that is the point of splitting it.** `RV-213` is a layout
+  preference gated on the owner; this is a defect with one right answer. Left inside that entry the
+  tap floor would sit blocked behind a question about whether to collapse the cards, which is a
+  different decision entirely.
+- **What, measured rather than read.** `components/nutrition/meal-card.tsx` gives the header's add
+  button `h-9 w-9` — **36 px** — where CLAUDE.md's mobile rules and every other icon button on the
+  screen hold to **48**. Found at the 384 px dark viewport on 2026-09-27 while capturing `RV-213`'s
+  before/after in the Playwright harness.
+- **It is already live and already the harder target of the two.** Today an empty meal offers both
+  the header `+` and a full "Add food" card, so the undersized control has a large sibling and the
+  defect is easy to miss. It is a real miss regardless: a 36 px target on the S25 is the one a thumb
+  fails on, and he reaches for whichever is nearer rather than whichever is bigger.
+- **⚠ And it becomes the ONLY way in if `RV-213` is taken** — that entry removes the "Add food"
+  card. So shipping `RV-213` without this is shipping a regression, which is why the mockup put the
+  two together in front of him rather than offering the collapse alone. Fixing it here means
+  `RV-213` needs no such caveat whichever way he answers.
+- **Scope:** the one button's classes. No layout decision, nothing gated.
 
 ### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
 - **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
@@ -5130,6 +5191,10 @@ volume7dKg,                             // likewise
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
 
 ### [workouts] TN-74 — the zero `estimated_1rm` is mostly BY DESIGN, and the rest is Q-298's already-fixed bug
+- **✅ ANSWERED by `RV-170` 2026-09-24 — and the answer is DO NOT REWRITE.** The zero one-rep-max
+  rows are a **hand-edit**, limb (b): **NO**, per the `BF-81` precedent. **Mark them visibly
+  known-bad instead.** `RV-170` also corrects the count — **15, not 10**; the 08-09 and 08-16 Pull
+  clusters sat on deload sessions. The "the OWNER'S call" sentence below is stale.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. **⚠ Re-measured by Lane A the same day
   against production and the code; the original framing does not survive, and the corrected version
@@ -6269,6 +6334,47 @@ drift.
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
+- **✅ FIRST PASS RUN 2026-09-27 (Orchestrator). The 70 was an upper bound and the real number is
+  smaller — but the sweep found three defect CLASSES the count did not predict.**
+  **Measured with `parseEntries`, not a grep over the file:** **422** Lane A/B entries carry no
+  `Ask:`; **54** of those contain owner-decision language; **13** of the 54 already carry
+  `Gate: owner`. Read individually, they fall into four groups.
+- **① Prose about a decision already MADE — no action, and the phrasing is the trap.** `TN-64`,
+  `OR-138`, `PS-17`, `Q-407`, `BF-81` all say *"the owner's call"* about a call he has since made
+  and that the entry records. A keyword scan cannot tell these from a live question, which is why
+  the 70 was never a finding.
+- **② STALE — the answer exists and the entry does not know it. Corrected this pass.**
+  **`RV-165`** said the scale re-derivation at 158 cm was his call; `RV-170` authorised it on
+  2026-09-24 as a limb-(a) recompute. **`Q-298`** said repairing the zero one-rep-max rows was his
+  call; `RV-170` answered it as a limb-(b) hand-edit — **do not rewrite, mark known-bad** — and
+  corrected the count to **15, not 10**. Both entries now carry the answer.
+- **③ ROUTED BY A SENTENCE, NOT A FIELD — the class worth keeping.** **`Q-422` had no `Lane:` field
+  at all**, and `parseEntries` was reading `A` out of the prose *"Tuning proposes and the owner
+  signs off; Lane A implements"*. A routing decision was being made by a phrase nobody wrote as a
+  field. `RV-38` had a real field AND the same prose, and the checker caught the duplicate when one
+  was added — its `Lane: B` half had already shipped. **Five entries were re-laned to `T`**
+  (`Q-422`, `RV-38`, `Q-306`, `Q-420`, `LA-121`): each is a scoring change, and `Lane: T` is the
+  field that says a Tuning proposal is owed before anyone builds it.
+  **`TN-22` is the same class inverted** — it states it *"carries `Gate: owner` … so it parks
+  honestly"* and carries no `Gate:` field, so it claims to park and is READY. Flagged on the entry,
+  deliberately not "fixed", because adding the gate would hide it rather than resolve it.
+- **④ GENUINELY LIVE AND STILL BURIED — the output of this sweep, and what the next owner round
+  draws from.** Each needs splitting into its own `Lane: O` entry or answering in a batch:
+  hiding the readiness score until the check-in is saved (`TN-67`, `TN-50` — a product change);
+  whether a guided or treadmill walk counts as doing a prescribed run (`RV-166`, an unanswered
+  `RV-170` rider); making the E2E job a required check (`LB-149`, `Q-297` — branch protection, a
+  shared system); the destructive-migration group needing one yes (`BF-144`, `LA-71`, `LB-42`);
+  the `event_name` drop (`Q-540`, data-dropping); a second Railway service (`Q-251` — money);
+  the collection tier mapping (`PS-51`); the wallpaper tint default (`BF-145`, `BF-139`, `BF-96`);
+  removing an HTTP surface (`LA-89`); the scanner choice (`LB-38`); the 84-day re-derive
+  (`TN-72`, `TN-74`); and one plain factual question — was *Start Again* pressed before the back
+  press (`BF-168`).
+- **⚠ `LB-13` says something FALSE and it should not be acted on:** *"Correcting the rule needs the
+  owner (CLAUDE.md is not an implementer's to edit)."* The Orchestrator owns the docs and edits
+  `CLAUDE.md` routinely; the owner's carve-out is data, money, auth and scoring, not documentation.
+- **Still owed on this entry:** group ④ is a list, not yet entries. Splitting each into its own
+  `Lane: O` is the second pass. `LA-122` already tracks six of Lane A's and should be reconciled
+  rather than duplicated.
 - **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
 - **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
 - **Needs:** — nothing.
@@ -7197,6 +7303,10 @@ drift.
 - **Reversal cost:** delete the field and one print block.
 
 ### [body][nutrition] RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old height
+- **✅ NO LONGER THE OWNER'S CALL — `RV-170` answered it 2026-09-24 and this entry was not updated.**
+  Re-deriving scale composition at 158 cm is a **recompute from stored inputs**, limb (a) of the
+  history-row policy: **YES, authorised.** `RV-170` names this entry in its (a) list. Nothing is
+  owed from him; what remains is running it. The "the owner's call" sentence below is stale.
 
 - **Branch:** `lane-a/rv165-height-calibration` · **Added:** 2026-09-24 · Review sweep 57.
   **Live half shipped 2026-09-24 (Lane A); the history edit is NOT done and is not this entry's.**
@@ -9710,9 +9820,13 @@ window, and `rmssdFromRr` over it is comparable to the ring's figure for the sam
 
 
 ### [readiness][devices] LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder
+- **↻ RE-LANED TO `T` 2026-09-27 by the `BF-202` sweep** — whether the temperature ladder is ported or superseded by `tempZ` is a scoring decision, as its own step (1) says. `Lane: T` (OR-178) means a
+  scoring change owing a **Tuning proposal before anyone may build it**; Tuning re-lanes it to its
+  implementation lane once the proposal lands. A proposal is incomplete until it states **how many
+  other days the change moves**.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (found while shipping BF-178) · **MEASURED 2026-09-20**, which changed the entry.
-- **Lane: A** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
+- **Lane: T** — `lib/health/readiness-payload.ts:581, 610, 614, 628, 751`.
 - **✅ OWNER DECIDED 2026-09-22 — DO NOT port the temperature ladder. Let `tempZ` stand.** The gate
   that stood here from 2026-09-20 is lifted and this is startable. Temperature already reaches
   readiness through `computeReadinessComposite`, so nothing is missing; the reason for the answer is
@@ -13622,6 +13736,12 @@ window does not match anything, which is an equally valid result and the one tha
 metric.
 
 ### [readiness] TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
+- **⚠ FIELD DEFECT, found by the `BF-202` sweep 2026-09-27.** This entry says it *"carries `Gate:
+  owner` rather than a prose marker so it parks honestly"* — and carries **no `Gate:` field at
+  all**; `parseEntries` reports `gates=[]`. The sentence was copied from `TN-33`, which does have
+  one. So it claims to park and is READY in Lane A — the exact inversion the sentence was written
+  to prevent. **Left ungated deliberately**: if the decision here is still live it belongs in
+  `Lane: O` as work, not behind a gate that hides it. Establish which before "fixing" this.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · owner: *"give me the update on our stress reading/calculation… how can we test it works?"*
 - **Lane: A** for the level-2 test harness; the level-3 blocker is an owner action, not code.
@@ -16175,6 +16295,13 @@ job and this closes as understood. Either way the rejection stays — a sample a
 clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
 
 ### [readiness][app-shell] RV-38 — Body Battery printed 50 and called it "Good" for an empty account (treatment fixed; the NUMBER is Tuning's)
+- **Lane: T** — re-laned 2026-09-27 by the `BF-202` sweep. **Its `Lane: B` half has SHIPPED** (the
+  no-data treatment in `components/body-battery-card.tsx`), and what is left is the Body Battery
+  re-fit, which is a scoring change. `Lane: T` (OR-178) means it owes a **Tuning proposal before
+  anyone may build it**; Tuning re-lanes it once the proposal lands, and a proposal is incomplete
+  until it states **how many other days the change moves** — a re-fit silently re-scores history.
+  The old `Lane:` bullet below is demoted to prose so this field is the only one; it is kept
+  because it records which half shipped.
 
 - **📱 Sweep 2: COULD NOT CHECK** — the request is fetched by the service worker, which
   `page.route` cannot intercept. Next attempt: CDP `Network.setBlockedURLs`, which did reach an SW
@@ -16185,7 +16312,7 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   Tuning proposes, the owner signs off, Lane A implements — and a proposal must state how many other
   days it moves, because a Body Battery re-fit silently re-scores months of history. **Nothing below
   touches the number.**
-- **Lane:** B for the no-data *treatment*, `components/body-battery-card.tsx` only. Shipped
+- **Shipped half (was the `Lane: B` field until 2026-09-27):** the no-data *treatment*, `components/body-battery-card.tsx` only. Shipped
   2026-09-15; the route needed no change and got none.
 - **Added:** 2026-09-03, Review sweep 42 —
   [`write-up §2`](reviews/2026-09-03-first-run-honesty-and-instant-paint.md)
@@ -22955,6 +23082,10 @@ lived context.
   past four hours, restarting the app, and logging an exercise.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
+- **↻ RE-LANED TO `T` 2026-09-27 by the `BF-202` sweep** — picking thresholds for a derived intensity value is a calibration, not an implementation. `Lane: T` (OR-178) means a
+  scoring change owing a **Tuning proposal before anyone may build it**; Tuning re-lanes it to its
+  implementation lane once the proposal lands. A proposal is incomplete until it states **how many
+  other days the change moves**.
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
 > evaporated, and the real case is a different one. Read this before starting.**
@@ -22988,7 +23119,7 @@ lived context.
 > place and losing the ability to tell them apart.
 
 
-- **Lane:** B — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
+- **Lane:** T — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
   `sessionEffort()` derives from set RPEs with no stored column, and `app/api/health-trends`'s
   `session-rpe` view already reads it (`effort.source: 'self' | 'derived'`), labelled in the series
   and the insight line. Owner decision items 2–4 below are done. **What remains is item 1 only** —
@@ -23190,6 +23321,14 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 - **Keep:** the derived-scale thresholds and the plausibility check against the 20 paired sessions.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
+- **Lane: T** — set as a FIELD 2026-09-27 by the `BF-202` sweep, because this entry had **none**.
+  Its lane was being inferred from the prose *Tuning proposes and the owner signs off; Lane A implements*: the loose match reads `Lane A` out of a
+  sentence, so a routing decision was being made by a phrase nobody wrote as a field. That prose is
+  the `T` contract written out before the field existed (OR-178) — a scoring change owes a **Tuning
+  proposal before anyone may build it**, and Tuning re-lanes it to its implementation lane once the
+  proposal lands. A proposal is incomplete until it states **how many other days the change moves**.
+  **This bullet sits directly under the heading on purpose** — the field is first-match-wins, so it
+  must precede the sentence it is correcting.
 
 - ⚠ **That owner gate is held as of 2026-08-30, and Q-420 is not yet clear.** The owner signed off the
   tuning batch, and this entry is a legitimate scoring sign-off in principle — but Q-420 sets the
@@ -25201,8 +25340,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **15 zero one-rep-max rows before the fix, not 10** (UTC 08-06 ×5, 08-09 ×5, 08-16 ×5). The 08-09 and 08-16 Pull clusters sit on sessions with `phase_type='deload'`, so they were deliberate deloads; only the `exercise_deloaded` stamp was missing. The history question is now asked once, in **RV-170**.
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
+- **↻ RE-LANED TO `T` 2026-09-27 by the `BF-202` sweep** — moving these numbers changes who gets a deload or a taper. `Lane: T` (OR-178) means a
+  scoring change owing a **Tuning proposal before anyone may build it**; Tuning re-lanes it to its
+  implementation lane once the proposal lands. A proposal is incomplete until it states **how many
+  other days the change moves**.
 
-- **Lane:** A
+- **Lane:** T
 - **Needs:** Q-289
 - **Branch:** `fix/deload-trigger-thresholds`
 - **Plan:** none yet
