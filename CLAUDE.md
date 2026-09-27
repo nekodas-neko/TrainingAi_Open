@@ -19,7 +19,7 @@
     -H "Authorization: Bearer $CLAUDE_DB_QUERY_SECRET" -H 'Content-Type: application/json' \
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
-  Anything new gets a `projectOverview.md` Known-Issues row or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
+  Anything new gets a Known-Issues row in [`docs/overview/known-issues.md`](docs/overview/known-issues.md) or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
 - **BugFix reads the in-app reports at session start; the Orchestrator does too, as a backstop** — *Report an Issue* on
   `/more` writes to `feedback_submissions`, and the read is one query on the same endpoint:
   ```
@@ -643,7 +643,7 @@ kept here because they're cheap to state and expensive to relearn:
 - **Sibling-surface sweep**: when fixing or adding a pattern on one surface (a write path, a fetch+sync pairing, a display format, a scale/dial config), grep for every other surface handling the same domain and update them in the same PR — the UI analogue of the sync-push mirroring rule above. A fix applied to one surface and not its siblings is only half done.
 - **No global element-selector styling**: tap-target floors, focus rings, and similar UI defaults belong in the shared component (`components/ui/button.tsx` variants), never in a bare `button`/`a` selector in `globals.css`. Any unavoidable global rule needs its opt-outs applied in the same PR, not left for a later audit.
 - **Report-invalidation**: never dismiss a user-reported visual bug as "stale build" or "can't reproduce" without reproducing at the S25 viewport (≤640px) against freshly-pulled `main` — the mirror of "never mark an issue fixed from intent" above.
-- **No orphaned findings**: any bug or gap written into a plan, review, or journal doc gets a backlog entry or a `projectOverview.md` Known-Issues row **in the same PR**. A documented finding without a queue entry is a dropped finding.
+- **No orphaned findings**: any bug or gap written into a plan, review, or journal doc gets a backlog entry or a `docs/overview/known-issues.md` Known-Issues row **in the same PR**. A documented finding without a queue entry is a dropped finding.
 - **Mutation-callback contract**: completion callbacks must carry the written entity (`onLogged(log)`), not fire as a parameterless "please refetch" after a local write — the latter is the pattern behind several of this project's stale-repaint bugs.
 
 ---
@@ -710,7 +710,7 @@ locally.
 **Green `pnpm dev` is necessary, never sufficient.** For any change touching an offline-first
 domain, a native plugin, safe-area, gestures, or notifications, the merge gate is the on-device
 smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
-explicit Known-Issues row in `projectOverview.md` marking the change NOT verified on device.
+explicit Known-Issues row in `docs/overview/known-issues.md` marking the change NOT verified on device.
 
 ## Migrations that add a table or column — the `claude_ro` twin, and the two tests that catch it
 
