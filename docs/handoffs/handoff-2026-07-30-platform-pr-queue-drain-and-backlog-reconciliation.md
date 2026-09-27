@@ -88,9 +88,9 @@ touched up four domain READMEs (`workouts`, `devices`, `sleep`, `platform`).
 - `docs/implementation-backlog.md` — the queue, just reconciled; read its top-of-file notice
   before trusting anything below it, and re-verify open PRs with `list_pull_requests` since it
   drifts fast across parallel sessions.
-- `docs/overview/entries/2026-07-30-pr-queue-drain-and-backlog-reconciliation.md` — full per-PR
+- `docs/overview/history-2026-07-28.md#2026-07-30-pr-queue-drain-and-backlog-reconciliation` — full per-PR
   detail for this pass.
-- `docs/overview/entries/2026-07-30-ai-dynamic-phase-labels-and-layout-shift.md` — #943's own
+- `docs/overview/history-2026-07-28.md#2026-07-30-ai-dynamic-phase-labels-and-layout-shift` — #943's own
   detail (files/lines touched).
 
 ## Open questions / blockers

@@ -34,7 +34,7 @@ budget.
 | `standardBudgetMin` threaded through `workingBudgetMin` | same file |
 | Call site passes the session's own configured length | `packages/shared/src/ai-periodization/signals.ts:499-503` |
 | Two test blocks: cap binding at a shortened budget (incl. the floor/ceiling meeting point), and inertness at/above standard length | `lib/__tests__/duration-model.test.ts` |
-| Journal entry | `docs/overview/entries/2026-08-05-measured-warmup-scale-with-preset.md` |
+| Journal entry | `docs/overview/history-2026-08-04.md#2026-08-05-measured-warmup-scale-with-preset` |
 | Q-83 entry removed, **Q-85 filed** | `docs/implementation-backlog.md` |
 | v1.266.0 | `package.json`, `packages/shared/src/changelog.ts` |
 

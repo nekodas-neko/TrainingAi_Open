@@ -1142,7 +1142,7 @@ kept consistent with the "Started at"/summary lines' existing wording choices (r
 - **Reported:** owner-reported, 2026-08-05 (screenshot: Home screen, nobody on the scale, a
   "Weighing you…" progress toast visible above the bottom nav). This is the same symptom a prior
   session already investigated and shipped a fix for
-  (`docs/overview/entries/2026-08-01-scale-false-weighing-toast-on-home-focus.md`,
+  (`docs/overview/history-2026-07-30.md#2026-08-01-scale-false-weighing-toast-on-home-focus`,
   `projectOverview.md`'s `[platform][devices]` Q-67-adjacent entry) — the toast is recurring after
   that fix, not a first report.
 
@@ -2467,7 +2467,7 @@ no new logic — the correct refetch function already exists in the same file.
 ### The risk was flagged by the implementer who shipped it, unverified, and it landed
 
 `OuraBatteryChip` was wired into the Home header on 2026-08-08 (Q-111 ring half,
-`docs/overview/entries/2026-08-08-home-ring-battery-chip.md`), placed inside the same flex row as
+`docs/overview/history-2026-08-07.md#2026-08-08-home-ring-battery-chip`), placed inside the same flex row as
 the date text and `WeatherChip`:
 
 ```

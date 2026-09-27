@@ -17533,7 +17533,7 @@ rather than the journal: the entry's two contrast figures were measured against 
 1.65:1 and 2.11:1 rather than 2.04 and 2.60), its prescribed fix cannot be built (there is 1.52:1 of
 total range to hold the two lifted stops and their separation), and two things it asked for are
 declined with reasons rather than silently skipped. Narrative went to
-`docs/overview/entries/2026-09-25-rv101-heatmap-ramp-and-key.md`.
+`docs/overview/history-2026-09-26-folded-1.md#2026-09-25-rv101-heatmap-ramp-and-key`.
 
 A refutation left out of the entry gets rediscovered by whoever picks it up next, which is what the
 extra lines buy.
@@ -17602,7 +17602,7 @@ this branch was in the gate, so the baseline moved under it; the +9 is unchanged
 
 The entry stays open deliberately: `ci.yml` now dumps `dmesg` on an E2E failure, and the cause is
 established by the next red run rather than by this PR. Narrative in
-`docs/overview/entries/2026-09-25-lb149-e2e-browser-death.md`.
+`docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lb149-e2e-browser-death`.
 
 ## 2026-09-25 — `docs/implementation-backlog.md` 31321 → 31326 (+5)
 
@@ -17687,7 +17687,7 @@ PR, and only the removal was missed. It carried no `Keep:` and no `STILL OPEN`, 
 `node scripts/next-item.js --lane A` kept offering finished work as READY at position 23. Its
 content is not lost: the Q-139 history, the 16,144 ds round-trip error, the nine adapter call sites
 and the fixture-that-could-not-fail lesson are all in
-`docs/overview/entries/2026-09-25-la141-clock-inverse.md`, checked line by line before deleting.
+`docs/overview/history-2026-09-26-folded-1.md#2026-09-25-la141-clock-inverse`, checked line by line before deleting.
 
 Its two queue neighbours, RV-181 and RV-182, were checked at the same time and **stay** — each
 carries inline unfinished work (RV-181's memo and `/api/health/trends`; RV-182's

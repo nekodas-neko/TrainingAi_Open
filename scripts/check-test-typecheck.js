@@ -41,15 +41,16 @@ const BASELINE = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
 // `tsc` exits non-zero when it reports errors, which is the normal case here — the errors are the
 // output, not a failure to run. A crash (no diagnostics at all) is different and must not be read
 // as "clean", so an empty result with a non-zero exit is reported rather than passed.
-// DV-1: `npx` is `npx.cmd` on Windows, and `execFileSync` does not consult PATHEXT — so this died
-// with `spawnSync npx ENOENT` on the machine the Device Verification agent runs on, before tsc was
-// ever reached. Naming the `.cmd` explicitly is preferred over `shell: true`, which would hand the
-// argument list to a shell for re-parsing.
-const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+// Runs TypeScript's own entry point with this `node`, so there is no `npx` to find at all.
+// DV-1 first hit `spawnSync npx ENOENT` on Windows (`execFileSync` does not consult PATHEXT) and fixed
+// it by naming `npx.cmd`. Node's CVE-2024-27980 fix then made spawning any `.cmd` without a shell
+// throw `EINVAL`, so the script died on Windows again before tsc ran (OR-194, 2026-09-27). `shell:
+// true` would hand the argument list to a shell for re-parsing, which DV-1 rightly refused.
+const TSC = require.resolve('typescript/bin/tsc', { paths: [root] });
 
 function runTsc() {
   try {
-    return execFileSync(NPX, ['tsc', '--noEmit', '-p', 'tsconfig.tests.json'], {
+    return execFileSync(process.execPath, [TSC, '--noEmit', '-p', 'tsconfig.tests.json'], {
       cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
     });
   } catch (err) {
