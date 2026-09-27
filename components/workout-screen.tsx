@@ -26,6 +26,7 @@ import {
   sessionContextLabel,
 } from "@/components/workout/utils";
 import { estimateOneRm } from "@trainingai/shared/1rm";
+import { isDeloadedForEstimate } from "@trainingai/shared/workout/log-exercise";
 import type { ExerciseSummaryData, SessionLogEntry } from "@/components/workout/types";
 import { buildSetSequence, nextStep } from "@trainingai/shared/workout/superset-order";
 import { exerciseLibraryRowsFrom } from '@/lib/local-store/program-assembler';
@@ -1221,7 +1222,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         exerciseType: ex.exerciseType === "bodyweight" ? "bodyweight" : "weighted",
         style: ex.progressionStyle,
         isBaseline,
-        deloaded: ex.deloaded === true || (isAnyDeload && !isBaseline),
+        deloaded: isDeloadedForEstimate({ exerciseDeloaded: ex.deloaded, isAnyDeload, isBaseline }),
       },
     );
     // User-tz datetime (not device-local) so the whole completion flow anchors on a

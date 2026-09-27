@@ -50,6 +50,27 @@ export const LogExercisePayloadSchema = z.object({
 
 export type LogExercisePayload = z.infer<typeof LogExercisePayloadSchema>;
 
+/**
+ * Whether this exercise's 1RM estimate must be suppressed as deload work.
+ *
+ * TN-74: this predicate had two copies — here and in `components/workout-screen.tsx`, which
+ * computes the estimate the DEVICE stores when a set is logged offline. They agreed, which is
+ * why nothing had broken; they are one function now because of what they decide. The estimate
+ * this gates is the field `estimated_1rm > 0 IS the deload test` keys off, so a drift between
+ * the two copies would not show up as a wrong number on a screen — it would show up as an
+ * offline-logged exercise disagreeing with the server about whether a deload happened at all.
+ *
+ * `isBaseline` is the carve-out both copies already had: a baseline test is a genuine max-effort
+ * attempt even inside an otherwise-active deload window.
+ */
+export function isDeloadedForEstimate(a: {
+  exerciseDeloaded?: boolean
+  isAnyDeload: boolean
+  isBaseline: boolean
+}): boolean {
+  return a.exerciseDeloaded === true || (a.isAnyDeload && !a.isBaseline);
+}
+
 // PR gate: deload work is deliberately submaximal, so its 1RM estimate must
 // never enter personal_records. Whole-session deloads were already excluded;
 // a per-exercise deload excludes just that exercise — and unlike the session
@@ -215,7 +236,7 @@ export async function logExerciseFromPayload(
   const isAnyDeload = currentPhaseType === 'deload' || sessionIsEarlyDeload;
   /** The one predicate that decides whether this exercise's 1RM is estimated at all — named once so
    *  the estimate and the stored provenance cannot disagree, which is exactly how Q-298 arose. */
-  const deloadedForEstimate = exerciseDeloaded === true || (isAnyDeload && !isBaseline);
+  const deloadedForEstimate = isDeloadedForEstimate({ exerciseDeloaded, isAnyDeload, isBaseline });
   // Mirrors shouldCountTowardPr's gate below: a deliberately submaximal set — whether from a
   // static program's deload phase (isAnyDeload) or an AI per-exercise/whole-session deload
   // (exerciseDeloaded) — must never feed the 1RM estimate itself, not just be excluded from

@@ -4617,10 +4617,22 @@ volume7dKg,                             // likewise
      and their `updated_at` is **6–7 hours later, on 08-07**. Some later write path set `target_80`
      without touching `estimated_1rm`. **Which path is NOT established** and is the one thing here
      still worth chasing.
-  2. **`target80` is an accepted input that silently does nothing.** `log-exercise.ts:48` takes
-     `target80: z.number().optional()`, and line 224 destructures `target80` from `estimateOneRm`,
-     **shadowing** it. A caller can send the field and it is discarded without a word. Either drop
-     it from the schema or honour it.
+  2. **⛔ RESOLVED 2026-09-27 (Lane A) — and item 2 as written was a TRAP. Do not drop the field.**
+     *"An accepted input that silently does nothing"* is true of the SERVER and false of the
+     device. `sqlite-backend.ts:459-460` writes `payload.estimated1rm` and `payload.target80`
+     straight into the local `exercise_logs` row, under its own comment *"use client-provided
+     offline estimate if present"* — so the field is load-bearing on the offline path, which is
+     the canonical runtime. **Taking either of the entry's two remedies would have removed the
+     1RM from every offline-logged exercise on the device until it synced.**
+     - **The real defect was underneath it, and is fixed.** The predicate deciding whether an
+       estimate is suppressed existed in **two copies** — `log-exercise.ts:218` and
+       `workout-screen.tsx:1224` — computing `exerciseDeloaded === true || (isAnyDeload &&
+       !isBaseline)` independently. They agreed, so nothing had broken. They are now one exported
+       `isDeloadedForEstimate` in `packages/shared/src/workout/log-exercise.ts`, called by both.
+     - **Why it mattered despite agreeing:** the client copy decides what the DEVICE stores
+       offline, and `estimated_1rm > 0` **is** the deload test (`adapter.ts:1482`). A drift would
+       not have shown as a wrong number on a screen — it would have shown as an offline-logged
+       exercise disagreeing with the server about whether a deload happened at all.
 - **Repairing the historical rows is the OWNER'S call, not this entry's.** Rewriting 10 (or 42)
   stored estimates is a data rewrite; the code that produced them is fixed, and nothing here
   establishes that a wrong prescribed weight ever reached a screen.
