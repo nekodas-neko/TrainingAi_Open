@@ -259,6 +259,11 @@ export interface SyncDelta {
   scheduleDays:       unknown[];
   progressionStyles:  unknown[];
   styleSets:          unknown[];
+  // RV-174: every program and style id the user HAS, on every page, whatever changed. Both are hard
+  // deletes with no tombstone, so the delta above can say what changed but never what is gone; the
+  // device prunes its read-only mirror to these. Optional so a delta without them prunes nothing.
+  programRoster?:         string[];
+  progressionStyleRoster?: string[];
   bodyMetrics:        unknown[];
   sleepSessions:      unknown[];
   moodLogs:           unknown[];

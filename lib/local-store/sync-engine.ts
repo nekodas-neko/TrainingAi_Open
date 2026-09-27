@@ -653,6 +653,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     ouraDailySummary.length + ouraDailyDerived.length +
     dayCheckins.length + mealPlans.length + planMealAnswers.length;
 
+  let prunedPrograms = 0;
   try {
     await store!.applyDelta({ bodyMetrics, moodLogs, sleepSessions,
       workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
@@ -660,6 +661,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       foodItems, foodLogs, supplements, supplementLogs, injuries,
       exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
       mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers });
+    // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
+    // server's roster. Only when the server sent one — an absent roster must never read as "none".
+    const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
+    prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
     await store!.setLastSyncAt(raw.syncedAt);
   } catch (err) {
     // A broken local schema throws here, not at the fetch — and this used to propagate straight
@@ -671,10 +676,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   }
 
   return {
-    count,
+    count: count + prunedPrograms,
     domains: {
       biometrics:  bodyMetrics.length > 0 || moodLogs.length > 0 || sleepSessions.length > 0,
-      programs:    programs.length > 0 || progressionStyles.length > 0 ||
+      programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
                    programSessions.length > 0 || sessionExercises.length > 0 ||
                    schedules.length > 0 || scheduleDays.length > 0 || styleSets.length > 0,
       workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || personalRecords.length > 0,

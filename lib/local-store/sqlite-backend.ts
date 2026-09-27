@@ -1267,6 +1267,43 @@ export class SQLiteLocalStore implements LocalStore {
     );
   }
 
+  // RV-174 — see the interface. The mirror is read-only (nothing on the device creates a program or a
+  // style), so there is no pending local row a prune could destroy.
+  async pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number> {
+    let removed = 0
+    if (programIds) {
+      const keep = new Set(programIds)
+      const stale = (await querySQL<{ id: string }>(`SELECT id FROM local_programs`))
+        .map(r => r.id).filter(id => !keep.has(id))
+      if (stale.length) {
+        const ph = stale.map(() => '?').join(',')
+        await runSQL(
+          `DELETE FROM session_exercises WHERE session_id IN
+             (SELECT id FROM program_sessions WHERE program_id IN (${ph}))`, stale)
+        await runSQL(
+          `DELETE FROM schedule_days WHERE schedule_id IN
+             (SELECT id FROM schedules WHERE program_id IN (${ph}))`, stale)
+        await runSQL(`DELETE FROM program_sessions WHERE program_id IN (${ph})`, stale)
+        await runSQL(`DELETE FROM schedules WHERE program_id IN (${ph})`, stale)
+        await runSQL(`DELETE FROM local_programs WHERE id IN (${ph})`, stale)
+        removed += stale.length
+      }
+    }
+    if (styleIds) {
+      const keep = new Set(styleIds)
+      const stale = (await querySQL<{ id: string }>(`SELECT id FROM local_progression_styles`))
+        .map(r => r.id).filter(id => !keep.has(id))
+      if (stale.length) {
+        const ph = stale.map(() => '?').join(',')
+        await runSQL(`DELETE FROM style_sets WHERE style_id IN (${ph})`, stale)
+        await runSQL(`UPDATE session_exercises SET style_id = NULL WHERE style_id IN (${ph})`, stale)
+        await runSQL(`DELETE FROM local_progression_styles WHERE id IN (${ph})`, stale)
+        removed += stale.length
+      }
+    }
+    return removed
+  }
+
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
     try {
       await beginTransaction();
