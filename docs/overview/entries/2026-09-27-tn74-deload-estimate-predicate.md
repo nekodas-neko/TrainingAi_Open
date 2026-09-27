@@ -36,6 +36,29 @@ test (`adapter.ts:1482`), not a proxy for one. A drift between the copies would 
 wrong number on a screen; it would surface as an offline-logged exercise disagreeing with the
 server about whether a deload happened at all — on the field that encodes the answer.
 
+## The mistake this cost, and the gate that was missing
+
+The predicate first went into `packages/shared/src/workout/log-exercise.ts`, beside the server
+call that used it, and the client imported it from there. `tsc` passed. **CI's Build did not**,
+and the import trace says why:
+
+```
+./lib/data/postgres/adapter.ts → ./lib/data/index.ts
+→ ./packages/shared/src/workout/log-exercise.ts → ./components/workout-screen.tsx
+```
+
+`log-exercise.ts` reaches the repository, which reaches the Postgres adapter, which reaches
+`onnxruntime-node` — so importing it from a client component pulls a **native binary into the
+browser bundle**. Being under `packages/shared/` does not make a module client-safe, and
+**typecheck cannot tell you**: the types resolve perfectly. Only the bundler knows.
+
+It now lives in `packages/shared/src/1rm.ts`, which has **no imports at all** — a true leaf, and
+already the home of `estimateOneRm`, whose `deloaded` argument this computes.
+
+**The gate I skipped was `pnpm build`.** For anything that adds a client-side import of a shared
+module, typecheck plus tests is not enough, and this is the one failure mode where local green and
+CI red are guaranteed rather than unlucky.
+
 ## Verification
 
 - New test, **6 cases**: per-exercise deload, session/phase deload with no per-exercise flag
@@ -44,7 +67,8 @@ server about whether a deload happened at all — on the field that encodes the 
 - **Mutation pass: baseline survives, 3 killed, 1 equivalent control survives.** Killed: `||`→`&&`;
   dropping the baseline exemption; making `isBaseline` override the per-exercise flag too (the
   tempting simplification). Control: `=== true` → truthy.
-- `tsc` clean; Custom Rules **82 of 82**.
+- `tsc` clean; **`pnpm build` clean** (the check that caught the first attempt); `check-test-typecheck` 316/87, none above baseline; Custom Rules **82 of 82**.
+- `packages/shared/src/workout` + `packages/shared/src/__tests__`: **649 passed (49 files)**.
 
 ## Not exercised
 

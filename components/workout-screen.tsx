@@ -25,8 +25,7 @@ import {
   exerciseSetCount,
   sessionContextLabel,
 } from "@/components/workout/utils";
-import { estimateOneRm } from "@trainingai/shared/1rm";
-import { isDeloadedForEstimate } from "@trainingai/shared/workout/log-exercise";
+import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
 import type { ExerciseSummaryData, SessionLogEntry } from "@/components/workout/types";
 import { buildSetSequence, nextStep } from "@trainingai/shared/workout/superset-order";
 import { exerciseLibraryRowsFrom } from '@/lib/local-store/program-assembler';

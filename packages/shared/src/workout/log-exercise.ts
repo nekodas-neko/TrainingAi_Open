@@ -1,3 +1,4 @@
+import { isDeloadedForEstimate } from '../1rm';
 import { z } from 'zod';
 import { oneRmImplausible } from '@trainingai/shared/validation/plausibility'
 import { aestMidnight, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -49,28 +50,6 @@ export const LogExercisePayloadSchema = z.object({
 });
 
 export type LogExercisePayload = z.infer<typeof LogExercisePayloadSchema>;
-
-/**
- * Whether this exercise's 1RM estimate must be suppressed as deload work.
- *
- * TN-74: this predicate had two copies — here and in `components/workout-screen.tsx`, which
- * computes the estimate the DEVICE stores when a set is logged offline. They agreed, which is
- * why nothing had broken; they are one function now because of what they decide. The estimate
- * this gates is the field `estimated_1rm > 0 IS the deload test` keys off, so a drift between
- * the two copies would not show up as a wrong number on a screen — it would show up as an
- * offline-logged exercise disagreeing with the server about whether a deload happened at all.
- *
- * `isBaseline` is the carve-out both copies already had: a baseline test is a genuine max-effort
- * attempt even inside an otherwise-active deload window.
- */
-export function isDeloadedForEstimate(a: {
-  exerciseDeloaded?: boolean
-  isAnyDeload: boolean
-  isBaseline: boolean
-}): boolean {
-  return a.exerciseDeloaded === true || (a.isAnyDeload && !a.isBaseline);
-}
-
 // PR gate: deload work is deliberately submaximal, so its 1RM estimate must
 // never enter personal_records. Whole-session deloads were already excluded;
 // a per-exercise deload excludes just that exercise — and unlike the session

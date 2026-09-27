@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isDeloadedForEstimate } from '../log-exercise'
+import { isDeloadedForEstimate } from '../../1rm'
 
 /**
  * TN-74 — the predicate that decides whether an exercise's 1RM estimate is suppressed had two
