@@ -7,7 +7,7 @@ tiles), `LA-136` (Home's sleep line), `RV-213` (Nutrition's empty meal slots) an
 walk and run in the cardio hub). The owner asked for them in one sitting, which is also the rule —
 splitting them means the same screens get judged three times.
 
-[`docs/design/2026-09-27-four-screen-mockups.html`](../design/2026-09-27-four-screen-mockups.html) ·
+[`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html) ·
 [hosted](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)
 
 ## Built from source, not from imagination
