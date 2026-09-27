@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.24",
+    date: "2026-09-27",
+    changes: [
+      "Changed: a lifted weight now reads the same everywhere \u2014 \"68 kg\" rather than \"68kg\" on some screens and \"68 kg\" on others. Half kilos and 1.25 kg plate steps show exactly, and nothing gains a decimal it did not have.",
+    ],
+  },
+  {
     version: "1.477.23",
     date: "2026-09-27",
     changes: [

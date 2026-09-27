@@ -3959,16 +3959,35 @@ which is the right shape for something that can only be validated by living with
   not two. `app/api/day-timeline/route.ts` formatted `h:mm a` itself (Home's `6:40 AM`), and a
   second shared helper, `fmtAest` (`h:mmaaa`, `6:40am`), fed `/api/day-log` (Health → Day) and
   the Body Battery card. The route now calls `formatTimeOfDay`, and `fmtAest` delegates to it, so
-  all four surfaces read `6:40 am`. **Still their own form, and Lane B's:**
+  all four surfaces read `6:40 am`. **⚠ A FOURTH FORM IS STILL LIVE AND IT IS LANE A'S — measured 2026-09-27 by running both
+  functions**, not by reading them: `formatTime12h('06:40')` returns **`6:40am`** against
+  `formatTimeOfDay`'s **`6:40 am`**. It lives in `packages/shared/src/date-utils.ts` and feeds
+  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
+  6:40am" surface this entry opened with, still unfixed.** The fix is one character in a Lane A
+  file, so it was not taken here.
+  **Still their own form, and blocked on the same lane:**
   `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
-  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both format minutes-of-day rather than
-  an instant, so they need a minutes-based sibling of `formatTimeOfDay`, not a straight swap.
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both
+  format minutes-of-day rather than an instant, so they need a minutes-based sibling of
+  `formatTimeOfDay` — which is `packages/shared`, i.e. **Lane A's engine half first**, then Lane B
+  converts the two call sites. The entry called these Lane B's; the path rule says otherwise.
   ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
   SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
   `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
-  one decimal. `formatKg` also takes `trim`. **The six sites are Lane B's and still to convert:**
-  `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`, `weights-summary:93`,
-  `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**` stays excluded.
+  one decimal. `formatKg` also takes `trim`. **✅ THE RENDER SITES SHIPPED 2026-09-27 (Lane B) — and the entry's list of six was NINE.**
+  The three it did not name: `next-workout-card`, `week-day-sheet` and `formatVolume`. Eight are
+  lifted loads and now call `formatLoadKg`; `app/profile/[userId]/page.tsx`'s `formatVolume` is
+  **excluded with its reason** — a lifetime tonnage with `kT`/`T`/`kg` tiers, deliberately whole,
+  and spacing only its bottom tier would leave the three disagreeing.
+  `components/ui/__tests__/rv208-one-load-unit-spacing.test.ts` holds it, sibling of the duration
+  guard. **Its first version passed its own control run** — the regex matched only `${x}kg` and
+  half these sites are JSX `{x}kg`, so it was checking less than it claimed; it keys on `}kg` now
+  and is control-run against both forms.
+  **Owed, and NOT obtained:** no render. The seeded account has no weights on any of the eight
+  surfaces, so nothing was seen at 412 px. The residual risk is a wrap, not a wrong value — an
+  added space in two tight cells (`pip-view`'s overlay, `week-day-sheet`'s truncated row).
+  `app/api/**` is excluded from the guard: its five `${x}kg` are LLM prompt text and a Google
+  Calendar description, **Lane A's** and not renders.
   ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
   is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
   Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
