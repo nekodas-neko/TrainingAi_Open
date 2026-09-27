@@ -3085,32 +3085,35 @@ which is the right shape for something that can only be validated by living with
   the reader takes `unknown` and narrows.
 
 ### [workouts] LB-165 — the rules prescription is built, returned, and reaches no screen at all
-- **Lane: A** (`packages/shared/src/ai-periodization/generate-prescription.ts`, plus whichever of
-  `app/api/workout-data/route.ts` / the `/prescribe` route carries the answer out).
-- **Added:** 2026-09-27 · found while building `RV-202 ③`, which needed to know whether a rules
-  plan was ever on screen to label. It is not.
-- **The chain, code-certain end to end — five links, each verified against `main`:**
-  1. `buildRulesPrescription` returns a plan with `source: 'rules'` and `confidence: 0.3`. It is
-     **deliberately not persisted** (`generate-prescription.ts`, the `RV-202` catch): storing it
-     would hold the model off for seven days, which is sound and is not the problem.
-  2. `/prescribe` returns it in the response body.
-  3. **Both client callers ignore that body.** `workout-screen.tsx` checks `res.ok`, invalidates,
-     and refetches; the completion-path caller only invalidates. Neither reads `prescription`.
-  4. `workout-data` reads `aiPeriodizationState?.prescription` — the STORED plan — and fires
-     regeneration as a background single-flight whose result it never consults.
-  5. `isAiPrescriptionPending` is `prescriptionStatus === 'consumed'`, and the rules path never
-     calls `storePrescription`, so the status never flips. The screen stays "pending".
-- **So the lifter's experience is unchanged by `RV-202 ①`**: still the ten 3 s polls, still
-  ~30 s of "Preparing your AI workout…", still the amber "couldn't generate" banner and the base
-  numbers. The entry's measurement (HTTP 200 where there was a 502) was real and was about the
-  ROUTE; the conclusion drawn from it was about a layer it did not test.
-- **Not obviously a bug in the non-persistence decision** — that reasoning holds. The gap is that
-  nothing carries a non-persisted plan out to the caller that paints. Two shapes, both Lane A's to
-  judge: have `workout-data` apply and report the in-process generation's result for this request
-  only, or store it with a same-day expiry so the next open still re-runs the model.
-- **Whichever ships, `RV-202 ③`'s label has a third case waiting for it** (`From your program`,
-  beside `From {date}` and `Base program`) — `components/workout/numbers-source.ts` is where it
-  goes, and it is a one-line addition once a client can see `source`.
+- **Lane: A** · **Added:** 2026-09-27 · found while building `RV-202 ③`.
+- **⚙ SHIPPED 2026-09-27 (Lane A). The entry's chain was verified link by link and is correct;
+  the fix is one line of persistence plus the expiry that makes it safe.**
+  - **Verified, not taken on trust:** `workout-data`'s `regeneratePrescriptionInBackground` is
+    fire-and-forget (only `onError` is read), and `isAiPrescriptionPending` returns true purely on
+    `prescriptionStatus === 'consumed'`, which only `storePrescription` clears. Both decisive
+    links confirmed against `main`.
+  - **The fix:** the model-failure catch now calls `storePrescription` with
+    `RULES_PRESCRIPTION_TTL_MS` (6 hours) instead of returning an unstored plan. `storePrescription`
+    defaults the status to `'pending'`, so the screen stops saying "Preparing your AI workout…"
+    and paints the program's own numbers.
+  - **Why storing is now right when RV-202 refused it.** RV-202's reasoning was about the
+    **seven-day** hold, and that part still stands. Its conclusion assumed the returned plan
+    reached someone — its comment said *"this plan is only what today's caller is handed"* — and
+    no caller read it. The seven-day objection is answered by the expiry rather than by refusing
+    to store: 6 hours covers the session in front of the lifter and lets the model be tried again
+    the same day, and `reevaluate` re-generates once `prescriptionExpiresAt` passes.
+  - **A duration, not a local-day boundary, deliberately:** a day boundary needs calendar
+    arithmetic and a timezone, and buys nothing over "a few hours from now".
+  - **The test that pinned the old decision was inverted, keeping its intent.** It asserted the
+    branch never stores; the property that mattered was "the model gets another attempt soon", so
+    that is now pinned on the expiry — stores, but never the seven-day default, and a second test
+    holds the TTL to hours rather than days. Phase state still must not move.
+- **Keep:** two things, neither Lane A's.
+  - **`RV-202 ③`'s third label case** (`From your program`) in `components/workout/numbers-source.ts`
+    is now unblocked — the client can see `source: 'rules'` on the stored plan. **Lane B.**
+  - **Device check:** the failure path is a model outage, which cannot be induced from the
+    sandbox. What is owed on the phone is that a failed generation paints the base numbers
+    instead of the amber banner.
 
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
 - **✅ ALL THREE ITEMS SHIPPED. ③ landed 2026-09-27 (#1760); the entry stays only for its `Keep:`.**

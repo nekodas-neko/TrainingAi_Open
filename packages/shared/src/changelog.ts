@@ -6,7 +6,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.8",
+    version: "1.477.9",
     date: "2026-09-27",
     changes: [
       "Fixed: the session card showed the word \"Dumbbell\" where its icon belongs, in text twice the size of the session name. It draws the icon now, so the session you are choosing is the biggest thing on the card.",
