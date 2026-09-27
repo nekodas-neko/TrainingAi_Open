@@ -819,25 +819,6 @@ below threshold and left in place for next time.
   docs PR now and after, or it is a change with no evidence it helped.
 - **Reversal cost: one workflow file.**
 
-### [platform] OR-198 — the journal fold breaks `Detail:` pointers, and no check can see it
-
-- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, found while relocating `Current Status` (OR-197).
-- **Measured:** of 281 narrative paragraphs, 152 cite a journal file. One — `LB-158`'s — pointed at
-  `docs/overview/entries/2026-09-26-lb158-local-barcode.md`, which `scripts/fold-journal-entries.js`
-  had already folded into `docs/overview/history-2026-09-27-folded-2.md`. The fold moves the file and
-  does not rewrite anything citing it.
-- **Why nothing caught it:** these are bare paths inside backticks, not markdown links, so
-  `check-doc-links.js` structurally cannot see them. It reported OK on the same file.
-- **1 of 152 is a low rate and that is the danger** — it is rare enough to be trusted and silent
-  enough to spread. Every fold sweep can add more.
-- **Recommendation: have the fold rewrite the pointers it invalidates**, in the same commit as the
-  move — the script knows both paths, which nothing downstream does. Alternative: teach a checker to
-  resolve backticked `docs/**.md` paths; useful anyway, but it reports a break after the fact rather
-  than preventing it.
-- **The one instance is already fixed** in the relocated file; this is about the mechanism.
-- **Reversal cost:** low — one script.
-
-
 ### [platform] OR-199 — Reference: do NOT compact `CLAUDE.md` the way `projectOverview.md` was compacted
 
 - **Reference:** the measurement and the reasoning behind a structural call, so it is not re-proposed.
@@ -13606,7 +13587,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 - **✅ SHIPPED 2026-09-12** — `components/admin/exercise-manager.tsx` and the new
   `components/admin/gif-review-sweep.tsx`. Journal:
-  `docs/overview/entries/2026-09-12-bf147-admin-exercise-manager.md`.
+  `docs/overview/history-2026-09-14-folded-1.md#2026-09-12-bf147-admin-exercise-manager`.
   - **The name fix is the action row, and THIS ENTRY'S DIAGNOSIS WAS WRONG.** It blamed the
     `SourceBadge` for not collapsing. Measured at 412 dp: the badge is **25 px**; the four action
     buttons are **204 px of a 340 px row**, because the global 48 dp tap-target floor inflates each
@@ -13648,7 +13629,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **✅ SHIPPED — the surface ramp now carries the user's brand hue.** `--brand-hue` is set in all
   four places `--brand` is (`:root`, each `[data-brand]` block, `applyCustomHue`, and the pre-paint
   script in `app/layout.tsx`), and the dark surface tokens are built from it. See
-  `docs/overview/entries/2026-09-12-bf145-tinted-dark-surfaces.md`.
+  `docs/overview/history-2026-09-14-folded-1.md#2026-09-12-bf145-tinted-dark-surfaces`.
   - **The entry's own prescription — chroma 0.01–0.03, lightness untouched — does not work, and it
     was measured rather than argued.** At the old lightnesses `--card` (L 0.09) with chroma 0.018
     paints sRGB `1,3,1`: a channel spread of 2 out of 255. No chroma is visible at L 0.05–0.13, so
@@ -31142,7 +31123,7 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Added:** 2026-08-05 · owner-reported (screenshot): the "Weighing you…" progress toast appeared
   on the Home screen with nobody on the scale — recurrence of a symptom a 2026-08-01 session
   already investigated and shipped a fix for
-  (`docs/overview/entries/2026-08-01-scale-false-weighing-toast-on-home-focus.md`).
+  (`docs/overview/history-2026-07-30.md#2026-08-01-scale-false-weighing-toast-on-home-focus`).
 - **⚑ 2026-08-10 update — the on-device log capture this entry was waiting for, and hypothesis (b)
   now looks confirmed by direct code read, not just log speculation.** Owner reported "when
   scrolling to home screen the weigh-in keeps triggering" with two screenshots: Home's live

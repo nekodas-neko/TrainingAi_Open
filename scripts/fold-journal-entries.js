@@ -149,10 +149,20 @@ const LINK_RE = /\]\(([^)\s]+)\)/g;
 // still the informative half, and no longer a path that has to resolve.
 const TEXT_PATH_RE = /\[`docs\/overview\/entries\/([^`\/]+)\.md`\]/g;
 
+// **Trap 7 (OR-198, 2026-09-27).** A citation that is a bare path in backticks, not a link at all —
+// `Detail: \`docs/overview/entries/x.md\``. Neither regex above sees it, and `check-doc-links` reads
+// only link targets, so every fold silently broke these: 79 of the repo's 100 such citations pointed
+// at a folded file when this was measured. Backticked paths are repo-root-relative, so the rewrite is
+// too, and it carries the anchor the history file gives every folded entry.
+const BARE_PATH_RE = /(^|[^[])`docs\/overview\/entries\/([^`\/]+)\.md`/gm;
+
 const rewriteAll = (text, fromAbs, inHistory) =>
   text
     .replace(LINK_RE, (m, t) => `](${rewrite(t, fromAbs, inHistory)})`)
-    .replace(TEXT_PATH_RE, (m, base) => (foldedSet.has(base) ? `[\`${base}\`]` : m));
+    .replace(TEXT_PATH_RE, (m, base) => (foldedSet.has(base) ? `[\`${base}\`]` : m))
+    .replace(BARE_PATH_RE, (m, pre, base) => (foldedSet.has(base)
+      ? `${pre}\`docs/overview/${fileFor.get(base)}#${anchorOf(base)}\``
+      : m));
 
 // ---- 1. Build the history file from the batch -------------------------------------------------
 const parts = new Map();
