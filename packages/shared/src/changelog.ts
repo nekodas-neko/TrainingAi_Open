@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.9",
+    date: "2026-09-27",
+    changes: [
+      "Changed: a brisk walk now earns active minutes. The daily zone-minutes goal is the World Health Organization's moderate-activity target, but it was only counting minutes above 134 bpm \u2014 which is where vigorous effort begins, not moderate. The floor is now 108 bpm. Past days are re-scored, and the effect is smaller than it sounds: days meeting the goal go from 1 to 3 in the last month.",
+    ],
+  },
+  {
     version: "1.477.8",
     date: "2026-09-27",
     changes: [

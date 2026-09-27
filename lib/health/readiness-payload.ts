@@ -22,8 +22,8 @@ import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines }
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
+import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
+import { accumulateZoneSeconds, activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
@@ -467,8 +467,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   if (baselineRhr != null && todayHrRows.length > 0) {
     const maxHr = hrMaxFromAge(ageYears)
     const zones = computeHrZones({ maxHr, restingHr: baselineRhr })
-    zoneMinutesToday = activeMinutesFromZoneSeconds(
-      accumulateZoneSeconds(todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })), zones),
+    zoneMinutesToday = activeMinutesFromReadings(
+      todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
+      zones,
+      moderateIntensityBpm({ maxHr, restingHr: baselineRhr }),
     )
     movedHoursToday = computeMovedHours({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
   }

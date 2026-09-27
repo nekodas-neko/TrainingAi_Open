@@ -4255,96 +4255,42 @@ which is the right shape for something that can only be validated by living with
   ones *should*.
 
 ### [activity][heart-rate] TN-78 — the zone-minutes goal is WHO's MODERATE target scored at a VIGOROUS threshold, so walking can never earn it
-- **✅ ANSWERED 2026-09-27 — 40% of heart-rate reserve. The floor moves from 134 bpm to 107.**
-  The owner took ACSM's definition, which is the one the 22-minute goal's own WHO citation implies.
-  **Now Lane A** by the path rule: `packages/shared/src/health/hr-zones.ts` (`ZONE_DEFS` Light
-  `lowerFrac: 0.6` → `0.4`), `zone-minutes.ts`, `daily-goals.ts`.
-  **⚠ Two things the implementer must not skip.** ① This RE-SCORES HISTORY — the owner hit the old
-  floor on 3 of 31 days and hits the new one on 24, so every past day's zone-minutes and anything
-  derived from them changes. State how many days move before merging, per the Tuning rule that a
-  proposal is incomplete without it. ② `DEFAULT_ZONE_MINUTES_GOAL = 22` was sized against the 60%
-  floor. At 40% it will be met most days and is probably too low — measure it and file the re-size
-  as its own entry rather than changing both numbers in one PR and losing the attribution.
+- **✅ SHIPPED 2026-09-27 (Lane A)** — as a **separate constant**, not as a change to the zone map.
+  `MODERATE_INTENSITY_FRAC = 0.4` + `moderateIntensityBpm()` in `hr-zones.ts`, consumed by the new
+  `activeMinutesFromReadings`. `ZONE_DEFS` is untouched.
+- **⛔ THE OBVIOUS IMPLEMENTATION IS WRONG — the entry names `ZONE_DEFS` Light `lowerFrac` and
+  that change is a regression.** `targetsForRunType` (`packages/shared/src/running/hr-targets.ts`)
+  builds run prescriptions from the same map, so moving Light to 0.4 takes a **recovery run's
+  ceiling from 134 bpm to 106** with it. CI caught it (`hr-targets.test.ts`: expected 134, got
+  106) after a local run of `packages/shared/src/health` alone had passed. The owner approved a
+  change to how active minutes are COUNTED, not to what a recovery run is. Two uses of one map
+  wanting different edges — an activity-guideline definition and a training prescription — so they
+  are two constants now, and a test pins that the Light band still reads 134.
+- **THE RE-SCORE, measured before merging as the Tuning rule requires — and the entry's own
+  figures were a different quantity.**
 
-- **Branch:** `tuning/zone-minutes-intensity-floor`
-- **Lane:** A — the deliverable is an owner decision on the threshold, and **getting** that answer is
-  the Orchestrator's work. Filed **ungated on purpose**: `Gate: owner` would PARK this in
-  `next-item.js`, so the question would sit in the queue with nobody tasked to put it. Once the
-  threshold is settled the build is Lane A by the path rule (`packages/shared/src/health/hr-zones.ts`,
-  `zone-minutes.ts`, `daily-goals.ts`) — reroute it then, do not pre-assign it.
-- **Added:** 2026-09-24 · Tuning agent, found while checking TN-76's `zoneMinutes` contributor.
-- **The decision, in one line:** does a minute of moderate activity start at 40% of heart-rate
-  reserve (ACSM's definition, which the 22-minute goal's own WHO citation implies) or stay at the
-  60% the zone map uses? Scoring calibration, so his — everything needed to answer it is below.
-- **Where the mechanism is:** `ZONE_DEFS` (`hr-zones.ts:38`) sets the Light band's floor at
-  `lowerFrac: 0.6`; `computeHrZones` turns that into `restingHr + 0.6 × reserve`;
-  `activeMinutesFromZoneSeconds` (`zone-minutes.ts:80`) names that band `moderateMin` and doubles
-  zones 3–5 as `vigorousMin`; `DEFAULT_ZONE_MINUTES_GOAL = 22` cites *"WHO ≥150 min/wk moderate"*.
-
-**Two intensity taxonomies are spliced together, and the seam is a whole band.** The goal is WHO's
-moderate-activity target. The threshold it is scored against is **60% of heart-rate reserve** —
-which is where ACSM's *vigorous* range begins. ACSM puts moderate at **40–59% HRR** and vigorous at
-60–89%. So the app requires vigorous effort to earn a minute it then calls moderate, and genuine
-moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSeconds` discards.
-
-  **Measured for the owner** (resting HR 54 from 36 readings, `hrMaxFromAge(33)` = 187, reserve 133):
-
-  | threshold | bpm | reached on |
+  | | old floor (134 bpm) | new floor (108 bpm) |
   |---|---:|---:|
-  | app's zone-2 "Light" floor (60% HRR) | **134** | **3 of 31 days** |
-  | ~50% HRR | 120 | 11 of 31 |
-  | ACSM moderate floor (40% HRR) | **107** | **24 of 31 days** |
+  | days **meeting** the 22-minute goal | **1** of 32 | **3** of 32 |
+  | mean active minutes/day | **0.9** | **4.9** |
+  | days with **any** time above the floor | 3 | 24 |
 
-  Daily max HR: median **118** — between the two floors. So the owner's ordinary days sit in the band
-  the app scores as nothing, and the contributor is unreachable by walking at any duration.
-
-- **This is the mechanism behind TN-76's `zoneMinutes` column.** That entry measured the contributor
-  as present on 11 of 30 days and **zero on 9 of them**. This is why: not missing data, and not
-  inactivity, but a floor set one band too high.
-- **The contributor therefore only ever subtracts.** On a training day a zero is excluded (the Q-190
-  suppression, correct); on a rest day a zero is included at full weight. With `activeEnergy`
-  structurally absent the weight base is 85, so the zero costs a **measured mean of 8.1 points
-  (range +7 to +9)** across those 9 days — larger than the whole score's standard deviation of 7.4
-  (TN-76). A 10-weight term that cannot be earned by the owner's actual movement is, in practice, a
-  flat rest-day penalty.
-- **⛔ TWO HYPOTHESES OF MINE WERE WRONG AND ARE RECORDED AS WRONG, because both would have sent a
-  lane somewhere useless.**
-  **(a) "The suppression rule is leaking onto rest days."** It is not. Crossed against the stored
-  `trained` flag: `zoneMinutes` is absent on **19 of 19** training days and present on **9 of 9**
-  rest days plus the 2 training days where it was non-zero and so not suppressed. The rule does
-  exactly what its comment says, including *"deliberately NOT extended to rest days"*.
-  **(b) "The zeros are the ring's PPG power-gating, not real inactivity."** Also wrong, and it was
-  the plausible one — the ring's radio sleeps when worn-idle, which is what a rest day is. But the
-  stored zeros carry real coverage: 203–2,395 samples across 21–24 distinct hours on each of the 9
-  days, and the day's **maximum** HR was **93–124 bpm** — never once within 10 bpm of the 134 floor.
-  The zeros are true readings of "no vigorous activity", and the defect is the threshold, not the
-  sensor.
-- **Recommendation: move the moderate floor to 40% HRR and keep the vigorous double at 60%.** That
-  makes the two halves of `activeMinutesFromZoneSeconds` mean what WHO means by the words the goal is
-  written in, and it needs no new data — it is two fractions in `ZONE_DEFS`. It would reclassify
-  zone 1's upper half as moderate, which is the point.
-  **What it costs:** the five-band zone map is also rendered as a legend and used by the interval-walk
-  targets, so changing `ZONE_DEFS` moves a display users read, not only this score. If that coupling
-  is unwanted, the alternative is a **separate moderate/vigorous pair of fractions owned by
-  `zone-minutes.ts`**, leaving the display bands alone — more code, no shared-constant drift risk,
-  and it loses One Formula One Place for the zone boundaries. **I recommend the first** and would take
-  the legend change as correct rather than collateral: a band labelled "Light" that starts at the
-  vigorous boundary is mislabelled on the display too.
-  **Alternative considered and rejected: lower the 22-minute goal.** It treats a threshold error as a
-  target error, and would leave the same minutes uncounted while making the goal easier — the score
-  would look better without measuring anything new.
-- **Incomplete until it states how many days it moves, per the Tuning rule.** Not computable from the
-  stored contributors, which hold only the finished sub-score; it needs the zone accumulator re-run
-  over `oura_heartrate` for the window. **That is the first task for whoever picks this up**, and the
-  number belongs in this entry before any change ships, because it re-scores history the owner reads.
-- **What this does NOT establish.** One user, one resting-HR baseline, 31 days. `hrMaxFromAge` is
-  `220 − age`, itself a population estimate with roughly ±10 bpm of individual spread, so the 134
-  figure carries that error — but the finding survives it: at a maxHr 10 bpm lower the floor is still
-  128, and the median day still peaks at 118. HR sampling is sparse on rest days (~10/hour against
-  ~82/hour overall), so any *minutes* estimate from this data would be unreliable; the table above
-  deliberately counts **days with any qualifying sample**, which sparsity can only bias downward.
-  And nothing here says more moderate minutes would make the owner healthier — only that the app is
-  not counting the ones its own stated goal is about.
+  The entry said *"the owner hit the old floor on 3 of 31 days and hits the new one on 24"*. That
+  pair reproduces **exactly** — it is the bottom row, days with any qualifying time, not goal
+  attainment. Measured by replicating `accumulateZoneSeconds` in SQL, 120-second gap cap included,
+  over `oura_heartrate` (the table `getHrForWindow` reads).
+- **⛔ WARNING ② IS RETRACTED — do NOT file the goal re-size.** The entry said
+  `DEFAULT_ZONE_MINUTES_GOAL = 22` "will be met most days and is probably too low" at 40%. It is
+  met on **3 of 32 days**, mean 4.9 minutes. If anything the number now looks ambitious rather
+  than slack, and re-sizing it on the entry's prediction would have moved it the wrong way.
+  Whether 22 is right is a separate question and wants its own measurement, not this one's.
+- **Why the change is still right despite the small effect.** The defect was never the day count:
+  a WHO moderate target scored where ACSM starts vigorous is wrong as a definition, and it meant
+  brisk walking could not earn a single minute. The test pins exactly that band — 120 bpm, between
+  the two floors — because the pre-existing zone tests use readings clear of the boundary and
+  passed either way.
+- **Keep:** the device check. Zone minutes appear on the Activity surfaces, and the new floor
+  changes what those read for every past day; nothing here was seen on the phone.
 
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
