@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.476.0",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: your best streak read lower than your current one, which is impossible. Home counted the days your streak has run and the profile counted the sessions in it, and both were labelled \u201cstreak\u201d \u2014 111 against 49 for the same history. Everything now counts days, the way the card and the streak badges always said.",
+      "Changed: a streak survives two rest days for everyone, and more than two if your own schedule has a longer gap in it \u2014 training Monday and Tuesday no longer breaks your streak every week.",
+    ],
+  },
+  {
     version: "1.475.0",
     date: "2026-09-26",
     changes: [

@@ -2836,7 +2836,10 @@ which is the right shape for something that can only be validated by living with
   the reader takes `unknown` and narrows.
 
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
-- **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
+- **Lane: B.** Items ① and ② shipped 2026-09-26 and were Lane A's; the only remaining work is
+  item ③, the offline label in `workout-screen.tsx` / `pre-workout-screen.tsx`. Re-laned so it
+  stops heading Lane A's READY list, where it cost two sessions a re-derivation.
+  (Was: `Lane: A` … plus **B** for the label.)
 - **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
 - **What:**
   1. **Model failure → 502** (`generate-prescription.ts:316`).
@@ -3355,19 +3358,22 @@ which is the right shape for something that can only be validated by living with
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
 
-### [workouts][app-shell] RV-216 — Home says a 111-day streak and More says the best streak is 49: two `computeStreak` functions disagree
-- **Lane: A** (the formula), then **B** (Home's call site).
-- **Added:** 2026-09-26 · Review sweep 64, from DV's gallery (`p23-home-warm-01`: "STREAK 111 days"; `p23-more-warm-01`: "Best streak 49").
-- **What:** a best streak lower than the current one is impossible, and both numbers sit on screens the owner opens daily. There are two implementations with the same name:
-  - `app/session-select/compute-streak.ts` (Home, fed by `/api/streak-data`'s trained days);
-  - `lib/achievements.ts:32` (More's `lifetimeStats.bestStreak`, which applies `maxCompliantRestGapFor` the schedule).
-
-  This is exactly the *one formula, one place* class.
-- **Fix:**
-  1. Move one definition into `packages/shared/src/workout/`, and have both screens import it.
-  2. Decide which rest-gap rule is right, recording why in the entry. That is a structural call, not the owner's.
-  3. Add a test that best ≥ current for the same input.
-- **Reversal cost:** low. Both are derived at read time; nothing is stored.
+### [app-shell] LA-156 — Home's streak card should read the schedule, not assume a rest gap of 2
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-216.
+- **The formula is done and shared** — `computeDayStreak` + `streakRestGapFor`
+  (`packages/shared/src/workout/day-streak.ts`), already used by `/api/achievements` and
+  `/api/friends/leaderboard`. What is left is Home's call site.
+- **What:** `app/session-select/compute-streak.ts` still holds its own copy and hardcodes a rest
+  gap of **2**. The shared function was written to be behaviourally identical to it, so nothing
+  on Home changes today — the swap is an import and a signature change (it takes
+  `(trainedDates, todayStr, gap)` rather than `(trainedDays, dayKey)`), and the old file goes.
+- **What the swap FIXES, and why it is not cosmetic:** 2 is the floor, not the answer.
+  `streakRestGapFor` raises it from the user's own schedule, so somebody training Mon+Tue gets 5
+  (BF-122a). Home cannot do that today because it never reads the schedule, so for a weekly user
+  Home under-reports against the achievements page. The owner is on a rotation, where the floor
+  is what applies, which is why this is not urgent for him.
+- **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
+  deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
 
 ### [sleep] RV-217 — the Sleep contributors list shows three raw keys: "hrv", "hr", "schedule"
 - **Lane: A** — `packages/shared/src/health/sleep-score.ts:506` (`CONTRIBUTOR_KEYS`), plus the label table behind `labelFor` (`lib/oura/contributors`).
