@@ -1383,78 +1383,113 @@ below threshold and left in place for next time.
 - **Not established:** whether the collaborator expects review *comments* or just merges. Worth
   asking him directly rather than inferring it.
 
-### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
+### [platform] BF-210 — dropping a column from a `claude_ro`-covered table breaks every historical view migration that names it
 
-- **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
+- **Lane:** A — `scripts/local-db/migrate.js` (`REPLAY_EXEMPT`), and whichever migration does the drop.
+- **Added:** 2026-09-27 · BugFix, from reading why `#1749`'s Migration Check is red.
+- **Needs:** — nothing.
+- **Measured on `#1749` (run 36290950892, Migration Check):** `[migrate] applied 228, skipped 0
+  already recorded, 0 already present, **58 failed**`, every one of them
+  `column t.active_calories_est does not exist [42703]`, spanning
+  **`142_claude_ro_views.sql` through `285_claude_ro_views_sleep_verdicts.sql`**.
+- **Why it happens, and why it is not that PR's mistake.** Each `claude_ro` twin migration recreates
+  the view set with an **explicit column list** — that is the point of the generator, and what makes
+  the schema default-deny. So a column named in those lists is named in *every* twin written while it
+  existed. `--replay` re-runs every migration against a schema that already has everything, i.e.
+  **after** the drop, and each of those 58 then selects a column that is gone. `#1749` found the
+  dependency for the **current** view and correctly put a `DROP VIEW` ahead of the drop; nothing in
+  the file it edited points at the 58 behind it.
+- **This is not a real-world breakage, and that distinction is the fix.** On a fresh database the
+  migrations run in order, so 142 runs while the column exists and 286 drops it afterwards. On
+  production `ensureSchema` tracks by filename and skips all 58. **Only replay reaches it** — which
+  is precisely the case `REPLAY_EXEMPT` already exists for.
+- **Recommendation: extend `REPLAY_EXEMPT`, with the reason, exactly as `001_initial.sql` is
+  handled.** Its comment reads *"`002` renamed the column it references … which is incoherent rather
+  than non-idempotent, and only reachable by truncating the ledger by hand."* **That is this case,
+  verbatim, with rename → drop.** The list is a `Map` of filename to reason and refuses a silent
+  skip, so each of the 58 arrives with its justification in the diff.
+  **Alternative — edit the 58 migrations to guard the column.** Rejected: CLAUDE.md is explicit that
+  an applied migration is never edited (`ensureSchema` tracks by filename, so an edit is skipped
+  forever), and it would rewrite history to satisfy a check about replaying it.
+  **Alternative — do not drop the column.** Genuinely better at one thing, keeping the exempt list
+  short, and it means no dead column can ever be removed from a covered table. That is the wrong
+  trade for a schema that gains columns continuously.
+- **The generalisable rule this establishes, which is the durable half:** **any `DROP COLUMN` on a
+  `claude_ro`-covered table costs N replay exemptions**, where N is the number of twin migrations
+  written since that column appeared. It is proportional to the column's age, so it grows quietly —
+  `active_calories_est` cost 58. Worth stating in the `claude_ro` twin section of CLAUDE.md in the
+  same PR, beside the existing rule about always emitting a new migration number.
+- **Reversal cost:** none. Entries in a `Map`, and the exemptions can be deleted whenever the
+  historical twins are ever compacted.
+- **Done when** `node scripts/local-db/migrate.js --replay` reaches `0 failed`, and the
+  `replay-exempt:` lines it prints name every exempted file with its reason. (Stated as prose, not a
+  `Verify:` field — that field means SHIPPED, and this is unbuilt.)
+
+### [platform] TN-80 — the register of open PRs waiting on the owner (7, re-read 2026-09-27)
+
+- **Lane:** O — the deliverable is the owner's review on the pull requests below. Ungated on purpose:
   `Gate: owner` would park it, and getting these in front of him is the work.
-- **Ask:** owner — three PRs are waiting on him with no queue entry: **#1607** bearer tokens for native
-  login (auth, external contributor), **#1592** accept `activeCalories` in health imports (**already merged as #1616 —
-  no longer his**, kept for the Q-204/Q-524 consequence), **#1499** widen `/api/admin/db-query` (his own Lane A work, held
-  for his yes). Recommendations below.
-- **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
-  review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
-  message.
-- **Why this is a defect and not bookkeeping.** `grep -cE '#1607|#1592|#1499'` over this file returns
-  **0**. The seven decisions already in `Lane: O` are correctly routed — these are not routed at all.
-  A GitHub review request is a channel nobody is watching: #1499 has sat since **2026-09-24** and the
-  two external PRs since the small hours of 09-25. **CLAUDE.md's rule covers exactly this** — a
-  question for the owner is a task, and a question that lives only in a reply dies with the session.
-  It says nothing about PRs, which is why three of them slipped: the rule is written about backlog
-  questions and the gap is one category wider than the rule's wording.
+- **Ask:** owner — **seven** open PRs need him. Two are blocked on a RED required check and are not
+  actually awaiting his yes; three are green and genuinely waiting; two are from an outside
+  contributor. Table and recommendations below.
+- **Added:** 2026-09-25 · Tuning, after the owner said *"everything should go to ORC for my
+  review/input"* and three PRs turned out to exist only in GitHub's review-request list.
+- **⚠ REWRITTEN 2026-09-27 — the register had fallen behind by five, which is the failure it was
+  created to prevent.** It named three PRs: #1607, #1592 (**already merged as #1616** before the
+  entry was written) and #1499. Measured against `main` that day, **#1755 appeared in this file
+  zero times** and #1749, #1672 and #1671 appeared once each — inside their own closing entries,
+  not as items awaiting him. A register that is updated only when someone remembers is the same
+  channel-nobody-watches that TN-80 was filed about; **this entry is now the place a PR needing the
+  owner gets written down, and whoever opens such a PR adds the row.**
+- **Why this is a defect and not bookkeeping.** A GitHub review request is a channel nobody is
+  watching. CLAUDE.md's rule — a question for the owner is a task, not a chat message — is written
+  about backlog questions and says nothing about PRs, which is exactly the gap these fall through.
 
-**The three, each with a recommendation.**
+**The seven, worst state first. CI read 2026-09-27 via `get_check_runs`, job-level conclusions.**
 
-  **#1607 — bearer tokens for native mobile login** (`native-token-exchange`, external contributor,
-  review requested from the owner). Adds an opt-in token response with expiry beside the existing
-  cookie login, for an Expo/React-Native iPhone client.
-  - **Recommendation: the owner reads this one himself before it merges, and no agent merges it.**
-    It is an **auth** change, which is his carve-out by CLAUDE.md's own list, and it arrives from
-    outside the standing-agent set. A second credential path is cheap to add and expensive to get
-    wrong — token lifetime, revocation and storage are the questions, and none of them is visible from
-    the PR title.
-  - **Not assessed here.** I have not read the diff; this entry routes it rather than reviewing it.
-    A security review before he reads it would be worth more than my summary — that is `Lane: A`'s
-    or a `/security-review` pass, and it should happen first.
+| PR | what | required checks | verdict |
+|---|---|---|---|
+| **#1749** | `LA-142` drop four dead columns | **Migration Check RED** | blocked — not his yet |
+| **#1499** | `OR-138` db-query user scoping | **Build RED** | blocked — not his yet |
+| **#1755** | `OR-159`+`RV-196` native security | all green (+ Android green) | **his call** |
+| **#1672** | `RV-190` read-only session leak | all green | **his call** |
+| **#1671** | `RV-191` image byte validation | all green | **his call** |
+| **#1608** | HealthKit storage (external) | all green, re-run 09-27 | **his call** |
+| **#1607** | bearer tokens (external, auth) | green but **from 09-25** | re-run first |
 
-  **#1592 — accept `activeCalories` in daily health imports** — **⚠ IT MERGED AS #1616 on 2026-09-25**
-  (*"…, rounded"*, superseding #1592), before this entry reached him, so nothing is owed on it. Kept
-  because the consequence below stopped being hypothetical the moment it landed, and because **the
-  Q-524 amendment it invalidates is corrected in this same PR** rather than left wrong on `main`.
-  Forwards `dailyMetrics[].activeCalories` into `body_metrics.active_calories`.
-  - **Recommendation: mergeable on its own terms, and it must not merge silently.** It is a
-    reasonable Apple-Health feature and the storage column already exists. But that column is the
-    input to the Activity Score's `activeEnergy` contributor (weight 15), dead since 2026-07 — so
-    **this revives the input `Q-204` exists to remove**, from a direction nobody was watching, and
-    `Q-184`'s own check says do not revive it.
-  - **It also invalidates a conclusion I published yesterday.** The Q-524 amendment answered its
-    double-count blocker with *"not live, and probably never"*, resting on `activeEnergy` having no
-    live source. If this merges it has one, and the steps/energy double-count becomes live the moment
-    anyone builds the energy-derived step goal. **Whoever merges it should add that line to Q-204 and
-    Q-524 in the same PR**, or my amendment is wrong on `main` with nothing marking it.
-
-  **#1499 — scope `/api/admin/db-query` to a user who filed feedback** (`lane-a/or138-pivot-readonly-scope`,
-  his own Lane A work, explicitly held: *"AUTH/SECURITY — not merged on my own authority"*).
-  - **Recommendation: approve.** The widening is narrow — it reaches only users who have filed
-    feedback, which is one predicate to remove if he ever wants it broader, and the no-leak behaviour
-    was proven against a real pool pinned to `max: 1` rather than asserted. The PR also settled the
-    entry's own flagged unknown (a bare `SET` cannot stick, because every statement is wrapped in a
-    subquery), so the single-user guarantee was never as soft as feared.
-  - **One caveat worth his eye:** the audit trail goes in as a `-- claude_ro pivot: <uuid>` comment on
-    the audit row rather than a column, because a column is a migration and migrations ship alone.
-    Attributable, greppable, and tidier as a follow-up — not a reason to hold the PR.
-
-- **The process half, which is the durable part.** The rule that routes owner questions is written
-  about backlog entries and does not mention pull requests, so a PR awaiting the owner has no home in
-  the queue. **Recommendation: extend it** — when a PR needs the owner (auth, secrets, money, a
-  data-dropping migration, or an external contribution touching any of those), the opening agent files
-  a `Lane: O` entry with an `Ask:` naming the PR, and strikes it when the PR merges or closes. Cheap,
-  and it is the only thing that makes "everything goes to ORC" true for PRs as well as decisions.
-  Filed as a recommendation rather than edited into CLAUDE.md, because a standing-rule change is the
-  owner's to accept.
-- **What this entry does NOT do.** It does not review any of the three diffs — #1607's auth surface in
-  particular deserves a real read, and this is a routing entry. And it makes no claim about whether
-  the two external PRs are otherwise sound: CI state, test coverage and contributor provenance are all
-  unexamined here.
+- **#1749 — blocked, and the cause is structural rather than a slip.** Migration Check fails with
+  **58 migrations** reporting `column t.active_calories_est does not exist`, under `--replay`
+  (every migration re-run against a schema that already has everything). Dropping the column breaks
+  every historical `claude_ro` view migration from **142 to 285** that names it. The PR found this
+  dependency for the *current* view and added a `DROP VIEW` ahead of the drop; it did not see the 58
+  behind it. **The general form is `BF-210`** — the fix is precedented and small, and it is Lane A's.
+  Its description says the gates pass, so **do not read that as current**.
+- **#1499 — blocked on its own new test file.** Build fails at the test-typecheck gate:
+  `app/api/__tests__/or138-readonly-pivot.test.ts: 6 error(s) — this file had none.` The description
+  reports *"`npx tsc --noEmit` — clean"*, which is true and is **a different gate** — that one reads
+  `tsconfig.json`, the CI step reads `tsconfig.tests.json`. Six type errors in the PR's own spec.
+  **Recommendation: back to Lane A to fix the spec; it returns to him green.**
+- **#1755 — recommendation: merge, after reading the one judgement call its author flagged.** All
+  required checks green **and** the `Android (Kotlin tests + debug APK)` job passed — that job is not
+  required, and its author correctly said its result needed reading rather than assuming. The flagged
+  call is that `device-transfer` is excluded from backup alongside `cloud-backup`, so a phone-to-phone
+  transfer also drops the session cookie: the cost is signing in again after switching phones. That is
+  the right default. **It needs a new APK to reach the device.**
+- **#1672 and #1671 — recommendation: merge both.** Green, and both are narrowing changes rather than
+  widening ones. **#1671 carries a finding worth his eye:** its author executed the exploit RV-191 was
+  filed on and **it does not reproduce** — the browser blocks both legs — so the entry's SECURITY/HIGH
+  priority is wrong even though the validation gap it describes is real. Not measured on the Samsung
+  WebView, which is the canonical runtime.
+- **#1607 — recommendation: he reads this one himself, and no agent merges it.** An **auth** change
+  (a second credential path) from outside the standing-agent set, which is his carve-out by name.
+  **Its green is from 2026-09-25 and describes a workflow that no longer exists** — it ran a single
+  `Tests` job where every PR since runs four shards. Re-run before reading it.
+- **#1608 — recommendation: merge.** Storage only, re-ran green on 09-27, no sync or calculation
+  change. Same external contributor; unlike #1607 it touches no credential path.
+- **#1465 was the eighth and is CLOSED (2026-09-27), not pending.** Every change in it was already on
+  `main` by another route — its base-read fix shipped as `LA-132`, `BF-24` and `Q-395` already carry
+  the lane it proposed, and `RV-111` and `BF-92` have left the queue. It was also conflicted with
+  zero CI runs, which is what a conflicted PR always looks like: GitHub schedules no workflow for one.
 
 ### [readiness] OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call
 
