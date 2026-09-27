@@ -200,6 +200,14 @@ describe('/api/day-timeline — workouts', () => {
     expect(events[0].title).toBe('Upper')
   })
 
+  it('writes clock times through formatTimeOfDay, like every other screen (RV-208 ①)', async () => {
+    // It formatted `h:mm a` itself, so Home read "5:00 PM" where every other screen reads "5:00 pm".
+    getWorkoutSessionsFrom.mockResolvedValue([workout()])
+    const [ev] = await eventsOf('workout')
+    expect(ev.time).toBe('5:00 pm')
+    expect(ev.endTime).toBe('6:00 pm')
+  })
+
   it('counts sets across exercises and reports a duration only when completed', async () => {
     getWorkoutSessionsFrom.mockResolvedValue([
       workout({ exercises: [

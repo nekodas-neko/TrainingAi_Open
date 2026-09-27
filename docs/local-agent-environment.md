@@ -18,6 +18,11 @@ git worktree add ../TrainingAi_Open-lane-a origin/main
 Start the agent in that directory. Never share one between lanes, and never run a lane from the
 owner's own working copy.
 
+**The same applies to ONE agent running two things at once.** A background suite reads the checkout
+as it goes, so a `git checkout` mid-run makes it test half of each branch. Measured 2026-09-27: a
+test file loaded from one branch ran against `date-utils.ts` from another and failed on a correct
+change. Run the suite in its own worktree, or do not switch branches until it exits.
+
 ## ② One database per agent
 
 `setup.sh` takes `LOCAL_DB_PORT`, `LOCAL_DB_NAME`, `LOCAL_PGDATA` and `LOCAL_PGLOG`, defaulting to the
@@ -65,6 +70,10 @@ Unsetting `DATABASE_SSL` in the shell is not enough, because `.env.local`'s `tru
   `netstat -ano` and kill it.
 - **`pnpm start` will not boot without valid storage keys.** The instrumentation hook fails closed in
   production mode on `SignatureDoesNotMatch (403)`. That is deliberate, so do not work around it.
+- **Do not run `pnpm lint` (or anything that reads the source tree) while the full suite runs.**
+  `check-comment-blindness.test.ts` writes fixtures into real files such as
+  `components/workout/set-card.tsx` and restores them afterwards. A lint in that window reports a
+  parsing error in a file nobody touched. Measured 2026-09-27; lint on its own was clean.
 - **Nine tests in six files fail on Windows and pass on Linux CI** — backslash paths, node running
   in the machine's timezone rather than UTC, and one spawn timeout. See `LA-163`. Read a local red
   against that list before debugging it, and treat CI as the authority.
