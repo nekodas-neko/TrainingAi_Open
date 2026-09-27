@@ -1,4 +1,15 @@
 import { todayInTz } from '@trainingai/shared/date-utils'
+
+/**
+ * How long a rules fallback plan is held (LB-165).
+ *
+ * Long enough to cover the session the lifter is about to do, short enough that one provider
+ * blip is not a day of uninformed plans — the seven-day hold a normal `storePrescription` takes
+ * is the thing RV-202 was right to refuse. Expressed as a duration rather than a local-day
+ * boundary deliberately: a day boundary needs calendar arithmetic and a timezone, and neither
+ * buys anything here over "a few hours from now".
+ */
+const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
 import { accessoryTargetRpe } from '@trainingai/shared/ai-periodization/goal-ranges'
@@ -422,15 +433,32 @@ async function runPrescriptionGeneration(
     // workout…" for about thirty seconds and then got the base program anyway. This arrives at
     // the same numbers immediately.
     //
-    // **Deliberately NOT persisted.** `storePrescription` would hold this for seven days and the
-    // model would get no further attempt until it expired — one provider blip becoming a week of
-    // uninformed plans, which is the shape RV-69 fixed for the digests. Leaving the slot empty
-    // means the next open re-runs the model, and this plan is only what today's caller is handed.
+    // **Persisted, with a SHORT expiry — and the comment here used to say the opposite.**
+    //
+    // RV-202 left this unstored, reasoning that `storePrescription` holds a plan for seven days
+    // so the model would get no further attempt until it expired. That reasoning is still right
+    // about seven days, and the conclusion it reached was wrong, because it assumed the returned
+    // plan reached someone: *"this plan is only what today's caller is handed"*. LB-165 measured
+    // the caller. `workout-data` fires this generation as a background single-flight and never
+    // reads its result; both `/prescribe` clients check `res.ok` and refetch. Nothing painted it.
+    // And `isAiPrescriptionPending` keys on `prescriptionStatus === 'consumed'`, which only
+    // `storePrescription` clears — so not storing also left the screen saying "Preparing your AI
+    // workout…" forever. The lifter's experience was unchanged by RV-202: the same ten 3 s polls
+    // and the same amber banner.
+    //
+    // Storing it is what makes it visible, and the seven-day objection is answered by the expiry
+    // rather than by refusing to store: `RULES_PRESCRIPTION_TTL_MS` covers the session in front of
+    // the lifter and lets the model be tried again the same day. `reevaluate` re-generates once
+    // `prescriptionExpiresAt` passes, and `workout-data` serves a stored plan without checking
+    // expiry, so the short TTL costs nothing on the read side.
     const rules = buildRulesPrescription(
       signals,
       'Your AI coach could not be reached, so this is your program as written.',
     )
     if (rules) {
+      await repo.storePrescription(
+        userId, programSessionId, rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS),
+      )
       return {
         ok: true,
         prescription: rules,
