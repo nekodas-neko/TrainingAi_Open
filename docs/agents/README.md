@@ -55,9 +55,13 @@ picking up the issues and PRs I raise … so they're never getting touched/revie
 priority with a lane → move the watermark** in the baton. **An issue is never answered by replying
 to it**; it becomes a queue entry, or it is recorded as not-a-defect with the reason.
 
-**PULL requests from outside are REVIEW's, not BugFix's** — reviewing a diff against this repo's
-rules is what that role does, and an inbound PR is a code review with an author attached. BugFix
-takes the report; Review takes the patch.
+**⚑ BugFix MONITORS all of it — issues and inbound pull requests both** (owner, 2026-09-27,
+OR-185: *"make that part of our rules that we are monitoring github from bugfix"*). It reads
+`list_pull_requests` (open) beside `list_issues` and files an entry for every PR not authored by the
+agent account. **It does not read the diff** — that goes to Review with a `Lane:`, because reviewing
+a patch against this repo's rules is Review's competence. **One watcher, two readers**: a channel
+watched by two roles is a channel where each assumes the other looked, which is the failure this
+whole section exists to fix.
 
 **It does not fix.** The temptation to fix a one-line bug in the intake session is exactly how
 intake stops being reliable — the queue is the record, and a fix that skipped the queue is a fix
@@ -101,9 +105,23 @@ end-to-end for *our own* PRs (*"when the user pushes a feature branch and opens 
 collaborator's PR arrived into a channel with no reader. Two sat from 2026-09-25 and were noticed
 only sideways, by `TN-80`, while it was doing something else.
 
-**The loop, at session start:** `list_pull_requests` (state open), take the ones whose author is not
-the agent account, and for each **read the diff against this repo's rules and leave a review**. Then
-file what it needs as a backlog entry, the same as any other finding.
+**Review does not watch the channel; BugFix does** (OR-185) and hands each inbound PR over with a
+`Lane:`. Review's job starts at the diff: **read it against this repo's rules and post a review on
+the PR.** Then file what it needs as a backlog entry, the same as any other finding.
+
+**⚑ THE REVIEW COMMENT IS VERY CONCISE — no fluff** (owner, 2026-09-27). He asked for comments to be
+posted *and* for them to be short, which are two instructions and the second is the one that gets
+lost:
+- **No preamble, no praise, no restating what the PR does.** The author wrote it; they know.
+- **One finding per comment.** The problem, the fix, and the `file:line` or the rule that makes it a
+  problem. A finding with no cited rule is an opinion.
+- **Nothing wrong → one line saying so.** Not a summary of everything checked.
+- The Claude Code attribution footer is still required on every posted comment; that is the harness's
+  rule, not padding, and it does not count against the concision.
+
+**A contributor is not the owner.** Write to someone who does not know this repo's conventions: name
+the rule rather than assuming it, and never imply their approach was careless when it is simply not
+what this repo does.
 
 **What Review may NOT do with one:** merge it. An inbound PR is somebody else's code entering the
 owner's app, and two of the standing carve-outs bite immediately — `#1607` is **auth** (bearer
