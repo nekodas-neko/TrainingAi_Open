@@ -30,7 +30,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   notification retarget. **RV-201 then removed the model entirely (2026-09-26)** — the route is a
   `GET`, the prose comes from `buildWeeklyDigestText`, and Home's banner and the week page share
   one cached `weekly-digest:<week>` entry, which is what lets the page paint without a network.
-  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md).
+  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/history-2026-09-27-folded-3.md#2026-09-26-rv201-weekly-digest-offline).
   Read §1 before touching the plan, because three of the original backlog entry's claims about the
   code were stale even then.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
