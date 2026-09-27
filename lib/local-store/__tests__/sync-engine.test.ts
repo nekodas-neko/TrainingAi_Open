@@ -8,6 +8,9 @@ const { fakeStore } = vi.hoisted(() => ({
     recordMutationFailures: vi.fn().mockResolvedValue(undefined),
     getFoodLogs:            vi.fn().mockResolvedValue([]),
     markFoodLogSynced:      vi.fn().mockResolvedValue(undefined),
+    markSessionSynced:      vi.fn().mockResolvedValue(undefined),
+    markExerciseLogSynced:  vi.fn().mockResolvedValue(undefined),
+    markWorkoutSessionTreeSynced: vi.fn().mockResolvedValue(undefined),
     getInjuries:            vi.fn().mockResolvedValue([]),
     upsertInjury:           vi.fn().mockResolvedValue(undefined),
     markInjurySynced:       vi.fn().mockResolvedValue(undefined),
@@ -94,6 +97,24 @@ describe('pushMutations', () => {
     // invisibility that let DV-8 accumulate 36 rows over 14 days.
     expect(errorLog).toHaveBeenCalledWith(
       expect.stringContaining('confirm failed'), 'injuries', expect.any(Error))
+  })
+
+  // LA-165. The confirm guards ask "is another mutation still queued for this row?", and this loop
+  // runs before the batch is deleted — so each confirm must be told which ids it is confirming.
+  it('confirms the offline log edits and the session delete, passing the batch it is confirming', async () => {
+    const edit = mut('ob-e', 'exercise_log_edit', '2026-07-01'); edit.payload = { exerciseLogId: 'el-1', weights: [50], reps: [5] }
+    const del = mut('ob-d', 'exercise_log_delete', '2026-07-01'); del.payload = { exerciseLogId: 'el-2' }
+    const ses = mut('ob-s', 'workout_session_delete', '2026-07-01'); ses.payload = { workoutSessionId: 'ws-9' }
+    const rpe = mut('ob-r', 'session_rpe', '2026-07-01'); rpe.payload = { workoutSessionId: 'ws-8', sessionRpe: 7 }
+    fakeStore.getPendingMutations.mockResolvedValue([edit, del, ses, rpe])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ processed: 4, errors: [] })))
+    await pushMutations('u1')
+    const batch = ['ob-e', 'ob-d', 'ob-s', 'ob-r']
+    expect(fakeStore.markExerciseLogSynced).toHaveBeenCalledWith('el-1', batch)
+    expect(fakeStore.markExerciseLogSynced).toHaveBeenCalledWith('el-2', batch)
+    expect(fakeStore.markWorkoutSessionTreeSynced).toHaveBeenCalledWith('ws-9', batch)
+    expect(fakeStore.markSessionSynced).toHaveBeenCalledWith('ws-8', batch)
+    expect(fakeStore.deleteMutations).toHaveBeenCalledWith(batch)
   })
 
   it('deletes confirmed rows and records failures only for server-failed ids', async () => {

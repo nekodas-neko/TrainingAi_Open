@@ -469,19 +469,23 @@ describe('upsertActivityLog GPS fields', () => {
   })
 })
 
-// SYN-4: these mirrors run only after an awaited web PATCH/DELETE already succeeded
+// SYN-4: by DEFAULT these mirrors run only after an awaited web PATCH/DELETE already succeeded
 // (local == server at that instant) — must write 'synced', never 'pending', or the
 // row is permanently stranded behind every future pull's `WHERE sync_status='synced'` gate.
+// LA-165 added an explicit `pending` mode for offline writes, with a confirm that flips it back;
+// the status is now a bound parameter, so these read it from the call rather than the SQL text.
+const paramsOf = (pred: (sql: string) => boolean) =>
+  runSQL.mock.calls.filter(c => pred(String(c[0]))).map(c => c[1] as unknown[])
+
 describe('deleteExerciseLogLocally / updateExerciseLogLocally sync_status (SYN-4)', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
   it('deleteExerciseLogLocally marks both the exercise_log and its sets synced, not pending', async () => {
     await store.deleteExerciseLogLocally('el-1')
-    const exStmt = sqlCalls().find(s => s.includes('UPDATE exercise_logs'))!
-    expect(exStmt).toContain(`sync_status='synced'`)
-    expect(exStmt).not.toContain(`sync_status='pending'`)
-    const setStmt = sqlCalls().find(s => s.includes('UPDATE set_logs'))!
-    expect(setStmt).toContain(`sync_status='synced'`)
+    const ex = paramsOf(s => s.includes('UPDATE exercise_logs'))
+    expect(ex[0]).toContain('synced')
+    expect(ex[0]).not.toContain('pending')
+    expect(paramsOf(s => s.includes('UPDATE set_logs'))[0]).toContain('synced')
   })
 
   // Q-328. `deleteActivityLog`, which wrote `sync_status='synced'` here, is gone with the last
@@ -526,16 +530,16 @@ describe('deleteExerciseLogLocally / updateExerciseLogLocally sync_status (SYN-4
   })
 
   it('updateExerciseLogLocally marks the exercise_log and each set synced, not pending', async () => {
+    querySQL.mockResolvedValueOnce([{ id: 's-1' }])   // set 1 already exists → the UPDATE branch
     await store.updateExerciseLogLocally('el-1', [
       { setNumber: 1, weightKg: 100, reps: 5, intensityPct: 80 },
     ])
-    const exStmt = sqlCalls().find(s => s.startsWith('UPDATE exercise_logs'))!
-    expect(exStmt).toContain(`sync_status='synced'`)
-    const setStmt = sqlCalls().find(s => s.includes('weight_kg=?') && s.includes('intensity_pct=?'))!
-    expect(setStmt).toContain(`sync_status='synced'`)
+    expect(paramsOf(s => s.startsWith('UPDATE exercise_logs'))[0]).toContain('synced')
+    expect(paramsOf(s => s.includes('weight_kg=?') && s.includes('intensity_pct=?'))[0]).toContain('synced')
   })
 
   it('updateExerciseLogLocally preserves the server-recomputed intensityPct when omitted', async () => {
+    querySQL.mockResolvedValueOnce([{ id: 's-1' }])
     await store.updateExerciseLogLocally('el-1', [
       { setNumber: 1, weightKg: 100, reps: 5 },
     ])
@@ -562,12 +566,9 @@ describe('deleteWorkoutSessionLocally (SYN-1/SYN-2)', () => {
 
   it('tombstones the session and every child exercise_log/set_log as synced', async () => {
     await store.deleteWorkoutSessionLocally('ws-1')
-    const wsStmt = sqlCalls().find(s => s.includes('UPDATE workout_sessions'))!
-    expect(wsStmt).toContain(`sync_status='synced'`)
-    const elStmt = sqlCalls().find(s => s.includes('UPDATE exercise_logs') && s.includes('workout_session_id'))!
-    expect(elStmt).toContain(`sync_status='synced'`)
-    const slStmt = sqlCalls().find(s => s.includes('UPDATE set_logs') && s.includes('exercise_log_id IN'))!
-    expect(slStmt).toContain(`sync_status='synced'`)
+    expect(paramsOf(s => s.includes('UPDATE workout_sessions'))[0]).toContain('synced')
+    expect(paramsOf(s => s.includes('UPDATE exercise_logs') && s.includes('workout_session_id'))[0]).toContain('synced')
+    expect(paramsOf(s => s.includes('UPDATE set_logs') && s.includes('exercise_log_id IN'))[0]).toContain('synced')
   })
 })
 
