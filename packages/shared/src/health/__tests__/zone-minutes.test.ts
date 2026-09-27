@@ -3,7 +3,7 @@ import { computeHrZones } from '../hr-zones'
 import { accumulateZoneSeconds, edwardsTrimp, zoneBreakdownFromReadings, activeMinutesFromZoneSeconds } from '../zone-minutes'
 
 // Profile: maxHr 190, restingHr 50 → reserve 140. Zone lower bpms:
-// Z1 50, Z2 50+0.4*140=106 (TN-78), Z3 50+0.7*140=148, Z4 50+0.8*140=162, Z5 50+0.9*140=176
+// Z1 50, Z2 50+0.6*140=134, Z3 50+0.7*140=148, Z4 50+0.8*140=162, Z5 50+0.9*140=176
 const zones = computeHrZones({ maxHr: 190, restingHr: 50 })
 
 const t = (min: number) => new Date(Date.UTC(2026, 6, 17, 15, 0, 0) + min * 60_000).getTime()

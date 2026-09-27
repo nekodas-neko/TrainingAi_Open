@@ -4181,9 +4181,17 @@ which is the right shape for something that can only be validated by living with
   ones *should*.
 
 ### [activity][heart-rate] TN-78 — the zone-minutes goal is WHO's MODERATE target scored at a VIGOROUS threshold, so walking can never earn it
-- **✅ SHIPPED 2026-09-27 (Lane A).** `ZONE_DEFS` Light `lowerFrac` 0.6 → 0.4, on the owner's
-  2026-09-27 answer (40% of heart-rate reserve, ACSM's moderate range, which the 22-minute goal's
-  own WHO citation implies). The band above it is untouched.
+- **✅ SHIPPED 2026-09-27 (Lane A)** — as a **separate constant**, not as a change to the zone map.
+  `MODERATE_INTENSITY_FRAC = 0.4` + `moderateIntensityBpm()` in `hr-zones.ts`, consumed by the new
+  `activeMinutesFromReadings`. `ZONE_DEFS` is untouched.
+- **⛔ THE OBVIOUS IMPLEMENTATION IS WRONG — the entry names `ZONE_DEFS` Light `lowerFrac` and
+  that change is a regression.** `targetsForRunType` (`packages/shared/src/running/hr-targets.ts`)
+  builds run prescriptions from the same map, so moving Light to 0.4 takes a **recovery run's
+  ceiling from 134 bpm to 106** with it. CI caught it (`hr-targets.test.ts`: expected 134, got
+  106) after a local run of `packages/shared/src/health` alone had passed. The owner approved a
+  change to how active minutes are COUNTED, not to what a recovery run is. Two uses of one map
+  wanting different edges — an activity-guideline definition and a training prescription — so they
+  are two constants now, and a test pins that the Light band still reads 134.
 - **THE RE-SCORE, measured before merging as the Tuning rule requires — and the entry's own
   figures were a different quantity.**
 
