@@ -3689,27 +3689,49 @@ which is the right shape for something that can only be validated by living with
       overstate it. And the `resilience_daily_sleep_recovery` finding rests on **5 days against 6**,
       not 16 against 14: the three daily indices are NULL on the other 19 rows.
 
-### [readiness][devices] LA-158 — resilience stopped publishing five days ago and nothing says so
-- **Lane: A** for the surfacing; the input collapse behind it may be `DV`.
+### [readiness][devices] LA-158 — resilience stopped publishing and the surface says nothing
+- **Lane: B** — the payload half shipped (below); what is left is rendering it.
 - **Branch:** _unassigned_ · **Added:** 2026-09-27 · found verifying TN-70 against production.
-- **What:** `oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22**
-  while the rollup runs normally (last write 2026-09-27 02:19 UTC, coverage column populated to
-  2026-09-27). The mechanism is established in TN-70's third-regime note: daytime-stress coverage
-  has cleared the 240-minute per-day gate on **2 of the last 13 days**, so fewer than 5 of the
-  trailing 14 are valid and the publish gate closes.
-- **Why it is an entry rather than a note:** a score the owner reads simply stopped, and **the only
-  reason anyone knows is that someone queried the table**. There is no Known-Issues row, no
-  surface that says "not enough daytime coverage to compute this", and no alert. The metric's
-  absence looks identical to the app not having got to it yet.
-- **Two candidate causes for the coverage collapse, NEITHER established:** the ring is genuinely
-  worn less during the day since mid-September, or daytime stress ingest/decode has degraded. The
-  database cannot separate them — `worn_hours_ble` is NULL on every row (TN-70), so there is no
-  stored wear figure to check against.
-- **Shape:** (a) surface the shortfall where the score would be, naming the gate rather than going
-  blank; (b) a `DV` check of whether the ring is actually being worn in the daytime, which is the
-  only thing that separates the two causes.
-- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's
-  own constant, and a level computed from 50 minutes would be worse than no level.
+- **⚙ THE ENGINE HALF SHIPPED 2026-09-27 (Lane A), and it corrected this entry's premise.**
+  The entry said the tile had gone blank. It had not: `buildReadinessPayload` reads a **7-day**
+  window (`getOuraDailyDerived(userId, from7dIso, todayIso)`) and takes the most recent row with a
+  level, so on 2026-09-27 the tile was **rendering 09-22's level 1 as if it were today's, with no
+  date** — and would have gone silently blank once 09-22 left the window. Two defects, and the
+  live one was staleness rather than absence.
+  - `ReadinessScoreResponse` now carries **`ownResilienceAsOf`** (the day the level came from) and
+    **`ownResilienceUnavailable`** (`daysSeen`, `daysMeetingCoverageGate`, `coverageGateMinutes`,
+    `minValidDays`, `modelWindowDays`) via the new pure `observeResilienceCoverage` in
+    `lib/health/stress-resilience.ts`.
+  - **It is an OBSERVATION, not a diagnosis, deliberately.** The payload sees 7 days while the
+    model gates on `windowDays` (14), so a shortfall it can see does not establish that the
+    coverage gate is why nothing published. The fields make a true sentence — *"2 of the last 7
+    days had enough daytime coverage; the model needs 5 of 14"* — and stop there. A test pins the
+    absence of a `reason` field so a later "tidy-up" cannot turn it into a verdict.
+- **What is left, and it is Lane B's:** render them. `components/health/resilience-tile.tsx` takes
+  level/band/confidence and no date, and `health-score-detail.tsx:265` renders the tile only when
+  `ownResilienceLevel != null`. So: show `ownResilienceAsOf` (or a staleness marker) whenever the
+  level is not today's, and when there is no level render the shortfall from
+  `ownResilienceUnavailable` instead of rendering nothing.
+- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's own
+  constant, and a level computed from 50 minutes would be worse than no level.
+- **Keep:** the Lane B render above. The wear-vs-ingest question is now **LA-160**.
+
+### [readiness][devices] LA-160 — is the ring actually worn in the daytime, or has daytime-stress ingest degraded?
+- **Lane: DV** — only the phone can separate these two.
+- **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-158 on shipping its engine half.
+- **What:** daytime-stress coverage has collapsed. Measured in production 2026-09-27 over
+  2026-09-15 → 09-27: **290, 290, 170, 170, 120, 50, 150, 60, 150, 60, 140, 110, 50** minutes
+  against a 240-minute per-day gate — **2 of 13 days clear it**, so resilience has published
+  nothing since 09-22.
+- **Two candidate causes, NEITHER established:** the ring is genuinely worn less during the day
+  since mid-September, or daytime-stress ingest/decode has degraded. **The database cannot
+  separate them** — `worn_hours_ble` is NULL on every row (TN-70), so there is no stored wear
+  figure to check against.
+- **The check:** on the device, over a few ordinary days, whether the ring is on the hand through
+  the working day, and whether the BLE service is draining daytime stress frames while it is.
+  Answer VERIFIED / FAILED / COULD NOT CHECK, naming the days observed.
+- **Why it matters beyond resilience:** daytime stress feeds Body Battery and the stress scalars
+  too, so a collapse here is not confined to one tile.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
