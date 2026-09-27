@@ -567,6 +567,18 @@ below threshold and left in place for next time.
 - **Reversal cost:** none here — nothing has merged.
 
 ### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
+- **✅ SECURITY REVIEW POSTED 2026-09-27** — [the comment](https://github.com/nekodas-neko/TrainingAi_Open/pull/1607#issuecomment-5854224892).
+  **No approval given, deliberately**: it is an auth change and the owner answered that he reads
+  this one himself. **Three findings.** ① No test for the new `responseType: 'token'` branch,
+  although `lib/__tests__/user-account-routes.test.ts:332` already covers the route. ② No per-token
+  revocation — a leaked bearer is valid 7 days and the only kill switch deactivates the whole
+  account. ③ A pre-existing cookie/JWT lifetime mismatch in the same file, split out as `OR-193`.
+- **What the review CONFIRMED, so nobody re-derives it:** the credential is the existing NextAuth
+  session JWT rather than a new one, and `auth()` already resolves it through
+  `lib/auth/bearer-session.ts` with a per-request `isActive` re-read — so the Q-1a overlap this
+  entry flagged is **reuse, not duplication**. PKCE, one-time consumption and the rate limit are
+  untouched, and `secureCookie` matches `bearer-session.ts:38`.
+- **`TN-80` is struck** — it routed this PR before BugFix filed it properly; this entry is the live record.
 
 - **Lane:** O — **Review** reads the diff and posts the review; the **merge is the owner's** (auth,
   outside contributor — both halves of that carve-out at once). Filed `O` for the same reason as
@@ -677,6 +689,27 @@ below threshold and left in place for next time.
   [`docs/oura-raw-archive-retention-brief.md`](oura-raw-archive-retention-brief.md).
 - **Reversal cost: none for the measurement; total and permanent for acting on a wrong answer** —
   a pruned raw row cannot be re-drained from the ring.
+
+
+### [platform] OR-193 — the mobile session cookie outlives the JWT inside it by 23 days
+
+- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, found while security-reviewing inbound PR
+  `#1607` ([review comment](https://github.com/nekodas-neko/TrainingAi_Open/pull/1607#issuecomment-5854224892)).
+  **Pre-existing on `main`; not introduced by that PR.**
+- **Measured.** `app/api/auth/exchange-mobile-token/route.ts` sets the session cookie with
+  `maxAge: 30 * 24 * 60 * 60` — **30 days**. The JWT it carries has `maxAge: 7 * 24 * 60 * 60` in
+  `auth.config.ts:9` — **7 days**. So from day 7 the browser keeps presenting a cookie whose token
+  `getToken` rejects, for another 23 days.
+- **The symptom is a silent sign-out on the mobile path at day 7**, with a cookie still present.
+  Not a security hole — the expired token is refused, which is the safe direction — but the cookie
+  is making a promise the credential does not keep.
+- **Recommendation: derive the cookie's `maxAge` from the session `maxAge` rather than restating
+  it.** One constant, imported, so the two cannot drift again. The alternative — raising the JWT to
+  30 days to match the cookie — is the wrong direction: it triples the window a leaked bearer stays
+  valid, which `#1607` makes newly relevant.
+- **Check the other writer in the same change:** `updateAge: 24 * 60 * 60` means a JWT is re-issued
+  at most daily, so an active user is not affected; this bites the user who is away 7–30 days.
+- **Reversal cost:** one constant.
 
 
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
@@ -1564,89 +1597,6 @@ below threshold and left in place for next time.
   most of the argument for doing it now.
 - **Not established:** whether the collaborator expects review *comments* or just merges. Worth
   asking him directly rather than inferring it.
-
-### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
-- **⚑ RECONCILE BEFORE ACTING — BugFix has already filed all three, with findings this entry does
-  not have.** `BF-211` (issue #1620), `BF-212` (#1607, and it notes `Q-1a` covers the same area),
-  and **`BF-213`, which is the one that matters: #1608 takes migration numbers 288/289 that `main`
-  has already used, and the collision destroys its `claude_ro` twin.** That is a blocking defect
-  found by reading the diff, not a routing note. **Those three are now the live record; this entry
-  is the routing history.** Strike it once the security review is posted rather than working it
-  twice.
-- **✅ ANSWERED 2026-09-27 — run a security review on `#1607` first, then the owner reads the diff himself.**
-  He declined both the approve-if-clean option and the comment-only one. So: **a `/security-review`
-  pass, findings posted concisely on the PR, and then it waits for him.** No agent merges it — it is
-  auth AND it is not ours, so the ceiling is review/comment/approve under the 2026-09-27 rule.
-  **`#1608`** (HealthKit sample storage) is an ordinary external PR and gets a normal review on the
-  same pass. **Orchestrator holds this** until the review is posted; `OR-184` tracks the same three
-  items from the intake side and the two should be reconciled, not worked twice.
-
-- **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
-  `Gate: owner` would park it, and getting these in front of him is the work.
-- **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
-  review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
-  message.
-- **Why this is a defect and not bookkeeping.** `grep -cE '#1607|#1592|#1499'` over this file returns
-  **0**. The seven decisions already in `Lane: O` are correctly routed — these are not routed at all.
-  A GitHub review request is a channel nobody is watching: #1499 has sat since **2026-09-24** and the
-  two external PRs since the small hours of 09-25. **CLAUDE.md's rule covers exactly this** — a
-  question for the owner is a task, and a question that lives only in a reply dies with the session.
-  It says nothing about PRs, which is why three of them slipped: the rule is written about backlog
-  questions and the gap is one category wider than the rule's wording.
-
-**The three, each with a recommendation.**
-
-  **#1607 — bearer tokens for native mobile login** (`native-token-exchange`, external contributor,
-  review requested from the owner). Adds an opt-in token response with expiry beside the existing
-  cookie login, for an Expo/React-Native iPhone client.
-  - **Recommendation: the owner reads this one himself before it merges, and no agent merges it.**
-    It is an **auth** change, which is his carve-out by CLAUDE.md's own list, and it arrives from
-    outside the standing-agent set. A second credential path is cheap to add and expensive to get
-    wrong — token lifetime, revocation and storage are the questions, and none of them is visible from
-    the PR title.
-  - **Not assessed here.** I have not read the diff; this entry routes it rather than reviewing it.
-    A security review before he reads it would be worth more than my summary — that is `Lane: A`'s
-    or a `/security-review` pass, and it should happen first.
-
-  **#1592 — accept `activeCalories` in daily health imports** — **⚠ IT MERGED AS #1616 on 2026-09-25**
-  (*"…, rounded"*, superseding #1592), before this entry reached him, so nothing is owed on it. Kept
-  because the consequence below stopped being hypothetical the moment it landed, and because **the
-  Q-524 amendment it invalidates is corrected in this same PR** rather than left wrong on `main`.
-  Forwards `dailyMetrics[].activeCalories` into `body_metrics.active_calories`.
-  - **Recommendation: mergeable on its own terms, and it must not merge silently.** It is a
-    reasonable Apple-Health feature and the storage column already exists. But that column is the
-    input to the Activity Score's `activeEnergy` contributor (weight 15), dead since 2026-07 — so
-    **this revives the input `Q-204` exists to remove**, from a direction nobody was watching, and
-    `Q-184`'s own check says do not revive it.
-  - **It also invalidates a conclusion I published yesterday.** The Q-524 amendment answered its
-    double-count blocker with *"not live, and probably never"*, resting on `activeEnergy` having no
-    live source. If this merges it has one, and the steps/energy double-count becomes live the moment
-    anyone builds the energy-derived step goal. **Whoever merges it should add that line to Q-204 and
-    Q-524 in the same PR**, or my amendment is wrong on `main` with nothing marking it.
-
-  **#1499 — scope `/api/admin/db-query` to a user who filed feedback** (`lane-a/or138-pivot-readonly-scope`,
-  his own Lane A work, explicitly held: *"AUTH/SECURITY — not merged on my own authority"*).
-  - **Recommendation: approve.** The widening is narrow — it reaches only users who have filed
-    feedback, which is one predicate to remove if he ever wants it broader, and the no-leak behaviour
-    was proven against a real pool pinned to `max: 1` rather than asserted. The PR also settled the
-    entry's own flagged unknown (a bare `SET` cannot stick, because every statement is wrapped in a
-    subquery), so the single-user guarantee was never as soft as feared.
-  - **One caveat worth his eye:** the audit trail goes in as a `-- claude_ro pivot: <uuid>` comment on
-    the audit row rather than a column, because a column is a migration and migrations ship alone.
-    Attributable, greppable, and tidier as a follow-up — not a reason to hold the PR.
-
-- **The process half, which is the durable part.** The rule that routes owner questions is written
-  about backlog entries and does not mention pull requests, so a PR awaiting the owner has no home in
-  the queue. **Recommendation: extend it** — when a PR needs the owner (auth, secrets, money, a
-  data-dropping migration, or an external contribution touching any of those), the opening agent files
-  a `Lane: O` entry with an `Ask:` naming the PR, and strikes it when the PR merges or closes. Cheap,
-  and it is the only thing that makes "everything goes to ORC" true for PRs as well as decisions.
-  Filed as a recommendation rather than edited into CLAUDE.md, because a standing-rule change is the
-  owner's to accept.
-- **What this entry does NOT do.** It does not review any of the three diffs — #1607's auth surface in
-  particular deserves a real read, and this is a routing entry. And it makes no claim about whether
-  the two external PRs are otherwise sound: CI state, test coverage and contributor provenance are all
-  unexamined here.
 
 ### [readiness] OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call
 
