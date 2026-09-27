@@ -1322,6 +1322,67 @@ below threshold and left in place for next time.
 - **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
   `Footprints`, unchecked against the current glyph.
 
+### [platform] OR-184 — the collaborator's issue and two PRs, and the channel that had no reader
+
+- **Lane: O** — the routing only. **The three are now covered by a standing rule rather than by this
+  entry** (OR-185): BugFix reads GitHub at session start, so its next session finds all three without
+  being told. This stays open to catch the case where that does not happen, and **self-clears the
+  moment BugFix files them.**
+- **⛔ Deliberately NOT adding a `Lane: BF`.** The routing gap is real — the next action here is
+  BugFix's and no lane names BugFix — but `OR-150` waited for fifteen entries and three sweeps before
+  `Lane: T` was justified, and this is one entry. **A fifth lane value added for a single case is a
+  channel nobody reads.** Revisit if a second and third entry need to be handed to BugFix; until
+  then the session-start rule is the mechanism.
+- **Added:** 2026-09-27 · the collaborator, relayed by the owner: *"it's also not picking up the
+  issues and PRs I raise to your Training app, so they're never getting touched/reviewed either."*
+  **He is right, and it was checked rather than assumed.**
+- **What is actually open, read from GitHub 2026-09-27:**
+  | item | author | opened | state in this repo |
+  |---|---|---|---|
+  | **issue #1620** — replace the manual migration counter with a calculated next number | `jsboiss` | 09-25 | **nothing references it**; `grep 1620` over the backlog returns one hit and it is not this |
+  | **PR #1607** — return bearer tokens for native mobile login | `jsboiss` | 09-25 | in `TN-80` as *waiting on the owner*; **never reviewed** |
+  | **PR #1608** — add storage for HealthKit samples and deletion records | `jsboiss` | 09-25 | branch named in one entry; **not tracked as a PR at all** |
+- **Why nothing read them, which is the part worth fixing.** BugFix owns intake and its two channels
+  were spoken reports and `feedback_submissions` — neither is GitHub. `CLAUDE.md`'s CI/CD section is
+  written end to end for **our own** PRs (*"when the user pushes a feature branch and opens a PR"*),
+  so an inbound PR landed in a channel with no reader at all. **`grep -c list_issues` over `CLAUDE.md`
+  and `docs/agents/README.md` returned 0.** `TN-80` caught two of the three sideways while doing
+  something else, which is luck, not a channel.
+- **✓ FIXED IN THIS PR (OR-183):** GitHub issues are BugFix's third intake channel and inbound PRs
+  are Review's, both in the session-start list and both roles' sections. **That fixes the future and
+  not the three that are already open** — this entry is the three.
+- **What each needs next, and they are not the same:**
+  ① **#1620 is the easiest and nobody has to decide anything** — it is a tooling suggestion about the
+  migration counter, which is exactly the kind of structural call an agent takes. It needs a read and
+  either an entry or a reply saying why not.
+  ② **#1607 is AUTH.** Review reads it and posts a review; **the merge is the owner's**, per the
+  standing carve-out. `Q-1a` already covers the client half of the same area — check them against
+  each other before reviewing, because a conflicting design is the likely finding.
+  ③ **#1608 adds STORAGE**, so Lane A owns the half that touches schema, and any migration number is
+  Lane A's alone.
+- **✅ ANSWERED 2026-09-27: POST THE COMMENTS, AND KEEP THEM VERY CONCISE.** Owner: *"Yes write
+  comments but make sure they are very concise. No fluff."* The concision rule is now in `CLAUDE.md`
+  and `docs/agents/README.md` — no preamble, no praise, no restating the PR; one finding per comment
+  with the `file:line` or rule behind it; *"no issues found"* is one line. **He also moved the
+  watching to BugFix** (OR-185), so the channel has one watcher and Review reads the patch it is
+  handed. **The merges stay his** — unchanged, and both live PRs hit a carve-out anyway (`#1607`
+  auth, `#1608` storage).
+- **So the three are routed:** `#1620` → BugFix, triage and file or reply with why not. `#1607` and
+  `#1608` → BugFix files them, **Review reads the diffs and posts the reviews**, owner merges.
+  **Check `#1607` against `Q-1a` before reviewing** — same area, client half, and a conflicting
+  design is the likely finding.
+- **The superseded ask, kept for the reasoning:** **recommendation: let Review post reviews on #1607 and #1608 now, and keep the
+  merges yours.** A review is not a merge: it costs nothing to reverse, and the alternative is that a
+  contributor's work sits unread for a fourth day. **What I am NOT proposing** is that agents merge
+  outside PRs — both touch a carve-out (auth, storage), and outside code entering your app is the
+  clearest case for your eyes there is. **If you would rather no agent comments on his PRs at all**,
+  say so and this becomes "summarise them for him in chat instead", which is slower and keeps every
+  word yours.
+- **Reversal cost: a posted review can be edited or deleted.** Nothing here is hard to undo, which is
+  most of the argument for doing it now.
+- **Not established:** whether the collaborator expects review *comments* or just merges. Worth
+  asking him directly rather than inferring it.
+
 ### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
 
 - **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
@@ -3300,6 +3361,31 @@ which is the right shape for something that can only be validated by living with
 - **Brand in food names:** "Uncle Tobys — Rolled oats" (Log Food) against "Rolled oats / Uncle Tobys · …" (diary). Pick one.
 
 ### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
+
+- **✅ STEPS 1 AND 2 SHIPPED (#1748, 2026-09-27); step 3 is a RATCHET rather than a sweep.**
+  `--text-2xs: 11px` (with its line height) is in `@theme`, and the **nine sites the entry names**
+  are on it. Every one of the nine was verified against `main` first and every line number was
+  right — worth saying, because several entries this week were not.
+- **11 px, not 12.** That is where the existing mass sits (287 uses at 11 against 583 at 10), and
+  it is reachable without re-laying out cards that a 12 px floor would. The four `set-card` sites
+  were already at 11 and change nothing visually; what they gain is a place ON the scale, so the
+  next edit cannot reach for `text-[10.5px]`. The five at 9–10 px move up.
+- **Step 3 is frozen, not swept.** `components/workout/**` holds **103 sub-11 px literals across
+  24 files** and 41 more written as `text-[11px]`. A hundred blind edits is a worse risk than a
+  ratchet: `components/workout/__tests__/rv209-type-floor.test.ts` baselines both counts **per
+  file, shrink-only**, so every future touch pays a little of it down and nothing new lands below
+  the floor. To lower a number, convert that file and re-run. Control-run: putting a `text-[9px]`
+  back in `set-card` fails it.
+- **The other two halves of the entry are untouched and stay true.** Uppercase eyebrows may sit at
+  10–11 px — `workout-clocks:202` and `active-workout-screen:306` are eyebrows and went to 11, not
+  12, for that reason. Chart axis text is P36's and is inside the baseline rather than exempted,
+  because "is this string an axis label" is not something a scan can answer.
+- **Keep:** ① the device look. Rendered at 412 px dark on the active workout screen — set cards,
+  the percentage label and the RPE strip all sit clean, nothing overflows. **Two of the nine were
+  NOT on screen in that state** (`active-workout-screen:283/306`, the last-session panel), so they
+  are read from source only. ② the **26 small sites at 40–70 % opacity** that the entry notes: a
+  size floor does not fix a contrast one, and that is a separate decision.
+
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63 (static audit).
 - **What:** there are 13 named sizes plus 29 arbitrary ones (`text-[10.5px]`, `[11.5px]`, `[12.5px]`, `[13.5px]`, `[14.5px]`…), from 7 px to 34 px.
@@ -3515,6 +3601,11 @@ which is the right shape for something that can only be validated by living with
   independent comparator.
 - **Lane: A** — the producer is the BLE rollup (`lib/oura-ble/rollup/run.ts`), engine territory, and the
   decisive test below is a re-run rather than a calibration.
+- **Gate: owner** — the one step left is a wide rollup pass over history, which is a **production
+  write**. Everything readable has been read (see the three ⚙ blocks below); the evidence it would
+  overwrite is now captured, so the ask is narrow: may the rollup be re-run across
+  2026-07-24 → 2026-08-29 to fill `night_hrv_baseline_ms` and re-derive those days? A yes answers
+  TN-70's decisive question; a no leaves it permanently unanswerable from stored data.
 - **Measured 2026-09-24 over 129 derived days.**
 
   | regime | days | levels seen | mean `resilience_confidence` |
@@ -3641,27 +3732,67 @@ which is the right shape for something that can only be validated by living with
       later fault on the same metric.
     - **The actionable half is filed as LA-158** — nothing anywhere says the metric has stopped.
 
-### [readiness][devices] LA-158 — resilience stopped publishing five days ago and nothing says so
-- **Lane: A** for the surfacing; the input collapse behind it may be `DV`.
+  - **⚙ THE PRESCRIBED PASS WOULD DESTROY THIS ENTRY'S OWN EVIDENCE — measured 2026-09-27 (Lane A).
+    Do not run it before reading [`docs/reviews/2026-09-27-tn70-resilience-snapshot.md`](reviews/2026-09-27-tn70-resilience-snapshot.md).**
+    - `upsertDailyDerived` resolves every column as `COALESCE(excluded.<col>, oura_daily_derived.<col>)`
+      (`lib/data/postgres/slices/oura.ts`), so a recompute wins wherever it is non-null. The wide pass
+      fills `night_hrv_baseline_ms` — the point of it — **and in the same statement overwrites
+      `resilience_level`, `resilience_granular` and the three daily indices on every day it
+      publishes one.** The decisive question *"do those 16 July days still come back as 5?"* can
+      therefore be asked exactly once, and only if the before-values were recorded first.
+    - **They now are.** The entire evidentiary base is **30 rows** — of 132 derived days spanning
+      2026-05-07 → 09-27, exactly 30 carry a level (16 July + 14 September). All 30 are captured
+      per-day in the snapshot doc, so the pass is safe to run as far as the comparison goes.
+    - **It is still a production write, so it remains the owner's call** — that is the only blocker
+      left on it, and it is no longer an evidence-destroying one.
+    - **Two of this entry's readings are corrected there.** `confidence` spans the *identical* four
+      values in both regimes (`{5,6,7,8}/14`), so it separates nothing — the 0.464-vs-0.434 means
+      overstate it. And the `resilience_daily_sleep_recovery` finding rests on **5 days against 6**,
+      not 16 against 14: the three daily indices are NULL on the other 19 rows.
+
+### [readiness][devices] LA-158 — resilience stopped publishing and the surface says nothing
+- **Lane: B** — the payload half shipped (below); what is left is rendering it.
 - **Branch:** _unassigned_ · **Added:** 2026-09-27 · found verifying TN-70 against production.
-- **What:** `oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22**
-  while the rollup runs normally (last write 2026-09-27 02:19 UTC, coverage column populated to
-  2026-09-27). The mechanism is established in TN-70's third-regime note: daytime-stress coverage
-  has cleared the 240-minute per-day gate on **2 of the last 13 days**, so fewer than 5 of the
-  trailing 14 are valid and the publish gate closes.
-- **Why it is an entry rather than a note:** a score the owner reads simply stopped, and **the only
-  reason anyone knows is that someone queried the table**. There is no Known-Issues row, no
-  surface that says "not enough daytime coverage to compute this", and no alert. The metric's
-  absence looks identical to the app not having got to it yet.
-- **Two candidate causes for the coverage collapse, NEITHER established:** the ring is genuinely
-  worn less during the day since mid-September, or daytime stress ingest/decode has degraded. The
-  database cannot separate them — `worn_hours_ble` is NULL on every row (TN-70), so there is no
-  stored wear figure to check against.
-- **Shape:** (a) surface the shortfall where the score would be, naming the gate rather than going
-  blank; (b) a `DV` check of whether the ring is actually being worn in the daytime, which is the
-  only thing that separates the two causes.
-- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's
-  own constant, and a level computed from 50 minutes would be worse than no level.
+- **⚙ THE ENGINE HALF SHIPPED 2026-09-27 (Lane A), and it corrected this entry's premise.**
+  The entry said the tile had gone blank. It had not: `buildReadinessPayload` reads a **7-day**
+  window (`getOuraDailyDerived(userId, from7dIso, todayIso)`) and takes the most recent row with a
+  level, so on 2026-09-27 the tile was **rendering 09-22's level 1 as if it were today's, with no
+  date** — and would have gone silently blank once 09-22 left the window. Two defects, and the
+  live one was staleness rather than absence.
+  - `ReadinessScoreResponse` now carries **`ownResilienceAsOf`** (the day the level came from) and
+    **`ownResilienceUnavailable`** (`daysSeen`, `daysMeetingCoverageGate`, `coverageGateMinutes`,
+    `minValidDays`, `modelWindowDays`) via the new pure `observeResilienceCoverage` in
+    `lib/health/stress-resilience.ts`.
+  - **It is an OBSERVATION, not a diagnosis, deliberately.** The payload sees 7 days while the
+    model gates on `windowDays` (14), so a shortfall it can see does not establish that the
+    coverage gate is why nothing published. The fields make a true sentence — *"2 of the last 7
+    days had enough daytime coverage; the model needs 5 of 14"* — and stop there. A test pins the
+    absence of a `reason` field so a later "tidy-up" cannot turn it into a verdict.
+- **What is left, and it is Lane B's:** render them. `components/health/resilience-tile.tsx` takes
+  level/band/confidence and no date, and `health-score-detail.tsx:265` renders the tile only when
+  `ownResilienceLevel != null`. So: show `ownResilienceAsOf` (or a staleness marker) whenever the
+  level is not today's, and when there is no level render the shortfall from
+  `ownResilienceUnavailable` instead of rendering nothing.
+- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's own
+  constant, and a level computed from 50 minutes would be worse than no level.
+- **Keep:** the Lane B render above. The wear-vs-ingest question is now **LA-160**.
+
+### [readiness][devices] LA-160 — is the ring actually worn in the daytime, or has daytime-stress ingest degraded?
+- **Lane: DV** — only the phone can separate these two.
+- **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-158 on shipping its engine half.
+- **What:** daytime-stress coverage has collapsed. Measured in production 2026-09-27 over
+  2026-09-15 → 09-27: **290, 290, 170, 170, 120, 50, 150, 60, 150, 60, 140, 110, 50** minutes
+  against a 240-minute per-day gate — **2 of 13 days clear it**, so resilience has published
+  nothing since 09-22.
+- **Two candidate causes, NEITHER established:** the ring is genuinely worn less during the day
+  since mid-September, or daytime-stress ingest/decode has degraded. **The database cannot
+  separate them** — `worn_hours_ble` is NULL on every row (TN-70), so there is no stored wear
+  figure to check against.
+- **The check:** on the device, over a few ordinary days, whether the ring is on the hand through
+  the working day, and whether the BLE service is draining daytime stress frames while it is.
+  Answer VERIFIED / FAILED / COULD NOT CHECK, naming the days observed.
+- **Why it matters beyond resilience:** daytime stress feeds Body Battery and the stress scalars
+  too, so a collapse here is not confined to one tile.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -3816,43 +3947,18 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
 
-### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
-
-- **Lane: A** — `lib/health/readiness-payload.ts` (the `inDeloadPhase` branch),
-  `packages/shared/src/ai-periodization/`.
-- **Added:** 2026-09-25 while building TN-64(b). **⚠ REWRITTEN 2026-09-25 — the original filing's
-  central measurement was WRONG, and the wrong version is quoted here so it is not re-derived.**
-- **What the first version claimed:** *"`program_phases` holds 0 rows for all five programs."*
-  **False.** It came from a query joining `program_phases` on **`program_id`** — a legacy column
-  that is **NULL on all 46 rows** since phases moved under `phase_set_id`. The join matched nothing
-  and read as a clean zero. No error, no warning: the same silent-absence failure the External API
-  field-name rule in `CLAUDE.md` exists for, in a diagnostic query rather than in product code.
-- **Measured properly 2026-09-25:** `program_phases` holds **46 rows across 8 phase sets**,
-  **8 of them `phase_type = 'deload'`**, all 46 keyed by `phase_set_id`.
-
-  | program | mode | phase set | phases |
-  |---|---|---|---:|
-  | Bankai (**active**) | `ai_dynamic` | none | 0 |
-  | Shikai | `ai_dynamic` | none | 0 |
-  | AI-Phase1 | `ai_dynamic` | none | 0 |
-  | Main | `automatic` | yes | 6 |
-  | Strength + Hypertrophy | `automatic` | yes | 6 |
-
-- **So the real finding is narrower and still real.** `listProgramPhases` resolves through
-  `programs.phase_set_id` and returns `[]` when there is none, so on any `ai_dynamic` program
-  `inDeloadPhase` is always false. For the two `automatic` programs the suppression works exactly
-  as written. Since TN-64(b) extended the gate to `ai_dynamic`, the **active** program is now gated
-  without any in-deload suppression at all.
-- **The prior question is therefore answered: `ai_dynamic` is not *supposed* to write phase rows.**
-  It periodizes dynamically instead of from a fixed set, which is the point of the mode. **Do not
-  populate `program_phases` for it** — that was the trap the first version of this entry set up.
-- **What is actually open:** `ai_dynamic` has its own deload notion (`ai-dynamic.ts` carries an
-  elevated-temperature deload trigger), and the early-deload gate does not consult it. Whether it
-  should is the question. Worst case today is a redundant prompt, since every early deload needs
-  the owner's confirmation.
-- **Also worth a sweep, separately:** `program_phases.program_id` is dead — 0 of 46 populated — and
-  its presence is what made the bad query look answered. Dropping it is a migration and belongs to
-  whoever next touches that table, not here.
+### [readiness][platform] LA-159 — `program_phases.program_id` is dead and made a diagnostic query read as a clean zero
+- **Lane: A** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-138 on closing it.
+- **What:** `program_phases.program_id` is populated on **0 of 46 rows** — phases moved under
+  `phase_set_id` and the column stayed. Dropping it is a migration.
+- **Why it is worth an entry rather than a shrug:** joining on it returns nothing, with no error
+  and no warning, and that is exactly how LA-138's first filing came to claim *"`program_phases`
+  holds 0 rows for all five programs"* when it holds 46. A dead column that silently answers
+  "none" is a trap for the next person writing a diagnostic query, not just dead weight.
+- **Shape:** one migration (`DROP COLUMN program_id`) plus the regenerated `claude_ro` twin, and
+  a check that nothing reads it first. **Ships alone, and it is data-dropping, so
+  confirm-before-merge** — see LA-142 (#1749) for the shape, including that the `claude_ro` view
+  must be dropped in the same file before the column can go.
 
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
@@ -3950,6 +4056,41 @@ unverified"* is now answered: it persists.
   and every read re-decodes from `body_hex` via the adapter's `r.decoded ?? decodeEventBody(...)`
   fallback. Correct today; it does mean a decoder edit retroactively changes historical reads with
   nothing recording that it did.
+- **⚙ THE READ THIS ENTRY ASKED FOR IS DONE (2026-09-27, Lane A) — and it REFUTES the prediction.**
+  The entry said: *"after this deploys, check whether the 21 days read `scorer_no_output`. If they
+  do, the question is whether the constants are loaded."* **They do not.** Measured in production:
+
+  | day | gate | written |
+  |---|---|---|
+  | 2026-09-16 → 09-24 | `insufficient_met` | 09-27 03:21 |
+  | 2026-09-25, 09-26 | `scorer_no_output` | 09-27 03:21 |
+  | 2026-09-27 | `insufficient_met` | 09-27 03:21 |
+
+  - **None of these rows is stale** — all twelve carry the same `updated_at`, so every one is a
+    fresh verdict from the split, not a leftover label. The `scorer_no_output` string is live and
+    reaching the table.
+  - **So the constants hypothesis is NOT the next step.** `scorer_no_output` fires on only 2 of 12
+    days. On the other ten the MET floors themselves are firing — and 09-18 → 09-24 are exactly the
+    days this entry's own replay proved clear BOTH floors with room (09-23: a 1421-minute grid,
+    1073 valid minutes, against 720 and 360).
+  - **That is now a flat contradiction with one side inside the serving process.** The replay reads
+    frames straight from `oura_raw_samples`; production reaches them through
+    `getOuraDaytimeSignals`. Same frames, same `metGridFromDaytimeSamples`, opposite verdicts — so
+    the loss is in that method, which is where this entry already suspected it.
+  - **⚠ Two more hypotheses formed and KILLED here — do not re-run them.**
+    ① *Every MET value in a `0x50` frame is pushed with the same `tsMs`, so a day collapses to ~100
+    minutes.* The timestamps really are shared, and it is **not** the cause:
+    `metGridFromDaytimeSamples` regroups consecutive equal-timestamp bins into their source event
+    and lays them back out one minute apart, which is exactly what that code is for.
+    ② *`readRawFrames` truncates.* It does not — there is no `LIMIT` anywhere in it, hot or cold.
+  - **What is left, and it is two candidates, both inside `getOuraDaytimeSignals`:** the ds window
+    (`msToDs` on the day bounds — LA-139/RV-182 ② moved this to a robust offset across the whole
+    anchor series, and the window is only as good as that fit), or **rows silently dropped by
+    `dsToMs` returning null** (`if (tsMs == null) continue`), which discards a frame with no signal
+    of any kind.
+  - **The next step is instrumentation, not another read — filed as LA-161.** Nothing persisted
+    says how long the grid actually was, so the two candidates cannot be separated from outside.
+
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
   `reason: 'insufficient_met'` (`training-stress.ts:82`), and that model returns null down **seven**
@@ -4057,6 +4198,24 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
+
+### [readiness][devices] LA-161 — persist the MET grid's dimensions, so the training-load gate can be diagnosed from data
+- **Lane: A** · **Added:** 2026-09-27 · split out of TN-79 when its prescribed read refuted its own prediction.
+- **Why:** production gates `insufficient_met` on days whose stored frames replay to a 1421-minute
+  grid with 1073 valid minutes. One of those two is wrong and **nothing persisted says which**, so
+  the difference can only be guessed at from outside. TN-79 has now spent several sessions on
+  inference; two integers would end it.
+- **What:** persist, beside `training_load_gate`, the grid length and the valid-minute count that
+  `computeTrainingStress` actually gated on — the two numbers in
+  `i.metsPerMinute.length < 720 || validMin < 360`.
+- **Shape:** one migration adding two nullable integer columns to `oura_daily_derived`, its
+  regenerated `claude_ro` twin in the same PR, the row mapper, and the route's persist call.
+  **Ships alone** (migration). Additive and nullable, so it is not data-dropping.
+- **Done when:** one day of production says whether the grid production builds is short, and by how
+  much. If it is short, the cause is the ds window or `dsToMs` dropping rows; if it is not, the
+  floors are being evaluated on something other than what is stored.
+- **Do NOT lower the floors to make the gate pass.** 720 and 360 are the model's own, and the
+  question is why a day with 1073 valid minutes reads as insufficient.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 

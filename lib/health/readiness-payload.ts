@@ -28,7 +28,7 @@ import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hour
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { computeReadinessComposite, checkinScoreFromEnergy, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
-import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
+import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
@@ -243,6 +243,25 @@ export interface ReadinessScoreResponse {
   ownResilienceLevel: number | null                                          // 1.0-5.0
   ownResilienceBand: 'low' | 'limited' | 'adequate' | 'solid' | 'strong' | null
   ownResilienceConfidence: number | null
+  // LA-158: the day the level above was produced. The level is the most recent one in a 7-day
+  // window, NOT necessarily today's, and the tile had no way to tell the two apart — on
+  // 2026-09-27 it was rendering 09-22's level as current. A surface that shows a number owes
+  // the reader its date whenever the number can be days old.
+  ownResilienceAsOf: string | null                                           // 'YYYY-MM-DD'
+  // LA-158: what was observed when no level could be shown, so the surface can say why instead
+  // of rendering nothing. Deliberately NOT a diagnosis: the payload looks at 7 days while the
+  // model gates on `windowDays`, so a shortfall here is consistent with the coverage gate having
+  // closed without establishing it. The numbers let the surface state what is true —
+  // "N of the last M days had enough daytime coverage; the model needs K of W" — and no more.
+  // `null` for the threshold fields means the resilience constants were not injected on this
+  // request, which is a different thing from a threshold of zero.
+  ownResilienceUnavailable: {
+    daysSeen: number
+    daysMeetingCoverageGate: number | null
+    coverageGateMinutes: number | null
+    minValidDays: number | null
+    modelWindowDays: number | null
+  } | null
 }
 
 /** Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read. */
@@ -339,6 +358,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
   // Latest day with a produced resilience level (today may be too incomplete to resolve one yet).
   const latestResilience = [...derivedTodayRows].reverse().find(r => r.resilienceLevel != null) ?? null
+  // LA-158: when there is no level, record what was actually observed rather than leaving the
+  // surface to render nothing and say nothing. Measured 2026-09-27: resilience had published
+  // nothing since 09-22 and the only reason anyone knew was a query against the table.
+  const resilienceUnavailable = latestResilience?.resilienceLevel != null
+    ? null
+    : observeResilienceCoverage(derivedTodayRows.map(r => r.daytimeStressCoverageMin))
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
   const ouraByDate = toOuraByDate(ouraRows)
 
@@ -676,6 +701,27 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // The thresholds are NOT touched here (EARLY_DELOAD_SCORE_MAX / EARLY_DELOAD_ACWR_MIN). Moving
   // them in the same change would make it impossible to tell whether a prompt appeared because the
   // gate opened or because the bar dropped — and a threshold is Tuning's proposal, not this one's.
+  // LA-138, answered 2026-09-27 and closed: `ai_dynamic` gets NO in-deload suppression, on
+  // purpose. `inDeloadPhase` below can only ever be false for it — `listProgramPhases` resolves
+  // through `programs.phase_set_id` and that mode has none (it periodizes dynamically, which is
+  // the point of the mode; do NOT populate `program_phases` for it). The active program also has
+  // `started_at` NULL, so the ternary below short-circuits before the phases are even fetched —
+  // two independent reasons, where the entry named one.
+  //
+  // **Do not "fix" this by consulting `ai-dynamic.ts`'s deload signal.** That is
+  // `deloadOrRestRecommended` — a RECOMMENDATION to deload, not a state of being in one.
+  // Suppressing this warning on it would silence the prompt exactly when two independent systems
+  // agree a deload is due, which is backwards. The honest "already deloading" signal for this
+  // mode is a stored prescription with `phaseAction === 'deload'` under `prescriptionDrivesLoad`,
+  // and that is SESSION-scoped while this gate is program-scoped — it would have to guess which
+  // session it meant.
+  //
+  // What settles it is the asymmetry plus the count. A false suppression hides a health warning;
+  // a false prompt costs one confirmation tap, since every early deload needs the owner's yes.
+  // And there is nothing to suppress. Measured in production 2026-09-27: of the 119 logged
+  // workout sessions, `is_early_deload` is false on every one — the 3 that carry a deload
+  // `phase_type` are scheduled phase deloads off the two `automatic` programs, which is the
+  // path that already has suppression. Revisit if an early deload ever actually fires.
   let earlyDeloadRecommended = false
   let earlyDeload: EarlyDeloadReason | null = null
   if (program?.phaseMode === 'automatic' || program?.phaseMode === 'ai_dynamic') {
@@ -926,5 +972,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     ownResilienceLevel:       latestResilience?.resilienceLevel ?? null,
     ownResilienceBand:        latestResilience?.resilienceLevel != null ? resilienceLevelToBand(latestResilience.resilienceLevel) : null,
     ownResilienceConfidence:  latestResilience?.resilienceConfidence ?? null,
+    ownResilienceAsOf:        latestResilience?.day ?? null,
+    ownResilienceUnavailable: resilienceUnavailable,
   } satisfies ReadinessScoreResponse
 }

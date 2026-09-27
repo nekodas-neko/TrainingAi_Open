@@ -199,7 +199,7 @@ export function WarmupRampProgress({
               />
               <div className="relative">
                 <p
-                  className="text-[9px] font-bold uppercase tracking-wide mb-1"
+                  className="text-2xs font-bold uppercase tracking-wide mb-1"
                   style={{ color: isDone ? "var(--accent-green)" : isActive ? "var(--color-brand)" : "var(--color-muted-foreground)" }}
                 >
                   {isDone ? "✓" : `W${i + 1}`} · {w.label}
@@ -210,7 +210,7 @@ export function WarmupRampProgress({
                 >
                   {w.weight} kg
                 </p>
-                <p className="text-[9px] text-muted-foreground mt-0.5">× {w.reps} · {w.pct}%</p>
+                <p className="text-2xs text-muted-foreground mt-0.5">× {w.reps} · {w.pct}%</p>
               </div>
             </div>
           );
