@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **286** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v41** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **288** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v42** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -3769,34 +3769,6 @@ moderate activity lands in zone 1 (*"Recovery"*), which `activeMinutesFromZoneSe
   deliberately counts **days with any qualifying sample**, which sparsity can only bias downward.
   And nothing here says more moderate minutes would make the owner healthier — only that the app is
   not counting the ones its own stated goal is about.
-
-### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
-
-- **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
-- **Added:** 2026-09-25, Lane A — found while fixing LA-140, by asking how many columns share its
-  shape. **Corrected the same day; the first version of this entry was wrong, see below.**
-- **Measured on production 2026-09-25: 11 of `oura_daily_derived`'s columns are NULL on every row.**
-  All-NULL is not proof of a missing writer — so each was checked against the code.
-- **Four have no writer at all:** `active_calories_est`, `pwv`, `worn_hours_ble`, and the derived
-  `vascular_age` (distinct from `oura_daily.vascular_age`, which is a different table and is
-  written). None of the four has a reader either, so **deleting them and their plumbing is probably
-  right** — the ~40-member push path stops carrying dead fields. That is a migration plus a local
-  SQLite version bump, so it ships alone and is not a drive-by.
-- **⚠ RETRACTION — `training_load_ots` and `training_load_high` are NOT unwritten.** This entry first
-  said six columns had no writer and that two of them were read by live surfaces, making them
-  LA-140's trap with consumers. **`app/api/training-stress/route.ts:89` writes both**, on the
-  success branch. The repo-wide grep behind the original claim truncated its output per column and
-  that file never surfaced — the same "measured the wrong thing" failure this entry was filed to
-  describe.
-- **The symptom is real and belongs to TN-79, not here.** Both columns ARE all-NULL, so
-  `weekly-digest/route.ts:192`'s `otsHigh` is permanently false and `ai-chat/tools.ts:121`'s
-  `trainingStress` always returns an empty array. The cause is that the route's gate never reaches
-  `ok` and persists a reason instead — which is exactly what **TN-79** is already open for. Fixing
-  the gate fills the columns; nothing here needs a new writer.
-- **A ratchet is worth considering and is NOT free.** A check that every derived column has a writer
-  would catch the genuine four, but `chronic_stress_*` (gated on 21 complete nights),
-  `recovery_index_hours` and the training-load pair are all legitimately written-but-empty — so it
-  needs a reasoned allowlist rather than a bare scan, and is its own piece of work.
 
 ### [readiness][workouts] LA-138 — the early-deload gate has no in-deload suppression on an `ai_dynamic` program, because that mode does not use phase sets
 

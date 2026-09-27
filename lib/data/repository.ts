@@ -1496,7 +1496,6 @@ export interface OuraDailyDerivedRow {
   readinessSource: string | null
   activityScore: number | null
   activityContributors: unknown | null
-  activeCaloriesEst: number | null
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
   /** TN-64: acute:chronic workload ratio, the half of the early-deload gate nothing recorded. */
@@ -1506,7 +1505,6 @@ export interface OuraDailyDerivedRow {
   // `readinessSource`) rather than importing the health package's union into the data layer.
   trainingLoadGate: string | null
   recoveryIndexHours: number | null
-  wornHoursBle: number | null
   nightHrvBaselineMs: number | null
   illnessFlag: string | null
   illnessScore: number | null
@@ -1526,8 +1524,6 @@ export interface OuraDailyDerivedRow {
   daytimeStressCoverageMin: number | null
   chronicStressGranularNights: number | null
   bdiDerived: number | null
-  vascularAge: number | null
-  pwv: number | null
   bodyComp: unknown | null
 }
 

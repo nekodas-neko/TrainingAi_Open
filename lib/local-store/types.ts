@@ -207,12 +207,10 @@ export interface LocalOuraDailyDerived {
   readinessSource:                string | null;
   activityScore:                  number | null;
   activityContributors:           Record<string, unknown> | null;  // parsed from TEXT JSON
-  activeCaloriesEst:              number | null;
   trainingLoadOts:                number | null;
   trainingLoadGate:               string | null;
   trainingLoadHigh:               boolean | null;                  // stored as INTEGER 0/1
   recoveryIndexHours:             number | null;
-  wornHoursBle:                   number | null;
   nightHrvBaselineMs:             number | null;
   illnessFlag:                    string | null;
   illnessScore:                   number | null;
@@ -232,8 +230,6 @@ export interface LocalOuraDailyDerived {
   daytimeStressCoverageMin:       number | null;
   chronicStressGranularNights:    number | null;
   bdiDerived:                     number | null;
-  vascularAge:                    number | null;
-  pwv:                            number | null;
   bodyComp:                       Record<string, unknown> | null;  // parsed from TEXT JSON
   syncStatus:                     'pending' | 'synced';
   updatedAt:                      string;

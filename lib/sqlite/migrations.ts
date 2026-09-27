@@ -117,12 +117,10 @@ const CREATE_OURA_DAILY_DERIVED_LOCAL = `CREATE TABLE IF NOT EXISTS oura_daily_d
   readiness_source             TEXT,
   activity_score               INTEGER,
   activity_contributors        TEXT,
-  active_calories_est          INTEGER,
   training_load_ots            REAL,
   training_load_gate           TEXT,
   training_load_high           INTEGER,
   recovery_index_hours         REAL,
-  worn_hours_ble               REAL,
   night_hrv_baseline_ms        REAL,
   illness_flag                 TEXT,
   illness_score                INTEGER,
@@ -141,8 +139,6 @@ const CREATE_OURA_DAILY_DERIVED_LOCAL = `CREATE TABLE IF NOT EXISTS oura_daily_d
   daytime_stress_coverage_min  REAL,
   chronic_stress_granular_nights INTEGER,
   bdi_derived                  REAL,
-  vascular_age                 REAL,
-  pwv                          REAL,
   body_comp                    TEXT,
   updated_at                   TEXT NOT NULL,
   sync_status                  TEXT NOT NULL DEFAULT 'synced'
@@ -404,7 +400,6 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'oura_daily_derived', column: 'readiness_source',              ddl: `ALTER TABLE oura_daily_derived ADD COLUMN readiness_source TEXT` },
   { table: 'oura_daily_derived', column: 'activity_contributors',         ddl: `ALTER TABLE oura_daily_derived ADD COLUMN activity_contributors TEXT` },
   { table: 'oura_daily_derived', column: 'training_load_high',            ddl: `ALTER TABLE oura_daily_derived ADD COLUMN training_load_high INTEGER` },
-  { table: 'oura_daily_derived', column: 'worn_hours_ble',                ddl: `ALTER TABLE oura_daily_derived ADD COLUMN worn_hours_ble REAL` },
   { table: 'oura_daily_derived', column: 'night_hrv_baseline_ms',         ddl: `ALTER TABLE oura_daily_derived ADD COLUMN night_hrv_baseline_ms REAL` },
   { table: 'oura_daily_derived', column: 'illness_biomarkers',            ddl: `ALTER TABLE oura_daily_derived ADD COLUMN illness_biomarkers TEXT` },
   { table: 'oura_daily_derived', column: 'stress_high_minutes',           ddl: `ALTER TABLE oura_daily_derived ADD COLUMN stress_high_minutes INTEGER` },
@@ -418,7 +413,6 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'oura_daily_derived', column: 'daytime_stress_coverage_min', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN daytime_stress_coverage_min REAL` },
   { table: 'oura_daily_derived', column: 'chronic_stress_granular_nights', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN chronic_stress_granular_nights INTEGER` },
   { table: 'oura_daily_derived', column: 'training_load_gate', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN training_load_gate TEXT` },
-  { table: 'oura_daily_derived', column: 'vascular_age',                  ddl: `ALTER TABLE oura_daily_derived ADD COLUMN vascular_age REAL` },
   { table: 'oura_daily_derived', column: 'pwv',                          ddl: `ALTER TABLE oura_daily_derived ADD COLUMN pwv REAL` },
   { table: 'oura_daily_derived', column: 'body_comp',                     ddl: `ALTER TABLE oura_daily_derived ADD COLUMN body_comp TEXT` },
   // Direct-BLE scale composition (migration 155 server-side) — additive via reconcile per the
@@ -1596,6 +1590,25 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // above so fresh installs already have it, this ALTER reaches every upgraded device, and the
       // RECONCILE_COLUMNS row is the authority if it half-applies.
       `ALTER TABLE food_items ADD COLUMN barcode TEXT`,
+    ],
+  },
+  {
+    toVersion: 42,
+    statements: [
+      // LA-142, mirroring Postgres migration 286. The reverse of the usual shape: these four
+      // columns had no writer and no reader on either side, and were NULL on all 132 production
+      // rows, so this removes them from the device mirror too rather than leaving the ~40-field
+      // sync payload carrying dead fields.
+      //
+      // SQLite has supported DROP COLUMN since 3.35 (Android's bundled build is well past it) and
+      // none of the four is indexed or used in a view, which are the only cases it refuses. `IF
+      // EXISTS` is NOT available for DROP COLUMN in SQLite, so an upgrade that half-applied would
+      // throw on re-run — the RECONCILE_COLUMNS rows are gone, so nothing re-adds them, and the
+      // CREATE body above no longer has them for a fresh install.
+      `ALTER TABLE oura_daily_derived DROP COLUMN active_calories_est`,
+      `ALTER TABLE oura_daily_derived DROP COLUMN worn_hours_ble`,
+      `ALTER TABLE oura_daily_derived DROP COLUMN vascular_age`,
+      `ALTER TABLE oura_daily_derived DROP COLUMN pwv`,
     ],
   },
 ];

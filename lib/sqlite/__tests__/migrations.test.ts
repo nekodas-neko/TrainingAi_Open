@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(41)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(42)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
@@ -213,12 +213,17 @@ describe('local schema', () => {
     for (const col of summaryCols) {
       expect(mirror.has(`oura_daily_summary.${col}`), `RECONCILE_COLUMNS missing oura_daily_summary.${col}`).toBe(true)
     }
+    // LA-142 removed `worn_hours_ble`, `vascular_age` and `pwv` from this list (and
+    // `active_calories_est`, which was never in it) because the COLUMNS are gone — v42 drops them
+    // and the RECONCILE rows with them. A name leaves this guard only when its column leaves the
+    // schema; it must never be deleted because the assertion is inconvenient, which is the whole
+    // point of the 2026-07-23 outage it is named for.
     const derivedCols = [
-      'readiness_source', 'activity_contributors', 'training_load_high', 'worn_hours_ble',
+      'readiness_source', 'activity_contributors', 'training_load_high',
       'night_hrv_baseline_ms', 'illness_biomarkers', 'stress_high_minutes', 'recovery_high_minutes',
       'chronic_stress_contributors', 'resilience_daily_stress', 'resilience_daily_restorative_time',
       'resilience_daily_sleep_recovery', 'resilience_granular', 'resilience_confidence',
-      'vascular_age', 'pwv', 'body_comp',
+      'body_comp',
     ]
     for (const col of derivedCols) {
       expect(mirror.has(`oura_daily_derived.${col}`), `RECONCILE_COLUMNS missing oura_daily_derived.${col}`).toBe(true)
