@@ -191,16 +191,34 @@ describe('the catch branch uses it, and does not persist what it returns', () =>
   })
 
   /**
-   * The load-bearing one. `storePrescription` holds a plan for seven days, so persisting this
-   * would give the model no further attempt until it expired — one provider blip becoming a week
-   * of uninformed plans. That is the shape RV-69 fixed for the digests, and the reason the
-   * degraded recap is never cached there either.
+   * The load-bearing one, and it was INVERTED by LB-165 — deliberately, with its intent kept.
+   *
+   * It used to assert the branch never stores. The property that actually mattered was never
+   * "does not persist"; it was "the model gets another attempt soon", and RV-202 achieved that
+   * by not storing because it believed the returned plan reached the caller. It did not:
+   * `workout-data` never reads the background generation's result, and `isAiPrescriptionPending`
+   * only clears via `storePrescription`, so not storing left the screen preparing forever.
+   *
+   * So the plan is stored now, and the same property is pinned on the EXPIRY instead: a short
+   * TTL, never the seven-day default that would make one provider blip a week of uninformed
+   * plans. Phase state must still not move — that half is unchanged.
    */
-  it('NEVER stores it — the next open must re-run the model', () => {
-    // Matched as a CALL, not as the identifier: the branch's own comment explains why it does not
-    // persist, and naming the function there made the looser assertion fail on the explanation.
-    expect(catchBranch).not.toMatch(/storePrescription\s*\(/)
+  it('stores it so it can be painted, but never for the seven-day default', () => {
+    expect(catchBranch).toMatch(/storePrescription\s*\(/)
+    expect(catchBranch).toMatch(/RULES_PRESCRIPTION_TTL_MS/)
+    // The seven-day literal every other store site uses must not appear in this branch.
+    expect(catchBranch).not.toMatch(/7\s*\*\s*86_?400_?000/)
     expect(catchBranch).not.toMatch(/advancePhase\s*\(/)
+  })
+
+  it('holds the fallback for hours, not days', () => {
+    // Pins the magnitude rather than the number: a TTL that crept up to days would reintroduce
+    // exactly what RV-202 refused, and a constant is easy to edit without reading why it exists.
+    const m = /const RULES_PRESCRIPTION_TTL_MS = ([^\n]+)/.exec(src)
+    expect(m, 'the TTL constant').not.toBeNull()
+    const ms = Function(`"use strict"; return (${m![1].replace(/\/\/.*$/, '')})`)() as number
+    expect(ms).toBeGreaterThanOrEqual(60 * 60 * 1000)
+    expect(ms).toBeLessThan(24 * 60 * 60 * 1000)
   })
 
   it('keeps the 502 for the case the builder cannot serve', () => {
