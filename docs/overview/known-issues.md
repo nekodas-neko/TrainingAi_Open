@@ -44,6 +44,21 @@ a device.** **Pass test on the S25:** log a workout, set its RPE, wait five minu
 and the outbox shows no re-queued `workout_log` entries for that session. Before this change it would
 have shown one per exercise.
 
+### [heart-rate][devices] ⚠️ Ring workout HR thinned before the LA-168 fix stays thinned unless a full-window rollup re-runs (LA-168, 2026-09-28)
+
+An incremental rollup whose cutoff fell inside a workout re-saved the rest of that workout's ring
+HR at 5-minute bins and deleted the 15-second rows. It happened about three days after each workout.
+The fix is live once deployed, but it does not repair rows already rewritten. Measured on the
+owner's ring-only sessions: 08-21 103 → 12, 08-24 110 → 31, 09-05 32 → 5, 09-06 180 → 13,
+09-17 87 → 52, 09-20 164 → 99. The recap's `workout_hr_stats` snapshot kept its numbers, so recaps
+are unaffected. What re-derives from raw HR is affected: the Health HRR trend, zone minutes and the
+workout HR chart. **Recoverable only inside the rollup's 14-day HR window** (from 09-14 today), and
+only by a pass that starts before those sessions, meaning a full-window rollup (a cold start with no
+watermark, or the admin full-history run). The raw frames are still on the server. Sessions older
+than 14 days stay at 5 minutes, because nothing rewrites HR series past that horizon. **Owner
+decision:** whether to run one full-window pass after this deploys. It is cheap, but it pegs the
+process for minutes (Q-213).
+
 ### [workouts][platform] ⚠️ A deleted program now leaves the phone's mirror, and only the phone runs that code (RV-174, 2026-09-28)
 
 Deleting a program or progression style used to leave it in the device's local mirror forever: both
