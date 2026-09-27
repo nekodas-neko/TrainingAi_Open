@@ -4192,6 +4192,26 @@ which is the right shape for something that can only be validated by living with
 - **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
   deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
 
+### [nutrition][app-shell] LB-169 — the empty meal's header `+` is a 36 px tap target, under the 48 px floor
+- **Lane: B** · **Added:** 2026-09-27 · Lane B, split out of `RV-213` while rendering its mockup.
+- **Deliberately NOT part of `RV-213`, and that is the point of splitting it.** `RV-213` is a layout
+  preference gated on the owner; this is a defect with one right answer. Left inside that entry the
+  tap floor would sit blocked behind a question about whether to collapse the cards, which is a
+  different decision entirely.
+- **What, measured rather than read.** `components/nutrition/meal-card.tsx` gives the header's add
+  button `h-9 w-9` — **36 px** — where CLAUDE.md's mobile rules and every other icon button on the
+  screen hold to **48**. Found at the 384 px dark viewport on 2026-09-27 while capturing `RV-213`'s
+  before/after in the Playwright harness.
+- **It is already live and already the harder target of the two.** Today an empty meal offers both
+  the header `+` and a full "Add food" card, so the undersized control has a large sibling and the
+  defect is easy to miss. It is a real miss regardless: a 36 px target on the S25 is the one a thumb
+  fails on, and he reaches for whichever is nearer rather than whichever is bigger.
+- **⚠ And it becomes the ONLY way in if `RV-213` is taken** — that entry removes the "Add food"
+  card. So shipping `RV-213` without this is shipping a regression, which is why the mockup put the
+  two together in front of him rather than offering the collapse alone. Fixing it here means
+  `RV-213` needs no such caveat whichever way he answers.
+- **Scope:** the one button's classes. No layout decision, nothing gated.
+
 ### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
 - **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
 - **The labels and chevrons are FIXED** (RV-217, 2026-09-27): `hrv`, `hr` and `schedule` now carry
