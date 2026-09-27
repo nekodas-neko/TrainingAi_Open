@@ -7650,27 +7650,6 @@ drift.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
-### [workouts][platform] LA-165 — the local half of offline exercise edits: pending writes, and the confirm that clears them
-- **Lane: A** — `lib/local-store/sqlite-backend.ts`, `lib/local-store/sync-engine.ts`.
-- **Needs:** — nothing. The server half shipped as RV-175 (2026-09-28): the push domains
-  `exercise_log_edit`, `exercise_log_delete` and `workout_session_delete` exist and call the same
-  functions as the web routes (`lib/workout/exercise-log-edits.ts`, `lib/workout/delete-session-reconcile.ts`).
-- **Added:** 2026-09-28 · Lane A, while building RV-175.
-- **Why the hook cannot just swap `fetch` for `queueMutation` today:**
-  ① `updateExerciseLogLocally`, `deleteExerciseLogLocally` and `deleteWorkoutSessionLocally` all write
-  `sync_status = 'synced'`. That is right for their current callers, which run only after a 2xx. For
-  an offline write it is wrong: `applyDelta` overwrites `synced` rows, so a pull before the push lands
-  would restore the edited sets and **resurrect the deleted log**, which is CLAUDE.md's pending rule.
-  Give each an explicit pending mode, and keep the current behaviour as the default.
-  ② `sync-engine`'s push-confirm switch has no case for the three domains, so a pending row would never
-  flip back to `synced` and would then refuse every later pull. `markWorkoutSynced` / `markSessionSynced`
-  are the models, but `exercise_log_edit` carries only `exerciseLogId`, so it needs an id-only variant.
-  ③ `updateExerciseLogLocally` UPDATEs existing sets and never INSERTs one, so an edit that adds a
-  set shows nothing locally. Inserting under a local id then duplicates against the server's row on the
-  next pull (the server upserts by `(exercise_log_id, set_number)`). Resolve that key before
-  inserting, or the fix trades a missing set for a doubled one.
-- **Done when:** with the store in pending mode, an edit, a log delete and a session delete each
-  survive a pull that arrives before the push, and each row reads `synced` after its push confirms.
 
 ### [workouts] LA-166 — offline edits and deletes of logged work toast success and are lost: queue them instead
 - **Lane: B** — `lib/hooks/use-day-entry-mutations.ts` (`handleEdit`, `handleDelete`, `handleDeleteSession`).

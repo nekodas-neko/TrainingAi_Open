@@ -1027,7 +1027,10 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   // confirmation is not.
   const confirmedIds: string[] = [];
 
-  // Mark confirmed local records as synced
+  // Mark confirmed local records as synced. `batchIds` because this loop runs BEFORE
+  // `deleteMutations`: a confirm guard that asks "is another mutation still queued for this row?"
+  // must not count the ones it is confirming, or it never fires (LA-165).
+  const batchIds = confirmed.map(m => m.id);
   for (const m of confirmed) {
     try {
     if (m.domain === 'body_metrics') {
@@ -1122,7 +1125,14 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       if (wsId && exerciseLogId) await store.markWorkoutSynced(wsId, exerciseLogId);
     } else if (m.domain === 'session_rpe' || m.domain === 'complete_workout') {
       const wsId = m.payload.workoutSessionId as string | undefined;
-      if (wsId) await store.markSessionSynced(wsId);
+      if (wsId) await store.markSessionSynced(wsId, batchIds);
+    } else if (m.domain === 'exercise_log_edit' || m.domain === 'exercise_log_delete') {
+      // LA-165. The local write marked the log and its sets 'pending' so a pull could not revert it.
+      const exerciseLogId = m.payload.exerciseLogId as string | undefined;
+      if (exerciseLogId) await store.markExerciseLogSynced(exerciseLogId, batchIds);
+    } else if (m.domain === 'workout_session_delete') {
+      const wsId = m.payload.workoutSessionId as string | undefined;
+      if (wsId) await store.markWorkoutSessionTreeSynced(wsId, batchIds);
     } else if (m.domain === 'sleep_session') {
       // Local row id (its own PK, distinct from the server-side oura_id dedup key) —
       // same convention as workout_log/activity_logs above.

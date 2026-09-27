@@ -69,6 +69,25 @@ function foodItemRowToItem(r: Record<string, unknown>): FoodItem {
   };
 }
 
+/**
+ * Is a mutation OTHER than the ones being confirmed still queued for this row? The confirm guards
+ * (SYN-7) skip flipping a row to 'synced' while one is, so a pull cannot revert an edit still on
+ * its way. **The confirm loop runs BEFORE `deleteMutations` removes the batch**, so without
+ * `confirmingIds` every guard counted the mutation it was confirming and never fired: a session
+ * given an RPE stayed 'pending' for good, until the stranded-workout sweep re-pushed its every
+ * exercise five minutes later just to flip it back (found building LA-165).
+ */
+async function otherQueuedMutations(domains: string[], rowId: string, confirmingIds: string[]): Promise<boolean> {
+  const inDomains = domains.map(() => '?').join(',')
+  const notMine = confirmingIds.length ? ` AND id NOT IN (${confirmingIds.map(() => '?').join(',')})` : ''
+  const [{ cnt }] = await querySQL<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM mutations_outbox
+      WHERE domain IN (${inDomains}) AND payload LIKE '%' || ? || '%'${notMine}`,
+    [...domains, rowId, ...confirmingIds],
+  )
+  return Number(cnt) > 0
+}
+
 export class SQLiteLocalStore implements LocalStore {
   async getBodyMetrics(cutoffDate: string): Promise<LocalBodyMetric[]> {
     const rows = await querySQL<Record<string, unknown>>(
@@ -534,14 +553,8 @@ export class SQLiteLocalStore implements LocalStore {
   // applyDelta's synced-row overwrite branch. The LIKE match mirrors
   // getStrandedPendingWorkouts's existing pattern (every relevant payload embeds
   // the workoutSessionId uuid).
-  async markSessionSynced(workoutSessionId: string): Promise<void> {
-    const [{ cnt }] = await querySQL<{ cnt: number }>(
-      `SELECT COUNT(*) AS cnt FROM mutations_outbox
-        WHERE domain IN ('workout_log','session_rpe','complete_workout')
-          AND payload LIKE '%' || ? || '%'`,
-      [workoutSessionId],
-    );
-    if (Number(cnt) > 0) return;
+  async markSessionSynced(workoutSessionId: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['workout_log', 'session_rpe', 'complete_workout'], workoutSessionId, confirmingIds)) return;
     await runSQL(
       `UPDATE workout_sessions SET sync_status='synced' WHERE id=?`,
       [workoutSessionId],
@@ -1549,6 +1562,14 @@ export class SQLiteLocalStore implements LocalStore {
       if (r.deletedAt) {
         await runSQL(`DELETE FROM set_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
+        // LA-165: a set added by an offline edit is inserted locally under a local id, and the
+        // server mints its own when it upserts by (exercise_log_id, set_number). Without this, the
+        // pull would leave both rows — one set shown twice. Only a SYNCED local row gives way; a
+        // pending one is still on its way to the server and a pull must never revert it.
+        await runSQL(
+          `DELETE FROM set_logs WHERE exercise_log_id = ? AND set_number = ? AND id <> ? AND sync_status = 'synced'`,
+          [r.exerciseLogId, r.setNumber, r.id],
+        );
         await runSQL(
           `INSERT INTO set_logs
              (id, exercise_log_id, set_number, weight_kg, reps,
@@ -2205,43 +2226,61 @@ export class SQLiteLocalStore implements LocalStore {
     );
   }
 
-  // Mirrors this device's own render after the web PATCH/DELETE round-trip already
-  // succeeded — local matches server at this exact instant, so these write
-  // sync_status='synced' (not 'pending'). Marking them pending would strand the row:
-  // every future pull is gated behind `WHERE sync_status='synced'` (SYNC-4), so a
-  // never-flipped-back-to-synced row would permanently block re-syncing this record.
-  async deleteExerciseLogLocally(exerciseLogId: string): Promise<void> {
+  // Two modes (LA-165). The DEFAULT mirrors a write the server already confirmed — the web PATCH/
+  // DELETE round-trip succeeded — so local matches server at this instant and the rows are
+  // 'synced'. `pending: true` is an OFFLINE write that is queued: the rows must refuse a pull until
+  // the push confirms, because `applyDelta` overwrites only 'synced' rows and a pull that arrived
+  // first would restore the old sets or resurrect the deleted log. The push-confirm switch in
+  // sync-engine flips them back via markExerciseLogSynced / markWorkoutSessionTreeSynced — which is
+  // what keeps a pending row from blocking every later pull, the reason this was 'synced'-only.
+  async deleteExerciseLogLocally(exerciseLogId: string, opts?: { pending?: boolean }): Promise<void> {
+    const status = opts?.pending ? 'pending' : 'synced';
     const now = new Date().toISOString();
     await runSQL(
-      `UPDATE exercise_logs SET deleted_at=?, sync_status='synced', updated_at=? WHERE id=?`,
-      [now, now, exerciseLogId],
+      `UPDATE exercise_logs SET deleted_at=?, sync_status=?, updated_at=? WHERE id=?`,
+      [now, status, now, exerciseLogId],
     );
     await runSQL(
-      `UPDATE set_logs SET deleted_at=?, sync_status='synced' WHERE exercise_log_id=?`,
-      [now, exerciseLogId],
+      `UPDATE set_logs SET deleted_at=?, sync_status=? WHERE exercise_log_id=?`,
+      [now, status, exerciseLogId],
     );
   }
 
   async updateExerciseLogLocally(
     exerciseLogId: string,
     sets: Array<{ setNumber: number; weightKg: number; reps: number; intensityPct?: number | null }>,
+    opts?: { pending?: boolean },
   ): Promise<void> {
+    const status = opts?.pending ? 'pending' : 'synced';
     const now = new Date().toISOString();
-    await runSQL(`UPDATE exercise_logs SET sync_status='synced', updated_at=? WHERE id=?`, [now, exerciseLogId]);
+    await runSQL(`UPDATE exercise_logs SET sync_status=?, updated_at=? WHERE id=?`, [status, now, exerciseLogId]);
     for (const set of sets) {
-      if (set.intensityPct === undefined) {
-        // Omitted (not explicitly cleared) — preserve whatever the server recomputed
-        // rather than clobbering it with a bare null (SYNC-4).
+      const existing = await querySQL<{ id: string }>(
+        `SELECT id FROM set_logs WHERE exercise_log_id=? AND set_number=?`, [exerciseLogId, set.setNumber],
+      );
+      if (existing.length === 0) {
+        // LA-165: an edit that ADDS a set used to update nothing, so the new set never appeared on
+        // this device until a pull. The server upserts by (exercise_log_id, set_number) and mints
+        // its own id; applyDelta drops this local row in favour of that one once both are synced.
         await runSQL(
-          `UPDATE set_logs SET weight_kg=?, reps=?, updated_at=?, sync_status='synced'
+          `INSERT INTO set_logs (id, exercise_log_id, set_number, weight_kg, reps, intensity_pct, updated_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [crypto.randomUUID(), exerciseLogId, set.setNumber, set.weightKg, set.reps, set.intensityPct ?? null, now, status],
+        );
+      } else if (set.intensityPct === undefined) {
+        // Omitted (not explicitly cleared) — preserve whatever the server recomputed
+        // rather than clobbering it with a bare null (SYNC-4). `deleted_at=NULL` mirrors the
+        // server's upsert, which resurrects a set the edit re-adds.
+        await runSQL(
+          `UPDATE set_logs SET weight_kg=?, reps=?, updated_at=?, deleted_at=NULL, sync_status=?
            WHERE exercise_log_id=? AND set_number=?`,
-          [set.weightKg, set.reps, now, exerciseLogId, set.setNumber],
+          [set.weightKg, set.reps, now, status, exerciseLogId, set.setNumber],
         );
       } else {
         await runSQL(
-          `UPDATE set_logs SET weight_kg=?, reps=?, intensity_pct=?, updated_at=?, sync_status='synced'
+          `UPDATE set_logs SET weight_kg=?, reps=?, intensity_pct=?, updated_at=?, deleted_at=NULL, sync_status=?
            WHERE exercise_log_id=? AND set_number=?`,
-          [set.weightKg, set.reps, set.intensityPct, now, exerciseLogId, set.setNumber],
+          [set.weightKg, set.reps, set.intensityPct, now, status, exerciseLogId, set.setNumber],
         );
       }
     }
@@ -2250,28 +2289,47 @@ export class SQLiteLocalStore implements LocalStore {
     // removed.
     const maxSetNumber = sets.length > 0 ? Math.max(...sets.map(s => s.setNumber)) : 0;
     await runSQL(
-      `UPDATE set_logs SET deleted_at=?, sync_status='synced' WHERE exercise_log_id=? AND set_number>? AND deleted_at IS NULL`,
-      [now, exerciseLogId, maxSetNumber],
+      `UPDATE set_logs SET deleted_at=?, sync_status=? WHERE exercise_log_id=? AND set_number>? AND deleted_at IS NULL`,
+      [now, status, exerciseLogId, maxSetNumber],
     );
   }
 
-  // Mirrors a whole-session delete (SYN-1/SYN-2) — called only after the awaited web
-  // DELETE already succeeded, so 'synced' (not 'pending'), same reasoning as
-  // deleteExerciseLogLocally above.
-  async deleteWorkoutSessionLocally(workoutSessionId: string): Promise<void> {
+  // Mirrors a whole-session delete (SYN-1/SYN-2); modes as above.
+  async deleteWorkoutSessionLocally(workoutSessionId: string, opts?: { pending?: boolean }): Promise<void> {
+    const status = opts?.pending ? 'pending' : 'synced';
     const now = new Date().toISOString();
     await runSQL(
-      `UPDATE workout_sessions SET deleted_at=?, sync_status='synced', updated_at=? WHERE id=?`,
-      [now, now, workoutSessionId],
+      `UPDATE workout_sessions SET deleted_at=?, sync_status=?, updated_at=? WHERE id=?`,
+      [now, status, now, workoutSessionId],
     );
     await runSQL(
-      `UPDATE exercise_logs SET deleted_at=?, sync_status='synced', updated_at=? WHERE workout_session_id=?`,
-      [now, now, workoutSessionId],
+      `UPDATE exercise_logs SET deleted_at=?, sync_status=?, updated_at=? WHERE workout_session_id=?`,
+      [now, status, now, workoutSessionId],
     );
     await runSQL(
-      `UPDATE set_logs SET deleted_at=?, sync_status='synced'
+      `UPDATE set_logs SET deleted_at=?, sync_status=?
        WHERE exercise_log_id IN (SELECT id FROM exercise_logs WHERE workout_session_id=?)`,
-      [now, workoutSessionId],
+      [now, status, workoutSessionId],
+    );
+  }
+
+  // LA-165 push-confirms. Each waits while another queued mutation still names the row — two edits
+  // queued back to back must not have the first's confirm unguard the second (markSessionSynced's
+  // rule, for the same reason).
+  async markExerciseLogSynced(exerciseLogId: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['workout_log', 'exercise_log_edit', 'exercise_log_delete'], exerciseLogId, confirmingIds)) return;
+    await runSQL(`UPDATE exercise_logs SET sync_status='synced' WHERE id=?`, [exerciseLogId]);
+    await runSQL(`UPDATE set_logs SET sync_status='synced' WHERE exercise_log_id=?`, [exerciseLogId]);
+  }
+
+  async markWorkoutSessionTreeSynced(workoutSessionId: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['workout_log', 'session_rpe', 'complete_workout', 'workout_session_delete'], workoutSessionId, confirmingIds)) return;
+    await runSQL(`UPDATE workout_sessions SET sync_status='synced' WHERE id=?`, [workoutSessionId]);
+    await runSQL(`UPDATE exercise_logs SET sync_status='synced' WHERE workout_session_id=?`, [workoutSessionId]);
+    await runSQL(
+      `UPDATE set_logs SET sync_status='synced'
+       WHERE exercise_log_id IN (SELECT id FROM exercise_logs WHERE workout_session_id=?)`,
+      [workoutSessionId],
     );
   }
 
