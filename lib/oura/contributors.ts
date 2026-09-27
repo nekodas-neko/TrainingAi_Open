@@ -29,6 +29,14 @@ const CONTRIBUTOR_LABELS: Record<string, string> = {
   checkin: 'Morning check-in',
   temperature: 'Body temperature',
   prevDayActivity: 'Previous day activity',
+  // RV-217. The sleep model's own three components, which have NO Oura counterpart — Oura's
+  // daily_sleep set is exactly the seven snake_case keys above, so `sleepComponentsToContributors`
+  // passes these through unmapped by design. They rendered as the raw lowercase keys "hrv", "hr"
+  // and "schedule" on the Sleep contributors list, beside seven properly labelled rows. Same
+  // shape as the readiness three above, and the same fix.
+  hrv: 'HRV',
+  hr: 'Heart rate',
+  schedule: 'Sleep schedule',
   // Activity Score v2 (own components, 2026-07-22) — camelCase, distinct from the Oura keys above.
   steps: 'Steps',
   activeEnergy: 'Active energy',

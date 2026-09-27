@@ -3350,19 +3350,18 @@ which is the right shape for something that can only be validated by living with
 - **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
   deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
 
-### [sleep] RV-217 — the Sleep contributors list shows three raw keys: "hrv", "hr", "schedule"
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts:506` (`CONTRIBUTOR_KEYS`), plus the label table behind `labelFor` (`lib/oura/contributors`).
-- **Added:** 2026-09-26 · Review sweep 64 (`t2-sleep-01`, on the device).
-- **What:** of the ten contributors:
-  - seven carry a label and a chevron ("Deep sleep ›", "REM sleep ›"…);
-  - **three render the internal key, lowercase, with no chevron**: `hrv`, `hr`, `schedule`.
-
-  The vertical spacing is also uneven: there are larger gaps before Timing and Efficiency, which look like empty rows.
-- **Fix:**
-  1. **Code-certain cause:** `CONTRIBUTOR_KEYS` maps seven component keys to the Oura vocabulary and passes anything else through (`CONTRIBUTOR_KEYS[k] ?? k`). The sleep model's `hrv`, `hr` and `schedule` components have no entry, and `labelFor` has no label for the raw keys. Add all three to both tables ("HRV", "Heart rate", "Sleep schedule"), plus a `contributor-guide.ts` entry if each should get a chevron. A test should assert every component key the model emits has a label.
-  2. Give them chevrons if they have explanations, or mark them non-tappable consistently.
-  3. Find what renders the empty gaps.
-- **Sibling sweep:** check Readiness's "What goes into this score" list for the same fall-through.
+### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
+- **The labels and chevrons are FIXED** (RV-217, 2026-09-27): `hrv`, `hr` and `schedule` now carry
+  labels and contributor-guide entries, as does readiness's `checkin`, and a test derives the key
+  set from the model so a new component cannot arrive unlabelled.
+- **What is left is the third item of RV-217, which is a layout question:** the sweep saw larger
+  vertical gaps before Timing and Efficiency, "which look like empty rows". That was never
+  diagnosed — it is not the label fall-through, because those two rows always had labels.
+- **Why it needs the device:** the observation is from a screenshot (`t2-sleep-01`), and the two
+  candidate causes look identical in source — a row rendering with an empty value slot, or a
+  container's `gap`/margin applying unevenly. Reproduce at the 384 px dark viewport first.
+- **Done when:** the ten contributor rows are evenly spaced, or the gap is explained and kept.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **Lane: B.** If the numbers come from different routes, the reconciliation half goes to **A**.

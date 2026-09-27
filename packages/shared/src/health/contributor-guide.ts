@@ -170,6 +170,54 @@ const GUIDE: Record<string, ContributorGuide> = {
       'Address stress before bed with journaling or breathing.',
     ],
   },
+  // RV-217 sibling sweep. `checkin` is readiness's own contributor and the ONLY one of its nine
+  // with no guide — RV-201 gave it a label and stopped there, so it was the one row on
+  // "What goes into this score" with no chevron. A label without a guide is the same defect one
+  // step along: the row reads correctly and then does nothing when tapped.
+  checkin: {
+    measures: 'What you reported this morning — your own read on how you feel, scored from the energy answer.',
+    against: 'Feeling good scores higher. Worth a tenth of readiness, so it moves the number without deciding it.',
+    high: 'You woke up feeling good, and the score reflects that alongside the measurements.',
+    low: 'You told the app you feel poor. That is real information the sensors do not always have.',
+    remediate: [
+      'Answer it honestly rather than optimistically — it is the only contributor you control directly.',
+      'If it keeps disagreeing with the other contributors, the disagreement is the interesting part.',
+    ],
+  },
+  // RV-217 — the sleep model's own three, which had no guide and so drew no chevron beside a row
+  // that was already showing its raw key. Copy written from the curves in `sleep-score.ts`, not
+  // from the names.
+  hrv: {
+    measures: 'Your overnight average HRV, as a ratio to your own baseline rather than an absolute number.',
+    against: 'Higher than your baseline scores higher. Only scored on nights a baseline exists.',
+    high: 'Your nervous system settled — the strongest recovery signal here.',
+    low: 'Below your norm. Alcohol, illness, a hard session late in the day, and stress all push it down.',
+    remediate: [
+      'Leave three hours between your last drink or heavy meal and bed.',
+      'Keep the room cool.',
+      'Treat a run of low nights as a reason to back off training, not to train harder.',
+    ],
+  },
+  hr: {
+    measures: 'Your overnight average heart rate, as a ratio to your own baseline.',
+    against: 'LOWER is better — the mirror of HRV. At or below your norm scores full marks.',
+    high: 'Resting low overnight, which is what a recovered night looks like.',
+    low: 'An elevated night. This is the axis a hard or unwell night shows up on first.',
+    remediate: [
+      'Check for the obvious causes first: alcohol, a late meal, a warm room, illness.',
+      'An isolated elevated night is noise; several in a row is a signal.',
+    ],
+  },
+  schedule: {
+    measures: 'How far this night sat from your habitual bed and wake times, taking whichever end was worse.',
+    against: 'Consistency scores higher. Only lateness and early waking are penalised — an early night or a lie-in costs nothing.',
+    high: 'You slept on your usual schedule.',
+    low: 'A late night or an early wake. This is what catches a short night that duration alone makes look fine.',
+    remediate: [
+      'Hold the wake time steady first; the bedtime tends to follow.',
+      'A single late night is cheaper than shifting the whole schedule.',
+    ],
+  },
   timing: {
     measures: 'Whether you slept at a time aligned with your body clock (circadian midpoint).',
     against: 'Your natural chronotype and a socially-typical night window.',
