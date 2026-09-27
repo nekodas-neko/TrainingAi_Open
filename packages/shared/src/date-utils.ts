@@ -61,9 +61,13 @@ export function weekStartForDay(day: string): string {
   return formatInTimeZone(d, 'UTC', 'yyyy-MM-dd')
 }
 
-// Formats a UTC millisecond timestamp as "8:30am" in `tz`.
+/**
+ * A UTC millisecond timestamp as a time of day in `tz` — now exactly `formatTimeOfDay` (RV-208 ①).
+ * It used its own `h:mmaaa`, so Health → Day read "7:35am" beside Home's "7:35 AM" and the activity
+ * list's "7:35 am": three renderings of one moment. Kept as a name so its callers need no edit.
+ */
 export function fmtAest(ms: number, tz = DEFAULT_TZ): string {
-  return formatInTimeZone(new Date(ms), tz, 'h:mmaaa')
+  return formatTimeOfDay(ms, tz)
 }
 
 /**
