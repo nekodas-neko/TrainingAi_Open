@@ -6,6 +6,7 @@
  * The security model is DEFAULT-DENY: nothing is readable unless a view exists for it. Re-run this
  * after adding tables, and commit the regenerated migration:
  *
+ *   node scripts/next-schema-number.js     # what <NEXT-FREE-NUMBER> is — fetches, reads every branch
  *   CLAUDE_RO_OWNER_USER_ID=<uuid> node scripts/generate-claude-ro-views.js \\
  *     > lib/data/postgres/migrations/<NEXT-FREE-NUMBER>_claude_ro_views_<reason>.sql
  *

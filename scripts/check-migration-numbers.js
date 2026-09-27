@@ -8,10 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// Already on disk and already applied — each pair is independent, so the ambiguous order is
-// harmless and renaming them now would re-run them. Never add to this list to silence a new
-// collision: renumber the unmerged migration instead.
-const GRANDFATHERED = new Set(['081', '087', '146', '161']);
+const { GRANDFATHERED } = require('./lib/migration-claims');
 
 const dir = path.join(__dirname, '..', 'lib', 'data', 'postgres', 'migrations');
 const byNumber = new Map();
@@ -36,6 +33,8 @@ if (collisions.length > 0) {
   process.exit(1);
 }
 
-const used = [...byNumber.keys()].map(Number).sort((a, b) => a - b);
-const next = String(used[used.length - 1] + 1).padStart(3, '0');
-console.log(`check-migration-numbers: ${byNumber.size} numbers, no new collisions. Next free number: ${next}`);
+console.log(
+  `check-migration-numbers: ${byNumber.size} numbers, no new collisions. ` +
+    'For the next free number run `node scripts/next-migration-number.js`, which also sees ' +
+    'numbers claimed by branches that have not merged.',
+);

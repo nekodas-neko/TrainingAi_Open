@@ -42,10 +42,22 @@ direction), but the cookie promises what the credential does not keep. The fix i
 cookie's `maxAge` from the session's rather than restate it; raising the JWT to 30 days would be the
 wrong direction, since #1607 makes the leaked-bearer window newly relevant.
 
-## Also
+## `TN-80` was struck, and the strike was reverted at the merge
 
-`TN-80` is struck. It routed three GitHub items before BugFix filed them properly as
-`BF-211`/`BF-212`/`BF-213`; keeping both was two records of one thing.
+This PR originally deleted `TN-80` on the reasoning that BugFix's `BF-211`/`BF-212`/`BF-213` had
+superseded it. **That was true when written and false by the time it merged.** While this branch was
+open, BugFix added a measured census to `TN-80` that exists nowhere else: **seven PRs need the owner,
+not three**, two of them **blocked rather than waiting** — `#1749`'s Migration Check reports
+`58 failed`, all `column t.active_calories_est does not exist`, and `#1499`'s Build fails the
+test-typecheck gate its description reports as clean, because `tsconfig.json` and
+`tsconfig.tests.json` are different gates.
+
+The conflict resolution keeps their version whole and adds the review note to it. The entry now
+carries an explicit **do not strike** bullet, because the instruction to strike it is still sitting
+in its own body and would otherwise be followed by the next session that reads it.
+
+**Five PRs are genuinely waiting on the owner** by that census: `#1755`, `#1672`, `#1671`, `#1608`
+and `#1607`.
 
 **Not exercised:** no code changed in this PR, and the reviewed code was read rather than run — the
 findings are static. Nothing was verified against a running mobile client.

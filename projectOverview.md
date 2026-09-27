@@ -2664,15 +2664,12 @@ Last swept **2026-09-03**.
 > is the residual legacy backlog — mostly ✅/🚫 — plus the device-only verifications that can't be
 > exercised in the sandbox.
 
-**Next free Postgres migration number: 167.** (**Corrected 2026-08-02** — 166 was claimed and used
-the same day by `166_sleep_sessions_oura_id_user_scope.sql` (#1004). Previously said 166; before
-that, "next: 127"
-and was 38 migrations stale; on disk through 165 now. Known same-number collisions: 081, 087, 146,
-161 — apply order between each pair is ambiguous but independent, per CLAUDE.md's migration-number
-rule; do not rename an applied migration. Local SQLite is at **v20**. Claim any new number against
-both the directory AND open plan docs before writing a migration — this line drifts fast because
-multiple parallel sessions claim numbers; treat it as a hint, verify with `ls lib/data/postgres/migrations/`
-before trusting it.)
+**The next migration number and SQLite version are not written here any more** — run
+`node scripts/next-schema-number.js`. This line read *167* and *v20* against a directory at 289 and
+a schema at v43, and advised verifying with `ls`, which cannot see the numbers an **unmerged
+branch** holds — how an inbound PR came to claim 288/289 after `main` had used them (BF-211/BF-213).
+The four applied same-number collisions (081, 087, 146, 161) are grandfathered in
+`scripts/lib/migration-claims.js`; an applied migration is never renamed.
 
 ### 🔴 Security
 - ✅ **AI SDK CVE bump done.** `@ai-sdk/google ^3.0.86` (+ `@ai-sdk/openai`, `@ai-sdk/react`,

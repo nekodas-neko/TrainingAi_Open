@@ -7,19 +7,24 @@ git history and the session journal (`docs/overview/`).
 
 ## Live pointers
 
-**These two numbers are the ones sessions collide on.** They are checked by
-`scripts/check-backlog-pointers.js` in the Custom Rules job, which reads the real values from the
-migrations directory and `lib/sqlite/migrations.ts` — so a stale line here fails CI instead of
-silently misdirecting the next session. Update them in the same PR that consumes a number.
+**The two schema numbers sessions collide on are not written down here any more — ask for them:**
 
-| Pointer | Value | Source of truth |
-|---|---|---|
-| Next free Postgres migration | **290** | `lib/data/postgres/migrations/` | (286/287 are reserved by the unmerged LA-142 PR; 288/289 are LA-161) |
-| Local SQLite schema version | **v43** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max | (v42 is reserved by the unmerged LA-142 PR) |
+```
+node scripts/next-schema-number.js
+```
 
-> **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
-> never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
-> unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
+It fetches, then prints the next free Postgres migration number and the next free local SQLite
+version, and — the part a filename cannot tell you — which numbers are already **claimed by a
+branch that has not merged**, named by branch and file. It fetches because a stale remote-tracking
+ref answers with whatever that branch held last time, and a wrong pair reads exactly as
+authoritative as a right one. The table that used to sit here was checked against
+`max(merged) + 1`, so it could only ever restate what the directory already said, and it could never
+run ahead of the merged tree to reserve anything. What it actually held was a free-text parenthetical
+no check read. It had also drifted eleven behind the directory once, and five behind another time.
+
+> **There is no pointer table any more, and there is no entry-ID pointer either.** Entry IDs are
+> not allocated from a shared counter and never were safely: a next-free pointer is a *floor*, not
+> an authority, because it cannot see an unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
 > bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
 > 50 in two days — plus a ledger that drifted twice.
 >
@@ -564,21 +569,17 @@ below threshold and left in place for next time.
 - **This is `BF-211`'s evidence, and the two should be read together** — the issue proposes deriving
   the migration number from filenames, and this is what deriving it produces when an unmerged branch
   holds numbers the filenames cannot show.
+- **Reproduced independently by the tool BF-211 shipped**, 2026-09-27: `node
+  scripts/next-schema-number.js` names `288: merged: 288_training_load_grid_dimensions.sql vs
+  origin/health-sample-storage: 288_apple_health_samples.sql`, and the same for 289. It also reports
+  **290** as the next free pair, which is what this entry recommends. So the renumber can be
+  verified rather than argued.
+- **It flags a second collision that is NOT work: 273/274 on `origin/lane-a/q44-phase3-pr1-table-rename`**,
+  a branch with no open PR. A dead branch reads exactly like a reservation to any tool that scans
+  refs. Delete the branch or leave it; do not renumber anything for it.
 - **Reversal cost:** none here — nothing has merged.
 
 ### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
-- **✅ SECURITY REVIEW POSTED 2026-09-27** — [the comment](https://github.com/nekodas-neko/TrainingAi_Open/pull/1607#issuecomment-5854224892).
-  **No approval given, deliberately**: it is an auth change and the owner answered that he reads
-  this one himself. **Three findings.** ① No test for the new `responseType: 'token'` branch,
-  although `lib/__tests__/user-account-routes.test.ts:332` already covers the route. ② No per-token
-  revocation — a leaked bearer is valid 7 days and the only kill switch deactivates the whole
-  account. ③ A pre-existing cookie/JWT lifetime mismatch in the same file, split out as `OR-193`.
-- **What the review CONFIRMED, so nobody re-derives it:** the credential is the existing NextAuth
-  session JWT rather than a new one, and `auth()` already resolves it through
-  `lib/auth/bearer-session.ts` with a per-request `isActive` re-read — so the Q-1a overlap this
-  entry flagged is **reuse, not duplication**. PKCE, one-time consumption and the rate limit are
-  untouched, and `secureCookie` matches `bearer-session.ts:38`.
-- **`TN-80` is struck** — it routed this PR before BugFix filed it properly; this entry is the live record.
 
 - **Lane:** O — **Review** reads the diff and posts the review; the **merge is the owner's** (auth,
   outside contributor — both halves of that carve-out at once). Filed `O` for the same reason as
@@ -597,46 +598,68 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
-### [platform] BF-211 — issue #1620 asks to derive the migration number from filenames, which cannot see an unmerged branch
+### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
-- **Lane:** A — `scripts/check-backlog-pointers.js`, `docs/implementation-backlog.md`.
-- **Added:** 2026-09-27 · BugFix, triaging GitHub issue **#1620** (`jsboiss`, opened 2026-09-25,
-  assigned to the owner). Per OR-185 an issue becomes a queue entry rather than a reply.
+- **Lane:** A — `scripts/generate-claude-ro-views.js`, `lib/data/postgres/client.ts`,
+  `scripts/local-db/migrate.js`, `lib/data/postgres/migrations/`.
+- **Added:** 2026-09-27 · BugFix. **Supersedes the narrower `BF-210`**, which proposed replay
+  exemptions for the 58 twins a `DROP COLUMN` breaks; that treats the symptom. It is the root cause
+  behind `BF-213`, and it answers issue **#1620** more completely than `BF-211` did.
+- **`BF-211` shipped the same day and is gone from this queue — read what it settled before
+  starting ②.** It replaced the hand-maintained *Next free Postgres migration* row with
+  `node scripts/next-schema-number.js`, which fetches and reports what every unmerged branch is
+  holding. Two things from it bear on this entry. **The row could never reserve anything** — a CI
+  check pinned it to `max(merged) + 1`, measured — so ② is not removing a working reservation, it is
+  replacing one that was already only a restatement. And **the command reproduces `#1608`'s
+  collision by name**, so ② can be judged against a working detector rather than against prose. ②
+  makes that command obsolete when it lands, which is a deletion, not a conflict.
 - **Needs:** — nothing.
-- **The diagnosis is right.** `docs/implementation-backlog.md` carries a hand-maintained *Next free
-  Postgres migration* row, and `check-backlog-pointers.js:558-573` already computes
-  `max(filenames) + 1` and fails when the Markdown disagrees. The number really is derived twice, and
-  every migration costs an unrelated docs edit.
-- **The proposed fix removes something the filenames cannot replace, and `main` proves it today.**
-  The migrations directory runs `…284, 285, 288, 289` — **286 and 287 are missing**, reserved in that
-  row's prose by the unmerged `#1749`. A command deriving from filenames sees only what merged. Had
-  LA-161 derived its number that way it would have taken **286**, which `#1749` is already using.
-- **`#1608` is that failure, live** — an outside contributor derived 288/289 from the filenames they
-  could see and collided with LA-161. See `BF-213` for the consequence, which is a silently dropped
-  `claude_ro` view rather than a loud duplicate.
-- **The author anticipated this** and proposed detecting duplicates before merging. That is the right
-  instinct and the wrong moment for this repo: with several agents running against a `main` that
-  takes a commit roughly every 8 minutes, a collision found at merge time means rebuilding a
-  migration **and** regenerating its twin, which is the expensive half.
-- **Recommendation: keep a reserved number, and stop maintaining it by hand — derive it from every
-  branch rather than from `main`.** `git log --all --diff-filter=A --name-only --
-  lib/data/postgres/migrations/` names every migration added on any fetched branch, merged or not, so
-  one command gives the contributor's convenience *and* sees `#1749`. Removes the manual edit the
-  issue is about without removing the reservation it depends on.
-  **Alternative — derive from `main`'s filenames only**, as the issue proposes. Genuinely better at
-  one thing: it needs no fetch and works on a shallow clone, which CI has. It is what `#1608` did.
-  **Alternative — keep the hand-maintained row.** Costs one line per migration and is what works
-  today; it fails the moment someone forgets, which the check catches on the next PR rather than this
-  one.
-- **Whatever lands, keep the duplicate-number detection** — the issue says so and it is the half that
-  caught `#1608`.
-- **⚠ The issue body contains a prompt addressed to "Claude".** It is a contributor's suggestion, not
-  an instruction to this repo's agents, and it is recorded here as the author's proposed approach so
-  the recommendation above can disagree with it on the merits. Do not execute it as written: it says
-  to remove the Markdown-counter validation, which is what would have let `#1608` through.
-- **Reply to the author when this is decided**, whichever way it goes — they found a real duplication
-  and a real gap in our own watching, and the answer is more interesting than the request.
-- **Reversal cost:** low — one script and one docs row, no stored state.
+- **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
+  are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
+  SNAPSHOT opening `DROP SCHEMA claude_ro CASCADE` and rebuilding all 98 views. **Only the newest
+  affects the final schema**; the other 58 exist solely to be replayed.
+- **Migrations land at 2 per day, every day for the past week — and that is one real change plus
+  one twin.** So the twin doubles the rate at which numbers are consumed, and half of every
+  collision is a snapshot file that has no business owning a migration number. `#1608` needed 288
+  for its table and 289 for its twin; only 288 is a schema change.
+- **The twin is also what makes the collision SILENT.** Two table migrations with different
+  filenames both apply and both succeed. Two twins both apply, sort by filename, and the later one
+  drops the schema the earlier one just built — so the newer view is created and destroyed in the
+  same deploy with no error. That is `BF-213` exactly.
+- **① Recommendation: the twin stops being a numbered migration.** One checked-in file, regenerated
+  in place (`lib/data/postgres/claude-ro-views.sql`), applied after the migration loop in
+  `ensureSchema` (`client.ts:95`). Halves number consumption, deletes ~86k lines, makes `BF-210`
+  disappear because no historical twins remain to break, and makes `BF-213`'s failure structurally
+  impossible.
+  **⚠ Generate it in CI or at authoring time, NOT at runtime — this was the first draft of this
+  entry and stress-testing killed it.** The generator is **default-deny by construction**: its
+  `DENY` map withholds `password_hash`, the four `oura_tokens` secrets and three image/screenshot
+  blobs, and a table it cannot classify calls `process.exit(1)` rather than emitting an unscoped
+  view (`generate-claude-ro-views.js:214`). Two properties depend on the file being checked in:
+  **what columns are exposed is reviewable in the diff**, and **a classification failure happens
+  where a human sees it** rather than on a production boot with the schema already dropped.
+  **The cost of ① is one real conflict**: two concurrent schema changes now edit one file instead of
+  two. That is the right trade — the resolution is mechanical (re-run the generator), and a loud
+  conflict beats a silently dropped view.
+  **There is no CI check today that the twin matches the schema** — only
+  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`, which **skip unless
+  `DATABASE_URL` is TCP**. ① should add that check; it makes the twin strictly better verified than
+  it is now.
+- **② The remaining half: sort migrations NUMERICALLY, then name them by timestamp.** ① does not fix
+  the collision `#1620` is about — a contributor still picks a number that goes stale before review
+  ends. **A naive timestamp rename is a trap, verified rather than assumed:** both appliers sort
+  lexicographically (`client.ts:95`, `migrate.js:69`), and `"202609270534_x.sql" < "289_y.sql"`
+  because `'0' < '8'` — **every new migration would run before every old one.** Sorting by the
+  leading integer instead (one line in each applier) makes a minute-precision timestamp sort
+  correctly and collide only if two authors pick the same minute.
+- **Sequencing: ① then ②, and ① alone is worth shipping.** ① is self-contained; ② touches the apply
+  order for every migration and wants its own PR and its own careful read.
+- **Reply to `#1620` when this is decided** — the author raised it, and the answer is larger than
+  the request.
+- **Reversal cost:** ① moderate — it changes what runs at deploy, so it wants a careful rollout;
+  the 58 deleted twins are recoverable from git and are already recorded in `schema_migrations` by
+  filename, so removing the files does not re-run anything. ② is higher: it changes apply order,
+  and a wrong sort is a wrong schema.
 
 ### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
 
@@ -689,27 +712,6 @@ below threshold and left in place for next time.
   [`docs/oura-raw-archive-retention-brief.md`](oura-raw-archive-retention-brief.md).
 - **Reversal cost: none for the measurement; total and permanent for acting on a wrong answer** —
   a pruned raw row cannot be re-drained from the ring.
-
-
-### [platform] OR-193 — the mobile session cookie outlives the JWT inside it by 23 days
-
-- **Lane: A** · **Added:** 2026-09-27 · Orchestrator, found while security-reviewing inbound PR
-  `#1607` ([review comment](https://github.com/nekodas-neko/TrainingAi_Open/pull/1607#issuecomment-5854224892)).
-  **Pre-existing on `main`; not introduced by that PR.**
-- **Measured.** `app/api/auth/exchange-mobile-token/route.ts` sets the session cookie with
-  `maxAge: 30 * 24 * 60 * 60` — **30 days**. The JWT it carries has `maxAge: 7 * 24 * 60 * 60` in
-  `auth.config.ts:9` — **7 days**. So from day 7 the browser keeps presenting a cookie whose token
-  `getToken` rejects, for another 23 days.
-- **The symptom is a silent sign-out on the mobile path at day 7**, with a cookie still present.
-  Not a security hole — the expired token is refused, which is the safe direction — but the cookie
-  is making a promise the credential does not keep.
-- **Recommendation: derive the cookie's `maxAge` from the session `maxAge` rather than restating
-  it.** One constant, imported, so the two cannot drift again. The alternative — raising the JWT to
-  30 days to match the cookie — is the wrong direction: it triples the window a leaked bearer stays
-  valid, which `#1607` makes newly relevant.
-- **Check the other writer in the same change:** `updateAge: 24 * 60 * 60` means a JWT is re-issued
-  at most daily, so an active user is not affected; this bites the user who is away 7–30 days.
-- **Reversal cost:** one constant.
 
 
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
@@ -1597,6 +1599,121 @@ below threshold and left in place for next time.
   most of the argument for doing it now.
 - **Not established:** whether the collaborator expects review *comments* or just merges. Worth
   asking him directly rather than inferring it.
+
+### [platform] TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
+- **⚑ RECONCILE BEFORE ACTING — BugFix has already filed all three, with findings this entry does
+  not have.** `BF-211` (issue #1620), `BF-212` (#1607, and it notes `Q-1a` covers the same area),
+  and **`BF-213`, which is the one that matters: #1608 takes migration numbers 288/289 that `main`
+  has already used, and the collision destroys its `claude_ro` twin.** That is a blocking defect
+  found by reading the diff, not a routing note. **Those three are now the live record; this entry
+  is the routing history.** Strike it once the security review is posted rather than working it
+  twice.
+- **✅ #1607's SECURITY REVIEW IS POSTED, 2026-09-27** — [the comment](https://github.com/nekodas-neko/TrainingAi_Open/pull/1607#issuecomment-5854224892).
+  No approval given, per his answer. Three findings: no test for the new `responseType: 'token'`
+  branch; no per-token revocation (a leaked bearer is valid 7 days, and the only kill switch
+  deactivates the whole account); and a pre-existing cookie/JWT lifetime mismatch in the same file,
+  split out as `OR-193`. It CONFIRMED the credential is the existing NextAuth session JWT resolved
+  through `lib/auth/bearer-session.ts` with a per-request `isActive` re-read — so the `Q-1a` overlap
+  `BF-212` flagged is **reuse, not duplication**.
+- **⛔ DO NOT STRIKE THIS ENTRY.** An earlier version of this bullet said to strike it once the
+  review was posted. That was written before BugFix added the seven-PR census below, which exists
+  **nowhere else** — `BF-212` records #1607 only. The strike was attempted in #1778 and reverted at
+  the merge conflict; what is owed now is the owner's pass over the five green PRs, not a deletion.
+- **✅ ANSWERED 2026-09-27 — run a security review on `#1607` first, then the owner reads the diff himself.**
+  He declined both the approve-if-clean option and the comment-only one. So: **a `/security-review`
+  pass, findings posted concisely on the PR, and then it waits for him.** No agent merges it — it is
+  auth AND it is not ours, so the ceiling is review/comment/approve under the 2026-09-27 rule.
+  **`#1608`** (HealthKit sample storage) is an ordinary external PR and gets a normal review on the
+  same pass. **Orchestrator holds this** until the review is posted; `OR-184` tracks the same three
+  items from the intake side and the two should be reconciled, not worked twice.
+
+- **Lane:** O — the deliverable is the owner's review on three pull requests. Ungated on purpose:
+  `Gate: owner` would park it, and getting these in front of him is the work.
+- **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
+  review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
+  message.
+- **⚠ THE COUNT IS STALE: SEVEN need him, not three, and two of those are BLOCKED rather than
+  waiting (BugFix, 2026-09-27).** #1592 above **already merged as #1616** before this entry was
+  written. Measured that day with `get_check_runs`, job conclusions read rather than assumed:
+  | PR | what | required checks | verdict |
+  |---|---|---|---|
+  | **#1749** | `LA-142` drop four dead columns | **Migration Check RED** | blocked — not his yet |
+  | **#1499** | `OR-138` db-query user scoping | **Build RED** | blocked — not his yet |
+  | **#1755** | `OR-159`+`RV-196` native security | all green (+ Android green) | **his call** |
+  | **#1672** | `RV-190` read-only session leak | all green | **his call** |
+  | **#1671** | `RV-191` image byte validation | all green | **his call** |
+  | **#1608** | HealthKit storage (external) | all green | **his call** — see `BF-213` |
+  | **#1607** | bearer tokens (external, auth) | green but **from 09-25** | re-run first |
+  **#1755 appeared in this file ZERO times** when that was measured; #1749, #1672 and #1671 appeared
+  once each, inside their own closing entries rather than as items awaiting him.
+- **Both blocked PRs report their gates passing, and both have a red REQUIRED check.** #1749's
+  Migration Check reads `applied 228, skipped 0, **58 failed**`, every one `column
+  t.active_calories_est does not exist` — the general form is `BF-214`. #1499's Build fails at the
+  test-typecheck gate: `or138-readonly-pivot.test.ts: 6 error(s) — this file had none`, while its
+  description reports `npx tsc --noEmit` clean, which is true and is **a different gate**
+  (`tsconfig.json` vs `tsconfig.tests.json`). **A local gate's name is not the CI gate's name** —
+  both reported honestly against the command they ran.
+- **Why this is a defect and not bookkeeping.** `grep -cE '#1607|#1592|#1499'` over this file returns
+  **0**. The seven decisions already in `Lane: O` are correctly routed — these are not routed at all.
+  A GitHub review request is a channel nobody is watching: #1499 has sat since **2026-09-24** and the
+  two external PRs since the small hours of 09-25. **CLAUDE.md's rule covers exactly this** — a
+  question for the owner is a task, and a question that lives only in a reply dies with the session.
+  It says nothing about PRs, which is why three of them slipped: the rule is written about backlog
+  questions and the gap is one category wider than the rule's wording.
+
+**The three, each with a recommendation.**
+
+  **#1607 — bearer tokens for native mobile login** (`native-token-exchange`, external contributor,
+  review requested from the owner). Adds an opt-in token response with expiry beside the existing
+  cookie login, for an Expo/React-Native iPhone client.
+  - **Recommendation: the owner reads this one himself before it merges, and no agent merges it.**
+    It is an **auth** change, which is his carve-out by CLAUDE.md's own list, and it arrives from
+    outside the standing-agent set. A second credential path is cheap to add and expensive to get
+    wrong — token lifetime, revocation and storage are the questions, and none of them is visible from
+    the PR title.
+  - **Not assessed here.** I have not read the diff; this entry routes it rather than reviewing it.
+    A security review before he reads it would be worth more than my summary — that is `Lane: A`'s
+    or a `/security-review` pass, and it should happen first.
+
+  **#1592 — accept `activeCalories` in daily health imports** — **⚠ IT MERGED AS #1616 on 2026-09-25**
+  (*"…, rounded"*, superseding #1592), before this entry reached him, so nothing is owed on it. Kept
+  because the consequence below stopped being hypothetical the moment it landed, and because **the
+  Q-524 amendment it invalidates is corrected in this same PR** rather than left wrong on `main`.
+  Forwards `dailyMetrics[].activeCalories` into `body_metrics.active_calories`.
+  - **Recommendation: mergeable on its own terms, and it must not merge silently.** It is a
+    reasonable Apple-Health feature and the storage column already exists. But that column is the
+    input to the Activity Score's `activeEnergy` contributor (weight 15), dead since 2026-07 — so
+    **this revives the input `Q-204` exists to remove**, from a direction nobody was watching, and
+    `Q-184`'s own check says do not revive it.
+  - **It also invalidates a conclusion I published yesterday.** The Q-524 amendment answered its
+    double-count blocker with *"not live, and probably never"*, resting on `activeEnergy` having no
+    live source. If this merges it has one, and the steps/energy double-count becomes live the moment
+    anyone builds the energy-derived step goal. **Whoever merges it should add that line to Q-204 and
+    Q-524 in the same PR**, or my amendment is wrong on `main` with nothing marking it.
+
+  **#1499 — scope `/api/admin/db-query` to a user who filed feedback** (`lane-a/or138-pivot-readonly-scope`,
+  his own Lane A work, explicitly held: *"AUTH/SECURITY — not merged on my own authority"*).
+  - **Recommendation: approve.** The widening is narrow — it reaches only users who have filed
+    feedback, which is one predicate to remove if he ever wants it broader, and the no-leak behaviour
+    was proven against a real pool pinned to `max: 1` rather than asserted. The PR also settled the
+    entry's own flagged unknown (a bare `SET` cannot stick, because every statement is wrapped in a
+    subquery), so the single-user guarantee was never as soft as feared.
+  - **One caveat worth his eye:** the audit trail goes in as a `-- claude_ro pivot: <uuid>` comment on
+    the audit row rather than a column, because a column is a migration and migrations ship alone.
+    Attributable, greppable, and tidier as a follow-up — not a reason to hold the PR.
+
+- **The process half, which is the durable part.** The rule that routes owner questions is written
+  about backlog entries and does not mention pull requests, so a PR awaiting the owner has no home in
+  the queue. **Recommendation: extend it** — when a PR needs the owner (auth, secrets, money, a
+  data-dropping migration, or an external contribution touching any of those), the opening agent files
+  a `Lane: O` entry with an `Ask:` naming the PR, and strikes it when the PR merges or closes. Cheap,
+  and it is the only thing that makes "everything goes to ORC" true for PRs as well as decisions.
+  Filed as a recommendation rather than edited into CLAUDE.md, because a standing-rule change is the
+  owner's to accept.
+- **What this entry does NOT do.** It does not review any of the three diffs — #1607's auth surface in
+  particular deserves a real read, and this is a routing entry. And it makes no claim about whether
+  the two external PRs are otherwise sound: CI state, test coverage and contributor provenance are all
+  unexamined here.
 
 ### [readiness] OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call
 
@@ -3840,11 +3957,42 @@ which is the right shape for something that can only be validated by living with
    to the card, or drop it from the pre-workout screen) and it is a two-line change.
 
 ### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
+- **✅ ① SHIPPED 2026-09-27 (#1780). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**
 - **Lane: B.**
 - **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
-1. **Weekly stats shows its skeleton forever on a failed fetch.** `health-sections.tsx:688` passes `loading={weeklyStats === null}`, and a failure leaves it null. That breaks the self-fetching-card failure rule.
-2. **12 components render `null` while loading or empty,** so the card vanishes rather than saying why. Among them: `observed-hr-card.tsx:37`, `workout-density-card.tsx:36`, `nutrition-activity-trends-card.tsx:37`.
-3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState` primitive used in only 10.
+1. ~~**Weekly stats shows its skeleton forever on a failed fetch.**~~ — **SHIPPED, and exactly as
+   described.** `cachedFetchToday` had no `onError`, so a failure left `weeklyStats` null,
+   `loading={weeklyStats === null}` stayed true, and the skeleton animated until the app was
+   killed. The hub now takes `error`/`onRetry` and renders the shared `EmptyState` with a
+   **Try again**; a later success clears the flag so the error cannot sit over data that arrived.
+   - **The error branch is checked BEFORE `loading`, and that ordering is the fix rather than a
+     tie-break** — a failure leaves `data` null, so `loading` is *also* true and the skeleton
+     would still win. The test pins the order.
+   - **It is the eleventh use of `EmptyState`**, which is item ③'s complaint, rather than a
+     twelfth bespoke failure card.
+   - Guarded twice: a source test for the wiring, and
+     `e2e/rv215-weekly-stats-failure.spec.ts`, which serves a real 500 and asserts the screen
+     LEAVES the loading state. Control-run: removing `onError` fails both.
+- **The file is `app/health/health-sections.tsx`, not `components/health/…`**, and the line is
+  689 rather than 688.
+2. **12 components render `null` while loading or empty.** — **⚠ ALL THREE NAMED EXAMPLES ARE
+   ALREADY CORRECT (verified 2026-09-27), so the count of 12 cannot be trusted.**
+   - `observed-hr-card.tsx` already passes `onError` and renders *"Couldn't load your heart-rate
+     profile — pull to refresh"*. Its `if (!data) return null` at :37 sits **after** that branch.
+   - `workout-density-card.tsx:36` and `nutrition-activity-trends-card.tsx:37` return null **only
+     while `loading`**; once loading ends they render *"No workout density trends yet."* Both
+     carry a comment citing this very rule and explaining that a swallowed failure and "nothing
+     logged yet" are indistinguishable here, so they show the empty line either way.
+   - **The reading that produced "12" cannot tell a loading-DEFER from a vanish**, and a
+     `return null` while loading is neither a defect nor a rule breach.
+   - **What a trustworthy version of this item needs:** a scan that flags `return null` on a
+     component's TERMINAL state (loading finished, no error branch present), not any `return
+     null`. That is worth writing — it is the self-fetching-card rule's missing ratchet — but it
+     is a different piece of work from a hand-list of twelve, and the hand-list is not a
+     starting point because it is wrong about the three cases anyone can check.
+3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState`
+   primitive used in only 10. — **STANDS, untouched.** A 57-file sweep is its own change and
+   wants the daily screens picked deliberately; ① added the eleventh `EmptyState` use in passing.
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
 
