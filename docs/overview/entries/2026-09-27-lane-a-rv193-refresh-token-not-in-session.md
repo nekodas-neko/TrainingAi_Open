@@ -60,6 +60,23 @@ running that same callback. Deliberate, and stated here because it is invisible 
   rewriting the guard as a ternary over a local.
 - `tsc` 0 · `lint` 0 · `build` 0 · `check-test-typecheck` at baseline · Custom Rules **83 of 83**.
 
+## Local run on `pnpm dev` (2026-09-27, second session)
+
+The seeded account has no Google token, so the cookie was minted directly: `encode()` from
+`next-auth/jwt` with the app's own `AUTH_SECRET` and the dev cookie name `authjs.session-token` as
+the salt, carrying the seed user's id and a **fake** refresh token.
+
+- **The new cookie read decrypts.** `POST /api/log-calendar-event` with that cookie reached Google
+  and failed there with `invalid_grant` (the route's `500 Calendar write failed`, which is correct
+  for a fake token). A wrong salt/`secureCookie` pairing would have answered 401 before any Google
+  call. The same request with a cookie carrying no refresh token → **401**.
+- **The token is out of the page-readable session.** `GET /api/auth/session` on the same cookie
+  returned keys `user, expires, isActive`, with no trace of the token string.
+- **Control on `origin/main`, same cookie:** keys `user, expires, refreshToken, isActive`, token
+  string present. So the probe can see the leak, and this branch removes it.
+- Not covered by this run: a real calendar write (needs the owner's real Google grant), and the
+  production cookie name `__Secure-authjs.session-token` over https.
+
 ## Not exercised
 
 - **No real Google sign-in and no real calendar write.** OAuth cannot be driven from this container.
