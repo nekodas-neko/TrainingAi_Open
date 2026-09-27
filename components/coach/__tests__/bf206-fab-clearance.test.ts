@@ -58,14 +58,3 @@ describe('BF-206 — the Coach button and the space under it', () => {
     expect(rule![1]).toContain('safe-area-inset-bottom')
   })
 })
-
-describe('BF-206 — the Coach button says what it is', () => {
-  it('carries a VISIBLE label, not only an aria-label', () => {
-    // The owner asked what "that button on the widget, the white circle" was. A sparkle is this
-    // app's generic AI mark — the weekly-recap banner, the meal-source row and the profile tab all
-    // use it — so it names a category, not a destination. An aria-label is not an answer to that.
-    const fab = stripComments(readFileSync(join(repoRoot, 'components/coach/coach-fab.tsx'), 'utf8')) as string
-    expect(fab, 'the FAB lost its visible label and is iconic again').toMatch(/>\s*Coach\s*</)
-    expect(fab).toMatch(/aria-label="Open AI Coach"/)
-  })
-})

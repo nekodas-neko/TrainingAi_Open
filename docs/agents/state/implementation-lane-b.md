@@ -1,21 +1,23 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-164 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-165 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205**; eighteen more on 2026-09-25 — the journal is the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert**; eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** BugFix and review sweep 63 refilled the queue on 2026-09-26: **BF-208** (the "button" the owner asked about is the MOON in the pen's backdrop, and `+N more` beside it is a `<span>` styled as a chip — **it also corrects BF-206's premise**, so check what that entry now claims), then **RV-208**…**RV-215**. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Next is **RV-208**…**RV-215**, review sweep 63. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
 
 ## Blocked / owed
 
-- **PARKED:** `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width` (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated):** `LB-157`, `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`, **`LB-163`** (Home's Log tiles — a mockup is owed, and it is ungated BECAUSE the mockup does not exist yet; gate it once he has seen one). **Own follow-up:** `LB-162`, `TN-84`'s two copy deviations, and **`OR-162`'s arrival half** — 180/320/43 font writes on ARRIVING at a tab, a different mechanism from the per-switch re-render and unmeasurable here. **Claimed paths: none.**
+- **PARKED:** `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width` (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated):** `LB-157`, `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`, **`LB-163`** (Home's Log tiles — a mockup is owed, and it is ungated BECAUSE the mockup does not exist yet; gate it once he has seen one). **Own follow-up:** `LB-162`, `TN-84`'s two copy deviations, **`LB-164`** (the Coach label, reverted and put to him), and **`OR-162`'s arrival half** — 180/320/43 font writes on ARRIVING at a tab, a different mechanism from the per-switch re-render and unmeasurable here. **Claimed paths: none.**
 
 ## Lessons that cost real time
 
+- **`public/cats/` IS BUILD OUTPUT** — the pen backdrops and every cat sprite come from `scripts/collection-art/scenes.mjs` through `build.mjs`, and `collection-sprites.test.ts` fails a hand-edited SVG.
+- **A FIX JUSTIFIED BY A MISREAD OF THE OWNER GETS REVERTED, NOT KEPT BECAUSE IT SHIPPED.** #1730 labelled the Coach FAB on the reading that he had asked what it was; he meant the MOON in the pen backdrop (BF-208). The clearance half was measured from CSS and stands; the restyle was never requested, so it is reverted and filed as `LB-164`. Already-merged is not a reason to keep an unasked-for change to the screen he opens first — and a reading of what someone MEANT is a hypothesis, never to be listed beside a measured finding as though both were established.
 - **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
   Twenty-seven running: "seven quick wins" was five (RV-207); one asked to query a column that does
   not exist (RV-203 ②). **A change that alters what renders is the OWNER'S:** `Lane: O` + `Ask:`.
