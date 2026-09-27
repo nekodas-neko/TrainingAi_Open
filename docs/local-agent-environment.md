@@ -65,6 +65,10 @@ Unsetting `DATABASE_SSL` in the shell is not enough, because `.env.local`'s `tru
   `netstat -ano` and kill it.
 - **`pnpm start` will not boot without valid storage keys.** The instrumentation hook fails closed in
   production mode on `SignatureDoesNotMatch (403)`. That is deliberate, so do not work around it.
+- **Do not run `pnpm lint` (or anything that reads the source tree) while the full suite runs.**
+  `check-comment-blindness.test.ts` writes fixtures into real files such as
+  `components/workout/set-card.tsx` and restores them afterwards. A lint in that window reports a
+  parsing error in a file nobody touched. Measured 2026-09-27; lint on its own was clean.
 - **Nine tests in six files fail on Windows and pass on Linux CI** — backslash paths, node running
   in the machine's timezone rather than UTC, and one spawn timeout. See `LA-163`. Read a local red
   against that list before debugging it, and treat CI as the authority.
