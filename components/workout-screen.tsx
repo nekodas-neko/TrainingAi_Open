@@ -35,7 +35,9 @@ import { reportEnqueueFailure } from "@/lib/local-store/dead-letter-signal";
 import { todayInTz, toAestDateStr, nowDatetimeInTz } from "@trainingai/shared/date-utils";
 import { useWorkoutStore, effectiveRestSec } from "@/lib/stores/workout-store";
 import { useShallow } from "zustand/react/shallow";
-import { cachedFetch, readCacheSync, setCached, isWorkoutDataToday } from "@/lib/sqlite/cache";
+import { cachedFetch, readCacheSync, setCached } from "@/lib/sqlite/cache";
+import { type NumbersSource } from "@/components/workout/numbers-source";
+import { freshExercises as freshExercisesFor, seedNumbersSource, type WorkoutDataSeed } from "@/components/workout/workout-data-seed";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { calendarMonthInTz } from '@/lib/calendar-month';
 import { useDeloadChoice } from "@/components/workout/use-deload-choice";
@@ -211,6 +213,9 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   // of sync). We force an id-based re-sync and prompt the user to reselect — a dead id is
   // never silently remapped to another session by name.
   const [sessionStale, setSessionStale] = useState(false);
+  // Which paint source the numbers came from, when it is not today's payload — see
+  // `numbers-source.ts`. Every path that sets `exercises` sets this too, or it goes stale.
+  const [numbersSource, setNumbersSource] = useState<NumbersSource | null>(null);
   const [aiPrescriptionPending, setAiPrescriptionPending] = useState(false);
   // The session's configured budget, for the picker's "Standard" sublabel.
   const [sessionBudgetMin, setSessionBudgetMin] = useState<number | undefined>(undefined);
@@ -329,17 +334,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     // failure only escalates to the K2 error screen when the screen is truly blank.
     let localSeeded = false;
 
-    type WorkoutDataSeed = { dataDate?: string; exercises: WorkoutExercise[]; session?: { id: string; name: string; timeBudgetMinutes?: number }; phaseStatus?: PhaseStatus; program?: { phaseMode?: string }; aiPrescriptionPending?: boolean; sessionNotFound?: boolean };
-
-    // workout-data/workout-card is a date-less, 6h-TTL cache — a payload built before
-    // midnight can still be served after it. loggedTodayInSession is only meaningful
-    // for the day it was computed, so a stale-dated payload has it stripped here, at
-    // the single point every downstream consumer (this screen + pre-workout-screen +
-    // done-screen, all reading the same `exercises` state) derives from.
-    const freshExercises = (data: WorkoutDataSeed): WorkoutExercise[] =>
-      isWorkoutDataToday(data, tz)
-        ? (data.exercises ?? [])
-        : (data.exercises ?? []).map(ex => ({ ...ex, loggedTodayInSession: false }));
+    const freshExercises = (data: WorkoutDataSeed) => freshExercisesFor(data, tz);
 
     // Synchronous read for immediate paint from sessionStorage mirror
     const synced = readCacheSync<WorkoutDataSeed>(cacheKey);
@@ -350,22 +345,22 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     const cardSeed = !synced && !deload
       ? readCacheSync<WorkoutDataSeed>(`workout-card:${sessionType}`)
       : null;
+    // One body for both seeds: they were byte-identical but for the variable, which is how the
+    // card seed missed a field the screen's own seed set more than once.
+    const paintSeed = (seed: WorkoutDataSeed) => {
+      setExercises(freshExercises(seed));
+      setNumbersSource(seedNumbersSource(seed, tz));
+      setPhaseStatus(seed.phaseStatus ?? null);
+      if (seed.session?.name) setSessionDisplayName(seed.session.name);
+      if (seed.session?.id) setProgramSessionId(seed.session.id);
+      if (seed.session?.timeBudgetMinutes) setSessionBudgetMin(seed.session.timeBudgetMinutes);
+      if (seed.program?.phaseMode) setProgramPhaseMode(seed.program.phaseMode);
+      setLoading(false);
+    };
     if (synced) {
-      setExercises(freshExercises(synced));
-      setPhaseStatus(synced.phaseStatus ?? null);
-      if (synced.session?.name) setSessionDisplayName(synced.session.name);
-      if (synced.session?.id) setProgramSessionId(synced.session.id);
-      if (synced.session?.timeBudgetMinutes) setSessionBudgetMin(synced.session.timeBudgetMinutes);
-      if (synced.program?.phaseMode) setProgramPhaseMode(synced.program.phaseMode);
-      setLoading(false);
+      paintSeed(synced);
     } else if (cardSeed) {
-      setExercises(freshExercises(cardSeed));
-      setPhaseStatus(cardSeed.phaseStatus ?? null);
-      if (cardSeed.session?.name) setSessionDisplayName(cardSeed.session.name);
-      if (cardSeed.session?.id) setProgramSessionId(cardSeed.session.id);
-      if (cardSeed.session?.timeBudgetMinutes) setSessionBudgetMin(cardSeed.session.timeBudgetMinutes);
-      if (cardSeed.program?.phaseMode) setProgramPhaseMode(cardSeed.program.phaseMode);
-      setLoading(false);
+      paintSeed(cardSeed);
     } else {
       setLoading(true);
       // No cache yet — seed structure (sessions, exercises, per-set progression)
@@ -382,6 +377,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           const sess = local?.sessions.find(s => s.id === tab);
           if (local && sess) {
             setExercises(sess.exercises);
+            // The mirror holds the program's per-set style, never a prescription.
+            setNumbersSource({ kind: 'base' });
             setSessionDisplayName(sess.name);
             setProgramSessionId(sess.id);
             setProgramPhaseMode(local.phaseMode);
@@ -424,6 +421,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           }
           setSessionStale(false);
           setExercises(freshExercises(data));
+          // Stamped with the server's own today, so it clears a label a seed or the mirror set.
+          setNumbersSource(seedNumbersSource(data, tz));
           // Teach the on-device mirror what this response knows about each exercise, so the
           // next offline read can type a bodyweight movement as reps instead of kg (Q-20).
           // Fire-and-forget: a failed mirror write must never affect the painted screen.
@@ -1641,6 +1640,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         periodizationLoading={programPhaseMode === 'ai_dynamic' ? periodizationLoading : false}
         prescriptionPending={(aiPrescriptionPending || durationSwitching) && !prescriptionGenTimedOut}
         prescriptionGenTimedOut={aiPrescriptionPending && prescriptionGenTimedOut}
+        numbersSource={numbersSource}
         sessionBudgetMin={sessionBudgetMin}
         onDurationPresetChange={programPhaseMode === 'ai_dynamic' ? handleDurationPresetChange : undefined}
         deload={deload}

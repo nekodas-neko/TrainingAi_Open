@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.5",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the workout list now says when its numbers are not today's. Offline, or before it has refreshed, the heading carries \"From 26 Sept\" \u2014 or \"Base program\" when it is reading your program rather than a plan \u2014 instead of presenting an older day's sets as today's recommendation.",
+    ],
+  },
+  {
     version: "1.477.4",
     date: "2026-09-27",
     changes: [
