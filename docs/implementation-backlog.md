@@ -7743,8 +7743,28 @@ drift.
   (LB-150). `readTodayCacheSync()` keeps the unwrap in one place but is not TTL-aware, so a
   health-alert reconcile would act on a reading up to a Brisbane day old. **Do not hand-roll it at
   the call sites to keep the item in Lane B.**
-- **Still open:** the four `cachedFetchToday` reads above (blocked on the Lane A enabler), and the
-  other Lane A halves (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
+- **⚠ THE "ONE-LINE ENABLER" HAS AT MOST ONE LEGITIMATE CALLER — checked 2026-09-28 (Lane A)
+  against CLAUDE.md's RV-67 rule**, which disqualifies `freshWithinTtl` on any payload that is not a
+  pure function of stored rows the client can see being written:
+  - **`body-battery`: disqualified.** It drains with the clock, so its value changes with no writer
+    at all, and no invalidation group could ever catch that.
+  - **`readiness-score`: disqualified.** Its inputs are written server-side by the BLE rollup (sleep,
+    HRV, the derived scores). The client never observes those writes, so no proof can list them.
+  - **`next-session`: possible, not proven.** It is `getNextSession` (program, schedule, logs, rest
+    days, phase) **plus** the stored AI prescription (`getSessionPeriodization`) **plus** muscle
+    assignments. A proof has to show every one of those writers invalidates the key. The
+    prescription is written by the prescribe route and consumed at completion, which makes it the
+    one to check first.
+  - **The warm list's own read** inherits whichever of the above it warms.
+  **So do not expose the parameter on its own.** Ship it only in the PR that writes the
+  `next-session` proof. A flag with no qualifying caller is an invitation to add a disqualified one.
+- **Still open:** `next-session`'s proof (above), and the other Lane A halves
+  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round). **On the 2N+1 round,
+  keep the immediate invalidate unless a change also handles a push that moves nothing.**
+  `pushThenRevalidate` revalidates only when `pushed > 0`. With LB-151's single-flight push, a
+  concurrent drain can carry this write and report 0 here, and dropping the immediate round would
+  then leave the screen stale for the key's TTL. One wasted request a log is the cheaper side of
+  that trade.
 - **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
   Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
   across the 3 modules now take the user's zone.
