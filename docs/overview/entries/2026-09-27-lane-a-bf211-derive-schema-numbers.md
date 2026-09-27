@@ -100,6 +100,23 @@ Nothing runs on the device or in production; this is tooling and docs. The comma
 output depends on which refs the clone has — it fetches, but a ref the remote does not serve (a
 contributor's fork branch) is still invisible to it, and no check can see one.
 
+## `BF-214` landed while this was being written, and does not supersede it
+
+Another session filed `BF-214` the same hour — 59 of 287 migrations are `claude_ro` twins, **92% of
+the corpus by line**, so the twin doubles how fast numbers are consumed and is what makes a
+collision silent. It marked `BF-211` superseded on the way past. Reconciled rather than deferred to,
+because the two do not overlap:
+
+- `BF-214` ② proposes replacing authoring-time allocation entirely (timestamp names, numeric sort).
+  If it lands, `next-schema-number.js` is deleted. That is a deletion, not a conflict, and it is
+  behind ① and a careful read of apply order for all 287 migrations.
+- This PR removes a pointer that was **provably inert** — a check pinned it to `max(merged) + 1`.
+  `BF-214` ② is not removing a working reservation either, and its entry now says so, because
+  believing there was one is what kept the row alive.
+- The command gives ② something to be judged against: it reproduces `#1608`'s collision by name.
+
+`BF-211` is removed from the queue as shipped; `BF-214` keeps the whole restructure.
+
 ## Left for the owner
 
 **The issue author is owed a reply and I have not posted one.** Commenting on a shared surface is
