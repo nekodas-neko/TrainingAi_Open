@@ -7520,19 +7520,6 @@ drift.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
-### [workouts][platform] RV-174 — a deleted program or progression style never leaves the device's mirror
-
-- **Lane: A** — `lib/data/postgres/slices/programs.ts:435,866`, `lib/local-store/sqlite-backend.ts` `applyDelta`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **The gap:** both are hard deletes on tables with no `deleted_at`, and both tables are in the
-  delta by `updated_at`. The local `applyDelta` only upserts them, so deleted parents stay on the
-  device forever.
-- **Failure:** `assembleLocalActiveProgram` takes `find(isActive) ?? programs[0]`
-  (`program-assembler.ts:37`). After deleting active program A and activating B, the mirror can hold
-  two rows with `is_active=1`. Offline with no cached workout-data, the Workout screen then shows
-  the stale/reselect state (`workout-screen.tsx:376-395`). Online recovers it.
-- **Fix:** add a tombstone, or delete by absence as saved meals already do (`sqlite-backend.ts:2696`).
-
 ### [workouts][platform] RV-175 — editing or deleting a logged exercise or session offline is lost, after a success toast
 
 - **Lane: A** — a mutation domain for these edits. Lane B for `lib/hooks/use-day-entry-mutations.ts:50,90,132`.
