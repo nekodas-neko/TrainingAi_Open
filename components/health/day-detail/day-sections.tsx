@@ -46,6 +46,11 @@ function KeyValues({ rows }: { rows: [string, string][] }) {
 
 /** 48dp tap target for the row-level edit/delete controls (LB-1). Siblings sit in a `gap-2` row so
  *  two destructive targets are never adjacent without the 8dp the touch rule asks for. */
+// RV-219 ② — the row's two icon buttons are 48 px each, which is 96 of ~380 usable px at 412 px:
+// the entry's measured "about 25% of the row twice over". **Shrinking them is not available** —
+// 48 px IS the Android minimum touch target and the repo's tap-target floor, so the name wraps
+// instead (`line-clamp-2` above). The name is the part that distinguishes "Chest-Supported
+// Dumbbell Row" from every other row; the icons are the same two on every line.
 const ICON_BTN =
   "flex h-12 w-12 flex-none items-center justify-center rounded-xl text-muted-foreground transition active:scale-95 disabled:opacity-40";
 
@@ -147,12 +152,12 @@ export const TrainingSection = memo(function TrainingSection(
                     type="button"
                     onClick={() => onExerciseTap(ex.name)}
                     aria-label={`${ex.name} history`}
-                    className="min-w-0 flex-1 truncate text-left text-[12.5px] underline decoration-white/20 underline-offset-2"
+                    className="min-w-0 flex-1 line-clamp-2 text-left text-[12.5px] underline decoration-white/20 underline-offset-2"
                   >
                     {ex.name}
                   </button>
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-[12.5px]">{ex.name}</span>
+                  <span className="min-w-0 flex-1 line-clamp-2 text-[12.5px]">{ex.name}</span>
                 )}
                 <span className="flex-none text-[10.5px] tabular-nums text-muted-foreground">
                   {ex.sets ?? 0} × {ex.reps?.[0] ?? 0}

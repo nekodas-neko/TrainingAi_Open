@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.13",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: on a day's workout card, a long exercise name was cut exactly where it stops being recognisable \u2014 \"Chest-Supported Dumbb\u2026\". It wraps to a second line now.",
+    ],
+  },
+  {
     version: "1.477.12",
     date: "2026-09-27",
     changes: [
