@@ -3215,6 +3215,22 @@ which is the right shape for something that can only be validated by living with
 - **Alternatives:** drop email and password registration and keep only Google, since every current
   user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
 
+### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
+- **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
+- **Needs: RV-192**
+- **Added:** 2026-09-27 · found by Lane A running #1779 on `pnpm dev`.
+- **What:** on `?registered=1` the sign-in screen toasts *"Sign in below — or wait for approval if
+  not yet invited."* That was true while an invite activated a password account. RV-192 (#1779)
+  makes **every** password registration start inactive, invited or not, so the second half becomes
+  the whole story and the first half becomes wrong: an invited registrant who follows it and signs
+  in lands on `/pending`. The copy should say the account waits for approval. Parked on `RV-192`
+  because before that merges the current text is accurate.
+- **Check first, unconfirmed:** in three dev-mode runs the register form's
+  `router.push('/sign-in?registered=1')` did not navigate after a successful `POST`, although
+  calling the router by hand did. Fast Refresh rebuilds were logged around each submit, so it may
+  be a dev-only artefact. It needs one run against a production build before anyone treats it as a
+  bug, because if it is real the toast above is never seen at all.
+
 ### [platform] RV-193 — the Google refresh token is copied into the session JSON that page scripts can read
 - **Lane: A** — `auth.config.ts:51`, `app/api/log-calendar-event/route.ts:22`.
 - **⚠ AUTH — the owner confirms before this merges.** The change is one line.
@@ -15605,6 +15621,20 @@ with a fresh 7-day expiry on every request. Two ways to close it, neither taken 
    session for an inactive account, but it is a worse answer than 403.
 
 Not a decision for a queue pass: option 1 changes how every request in the app is served.
+
+> **Re-measured 2026-09-27 in a real browser, cookie rotation included: the ✅ holds.** Signed in
+> through `/sign-in`, `UPDATE users SET is_active=false`, next `GET /api/friends` on the same cookie
+> → **401**. Same for a deleted row on #1784's branch. Two things this entry's text does not say:
+> - **One call to `/api/auth/session` from app code would undo it, silently.** That handler
+>   re-issues the cookie with `isActiveCheckedAt` stamped, and from then on the one-day throttle
+>   skips the lookup. Measured by accident: a probe that called the endpoint read **200** after
+>   deactivation, and setting `ISACTIVE_RECHECK_MS` to `0` turned the same session into a 401 at
+>   once. The only thing keeping revocation immediate is that nothing in `app/`, `components/` or
+>   `lib/` calls that endpoint or mounts `SessionProvider`, and no check enforces that. Anyone
+>   adding `useSession()` reintroduces up to a day of staleness with every test still green.
+> - **`GET /` no longer redirects a deactivated session.** `app/(home)/page.tsx` has no server
+>   `auth()` call, so it serves the client shell (200) and every data call behind it answers 401.
+>   Data stays protected; the sentence above saying `/` goes to a `/sign-in` redirect is out of date.
 
 ### [platform] LA-61 — three email lookups on the OAuth path skip the normalisation the write applies
 
