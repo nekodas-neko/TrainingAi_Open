@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **286** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v41** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **290** | `lib/data/postgres/migrations/` | (286/287 are reserved by the unmerged LA-142 PR; 288/289 are LA-161) |
+| Local SQLite schema version | **v43** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max | (v42 is reserved by the unmerged LA-142 PR) |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -337,7 +337,7 @@ below threshold and left in place for next time.
 > **⚑ Owner unblocking decisions, 2026-08-02 — read before picking anything up.** Four questions
 > that had been stalling this queue were answered, and the answers are recorded with an ordered
 > run-list in
-> [`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../docs/handoff-2026-08-02-platform-batch-queue-drain.md).
+> [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md).
 > In short: **Q-1 is deferred but not cancelled** (do not provision the second Railway `api/`
 > service; do not delete the entry); **device access is available** — the owner installs one APK
 > and runs one consolidated checklist, so Kotlin items are in scope; **production read-only DB
@@ -354,7 +354,7 @@ below threshold and left in place for next time.
 > them (Q-36, Q-37) were actively losing the owner's data. **All five have shipped** — Q-36 (#987),
 > Q-37 (#988), Q-38 (#995), Q-39 (#996), Q-40 (#997). The batch is closed as an implementation
 > queue; what remains is device verification, tracked on the checklist in
-> [`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](handoff-2026-08-02-platform-batch-queue-drain.md).
+> [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](handoffs/handoff-2026-08-02-platform-batch-queue-drain.md).
 > Follow-ups Q-41 (activity-payload hardening) and Q-42 (readiness-composite extraction) stay in the
 > queue on their own merits.
 
@@ -4132,6 +4132,45 @@ unverified"* is now answered: it persists.
   and every read re-decodes from `body_hex` via the adapter's `r.decoded ?? decodeEventBody(...)`
   fallback. Correct today; it does mean a decoder edit retroactively changes historical reads with
   nothing recording that it did.
+- **⚙ THE READ THIS ENTRY ASKED FOR IS DONE (2026-09-27, Lane A) — and it REFUTES the prediction.**
+  The entry said: *"after this deploys, check whether the 21 days read `scorer_no_output`. If they
+  do, the question is whether the constants are loaded."* **They do not.** Measured in production:
+
+  | day | gate | written |
+  |---|---|---|
+  | 2026-09-16 → 09-24 | `insufficient_met` | 09-27 03:21 |
+  | 2026-09-25, 09-26 | `scorer_no_output` | 09-27 03:21 |
+  | 2026-09-27 | `insufficient_met` | 09-27 03:21 |
+
+  - **None of these rows is stale** — all twelve carry the same `updated_at`, so every one is a
+    fresh verdict from the split, not a leftover label. The `scorer_no_output` string is live and
+    reaching the table.
+  - **So the constants hypothesis is NOT the next step.** `scorer_no_output` fires on only 2 of 12
+    days. On the other ten the MET floors themselves are firing — and 09-18 → 09-24 are exactly the
+    days this entry's own replay proved clear BOTH floors with room (09-23: a 1421-minute grid,
+    1073 valid minutes, against 720 and 360).
+  - **That is now a flat contradiction with one side inside the serving process.** The replay reads
+    frames straight from `oura_raw_samples`; production reaches them through
+    `getOuraDaytimeSignals`. Same frames, same `metGridFromDaytimeSamples`, opposite verdicts — so
+    the loss is in that method, which is where this entry already suspected it.
+  - **⚠ Two more hypotheses formed and KILLED here — do not re-run them.**
+    ① *Every MET value in a `0x50` frame is pushed with the same `tsMs`, so a day collapses to ~100
+    minutes.* The timestamps really are shared, and it is **not** the cause:
+    `metGridFromDaytimeSamples` regroups consecutive equal-timestamp bins into their source event
+    and lays them back out one minute apart, which is exactly what that code is for.
+    ② *`readRawFrames` truncates.* It does not — there is no `LIMIT` anywhere in it, hot or cold.
+  - **What is left, and it is two candidates, both inside `getOuraDaytimeSignals`:** the ds window
+    (`msToDs` on the day bounds — LA-139/RV-182 ② moved this to a robust offset across the whole
+    anchor series, and the window is only as good as that fit), or **rows silently dropped by
+    `dsToMs` returning null** (`if (tsMs == null) continue`), which discards a frame with no signal
+    of any kind.
+  - **⚙ LA-161 SHIPPED 2026-09-27 (Lane A):** `oura_daily_derived.training_load_grid_len` and
+    `training_load_valid_min` now record the two numbers the gate evaluated, on every path
+    including the three gates that never reach the MET floors. **The next step is one read of
+    those columns**, after a day of production: a short grid points at the ds window or at
+    `dsToMs` dropping rows; a full grid means the floors are being evaluated on something other
+    than what is stored.
+
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
   `reason: 'insufficient_met'` (`training-stress.ts:82`), and that model returns null down **seven**
@@ -30967,7 +31006,7 @@ to ship *before* any native rewrite — "we can push it till we HAVE to do it."*
   gates are gone.
 
 The original framing and the research prompt for the rewrite question are still valid reading; see
-[`docs/handoff-2026-08-02-platform-offline-architecture-review.md`](../docs/handoff-2026-08-02-platform-offline-architecture-review.md)
+[`docs/handoffs/handoff-2026-08-02-platform-offline-architecture-review.md`](../docs/handoffs/handoff-2026-08-02-platform-offline-architecture-review.md)
 for the full reasoning and a ready-to-run research prompt for the next session.
 
 **Deactivation staleness — FIXED 2026-07-30 (v1.243.1).** `auth.ts`'s jwt callback re-reads
@@ -31226,7 +31265,7 @@ re-accumulating. The remaining half is the one-time `REINDEX` (~130 MB of the ta
 indexes), a Railway-console action on the owner checklist.
 What remains of *this* item is the no-code Railway-console steps (WAL trim + Postgres restart,
 the `VACUUM (VERBOSE, ANALYZE)`, and now the `REINDEX`); all are on the owner device/console checklist in
-[`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](../docs/handoff-2026-08-02-platform-batch-queue-drain.md).
+[`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md).
 
 **🆕 Re-measured 2026-08-08 — the console steps will not stop the trend, and the growth rate is
 ~3× what CLAUDE.md records.** ([review §2.1](reviews/2026-08-08-db-scalability-and-tooling-review.md))

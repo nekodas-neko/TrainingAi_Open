@@ -1750,6 +1750,10 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   // the gate that refused. Written on every evaluation, which is what makes "never called"
   // and "called and gated" distinguishable from outside for the first time.
   trainingLoadGate:     text('training_load_gate'),
+  // LA-161: the two numbers the gate evaluated, so `insufficient_met` can be checked against
+  // what the grid actually was rather than against a replay of the same frames.
+  trainingLoadGridLen:  integer('training_load_grid_len'),
+  trainingLoadValidMin: integer('training_load_valid_min'),
 
   recoveryIndexHours: doublePrecision('recovery_index_hours'),
   wornHoursBle:       doublePrecision('worn_hours_ble'),

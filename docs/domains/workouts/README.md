@@ -290,7 +290,7 @@ Live at the time of writing (2026-07-30):
   Android's recogniser in any test, so the parser is proven on strings, not on speech; the press is
   W4 in [`device-verification-queue.md`](../../device-verification-queue.md), sharing a sitting with
   LA-37.
-- **[`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
+- **[`docs/handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
   — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · ~~Q-423~~ · Q-420 · Q-421 · Q-422), from one
   owner question about making the burn estimate more accurate. Records that `computeActiveEnergy`
   **already** calls the estimator per strength session and discards the split; that the done screen
@@ -310,39 +310,39 @@ Live at the time of writing (2026-07-30):
   same `x && f(x)` shape but is inside a `displaySession ?` branch — redundant, not a bug.
 
 - Cross-domain, but the deload work lives here:
-  [`docs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
+  [`docs/handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
   (Q-175 — a confirmed deload **week** never reached the AI-dynamic prescription, the second of the
   app's two deload entry points; and **Q-185**, still open, which the fix exposed: the reduction
   lives inside `if (aiDrivesLoad)`, so an exercise the prescription does not name is not reduced by
   either entry point).
-- Handoffs: `ls docs/handoff-*-workouts-*.md` — most recently
-  [`docs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../../handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md)
+- Handoffs: `ls docs/handoffs/handoff-*-workouts-*.md` — most recently
+  [`docs/handoffs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../../handoffs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md)
   (Q-310 root-caused and queued — the ai_dynamic generic fallback's hardcoded `isDeloadActive:
   false`; also shipped the warm-up timer label fix, PR #1350. Q-245/246/247/248, filed earlier in
   the same owner-bug-batch thread, were picked up and shipped by other sessions before this handoff
   was written — see #1375/v1.317.0 and v1.317.1). Before that,
-  [`docs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md`](../../handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md)
+  [`docs/handoffs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md`](../../handoffs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md)
   (Q-83 **built** — the measured warmup median is now capped at 20% of the budget, but only when
   today's budget is below the session's own configured length; carries the sandbox traps for probing
   the AI time-budget path, and why an ungated cap is wrong. Produced **Q-85**: rest, not warmup,
   dominates a short budget). That superseded
-  [`docs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md`](../../handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md)
+  [`docs/handoffs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md`](../../handoffs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md)
   (the same work, triaged and queued but not yet built). Before that,
-  [`docs/handoff-2026-08-03-workouts-auto-apply-phase-transitions.md`](../../handoff-2026-08-03-workouts-auto-apply-phase-transitions.md)
+  [`docs/handoffs/handoff-2026-08-03-workouts-auto-apply-phase-transitions.md`](../../handoffs/handoff-2026-08-03-workouts-auto-apply-phase-transitions.md)
   (auto-apply set a status but never called `advancePhase`, so four of five session types sat in
   accumulation since June against prescriptions already written at intensification loads — fixed in
   #1025 / v1.252.0; carries the prod-audit evidence, the local test-env traps, and why deloads and
   ceiling-forced transitions still ask). Plus
-  [`docs/handoff-2026-07-29-ai-prescription-engine.md`](../../handoff-2026-07-29-ai-prescription-engine.md)
-  and [`docs/handoff-2026-07-29-ingest-and-records.md`](../../handoff-2026-07-29-ingest-and-records.md),
+  [`docs/handoffs/handoff-2026-07-29-ai-prescription-engine.md`](../../handoffs/handoff-2026-07-29-ai-prescription-engine.md)
+  and [`docs/handoffs/handoff-2026-07-29-ingest-and-records.md`](../../handoffs/handoff-2026-07-29-ingest-and-records.md),
   both written before the domain went into handoff filenames.
-  Also [`docs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md)
+  Also [`docs/handoffs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoffs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md)
   (Review sweep 40 — three program-config write paths accepted a progression-style id owned by another
   user while the `PUT` twin of one refused the identical value; all three fixed, RV-32…RV-34, and the
   write-up's FK inventory names the 23 edges still unprobed).
-  Also [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+  Also [`docs/handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-38 — a phase transition emptying the prescription card permanently), filed under `cross` because it spans five pillars.
-  Also [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+  Also [`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md)
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including

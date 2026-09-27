@@ -29,7 +29,8 @@ describe('the gate names which half failed (TN-79)', () => {
     // it is the point — the fix is not to rename the honest case.
     const metsPerMinute: (number | null)[] = new Array(200).fill(1.2)
     const r = computeTrainingStress({ ...base, startTimestampMs: Date.parse('2026-09-23T00:00:00Z'), metsPerMinute })
-    expect(r).toEqual({ status: 'gated', reason: 'insufficient_met' })
+    // LA-161 added the dimensions the gate decided from; 200 minutes, all valid.
+    expect(r).toEqual({ status: 'gated', reason: 'insufficient_met', metGridLen: 200, metValidMin: 200 })
   })
 
   it('a series that CLEARS both floors never reports insufficient_met', () => {
