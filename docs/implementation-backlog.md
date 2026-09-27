@@ -3063,6 +3063,24 @@ which is the right shape for something that can only be validated by living with
 - **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
   token is long-lived, can write to Google Calendar, and outlives sign-out.
 - **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
+- **✅ SHIPPED (Lane A, 2026-09-27) — and it is not one line.** The line is gone from
+  `auth.config.ts`'s session callback and from the `Session` interface in `types/next-auth.d.ts`;
+  the JWT keeps it. The route reads it through a new `lib/auth/session-token.ts`.
+- **Why a shared module rather than a `getToken()` call in the route.** Auth.js derives the
+  decryption **salt from the cookie NAME**, so `secureCookie` is load-bearing: get it wrong and
+  every valid token reads as invalid, the route answers a plain 401, and every workout completion
+  stops reaching the calendar with nothing in the logs. That exact pairing was already solved in
+  `bearer-session.ts` and commented on in `request-error.ts`; a second hand-rolled copy is how it
+  drifts. `bearerSession` now calls the shared reader too.
+- **Both halves are tested against a REALLY encrypted token**, not a mocked decode: one that the
+  session the browser receives no longer carries the claim, driven through the real
+  `authConfig.callbacks.session`; one that the server still reads it back from a cookie minted with
+  `encode()`. The second is the test that would catch the silent death above.
+- **`bearerSession` builds its session by running that same callback**, so the mobile path loses the
+  claim identically — deliberate, and worth stating because it is not visible from the diff.
+- **The route's authorisation semantics are unchanged**: no refresh token is still 401, which is
+  what a signed-in user who never granted the calendar scope gets. A second test now pins the
+  signed-out case separately, because the two conditions became independent.
 
 ### [platform] RV-195 — three low-severity auth and social gaps, one PR
 - **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
