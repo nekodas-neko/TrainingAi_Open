@@ -1,3 +1,4 @@
+import { isDeloadedForEstimate } from '../1rm';
 import { z } from 'zod';
 import { oneRmImplausible } from '@trainingai/shared/validation/plausibility'
 import { aestMidnight, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -49,7 +50,6 @@ export const LogExercisePayloadSchema = z.object({
 });
 
 export type LogExercisePayload = z.infer<typeof LogExercisePayloadSchema>;
-
 // PR gate: deload work is deliberately submaximal, so its 1RM estimate must
 // never enter personal_records. Whole-session deloads were already excluded;
 // a per-exercise deload excludes just that exercise — and unlike the session
@@ -215,7 +215,7 @@ export async function logExerciseFromPayload(
   const isAnyDeload = currentPhaseType === 'deload' || sessionIsEarlyDeload;
   /** The one predicate that decides whether this exercise's 1RM is estimated at all — named once so
    *  the estimate and the stored provenance cannot disagree, which is exactly how Q-298 arose. */
-  const deloadedForEstimate = exerciseDeloaded === true || (isAnyDeload && !isBaseline);
+  const deloadedForEstimate = isDeloadedForEstimate({ exerciseDeloaded, isAnyDeload, isBaseline });
   // Mirrors shouldCountTowardPr's gate below: a deliberately submaximal set — whether from a
   // static program's deload phase (isAnyDeload) or an AI per-exercise/whole-session deload
   // (exerciseDeloaded) — must never feed the 1RM estimate itself, not just be excluded from
