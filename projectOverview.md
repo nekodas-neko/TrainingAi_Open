@@ -2656,6 +2656,22 @@ Last swept **2026-09-03**.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][devices] ⚠️ Resilience stopped publishing on 2026-09-22 and nothing says so (LA-158, 2026-09-27)
+`oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22** while the
+rollup runs normally — last write **2026-09-27 02:19 UTC**, `daytime_stress_coverage_min`
+populated through 2026-09-27. It computes and then declines to publish. The mechanism is
+code-certain: a day counts only at **240 min** of daytime-stress coverage
+(`stress-resilience.ts:144`) and a level needs **5 valid days of 14** (`:288`). Coverage since
+09-15 reads **290, 290, 170, 170, 120, 50, 150, 60, 150, 60, 140, 110, 50** — **2 of the last 13
+clear 240**. On 09-22 confidence was exactly 5/14; on 09-23 the window rolled and the gate closed.
+**The only reason this is known is that someone queried the table** — there is no surface saying
+"not enough daytime coverage", so the absence looks like the app not having got to it. Two
+candidate causes for the coverage collapse, neither established: the ring is worn less in the
+daytime, or daytime-stress ingest has degraded; `worn_hours_ble` is NULL on every row, so the
+database cannot separate them. **Do not fix by lowering the gate** — 4 hours is the vendor
+model's own constant. This also narrows TN-70: the September 1→4 spread it tabulates was already
+decaying to the floor as it was measured.
+
 ### [workouts][app-shell] ⚠️ The workout recap has not run since July, across 43 completed workouts (LA-155, 2026-09-26)
 `GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx` whenever a
 workout completes. Measured against production on 2026-09-26: `ai_health_insights` holds **4**

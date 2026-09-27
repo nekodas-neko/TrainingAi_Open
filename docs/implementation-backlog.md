@@ -3576,6 +3576,48 @@ which is the right shape for something that can only be validated by living with
       re-derives each day from the packed raw tier, so a wide pass would fill history — that pass is
       the work, and it has not been run.
 
+  - **⚙ A THIRD REGIME, measured 2026-09-27 (Lane A) — and it is the one that is actionable.**
+    This entry describes two regimes. There are now three: **resilience has published NOTHING since
+    2026-09-22**, five days and counting, while the rollup keeps running.
+    - **The rollup is NOT broken.** `oura_daily_derived` was last written **2026-09-27 02:19 UTC**
+      and `daytime_stress_coverage_min` is populated through **2026-09-27**. It computes, and then
+      declines to publish a level.
+    - **The mechanism is code-certain and needs no replay.** A day is valid only if
+      `resolutionMinutes × nonNaN ≥ minDaytimeStressHours × 60` (`stress-resilience.ts:144`) —
+      **240 minutes**. A level publishes only if `validCount >= windowMinLength` = **5** of a
+      14-day window (`:288`). Coverage since 09-15: **290, 290, 170, 170, 120, 50, 150, 60, 150,
+      60, 140, 110, 50** — so only **2 of the last 13 days clear 240**. On 09-22 `confidence` was
+      **0.357 = exactly 5/14**, sitting on the floor; on 09-23 the window rolled past one more
+      valid day, `validCount` fell to 4, and the gate closed.
+    - **So the September spread was already dying as it was being measured.** The 1→2→3→4 spread
+      this entry tabulates runs 09-07 → 09-22, and confidence over that span decays to the
+      minimum. Reading it as a healthy regime to contrast against the level-5 one overstates it.
+    - **This does not explain the level-5 regime** and is not offered as doing so. It is a separate,
+      later fault on the same metric.
+    - **The actionable half is filed as LA-158** — nothing anywhere says the metric has stopped.
+
+### [readiness][devices] LA-158 — resilience stopped publishing five days ago and nothing says so
+- **Lane: A** for the surfacing; the input collapse behind it may be `DV`.
+- **Branch:** _unassigned_ · **Added:** 2026-09-27 · found verifying TN-70 against production.
+- **What:** `oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22**
+  while the rollup runs normally (last write 2026-09-27 02:19 UTC, coverage column populated to
+  2026-09-27). The mechanism is established in TN-70's third-regime note: daytime-stress coverage
+  has cleared the 240-minute per-day gate on **2 of the last 13 days**, so fewer than 5 of the
+  trailing 14 are valid and the publish gate closes.
+- **Why it is an entry rather than a note:** a score the owner reads simply stopped, and **the only
+  reason anyone knows is that someone queried the table**. There is no Known-Issues row, no
+  surface that says "not enough daytime coverage to compute this", and no alert. The metric's
+  absence looks identical to the app not having got to it yet.
+- **Two candidate causes for the coverage collapse, NEITHER established:** the ring is genuinely
+  worn less during the day since mid-September, or daytime stress ingest/decode has degraded. The
+  database cannot separate them — `worn_hours_ble` is NULL on every row (TN-70), so there is no
+  stored wear figure to check against.
+- **Shape:** (a) surface the shortfall where the score would be, naming the gate rather than going
+  blank; (b) a `DV` check of whether the ring is actually being worn in the daytime, which is the
+  only thing that separates the two causes.
+- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's
+  own constant, and a level computed from 50 minutes would be worse than no level.
+
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. This is the measurement LA-122 item 2b was
