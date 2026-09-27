@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.22",
+    version: "1.477.23",
     date: "2026-09-27",
     changes: [
       "Fixed: when the app could not reach the server and had nothing saved yet, More and Profile details quietly dropped your name, your readings and your tests \u2014 so it read like a brand-new account rather than a connection problem. Each now says it could not load.",
+    ],
+  },
+  {
+    version: "1.477.22",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a program or progression style you deleted stayed on your phone, and offline the Workout screen could open a program you had already deleted. Deletions now reach the phone on the next sync.",
     ],
   },
   {

@@ -31,6 +31,19 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] ⚠️ A deleted program now leaves the phone's mirror, and only the phone runs that code (RV-174, 2026-09-28)
+
+Deleting a program or progression style used to leave it in the device's local mirror forever: both
+are hard deletes with no tombstone, and the sync delta carries only what changed. After deleting
+active program A and activating B, the mirror could hold two active programs, and the Workout screen
+offline could pick the wrong one. The pull now carries every program and style id the user has
+(`programRoster` / `progressionStyleRoster`) and `pruneProgramStructure` deletes the rest, children
+included, and clears a deleted style from the exercises that used it. Verified against a real
+in-memory SQLite and over HTTP on `pnpm dev`, but `getLocalStore` is null on the web, so **the
+device path has not run anywhere.** **Pass test on the S25:** delete a non-active program in Config,
+pull to sync, go offline, and the Workout screen and program list no longer show it; then delete the
+ACTIVE one after activating another, and offline the Workout screen opens the new one.
+
 ### [app-shell] ⚠️ The scrim now reaches pushed routes, and no phone has seen it there (DV-22, 2026-09-27)
 
 `/health/sleep` and every other screen opened from a tab scrolled under the status-bar clock with no
