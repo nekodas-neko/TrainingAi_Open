@@ -34,7 +34,7 @@ Docs-only, all on branch `claude/workout-time-ai-prescription-lmbmuh`:
 | Q-84 plan | `docs/superpowers/plans/2026-08-05-guided-walk-cadence-in-summary.md` |
 | Q-84 queue entry | `docs/implementation-backlog.md` (tagged `[cardio]`) |
 | Domain index links | `docs/domains/workouts/README.md`, `docs/domains/cardio/README.md` |
-| Journal | `docs/overview/entries/2026-08-05-time-budget-cadence-backlog-planning.md` |
+| Journal | `docs/overview/history-2026-08-04.md#2026-08-05-time-budget-cadence-backlog-planning` |
 | Status | `projectOverview.md` current-status bullet |
 
 ## Deliberately NOT done

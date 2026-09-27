@@ -596,7 +596,7 @@ git commit -m "feat: render the elevation profile chart on the activity detail s
 
 **Files:**
 - Modify: `package.json`, `lib/changelog.ts`, `projectOverview.md`
-- Create: `docs/overview/entries/2026-07-27-cardio-elevation-profile.md`
+- Create: `docs/overview/history-2026-07-23.md#2026-07-27-cardio-elevation-profile`
 - Modify: `docs/implementation-backlog.md`
 
 - [ ] **Step 1: Run the full local gate**
@@ -623,7 +623,7 @@ Minor bump; changelog entry describing the new elevation chart in plain language
 
 - [ ] **Step 4: Journal entry**
 
-`docs/overview/entries/2026-07-27-cardio-elevation-profile.md` — what shipped, and explicitly flag
+`docs/overview/history-2026-07-23.md#2026-07-27-cardio-elevation-profile` — what shipped, and explicitly flag
 **not verified**: on-device (APK) for the local-SQLite/offline-sync path (Task 5) — the web sandbox
 only exercises the web-fallback write path and a manually-seeded read path, never the native SQLite
 local-first write→sync→pull round-trip; real GPS elevation data (the dev sandbox has no real device
