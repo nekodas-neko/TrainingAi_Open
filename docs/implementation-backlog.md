@@ -585,6 +585,61 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
+### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
+
+- **Lane:** A — `scripts/generate-claude-ro-views.js`, `lib/data/postgres/client.ts`,
+  `scripts/local-db/migrate.js`, `lib/data/postgres/migrations/`.
+- **Added:** 2026-09-27 · BugFix. **Supersedes the narrower `BF-210`**, which proposed replay
+  exemptions for the 58 twins a `DROP COLUMN` breaks; that treats the symptom. It also answers
+  issue **#1620** more completely than `BF-211` does, and is the root cause behind `BF-213`.
+- **Needs:** — nothing.
+- **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
+  are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
+  SNAPSHOT opening `DROP SCHEMA claude_ro CASCADE` and rebuilding all 98 views. **Only the newest
+  affects the final schema**; the other 58 exist solely to be replayed.
+- **Migrations land at 2 per day, every day for the past week — and that is one real change plus
+  one twin.** So the twin doubles the rate at which numbers are consumed, and half of every
+  collision is a snapshot file that has no business owning a migration number. `#1608` needed 288
+  for its table and 289 for its twin; only 288 is a schema change.
+- **The twin is also what makes the collision SILENT.** Two table migrations with different
+  filenames both apply and both succeed. Two twins both apply, sort by filename, and the later one
+  drops the schema the earlier one just built — so the newer view is created and destroyed in the
+  same deploy with no error. That is `BF-213` exactly.
+- **① Recommendation: the twin stops being a numbered migration.** One checked-in file, regenerated
+  in place (`lib/data/postgres/claude-ro-views.sql`), applied after the migration loop in
+  `ensureSchema` (`client.ts:95`). Halves number consumption, deletes ~86k lines, makes `BF-210`
+  disappear because no historical twins remain to break, and makes `BF-213`'s failure structurally
+  impossible.
+  **⚠ Generate it in CI or at authoring time, NOT at runtime — this was the first draft of this
+  entry and stress-testing killed it.** The generator is **default-deny by construction**: its
+  `DENY` map withholds `password_hash`, the four `oura_tokens` secrets and three image/screenshot
+  blobs, and a table it cannot classify calls `process.exit(1)` rather than emitting an unscoped
+  view (`generate-claude-ro-views.js:214`). Two properties depend on the file being checked in:
+  **what columns are exposed is reviewable in the diff**, and **a classification failure happens
+  where a human sees it** rather than on a production boot with the schema already dropped.
+  **The cost of ① is one real conflict**: two concurrent schema changes now edit one file instead of
+  two. That is the right trade — the resolution is mechanical (re-run the generator), and a loud
+  conflict beats a silently dropped view.
+  **There is no CI check today that the twin matches the schema** — only
+  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`, which **skip unless
+  `DATABASE_URL` is TCP**. ① should add that check; it makes the twin strictly better verified than
+  it is now.
+- **② The remaining half: sort migrations NUMERICALLY, then name them by timestamp.** ① does not fix
+  the collision `#1620` is about — a contributor still picks a number that goes stale before review
+  ends. **A naive timestamp rename is a trap, verified rather than assumed:** both appliers sort
+  lexicographically (`client.ts:95`, `migrate.js:69`), and `"202609270534_x.sql" < "289_y.sql"`
+  because `'0' < '8'` — **every new migration would run before every old one.** Sorting by the
+  leading integer instead (one line in each applier) makes a minute-precision timestamp sort
+  correctly and collide only if two authors pick the same minute.
+- **Sequencing: ① then ②, and ① alone is worth shipping.** ① is self-contained; ② touches the apply
+  order for every migration and wants its own PR and its own careful read.
+- **Reply to `#1620` when this is decided** — the author raised it, and the answer is larger than
+  the request.
+- **Reversal cost:** ① moderate — it changes what runs at deploy, so it wants a careful rollout;
+  the 58 deleted twins are recoverable from git and are already recorded in `schema_migrations` by
+  filename, so removing the files does not re-run anything. ② is higher: it changes apply order,
+  and a wrong sort is a wrong schema.
+
 ### [platform] BF-211 — issue #1620 asks to derive the migration number from filenames, which cannot see an unmerged branch
 
 - **Lane:** A — `scripts/check-backlog-pointers.js`, `docs/implementation-backlog.md`.
@@ -606,6 +661,11 @@ below threshold and left in place for next time.
   instinct and the wrong moment for this repo: with several agents running against a `main` that
   takes a commit roughly every 8 minutes, a collision found at merge time means rebuilding a
   migration **and** regenerating its twin, which is the expensive half.
+- **⚠ SUPERSEDED BY `BF-214` (2026-09-27), which answers this more completely.** The
+  recommendation below treats the counter as the problem. It is half of it: **92% of the migration
+  corpus is `claude_ro` twins**, so the twin doubles how fast numbers are consumed and is what makes
+  a collision silent. `BF-214` ① removes the twin from the numbered sequence and ② replaces
+  authoring-time allocation outright. Kept here because the measurement below is still the evidence.
 - **Recommendation: keep a reserved number, and stop maintaining it by hand — derive it from every
   branch rather than from `main`.** `git log --all --diff-filter=A --name-only --
   lib/data/postgres/migrations/` names every migration added on any fetched branch, merged or not, so
@@ -1586,6 +1646,27 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-25 · Tuning agent, after the owner said *"everything should go to ORC for my
   review/input"* and these three turned out to exist only in GitHub's review-request list and one chat
   message.
+- **⚠ THE COUNT IS STALE: SEVEN need him, not three, and two of those are BLOCKED rather than
+  waiting (BugFix, 2026-09-27).** #1592 above **already merged as #1616** before this entry was
+  written. Measured that day with `get_check_runs`, job conclusions read rather than assumed:
+  | PR | what | required checks | verdict |
+  |---|---|---|---|
+  | **#1749** | `LA-142` drop four dead columns | **Migration Check RED** | blocked — not his yet |
+  | **#1499** | `OR-138` db-query user scoping | **Build RED** | blocked — not his yet |
+  | **#1755** | `OR-159`+`RV-196` native security | all green (+ Android green) | **his call** |
+  | **#1672** | `RV-190` read-only session leak | all green | **his call** |
+  | **#1671** | `RV-191` image byte validation | all green | **his call** |
+  | **#1608** | HealthKit storage (external) | all green | **his call** — see `BF-213` |
+  | **#1607** | bearer tokens (external, auth) | green but **from 09-25** | re-run first |
+  **#1755 appeared in this file ZERO times** when that was measured; #1749, #1672 and #1671 appeared
+  once each, inside their own closing entries rather than as items awaiting him.
+- **Both blocked PRs report their gates passing, and both have a red REQUIRED check.** #1749's
+  Migration Check reads `applied 228, skipped 0, **58 failed**`, every one `column
+  t.active_calories_est does not exist` — the general form is `BF-214`. #1499's Build fails at the
+  test-typecheck gate: `or138-readonly-pivot.test.ts: 6 error(s) — this file had none`, while its
+  description reports `npx tsc --noEmit` clean, which is true and is **a different gate**
+  (`tsconfig.json` vs `tsconfig.tests.json`). **A local gate's name is not the CI gate's name** —
+  both reported honestly against the command they ran.
 - **Why this is a defect and not bookkeeping.** `grep -cE '#1607|#1592|#1499'` over this file returns
   **0**. The seven decisions already in `Lane: O` are correctly routed — these are not routed at all.
   A GitHub review request is a channel nobody is watching: #1499 has sat since **2026-09-24** and the
