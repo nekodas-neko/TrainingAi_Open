@@ -30,7 +30,7 @@ worth keeping filed below.
 ## The compaction
 
 **Relocated, not curated.** The whole narrative block moved whole to
-[`docs/overview/history-2026-09-27-status-narrative.md`](history-2026-09-27-status-narrative.md).
+[`docs/overview/history-2026-09-27-status-narrative.md`](../history-2026-09-27-status-narrative.md).
 Nothing was edited, summarised or dropped.
 
 That was a deliberate choice against the obvious one. Of the 281 paragraphs, **152 end in a pointer
