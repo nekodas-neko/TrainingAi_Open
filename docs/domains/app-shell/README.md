@@ -462,12 +462,12 @@ Live at the time of writing (2026-07-30):
   remaining ~18 ready items into two parallel-agent pickup prompts by file territory; Agent 2 owns
   the app-shell/UI/cache-correctness half (`lib/cache-groups.ts`, `components/*`). Filed under
   `cross` because it also covers `platform`-territory items.
-- **[`docs/overview/entries/2026-09-26-or162-hr-chart-memo.md`](../../overview/entries/2026-09-26-or162-hr-chart-memo.md)**
+- **[`2026-09-26-or162-hr-chart-memo`](../../overview/history-2026-09-27-folded-2.md#2026-09-26-or162-hr-chart-memo)**
   — OR-162. The tab switch's cost is a RE-RENDER, not a resize: `TabVisibilityProvider`'s `epoch`
   makes every screen refetch on re-show and hand its chart a value-identical new array, which
   defeats the default shallow `memo`. `HrDayChart` is memoised by value; the **arrival** half
   (180/320/43 font writes) is a different mechanism and is still open.
-- **[`docs/overview/entries/2026-09-26-dv21-notification-channels.md`](../../overview/entries/2026-09-26-dv21-notification-channels.md)**
+- **[`2026-09-26-dv21-notification-channels`](../../overview/history-2026-09-27-folded-2.md#2026-09-26-dv21-notification-channels)**
   — DV-21. Android drops a notification posted to a channel that was never created, silently.
   `health-alerts` and `workout-reminders` had both been posting to nothing; a source guard now
   fails on any `channelId:` with no `createChannel`.
