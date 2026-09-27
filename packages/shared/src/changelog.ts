@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.19",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a deload week left an exercise at its full working weight when it had no progression style set — Skull Crusher came up at 3 × 30 kg beside four lifts at 52%. Every exercise in the session is lightened now.",
+    ],
+  },
+  {
     version: "1.477.18",
     date: "2026-09-27",
     changes: [

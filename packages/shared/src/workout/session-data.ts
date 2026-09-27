@@ -295,11 +295,13 @@ export function buildWorkoutExercises(
       // trap worth naming: a clause proven unreachable is only unreachable against the code that
       // proved it. Anyone deleting this one should re-run that mutation rather than trust either
       // comment.
-      if (
-        !deloaded && isAiDynamic && !isBaselinePhase &&
-        (aiDeload || isDeloadActive) &&
-        progressionStyle && progressionStyle.length > 0
-      ) {
+      //
+      // BF-200: no requirement on `progressionStyle` here. It used to demand a non-empty one, but
+      // the deload style comes from the goal alone, and the only thing that demand still excluded
+      // was an exercise with NO style — which then kept its full working weight through a deload
+      // week (the owner's Skull Crusher, 3 × 30 kg beside four lifts at 52%). A style-less
+      // exercise has nothing to revert to, so `preDeloadStyle` stays null for it.
+      if (!deloaded && isAiDynamic && !isBaselinePhase && (aiDeload || isDeloadActive)) {
         const override = deloadOverrideForGoal(trainingGoal)
         preDeloadStyle = progressionStyle
         preDeloadSets = defaultSets
