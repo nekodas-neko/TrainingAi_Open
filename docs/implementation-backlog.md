@@ -6407,6 +6407,27 @@ drift.
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
 - **Needs:** — nothing.
+- **⚙ SHIPPED 2026-09-28 (Lane A): the deload now reaches an exercise with no style.** Root cause,
+  from production and then the code: Skull Crusher has had **no progression style** since
+  2026-09-10 (`session_exercises.style_id` NULL; its logs carry no `style_id` from that date),
+  and on 09-25 the AI prescription was not driving the load. The four styled exercises took their
+  base style and the Q-185 deload override (`packages/shared/src/workout/session-data.ts`) swapped in
+  the deload style: logged `deloaded`, 2 sets, `planned_pct = 52`. Skull Crusher had a null
+  `progressionStyle`, and that override **required a non-empty one**, so it was skipped: logged
+  `deloaded = false`, 3 × 30 kg, no `planned_pct`. The deload style comes from the goal alone, so
+  the requirement only ever exempted style-less exercises. Removed.
+  **Neither candidate (a) nor (b) above was the mechanism:** the basis was never consulted, and there
+  was no deload pct to misapply. The id-mismatch idea was checked too: the stored prescription's
+  `sessionExerciseId`s match all five current exercises.
+- **Keep:** three things the fix does not touch.
+  ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
+  remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
+  whether a save path can drop a style is the Lane A question.
+  ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
+  TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
+  needs a decision on a default, not a bug fix.
+  ③ **The 57.75 kg PR (2026-08-13) against a current 36.5** still looks inflated, as noted below. It
+  played no part in this bug.
 - **⚙ A SECOND SYMPTOM, same exercise, found 2026-09-27 (Lane A) while decomposing TN-75.**
   Barbell Skull Crusher is the ONLY loaded exercise in September with no `planned_pct` on any
   set — 6 sets across 09-19 and 09-25, including the very Upper session in the table below — and

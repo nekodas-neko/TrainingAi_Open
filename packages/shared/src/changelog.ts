@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.20",
+    version: "1.477.21",
     date: "2026-09-28",
     changes: [
       "Fixed: when a whole session was deloaded, choosing Full changed nothing, and sets done at full weight still counted as a deload and could not set a PR. Full now puts each exercise back to your program's own weights and sets, and those sets count.",
+    ],
+  },
+  {
+    version: "1.477.20",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a deload week left an exercise at its full working weight when it had no progression style set — Skull Crusher came up at 3 × 30 kg beside four lifts at 52%. Every exercise in the session is lightened now.",
     ],
   },
   {
