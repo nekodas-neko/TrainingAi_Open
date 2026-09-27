@@ -21,6 +21,10 @@ interface WeekStripCardProps {
 }
 
 function WeekStripCardComponent({ weekStrip, activeSessions, onDayClick }: WeekStripCardProps) {
+  // With no active program nothing was ever scheduled, so a past day with no session is not a REST
+  // day — it is a day the app knows nothing about, and "rest" is a claim about a schedule that does
+  // not exist (RV-211 ③). The strip already has the only signal needed to tell them apart.
+  const hasProgram = activeSessions.length > 0;
   return (
     <div className="px-4 pb-3">
       <div className="flex justify-between gap-1">
@@ -36,7 +40,9 @@ function WeekStripCardComponent({ weekStrip, activeSessions, onDayClick }: WeekS
               aria-label={`${day.label}${day.isToday ? ", today" : ""}${
                 day.sessions.length > 0
                   ? `, trained ${day.sessions[0]}`
-                  : ", rest day"
+                  : day.isFuture
+                    ? ""
+                    : hasProgram ? ", rest day" : ", nothing logged"
               }`}
               className="flex flex-1 flex-col items-center gap-1 disabled:cursor-default"
             >
@@ -72,8 +78,10 @@ function WeekStripCardComponent({ weekStrip, activeSessions, onDayClick }: WeekS
                   <div className="w-2 h-2 rounded-full bg-current" />
                 ) : day.isToday ? (
                   <span className="font-bold">{day.dayNum}</span>
-                ) : (
+                ) : hasProgram ? (
                   <span className="text-xs">rest</span>
+                ) : (
+                  <span className="text-xs">—</span>
                 )}
               </div>
               <span

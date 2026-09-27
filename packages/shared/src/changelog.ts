@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.6",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a brand-new account is no longer told things that are not true. Home announced a week in review for a week with nothing in it, Body Battery read \"Good\" and 50 with nothing behind it, and the week strip called every past day a rest day before you had a program. All three now say plainly that there is nothing yet.",
+    ],
+  },
+  {
     version: "1.477.4",
     date: "2026-09-27",
     changes: [

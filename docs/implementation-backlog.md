@@ -3439,15 +3439,62 @@ which is the right shape for something that can only be validated by living with
   weigh-in sheet — plus a glance at the weight dial with a keyboard up.
 
 ### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
+- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#PR), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked, ⑥ stays open.**
 - **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.
+  It did not: `hasData` is already on the response, so all three fixes were the card's and the
+  banner's own.
 - **Added:** 2026-09-26 · Review sweep 63. **Items 4 and 5 are from the web build, so RV-205's gallery confirms them on the device first.**
-1. **"Your week in review is ready"** shows for an account with **no data at all**. Gate the banner on the week having at least one logged item.
-2. **Body Battery reads "Good · 50"** with no data behind it. The "Limited data" chip is beside it, but the headline still says Good. With no inputs, show the no-data state instead of a band.
-3. **The week strip labels every unprogrammed past day "rest".** With no program, nothing was a rest day; show a dash.
+1. ~~**"Your week in review is ready"** shows for an account with **no data at all**.~~ — **SHIPPED.**
+   The banner is suppressed when the recap week is empty. **The digest TEXT cannot answer this** —
+   `buildWeeklyDigestText` always writes at least "0 sessions, 0 kg total" and "No personal records
+   this week", so `content` is never falsy. The route already returns `metrics` beside the digest,
+   which is what kept this in Lane B. `weekHasAnything` (`components/health/week/week-has-data.ts`)
+   **deliberately ignores `weightChangeKg` and `hrv.source`**: both are computed across the
+   **two-week** window, so either can be populated by the PRIOR week alone and would announce a
+   week that had nothing in it. Absent `metrics` (a cache entry predating the field) reads as
+   "don't suppress", never as empty.
+2. ~~**Body Battery reads "Good · 50"** with no data behind it.~~ — **SHIPPED.** With `hasData`
+   false the card shows **"No data yet" and "—"**, drops the trend badge, swaps the battery-level
+   icon for a no-signal one, and **leaves the progress track empty**.
+   - **This continues RV-38 rather than undoing it.** That entry found the "Limited data" chip got
+     WEAKER as data got worse, and fixed it by keying on `!conf.sufficient`. That condition is
+     untouched; `noData` only ever adds a stronger statement on top, and the unit test pins both.
+   - **⚠ The progress bar was not in the entry and was the harder half.** The header was correct
+     while the bar underneath still drew a 50% fill — the same claim, in the more legible place.
+     **No source guard would have found it**; the e2e render did, which is why it earns its runtime.
+   - **The "Also for the device" note about the fill running right-to-left is ANSWERED in source
+     and is deliberate:** *"fill anchored right so the tank empties from the left"*. RV-205 does not
+     need to establish it; whether the direction is legible without a mark is still the owner's eye.
+3. ~~**The week strip labels every unprogrammed past day "rest".**~~ — **SHIPPED.**
+   `activeSessions.length > 0` was already a prop, so the fix is local to
+   `app/session-select/components/week-strip-card.tsx`. **A second defect the entry did not name:**
+   the aria-label read ", rest day" for every session-less day **including FUTURE ones**, so a
+   screen reader called next Friday a rest day. Future days now say nothing; past ones say
+   "nothing logged" without a program.
 4. **An empty rounded pill sits beside the date** in both accounts, probably the temperature chip (BF-96) rendering with no value. Render nothing until it has one.
    - **🔎 On the device (Review sweep 64, `p23-home-warm-01`):** the pills are populated there (weather, UV and battery), and **they squeeze the date to "S…"**. The header row cannot hold the date and both pills at 384 px. Give the date its own line, or let the pills wrap below the greeting. That is the real defect; the empty pill was the web build without data.
-5. **Stray marks:** a dot between the Resting HR and Sleep rings, and a "·" glyph inside the "Limited data" chip.
-6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it, so "58" reads as a score. Add "bpm", or style it differently from the scores.
+5. ~~**Stray marks:** a dot between the Resting HR and Sleep rings, and a "·" glyph inside the
+   "Limited data" chip.~~ — **NOT A DEFECT. Both sightings are explained (2026-09-27).**
+   - The dot is a **background star**. `components/dynamic-background/particles.tsx` draws 18 of
+     them at `Math.random()` positions, 1–2.5 px, mounted globally through the weather overlay —
+     deliberate decoration, and a random position means one can land anywhere, including between
+     two rings. Four of them are visible in the zero-data render, in four unrelated places, which
+     is what gives it away: a per-card mark does not scatter.
+   - The "·" is the chip's own **`SignalLow` icon** at 12 px. The chip renders that glyph plus the
+     words; there is no `·` character anywhere in the file.
+   - **A source grep said "does not reproduce" and that was the wrong conclusion** — the marks are
+     real on screen, they are simply not stray. Rendering it is what separated the two.
+6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it,
+   so "58" reads as a score. Add "bpm", or style it differently from the scores. — **STILL OPEN,
+   and it is bigger than one line.** `oura-score-chip-row.tsx` has **four** ring renderers
+   (`ScoreRailCell`, `ScoreBandCell`, `ScoreMinimal`, `Cell`, chosen by the user's `ringStyle`) and
+   **eight** sites consuming `display`. The type already knows — `display: string; // the big value
+   (a score, or a bpm for HR)` — so the information exists and only the rendering is missing.
+   Appending " bpm" widens the value inside rings sized for two or three characters in all four
+   styles, which has to be MEASURED rather than assumed; and "style it differently" changes the
+   visual language of a daily card, which wants the owner's eye. **Not reachable on the zero-data
+   account either** — the whole row returns null when every score is null — so it needs the seeded
+   render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
 ### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
