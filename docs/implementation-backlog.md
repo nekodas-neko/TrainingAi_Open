@@ -504,10 +504,30 @@ below threshold and left in place for next time.
   glance, and the correct response (read the failure COUNT, then re-run once) is the exact
   response that is WRONG for a genuine failure. Every session that meets it pays to work that out.
 - **Where to start:** a worker writing a `console.log` as the run tears down. `vitest`'s
-  `onUserConsoleLog` RPC is still in flight when the worker's channel closes. Candidates, none
-  established: a test logging from an unawaited promise, a `reportServerError` fire-and-forget on a
-  DB path, or a pool/teardown ordering issue. **`silent: true` would hide it rather than fix it**
-  and would also hide the guard scripts' own output, which several tests assert on.
+  `onUserConsoleLog` RPC is still in flight when the worker's channel closes. **`silent: true`
+  would hide it rather than fix it** and would also hide the guard scripts' own output, which
+  several tests assert on.
+- **📏 MEASURED 2026-09-27 — the surface area is 381 RPCs per run, and two hypotheses are dead.**
+  - **`grep -cE '^(stdout|stderr) \| '` on a full `--reporter=default` run gives 381 console
+    emissions from 202 distinct sites.** Every one is an `onUserConsoleLog` round trip, so that is
+    how many chances per run the race gets. Top emitters: `rv177-rate-limits` (24),
+    `oura-ble-step-rollup` (23), `oura-ble-ingest-repro` (18), `feedback-calendar-scale-routes` (8),
+    `bf155-set-end-times-read-fresh` (8).
+  - **Only ONE emitter is application code rather than a test:** `ensureSchema`
+    (`lib/data/postgres/client.ts:122`), 11 times per run. That is the app printing into the test
+    output and is worth silencing under test on its own merits — **Lane A's file**.
+  - **DEAD: "a test spawns a child whose output arrives late."** All the child-process call sites
+    (`base-ref-read-failure`, `dead-repo-methods`, `catalogue-equipment-guard`) use **sync**
+    `execSync`/`spawnSync` with piped stdio, so nothing can arrive after the test returns.
+  - **DEAD: "the guard scripts' fixture output floods it."** `scripts/__tests__/` emits **one**
+    console line in total. The fixture text that looks like flooding is `pnpm check:rules` output,
+    a different command — two logs that are easy to conflate, and I did.
+  - **The run that produced these numbers was CLEAN** (exit 0, no teardown error), which is
+    consistent with ~1 in 5 and means the count above is the ordinary volume, not a bad run's.
+- **What would actually settle it,** in order of cost: (a) silence `ensureSchema` under test — one
+  line, Lane A, and removes the only non-test emitter; (b) cut the top five test emitters, which is
+  ~80 of the 381; (c) if it survives both, it is vitest-internal and the answer is a version bump,
+  not a repo change.
 - **Not the same as `LB-166`** (the E2E 45-minute ceiling) — different job, different mechanism.
   Both are CI-health, and neither is anyone's feature work, which is why both keep going unowned.
 
