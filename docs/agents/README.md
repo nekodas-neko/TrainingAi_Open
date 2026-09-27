@@ -123,10 +123,16 @@ lost:
 the rule rather than assuming it, and never imply their approach was careless when it is simply not
 what this repo does.
 
-**What Review may NOT do with one:** merge it. An inbound PR is somebody else's code entering the
-owner's app, and two of the standing carve-outs bite immediately — `#1607` is **auth** (bearer
-tokens) and `#1608` adds **storage**. Review's authority is docs-only and a posted review; the merge
-is the owner's, and the entry says so.
+**Review MAY APPROVE an inbound PR; it may NEVER MERGE one** (owner, 2026-09-27). Approving says
+*we read it and nothing blocks* — the useful half, and the thing an author is actually waiting on.
+**Merging is the author's or the owner's, always**: no exception for a green CI run or a one-line
+diff, and the *"merge a tested, CI-green PR without asking"* authority covers **our own** PRs only.
+**Cannot approve → comment and wait for the author.** Do not close it, do not push to their branch,
+do not open a rival PR, and do not merge it because the comment went unanswered. **A stalled PR that
+is theirs stays theirs.**
+
+Two of the standing carve-outs bite on the live ones anyway — `#1607` is **auth** (bearer tokens)
+and `#1608` adds **storage**.
 
 The failure mode to design against is a review that reads source and reports what *should* happen.
 This repo has paid for that repeatedly; the 2026-08-08 review that actually ran the app found two
