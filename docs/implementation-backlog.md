@@ -3301,7 +3301,7 @@ which is the right shape for something that can only be validated by living with
 
 ### [app-shell] RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens
 
-- **✅ STEPS 1 AND 2 SHIPPED (#PR, 2026-09-27); step 3 is a RATCHET rather than a sweep.**
+- **✅ STEPS 1 AND 2 SHIPPED (#1748, 2026-09-27); step 3 is a RATCHET rather than a sweep.**
   `--text-2xs: 11px` (with its line height) is in `@theme`, and the **nine sites the entry names**
   are on it. Every one of the nine was verified against `main` first and every line number was
   right — worth saying, because several entries this week were not.
