@@ -8176,6 +8176,35 @@ drift.
   prescription, so retiring the control silently changes what the engine receives. **Retiring it is
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
+### [platform] LB-166 — the full E2E suite no longer fits its 45-minute job limit, and it reports as `cancelled`
+- **Lane: B** (`.github/workflows/ci.yml`'s E2E job, `playwright.config.ts`, the `e2e/` suite).
+- **Added:** 2026-09-27 · measured on PR #1760, which was waiting for the advisory E2E it touched.
+- **Measured, run 36297501624:** E2E started **05:32:32Z**, killed **06:17:48Z** — **45m16s** —
+  with the job-level annotation *"The job has exceeded the maximum execution time of 45m0s"*. The
+  13 annotations then name **six specs** (`la109-back-from-subroute`,
+  `home-card-invalidation-refetch`, `food-log-swipe-delete`, `day-detail-sheets`,
+  `bf161-builder-adds-saved-meals`, `activity-untyped-entry`), **every one of them "Test
+  timeout"**, across six unrelated areas. Six simultaneous logic regressions is not the reading;
+  a runner at its wall-clock limit is.
+- **⚠ It reports as `cancelled`, NOT `failure`** — which is why nobody has noticed. `cancelled` is
+  also what a superseding push produces, so the two are indistinguishable from the checks endpoint
+  alone, and the honest one looks like the harmless one. **Tell them apart by DURATION:** a
+  supersede is cancelled early and at an arbitrary time; a ceiling hit lands within seconds of
+  45m0s and carries the job-level annotation quoted above.
+- **This is invisible on most PRs.** `scripts/e2e-ui-touched.js` short-circuits the job when a PR
+  touches no UI or e2e files, and three peer PRs the same hour reported `success` in **42, 42 and
+  52 seconds**. So the suite only runs in full on the PRs that most need it, and that is exactly
+  when it exceeds its budget.
+- **Needs:** LB-149 — that entry's browser-death signature (a 1.0s `newContext` failure before any
+  test body) may be the same saturation seen from the other end, or may be unrelated. Neither is
+  established and they should be looked at together.
+- **Not proposing a number.** Raising `timeout-minutes` hides it, and sharding E2E the way `Tests`
+  is already sharded is the durable answer — but LA-91 set every job's limit from MEASURED runs,
+  so the fix starts with a measurement of where the 45 minutes goes, not with a bigger limit.
+- **⚑ Whoever takes this should know the suite is still growing:** #1760 and the RV-211 PR each add
+  one spec, both deliberately, because both caught defects no source guard could. The ceiling is
+  the problem, not the specs.
+
 ### [platform] LB-149 — the E2E browser dies mid-run, and the run records nothing about why
 
 - **Lane: B**

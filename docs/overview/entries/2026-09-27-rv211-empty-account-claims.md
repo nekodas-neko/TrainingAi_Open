@@ -55,3 +55,20 @@ so a screen reader called next Friday a rest day. Fixed with the rest of item �
 unaffected by all of them — which also means a device pass adds little here and is not claimed as
 owed. What *is* owed is item ⑥, which needs either the seeded render or the phone: the score-ring
 row returns null when every score is null, so the zero-data account cannot reach it at all.
+
+## Found on the way out: the E2E job no longer fits its own limit
+
+Waiting on `#1760`'s advisory E2E — which it touched, so the lane's rule said to wait — produced
+this instead of a verdict: the job ran **45m16s** and was killed by its own `timeout-minutes`,
+annotated *"The job has exceeded the maximum execution time of 45m0s"*. The six specs it named had
+all hit "Test timeout", across six unrelated areas, and none of them was the spec that PR added.
+
+**It reports as `cancelled`, not `failure`**, which is also what a superseding push produces — so
+the honest signal is indistinguishable from the harmless one unless you read the duration. Three
+peer PRs the same hour reported E2E `success` in **42, 42 and 52 seconds**, because
+`e2e-ui-touched.js` short-circuits the job when no UI is touched: the suite runs in full only on
+the PRs that most need it, which is exactly when it exceeds its budget.
+
+Filed as **`LB-166`**, with `Needs: LB-149` — that entry's 1.0s browser-death signature may be the
+same saturation from the other end, and neither is established. `#1760` merged on its five required
+green checks, which is what "E2E is advisory" is configured for.
