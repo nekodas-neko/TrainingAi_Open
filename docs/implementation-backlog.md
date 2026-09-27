@@ -763,7 +763,7 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-208 — the "button" on the collection widget is the MOON, and the one thing beside it that looks tappable is a `<span>`
 
-- **✅ SHIPPED (#PR, 2026-09-26) — and the sweep found a DIFFERENT set than the entry predicted.**
+- **✅ SHIPPED (#1741, 2026-09-26) — and the sweep found a DIFFERENT set than the entry predicted.**
   Three of the twelve scenes drew a bright, hard-edged disc in the top-right, and they are
   **`meadow`, `space` and `kitchen`** — not the `space`/`snow`/`bedroom` the entry guessed.
   `snow` and `forest` have no large disc at all; `bedroom`'s is at `cx=90`, the left quarter, so
