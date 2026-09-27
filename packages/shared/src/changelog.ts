@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.3",
+    date: "2026-09-27",
+    changes: [
+      "Security: showing or deleting the Oura ring key now asks for confirmation in a system dialog, which page scripts cannot answer. Both are still one tap away in the ring console \u2014 there is just a confirm step in front of them now.",
+      "Security: the ring, scale and chest-strap services will only upload to this app's own address (or your own machine). They previously accepted any address the app asked for, and remembered it across restarts.",
+      "Security: your signed-in session is no longer included in Google Drive backups or phone-to-phone transfers, so a restore onto another device cannot arrive already signed in as you. You will sign in again after switching phones.",
+    ],
+  },
+  {
     version: "1.477.2",
     date: "2026-09-27",
     changes: [

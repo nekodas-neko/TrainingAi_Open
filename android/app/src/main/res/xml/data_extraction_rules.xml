@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OR-159 — the API 31+ counterpart of `backup_rules.xml`; see that file for the reasoning.
+
+  `device-transfer` is excluded as well as `cloud-backup`. The approval was for keeping the
+  session cookie off a restore onto another device, and a direct device-to-device transfer lands
+  it on another device just as a cloud restore does. The cost is re-signing in after switching
+  phones, which is the same cost the cloud-backup exclusion already accepts.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_webview" />
+    </device-transfer>
+</data-extraction-rules>

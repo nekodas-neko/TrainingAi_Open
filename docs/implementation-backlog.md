@@ -2107,7 +2107,7 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
 
 ### [devices][platform] OR-159 — Android backup carries the WebView session cookie; exclude it
 
-- **Lane: A** — `android/app/src/main/AndroidManifest.xml` and a backup-rules XML. **Added:**
+- **Lane: A** · **Batch: native-security** — `android/app/src/main/AndroidManifest.xml` and a backup-rules XML. **Added:**
   2026-09-24 · split out of `RV-199` item ③, which the owner approved.
 - **The decision is made — this is implementation, not a question.** `android:allowBackup="true"`
   with no rules (`AndroidManifest.xml:14`) means Google Drive backup takes whatever the app stores.
@@ -2121,6 +2121,9 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+- **⚙ BUILT 2026-09-27 (Lane A), batched with RV-196 as `Batch: native-security`.** `backup_rules.xml` (API 23-30) and `data_extraction_rules.xml` (API 31+) exclude `domain="root" path="app_webview"`, wired via `android:fullBackupContent` and `android:dataExtractionRules`. minSdk 26 / targetSdk 36, so both formats are needed. The ring key lives in `shared_prefs/oura_ble.xml` and is untouched — OR-160 stays open and unprejudiced.
+  - **One call of mine to flag:** `device-transfer` is excluded as well as `cloud-backup`. The approval was for keeping the cookie off a restore onto another device, and a direct D2D transfer lands it on another device exactly as a cloud restore does. Cost is re-signing in after switching phones. Say so if that is not wanted.
+- **Keep:** the device check — after the next APK, confirm sign-in survives a normal launch and that a restore does not carry the session. Backup is over the 25 MB quota today (31.2 MB measured), so nothing is backed up at all until D4's pruning lands; the exclusion is correct but currently unobservable.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **✅ ALL SEVEN ANSWERED as of 2026-09-25.** Items 1, 2, 3 and 6 were put to him and answered (delete hr-sync; render zones with the degradation marked; retire the Exercise-detected card; an agent runs the BF-77 session). Items 5 and 7 resolved without asking, and item 2's structural half was decided by the Orchestrator. **What remains is NOT a question: the twelve-entry admin sitting is a scheduling ask, not a decision** — it stays below until those entries are picked up. Each answer is recorded on its own entry; this one leaves the queue when the gates it tracked are all struck.
@@ -2725,7 +2728,7 @@ which is the right shape for something that can only be validated by living with
    only what the requester typed.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
-- **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
+- **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
   **⚠ SECURITY — the owner confirms before this merges.**
 - **Added:** 2026-09-24 · Review sweep 60.
 - **What:** Capacitor exposes these to the Railway origin:
@@ -2744,6 +2747,18 @@ which is the right shape for something that can only be validated by living with
   2. `revealKey` and `clearKey` require a native confirmation dialog, which script cannot click through.
 - **Reversal cost:** low. The Kotlin change is small, but it costs an APK cycle. Batch it with the next
   native change rather than cutting an APK for it alone, **unless RV-191 cannot land first**.
+- **⚙ BUILT 2026-09-27 (Lane A), batched with OR-159 as `Batch: native-security`** — one APK cycle.
+  1. **`setIngestUrl`** on all three plugins now goes through the new pure `IngestUrlPolicy`
+     (`android/app/src/main/java/com/trainingai/app/IngestUrlPolicy.kt`): the app's own origin over
+     https, plus loopback (`localhost`, `127.0.0.1`, `10.0.2.2`), and nothing else. It parses with
+     `java.net.URI` rather than prefix-matching, and refuses userinfo — `https://<app-origin>@evil/`
+     reads as the app to a human and to a prefix check. Loopback is allowed on purpose: it cannot
+     move data off the device. **9 JVM tests**, which CI runs (`android.yml`).
+  2. **`revealKey` and `clearKey`** now require a native `AlertDialog` tap. A system dialog is
+     outside the WebView, so a script in the origin can open it and cannot answer it. Both callers
+     are explicit buttons in the debug console, so the cost is one deliberate extra tap.
+- **Keep:** owner confirmation before merge (this entry's own ⚠), and the device check — the dialog
+  appears and is answerable, and ring/scale/strap ingest still reaches the server afterwards.
 
 ### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
 - **Lane: A** — `lib/security/csp.ts` and its existing test.

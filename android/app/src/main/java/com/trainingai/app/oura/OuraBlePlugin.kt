@@ -40,8 +40,43 @@ class OuraBlePlugin : Plugin() {
     @PluginMethod fun hasKey(call: PluginCall) =
         call.resolve(JSObject().put("hasKey", prefs().contains("key_hex")))
 
+    /**
+     * RV-196: both of the key's dangerous doors now need a native tap that script cannot reach.
+     *
+     * The Kotlin comment below is right that every caller is already app JavaScript — and that is
+     * exactly the problem, because it makes the CSP the only boundary and the CSP allows
+     * `'unsafe-inline'`. A dialog drawn by the system is outside the WebView, so a script in the
+     * origin can open it and cannot answer it. Both callers are explicit buttons in the debug
+     * console, so the cost to the owner is one deliberate extra tap.
+     *
+     * Refusing when there is no resumed activity is the safe direction: the only thing lost is a
+     * key read or delete that nobody is present to confirm.
+     */
+    private fun confirmNatively(title: String, message: String, positive: String, onResult: (Boolean) -> Unit) {
+        val act = activity
+        if (act == null || act.isFinishing) return onResult(false)
+        act.runOnUiThread {
+            android.app.AlertDialog.Builder(act)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton(positive) { _, _ -> onResult(true) }
+                .setNegativeButton("Cancel") { _, _ -> onResult(false) }
+                .show()
+        }
+    }
+
     @PluginMethod fun clearKey(call: PluginCall) {
-        prefs().edit().remove("key_hex").apply(); call.resolve()
+        confirmNatively(
+            "Delete the ring key?",
+            "This cannot be undone. Without the key the ring cannot be read, and re-pairing it " +
+                "through the official Oura app can change the firmware this app depends on.",
+            "Delete",
+        ) { confirmed ->
+            if (!confirmed) return@confirmNatively call.reject("cancelled")
+            prefs().edit().remove("key_hex").apply()
+            call.resolve()
+        }
     }
 
     /**
@@ -65,7 +100,14 @@ class OuraBlePlugin : Plugin() {
     @PluginMethod fun revealKey(call: PluginCall) {
         val hex = prefs().getString("key_hex", null)
             ?: return call.reject("no key stored")
-        call.resolve(JSObject().put("hex", hex))
+        confirmNatively(
+            "Show the ring key?",
+            "The key will be displayed on screen so it can be copied somewhere durable.",
+            "Show",
+        ) { confirmed ->
+            if (!confirmed) return@confirmNatively call.reject("cancelled")
+            call.resolve(JSObject().put("hex", hex))
+        }
     }
 
     // ---- permissions ----
@@ -224,8 +266,14 @@ class OuraBlePlugin : Plugin() {
      *  app shell on every open (window.location.origin), so the running service
      *  always has a current target; persisted so a restarted service has it too. */
     @PluginMethod fun setIngestUrl(call: PluginCall) {
-        val url = call.getString("url")?.trim()?.trimEnd('/') ?: return call.reject("url required")
-        if (!url.startsWith("http")) return call.reject("url must be absolute")
+        val url = com.trainingai.app.IngestUrlPolicy.normalize(call.getString("url"))
+            ?: return call.reject("url required")
+        // RV-196: an absolute URL was the only requirement, so a script in the origin could
+        // point this at any host and the choice survived restarts. The allowlist lives in
+        // IngestUrlPolicy so it is one decision across all three plugins, and unit-testable.
+        if (!com.trainingai.app.IngestUrlPolicy.isAllowed(url)) {
+            return call.reject("url origin not allowed")
+        }
         prefs().edit().putString("ingest_url", url).apply()
         OuraRingService.instance?.setIngestUrl(url)
         call.resolve()
