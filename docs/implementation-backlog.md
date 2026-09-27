@@ -4154,7 +4154,7 @@ which is the right shape for something that can only be validated by living with
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
 
 ### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
-- **✅ ② SHIPPED 2026-09-27 (#PR), rendered at 412 px. ① IS LANE A's — established, not assumed. ③ is RV-208's.**
+- **✅ ② SHIPPED 2026-09-27 (#1785), rendered at 412 px. ① IS LANE A's — established, not assumed. ③ is RV-208's.**
 - **Lane: A** for what remains (① needs a field on `app/api/day-log/route.ts`).
 - **Added:** 2026-09-26 · Review sweep 64 (`t2-day-01`).
 1. **Chin-Up shows "0 kg".** A bodyweight movement should read "BW" (or bodyweight + added load),
