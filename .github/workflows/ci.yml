@@ -578,6 +578,9 @@ jobs:
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
 
+      - name: How many implementation plans are still live
+        run: node scripts/check-plan-liveness.js
+
       - name: A Known Issue lives in exactly one list
         run: node scripts/check-known-issue-duplication.js
 
