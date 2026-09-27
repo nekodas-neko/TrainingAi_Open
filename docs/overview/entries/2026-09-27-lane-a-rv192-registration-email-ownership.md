@@ -71,9 +71,11 @@ real `/register` and `/sign-in` screens in a browser.
 - **Seen on the way, not caused by this diff** (it does not touch `app/register/`): after a
   successful `POST /api/auth/register`, the form's `router.push('/sign-in?registered=1')` did not
   navigate in three dev-mode runs, although calling the router by hand did. Fast Refresh rebuilds
-  were logged around each submit, so this may be dev-only. Also, `/sign-in?registered=1` renders no
-  notice. Once this PR merges, every password registration is pending, so a new registrant is told
-  nothing until they try to sign in. Filed as its own backlog entry.
+  were logged around each submit, so this may be dev-only.
+- **A toast this PR makes untrue.** On `?registered=1`, `app/sign-in/email-sign-in.tsx` says
+  *"Sign in below — or wait for approval if not yet invited."* After this PR an invited registrant
+  waits for approval too. That file is Lane B's, so the copy change is filed as `LA-162` with
+  `Needs: RV-192` rather than widened into this diff.
 
 ## Not exercised
 
