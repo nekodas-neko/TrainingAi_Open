@@ -87,7 +87,7 @@ export function GifReviewSweep({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex h-[92vh] flex-col" bottomInset="takeover" hideCloseButton>
+      <SheetContent side="bottom" className="flex h-[92dvh] flex-col" bottomInset="takeover" hideCloseButton>
         <SheetHeader className="flex-none">
           <div className="flex items-center justify-between gap-2">
             <SheetTitle className="text-base">

@@ -720,7 +720,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                   <p className="flex-1 text-sm truncate">{name}</p>
                   <div className="flex items-center gap-1 flex-none">
                     <input
-                      type="number"
+                      type="number" enterKeyHint="done"
                       inputMode="decimal"
                       value={oneRmInputs[name] ?? ''}
                       onChange={e => setOneRmInputs(prev => ({ ...prev, [name]: e.target.value }))}

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.4",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the keyboard no longer covers the button you are reaching for. Sheets now shrink to make room for it instead of keeping a height that no longer fits, and every number field's Enter key says \"done\" and closes the keyboard.",
+    ],
+  },
+  {
     version: "1.477.2",
     date: "2026-09-27",
     changes: [

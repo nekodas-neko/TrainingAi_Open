@@ -48,7 +48,7 @@ export const MealBatchSize = memo(function MealBatchSize({
           <Minus className="h-4 w-4" />
         </button>
         <input
-          type="number"
+          type="number" enterKeyHint="done"
           inputMode="decimal"
           min={1}
           step={1}

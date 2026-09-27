@@ -176,7 +176,7 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
         <div className="px-4 pb-2 space-y-4">
           <div className="flex items-center gap-3">
             <input
-              type="number"
+              type="number" enterKeyHint="done"
               step={logState?.step}
               min={0}
               value={value}

@@ -3400,17 +3400,43 @@ which is the right shape for something that can only be validated by living with
 - **This is a restyle, not a rearrangement,** so it needs no mockup. **Before and after captures come from RV-205's gallery,** P41.
 
 ### [app-shell] RV-210 — the keyboard: nothing tells the WebView to resize, sheets are sized in `vh`, and no field says what its Enter key does
+- **✅ ALL THREE FIXES SHIPPED 2026-09-27 (#PR). The entry stays for its `Keep:` — the device pass is the whole verification, and the sandbox cannot do any of it.**
 - **Lane: B** — `app/layout.tsx:117` (the viewport), sheets under `components/**`.
 - **Added:** 2026-09-26 · Review sweep 63 (static audit). **The device check is RV-205's P26, so run it before and after this.**
-- **What:**
-  - No `interactiveWidget` is set, and nothing uses `visualViewport`. About 30 sheets use `max-h-[85–92vh]`, which does not shrink when the keyboard opens.
+- **What the audit found, all three re-verified against `main` first:**
+  - No `interactiveWidget`, nothing using `visualViewport`. **23 `vh` heights across 22 files.**
   - Edge-to-edge is enforced (targetSdk 36).
-  - **0 of 135 inputs set `enterKeyHint`.**
-- **Fix:**
-  1. `interactiveWidget: "resizes-content"` in the viewport export.
-  2. `vh` → `dvh` on sheet heights.
-  3. `enterKeyHint="next"`/`"done"` on the numeric fields in food review (`review-step.tsx:175/251/273`), profile goals, and the metric-log sheets.
-- **Done when:** P26 shows no input or submit button covered, on food review and the weigh-in sheet.
+  - **0 inputs set `enterKeyHint`** — confirmed, zero in the whole tree.
+- **What shipped:**
+  1. `interactiveWidget: "resizes-content"` in the viewport export. **This is the load-bearing
+     one**, and the other two do nothing without it: Android's default is `resizes-visual`, which
+     draws the keyboard OVER a page that keeps its full height, so neither `dvh` nor
+     `env(safe-area-inset-bottom)` moves. Confirmed in the built HTML
+     (`interactive-widget=resizes-content` in the viewport meta), not just in the source.
+  2. **All 23 `vh` heights → `dvh`.** ⚠ The entry said "about 30 sheets"; it was 23 across 22
+     files, and **22 other sheets were ALREADY on `dvh`** — a 22/23 split nothing recorded, so
+     each new sheet was a coin toss. That is the half worth knowing, and it is why this shipped
+     with a check rather than as a sweep.
+  3. **`enterKeyHint="done"` on all 42 `type="number"` inputs across 28 files**, rather than the
+     three files the entry names. `done` everywhere, never `next`: every one of these forms is
+     saved by an explicit button, so Enter should DISMISS the keyboard — `next` would promise a
+     field-to-field traversal the forms do not define an order for. (The entry's "135 inputs"
+     counts every input type; the numeric ones are 42, which is why a complete sweep was
+     affordable here.)
+- **Guarded by `scripts/check-keyboard-viewport.js`** (Custom Rules, now **81** steps), which holds
+  BOTH conditions at zero — the two are a pair, and checking one alone passes a half-fix. Control-run
+  both ways: removing the viewport line fails it, and putting one `vh` back fails it.
+- **⚠ NOTHING HERE WAS VERIFIED BEHAVIOURALLY, AND NOTHING IN THE SANDBOX CAN BE.** A headless
+  Chromium has no soft keyboard, so `interactive-widget` is inert there and `dvh` resolves exactly
+  as `vh` — measured: a converted `max-h-[90dvh]` sheet computes **823.5 px at a 915 px viewport**,
+  which is 90% to the decimal, i.e. the conversion is a no-op in the harness BY CONSTRUCTION. That
+  is the correct outcome and it is not evidence the fix works.
+- **One interaction found while checking, not a defect:** `components/ui/weight-dial.tsx` sizes
+  itself from `window.innerHeight`, which `resizes-content` makes shrink when a keyboard opens. It
+  already listens for `resize` and re-snaps, and it is capped at 320 px, so it degrades; worth a
+  look during P26 rather than a pre-emptive change.
+- **Keep / Done when:** P26 shows no input or submit button covered, on food review and the
+  weigh-in sheet — plus a glance at the weight dial with a keyboard up.
 
 ### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
 - **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.

@@ -487,6 +487,11 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
+- **[`docs/overview/entries/2026-09-27-rv210-keyboard-and-viewport.md`](../../overview/entries/2026-09-27-rv210-keyboard-and-viewport.md)**
+  — RV-210. `interactive-widget=resizes-content`, all 23 `vh` sheet heights to `dvh` (22 others were
+  already there — an unrecorded 22/23 split), and `enterKeyHint="done"` on all 42 numeric inputs.
+  Guarded by `check-keyboard-viewport.js`, which holds both source conditions at once because either
+  alone is a half-fix. **None of it is verifiable in the sandbox** — no soft keyboard exists there.
 - **[`docs/overview/entries/2026-09-27-rv209-type-scale-floor.md`](../../overview/entries/2026-09-27-rv209-type-scale-floor.md)**
   — RV-209 steps 1–2. `--text-2xs: 11px` is the floor of the type scale (42 sizes, 1,035 uses under
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine

@@ -47,13 +47,13 @@ export function DayOverlayDialogs({
                   <div className="flex-1 flex gap-2">
                     <div className="flex-1">
                       <label className="text-[10px] text-muted-foreground">kg</label>
-                      <input type="number" min={0} step={0.25} value={w}
+                      <input type="number" enterKeyHint="done" min={0} step={0.25} value={w}
                         onChange={e => { const n = [...editEx.weights]; n[i] = parseFloat(e.target.value) || 0; onEditExChange({ ...editEx, weights: n }); }}
                         className="w-full rounded-md border bg-background px-2 py-1 text-sm tabular-nums" />
                     </div>
                     <div className="flex-1">
                       <label className="text-[10px] text-muted-foreground">reps</label>
-                      <input type="number" min={1} step={1} value={editEx.reps[i] ?? 1}
+                      <input type="number" enterKeyHint="done" min={1} step={1} value={editEx.reps[i] ?? 1}
                         onChange={e => { const n = [...editEx.reps]; n[i] = parseInt(e.target.value) || 1; onEditExChange({ ...editEx, reps: n }); }}
                         className="w-full rounded-md border bg-background px-2 py-1 text-sm tabular-nums" />
                     </div>

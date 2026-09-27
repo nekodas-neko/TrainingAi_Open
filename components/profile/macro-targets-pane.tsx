@@ -140,7 +140,7 @@ export function MacroTargetsPane({ refreshKey, baseline }: MacroTargetsPaneProps
                     <span className="text-sm text-muted-foreground flex-1">{f.label}</span>
                     <div className="flex items-center gap-1.5">
                       <input
-                        type="number"
+                        type="number" enterKeyHint="done"
                         min={0}
                         value={form[f.key]}
                         onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
