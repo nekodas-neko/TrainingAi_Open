@@ -275,14 +275,14 @@ export function MealTypeManager() {
                 <div className="flex gap-2 items-center text-xs text-muted-foreground">
                   <span>Hours</span>
                   <input
-                    type="number" min={0} max={23}
+                    type="number" enterKeyHint="done" min={0} max={23}
                     value={editForm.timeStartHour}
                     onChange={e => setEditForm(f => ({ ...f, timeStartHour: parseInt(e.target.value) || 0 }))}
                     className="w-16 rounded-lg border bg-background px-2 py-1.5 text-center text-sm"
                   />
                   <span>to</span>
                   <input
-                    type="number" min={1} max={24}
+                    type="number" enterKeyHint="done" min={1} max={24}
                     value={editForm.timeEndHour}
                     onChange={e => setEditForm(f => ({ ...f, timeEndHour: parseInt(e.target.value) || 24 }))}
                     className="w-16 rounded-lg border bg-background px-2 py-1.5 text-center text-sm"
@@ -347,14 +347,14 @@ export function MealTypeManager() {
           <div className="flex gap-2 items-center text-xs text-muted-foreground">
             <span>Hours</span>
             <input
-              type="number" min={0} max={23}
+              type="number" enterKeyHint="done" min={0} max={23}
               value={newForm.timeStartHour}
               onChange={e => setNewForm(f => ({ ...f, timeStartHour: parseInt(e.target.value) || 0 }))}
               className="w-16 rounded-lg border bg-background px-2 py-1.5 text-center text-sm"
             />
             <span>to</span>
             <input
-              type="number" min={1} max={24}
+              type="number" enterKeyHint="done" min={1} max={24}
               value={newForm.timeEndHour}
               onChange={e => setNewForm(f => ({ ...f, timeEndHour: parseInt(e.target.value) || 24 }))}
               className="w-16 rounded-lg border bg-background px-2 py-1.5 text-center text-sm"

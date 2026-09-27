@@ -165,7 +165,7 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
                 <Label htmlFor="ep-weightGoal" className="text-xs text-muted-foreground">Weight Goal (kg)</Label>
                 <Input
                   id="ep-weightGoal"
-                  type="number"
+                  type="number" enterKeyHint="done"
                   value={weightGoalKg}
                   onChange={e => setWeightGoalKg(e.target.value)}
                   placeholder="80"

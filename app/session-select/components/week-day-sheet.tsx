@@ -45,7 +45,7 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
 
   return (
     <Sheet open={date !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto">
+      <SheetContent side="bottom" className="max-h-[80dvh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{date ? formatOverlayDate(date) : ""}</SheetTitle>
         </SheetHeader>

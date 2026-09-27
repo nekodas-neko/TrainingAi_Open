@@ -94,7 +94,7 @@ export function QuantityEditor({ item, qty, unit, onUnitChange, onQtyChange, onS
           <Minus className="h-5 w-5" />
         </button>
         <input
-          type="number"
+          type="number" enterKeyHint="done"
           inputMode="decimal"
           min={0}
           step={unit === 'g' ? 5 : 0.5}

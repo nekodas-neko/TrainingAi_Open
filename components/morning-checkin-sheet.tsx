@@ -173,7 +173,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     <Sheet open={open} onOpenChange={o => !o && onClose()}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl max-h-[92vh] flex flex-col p-0 bg-secondary border-t border-border/70"
+        className="rounded-t-2xl max-h-[92dvh] flex flex-col p-0 bg-secondary border-t border-border/70"
         hideCloseButton
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">

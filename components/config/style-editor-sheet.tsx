@@ -67,7 +67,7 @@ export function StyleEditorSheet({
                 <div key={set.key} className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-muted-foreground w-10 flex-none text-right">Set {i + 1}</span>
                   <input
-                    type="number"
+                    type="number" enterKeyHint="done"
                     inputMode="numeric"
                     min={1}
                     max={100}
@@ -78,7 +78,7 @@ export function StyleEditorSheet({
                   <span className="text-xs text-muted-foreground">% of 1RM</span>
                   <span className="text-xs text-muted-foreground">×</span>
                   <input
-                    type="number"
+                    type="number" enterKeyHint="done"
                     inputMode="numeric"
                     min={1}
                     max={50}
