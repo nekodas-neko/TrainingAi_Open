@@ -91,7 +91,11 @@ export const EnergyTimelineChart = memo(function EnergyTimelineChart(
         <Key colour="var(--accent-green)" label={`Eaten ${eaten.toLocaleString()}`} />
         <Key colour="var(--accent-amber)" label={`Burned ${burned.toLocaleString()}`} />
         <span className="text-muted-foreground">
-          {net >= 0 ? `+${net.toLocaleString()} surplus` : `${net.toLocaleString()} deficit`}
+          {/* `Math.abs` on the deficit: `net` is negative there, so the raw value printed
+              "−1,694 deficit" — the sign and the word both say "under", which reads as a negative
+              deficit, i.e. a surplus (RV-218). The surplus branch keeps its "+", where the sign
+              and the word agree. */}
+          {net >= 0 ? `+${net.toLocaleString()} surplus` : `${Math.abs(net).toLocaleString()} deficit`}
         </span>
       </div>
 
