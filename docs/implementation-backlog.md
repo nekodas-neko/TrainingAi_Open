@@ -574,6 +574,65 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
+### [devices][app-shell] BF-215 — the strap battery reads 100 at rest and 30 under load, so the chip is a gauge that only tells the truth mid-workout
+
+- **Lane:** B — `components/device-battery-chip.tsx`, `components/home/header-chips.tsx`,
+  `lib/hooks/use-strap-battery.ts`. No native change: the Kotlin read is correct.
+- **Added:** 2026-09-27 · owner: *"Strap battery is at 100... it was 30 last time I used it? Is this
+  working?"*
+- **Needs:** — nothing.
+- **The pipeline is working, and the measurement says so.** Production `strap_status`, every
+  non-null reading ever recorded: **exactly two distinct values.** `100` — 43 readings,
+  2026-09-23 23:19 → 2026-09-27 20:58. `30` — 17 readings, **all inside one 92-minute window**,
+  2026-09-25 20:54 → 22:26. The app stored and rendered what the strap reported, each time.
+- **A CR2025 cannot recharge, so 100 → 30 → 100 is not a state of charge.** It is coin-cell voltage
+  sag: under a sustained BLE session the cell droops and the H10 reports a lower level, and at rest
+  it recovers. That the 30s are one contiguous session rather than scattered is what rules out a
+  decode fault or buffer garbage — a misread would vary, and this does not.
+- **Two values across five days also says the H10's gauge is COARSE**, not a 0–100 scale. Treat
+  `100` as "not obviously dying" rather than "full".
+- **The consequence is the actual defect, and it is a UI one.** The cell only reads low while it is
+  under load, which is exactly when the owner is training and not looking at Home. At rest — when he
+  does look — it reads 100. **So the chip will read 100 until the cell is almost completely dead**,
+  and the one number that predicts failure is the one it never shows.
+- **The low-battery notification DID work and is the existing backstop.**
+  `DeviceBatteryNotifier.LOW_THRESHOLD = 35`, the reading was 30, so it fired during that session.
+  Any change here must not break it.
+- **Recommendation: show the LOWEST reading from the most recent connected session, not the latest.**
+  A coin cell's resting voltage stays high until the end; the sag under load is the early warning, so
+  the minimum is the informative number and the last value is the least informative one. Label it for
+  what it is ("30 under load") rather than presenting it as a live level.
+  **Alternative — leave the chip alone and lean on the notification.** It already fires at the right
+  moment and costs nothing. It loses the at-a-glance answer to *"should I change the cell before this
+  workout?"*, which is the question the chip exists to answer.
+  **Alternative — drop the strap chip entirely.** Honest, and it removes a number nobody can act on;
+  it also removes the only place the strap's state is visible without opening settings.
+- **Reversal cost:** none — presentation only, no stored state and no native change.
+- **Verify on the device** across a workout: the chip should show the session minimum afterwards, and
+  the low-battery notification must still fire at the same point it does today.
+
+### [devices] BF-216 — the pairing screen reads a BLE characteristic through `.buffer`, which ignores the view's offset
+
+- **Lane:** B — `components/settings/chest-strap-pairing.tsx`.
+- **Added:** 2026-09-27 · BugFix, found while tracing `BF-215`. **Not the cause of that report** —
+  every recorded reading came from the native path, which is correct.
+- **Needs:** — nothing.
+- **`chest-strap-pairing.tsx:94`** reads the battery level as
+  `new Uint8Array(batt.buffer)[0]`. `batt` is a `DataView`, and **`.buffer` is the whole backing
+  `ArrayBuffer`** — it discards `byteOffset` and `byteLength`. If the BLE layer ever hands back a
+  view into a pooled or offset buffer, that reads a byte belonging to something else and stores it
+  as a battery percentage. `batt.getUint8(0)` is the correct read and cannot drift.
+- **The same shape is two lines below**, on the firmware string:
+  `new TextDecoder().decode(fw.buffer)` at `:102`. Same fix — decode the view, not its buffer.
+- **Latent rather than live, and worth fixing anyway.** `@capacitor-community/bluetooth-le` builds
+  its `DataView` from a fresh buffer today, so the offset is 0 and the read happens to be right. That
+  is a property of the plugin's current implementation, not of the API contract, and it is one
+  version bump away from silently changing.
+- **It writes to the same store the Home chip reads** (`writeStrapBattery`), so a wrong value here
+  would show up as `BF-215`'s symptom with a different cause — which is the argument for closing it
+  now rather than leaving two candidates for the next battery question.
+- **Reversal cost:** none. Two expressions.
+
 ### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
@@ -3374,7 +3433,7 @@ which is the right shape for something that can only be validated by living with
      - **Replace:** a template that names the heaviest-weighted signal.
      - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
   3. **✅ SHIPPED 2026-09-26 — running-plan explain is gone**
-     ([entry](overview/entries/2026-09-26-rv200-running-plan-explain.md)). Claim confirmed exactly:
+     ([entry](overview/history-2026-09-27-folded-3.md#2026-09-26-rv200-running-plan-explain)). Claim confirmed exactly:
      the card rendered the deterministic `rationale` immediately and only swapped in the model's
      sentence when it landed, so the call reworded text already on screen. Route, fetch, cache key
      and TTL deleted.

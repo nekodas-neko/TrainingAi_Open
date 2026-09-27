@@ -13,7 +13,7 @@ The growth is the corrected command plus a four-line warning. It stays in the in
 moving to a reference doc because **the command it corrects is in the index** — a reader who
 follows the snippet there and never opens the reference doc is exactly the person who gets the
 wrong output. The narrative is in the journal entry
-(`docs/overview/entries/2026-09-27-la161-grid-dimensions.md`); only the operative warning is here.
+(`docs/overview/history-2026-09-27-folded-3.md#2026-09-27-la161-grid-dimensions`); only the operative warning is here.
 
 The net number moved **down**, not up: a parallel compaction shrank `CLAUDE.md` between this
 branch being cut and merging, so the recomputed baseline is 946 rather than the ~1068 this note
