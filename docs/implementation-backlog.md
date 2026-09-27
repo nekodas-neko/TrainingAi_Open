@@ -2836,7 +2836,10 @@ which is the right shape for something that can only be validated by living with
   the reader takes `unknown` and narrows.
 
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
-- **Lane: A** (`packages/shared/src/ai-periodization/**`, `app/api/workout-data/route.ts`), plus **B** for the label (`workout-screen.tsx`, `pre-workout-screen.tsx`).
+- **Lane: B.** Items ① and ② shipped 2026-09-26 and were Lane A's; the only remaining work is
+  item ③, the offline label in `workout-screen.tsx` / `pre-workout-screen.tsx`. Re-laned so it
+  stops heading Lane A's READY list, where it cost two sessions a re-derivation.
+  (Was: `Lane: A` … plus **B** for the label.)
 - **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
 - **What:**
   1. **Model failure → 502** (`generate-prescription.ts:316`).
@@ -2978,16 +2981,50 @@ which is the right shape for something that can only be validated by living with
   way, so a wrong answer is visible on the next plan and undone in the next PR. This is cheap
   enough that "try it for a month" is a legitimate answer.
 
-### [workouts] RV-204 — workout-review and the recap have code that already does their job; neither ran in 30 days
-- **Lane: A.** Low priority: zero calls in 30 days.
-- **Added:** 2026-09-25 · Review sweep 61.
-- **workout-review** (runs automatically when its sheet opens from Config):
-  - `reconcileReview` already clamps every adjustment, refuses unsafe drops, back-fills what the model omitted, and recomputes duration and weekly volume (`reconcile.ts:104-220`).
-  - `dropToBudget`/`fitToBudget` already fit a session to its budget.
-  - **Fix:** run those directly, losing only the free-text drop reasons (a fallback string already exists, `:177`). Size M.
-- **Recap:**
-  - Facts come from `buildRecapFacts`, and a failure already falls back to `degradedFromFacts` (`recap/route.ts:52-102`).
-  - **Fix:** show that stat block by default, built on the device from local logs, and keep "Generate" only if the prose is wanted. Size S–M.
+### [workouts] RV-204 — the recap half, once LA-155 says why the screen is never reached
+- **Lane: A** · **Branch:** `feat/rv204-rules-workout-review` (workout-review half) · **Added:** 2026-09-25 · Review sweep 61.
+- **Needs: LA-155** — ② cannot be built until that answers why the screen is never reached.
+- **✅ workout-review SHIPPED 2026-09-26.** Its `generateObject` call is gone; the proposal is
+  `buildRulesReview` → `reconcileReview`, running `applyRoleSetPlausibility` → `dropToBudget` —
+  the same trim ordering the prescription path uses, so a review can no longer propose a shape
+  the prescription would never generate. Free-text drop reasons are the one loss and
+  `reconcileReview` already carried the fallback string. `review/prompt.ts` and `review/schema.ts`
+  were deleted with it.
+  - The entry's measurement was right and **understated**: `workout-review` has **zero** calls in
+    the owner's `ai_call_log` over **60** days, not 30.
+- **② The recap is NOT an unused feature — it is a broken one, and this half is blocked on knowing
+  why (LA-155).** The entry reads as disuse; the recap fires **automatically** from
+  `done-screen.tsx` whenever a workout completes. Measured 2026-09-26: `ai_health_insights` holds
+  **4** `session-recap` rows, the last on **2026-07-23**, against **43** workouts completed
+  2026-07-30 → 2026-09-25, and no `error_events` row implicates the route. So it is never called.
+  **Making the stat block the default on a screen nobody reaches fixes nothing**, which is why
+  this is parked behind LA-155 rather than built.
+  - The fix as written is also partly already there: `degradedFromFacts` ships and the done screen
+    renders it (RV-69), with `shouldCache` keeping it out of the 24 h key. What ② actually adds is
+    *default* rather than *fallback*, and *on the device* rather than server-side.
+
+### [workouts][app-shell] LA-155 — the workout recap has not run since July, across 43 completed workouts
+- **Lane: DV** — the question is what the app does after the last set, which only the phone can answer.
+- **Branch:** _unassigned_ · **Added:** 2026-09-26 · found verifying RV-204 against production.
+- **What:** `GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx`
+  whenever a workout is completed. Measured 2026-09-26 against production:
+  - `claude_ro.ai_health_insights` — **4** rows with `section` beginning `session-recap`, newest
+    **2026-07-23**.
+  - `claude_ro.workout_sessions` — **43** rows with `completed_at` in the last 60 days, spanning
+    **2026-07-30 → 2026-09-25**.
+  - `claude_ro.ai_call_log` — **no** `workout-recap` section in 60 days.
+  - `claude_ro.error_events` — nothing implicating the route; the whole 30-day window is BF-110's
+    own instrumentation.
+- **So the route is not failing, it is not being reached.** Both readings are row-scoped to the
+  owner, so this is his workouts against his recaps — the right comparison.
+- **What could not be settled from the sandbox** (and is why this is `Lane: DV`): whether
+  `mode === 'done'` is reached at all after the last set, or whether it is reached with
+  `store.workoutSessionId` null — every recap/energy/HR loader on that screen is guarded by
+  `if (!workoutSessionId) return`, so a null id silently disables all three at once.
+- **Pass test:** complete a workout on the S25, reach the done screen, and report whether the
+  recap card renders, shows its skeleton, or is absent — and whether the energy and HR cards
+  beside it are there. A recap row appearing in `ai_health_insights` is the confirmation.
+- **Blocks: RV-204 ②**, which proposes building a stat block into that same screen.
 
 ### [app-shell] LB-162 — the three `height: auto` collapses; the three bars are done
 - **Lane: B** · **Branch:** `lane-b/lb162-remaining-bars` · **Added:** 2026-09-26.
@@ -3342,33 +3379,35 @@ which is the right shape for something that can only be validated by living with
    - Convert the daily-screen ones first.
    - **RV-206's P32 (the bad-network timeline) is the before and after.**
 
-### [workouts][app-shell] RV-216 — Home says a 111-day streak and More says the best streak is 49: two `computeStreak` functions disagree
-- **Lane: A** (the formula), then **B** (Home's call site).
-- **Added:** 2026-09-26 · Review sweep 64, from DV's gallery (`p23-home-warm-01`: "STREAK 111 days"; `p23-more-warm-01`: "Best streak 49").
-- **What:** a best streak lower than the current one is impossible, and both numbers sit on screens the owner opens daily. There are two implementations with the same name:
-  - `app/session-select/compute-streak.ts` (Home, fed by `/api/streak-data`'s trained days);
-  - `lib/achievements.ts:32` (More's `lifetimeStats.bestStreak`, which applies `maxCompliantRestGapFor` the schedule).
+### [app-shell] LA-156 — Home's streak card should read the schedule, not assume a rest gap of 2
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-216.
+- **The formula is done and shared** — `computeDayStreak` + `streakRestGapFor`
+  (`packages/shared/src/workout/day-streak.ts`), already used by `/api/achievements` and
+  `/api/friends/leaderboard`. What is left is Home's call site.
+- **What:** `app/session-select/compute-streak.ts` still holds its own copy and hardcodes a rest
+  gap of **2**. The shared function was written to be behaviourally identical to it, so nothing
+  on Home changes today — the swap is an import and a signature change (it takes
+  `(trainedDates, todayStr, gap)` rather than `(trainedDays, dayKey)`), and the old file goes.
+- **What the swap FIXES, and why it is not cosmetic:** 2 is the floor, not the answer.
+  `streakRestGapFor` raises it from the user's own schedule, so somebody training Mon+Tue gets 5
+  (BF-122a). Home cannot do that today because it never reads the schedule, so for a weekly user
+  Home under-reports against the achievements page. The owner is on a rotation, where the floor
+  is what applies, which is why this is not urgent for him.
+- **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
+  deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
 
-  This is exactly the *one formula, one place* class.
-- **Fix:**
-  1. Move one definition into `packages/shared/src/workout/`, and have both screens import it.
-  2. Decide which rest-gap rule is right, recording why in the entry. That is a structural call, not the owner's.
-  3. Add a test that best ≥ current for the same input.
-- **Reversal cost:** low. Both are derived at read time; nothing is stored.
-
-### [sleep] RV-217 — the Sleep contributors list shows three raw keys: "hrv", "hr", "schedule"
-- **Lane: A** — `packages/shared/src/health/sleep-score.ts:506` (`CONTRIBUTOR_KEYS`), plus the label table behind `labelFor` (`lib/oura/contributors`).
-- **Added:** 2026-09-26 · Review sweep 64 (`t2-sleep-01`, on the device).
-- **What:** of the ten contributors:
-  - seven carry a label and a chevron ("Deep sleep ›", "REM sleep ›"…);
-  - **three render the internal key, lowercase, with no chevron**: `hrv`, `hr`, `schedule`.
-
-  The vertical spacing is also uneven: there are larger gaps before Timing and Efficiency, which look like empty rows.
-- **Fix:**
-  1. **Code-certain cause:** `CONTRIBUTOR_KEYS` maps seven component keys to the Oura vocabulary and passes anything else through (`CONTRIBUTOR_KEYS[k] ?? k`). The sleep model's `hrv`, `hr` and `schedule` components have no entry, and `labelFor` has no label for the raw keys. Add all three to both tables ("HRV", "Heart rate", "Sleep schedule"), plus a `contributor-guide.ts` entry if each should get a chevron. A test should assert every component key the model emits has a label.
-  2. Give them chevrons if they have explanations, or mark them non-tappable consistently.
-  3. Find what renders the empty gaps.
-- **Sibling sweep:** check Readiness's "What goes into this score" list for the same fall-through.
+### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
+- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
+- **The labels and chevrons are FIXED** (RV-217, 2026-09-27): `hrv`, `hr` and `schedule` now carry
+  labels and contributor-guide entries, as does readiness's `checkin`, and a test derives the key
+  set from the model so a new component cannot arrive unlabelled.
+- **What is left is the third item of RV-217, which is a layout question:** the sweep saw larger
+  vertical gaps before Timing and Efficiency, "which look like empty rows". That was never
+  diagnosed — it is not the label fall-through, because those two rows always had labels.
+- **Why it needs the device:** the observation is from a screenshot (`t2-sleep-01`), and the two
+  candidate causes look identical in source — a row rendering with an empty value slot, or a
+  container's `gap`/margin applying unevenly. Reproduce at the 384 px dark viewport first.
+- **Done when:** the ten contributor rows are evenly spaced, or the gap is explained and kept.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **Lane: B.** If the numbers come from different routes, the reconciliation half goes to **A**.
@@ -3581,6 +3620,48 @@ which is the right shape for something that can only be validated by living with
       NOT retroactively answer this question**: the 130 existing rows are still NULL. The rollup
       re-derives each day from the packed raw tier, so a wide pass would fill history — that pass is
       the work, and it has not been run.
+
+  - **⚙ A THIRD REGIME, measured 2026-09-27 (Lane A) — and it is the one that is actionable.**
+    This entry describes two regimes. There are now three: **resilience has published NOTHING since
+    2026-09-22**, five days and counting, while the rollup keeps running.
+    - **The rollup is NOT broken.** `oura_daily_derived` was last written **2026-09-27 02:19 UTC**
+      and `daytime_stress_coverage_min` is populated through **2026-09-27**. It computes, and then
+      declines to publish a level.
+    - **The mechanism is code-certain and needs no replay.** A day is valid only if
+      `resolutionMinutes × nonNaN ≥ minDaytimeStressHours × 60` (`stress-resilience.ts:144`) —
+      **240 minutes**. A level publishes only if `validCount >= windowMinLength` = **5** of a
+      14-day window (`:288`). Coverage since 09-15: **290, 290, 170, 170, 120, 50, 150, 60, 150,
+      60, 140, 110, 50** — so only **2 of the last 13 days clear 240**. On 09-22 `confidence` was
+      **0.357 = exactly 5/14**, sitting on the floor; on 09-23 the window rolled past one more
+      valid day, `validCount` fell to 4, and the gate closed.
+    - **So the September spread was already dying as it was being measured.** The 1→2→3→4 spread
+      this entry tabulates runs 09-07 → 09-22, and confidence over that span decays to the
+      minimum. Reading it as a healthy regime to contrast against the level-5 one overstates it.
+    - **This does not explain the level-5 regime** and is not offered as doing so. It is a separate,
+      later fault on the same metric.
+    - **The actionable half is filed as LA-158** — nothing anywhere says the metric has stopped.
+
+### [readiness][devices] LA-158 — resilience stopped publishing five days ago and nothing says so
+- **Lane: A** for the surfacing; the input collapse behind it may be `DV`.
+- **Branch:** _unassigned_ · **Added:** 2026-09-27 · found verifying TN-70 against production.
+- **What:** `oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22**
+  while the rollup runs normally (last write 2026-09-27 02:19 UTC, coverage column populated to
+  2026-09-27). The mechanism is established in TN-70's third-regime note: daytime-stress coverage
+  has cleared the 240-minute per-day gate on **2 of the last 13 days**, so fewer than 5 of the
+  trailing 14 are valid and the publish gate closes.
+- **Why it is an entry rather than a note:** a score the owner reads simply stopped, and **the only
+  reason anyone knows is that someone queried the table**. There is no Known-Issues row, no
+  surface that says "not enough daytime coverage to compute this", and no alert. The metric's
+  absence looks identical to the app not having got to it yet.
+- **Two candidate causes for the coverage collapse, NEITHER established:** the ring is genuinely
+  worn less during the day since mid-September, or daytime stress ingest/decode has degraded. The
+  database cannot separate them — `worn_hours_ble` is NULL on every row (TN-70), so there is no
+  stored wear figure to check against.
+- **Shape:** (a) surface the shortfall where the score would be, naming the gate rather than going
+  blank; (b) a `DV` check of whether the ring is actually being worn in the daytime, which is the
+  only thing that separates the two causes.
+- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's
+  own constant, and a level computed from 50 minutes would be worse than no level.
 
 ### [readiness] TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor is "never scored"
 
@@ -6309,7 +6390,8 @@ drift.
 ### [workouts][platform] LA-143 — backfill `session_exercises.exercise_id` for the rows already saved
 
 - **Lane: A** — a one-statement migration, no new table or column so no `claude_ro` twin.
-- **Gate: owner** — it writes production rows, the only reason it is not already done.
+- **✅ AUTHORISED 2026-09-27 (OR-182) — gate removed; this is the ADD half of the new policy.** It writes production rows and adds nothing destructive, so it no longer needs a separate yes. **The policy he set 2026-09-27 (OR-182):** an agent may run a production DB change that ADDS or backfills, and may drop an object proved dead with the evidence shown — each after a verified snapshot. **Anything that DELETES rows holding data still comes to him individually.**
+  **Two conditions before running it:** take the snapshot first and confirm it restores, and print the affected-row count and compare it against what the backfill predicted — a count that does not match the prediction stops the run rather than being written up afterwards.
 - **Added:** 2026-09-25, Lane A, while shipping RV-168.
 - **What is left.** RV-168 made `saveProgram` fill the FK, so it is correct from each program's next
   save onward. Rows saved before that are still NULL — Bankai **0 of 25**, the others 1/25, 2/25,
@@ -7236,7 +7318,14 @@ drift.
   flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
-- **Keep:** ① above. **Lane: DV.**
+- **⚑ REOPENED AS LANE B WORK 2026-09-27 (OR-182) — the `Keep:` filed a live defect as residue.**
+  Sweep 4a passed the original fix and found a **new** one, 1 of 1: after using **Retry**, deleting
+  that food left the card on 1,454 for 16 s+ while the server's balance said 1,534, and a tab swap
+  corrected it. Deletes in the DV-15 rounds, which had not used Retry, refreshed normally. **The
+  entry's own text already said this is what it now owes**, and the diagnosis is written — the Retry
+  path looks like it leaves the card's refresh subscription dead. That is a code fix, so the old
+  `Lane: DV` inside this bullet is wrong too: **nothing further is owed by the phone before it can be
+  built.** Read `use-energy-balance-refetch.ts`'s Retry arm against the subscription it re-establishes.
 
 ### [platform] LB-132 — write paths that invalidate for this device but not after the push
 
@@ -12451,7 +12540,7 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   strictly one at a time, each with its own migration number and its own green CI.
 
 - **Lane:** A — a column drop is a migration, and migrations are Lane A's alone.
-- **Gate:** owner — the drop is data-losing and needs confirmation. Deliberately added ONLY now that
+- **✅ AUTHORISED 2026-09-27 (OR-182) — gate removed, WITH the evidence condition.** **The policy he set 2026-09-27 (OR-182):** an agent may run a production DB change that ADDS or backfills, and may drop an object proved dead with the evidence shown — each after a verified snapshot. **Anything that DELETES rows holding data still comes to him individually.** This column is the dead-object case, so it qualifies — **but only once the diff shows it is dead**: no reader in `app/**`, `lib/**` or `packages/**`, no value in production that anything selects, and the snapshot taken and restored first. **If any of those three does not hold, it is a row-deleting change and comes back to him.** Original gate text: the drop is data-losing and needs confirmation. Deliberately added ONLY now that
   the startable half is out: a `Gate:` parks the whole entry, and putting one here while the guard
   was still owed would have hidden real work behind a question, which is the failure this entry's
   own filing warned about.
@@ -16123,6 +16212,15 @@ feature and not a deletion like LB-41:
 - **📱 Sweep 2 (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23):** expanded sections draw the macro line once (`pDraws` 1). The
   collapse half could not be driven — the header chevron has **no `aria-expanded`** (Q-491).
 
+- **✅ THE READING IS SETTLED 2026-09-27 (OR-182): it is (b) — the grouped MEAL ROW itself.** He
+  confirmed he minimised the meal, not the section, so **build (b) and do not start from (a)**: the
+  meal row's own macro summary is missing, which is a different component from the section totals and a
+  plausible gap after Q-406 moved per-item macros into the detail sheet. Reading (a) is struck —
+  `meal-card.tsx:90` already renders section totals when collapsed, and chasing it was the wrong file.
+- **⚑ The `Verify: device` was struck the same day.** The fix shipped, the device said it FAILED, and
+  the field kept printing this to Lane B as *shipped, a look is owed*. A FAILED is work.
+- **⚠ One harness limit survives the answer:** the collapse half cannot be driven automatically at
+  all, because the header chevron has no `aria-expanded` (Q-491). Verification is by hand or by eye.
 - **❌ FAILED ON THE S25, 2026-09-13, and the report is the INVERSE of the original defect.**
   Owner: *"if you add a meal to a section and minimize it, it shows no overview of the macros; but if
   you have all single items and minimize the block, it still does"*.
@@ -16136,7 +16234,9 @@ feature and not a deletion like LB-41:
   but "the block" in the second clause fits (a). **One screenshot settles it.**
 
 - **Lane:** B — `components/nutrition/meal-card.tsx`, one condition. **Shipped 2026-09-01.**
-- **Verify:** device — the owner's screenshot is the only place the duplication has been seen. On
+- **The device check this still owes once the reading is settled** (prose, not a `Verify:` field — that
+  field means SHIPPED and the device said this FAILED): the owner's screenshot is the only place the
+  duplication has been seen. On
   the S25, open a meal section holding **only** a scanned or saved group: exactly one macro row and
   one calorie total. Then add a loose item to that section — the footer returns, with numbers that
   differ from the group's.
@@ -20432,9 +20532,13 @@ the bar to beat, not to assume).
 
 ### [readiness] TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign
 
-- **Gate:** owner — and it is NOT SIGNABLE yet, so do not offer it in a tuning batch. The metric runs the wrong way (n = 33), so the warning would fire on his best days. `Needs: Q-507` to settle the sign; then it becomes an ordinary proposal.
+- **✓ THE OWNER GATE IS REMOVED AND THIS IS TUNING'S, 2026-09-27 (OR-182).** The field said *"NOT SIGNABLE
+  yet, so do not offer it in a tuning batch"* — an instruction not to ask him, written in the field
+  that makes every sweep count it as his. **What is owed is a better proposal**, which is exactly what
+  `Lane: T` is for (OR-178). `Needs: Q-507` still parks it, so nothing becomes startable. Original
+  text: The metric runs the wrong way (n = 33), so the warning would fire on his best days. `Needs: Q-507` to settle the sign; then it becomes an ordinary proposal.
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
-- **Lane: B**
+- **Lane: T** — set deliberately 2026-09-27 (OR-182): the next action is a Tuning proposal that runs the right way round, not a build. **Implementation is Lane B’s** once one exists.
 - **Needs: Q-507** — deliberately. Read the next paragraph before starting.
 - ⛔ **That owner gate is NOT SIGNABLE, and a blanket sign-off does not clear it.** Offered one on
   2026-08-30 as part of a tuning batch and **deliberately not applied here.** This gate is a stop
@@ -23819,7 +23923,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   keep/hide/delete per row.
 - **Hide beats delete for anything recoverable.** A destructive admin control that is gone cannot be
   used when it is needed; one behind a disclosure is out of the way and still there.
-- **Gate:** owner — the keep/hide/delete call per control is theirs once the inventory exists. The
+- **✓ GATE REMOVED 2026-09-27 (OR-182) — it is gated on OUR work, not his.** The call per control is his
+  *"once the inventory exists"*, and the inventory does not exist. Gating on him made it owner debt
+  for work nobody had started. **Build the inventory first**; the keep/hide/delete call then becomes a
+  real question and gets an `Ask:` with the list attached. Original text: the keep/hide/delete call per
+  control is theirs once the inventory exists. The
   inventory itself is not gated and is the next action.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
@@ -27583,7 +27691,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
 - **✅ NOT rerouted to OR-150, checked 2026-09-24 (OR-153) — this one IS owner-ready.** Every other scoring gate went to Tuning because no proposal existed; this entry's gate already states the number a proposal owes (*"moves ~20% of days at the deload boundary and turns 4 taper days"*). A scoring gate is not automatically premature — check for the days-moved figure before assuming it is.
-- **Gate:** owner — the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
+- **✅ ANSWERED 2026-09-27 (OR-182): SWITCH TO UNCOUPLED EWMA.** He took it over keeping the coupled window and over re-tuning the taper threshold to preserve the current firing count — that third option was offered and declined, so **do not re-tune 1.5 to hold 4 tapers**; fitting a threshold to preserve an outcome is how a calibration drifts, and the point of the switch is that the four were not all genuine spikes. **Build it as measured:** early-deload 12/95 → 15/95, taper 4 → 1, ~20% of days flipping at the deload boundary in both directions. Lane A. Original gate text: the EWMA switch moves ~20% of days at the deload boundary and turns 4 taper
   firings into 1. Measured 2026-09-03, so this is a decision with numbers rather than a guess.
 - **Added:** 2026-08-15 · from the comprehensive review §2.2
 - **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: it names `lib/health/readiness-payload.ts`, which three API routes reach.
@@ -28020,7 +28128,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
-- **Gate: owner** — shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
+- **✅ ANSWERED 2026-09-27 (OR-182): NOT YET, and the trigger is named.** He declined the second Railway service for now — the snapshot endpoint shipped as Q-530 already gives agents a real copy of the data to test against, which was most of the value, and the remaining half is a recurring cost against a risk that has not yet bitten. **The trigger: the first migration that damages production authorises it immediately, without asking again.** The gate is removed because nothing is waiting on him; this entry now waits on an event. Original text: shape (a) shipped as Q-530; all that remains is **shape (b), a second Railway
   service**, which costs money to run and is the owner's call to authorise, not an implementation.
 - **Lane:** A
 - **Branch:** `feat/staging-environment`
@@ -30757,7 +30865,10 @@ millisecond count talk a future session out of it.
 ### [devices][readiness][app-shell] 🟠 Q-29 — Oura on-device rollup migration — Task 4 built, Task 5 next
 
 - **Lane:** A
-- **Gate: owner** — and the ball is **OURS**, not theirs. Put to the owner 2026-09-22 (OR-125) as a
+- **✓ GATE REMOVED 2026-09-27 (OR-182) — the field said so itself.** It read *"the ball is **OURS**, not
+  theirs"*, which is an argument for not gating it on him. Whatever is owed here is ours to produce
+  first; when it produces a real question, that question gets an `Ask:`. Original text: the ball is
+  **OURS**, not theirs. Put to the owner 2026-09-22 (OR-125) as a
   yes-on-principle to Task 5's drop of the server raw archive. **They declined to answer against a
   one-line summary and asked for the case first**, which is the right call and is now a debt on this
   entry rather than on them. It is tracked as **OR-126**.

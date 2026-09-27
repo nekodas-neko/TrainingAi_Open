@@ -6,12 +6,35 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.474.2",
+    version: "1.477.1",
     date: "2026-09-27",
     changes: [
       "Fixed: a sleep or nap under an hour showed as \"0h\" on the day timeline, with the minutes thrown away. It reads \"45m\" now.",
-      "Durations read the same everywhere — \"55 min\" rather than \"55m\" on some screens. A whole hour now prints as \"7h 00m\".",
+      "Durations read the same everywhere \u2014 \"55 min\" rather than \"55m\" on some screens. A whole hour now prints as \"7h 00m\".",
       "Big numbers get their commas back: your steps tile, the calories line on Home and the XP total on More all had a few that did not.",
+    ],
+  },
+  {
+    version: "1.477.0",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: three rows in the Sleep score breakdown showed their internal names \u2014 \u201chrv\u201d, \u201chr\u201d and \u201cschedule\u201d \u2014 in lowercase, with nothing to tap. They now read HRV, Heart rate and Sleep schedule, and each opens an explanation like the other seven.",
+      "Fixed: the morning check-in row on Readiness read correctly but did nothing when tapped. It now opens an explanation too.",
+    ],
+  },
+  {
+    version: "1.476.0",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: your best streak read lower than your current one, which is impossible. Home counted the days your streak has run and the profile counted the sessions in it, and both were labelled \u201cstreak\u201d \u2014 111 against 49 for the same history. Everything now counts days, the way the card and the streak badges always said.",
+      "Changed: a streak survives two rest days for everyone, and more than two if your own schedule has a longer gap in it \u2014 training Monday and Tuesday no longer breaks your streak every week.",
+    ],
+  },
+  {
+    version: "1.475.0",
+    date: "2026-09-26",
+    changes: [
+      "Changed: Workout Review now answers straight away instead of waiting on the AI. It works out what to trim the same way your workout prescription already does, so the two can no longer suggest different things about the same session. The only thing lost is the written sentence explaining each dropped exercise.",
     ],
   },
   {

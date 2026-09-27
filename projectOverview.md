@@ -26,8 +26,14 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.474.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.477.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-26.
+
+**Three Sleep contributors rendered their own key, and the class had shipped twice before (RV-217, v1.477.0).** Of the Sleep score's ten rows, seven carried a label and a chevron and three showed `hrv`, `hr`, `schedule` in lowercase with nothing to tap. The fall-through causing it is correct and stays — `CONTRIBUTOR_KEYS` translates the model's keys into Oura's vocabulary, and Oura's `daily_sleep` set is exactly the seven that are mapped, so the app's own three pass through by design. What was missing is a label and a guide entry for what comes out. **The sibling sweep found the same defect one step along:** readiness's `checkin` has a label (RV-201) and no guide, so it was the one row there that read correctly and did nothing when tapped. Both fixed. The test **derives** the key set by running the model rather than listing it — a list is what let the third occurrence happen — and carries a vacuity guard so it cannot quietly stop testing. ⚠️ **Nothing was rendered**: `labelFor`/`guideFor` are pure and covered by test, but the Sleep list itself was not opened. The entry's third item, uneven row spacing that "looks like empty rows", is a layout question a screenshot cannot settle and is filed as **LA-157** (Lane B). Detail: `docs/overview/entries/2026-09-27-rv217-contributor-labels.md`.
+
+**A best streak below the current one, because the two were counting different things (RV-216, v1.476.0).** Home said a 111-day streak and More said the best was 49. Both functions were called `computeStreak` and neither was arithmetically wrong: Home counts **calendar days** (`count += 1 + consecutiveRest`), achievements counted **sessions** (`streak++` per dated entry). Replayed against the owner's real 103 trained days: **111 days against 83 sessions at the same gap**, and the 49 was the session count at BF-122a's rotation allowance of 1. One shared `computeDayStreak` in `packages/shared/src/workout/day-streak.ts` now serves `/api/achievements` and `/api/friends/leaderboard`, counting days — which is what the card ("STREAK … days"), the four achievements ("7-day", "30-day") and the banner already promised. **The rest gap is a floor, not a replacement:** `streakRestGapFor` is `max(2, maxCompliantRestGapFor(schedule))`, because a flat 2 would have regressed BF-122a, whose Mon+Tue user has a legitimate five-day hole. The achievements file's function is renamed `computeEntryStreak` and still serves food, sleep and calorie streaks, which correctly count entries. ⚠️ **This raises his best streak from 49 to 111 and awards "Iron Will" (60-day)** — the intended change, stated plainly because it is a number he reads. ⚠️ **Home still holds its own identical copy**; the swap is `LA-156` (Lane B), and until then a *weekly* user sees Home under-report, since Home cannot read the schedule. Detail: `docs/overview/entries/2026-09-27-rv216-one-streak-formula.md`.
+
+**The Workout Review stopped calling a model, and the recap turned out to be broken rather than unused (RV-204, v1.475.0).** The review's `generateObject` call is gone: `reconcileReview` already clamped every number, refused unsafe drops, back-filled omissions and recomputed the totals, so what survived the model was the *choice* — and that choice is already made deterministically on every prescription by the same trim ordering. Running it here is what makes a review and a prescription agree instead of proposing contradicting shapes. **The second half is the finding.** The entry priced both routes as unused ("neither ran in 30 days"); over 60 days both are at zero, but the recap fires **automatically** on the done screen, and against **43 workouts completed 2026-07-30 → 2026-09-25** it has stored **4** rows ever, the last on **2026-07-23**, with nothing in `error_events`. It is never being called — a fault, not disuse — so RV-204 ② is parked behind **LA-155** rather than built into a screen that may not be reached. The mutation pass also deleted a branch this work had written: a trim-before-drop guard that could not change any answer, because `dropToBudget` already is trim-then-drop. Detail: `docs/overview/entries/2026-09-26-rv204-rules-workout-review.md`.
 
 **The barcode column existed everywhere and held nothing (LB-158, v1.474.0).** `food_items.barcode`
 had a column, a Zod schema, a server read mapper, a route that passes it through and a push branch
@@ -2655,6 +2661,34 @@ Last swept **2026-09-03**.
 ### [app-shell] ⚠️ Durations and counts read the same everywhere now; two daily screens changed what they print and neither has been seen (RV-208, 2026-09-27)
 
 Seven hand-rolled duration formatters went through `formatHoursMinutes`/`formatMinutes`, and one of them was a **defect**: the day timeline floored to the hour and dropped the remainder, so a 45-minute nap read `0h`. Thousands separators added at the three sites the device sweep confirmed. **An exact hour now prints `7h 00m` rather than `7h`** on the day timeline and the sleep sheet — the shared formatter's padded minute, for the `tabular-nums` columns. **Pass test:** on the S25, a sub-hour sleep or nap shows its minutes, and the padded form does not look wrong beside the numbers around it. Still open on RV-208: the time-of-day casing and `formatKg` spacing (both Lane A), the movement-category palette, dates, and brand names.
+### [readiness][devices] ⚠️ Resilience stopped publishing on 2026-09-22 and nothing says so (LA-158, 2026-09-27)
+`oura_daily_derived.resilience_level` has been NULL every day since **2026-09-22** while the
+rollup runs normally — last write **2026-09-27 02:19 UTC**, `daytime_stress_coverage_min`
+populated through 2026-09-27. It computes and then declines to publish. The mechanism is
+code-certain: a day counts only at **240 min** of daytime-stress coverage
+(`stress-resilience.ts:144`) and a level needs **5 valid days of 14** (`:288`). Coverage since
+09-15 reads **290, 290, 170, 170, 120, 50, 150, 60, 150, 60, 140, 110, 50** — **2 of the last 13
+clear 240**. On 09-22 confidence was exactly 5/14; on 09-23 the window rolled and the gate closed.
+**The only reason this is known is that someone queried the table** — there is no surface saying
+"not enough daytime coverage", so the absence looks like the app not having got to it. Two
+candidate causes for the coverage collapse, neither established: the ring is worn less in the
+daytime, or daytime-stress ingest has degraded; `worn_hours_ble` is NULL on every row, so the
+database cannot separate them. **Do not fix by lowering the gate** — 4 hours is the vendor
+model's own constant. This also narrows TN-70: the September 1→4 spread it tabulates was already
+decaying to the floor as it was measured.
+
+### [workouts][app-shell] ⚠️ The workout recap has not run since July, across 43 completed workouts (LA-155, 2026-09-26)
+`GET /api/workout-sessions/[id]/recap` is called automatically by `done-screen.tsx` whenever a
+workout completes. Measured against production on 2026-09-26: `ai_health_insights` holds **4**
+`session-recap` rows, newest **2026-07-23**; `workout_sessions` holds **43** completions spanning
+**2026-07-30 → 2026-09-25**; `ai_call_log` has no `workout-recap` section in 60 days; and no
+`error_events` row implicates the route — that whole window is BF-110's own instrumentation. So
+the route is not failing, it is never reached. Both reads are row-scoped to the owner, so this is
+his workouts against his recaps. **What the sandbox cannot settle** is whether `mode === 'done'`
+is reached at all after the last set, or reached with `store.workoutSessionId` null — the recap,
+energy and HR loaders on that screen share one `if (!workoutSessionId) return`, so a single null
+disables all three. Filed as **LA-155**, `Lane: DV`; it blocks **RV-204 ②**, which proposes
+building a stat block into the same screen.
 
 ### [app-shell] ⚠️ Home sections can be dragged now, and the scroll interaction has not been tried on the phone (BF-205, 2026-09-26)
 

@@ -761,6 +761,7 @@ said nothing, because both had skipped inside it.
 ## Safety & Reversibility
 
 - Never force-push, `reset --hard`, or run any destructive git operation without explicit user confirmation.
+- **Production DB changes follow a standing policy (owner, 2026-09-27, OR-182): ADD and backfill are authorised; DELETE still asks.** An agent may run a production change that adds rows or columns, or backfills them, and may drop an object it has **proved dead** (no reader in `app/**`, `lib/**`, `packages/**`; nothing selects a value in production) with that evidence shown. **Every such run takes a verified snapshot first** — taken *and* restored, not just taken — and prints its affected-row count against what it predicted, stopping on a mismatch rather than writing it up after. **Anything that DELETES rows holding data is still confirm-first, every time**, and so is anything irreversible: the ring's history buffer only moves forward, so a dropped raw row cannot be re-drained.
 - Never skip hooks (`--no-verify`) — investigate the failure and fix the root cause instead.
 - Never commit secrets, `.env` files, or credential files under any circumstances.
 - Confirm with the user before any action that affects shared systems: posting comments, sending messages, or closing PRs. **Exempt (per the CI/CD PR workflow):** pushing to a feature branch, opening a PR, and merging a tested, CI-green PR — those proceed without asking, except the destructive/irreversible carve-out (data-dropping migrations, auth/security, secrets), which is still confirm-first.
