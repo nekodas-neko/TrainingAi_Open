@@ -3763,7 +3763,7 @@ which is the right shape for something that can only be validated by living with
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
 
 ### [workouts] RV-214 — the session card leads with the equipment, not the session; the recovery chips slide under their label
-- **✅ ①③④ SHIPPED 2026-09-27 (#PR), rendered at 412 px dark. ② DOES NOT REPRODUCE, ⑤ is a design pick — both below.**
+- **✅ ①③④ SHIPPED 2026-09-27 (#1775), rendered at 412 px dark. ② DOES NOT REPRODUCE, ⑤ is a design pick — both below.**
 - **Lane: B** — the card is `app/workout-select/workout-select-content.tsx`, **not** `app/workout/**`.
 - **Added:** 2026-09-26 · Review sweep 63.
 1. ~~**"Dumbbell" is set at about twice the size of "Push".**~~ — **SHIPPED, and the device note's
