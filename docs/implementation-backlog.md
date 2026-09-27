@@ -3036,6 +3036,14 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** the sleep line returns under the mood card, driven by `sleepQualityFeel` (1–5), captioned *"Your rating, not a score"* so it cannot be misread as derived the way the fabricated `Sleep: OK` was.
+- **Gate:** owner — **and it is correct NOW, which it was not before.** The mockup did not exist,
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The cost is on the mockup and is not optional:** Home is in the persistent tab shell, so it needs `useCachedValue`, a canonical TTL and registration in every `day_checkins` write group, or it paints once and never refreshes.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
   and `RV-213` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>. The after reads
@@ -3618,6 +3626,14 @@ which is the right shape for something that can only be validated by living with
   bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** a fixed three-column grid filling the row, and `Log` moved out from under the icon to its own control below the value. The `absolute top-0.5 right-0.5` pill with `min-h-11` is what puts it on the icon; the flex row is what leaves the right third empty.
+- **Gate:** owner — **and it is correct NOW, which it was not before.** The mockup did not exist,
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The trade, stated on the mockup:** each tile is narrower, so a fourth widget wraps to a second line rather than scrolling sideways.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added, and the lane moved `O` → `B`**: the remaining
   work after his answer is `app/session-select/components/metric-tiles-card.tsx`, which the path rule
   puts in Lane B. Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting
@@ -4056,6 +4072,14 @@ which is the right shape for something that can only be validated by living with
    - **The definition is the owner's call. The copy is not.**
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** an empty meal collapses to one row — its name and a single `+`; meals with food keep the full card. Four empty meals go from roughly **320 px to 170 px**.
+- **Gate:** owner — **and it is correct NOW, which it was not before.** The mockup did not exist,
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The trade:** adding to an empty meal becomes a `+` rather than a labelled full-width row. Still a 44 px target, but a smaller one.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
   and `LA-136` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
@@ -7338,6 +7362,15 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed, to his instruction:** one *Today's cardio* card at the top of the hub holding the prescription and both ways to satisfy it, with either marking the day done.
+- **Gate:** owner — **and it is correct NOW, which it was not before.** The mockup did not exist,
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **⚠ THIS ONE MOVES STORED NUMBERS, unlike the other three.** Every past run day becomes completable, so adherence, streaks and compliance all shift once it ships — **quantify how far before merging.**
+- **⚠ Its BEFORE pane is rebuilt from the components, not screenshotted** — the hub needs live data the sandbox does not have. The other three befores come from source, and `LB-163`'s was independently reproduced in the Playwright harness.
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
 - **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
@@ -8574,6 +8607,14 @@ drift.
   the sandbox can only prove the primitive is wired in.
 
 ### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
+- **✅ THE CLASS IS FIXED FOR THE 2026-09-27 BATCH, though this entry's own artefact is still lost.**
+  Four mockups (`LB-163`, `LA-136`, `RV-213`, `RV-166`) were produced and **committed to the repo**
+  as [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html)
+  rather than shown only in a chat, which is exactly the failure this entry records. **The
+  convention to follow: a mockup is not shown until it is in `docs/design/`** — an approval whose
+  artefact lives in a transcript is an approval no implementer can build to.
+  **What is STILL owed here is unchanged:** the 2026-09-22 Home IA mockup that `RV-119` was approved
+  against was never saved and cannot be recovered from this repo. That one has to be redrawn.
 
 - **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
 - **RV-119, RV-117 and RV-118 all carry "Owner gate SATISFIED 2026-09-22 — mockup shown at 384 px
