@@ -4808,6 +4808,27 @@ unverified"* is now answered: it persists.
     (`sync-provider` warm, `training-stress-line`, `training-stress-badge`), so the first row with
     numbers will be the next day the owner opens the app. Read that day; the older days will never
     get them without a per-date call.
+  - **⚙ READ DONE 2026-09-28 (Lane A), and it resolves the "flat contradiction": the gate only ever
+    judges an UNFINISHED day.** The first row with LA-161's numbers is **09-28: grid 471, valid 343,
+    written 08:46 Brisbane.** At 08:46 about 526 minutes of the day exist, so a 720-minute floor
+    **cannot** pass. The route re-persists on every call but is only asked about **today**
+    (`sync-provider` warm, the line and the badge), and nothing ever evaluates a day after it ends.
+    So each stored `insufficient_met` is the verdict of whichever evaluation came last that day. A
+    morning one is guaranteed to fail, and the replay that "cleared both floors" read the day
+    **after** it finished. That is CLAUDE.md's *"treat today as a partial day"* rule, missed.
+    **Confirm with one evening read** (a grid ≥ 720 on the same day's row); strong, not yet observed.
+  - **So there are two layers, and the second is the 09-24 root cause again.** 09-25 and 09-26 read
+    `scorer_no_output`, which is **only** reachable once both floors pass, so those were late
+    evaluations of real days and the scorer still returned nothing. **The 09-24 NaN-validator
+    diagnosis is NOT refuted.** Hypothesis ① above ("a gap-filled series still returns null") was
+    measured in the sandbox, where `MANIFEST.json` is absent and the scorer returns null for
+    everything, so it proved nothing either way. Treat fix (b), filling the grid under a stated rule,
+    as the live proposal. It is a modelling assumption, so it goes through Tuning before Lane A
+    builds it.
+  - **The buildable half is filed as LA-170:** evaluate a day once it has ended, so the stored
+    verdict describes the whole day. Alone it only turns `insufficient_met` into
+    `scorer_no_output` on full days until the NaN fix lands. That is still worth having, because it
+    makes the stored reason honest.
 
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
@@ -4916,6 +4937,25 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
+
+### [readiness][heart-rate] LA-170 — the training-load verdict is only ever computed for an unfinished day
+- **Lane: A** — `app/api/training-stress/route.ts`, `packages/shared/src/health/training-stress.ts`.
+- **Added:** 2026-09-28 · Lane A, from TN-79's LA-161 read.
+- **What:** `/api/training-stress` is asked only about today, and re-persists its gate on every call.
+  A day's stored verdict is therefore the last evaluation made *during* that day. A morning
+  evaluation cannot pass the 720-minute MET floor (09-28 at 08:46: grid 471). No path evaluates a
+  day after it ends, so every stored `insufficient_met` may be describing a partial day.
+- **Fix shape:** when today is evaluated, also evaluate the previous day if its stored verdict was
+  written before that day ended. That needs a record of *when* the verdict was computed, because
+  `updated_at` is bumped by device pushes (the sync-push branch COALESCEs into the same row). That
+  means a column (`training_load_evaluated_at`), so a migration **waits behind BF-214's numbering**.
+  Without it, re-evaluating on grid length alone would re-read a day of frames on every call for a
+  day the ring barely saw.
+- **What it will and will not change:** full days move from `insufficient_met` to a verdict computed
+  on the whole day, which today means `scorer_no_output` until TN-79's NaN fix lands. No score
+  appears from this alone; the stored reason becomes true.
+- **Done when:** yesterday's row carries a grid measured after its end, and a test pins that a
+  morning evaluation of today never becomes a completed day's final verdict.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
