@@ -35,6 +35,13 @@ export interface HrZone {
 
 // Fraction-of-reserve lower bounds for each zone (Karvonen). Zone 1 starts at the
 // resting HR itself so the whole plausible range is covered.
+//
+// **TN-78: do NOT move the Light floor to score WHO active minutes — this map is shared.**
+// `targetsForRunType` (`packages/shared/src/running/hr-targets.ts`) builds run prescriptions from
+// these same bands, so dropping Light to 0.4 takes a RECOVERY run's ceiling from 134 bpm to 106
+// with it. That was never the decision, and CI caught it. WHO active-minute accounting has its
+// own floor below — `MODERATE_INTENSITY_FRAC` — precisely because the two uses want different
+// edges: one is an activity-guideline definition, the other is a training prescription.
 const ZONE_DEFS: { id: HrZone['id']; name: string; lowerFrac: number; color: string }[] = [
   { id: 1, name: 'Recovery', lowerFrac: 0.0, color: '#3b82f6' },
   { id: 2, name: 'Light',    lowerFrac: 0.6, color: '#22c55e' },
@@ -47,6 +54,26 @@ const ZONE_DEFS: { id: HrZone['id']; name: string; lowerFrac: number; color: str
 // that don't have a bpm context). Same source as the band builder — no second palette.
 export const HR_ZONE_META: { id: HrZone['id']; name: string; color: string }[] =
   ZONE_DEFS.map((z) => ({ id: z.id, name: z.name, color: z.color }))
+
+/**
+ * Where MODERATE activity begins, as a fraction of heart-rate reserve — ACSM's definition
+ * (40-59% HRR), and the owner's decision of 2026-09-27 (TN-78).
+ *
+ * Deliberately separate from `ZONE_DEFS`. `DEFAULT_ZONE_MINUTES_GOAL` cites WHO's ≥150 min/wk of
+ * moderate activity, and that goal used to be scored off the Light band, whose floor sits at 60%
+ * — where ACSM puts VIGOROUS. So the target was moderate and the bar was vigorous, and brisk
+ * walking could not earn a single minute.
+ *
+ * Fixing that by moving the Light band would have moved run prescriptions too, since
+ * `targetsForRunType` reads the same map: a recovery run's ceiling would have fallen from 134 bpm
+ * to 106. Two different questions, two constants.
+ */
+export const MODERATE_INTENSITY_FRAC = 0.4
+
+/** The bpm at which moderate activity begins for a profile (TN-78). */
+export function moderateIntensityBpm({ maxHr, restingHr }: { maxHr: number; restingHr: number }): number {
+  return Math.round(restingHr + MODERATE_INTENSITY_FRAC * hrReserve(maxHr, restingHr))
+}
 
 /** Build the five HR zones as absolute bpm bands for a given profile. */
 export function computeHrZones({ maxHr, restingHr }: { maxHr: number; restingHr: number }): HrZone[] {

@@ -77,6 +77,34 @@ export function zoneBreakdownFromReadings(
  *  WHO 2020 guideline that vigorous minutes count double toward the weekly moderate-equivalent target.
  *  Takes the same per-zone seconds `accumulateZoneSeconds` already produces — no second zone
  *  computation, just a different roll-up of the one canonical result. */
+/**
+ * WHO active minutes computed from readings, with moderate starting at `MODERATE_INTENSITY_FRAC`
+ * of reserve rather than at the Light band's floor (TN-78).
+ *
+ * The zone map cannot answer this on its own: its Light band begins at 60% of reserve, where ACSM
+ * puts vigorous, and it is shared with run prescriptions — so widening it to fix the accounting
+ * would have dropped a recovery run's ceiling with it. This walks the readings once, with the same
+ * gap cap `accumulateZoneSeconds` uses, and splits on two edges: the moderate floor, and the
+ * Aerobic band's floor above which WHO counts a minute double.
+ */
+export function activeMinutesFromReadings(
+  readings: HrReading[],
+  zones: { id: number; minBpm: number }[],
+  moderateFloorBpm: number,
+  maxGapSec = DEFAULT_MAX_GAP_SEC,
+): number {
+  const vigorousFloor = zones.find(z => z.id === 3)?.minBpm ?? Infinity
+  let moderateSec = 0
+  let vigorousSec = 0
+  for (let i = 0; i + 1 < readings.length; i++) {
+    const dt = Math.min((readings[i + 1].timestamp - readings[i].timestamp) / 1000, maxGapSec)
+    const bpm = readings[i].bpm
+    if (bpm >= vigorousFloor) vigorousSec += dt
+    else if (bpm >= moderateFloorBpm) moderateSec += dt
+  }
+  return Math.round(moderateSec / 60 + (vigorousSec / 60) * 2)
+}
+
 export function activeMinutesFromZoneSeconds(zoneSeconds: number[]): number {
   const [, lightSec, aerobicSec, hardSec, peakSec] = zoneSeconds
   const moderateMin = lightSec / 60
