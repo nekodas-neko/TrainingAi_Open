@@ -4016,7 +4016,9 @@ which is the right shape for something that can only be validated by living with
 - **Done when:** the ten contributor rows are evenly spaced, or the gap is explained and kept.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
-- **Lane: B.** If the numbers come from different routes, the reconciliation half goes to **A**.
+- **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
+- **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
+  the reconciliation half goes to A"* — they do, and it does.
 - **Added:** 2026-09-26 · Review sweep 64 (`p23-nutrition-warm-01/02`, `t2-day-01`, `home-nutri` crop).
 - **What the owner sees on one day:**
   - the Nutrition ring: **"0 OF 1,534"** (1,297 resting + 237 movement);
@@ -4026,15 +4028,33 @@ which is the right shape for something that can only be validated by living with
 
   So the ring's 1,534 is neither the goal nor the budget the explainer names. It is a third target the screen never explains, and "burned" is a fourth number on the next screen.
 - **Copy bugs (code-certain once found):**
-  - "**+237 earned from movement (205 workouts · 32 steps)**" on both Home and Nutrition: 205 is kcal, and without the unit it reads as 205 workouts. Write "205 kcal workouts · 32 kcal steps".
-  - "**deficit -1,694**" is a double negative.
-  - "**0 / 1534 kcal**" beside "**1,534 left**" on the same Home card (RV-208's separator item).
-- **The 7-day chart shows 5 bars (Sun–Thu)** on a Saturday. Days with no log disappear instead of drawing as zero, so a "7-day" chart has five days.
+  - ~~"**+237 earned from movement (205 workouts · 32 steps)**"~~ — **SHIPPED.**
+    `movementSummary` (`components/nutrition/movement-breakdown.ts`) is the one producer, feeding
+    both Home and Nutrition, so it was a one-line fix in one place. The test now asserts the unit
+    **per addend** with a regex rather than pinning the whole string, so a reworded separator or a
+    reordered list cannot quietly drop it.
+  - ~~"**deficit -1,694**" is a double negative.~~ — **SHIPPED.** `energy-timeline-chart.tsx`
+    printed the signed `net`, and on that branch `net` is negative — so the minus and the word
+    both said "under", which reads as a *negative deficit*, i.e. a surplus. `Math.abs` on that
+    branch only; **the surplus branch keeps its "+" deliberately**, where sign and word agree, and
+    the test pins that asymmetry so nobody "tidies" it into a second double negative.
+  - ~~"**0 / 1534 kcal**" beside "**1,534 left**"~~ — **ALREADY FIXED**, by RV-208 (#1743) earlier
+    the same day. `home-nutrition-card.tsx:113` calls `.toLocaleString()` on both numbers. Verified
+    against `main` rather than re-fixed.
+- **The 7-day chart shows 5 bars (Sun–Thu)** on a Saturday. Days with no log disappear instead of
+  drawing as zero, so a "7-day" chart has five days. — **LANE A, and here is why.**
+  `app/api/nutrition/weekly-summary/route.ts` computes the window itself (`from = shiftDateStr(today, -6)`)
+  and then returns `repo.listFoodLogsSummary(userId, from, today)` **verbatim** — an aggregate that
+  naturally omits days with no rows. **The route is the only layer that knows the window**, so it is
+  where the gap should be filled; padding in `weekly-nutrition-chart.tsx` would make every future
+  consumer re-derive those seven dates, which is how a second copy of a window starts.
 - **Fix:**
-  1. Settle which number the ring's denominator is, and make the explainer name that one.
-  2. Make "burned" on Day and Nutrition come from the same function.
-  3. Fix the three copy bugs.
-  4. Draw zero days.
+  1. Settle which number the ring's denominator is, and make the explainer name that one. — **A.**
+  2. Make "burned" on Day and Nutrition come from the same function. — **A.**
+  3. ~~Fix the three copy bugs.~~ — **DONE** (two shipped, one already fixed).
+  4. Draw zero days. — **A**, in the route, for the reason above.
+- **Nothing here is Lane B's any more.** ①② are a reconciliation across routes, and ④ is the route
+  under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
 
 ### [workouts] RV-219 — Health → Day's workout card: a bodyweight lift reads "0 kg", and names truncate mid-word
