@@ -300,7 +300,7 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
                 {statsKnown ? `Level ${level} · ${levelLabel}` : 'Level —'}
               </p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {statsKnown ? `${xp} XP total · tap for details` : 'Tap for details'}
+                {statsKnown ? `${xp.toLocaleString()} XP total · tap for details` : 'Tap for details'}
               </p>
             </div>
           </button>

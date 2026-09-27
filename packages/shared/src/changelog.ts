@@ -6,10 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.476.1",
+    version: "1.477.2",
     date: "2026-09-27",
     changes: [
       "Changed: the smallest text on the workout screens is legible again. Five labels read mid-set \u2014 the set-type caption, the rest/set clock labels and the 1RM caption \u2014 were set at 9 and 10 pixels; they are now 11, which is the app's new floor for small text.",
+    ],
+  },
+  {
+    version: "1.477.1",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a sleep or nap under an hour showed as \"0h\" on the day timeline, with the minutes thrown away. It reads \"45m\" now.",
+      "Durations read the same everywhere \u2014 \"55 min\" rather than \"55m\" on some screens. A whole hour now prints as \"7h 00m\".",
+      "Big numbers get their commas back: your steps tile, the calories line on Home and the XP total on More all had a few that did not.",
+    ],
+  },
+  {
+    version: "1.477.0",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: three rows in the Sleep score breakdown showed their internal names \u2014 \u201chrv\u201d, \u201chr\u201d and \u201cschedule\u201d \u2014 in lowercase, with nothing to tap. They now read HRV, Heart rate and Sleep schedule, and each opens an explanation like the other seven.",
+      "Fixed: the morning check-in row on Readiness read correctly but did nothing when tapped. It now opens an explanation too.",
     ],
   },
   {

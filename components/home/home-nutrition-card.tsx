@@ -110,7 +110,7 @@ export function HomeNutritionCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between mb-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Nutrition{isWeekly ? ' (week)' : ''}</p>
-            {goalDisplay && <p className="text-xs text-muted-foreground">{consumedDisplay ?? 0} / {goalDisplay} kcal</p>}
+            {goalDisplay && <p className="text-xs text-muted-foreground">{(consumedDisplay ?? 0).toLocaleString()} / {goalDisplay.toLocaleString()} kcal</p>}
           </div>
           {/* Q-401: the gradient progress fill that used to be here measured "how full is the
               tank" against a fixed target. The zone bar measures "am I on target" against a

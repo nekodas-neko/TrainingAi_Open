@@ -492,6 +492,11 @@ Live at the time of writing (2026-07-30):
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
+- **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
+  — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
+  one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
+  casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
+  collides with `SESSION_PALETTE` because that palette is indexed by POSITION, not by name.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
