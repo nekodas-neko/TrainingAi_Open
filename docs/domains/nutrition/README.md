@@ -518,6 +518,13 @@ Live at the time of writing (2026-07-30):
   with a three-step instrumented probe instead of a third speculative fix.
 - Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
+  — including
+  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/entries/2026-09-27-rv212-nutrition-tone.md)
+  (RV-212 ①②: the energy-balance headline stops reading a partial day as a fault, following
+  `energy-card.tsx`'s own earlier split which keeps the colour on the " so far"-qualified label; a
+  taken supplement is muted rather than struck through, while the manage sheet's `!s.active`
+  strikethrough — a different claim — stays. Item ④ went back to the owner as `LB-167`, because
+  `meal-thumb.tsx` records his instruction for the placeholder it asked to remove).
 
 ## Decided, and deliberately not built
 

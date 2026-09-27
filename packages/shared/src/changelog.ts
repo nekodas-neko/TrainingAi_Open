@@ -15,6 +15,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.477.8",
+    date: "2026-09-27",
+    changes: [
+      "Changed: an afternoon that is only part-eaten no longer reads as a mistake. The energy-balance number stops turning red before the day is over; the verdict beside it still carries its colour, where \"so far\" says what it means.",
+      "Changed: a supplement you have taken is no longer crossed out, which read as cancelled. The green tick says it, and the row is simply dimmed.",
+    ],
+  },
+  {
     version: "1.477.7",
     date: "2026-09-27",
     changes: [

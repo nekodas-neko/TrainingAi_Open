@@ -200,7 +200,11 @@ export function SupplementsSection({ supplements, loading, onChanged, userId , g
                   {s.loggedToday && <CheckIcon className="w-3 h-3" style={{ color: '#0a0a0a' }} />}
                 </div>
                 <div className="flex-1 text-left min-w-0">
-                  <p className={cn("text-sm font-medium", s.loggedToday && "line-through text-muted-foreground")}>
+                  {/* Muted, not struck through (RV-212 ②). A strikethrough reads as cancelled or
+                      deleted; taken is the opposite, and the green tick to the left already says
+                      it. The sheet's own `!s.active` strikethrough is a different claim —
+                      discontinued — and stays. */}
+                  <p className={cn("text-sm font-medium", s.loggedToday && "text-muted-foreground")}>
                     {s.name}
                   </p>
                   {/* BF-112: what today recorded, falling back to the definition — the two are
