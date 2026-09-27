@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.21",
+    version: "1.477.22",
     date: "2026-09-28",
     changes: [
       "Fixed: a program or progression style you deleted stayed on your phone, and offline the Workout screen could open a program you had already deleted. Deletions now reach the phone on the next sync.",
+    ],
+  },
+  {
+    version: "1.477.21",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: when a whole session was deloaded, choosing Full changed nothing, and sets done at full weight still counted as a deload and could not set a PR. Full now puts each exercise back to your program's own weights and sets, and those sets count.",
     ],
   },
   {
