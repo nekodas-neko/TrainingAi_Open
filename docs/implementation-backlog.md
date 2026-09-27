@@ -799,6 +799,39 @@ below threshold and left in place for next time.
 - **Reversal cost:** low — one script.
 
 
+### [platform] OR-199 — Reference: do NOT compact `CLAUDE.md` the way `projectOverview.md` was compacted
+
+- **Reference:** the measurement and the reasoning behind a structural call, so it is not re-proposed.
+- **Lane: O** · **Added:** 2026-09-27 · Orchestrator, immediately after `OR-197` took
+  `projectOverview.md` from 309 KB to 17 KB and the obvious next move looked like doing the same here.
+- **The call: stop. `CLAUDE.md` stays roughly its current size.** Measured 2026-09-27: **945 lines,
+  120 KB**, of which the four largest sections are Standing Instructions 18.3 KB, Standing Agents
+  16.8 KB, Cache Invalidation 10.9 KB, Git Workflow 10.0 KB — **56 KB, 47%**.
+- **Why it is not the same job.** `projectOverview.md` was 94% one section that was a changelog
+  under a status heading: a relocation with no judgement calls. `CLAUDE.md` has no equivalent block.
+  It is rules with their evidence attached, and the evidence is what the rules are made of.
+- **⚠ The "archaeology" is LOAD-BEARING, and this file proves it about itself.** The passages that
+  look most cuttable are the ones reading *"this paragraph said the opposite until 2026-09-25, and
+  both versions were wrong about the mechanism"*. The branch-protection rule has been stated
+  **backwards twice**; the merge-button passage was wrong **in both directions**. What prevents a
+  third occurrence is the record that it happened. Removing it is the edit that reads as a saving
+  and returns as a bug.
+- **And the saving is smaller than it looks.** A standing role runs as one continuous session, so
+  this file is read once at session start and served from the prompt cache after. The cost is
+  ~120k tokens per session START, not per turn — which is why `OR-197`'s 292 KB of per-start noise
+  was worth removing and 3–4 KB of rules here is not.
+- **The one idea that might survive, and the reason it is not actioned:** the Standing Agents
+  section (16.8 KB) declares itself the must-bind subset of
+  [`docs/agents/README.md`](agents/README.md) (52 KB), so some of it is a second copy. **That was
+  NOT established** — a token-coverage scan was written, judged too weak to support the claim, and
+  discarded under the rule that no grep may conclude where no tool owns the question. Doing it
+  properly needs a careful read of both files against each other; it is a session's work, and the
+  prize is a few KB per session start. **If anyone picks it up: cut only what the README genuinely
+  states, quote both sides in the PR, and never drop a rule's evidence to save room.**
+- **Reversal cost: none** — this is a decision not to act. Reopen it if the per-session-start cost is
+  ever shown to matter, with a measurement rather than an argument.
+
+
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
