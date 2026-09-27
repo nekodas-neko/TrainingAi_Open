@@ -3152,6 +3152,52 @@ which is the right shape for something that can only be validated by living with
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
+
+- **✅ PART ONE SHIPPED (#PR, 2026-09-27) — numbers and durations. The rest is below, with who owns each.**
+  **Thousands separators** at the three device-confirmed sites: Home's metric tile (`11900` →
+  `11,900`, value and `aria-label`), Home's nutrition card (`0 / 1534 kcal`), More's profile
+  (`2815 XP total`, one line above its own `2,815 XP`). They now match the `toLocaleString()` their
+  neighbours already used.
+  **One duration form**, through `packages/shared/src/format/units.ts`, which RV-90 already owns.
+- **⚑ THE SWEEP FOUND A DEFECT, NOT JUST AN INCONSISTENCY.** `home-day-timeline`'s private `fmt`
+  floored to the hour and threw the remainder away, so **a 45-minute nap rendered `0h`**.
+  `formatHoursMinutes` returns `45m`. That is the argument for the consolidation over a style
+  note: a second implementation is somewhere for a bug to live alone. **Seven copies in all** —
+  `walk-summary` and `weekly-stats-hub` (`55m` against `55 min`), `health-metric-sheet`'s
+  `fmtHours` and its two latency renders, `home-day-timeline`'s `fmt`.
+  **Consequence to expect:** an exact hour now reads **`7h 00m`** rather than `7h` on the sleep
+  sheet and the day timeline. The padded minute is the shared formatter's deliberate choice, for
+  the `tabular-nums` columns these sit in.
+- **`components/ui/__tests__/rv208-one-duration-form.test.ts` holds it**, matching an interpolated
+  name that SAYS minutes rather than a bare `${v}m` — the elevation and pace axes are full of
+  those and they are **metres**. One exemption with its reason: `formatSyncAge`'s `3m ago`, which
+  is relative age, a different idiom from a duration. Control-run: reinstating the timeline's own
+  helper fails it.
+- **STILL OPEN, and two of them are NOT Lane B:**
+  ① **Time-of-day casing is Lane A.** `formatTimeOfDay` emits `6:40am` (`h:mm aaa`); the uppercase
+  `6:40 AM` comes from **`app/api/day-timeline/route.ts:44`**, which formats `h:mm a` server-side.
+  That is `app/api/**`. **Lane: A** — one format string, and the route returning a display string
+  at all is worth a second look while it is open.
+  ② **Unit spacing (`7 × 68kg` against `98 kg`) needs a `formatKg` that emits decimals AS NEEDED.**
+  The default is one decimal, so routing the lift sites through it turns `68kg` into `68.0 kg`,
+  which is worse. `packages/shared/**` is **Lane A**: either an option on `formatKg` or a sibling.
+  Sites waiting on it: `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`,
+  `weights-summary:93`, `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**`
+  is deliberately excluded, as it is for the timezone rules.
+  ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
+  is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
+  Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
+  `--accent-cyan/purple/green`, and **purple and green collide with session slots 2 and 5**. Only
+  four accent tokens exist; giving the categories a non-clashing set means adding two to
+  `app/globals.css` with contrast checked there. Lane B, but it is design work rather than a
+  rename — it deserves its own pass, not a tail-end of this one.
+  ④ **Dates** (`25 Sept` / `Saturday 26 September` / `September 2026`) and ⑤ **brand-in-food-name**
+  are copy decisions, untouched here.
+- **A question this raised and did not answer:** every separator site uses a bare
+  `toLocaleString()`, which follows the DEVICE locale — a phone set to German renders `1.534`. The
+  fix above matches the existing convention rather than inventing a rival one. Whether counts
+  should pin a locale, as clock times had to, is a `packages/shared` call and therefore Lane A's.
+
 - **Lane: B.** One PR. **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.
 - **Added:** 2026-09-26 · Review sweep 63.
 - **Colour, on ONE screen.** Health → Training's calendar and load legend colour **Push orange, Pull green, Legs purple**. Two cards down, Movement balance colours **Push cyan, Pull purple, Legs green**.

@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { StatTile } from '@/components/ui/stat-tile'
+import { formatMinutes } from '@trainingai/shared/format/units'
 import { pullDelta } from '@/lib/local-store/sync-engine'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
@@ -276,7 +277,8 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     <div className="flex flex-col gap-4 px-6 pt-safe pb-safe-action-lg">
       <h2 className="text-2xl font-bold">Walk complete</h2>
       <div className="grid grid-cols-4 gap-2 text-center">
-        <StatTile label="Duration" value={`${durationMin}m`} />
+        {/* RV-208: `55m` here against `55 min` from `formatMinutes` on every other surface. */}
+        <StatTile label="Duration" value={formatMinutes(durationMin)} />
         <StatTile label="Avg HR" value={avgHr != null ? `${avgHr}` : '—'} />
         <StatTile label="Max HR" value={maxHr != null ? `${maxHr}` : '—'} />
         {/* BF-107. A dash until the derived figure lands, never a zero — a zero is a claim about a
