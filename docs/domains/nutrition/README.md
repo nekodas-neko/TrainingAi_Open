@@ -338,15 +338,11 @@ Live at the time of writing (2026-07-30):
 - The quick-edit sheet fixes and the NUT-10/11 hygiene pass shipped, but interactive verification
   was blocked in the sandbox.
 - Supplement reminders and meal-type reminder cancellation are unverified on device.
-- ⚠️ **The empty meal's header `+` is a 36 px tap target** (`LB-169`, found 2026-09-27,
-  `meal-card.tsx:72`) — under the 48 px floor the rest of the screen holds to. Easy to miss
-  today because an empty meal also shows a full "Add food" card beside it; **it becomes the
-  only way in if `RV-213`'s collapse is taken**, so fix it before or with that entry. `RV-213`
-  itself is mocked up at 384 px dark and waiting on the owner's answer —
-  [`journal`](../../overview/entries/2026-09-27-mockups-home-nutrition-sitting.md).
-
-## History
-
+- ✅ **The empty meal's header `+` is NOT undersized** — retracted 2026-09-27, the same day it was
+  filed. `meal-card.tsx` gives it `h-9 w-9`, but `app/globals.css` floors every `button` and
+  `[role="button"]` at 48 px, so it renders at 48 × 48 (measured). **A Tailwind size class is not the
+  rendered size here** — check the global floor before filing one of these. `RV-213`'s collapse is
+  unblocked by it; the entry carries the retraction.
 - [`2026-09-15-bf74-photo-remove-confirm`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf74-photo-remove-confirm)
   — **BF-74 round two (2026-09-15): removing a meal photo asks first.** Round one moved the ✕ out of
   the dismiss corner and made it a bin; the device pass still found it destroyed the photo on one

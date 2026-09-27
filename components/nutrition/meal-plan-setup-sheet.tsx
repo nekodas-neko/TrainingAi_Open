@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
@@ -23,7 +23,7 @@ import {
 } from '@trainingai/shared/nutrition/grocery-catalogue'
 import type { DietaryRestriction, MealPlan, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
-import { TTL_LONG } from '@trainingai/shared/cache-ttl'
+import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import type { DietaryRestrictionsResponse } from '@/app/api/nutrition/dietary-restrictions/route'
 
 // The five lists moved to `@trainingai/shared/nutrition/grocery-catalogue` when `/api/coach/options`
@@ -76,9 +76,18 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
   const [trainingTime, setTrainingTime] = useState('')
   const [splitDays, setSplitDays] = useState(false)
   const [keepMealIds, setKeepMealIds] = useState<string[]>([])
-  // BF-11h: let the planner pick from the library for the slots nobody pinned. Off by default —
-  // on changes what every generation returns, so it is the user's call rather than a new default.
+  // BF-11h let the planner pick from the library for the slots nobody pinned; LB-159 made the
+  // default conditional (owner, 2026-09-27): **on when there are saved meals, off when there are
+  // none.** A plan built from meals already cooked and liked carries real macros rather than an
+  // estimate, and the generate route only fills the slots the library cannot — so variety is filled
+  // in around the library rather than lost. Defaulting on with an EMPTY library would be worse than
+  // useless: it ticks a box that changes nothing.
   const [useLibrary, setUseLibrary] = useState(false)
+  // Set once the user works the toggle, so the library read below can never overwrite their answer.
+  // Reaching this control takes several taps and the fetch resolves long before that, which makes
+  // this belt-and-braces — but an async response replacing a choice the user just made is a bug
+  // class this project keeps re-finding, and the guard costs one ref.
+  const useLibraryTouched = useRef(false)
   // Non-null while the user is answering "you have more meals kept than slots". Holds the count
   // they asked for and the one to go back to, because Cancel must restore the previous count and
   // that is not always one more (5 → 2 is a single tap on this chip row).
@@ -95,6 +104,23 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
     if (!open) return
     setStep(0); setDraft(null); setKeepMealIds([]); setTypedMeals([]); setUseLibrary(false)
     setLoadedRestrictions(null); setRestrictionsFailed(false); setRestrictions([])
+    // The default is decided HERE, not at the `useState` above: this effect resets the toggle on
+    // every open, so an initial value alone would never survive to be seen.
+    //
+    // Seeded synchronously and then corrected, because the seed can be cold — the `saved-meals` key
+    // is only warm once something has read it this session, and opening this sheet without first
+    // visiting the library would otherwise default OFF against a full library, which is the wrong
+    // answer arrived at silently. Same key and TTL `MyMealsPicker` uses; a second key for the same
+    // endpoint is how stale and blank first paints happen.
+    useLibraryTouched.current = false
+    setUseLibrary((readCacheSync<SavedMeal[]>('saved-meals')?.length ?? 0) > 0)
+    cachedFetch<SavedMeal[]>(
+      'saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM,
+      d => { if (!useLibraryTouched.current) setUseLibrary(Array.isArray(d) && d.length > 0) },
+      // A failed read keeps whatever the seed decided rather than forcing the toggle off: `off`
+      // here is a claim that the library is empty, and a network failure is not evidence of that.
+      { onError: () => {} },
+    ).catch(() => {})
     // `cachedFetch` on the `dietary-restrictions` key (LB-155). `invalidateMealPlans()` has always
     // cleared that key — it was written for a reader that did not exist, and this is it.
     //
@@ -398,7 +424,7 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
               onChangeTyped={setTypedMeals}
               mealCount={mealCount}
               useLibrary={useLibrary}
-              onChangeUseLibrary={setUseLibrary}
+              onChangeUseLibrary={v => { useLibraryTouched.current = true; setUseLibrary(v) }}
             />
           )}
 

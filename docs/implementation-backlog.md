@@ -3614,30 +3614,6 @@ which is the right shape for something that can only be validated by living with
   name of a food logged before → it appears under *"You already have"* and tapping it reaches the
   assign step.
 
-### [nutrition] LB-159 — should a meal plan reuse your own meals by default?
-- **✅ ANSWERED 2026-09-27 — default it ON when there are saved meals, OFF when there are none.**
-  He took the recommendation outright, not the try-it-for-a-month variant, so this ships as a
-  settled default and needs no follow-up re-ask.
-  **Now Lane B** — `useLibrary`'s initial value in `meal-plan-setup-sheet.tsx:81`. It is conditional
-  on the library being non-empty: defaulting on with nothing saved ticks a box that changes nothing.
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, split out of RV-203 ④.
-- **Recommendation: default it ON when you have saved meals, and off when you have none.** A plan
-  built from meals you have already cooked and already like is one you are more likely to eat, the
-  macros are your real ones rather than an estimate, and the route already fills only the slots the
-  library cannot (`generate/route.ts:297-307`) — so variety is not lost, it is *filled in around*
-  what you keep. Defaulting on for an empty library would be worse than useless: it would tick a
-  box that changes nothing.
-- **Why a year out:** the saved-meal library only grows, so the value of this default rises with
-  time while the cost stays flat. Leaving it off means the library is quietly worth less every
-  month it fills up.
-- **The alternative, and what it is genuinely better at: leave it off.** It is better at
-  *discovery* — an invented plan is where new meals come from, and if you generate a plan partly to
-  be given ideas, a library-first default removes exactly the thing you wanted. It is also the
-  status quo, so it is the safe answer if you are not sure which of the two you use plans for.
-- **Reversal cost: one line, one release.** It is a default on a toggle that is on screen either
-  way, so a wrong answer is visible on the next plan and undone in the next PR. This is cheap
-  enough that "try it for a month" is a legitimate answer.
-
 ### [workouts] RV-204 — the recap half, once LA-155 says why the screen is never reached
 - **Lane: A** · **Branch:** `feat/rv204-rules-workout-review` (workout-review half) · **Added:** 2026-09-25 · Review sweep 61.
 - **Needs: LA-155** — ② cannot be built until that answers why the screen is never reached.
@@ -3904,6 +3880,13 @@ which is the right shape for something that can only be validated by living with
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
+- **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
+  **not** a one-off. Review sweep 63 flagged Nutrition's "I've finished logging" as the only
+  near-white button in the app; sweep 64 then found the weigh-in sheet's Save is the same
+  (`t2-sheet-weigh-in-01`), so **white is the DIALOG primary** while green is the page primary.
+  Nobody has decided whether that split is intentional. If this entry's consistency pass picks one
+  primary for the whole app, that is where it gets settled — and until it does, neither button is
+  wrong on its own.
 
 - **✅ PART ONE SHIPPED (#1743, 2026-09-27) — numbers and durations. The rest is below, with who owns each.**
   **Thousands separators** at the three device-confirmed sites: Home's metric tile (`11900` →
@@ -4044,11 +4027,12 @@ which is the right shape for something that can only be validated by living with
   itself from `window.innerHeight`, which `resizes-content` makes shrink when a keyboard opens. It
   already listens for `resize` and re-snaps, and it is capped at 320 px, so it degrades; worth a
   look during P26 rather than a pre-emptive change.
-- **Keep / Done when:** P26 shows no input or submit button covered, on food review and the
+- **Keep:** the device pass, and it is the whole remaining ask — done when P26 shows no input or submit button covered, on food review and the
   weigh-in sheet — plus a glance at the weight dial with a keyboard up.
 
 ### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
-- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#1770), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked, ⑥ stays open.**
+- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#1770), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked; ⑥ is now `LB-172`.**
+- **Keep:** ④ only — the header row cannot hold the date and both pills at 384 px, and it is parked on `LB-157` in the `header-row-width` batch. Nothing else here is startable.
 - **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.
   It did not: `hasData` is already on the response, so all three fixes were the card's and the
   banner's own.
@@ -4093,9 +4077,12 @@ which is the right shape for something that can only be validated by living with
      words; there is no `·` character anywhere in the file.
    - **A source grep said "does not reproduce" and that was the wrong conclusion** — the marks are
      real on screen, they are simply not stray. Rendering it is what separated the two.
-6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it,
-   so "58" reads as a score. Add "bpm", or style it differently from the scores. — **STILL OPEN,
-   and it is bigger than one line.** `oura-score-chip-row.tsx` has **four** ring renderers
+6. **Resting HR sits in a score ring with no unit** — **SPLIT OUT to `LB-172` (`Lane: O`) 2026-09-27,
+   because BOTH fixes this item proposes are impossible as written, measured at 384 px.** A cell is
+   **82 px** wide; `"58 bpm"` at the value's own font measures **140 px**, and `"Resting HR (bpm)"`
+   in the label measures **97 px**. What is left is a design fork that wants the owner's eye, so it
+   is its own entry rather than a sub-item of a Lane B entry he will never be routed to. The detail
+   below is kept for the record: `oura-score-chip-row.tsx` has **four** ring renderers
    (`ScoreRailCell`, `ScoreBandCell`, `ScoreMinimal`, `Cell`, chosen by the user's `ringStyle`) and
    **eight** sites consuming `display`. The type already knows — `display: string; // the big value
    (a score, or a bpm for HR)` — so the information exists and only the rendering is missing.
@@ -4105,46 +4092,6 @@ which is the right shape for something that can only be validated by living with
    account either** — the whole row returns null when every score is null — so it needs the seeded
    render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
-
-### [nutrition] RV-212 — Nutrition's tone and emphasis: red at 2 pm, a strikethrough for "taken", and an off-palette button
-- **✅ ①② SHIPPED 2026-09-27 (#1773). ③⑤ were already struck by sweep 64. ④ IS THE OWNER'S AND IS NOW `LB-167` — do not implement it from this entry.** Nothing is left here for a lane.
-- **Lane: B.**
-- **Added:** 2026-09-26 · Review sweep 63.
-1. ~~**"Well under so far" in red, over a red bar,** at 885 of 2,114 kcal in the afternoon.~~ —
-   **SHIPPED, in the half that had precedent.** The 2xl headline number in
-   `calorie-balance-bar.tsx` no longer takes `zoneColor`.
-   - **`energy-card.tsx` had already made this exact change for its own copy of the number**, and
-     its comment names this component as the one still doing it: *"`CalorieBalanceBar` coloured
-     this number by band, which paints the headline red at 10 am for a day that is legitimately
-     'well under so far'."* Following an established in-repo decision, not inventing one.
-   - **The qualified LABEL keeps its colour, deliberately, and the entry asked otherwise.**
-     `energy-card`'s same comment settles it: *"The verdict keeps the colour, on the label below
-     where it is qualified."* The label carries " so far" on the current day, which is what makes
-     the colour a running state rather than a verdict. Overriding a documented decision needed
-     evidence the entry did not bring; the compounding it DID observe ("over a red bar") is
-     addressed by removing the largest red element, which is the number.
-   - Both halves are pinned by `rv212-tone-and-emphasis.test.ts`, so a later sweep cannot quietly
-     take the label's colour as well.
-2. ~~**A taken supplement is struck through,** which reads as cancelled or deleted.~~ — **SHIPPED.**
-   `supplements-section.tsx` mutes the row instead; **the green tick already existed** to its left,
-   so the meaning was never carried by the strikethrough alone.
-   - **The `manage-supplements-sheet.tsx` strikethrough is a DIFFERENT claim and stays**: it marks
-     `!s.active`, i.e. discontinued, where "crossed out" is right. A sibling-surface sweep that
-     took both would have been wrong, and the test pins that it survives.
-3. **"I've finished logging" is a near-white button,** the only one in the app. Primaries elsewhere are green (and yellow on the readiness prompt). Use the primary variant.
-   - **🔎 Corrected on the device (sweep 64):** the weigh-in sheet's Save is the same near-white (`t2-sheet-weigh-in-01`), so white is the dialog primary, not a one-off. **Drop this item** unless RV-208's consistency pass picks one primary for the whole app.
-4. **The food rows' icons are a generic fork-and-knife on a brown square,** and read as a failed
-   image. — **NOT A LANE'S TO CHANGE. Re-filed as `LB-167`, `Lane: O`.**
-   `components/nutrition/meal-thumb.tsx` records the owner's instruction in its own docstring —
-   *"it should show the default one in the mockup if no image is attached"* — and states the
-   placeholder is *"the always-present state, not a fallback bolted on afterwards"* (BF-32), with
-   the reason: a row without the box makes the list read ragged. **Implementing this entry as
-   written would undo a design he specified**, which is the shape the Coach-label revert (`LB-164`)
-   was about. The decision brief, with a recommendation, is on `LB-167`.
-5. **Adherence shows 0% over 7 and 28 days** beside seven days of logged calories, because the definition needs every "required meal (6)", including snacks.
-   - **🔎 Device, sweep 64 (`p23-nutrition-warm-03`):** the owner's real screen reads 14% (7 days) and 39% (28 days), with "required meal (3)". Those are sensible numbers for his configuration, so the web build's 0% was the seed's six-meal setup. **Drop this item.**
-   - Check this on the device with real data before changing it. If it holds, the copy must say why, or the definition should count main meals only.
-   - **The definition is the owner's call. The copy is not.**
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
@@ -4156,11 +4103,16 @@ which is the right shape for something that can only be validated by living with
 - **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
   Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
   goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
-- **⚠ One thing the recommendation below misses, and it is a rule violation rather than a taste
-  call.** Once the "Add food" card goes, the header `+` is the ONLY way into an empty meal — and it
-  is `h-9 w-9`, a **36 px** target, under the 48 px floor the rest of the app holds to. Enlarging it
-  is part of this change, not a follow-up, so the page presents it that way rather than offering the
-  collapse alone and leaving him to approve a regression.
+- **⚠ RETRACTED 2026-09-27, SAME DAY — the tap-target caveat on this entry was WRONG, and it was
+  shown to the owner before it was checked.** It said the header `+` is `h-9 w-9`, a 36 px target
+  under the floor, so enlarging it had to ride along with the collapse. **Measured in the harness:
+  the button renders at 48 × 48.** `app/globals.css` carries a global floor —
+  `button, [role="button"] { min-height: 48px; min-width: 48px }`, with a `.tap-dense` opt-out — so
+  a Tailwind `h-9 w-9` on a `<button>` is raised to 48 and the class is not the rendered size.
+  **`LB-169` was filed on that misreading and has been removed.** The mockup page has been corrected.
+  **Nothing blocks this entry: collapsing an empty meal to its header row leaves a control that is
+  already at the floor.** The lesson is the one this repo keeps relearning from the other direction —
+  a source grep is a hypothesis, and a global stylesheet can make a class a poor guide to a size.
 
 - **Lane: B**
 - **UNGATED 2026-09-27 — the mockup does not exist yet, so the next act is to PRODUCE one, and that
@@ -4172,149 +4124,6 @@ which is the right shape for something that can only be validated by living with
 - **Added:** 2026-09-26 · Review sweep 63.
 - **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
-
-### [workouts] RV-214 — the session card leads with the equipment, not the session; the recovery chips slide under their label
-- **✅ ①③④ SHIPPED 2026-09-27 (#1775), rendered at 412 px dark. ② DOES NOT REPRODUCE, ⑤ is a design pick — both below.**
-- **Lane: B** — the card is `app/workout-select/workout-select-content.tsx`, **not** `app/workout/**`.
-- **Added:** 2026-09-26 · Review sweep 63.
-1. ~~**"Dumbbell" is set at about twice the size of "Push".**~~ — **SHIPPED, and the device note's
-   diagnosis was close but not the cause.** It guessed *"an icon name rendered as text when the
-   icon does not resolve … check the session-icon map's FALLBACK"*. The fallback is fine. **The
-   surface never consulted the map at all**: the slot was
-   `<span className="text-3xl">{currentSession?.icon ?? p.emoji}</span>`, and `program_sessions.icon`
-   is a free-text column, so a non-emoji value prints as a 30 px WORD beside a 20 px session name.
-   - **`getSessionIcon` already existed** (`lib/session-icon.tsx`) with the whole chain —
-     emoji→Lucide, then palette position, then `Dumbbell`. **A-7 had already converted one surface
-     and left a comment claiming *"every other session surface uses getSessionIcon"*. Three did
-     not**: this card, `components/stats/program-exercise-list.tsx`, and
-     `components/workout-builder/builder-review.tsx`. A claim in a comment is not a guarantee.
-   - **No hierarchy change was needed.** With a component in the slot the session name is already
-     the largest text on the card — confirmed in the render. The entry's proposed fix (retitle the
-     card) would have treated the symptom and left the word printing elsewhere.
-   - **Guarded by `scripts/check-session-icon-render.js`** (Custom Rules, now **83** steps) plus
-     `SessionGlyph`. The check is deliberately keyed on a SESSION-shaped identifier rather than on
-     `.icon`: the broad version was written first and flagged four more sites — `swipe-actions`,
-     `capture-actions`, `activity-secondary-metrics`, `deload-explanation` — **every one of which
-     declares `icon: React.ReactNode`**, where rendering it is correct. Exempting four correct
-     files by name would have taught the next person that an exemption is how you satisfy it.
-   - **🔎 On the device (sweep 64, `p23-workout-warm-01`):** the slot holds an **icon** (a red triangle) beside "Upper", not a word. So the web build's "Dumbbell" is most likely **an icon name rendered as text** when the icon does not resolve. Check the session-icon map's fallback; that is the fix, not a hierarchy change. **Item 4 (recovery chips clipped under their label) is confirmed on the device.**
-2. **The "Recommended today" pill wraps onto two lines** at 412 px. — **DOES NOT REPRODUCE
-   (2026-09-27).** Rendered at exactly 412 px dark with the seeded program: the pill sits on one
-   line. **Not closed**, because the seeded session is named "Push" and a long name would take the
-   width the pill needs — the sweep may have seen it beside one. **What would settle it:** the
-   owner's own session names at 412 px, or a render with a deliberately long name. Do not "fix" a
-   wrap nobody can currently produce.
-3. ~~**"Yesterday"** with a calendar icon, on a card recommended for today, is ambiguous.~~ —
-   **SHIPPED, and widened.** The ambiguity is not specific to "Yesterday": **"9 days ago" reads
-   just as easily as when the session is next DUE**. Both elapsed branches of
-   `getLastTrainedLabel` now say what the number measures ("Last done yesterday", "Last done 9
-   days ago"). `"Trained today"` is untouched — `trainedToday` compares against that exact string,
-   and the test pins that pairing.
-4. ~~**The recovery chips scroll under the "RECOVERY" label.**~~ — **SHIPPED, reproduced first.**
-   The render showed `RECOVERY | t | 100% Shoulders` — a lone "t", the tail of "Chest", cut dead at
-   the container edge.
-   - **The scroller already started after the label**; they are siblings in a flex row, so the
-     entry's first suggestion was already true. The cut came from `overflow-hidden` ending flush
-     against the label, which reads as the label clipping it.
-   - Took the second suggestion: a 12 px `mask-image` fade at both ends, so a chip reads as moving
-     out of view rather than being severed. `-webkit-` included — Samsung's WebView is the
-     canonical runtime. Verified in the **emitted** CSS and in a second render.
-5. **The two "Start Workout" buttons differ:** radius, and one has an icon and one does not. —
-   **CONFIRMED, NOT FIXED: it is a pick, not a defect.** Measured 2026-09-27 — the card's button is
-   full-width green with **no** icon; the pre-workout screen's carries a dumbbell. **"Use the same
-   variant" does not say WHICH**, and both are on daily paths, so choosing arbitrarily is a visible
-   change to the owner's screen on no grounds. Cheap either way. Decide the direction (add the icon
-   to the card, or drop it from the pre-workout screen) and it is a two-line change.
-
-### [app-shell] RV-215 — loading and failure states: a skeleton that never ends, cards that vanish, and an `EmptyState` that almost nothing uses
-- **✅ ① SHIPPED 2026-09-27 (#1780). ② IS WRONG ABOUT ALL THREE CARDS IT NAMES — see below. ③ stands.**
-- **Lane: B.**
-- **Added:** 2026-09-26 · Review sweep 63 (static audit, read at source).
-1. ~~**Weekly stats shows its skeleton forever on a failed fetch.**~~ — **SHIPPED, and exactly as
-   described.** `cachedFetchToday` had no `onError`, so a failure left `weeklyStats` null,
-   `loading={weeklyStats === null}` stayed true, and the skeleton animated until the app was
-   killed. The hub now takes `error`/`onRetry` and renders the shared `EmptyState` with a
-   **Try again**; a later success clears the flag so the error cannot sit over data that arrived.
-   - **The error branch is checked BEFORE `loading`, and that ordering is the fix rather than a
-     tie-break** — a failure leaves `data` null, so `loading` is *also* true and the skeleton
-     would still win. The test pins the order.
-   - **It is the eleventh use of `EmptyState`**, which is item ③'s complaint, rather than a
-     twelfth bespoke failure card.
-   - Guarded twice: a source test for the wiring, and
-     `e2e/rv215-weekly-stats-failure.spec.ts`, which serves a real 500 and asserts the screen
-     LEAVES the loading state. Control-run: removing `onError` fails both.
-- **The file is `app/health/health-sections.tsx`, not `components/health/…`**, and the line is
-  689 rather than 688.
-2. **12 components render `null` while loading or empty.** — **⚠ ALL THREE NAMED EXAMPLES ARE
-   ALREADY CORRECT (verified 2026-09-27), so the count of 12 cannot be trusted.**
-   - `observed-hr-card.tsx` already passes `onError` and renders *"Couldn't load your heart-rate
-     profile — pull to refresh"*. Its `if (!data) return null` at :37 sits **after** that branch.
-   - `workout-density-card.tsx:36` and `nutrition-activity-trends-card.tsx:37` return null **only
-     while `loading`**; once loading ends they render *"No workout density trends yet."* Both
-     carry a comment citing this very rule and explaining that a swallowed failure and "nothing
-     logged yet" are indistinguishable here, so they show the empty line either way.
-   - **The reading that produced "12" cannot tell a loading-DEFER from a vanish**, and a
-     `return null` while loading is neither a defect nor a rule breach.
-   - **What a trustworthy version of this item needs:** a scan that flags `return null` on a
-     component's TERMINAL state (loading finished, no error branch present), not any `return
-     null`. That is worth writing — it is the self-fetching-card rule's missing ratchet — but it
-     is a different piece of work from a hand-list of twelve, and the hand-list is not a
-     starting point because it is wrong about the three cases anyone can check.
-3. **88 bare `Loader2` spinners in 57 files,** against skeletons in 58, and the `EmptyState`
-   primitive used in only 10. — **STANDS, untouched.** A 57-file sweep is its own change and
-   wants the daily screens picked deliberately; ① added the eleventh `EmptyState` use in passing.
-   - Convert the daily-screen ones first.
-   - **RV-206's P32 (the bad-network timeline) is the before and after.**
-
-### [app-shell] LA-156 — Home's streak card should read the schedule, not assume a rest gap of 2
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-216.
-- **The formula is done and shared** — `computeDayStreak` + `streakRestGapFor`
-  (`packages/shared/src/workout/day-streak.ts`), already used by `/api/achievements` and
-  `/api/friends/leaderboard`. What is left is Home's call site.
-- **What:** `app/session-select/compute-streak.ts` still holds its own copy and hardcodes a rest
-  gap of **2**. The shared function was written to be behaviourally identical to it, so nothing
-  on Home changes today — the swap is an import and a signature change (it takes
-  `(trainedDates, todayStr, gap)` rather than `(trainedDays, dayKey)`), and the old file goes.
-- **What the swap FIXES, and why it is not cosmetic:** 2 is the floor, not the answer.
-  `streakRestGapFor` raises it from the user's own schedule, so somebody training Mon+Tue gets 5
-  (BF-122a). Home cannot do that today because it never reads the schedule, so for a weekly user
-  Home under-reports against the achievements page. The owner is on a rotation, where the floor
-  is what applies, which is why this is not urgent for him.
-- **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
-  deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
-
-### [nutrition][app-shell] LB-169 — the empty meal's header `+` is a 36 px tap target, under the 48 px floor
-- **Lane: B** · **Added:** 2026-09-27 · Lane B, split out of `RV-213` while rendering its mockup.
-- **Deliberately NOT part of `RV-213`, and that is the point of splitting it.** `RV-213` is a layout
-  preference gated on the owner; this is a defect with one right answer. Left inside that entry the
-  tap floor would sit blocked behind a question about whether to collapse the cards, which is a
-  different decision entirely.
-- **What, measured rather than read.** `components/nutrition/meal-card.tsx` gives the header's add
-  button `h-9 w-9` — **36 px** — where CLAUDE.md's mobile rules and every other icon button on the
-  screen hold to **48**. Found at the 384 px dark viewport on 2026-09-27 while capturing `RV-213`'s
-  before/after in the Playwright harness.
-- **It is already live and already the harder target of the two.** Today an empty meal offers both
-  the header `+` and a full "Add food" card, so the undersized control has a large sibling and the
-  defect is easy to miss. It is a real miss regardless: a 36 px target on the S25 is the one a thumb
-  fails on, and he reaches for whichever is nearer rather than whichever is bigger.
-- **⚠ And it becomes the ONLY way in if `RV-213` is taken** — that entry removes the "Add food"
-  card. So shipping `RV-213` without this is shipping a regression, which is why the mockup put the
-  two together in front of him rather than offering the collapse alone. Fixing it here means
-  `RV-213` needs no such caveat whichever way he answers.
-- **Scope:** the one button's classes. No layout decision, nothing gated.
-
-### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
-- **The labels and chevrons are FIXED** (RV-217, 2026-09-27): `hrv`, `hr` and `schedule` now carry
-  labels and contributor-guide entries, as does readiness's `checkin`, and a test derives the key
-  set from the model so a new component cannot arrive unlabelled.
-- **What is left is the third item of RV-217, which is a layout question:** the sweep saw larger
-  vertical gaps before Timing and Efficiency, "which look like empty rows". That was never
-  diagnosed — it is not the label fall-through, because those two rows always had labels.
-- **Why it needs the device:** the observation is from a screenshot (`t2-sleep-01`), and the two
-  candidate causes look identical in source — a row rendering with an empty value slot, or a
-  container's `gap`/margin applying unevenly. Reproduce at the 384 px dark viewport first.
-- **Done when:** the ten contributor rows are evenly spaced, or the gap is explained and kept.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
@@ -4366,21 +4175,6 @@ which is the right shape for something that can only be validated by living with
 - **Nothing here is Lane B's any more.** ①② are a reconciliation across routes, and ④ is the route
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
-
-### [workouts] LA-164 — Health → Day's workout card still reads "0 kg" for a chin-up; the route now says which lifts are bodyweight
-- **Lane: B** — `components/health/day-detail/day-sections.tsx`.
-- **Needs: RV-219**
-- **Added:** 2026-09-27 · Lane A, the render half of `RV-219` ①.
-- **What:** `/api/day-log`'s `DayExercise` now carries `exerciseType` (`'bodyweight'` / `'weighted'`
-  / `null`), resolved from `exercise_library` via `exercise_logs.exercise_id`. Every one of the
-  owner's 504 logs has that id, and his Chin-Up resolves to `bodyweight` (measured on production
-  2026-09-27). The card's weight cell (`day-sections.tsx`, the `{ex.weightKg ?? "—"}` + `kg` span)
-  ignores it, so a chin-up still renders `0kg`.
-- **Fix shape:** pass `ex.exerciseType` to `isBodyweightType` (`packages/shared/src/1rm.ts`) and
-  render bodyweight rather than kg: `BW` at 0 kg added, `BW +10` when weighted. That is what the
-  entry asked for; the exact copy is a Lane B call.
-- **Done when:** rendered at 412 px, a bodyweight lift at 0 kg reads as bodyweight, and a weighted
-  lift is unchanged.
 
 ### [platform] RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled
 - **Lane: DV** — `scripts/device/**`, then re-capture.
@@ -6442,6 +6236,59 @@ drift.
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
+### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
+- **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
+  Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
+  would park it. Add the gate once he has seen one.
+- **Ask** — owner: should the Resting HR cell carry a small unit caption in the styles that already
+  show a label (and stay ambiguous in the ones that do not), or should it be styled differently from
+  the three score cells outright?
+- **Added:** 2026-09-27 · split out of `RV-211` ⑥ by Lane B after measuring it.
+- **The defect is real.** Three of the four cells on Home are 0–100 scores; the fourth is a heart
+  rate in bpm, drawn in the same ring at the same weight. **"58" reads as a score**, and nothing on
+  the cell says otherwise except the word "Resting HR" underneath.
+- **📏 BOTH FIXES `RV-211` PROPOSED ARE IMPOSSIBLE AS WRITTEN — measured in the harness at 384 px dark,
+  not estimated.** A cell is **82 px** wide.
+  - `"58 bpm"` at the value's own font (34.4 px) measures **140 px** — **1.7× the whole cell**.
+  - `"Resting HR (bpm)"` in the label measures **97 px** against a label that currently measures
+    **60 px** — it overflows the cell by 15 px.
+  - So "add bpm" is not a small change; it is not available at all in either place the entry meant.
+- **What IS geometrically available:** a small caption under the number. The component already draws
+  one there — the cue word, at 7.5 px — and in the **default** style `showDot` is `false`, so that
+  slot renders nothing and is free. A `bpm` caption at ~9 px costs about 22 px under a 46 px number.
+- **⚠ And that is where it stops being an implementer's call: there are NINETEEN ring styles.**
+  `SCORE_RING_STYLES` (`lib/home/home-prefs.ts`) is user-selectable, and **`nolabel` deliberately
+  removes the label because "the glyph is the name"** — a unit caption there fights the premise of
+  the style. `overlap` has no caption slot either. So no single treatment is right for all nineteen,
+  which is the fork:
+  - **(a) The unit appears only where a label already does.** Cheap, honest, and leaves `nolabel`
+    and `overlap` exactly as ambiguous as they are today — which is arguably fine, since choosing
+    those styles is choosing to drop names.
+  - **(b) The HR cell is styled differently from the score cells** — the entry's second option. It
+    fixes every style at once and it changes the visual language of the row he reads daily.
+- **Recommendation: (a)**, and only in the styles that already carry a label. It is the smaller
+  change, it is reversible in one component, and it does not re-open a visual language he has
+  already chosen between nineteen times. **(b) is genuinely better at one thing** — it is the only
+  option that fixes `nolabel`, where the ambiguity is worst because nothing names the metric at all.
+- **Reversal cost: low.** One component, no stored data, no route change.
+- **What is owed before any code:** a mockup of (a) in the default style at 384 px dark, per the
+  large-UI rule. The measurements above are what it should be drawn against.
+
+### [workouts] LB-173 — the two "Start Workout" buttons differ, and "use the same variant" does not say which
+- **Lane: O.** A two-line change either way, on two daily paths, with no grounds in the repo for
+  picking a direction. Ungated: nothing is owed but the answer.
+- **Ask** — owner: should the session card's Start Workout gain the dumbbell icon, or should the
+  pre-workout screen's lose it?
+- **Added:** 2026-09-27 · split out of `RV-214` ⑤ when that entry was cleared.
+- **Measured 2026-09-27:** the card's button is full-width green with **no** icon; the pre-workout
+  screen's carries a dumbbell. Review sweep 63 asked for "the same variant" and did not say which,
+  and both sit on paths he uses daily — so choosing arbitrarily is a visible change to his screen on
+  no grounds, which is the shape `LB-164` (the Coach label) was reverted for.
+- **No recommendation, deliberately.** There is nothing in the repo that favours either direction:
+  the icon is not load-bearing, and neither button is inconsistent with anything else. This is
+  preference, and inventing a reason to prefer one would be dressing a coin toss as analysis.
+- **Reversal cost: two lines.**
+
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
 - **✅ FIRST PASS RUN 2026-09-27 (Orchestrator). The 70 was an upper bound and the real number is
   smaller — but the sweep found three defect CLASSES the count did not predict.**
@@ -6968,7 +6815,7 @@ drift.
   travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and
   below `MIN_WALK_SEC` (60s) the existing end-walk dialog becomes a discard confirm instead of being
   followed by a second prompt.
-- **Keep ①, the owner's:** **three** phantom rows are already in `activity_logs` and nothing marks
+- **Keep:** two things — ① the owner's, below, and ② the device check further down. ① **three** phantom rows are already in `activity_logs` and nothing marks
   them spurious. `b8083d04` (09-24, 40 min, 133 kcal) is the one he reported; Review sweep 57
   measured **two more** — `ea77ce16` (07-30, 30-min interval walk, 0.037 km, pace 49,104 s/km) and
   `a85568a4` (09-14, 22-min treadmill, 74 kcal, HR 65). He soft-deletes them from the activity list,
@@ -6977,7 +6824,7 @@ drift.
   **The signature to find any others is NOT `avg_hr`/`steps` both null** — that finds only 09-24,
   because the older two carry HR from their first ~90 seconds. It is `created_at` falling more than
   2 minutes before `end_time` on the same local day.
-- **Keep ②, the device check:** start a guided walk, end it inside a minute, and confirm the dialog
+- **② The device check:** start a guided walk, end it inside a minute, and confirm the dialog
   offers Discard and no row is written; then end one after a few minutes and confirm the row's
   duration matches the clock; then complete a full walk and confirm it is unchanged. **Lane: DV.**
   The sandbox cannot reach it — `getLocalStore` returns null there, so the branch that writes the
@@ -6989,44 +6836,30 @@ drift.
   Filed as LB-141.
 
 
-### [activity][app-shell] LB-141 — two of the three ways out of a guided walk keep nothing, and the third keeps everything
+### [activity][app-shell] LB-174 — the guided walk has no tab bar, so one of the two exits LB-141 fixed cannot fire
 
-- **✅ ANSWERED BY THE OWNER, 2026-09-26: PROMPT ON BOTH.** The back gesture and the tab bar each raise a
-  save-or-discard dialog rather than silently keeping or dropping the walk. **He chose the prompt over
-  the recommended silent save**, so build the prompt — do not re-argue it from the asymmetry argument
-  the recommendation used.
-- **Two things the build must get right, because the prompt is the whole change:** the End button
-  already raises its own dialog, so **the two must not both fire** on any single exit; and a walk
-  under `MIN_WALK_SEC` (60s) already turns End's dialog into a discard confirm (BF-190/BF-191), so
-  the new exits need the same short-walk behaviour rather than a second, differently-worded prompt.
-
-- **Lane: B** — re-laned 2026-09-26 (OR-178) now the decision exists; the three `LeaveWalkDialog` callers are
-  Lane B's by the path rule. It was `O` for a product decision, which has been made.
-  **Added:** 2026-09-24 · Lane B, found while shipping BF-190/BF-191 (the dialog copy had to be
-  written per call site, which is what surfaced it).
-- **Measured in source, three callers of `LeaveWalkDialog`:**
-  | Exit | What it does |
-  |---|---|
-  | **End walk** button (`walk-active.tsx`) | saves the walk at the elapsed time |
-  | **Back gesture** (`mobile-auth-handler.tsx:184`) | `reset()` — keeps nothing |
-  | **Tab bar** (`bottom-nav.tsx:159`) | `reset()` — keeps nothing |
-- **So walking away from a 39-minute walk by tapping another tab discards it**, with no row and
-  nothing in history. Until 2026-09-24 all three showed the same sentence — *"Ending now will stop
-  it early"* — which was false at every one of them.
-- **Shipped alongside: the copy is now honest**, each caller naming its outcome. That is the half
-  that needed no decision. Making the other two exits SAVE is the half that does.
-- **Recommended: make all three save**, on the reading that a walk the lifter actually did is data
-  they did not ask to throw away, and the app now knows the real elapsed time (BF-190) so saving is
-  no longer lossy or wrong.
-- **Alternative: keep discarding.** Better if leaving by the tab bar is meant to read as "I am not
-  doing this" rather than "I am done" — which is a real distinction, and the reason this is his
-  call rather than mine. It also avoids rows he never deliberately ended.
-- **Alternative: make the two paths ASK** (save or discard) rather than assume. Better at never
-  guessing wrong; worse in that it puts a two-option dialog in front of a tab tap, which is the
-  interruption BF-191 just finished removing from the other exit.
-- **Reversal cost: near zero.** Each path is one call — `reset()` or the same finish the End-walk
-  button uses.
-
+- **Lane: O** — an information-architecture call about a screen he uses, with a recommendation
+  attached; nothing to build until it is answered.
+- **Added:** 2026-09-27 · Lane B, measured while shipping LB-141.
+- **What:** LB-141 was filed from a source read of the three `LeaveWalkDialog` callers and recorded
+  that the tab bar discards a walk. **It cannot.** `BottomNav` is mounted by `tab-shell.tsx`;
+  `/activity/guided-walk` is its own route outside that shell, so the component's
+  `pathname.startsWith('/activity/guided-walk')` guard is never true while it is on screen.
+  Measured at 412 px: the walk route renders **zero** `nav` elements, and the only exit it offers is
+  the End button (`e2e/lb141-walk-exit-prompt.spec.ts` pins both). The hardware back gesture is
+  therefore the only silent way out, which is where LB-141's prompt actually landed.
+- **The question:** is the walk meant to be immersive — no tab bar, leave by End or by back — or did
+  it lose the shell by accident?
+- **Recommended: immersive, deliberately.** A timed interval walk is the one screen where a stray
+  tab tap costs the most, and the End button plus the back prompt now cover both exits honestly. The
+  tab-bar wiring stays as written: it is correct if the screen ever moves into the shell, and the
+  spec above fails the day it does, which is the moment someone needs to look at it.
+- **Alternative: give the walk the tab shell.** Better if he expects to check a number mid-walk
+  without ending it — today that costs him the walk screen entirely. It makes the LB-141 wiring live
+  and needs no further code.
+- **Alternative: delete the tab-bar dialog as dead code.** Better at leaving nothing misleading
+  behind, and worse the day the screen moves: the silent discard comes back with it.
+- **Reversal cost: near zero either way** — one route's layout, or one deleted JSX block.
 
 ### [platform] OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
 
@@ -8091,7 +7924,7 @@ drift.
 - **Why the logic is not in the component.** Every vitest project here is `environment: 'node'` and
   **cannot transform `.tsx` at all** — measured: importing the component fails at parse. Logic left
   inside it is logic nothing can drive, and on the phone a dead scrim and a mis-scoped one look
-  identical. So the decision lives in a plain `.ts` controller with 12 tests
+  identical. So the decision lives in a plain `.ts` controller with 15 tests
   (`lib/shell/__tests__/dv6-status-bar-scrim-controller.test.ts`, jsdom via a per-file docblock),
   and the component's four wiring constraints are pinned by reading its source. Control runs: with
   `reevaluate` neutered the tab-flip test fails; with the component's `true` capture flag removed
@@ -8099,10 +7932,11 @@ drift.
 - **Keep:** the device look — on the S25, scroll Home and confirm the caption no longer runs through
   the clock, that the scrim is absent at rest, and **how the gradient composes with
   `DynamicBackground`'s sky**, which is the one thing the sandbox cannot judge. Check both themes.
-- **⚑ The PUSHED ROUTES have no scrim — that is `DV-22`, not this entry (sweep 4b, 2026-09-26).**
-  This fix is mounted once in `tab-shell.tsx`, which covers the five tab panels and nothing pushed on
-  top of them, so `/health/sleep` still scrolls under the clock. The fix was scoped narrower than the
-  defect: nothing here regressed and nothing here needs reopening.
+- **⚑ The pushed routes had no scrim — that was `DV-22`, and it SHIPPED 2026-09-27.** This fix was
+  mounted once in `tab-shell.tsx`, which covered the five tab panels and nothing pushed on top of
+  them; the mount is now in `app/layout.tsx` and the controller takes a document scroll, since a
+  pushed route has no inner scroller. Nothing here regressed and nothing here needs reopening — but
+  **the device look below is now owed for a pushed route as well as for Home.**
 
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
@@ -8300,29 +8134,6 @@ drift.
     Known-Issues row.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
-
-### [app-shell] DV-22 — the status-bar scrim is wired in the tab shell, so every pushed route scrolls under the clock without it
-
-- **Lane: B** — `components/shell/status-bar-scrim.tsx` is mounted once in `tab-shell.tsx`; a pushed
-  route is not inside that shell, so it gets nothing.
-- **Added:** 2026-09-26 · Device Verification, sweep 4b — observed on `/health/sleep` (S25 · web
-  v1.465.67 · APK 1.465.52 · gesture nav): cards scroll under the status-bar clock with no backing.
-- **This is DV-6's defect on a surface DV-6's fix never reached.** DV-6 shipped the scrim
-  (2026-09-25, v1.465.11) and its own note says *"wired once in `tab-shell.tsx`"* — which was the
-  right call for the five tab panels and is exactly why the pushed routes have none. Nothing
-  regressed; the fix was scoped narrower than the defect.
-- **The look is already decided, so this is placement only.** The owner chose a gradient that fades
-  in on scroll rather than a solid strip (DV-6, 2026-09-23). Reuse that component and controller —
-  do not design a second scrim, and do not make each pushed screen opt in, which is the "a future
-  screen forgets" shape DV-6 deliberately avoided.
-- **Two things to establish before building**, neither of which the sweep answers:
-  ① which layout every pushed route actually shares, if any — if there is no common parent the
-  component can mount in, that choice IS the work;
-  ② whether the controller's capture-phase listener and its per-panel re-read still hold when the
-  scrolling element is a pushed page rather than one of the five panels it remembers.
-- **The device check this OWES once built** (prose, not a `Verify:` field — that field means SHIPPED):
-  scroll a pushed route (`/health/sleep` is the observed one) and confirm the scrim behaves as it does
-  on the tabs — absent at rest, faded in on scroll. Both themes.
 
 ### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
 
@@ -8964,6 +8775,17 @@ drift.
   touches no UI or e2e files, and three peer PRs the same hour reported `success` in **42, 42 and
   52 seconds**. So the suite only runs in full on the PRs that most need it, and that is exactly
   when it exceeds its budget.
+- **⚠ SECOND OCCURRENCE 2026-09-27, AND THIS ONE COST A VERDICT — run 36322982763, PR #1803.**
+  E2E started **13:36:32Z** and was cancelled at **45m17s**, the ceiling again to the second, with
+  no superseding push on that branch. **What is new is the consequence:** that PR ADDED a spec
+  (`e2e/lb159-library-default.spec.ts`), and the job died before reporting, so **the new spec has
+  never been verified in CI** — it is green locally (4 passed, control-run both ways) and on `main`
+  with no CI verdict at all. The first occurrence merely wasted a wait; this one means the suite can
+  no longer confirm a spec on the PR that introduces it, which is the case it exists for.
+  **Two consequences worth acting on rather than noting:** every future spec lands unverified while
+  this stands, and the ceiling is now reached by an ORDINARY PR rather than an unusually large one,
+  so the margin is gone rather than thin. **This raises the entry's priority; it is no longer
+  latent.**
 - **Needs:** LB-149 — that entry's browser-death signature (a 1.0s `newContext` failure before any
   test body) may be the same saturation seen from the other end, or may be unrelated. Neither is
   established and they should be looked at together.
@@ -10201,11 +10023,11 @@ why the count of affected entries always understated the harm.
   Verified by count, since the failure is silent and passes `check-doc-links`: the second fold of
   2026-09-24 left `folded-1` at **26** anchors untouched and wrote **41** into `folded-2`; anchors
   across all history files went 645 → 686, entries 69 → 29.
-- **Keep ①: the additive write is still the better long-term answer** and is not done. One file per
+- **Keep:** two things — ① the additive write, below, and ② the recovery path after it. ① The additive write is still the better long-term answer and is not done. One file per
   day is tidier than N, and it is what makes a same-day fold idempotent rather than merely safe. It
   loses today only because it has to merge two documents correctly and corrupts the archive when it
   does not — which is the failure this entry exists for.
-- **Keep ②: the recovery path, untouched.** Nothing reports which entries a past fold dropped, and
+- **② The recovery path, untouched.** Nothing reports which entries a past fold dropped, and
   #1484's losses are only in git history. That half is unaffected by the fix above.
 - **📊 Second live instance, and the reason the fix could not wait:** it happened again on
   2026-09-24. The 60-entry limit fails for EVERY lane at once, so two lanes started the same fold
