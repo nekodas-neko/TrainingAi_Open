@@ -177,6 +177,15 @@ export interface LocalStore {
     planMealAnswers?:   LocalPlanMealAnswer[];
   }): Promise<void>;
 
+  /**
+   * RV-174. Deletes every mirrored program and progression style the server no longer has, with
+   * their children, and clears a session exercise's style if that style is gone (the server's FK
+   * does the same, `ON DELETE SET NULL`, without touching the program, so no delta ever says so).
+   * An absent roster prunes nothing; an EMPTY one means the user has none left. Returns how many
+   * programs and styles it removed, so the caller can tell whether anything changed.
+   */
+  pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number>;
+
   // Outbox
   queueMutation(m: Omit<PendingMutation, 'id' | 'createdAt' | 'attempts' | 'lastError' | 'status' | 'nextRetryAt'>): Promise<void>;
   getPendingMutations(userId: string): Promise<PendingMutation[]>;

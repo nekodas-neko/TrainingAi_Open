@@ -4647,8 +4647,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         maxUpdatedAt: ouraDailyDerived.length ? new Date(ouraDailyDerived[ouraDailyDerived.length - 1].updatedAt as unknown as string | Date) : null },
     ], now)
 
+    // RV-174 — see `SyncDelta.programRoster`. Two small id-only reads, not windowed or paged:
+    // a roster that stopped at a page boundary would delete the rows it did not reach.
+    const programRosterRows = await this.db.select({ id: s.programs.id }).from(s.programs)
+      .where(eq(s.programs.userId, userId))
+    const styleRosterRows = await this.db.select({ id: s.progressionStyles.id }).from(s.progressionStyles)
+      .where(eq(s.progressionStyles.userId, userId))
+
     return { programs, programSessions, sessionExercises, schedules, scheduleDays,
-             progressionStyles, styleSets, bodyMetrics, sleepSessions,
+             progressionStyles, styleSets,
+             programRoster: programRosterRows.map(r => r.id),
+             progressionStyleRoster: styleRosterRows.map(r => r.id),
+             bodyMetrics, sleepSessions,
              moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
              exerciseLogs, setLogs,
              personalRecords: personalRecords.map(r => ({
