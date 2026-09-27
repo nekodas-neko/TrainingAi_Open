@@ -4,7 +4,7 @@
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert** (#1741), **RV-208 part one** (#1743), **RV-209 steps 1–2** (#1748), **RV-202 ③ + LB-165** (#PR); eighteen more on 2026-09-25 — the journal is the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert** (#1741), **RV-208 part one** (#1743), **RV-209 steps 1–2** (#1748), **RV-202 ③ + LB-165** (#1760); eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 

@@ -2925,7 +2925,7 @@ which is the right shape for something that can only be validated by living with
   goes, and it is a one-line addition once a client can see `source`.
 
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
-- **✅ ALL THREE ITEMS SHIPPED. ③ landed 2026-09-27 (#PR); the entry stays only for its `Keep:`.**
+- **✅ ALL THREE ITEMS SHIPPED. ③ landed 2026-09-27 (#1760); the entry stays only for its `Keep:`.**
 - **Lane: B.** Items ① and ② shipped 2026-09-26 and were Lane A's; item ③ was the label in
   `workout-screen.tsx` / `pre-workout-screen.tsx`. Re-laned so it stopped heading Lane A's READY
   list, where it cost two sessions a re-derivation. (Was: `Lane: A` … plus **B** for the label.)
