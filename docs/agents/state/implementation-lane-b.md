@@ -1,6 +1,6 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-165 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-167 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue. (LB-165 = RV-202 ①'s dead rules plan, #1760; LB-166 = the E2E 45-minute ceiling, #1770.)
 
 ## Now
 
@@ -12,7 +12,7 @@ Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#
 
 ## Blocked / owed
 
-- **PARKED:** `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width` (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated):** `LB-157`, `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`, **`LB-163`** (Home's Log tiles — a mockup is owed, and it is ungated BECAUSE the mockup does not exist yet; gate it once he has seen one). **Own follow-up:** `LB-162`, `TN-84`'s two copy deviations, **`LB-164`** (the Coach label, reverted and put to him), and **`OR-162`'s arrival half** — 180/320/43 font writes on ARRIVING at a tab, a different mechanism from the per-switch re-render and unmeasurable here. **Claimed paths: none.**
+- **PARKED:** `LB-166` (the E2E ceiling) on **`LB-149`**; `LB-155` on **`LB-156`**; `RV-203` ② on **`LB-158`** (both Lane A); `header-row-width` (BF-139 + BF-96) on **`LB-157`**. **Owner (`Lane: O`, ungated):** `LB-157`, `LB-152` (14 sites, not ~113), `LB-153`, `LB-159`, **`LB-163`** (Home's Log tiles — a mockup is owed, and it is ungated BECAUSE the mockup does not exist yet; gate it once he has seen one). **Own follow-up:** `LB-162`, `TN-84`'s two copy deviations, **`LB-164`** (the Coach label, reverted and put to him), and **`OR-162`'s arrival half** — 180/320/43 font writes on ARRIVING at a tab, a different mechanism from the per-switch re-render and unmeasurable here. **Claimed paths: none.**
 
 ## Lessons that cost real time
 
