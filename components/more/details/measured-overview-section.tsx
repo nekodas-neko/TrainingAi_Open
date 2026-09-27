@@ -59,7 +59,12 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
 
   // The owner asked for average sleep duration and time by name. It is an average over the window
   // rather than a latest reading, so it is built beside the groups rather than inside them.
-  const nights = useCachedValue<SleepNight[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM)
+  // RV-150: without `onError` a failed load is indistinguishable from "nothing measured yet", and
+  // the section's empty branch is `return null` — so on a cold start with the route down the whole
+  // of "What the app has measured" was simply absent, with nothing anywhere saying why.
+  const [failed, setFailed] = useState(false)
+  const nights = useCachedValue<SleepNight[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
+    { onError: () => setFailed(true) })
   const sleep = Array.isArray(nights) ? sleepAverages(nights) : null
   const bedtime = Array.isArray(nights)
     // The minutes-of-day are computed in the USER's zone before the circular mean, not the device's
@@ -81,7 +86,19 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
     sleep.respiratoryRate != null && { label: 'Breathing rate', value: `${sleep.respiratoryRate.toFixed(1)} /min` },
   ].filter(Boolean) as { label: string; value: string }[]) : []
 
-  if ((groups == null || groups.length === 0) && sleepRows.length === 0) return null
+  if ((groups == null || groups.length === 0) && sleepRows.length === 0) {
+    // Only when there is nothing real to show. A partial load keeps its readings and says nothing:
+    // a banner over data that did arrive is worse than the gap it explains.
+    if (!failed) return null
+    return (
+      <section className="space-y-1">
+        <h2 className="text-sm font-semibold">What the app has measured</h2>
+        <p className="text-xs text-muted-foreground">
+          Couldn&rsquo;t load your readings. Check your connection and reopen this screen.
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="space-y-4">

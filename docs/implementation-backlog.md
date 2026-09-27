@@ -574,6 +574,65 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
+### [devices][app-shell] BF-215 — the strap battery reads 100 at rest and 30 under load, so the chip is a gauge that only tells the truth mid-workout
+
+- **Lane:** B — `components/device-battery-chip.tsx`, `components/home/header-chips.tsx`,
+  `lib/hooks/use-strap-battery.ts`. No native change: the Kotlin read is correct.
+- **Added:** 2026-09-27 · owner: *"Strap battery is at 100... it was 30 last time I used it? Is this
+  working?"*
+- **Needs:** — nothing.
+- **The pipeline is working, and the measurement says so.** Production `strap_status`, every
+  non-null reading ever recorded: **exactly two distinct values.** `100` — 43 readings,
+  2026-09-23 23:19 → 2026-09-27 20:58. `30` — 17 readings, **all inside one 92-minute window**,
+  2026-09-25 20:54 → 22:26. The app stored and rendered what the strap reported, each time.
+- **A CR2025 cannot recharge, so 100 → 30 → 100 is not a state of charge.** It is coin-cell voltage
+  sag: under a sustained BLE session the cell droops and the H10 reports a lower level, and at rest
+  it recovers. That the 30s are one contiguous session rather than scattered is what rules out a
+  decode fault or buffer garbage — a misread would vary, and this does not.
+- **Two values across five days also says the H10's gauge is COARSE**, not a 0–100 scale. Treat
+  `100` as "not obviously dying" rather than "full".
+- **The consequence is the actual defect, and it is a UI one.** The cell only reads low while it is
+  under load, which is exactly when the owner is training and not looking at Home. At rest — when he
+  does look — it reads 100. **So the chip will read 100 until the cell is almost completely dead**,
+  and the one number that predicts failure is the one it never shows.
+- **The low-battery notification DID work and is the existing backstop.**
+  `DeviceBatteryNotifier.LOW_THRESHOLD = 35`, the reading was 30, so it fired during that session.
+  Any change here must not break it.
+- **Recommendation: show the LOWEST reading from the most recent connected session, not the latest.**
+  A coin cell's resting voltage stays high until the end; the sag under load is the early warning, so
+  the minimum is the informative number and the last value is the least informative one. Label it for
+  what it is ("30 under load") rather than presenting it as a live level.
+  **Alternative — leave the chip alone and lean on the notification.** It already fires at the right
+  moment and costs nothing. It loses the at-a-glance answer to *"should I change the cell before this
+  workout?"*, which is the question the chip exists to answer.
+  **Alternative — drop the strap chip entirely.** Honest, and it removes a number nobody can act on;
+  it also removes the only place the strap's state is visible without opening settings.
+- **Reversal cost:** none — presentation only, no stored state and no native change.
+- **Verify on the device** across a workout: the chip should show the session minimum afterwards, and
+  the low-battery notification must still fire at the same point it does today.
+
+### [devices] BF-216 — the pairing screen reads a BLE characteristic through `.buffer`, which ignores the view's offset
+
+- **Lane:** B — `components/settings/chest-strap-pairing.tsx`.
+- **Added:** 2026-09-27 · BugFix, found while tracing `BF-215`. **Not the cause of that report** —
+  every recorded reading came from the native path, which is correct.
+- **Needs:** — nothing.
+- **`chest-strap-pairing.tsx:94`** reads the battery level as
+  `new Uint8Array(batt.buffer)[0]`. `batt` is a `DataView`, and **`.buffer` is the whole backing
+  `ArrayBuffer`** — it discards `byteOffset` and `byteLength`. If the BLE layer ever hands back a
+  view into a pooled or offset buffer, that reads a byte belonging to something else and stores it
+  as a battery percentage. `batt.getUint8(0)` is the correct read and cannot drift.
+- **The same shape is two lines below**, on the firmware string:
+  `new TextDecoder().decode(fw.buffer)` at `:102`. Same fix — decode the view, not its buffer.
+- **Latent rather than live, and worth fixing anyway.** `@capacitor-community/bluetooth-le` builds
+  its `DataView` from a fresh buffer today, so the offset is 0 and the read happens to be right. That
+  is a property of the plugin's current implementation, not of the API contract, and it is one
+  version bump away from silently changing.
+- **It writes to the same store the Home chip reads** (`writeStrapBattery`), so a wrong value here
+  would show up as `BF-215`'s symptom with a different cause — which is the argument for closing it
+  now rather than leaving two candidates for the next battery question.
+- **Reversal cost:** none. Two expressions.
+
 ### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
@@ -3374,7 +3433,7 @@ which is the right shape for something that can only be validated by living with
      - **Replace:** a template that names the heaviest-weighted signal.
      - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
   3. **✅ SHIPPED 2026-09-26 — running-plan explain is gone**
-     ([entry](overview/entries/2026-09-26-rv200-running-plan-explain.md)). Claim confirmed exactly:
+     ([entry](overview/history-2026-09-27-folded-3.md#2026-09-26-rv200-running-plan-explain)). Claim confirmed exactly:
      the card rendered the deterministic `rationale` immediately and only swapped in the model's
      sentence when it landed, so the call reworded text already on screen. Route, fetch, cache key
      and TTL deleted.
@@ -3914,16 +3973,35 @@ which is the right shape for something that can only be validated by living with
   not two. `app/api/day-timeline/route.ts` formatted `h:mm a` itself (Home's `6:40 AM`), and a
   second shared helper, `fmtAest` (`h:mmaaa`, `6:40am`), fed `/api/day-log` (Health → Day) and
   the Body Battery card. The route now calls `formatTimeOfDay`, and `fmtAest` delegates to it, so
-  all four surfaces read `6:40 am`. **Still their own form, and Lane B's:**
+  all four surfaces read `6:40 am`. **⚠ A FOURTH FORM IS STILL LIVE AND IT IS LANE A'S — measured 2026-09-27 by running both
+  functions**, not by reading them: `formatTime12h('06:40')` returns **`6:40am`** against
+  `formatTimeOfDay`'s **`6:40 am`**. It lives in `packages/shared/src/date-utils.ts` and feeds
+  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
+  6:40am" surface this entry opened with, still unfixed.** The fix is one character in a Lane A
+  file, so it was not taken here.
+  **Still their own form, and blocked on the same lane:**
   `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
-  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both format minutes-of-day rather than
-  an instant, so they need a minutes-based sibling of `formatTimeOfDay`, not a straight swap.
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both
+  format minutes-of-day rather than an instant, so they need a minutes-based sibling of
+  `formatTimeOfDay` — which is `packages/shared`, i.e. **Lane A's engine half first**, then Lane B
+  converts the two call sites. The entry called these Lane B's; the path rule says otherwise.
   ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
   SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
   `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
-  one decimal. `formatKg` also takes `trim`. **The six sites are Lane B's and still to convert:**
-  `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`, `weights-summary:93`,
-  `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**` stays excluded.
+  one decimal. `formatKg` also takes `trim`. **✅ THE RENDER SITES SHIPPED 2026-09-27 (Lane B) — and the entry's list of six was NINE.**
+  The three it did not name: `next-workout-card`, `week-day-sheet` and `formatVolume`. Eight are
+  lifted loads and now call `formatLoadKg`; `app/profile/[userId]/page.tsx`'s `formatVolume` is
+  **excluded with its reason** — a lifetime tonnage with `kT`/`T`/`kg` tiers, deliberately whole,
+  and spacing only its bottom tier would leave the three disagreeing.
+  `components/ui/__tests__/rv208-one-load-unit-spacing.test.ts` holds it, sibling of the duration
+  guard. **Its first version passed its own control run** — the regex matched only `${x}kg` and
+  half these sites are JSX `{x}kg`, so it was checking less than it claimed; it keys on `}kg` now
+  and is control-run against both forms.
+  **Owed, and NOT obtained:** no render. The seeded account has no weights on any of the eight
+  surfaces, so nothing was seen at 412 px. The residual risk is a wrap, not a wrong value — an
+  added space in two tight cells (`pip-view`'s overlay, `week-day-sheet`'s truncated row).
+  `app/api/**` is excluded from the guard: its five `${x}kg` are LLM prompt text and a Google
+  Calendar description, **Lane A's** and not renders.
   ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
   is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
   Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
@@ -8186,26 +8264,28 @@ drift.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
 
-### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
+### [app-shell][activity] LB-175 — two surfaces still read as an empty account when their reads fail cold
 
-- **📱 ANSWERED for warm revisits (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Blocking each of 24 read endpoints in turn (Home 4,
-  Nutrition 6, More 4, Health 10) and revisiting the tab: **nothing visible changed in any case** — no
-  section lost, no error or "may be stale" signal, identical text. A failed refetch is invisible: every
-  card keeps its cached value as if current. Not tested: a failure with no cache (cold start).
-
-- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
-  **Answered: a failed refetch is invisible — no stale signal reaches the user.** This is the
-  `Q-499` shape (`cachedFetch`/`useCachedValue` swallow `!res.ok` unless the caller passes
-  `onError`), so the fix is at the call sites in `components/**`. Lane B.
-- **Added:** 2026-09-24 · Review. Method: **P18**.
-- **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
-  `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
-  a stale number with no failure line, **by hand, on one screen**. `Fetch.enable` can fail any single
-  `GET /api/*` on the phone, so the whole app can be checked in one sitting.
-- **The falsifiable claim:** for each read endpoint, every card that reads it shows an error or
-  offline state when that endpoint returns 500 or never answers. **FAILED** per card that vanishes or
-  shows a stale value as current. Report it as a table (endpoint × card × outcome).
-  - **Never fail a write or `/api/sync/*`.** This probe is read-only by construction.
+- **Lane: B** — `app/session-select/session-select-content.tsx` (Home), then the Health tab.
+- **Added:** 2026-09-27 · Lane B, measured while shipping RV-150's fix.
+- **What:** RV-150's device sweep tested a WARM app and found nothing visible changed anywhere. The
+  case it names as untested — a failure with **no cache** — was measured at 412 px by clearing
+  storage and failing every `GET /api/*`, and it is a different answer. Three surfaces were fixed in
+  that PR; these two are what is left.
+  | surface | under a cold failure | honest? |
+  |---|---|---|
+  | Home | *"Your week in review didn't load"*, *"Couldn't load today's timeline"*, em dashes for the numbers | **yes** — the reference for this class |
+  | Home · body battery | the whole **BODY BATTERY** card and its explainer are absent | no |
+  | Home · greeting | *"Good morning, <name>."* and the avatar initials are absent | no |
+  | Health | 8 honest failure lines, but **GOALS**, **ESTIMATED 1RM** and **AVG DURATION** are absent | partly |
+- **Why it is not a one-line fix:** the leaf cards do not fetch. `body-battery-card.tsx` takes its
+  series as a prop and returns null under two points; `{bodyBattery && <BodyBatteryCard …>}` in the
+  parent is what removes it. The owner of each read is the screen, so the fix is one flag per read in
+  `session-select-content.tsx`, not an `onError` on a card.
+- **Done when:** a cold start with the reads failing names each absent section on Home and Health,
+  the way `/more/details` now does. `e2e/rv150-failed-read-says-so.spec.ts` is the shape to extend —
+  it must keep a healthy-cold-start case, or a component that always renders the line passes.
+- **Not in scope:** Nutrition's cold-start zeros, which are on `RV-103`.
 
 ### [platform] RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
 
@@ -8307,6 +8387,14 @@ drift.
   flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
+- **⚑ A SECOND, MEASURED DEFECT — cold start, 2026-09-27 (Lane B, while shipping RV-150).** With
+  storage cleared and every `GET /api/*` failing at 412 px, the card renders **`0 KCAL`**, *"Set a
+  calorie goal to see what's left"* and **`0 g`** for protein, carbs and fat, and the whole meal list
+  is absent. That is a failure stated as fact — the RV-87 shape — and it is worse than the vanishing
+  RV-150 fixed elsewhere, because the reader has no way to tell it from a day with nothing logged.
+  `energy-card.tsx` takes `breakdown` as a prop and defaults each figure with `?? 0`; the gate
+  belongs beside the `refreshing`/failure slot this entry already built, not in the card's defaults.
+
 - **⚑ REOPENED AS LANE B WORK 2026-09-27 (OR-182) — the `Keep:` filed a live defect as residue.**
   Sweep 4a passed the original fix and found a **new** one, 1 of 1: after using **Retry**, deleting
   that food left the card on 1,454 for 16 s+ while the server's balance said 1,534, and a tab swap

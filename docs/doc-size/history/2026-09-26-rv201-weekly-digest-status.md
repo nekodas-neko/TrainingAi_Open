@@ -6,7 +6,7 @@ index exists to tell the next session before it reads anything else.
 
 **Written short on purpose.** The first draft was 19 lines and was cut to 16 by moving the detail
 where it belongs: the three defects the work surfaced, the mutation pass and the verification
-matrix are in `docs/overview/entries/2026-09-26-rv201-weekly-digest-offline.md`, which the
+matrix are in `docs/overview/history-2026-09-27-folded-3.md#2026-09-26-rv201-weekly-digest-offline`, which the
 paragraph now links rather than summarising. What stays in the index is the shape of the change,
 the shared cache key, and the one thing a later session must not assume — that the offline
 navigation is **not** demonstrated, because `pnpm dev` runs no service worker.

@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.24",
+    date: "2026-09-27",
+    changes: [
+      "Changed: a lifted weight now reads the same everywhere \u2014 \"68 kg\" rather than \"68kg\" on some screens and \"68 kg\" on others. Half kilos and 1.25 kg plate steps show exactly, and nothing gains a decimal it did not have.",
+    ],
+  },
+  {
+    version: "1.477.23",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when the app could not reach the server and had nothing saved yet, More and Profile details quietly dropped your name, your readings and your tests \u2014 so it read like a brand-new account rather than a connection problem. Each now says it could not load.",
+    ],
+  },
+  {
     version: "1.477.22",
     date: "2026-09-28",
     changes: [
