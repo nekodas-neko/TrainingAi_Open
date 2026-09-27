@@ -20,7 +20,7 @@
 | **Completed — shipped plans/specs** | `docs/superpowers/plans/archive/` and `docs/superpowers/specs/archive/` |
 | **Completed — shipped uplift ideas** | `docs/overview/uplift-archive.md` |
 | **Architecture reference** | the top of [`CLAUDE.md`](CLAUDE.md) — stack, data model, key files, Oura integration (authoritative, kept current) |
-| **Session handoffs** | `docs/handoff-YYYY-MM-DD-<domain>-<title>.md` — the **only** handoff convention (there is no root `HANDOFF.md`). `ls docs/handoff-*-<pillar>-*.md` finds every handoff for a pillar; the pillar index at `docs/domains/<pillar>/README.md` links the ones that matter. Written via the `handoff` skill — see **Session Wrap-Up** in [`CLAUDE.md`](CLAUDE.md). |
+| **Session handoffs** | `docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md` — the **only** handoff convention (there is no root `HANDOFF.md`). `ls docs/handoffs/handoff-*-<pillar>-*.md` finds every handoff for a pillar; the pillar index at `docs/domains/<pillar>/README.md` links the ones that matter. Written via the `handoff` skill — see **Session Wrap-Up** in [`CLAUDE.md`](CLAUDE.md). |
 
 ---
 
@@ -1263,7 +1263,7 @@ it is not in the size baseline, so the next addition there fails outright
 
 **Lane A session wrapped 2026-09-02 — ten PRs, and the finding is about the QUEUE rather than the
 code.** Handoff:
-[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](docs/handoff-2026-09-02-nutrition-lane-a-session.md).
+[`docs/handoffs/handoff-2026-09-02-nutrition-lane-a-session.md`](docs/handoffs/handoff-2026-09-02-nutrition-lane-a-session.md).
 **Six of the eight backlog entries examined were wrong about something load-bearing** — not stale,
 wrong at filing time: a function name that does not exist (`logMealFromSaved`), a severity that does
 not reproduce (LB-48's "until the app is restarted"), a missing `Gate:` that put owner-gated planning
@@ -2404,7 +2404,7 @@ r = +0.67 into r = −0.06 and stood in the docs for eleven days.
 
 **Five exercises now record the muscles their sibling movement already had (BF-16a).** A cable chest dip left out the shoulders, a dumbbell shoulder press the traps, a cable pulldown the upper back, a barbell shrug the upper back and forearms, and a barbell hip thrust the quads, lower back and adductors. That is the real defect behind *"hip thrusts and dumbbell shoulder press should be able to be a secondary"* — the role rule reads muscle counts and BF-15's anchor rule wants ≥ 3, so a row seeded with two was barred whatever the thresholds said. **The entry's premise was wrong in one way that mattered:** it called this production drift, and it is a defective *seed* — all 140 seeded rows fingerprint identically in the dev DB and production, so it reproduces locally and was proved through the live `/api/weekly-muscle-sets` route rather than reasoned about. Migration **216**, idempotent and case-insensitive. **The scan found eight more rows with the same shape; they are LA-24**, split into the five that a family member already answers and the three families where BF-16a's own additions have no precedent to propagate.
 
-**Lane B's 2026-08-25 run — 19 PRs — is written up in [`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).** Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item: the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked, needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+**Lane B's 2026-08-25 run — 19 PRs — is written up in [`docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).** Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item: the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked, needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
 
 **There were two quantity sheets and the busier one was wrong (BF-26).** The owner's *"everything looks the same"* was literally true of the diary's: its `−`, value and `+` were the same square at the same fill. Both sheets render one `quantity-editor.tsx` now — `srv`/`g`, absolute presets, `MACRO_COLORS`. **And a font-size class on an `<input>` does nothing on a phone:** `globals.css` sets `16px !important` under 640 px for the iOS-zoom guard, so the value needed `!text-2xl` to outgrow its steppers at all. Only two other inputs carry a size class and both want ≤16 px, so it is narrow — but silent ([`journal`](docs/overview/history-2026-09-10-folded-3.md#2026-08-25-quantity-sheet-convergence)).
 
@@ -2498,7 +2498,7 @@ the fixture MET constants sat below `estWorkoutKcal`'s 1.5 floor, so **every** M
 was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort()` now returns
 `{ rpe, source: 'self' | 'derived' }` so a mean of set RPEs is never read as a self-report
 (**Q-420**). ⚠️ **None device-verified.** Detail, and the four wrong turns that produced them, in
-[the Lane A handoff](docs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
+[the Lane A handoff](docs/handoffs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
 
 **The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18 hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch. Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range ([`journal`](docs/overview/history-2026-09-10-folded-2.md#2026-08-23-feat-oura-autopack)).
 
@@ -2592,7 +2592,7 @@ Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first 
 `Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
 are actually startable.
 
-**Session handoff:** [`docs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md`](docs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md)
+**Session handoff:** [`docs/handoffs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md`](docs/handoffs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md)
 — Tuning retracted its own Q-528: `oura_daily_summary` was never wiped, and **43 of its 45 rows were
 created 2026-08-17 07:50**, straddling the reading that reported one. The count came from
 `pg_stat_user_tables.n_live_tup`, a **planner estimate** that reads **0** against `oura_raw_packed`'s
@@ -2600,15 +2600,15 @@ created 2026-08-17 07:50**, straddling the reading that reported one. The count 
 With Q-525 un-suspended, both of chronic stress's countable gates were measured and **both pass**, so
 its refusal is inside the granular layer, which records no reason for a null (**TN-1**).
 
-**Session handoff:** [`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
+**Session handoff:** [`docs/handoffs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoffs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
 — CI's **Migration Check** couldn't fail on a broken migration; fixing that caught `142_claude_ro_views.sql`
 creating a view over a table `143` creates, aborting on every fresh CI database. Also the CSP's
 missing `'wasm-unsafe-eval'` and the done screen's first-ever-weight calorie estimate. **PS-3 closed
 on top:** the four migrations retried on every cold start are idempotent now, 206 of 206
 ([journal](docs/overview/history-2026-09-10-folded-2.md#2026-08-20-non-idempotent-migrations)).
 
-**Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
-(reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+**Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
+(reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoffs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
 (**Q-536 CLOSED, confirmed on device**; its cause **Q-314** is still live and reopens on every re-pair).
 
 **Open PRs:** run `list_pull_requests` — any snapshot written here goes stale within the hour, and
@@ -2738,7 +2738,7 @@ contributor bars render on a BLE night; confirm Body Battery no longer opens at 
   it is how every non-Oura user gets sleep, and `saveSleepSession` now stamps provenance through the
   ranked merge. The Tasker ingest route is still the unexercised part. **The HC device check is
   owed** — see the owner checklist in
-  [`docs/handoff-2026-08-02-platform-batch-queue-drain.md`](docs/handoff-2026-08-02-platform-batch-queue-drain.md);
+  [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md);
   nothing in the HC path has ever run against a real provider.
 
 ### 🟢 Nice-to-have
