@@ -57,6 +57,24 @@ remembering as a shape: the file was not wrong, it was narrower than its name.
   `isActive`. Control: `isActive ?? false` → `isActive === true`.
 - `tsc` 0 · `lint` 0 · `build` 0 · `check-test-typecheck` at baseline · Custom Rules **83 of 83**.
 
+## Local run on `pnpm dev` (2026-09-27, second session)
+
+Run on Windows against a fresh local Postgres (all migrations applied, seed loaded), through the
+real `/register` and `/sign-in` screens in a browser.
+
+- **An invited address registers inactive.** With `invited-…@local.dev` in `invited_emails`,
+  `/register` created the row with `is_active = false`. Signing in with it went to `/pending`
+  ("Awaiting approval") with no session.
+- **An uninvited address** also registered with `is_active = false`.
+- **An existing active password account still signs in** and lands on Home.
+- Not covered by this run: Google linking clearing the password, which needs a real Google sign-in.
+- **Seen on the way, not caused by this diff** (it does not touch `app/register/`): after a
+  successful `POST /api/auth/register`, the form's `router.push('/sign-in?registered=1')` did not
+  navigate in three dev-mode runs, although calling the router by hand did. Fast Refresh rebuilds
+  were logged around each submit, so this may be dev-only. Also, `/sign-in?registered=1` renders no
+  notice. Once this PR merges, every password registration is pending, so a new registrant is told
+  nothing until they try to sign in. Filed as its own backlog entry.
+
 ## Not exercised
 
 - **No real sign-in was performed.** Google OAuth cannot be driven from this container, so the
