@@ -31,6 +31,19 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] ⚠️ A session given an RPE now returns to "synced" on the phone, and only the phone runs it (LA-165, 2026-09-28)
+
+`markSessionSynced`'s guard skips flipping a session to `synced` while another mutation for it is
+queued. The push-confirm loop runs BEFORE the batch is deleted, so the guard counted the very
+mutation it was confirming and never fired: proven against a real SQLite, a session whose only
+queued mutation was confirmed stayed `pending`. By the code, the stranded-workout sweep then found
+it five minutes later and re-queued a `workout_log` push for every exercise in the session, and only
+that re-push flipped it back. Every confirm now excludes the batch it is confirming. The same change
+adds the pending mode and confirms that offline log edits need (LA-166 will use them). **Not seen on
+a device.** **Pass test on the S25:** log a workout, set its RPE, wait five minutes with the app open,
+and the outbox shows no re-queued `workout_log` entries for that session. Before this change it would
+have shown one per exercise.
+
 ### [activity][platform] ⚠️ The phone now retires an activity row the server merged away, and only the phone runs that code (DV-19, 2026-09-28)
 
 A push that lands on an activity already on the server at the same `(date, start_time)` merges into

@@ -633,13 +633,29 @@ below threshold and left in place for next time.
   now rather than leaving two candidates for the next battery question.
 - **Reversal cost:** none. Two expressions.
 
-### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
+### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
   the **schema half is Lane A's**, and the **merge is the owner's** (outside contributor, storage
   carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
 - **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
   than re-deriving it; the diff read is still Review's.
+- **✅ THE COLLISION IS RESOLVED — the contributor fixed it, verified 2026-09-27 22:56 on head
+  `0bb5a87e`.** This entry said the PR took **288/289**, which `main` already held, and that the
+  later-sorting twin would silently drop the new view. He renumbered to **290/291** and regenerated
+  the twin **after** applying, which is the ordering that matters: the regenerated file carries
+  `training_load_grid_len` and `training_load_valid_min`, so it was generated against a database
+  holding LA-161 rather than against a stale one.
+  **Checked with the tool that owns the question, not by reading the diff:**
+  `node scripts/next-schema-number.js` reports **292** next free, lists 290/291 as claimed by
+  `origin/health-sample-storage` alone, and reports **no collision** on them. CI is **all ten jobs
+  completed and success** on that head, Migration Check included.
+- **What is still owed is the diff read, and only that.** Storage carve-out, outside contributor:
+  **Review** reads it, **the owner merges**. Nothing here is blocking any more.
+- **⚠ Separately, `next-schema-number.js` reports a REAL collision that is OURS, not his** — `273`
+  and `274` are claimed by both `main` (merged, `273_exercise_media_review_status.sql`) and
+  `origin/lane-a/q44-phase3-pr1-table-rename`. That branch must renumber before it can land; the
+  check fails once both are in one tree. Not this entry's work — recorded so it is not lost.
 - **Needs:** — nothing.
 - **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
   `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
@@ -4808,6 +4824,27 @@ unverified"* is now answered: it persists.
     (`sync-provider` warm, `training-stress-line`, `training-stress-badge`), so the first row with
     numbers will be the next day the owner opens the app. Read that day; the older days will never
     get them without a per-date call.
+  - **⚙ READ DONE 2026-09-28 (Lane A), and it resolves the "flat contradiction": the gate only ever
+    judges an UNFINISHED day.** The first row with LA-161's numbers is **09-28: grid 471, valid 343,
+    written 08:46 Brisbane.** At 08:46 about 526 minutes of the day exist, so a 720-minute floor
+    **cannot** pass. The route re-persists on every call but is only asked about **today**
+    (`sync-provider` warm, the line and the badge), and nothing ever evaluates a day after it ends.
+    So each stored `insufficient_met` is the verdict of whichever evaluation came last that day. A
+    morning one is guaranteed to fail, and the replay that "cleared both floors" read the day
+    **after** it finished. That is CLAUDE.md's *"treat today as a partial day"* rule, missed.
+    **Confirm with one evening read** (a grid ≥ 720 on the same day's row); strong, not yet observed.
+  - **So there are two layers, and the second is the 09-24 root cause again.** 09-25 and 09-26 read
+    `scorer_no_output`, which is **only** reachable once both floors pass, so those were late
+    evaluations of real days and the scorer still returned nothing. **The 09-24 NaN-validator
+    diagnosis is NOT refuted.** Hypothesis ① above ("a gap-filled series still returns null") was
+    measured in the sandbox, where `MANIFEST.json` is absent and the scorer returns null for
+    everything, so it proved nothing either way. Treat fix (b), filling the grid under a stated rule,
+    as the live proposal. It is a modelling assumption, so it goes through Tuning before Lane A
+    builds it.
+  - **The buildable half is filed as LA-170:** evaluate a day once it has ended, so the stored
+    verdict describes the whole day. Alone it only turns `insufficient_met` into
+    `scorer_no_output` on full days until the NaN fix lands. That is still worth having, because it
+    makes the stored reason honest.
 
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
@@ -4916,6 +4953,25 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
+
+### [readiness][heart-rate] LA-170 — the training-load verdict is only ever computed for an unfinished day
+- **Lane: A** — `app/api/training-stress/route.ts`, `packages/shared/src/health/training-stress.ts`.
+- **Added:** 2026-09-28 · Lane A, from TN-79's LA-161 read.
+- **What:** `/api/training-stress` is asked only about today, and re-persists its gate on every call.
+  A day's stored verdict is therefore the last evaluation made *during* that day. A morning
+  evaluation cannot pass the 720-minute MET floor (09-28 at 08:46: grid 471). No path evaluates a
+  day after it ends, so every stored `insufficient_met` may be describing a partial day.
+- **Fix shape:** when today is evaluated, also evaluate the previous day if its stored verdict was
+  written before that day ended. That needs a record of *when* the verdict was computed, because
+  `updated_at` is bumped by device pushes (the sync-push branch COALESCEs into the same row). That
+  means a column (`training_load_evaluated_at`), so a migration **waits behind BF-214's numbering**.
+  Without it, re-evaluating on grid length alone would re-read a day of frames on every call for a
+  day the ring barely saw.
+- **What it will and will not change:** full days move from `insufficient_met` to a verdict computed
+  on the whole day, which today means `scorer_no_output` until TN-79's NaN fix lands. No score
+  appears from this alone; the stored reason becomes true.
+- **Done when:** yesterday's row carries a grid measured after its end, and a test pins that a
+  morning evaluation of today never becomes a completed day's final verdict.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
@@ -5315,14 +5371,23 @@ volume7dKg,                             // likewise
   certainly the same root as BF-200**, which is the owner reporting Skull Crusher alone ignoring a
   deload in the 09-25 Upper session — same exercise, same session, same missing per-exercise
   prescription data. Whoever takes BF-200 should check whether fixing it also restores this.
-- **What is left, and it is one question:** what happened in 09-06 → 09-12. The database does not
-  hold it — session metadata is uniform across the boundary — so it needs the deploy history for
-  those dates, not another query.
-- **And one product question, not a defect:** should a bodyweight exercise carry a plan at all?
-  `planned_pct` is a percentage of a 1RM that bodyweight movements do not have. 23 of September's
-  49 gaps are this, and every future adherence figure is computed over a denominator that silently
-  includes them. Deciding it is `Lane: O`; until it is decided, adherence coverage should be quoted
-  over LOADED sets only.
+- **~~What is left, and it is one question~~ — ANSWERED 2026-09-28 (Lane A): the window is the
+  BASELINE CALIBRATION ROUND, by design.** 09-07 to 09-12 is exactly **one workout for each of the
+  five sessions** (Pull, Push, Legs, Upper, Lower), the first after the 09-02 → 09-06 deload. Each
+  logged one set per exercise at up to **20 reps**, which is an AMRAP. Every session after it returns
+  to 10 planned sets. In the baseline phase `session-data.ts:215-216` sets `defaultSets = 1` and no
+  progression style, so there are no per-set percentages to write. Those 20 sets are a calibration
+  pass, not lost plans. **The deploy history was not needed.** BF-143 (09-12) touched the same
+  code, but it only stopped a *rebuilt* session skipping calibration.
+- **So TN-75's remaining work is small.** ① The loaded residue is Barbell Skull Crusher with no
+  `style_id`. That is BF-200's residue: the engine now deloads it (#1814), but it still records no
+  per-set plan until a style is assigned in Config, which is an owner action. ② The acceptance
+  criterion *"a set with no available plan is distinguishable from one never asked"* still holds.
+  Baseline sets cannot be told apart at read time, because `workout_sessions` stores no baseline
+  marker (`phase_type` is NULL across the boundary). It needs a column, so a migration, and it
+  waits behind BF-214's numbering. **Until then, quote adherence over loaded, non-baseline sets.**
+- **The bodyweight product question is split out as LA-169 (`Lane: O`)**, per the rule that an owner
+  decision must not sit inside a Lane A body.
 
 - **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
   written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
@@ -6308,6 +6373,24 @@ drift.
 - **Verification that gates the ship:** replay the corrector over ~120 days of the owner's history and
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
+
+### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
+- **Lane: O** — a product preference: what the app should prescribe, not how.
+- **Ask** — owner: for Chin-Up, Pull-Up, Hanging Leg Raise and other bodyweight movements, should the
+  workout screen prescribe a target (reps per set) the way it does for loaded lifts, or only record
+  what you did?
+- **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
+- **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
+  rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
+  `planned_pct` stays empty because it is a percentage of a lifted 1RM. Over time this makes adherence
+  measurable on those exercises too, with no new column.
+- **Alternatives.** *Record only, no plan:* the simplest, and honest if you never follow a target on
+  these, but they stay outside every adherence figure. *A load-style plan through added weight:*
+  better if you mostly train them weighted, but it misstates an unweighted set.
+- **Why it matters:** 23 of September's 49 sets with no plan are bodyweight. Until this is decided,
+  Tuning quotes adherence over loaded sets only.
+- **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
+  already stored changes.
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
@@ -7597,27 +7680,6 @@ drift.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
-### [workouts][platform] LA-165 — the local half of offline exercise edits: pending writes, and the confirm that clears them
-- **Lane: A** — `lib/local-store/sqlite-backend.ts`, `lib/local-store/sync-engine.ts`.
-- **Needs:** — nothing. The server half shipped as RV-175 (2026-09-28): the push domains
-  `exercise_log_edit`, `exercise_log_delete` and `workout_session_delete` exist and call the same
-  functions as the web routes (`lib/workout/exercise-log-edits.ts`, `lib/workout/delete-session-reconcile.ts`).
-- **Added:** 2026-09-28 · Lane A, while building RV-175.
-- **Why the hook cannot just swap `fetch` for `queueMutation` today:**
-  ① `updateExerciseLogLocally`, `deleteExerciseLogLocally` and `deleteWorkoutSessionLocally` all write
-  `sync_status = 'synced'`. That is right for their current callers, which run only after a 2xx. For
-  an offline write it is wrong: `applyDelta` overwrites `synced` rows, so a pull before the push lands
-  would restore the edited sets and **resurrect the deleted log**, which is CLAUDE.md's pending rule.
-  Give each an explicit pending mode, and keep the current behaviour as the default.
-  ② `sync-engine`'s push-confirm switch has no case for the three domains, so a pending row would never
-  flip back to `synced` and would then refuse every later pull. `markWorkoutSynced` / `markSessionSynced`
-  are the models, but `exercise_log_edit` carries only `exerciseLogId`, so it needs an id-only variant.
-  ③ `updateExerciseLogLocally` UPDATEs existing sets and never INSERTs one, so an edit that adds a
-  set shows nothing locally. Inserting under a local id then duplicates against the server's row on the
-  next pull (the server upserts by `(exercise_log_id, set_number)`). Resolve that key before
-  inserting, or the fix trades a missing set for a doubled one.
-- **Done when:** with the store in pending mode, an edit, a log delete and a session delete each
-  survive a pull that arrives before the push, and each row reads `synced` after its push confirms.
 
 ### [workouts] LA-166 — offline edits and deletes of logged work toast success and are lost: queue them instead
 - **Lane: B** — `lib/hooks/use-day-entry-mutations.ts` (`handleEdit`, `handleDelete`, `handleDeleteSession`).
@@ -7730,8 +7792,28 @@ drift.
   (LB-150). `readTodayCacheSync()` keeps the unwrap in one place but is not TTL-aware, so a
   health-alert reconcile would act on a reading up to a Brisbane day old. **Do not hand-roll it at
   the call sites to keep the item in Lane B.**
-- **Still open:** the four `cachedFetchToday` reads above (blocked on the Lane A enabler), and the
-  other Lane A halves (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
+- **⚠ THE "ONE-LINE ENABLER" HAS AT MOST ONE LEGITIMATE CALLER — checked 2026-09-28 (Lane A)
+  against CLAUDE.md's RV-67 rule**, which disqualifies `freshWithinTtl` on any payload that is not a
+  pure function of stored rows the client can see being written:
+  - **`body-battery`: disqualified.** It drains with the clock, so its value changes with no writer
+    at all, and no invalidation group could ever catch that.
+  - **`readiness-score`: disqualified.** Its inputs are written server-side by the BLE rollup (sleep,
+    HRV, the derived scores). The client never observes those writes, so no proof can list them.
+  - **`next-session`: possible, not proven.** It is `getNextSession` (program, schedule, logs, rest
+    days, phase) **plus** the stored AI prescription (`getSessionPeriodization`) **plus** muscle
+    assignments. A proof has to show every one of those writers invalidates the key. The
+    prescription is written by the prescribe route and consumed at completion, which makes it the
+    one to check first.
+  - **The warm list's own read** inherits whichever of the above it warms.
+  **So do not expose the parameter on its own.** Ship it only in the PR that writes the
+  `next-session` proof. A flag with no qualifying caller is an invitation to add a disqualified one.
+- **Still open:** `next-session`'s proof (above), and the other Lane A halves
+  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round). **On the 2N+1 round,
+  keep the immediate invalidate unless a change also handles a push that moves nothing.**
+  `pushThenRevalidate` revalidates only when `pushed > 0`. With LB-151's single-flight push, a
+  concurrent drain can carry this write and report 0 here, and dropping the immediate round would
+  then leave the screen stale for the key's TTL. One wasted request a log is the cheaper side of
+  that trade.
 - **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
   Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
   across the 3 modules now take the user's zone.
