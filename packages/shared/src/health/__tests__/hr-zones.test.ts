@@ -34,7 +34,7 @@ describe('computeHrZones', () => {
   })
 
   it('places the 60%-reserve boundary at 138 bpm', () => {
-    expect(zones[1].minBpm).toBe(Math.round(60 + 0.6 * 130)) // 138
+    expect(zones[1].minBpm).toBe(Math.round(60 + 0.4 * 130)) // 112 — TN-78 moved Light to 40% HRR
   })
 })
 

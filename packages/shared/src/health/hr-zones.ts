@@ -35,9 +35,20 @@ export interface HrZone {
 
 // Fraction-of-reserve lower bounds for each zone (Karvonen). Zone 1 starts at the
 // resting HR itself so the whole plausible range is covered.
+//
+// TN-78: Light starts at 0.4, not 0.6 — owner's decision, 2026-09-27, and the reason is a
+// taxonomy splice rather than a preference. `DEFAULT_ZONE_MINUTES_GOAL` cites WHO's ≥150 min/wk
+// of MODERATE activity, and `activeMinutesFromZoneSeconds` scores that goal off this band. At
+// 0.6 the band began where ACSM puts VIGOROUS, so the target was moderate and the bar was
+// vigorous, and walking could not earn a minute of it. ACSM's moderate range is 40-59% HRR.
+//
+// **It re-scores history, and by far less than the entry predicted.** Measured on the owner's
+// last 32 days: days MEETING the 22-minute goal go 1 → 3, and mean active minutes 0.9 → 4.9.
+// The entry's "3 of 31 → 24 of 31" is a different quantity — days with ANY time above the floor,
+// which reproduces exactly (3 and 24) and is not goal attainment.
 const ZONE_DEFS: { id: HrZone['id']; name: string; lowerFrac: number; color: string }[] = [
   { id: 1, name: 'Recovery', lowerFrac: 0.0, color: '#3b82f6' },
-  { id: 2, name: 'Light',    lowerFrac: 0.6, color: '#22c55e' },
+  { id: 2, name: 'Light',    lowerFrac: 0.4, color: '#22c55e' },
   { id: 3, name: 'Aerobic',  lowerFrac: 0.7, color: '#eab308' },
   { id: 4, name: 'Hard',     lowerFrac: 0.8, color: '#f97316' },
   { id: 5, name: 'Peak',     lowerFrac: 0.9, color: '#ef4444' },
