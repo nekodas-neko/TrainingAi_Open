@@ -487,6 +487,11 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
+- **[`docs/overview/entries/2026-09-27-rv211-empty-account-claims.md`](../../overview/entries/2026-09-27-rv211-empty-account-claims.md)**
+  — RV-211 ①②③. Home's empty-account states: no week-in-review banner for an empty week, Body
+  Battery's "No data yet" instead of a band, "—" instead of "rest" with no program. Also why item ⑤
+  is **not** a defect — the "stray dot" is one of 18 `Math.random()` background stars — and why the
+  progress bar (which no source guard caught) is the case for the e2e render.
 - **[`docs/overview/entries/2026-09-27-rv210-keyboard-and-viewport.md`](../../overview/entries/2026-09-27-rv210-keyboard-and-viewport.md)**
   — RV-210. `interactive-widget=resizes-content`, all 23 `vh` sheet heights to `dvh` (22 others were
   already there — an unrecorded 22/23 split), and `enterKeyHint="done"` on all 42 numeric inputs.
