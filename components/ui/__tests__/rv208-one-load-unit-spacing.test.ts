@@ -38,7 +38,7 @@ const EXEMPT = new Set(['app/profile/[userId]/page.tsx'])
 
 const sources = ROOTS
   .flatMap(d => walk(join(repoRoot, d)))
-  .map(f => ({ file: f.slice(repoRoot.length + 1), code: stripComments(readFileSync(f, 'utf8')) as string }))
+  .map(f => ({ file: f.slice(repoRoot.length + 1).replace(/\\/g, '/'), code: stripComments(readFileSync(f, 'utf8')) as string }))
   // `app/api/**` is not a render surface and is not this lane's: the five `${x}kg` there are LLM
   // prompt text (`nutrition-goals/recommend`) and a Google Calendar event description
   // (`log-calendar-event`). Neither is the app drawing a load on a screen, and a prompt's wording
