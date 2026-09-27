@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.11",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when your weekly stats fail to load, the card now says so and offers a retry. It used to show its loading shimmer forever \u2014 until the app was killed \u2014 because a failed request looked exactly like one that had not finished.",
+    ],
+  },
+  {
     version: "1.477.10",
     date: "2026-09-27",
     changes: [
