@@ -1,6 +1,7 @@
 "use client";
 
 import { BatteryLowIcon } from "lucide-react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
@@ -25,7 +26,7 @@ function lineFor(
   // set's pct produces a weight the lifter never moved. The sets×reps @ pct line still reads fine
   // without it — the same reasoning as the pre-workout card's bodyweight branch.
   const showKg = oneRm != null && oneRm > 0 && !isBodyweightType(exerciseType);
-  const kg = showKg ? ` (~${mround125(oneRm * s.pct / 100)}kg)` : "";
+  const kg = showKg ? ` (~${formatLoadKg(mround125(oneRm * s.pct / 100))})` : "";
   return `${sets ?? style?.length ?? 0}×${s.reps} @ ${s.pct}%${kg}`;
 }
 

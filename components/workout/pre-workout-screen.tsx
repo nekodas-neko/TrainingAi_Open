@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import dynamic from "next/dynamic";
 import { BatteryLowIcon, CheckIcon, ChevronLeftIcon, DumbbellIcon, RefreshCwIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -395,7 +396,7 @@ export function PreWorkoutScreen({
                             const reps = avgReps(ex.lastReps, 'floor');
                             const weight = modalWeight(ex.lastSetWeights ?? []);
                             const parts: string[] = [];
-                            if (reps != null && weight != null) parts.push(`${reps} × ${weight}kg`);
+                            if (reps != null && weight != null) parts.push(`${reps} × ${formatLoadKg(weight)}`);
                             else if (reps != null) parts.push(`${reps} reps`);
                             if (ex.estimated1rm != null) {
                               // RV-89: the `~` and `Math.round` were not a deliberate approximation
