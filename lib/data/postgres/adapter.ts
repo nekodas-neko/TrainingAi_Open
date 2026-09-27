@@ -2340,7 +2340,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         ? await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: [s.activityLogs.userId, s.activityLogs.date, s.activityLogs.startTime],
             targetWhere: isNotNull(s.activityLogs.startTime),
-            set,
+            // DV-19. The natural-identity index covers tombstones, so a new activity saved at the
+            // minute of a deleted one lands on the deleted row, and without this it stays deleted
+            // and never reaches any device. Only a DIFFERENT id revives it: a stale edit to the
+            // deleted activity itself is the same id, and delete keeps winning over that.
+            set: {
+              ...set,
+              deletedAt: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedAt} ELSE NULL END`,
+            },
           }).returning()
         : await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: s.activityLogs.id,

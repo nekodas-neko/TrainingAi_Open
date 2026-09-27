@@ -1791,6 +1791,18 @@ export class SQLiteLocalStore implements LocalStore {
          r.segments ? JSON.stringify(r.segments) : null,
          r.updatedAt],
       );
+      // DV-19. The server holds one activity per (date, start_time) and a push that collides
+      // merges into the row already there, under THAT row's id. The device's own row is confirmed
+      // `synced` and never comes back from the server, so it stays beside this one for good and
+      // the walk lists twice. Once the server's row for that minute is here, any other synced
+      // row at the same minute is that orphan. A pending one is still on its way and is kept.
+      if (r.startTime) {
+        await runSQL(
+          `DELETE FROM activity_logs WHERE date = ? AND id <> ? AND sync_status = 'synced'
+             AND (CASE WHEN length(start_time) = 5 THEN start_time || ':00' ELSE substr(start_time, 1, 8) END) = ?`,
+          [r.date, r.id, r.startTime.length === 5 ? `${r.startTime}:00` : r.startTime.slice(0, 8)],
+        );
+      }
     }
 
     for (const r of delta.fitnessTests ?? []) {

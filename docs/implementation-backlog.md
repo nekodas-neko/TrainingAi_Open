@@ -4623,30 +4623,6 @@ which is the right shape for something that can only be validated by living with
 - **Keep:** the device check. Zone minutes appear on the Activity surfaces, and the new floor
   changes what those read for every past day; nothing here was seen on the phone.
 
-### [platform] LB-170 — the rate limiter's flush outlives the request, and under test it outlived the file
-- **Lane: A** — `lib/rate-limit.ts`. **Added:** 2026-09-27 · split out of `LB-168` once that was root-caused.
-- **Why it is split out rather than a `Keep:` on `LB-168`.** `LB-168` was a CI-health defect and it is
-  fixed; this is a latent behavioural one in Lane A's file with no live symptom. Left inside that
-  entry it would read as verification debt on something already shipped.
-- **What, measured.** `scheduleFlush` fires `(async () => { … })()` and nobody awaits it, so a DB
-  round trip (`ensureSchema` + an upsert on `rate_limits`) continues after the request that started it
-  has been answered. `inFlightFlushes` tracks the promises and **`_awaitRateLimitFlushes()` is already
-  exported for exactly this** — six test files call it. Nothing in the request path does.
-- **How it surfaced:** under vitest the flush landed after its test file had returned, which is how
-  `LB-168`'s teardown race happened. That half is fixed at the logging end, so this is now invisible
-  rather than absent — the write still happens late, it just no longer prints.
-- **Why it may be fine, and why that should be decided rather than assumed.** In production the
-  process is long-lived, so a flush completing after the response is the intended design (the comment
-  at the top of the file says so: the L1 map is the synchronous fast path and the DB is caught up
-  behind it). The question is the **shutdown** case — a Railway deploy replacing the container mid-flush
-  drops that increment silently, which is the same class as the accepted lag already documented there.
-- **What is actually owed:** a judgement, not necessarily a change. Either await the drain on shutdown
-  (there is no cron layer or lifecycle hook here — see `docs/module-map.md` §0, so this may cost more
-  than it saves), or write one line in `lib/rate-limit.ts` recording that a lost increment on deploy
-  is accepted, so the next reader does not re-open it. **Prefer the second unless the first is cheap.**
-- **Do NOT "fix" it by draining in the test setup** — measured on 2026-09-27, that takes the suite
-  from 348 s to 482 s and fails 70 files. `LB-168` has the numbers.
-
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
 - **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
@@ -5694,7 +5670,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [activity][platform] DV-19 — one treadmill walk is three rows on the device, and the list shows it twice
 
-- **Lane:** A — the activity write/sync path; B for the list if the rows are legitimate.
+- **Lane:** A — the activity write/sync path (② shipped); B for ③, the summary saving on every mount.
 - **Added:** 2026-09-26 · Device Verification, sweep 4a (seen while checking BF-107).
 - **Measured (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** The 2026-09-24 treadmill walk (~09:18–09:59) is **three** `activity_logs` rows in
   the local store, all `synced`, none deleted:
@@ -5703,8 +5679,22 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - `4b5c23e0` `09:18`–`09:58` (no seconds), calories NULL (updated 23:19:12.887Z).
   Health → Training → *Activities this week* shows **two** "Treadmill interval walk · 24 Sept · 40 min ·
   133 kcal" rows.
-- **Not established:** what the server holds (my read of `/api/activity-logs?date=` returned an empty list,
-  and its parameters are unverified), and which write created the 09:18 pair 0.4 s apart.
+- **~~Not established~~ — traced 2026-09-28 (Lane A), production read-only.** The server holds **two**
+  rows. `b8083d04` was created **09:18:27, at the walk's start**, with the plan's 40 minutes. `d0231b08`
+  was created 09:59:28, at its end. Three causes, two of them already fixed:
+  ① **The 09:18 row is a walk ended within seconds and saved at the PLAN's duration.** That is
+  BF-190 and BF-191 (#1570), which shipped on 09-25, the day after this walk. It is not reproducible on current code.
+  ② **The third device row is an orphan, fixed 2026-09-28.** The device saved `4b5c23e0` at 09:18.
+  The push merged it into `b8083d04` on the server's `(user, date, start_time)` key and kept the
+  server's id, so `4b5c23e0` was confirmed `synced` and never came back. `applyDelta` now retires a
+  synced row at the same minute as an applied server row. **The same merge also landed a new activity
+  on a TOMBSTONE and left it deleted**, which is fixed with it: a different id now revives the row.
+  ③ **Two saves 45 s apart for one walk** (09:18:27 server, 09:19:12 device). The summary saves on
+  every mount (`savedRef` is per mount), so a remount writes a second row under a new id. **Lane B,
+  not traced further.** Check whether `WalkSummary` can still remount after LB-141 (#1812).
+- **What the owner's data still holds:** `b8083d04` is a genuine server row for a walk that did not
+  happen as recorded. Delete it from the list. `4b5c23e0` stays on this phone until `b8083d04`
+  changes, because the retire runs when the server row is applied. Deleting `b8083d04` does that.
 - **Pass test (device):** one walk produces one row, and the list shows it once.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
@@ -7757,36 +7747,6 @@ drift.
 - **Worth doing only if RV-186 shows script evaluation matters at cold start.** FCP is already
   1.02 s, and the service worker caches the chunks after the first load.
 
-### [platform] LA-145 — a date's SHAPE is checked in 25 files; its VALIDITY in 9
-
-- **Lane: A**
-- **Added:** 2026-09-25 · split out of RV-177, which closed the same day. RV-177 fixed four
-  date-validity gaps one at a time and the pattern under them was never filed, which is what this
-  entry is for. **The counts here are measured, not estimated** (`grep -rl` over `app/ lib/
-  packages/`, 2026-09-25): **25 files** carry the `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex, **9**
-  reach `isCalendarDate` or `normalizeDateParamIso`.
-- **Why the shape is not the check.** The regex accepts `2026-02-31` and `2026-99-99`. Both then
-  reach a `date` column and fail at the driver — `22008 date/time field value out of range` — which
-  surfaces as a bodiless 500, or, on a batch route, takes every record travelling with it. RV-177
-  measured exactly that on `sync-health`: a three-day payload with one bad day wrote none of it.
-- **The 11 files with a shape regex and no validity check**, as measured:
-  `app/api/admin/timing-baseline/route.ts` · `app/api/dexa-scans/route.ts` ·
-  `app/api/measured-rmr/route.ts` · `app/api/nutrition/plan-meal-answers/route.ts` ·
-  `app/api/water-log/route.ts` · `packages/shared/src/validation/injury.ts` ·
-  `packages/shared/src/validation/supplement.ts` · `packages/shared/src/validators/chat.ts` ·
-  `packages/shared/src/validation/health-connect-ingest.ts` · `app/api/sync-health/route.ts` ·
-  `lib/observability/sentry-scrub.ts`
-- **⚠ The last three are known false positives and must not be "fixed" blindly.**
-  `sentry-scrub.ts` matches dates to REDACT them, not to accept them — validity is meaningless
-  there. `sync-health` and `health-connect-ingest` both route their dates through
-  `ingestDayRejection`/`resolveIngestDate`, which call `isCalendarDate` internally; the grep cannot
-  see through the import. **So this is per-file triage, not a sweep** — the count is the reason to
-  look, never the size of the fix.
-- **The fix per file is one of two things**, both already in the tree: `.refine(isCalendarDate)` on
-  the validator where the date is a plain field, or `normalizeDateParamIso` in the handler where it
-  arrives as a param. Prefer ONE of them per route — RV-177 added both to `body-metadata` and the
-  mutation pass showed the second killed nothing, so it was reverted.
-
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 
 - **Lane: O** — decide which to widen. Each is a small script change, and each one has a live
@@ -8775,24 +8735,6 @@ drift.
 - **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
-
-### [platform] LB-151 — `pushMutations` has no in-flight guard, and several surfaces can call it at once
-
-- **Lane: A** — `lib/local-store/sync-engine.ts` (Lane B found it while shipping RV-122).
-- **Added:** 2026-09-25 · from RV-122's *"do not double-fire against `handlePullSync`"* note, which
-  turned out to describe a gap in the engine rather than in the card.
-- **Measured:** `pushMutations` (`sync-engine.ts:839`) holds **no concurrency guard** — the only
-  gate is `push5xxUntil`, a server-error backoff — so two overlapping calls both drain the outbox.
-  Eleven call sites reach it (`more-content.tsx:118`, `sync-provider.tsx:165`/`:220`,
-  `push-then-revalidate.ts:33`, `sync-health-card.tsx`, per-domain writes); the More tab alone has
-  two on one screen, the pull gesture and the card.
-- **⚠ NOT established, and must be before this is sized:** whether a double drain actually
-  double-WRITES. The push endpoint shows no dedup on a mutation id, but the per-domain handlers may
-  be upserts, which makes it wasteful rather than wrong. **Read a couple of the domain writers
-  first** — that decides whether this is a correctness bug or a bandwidth one.
-- **RV-122 slightly improves it:** "Retry all" sends one push for N failures where N taps sent N.
-- **Fix if real:** a module-level in-flight promise later callers await, the shape `cachedFetch`'s
-  in-flight map already uses for reads.
 
 ### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
 

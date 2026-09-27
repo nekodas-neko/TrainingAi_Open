@@ -844,7 +844,40 @@ async function enrichPayload(
   }
 }
 
-export async function pushMutations(userId: string): Promise<{ pushed: number } | null> {
+type PushResult = { pushed: number } | null;
+const pushRunning = new Map<string, Promise<PushResult>>();
+const pushTrailing = new Map<string, Promise<PushResult>>();
+
+/**
+ * LB-151: at most ONE drain of the outbox per user at a time. Eleven call sites reach this (the pull
+ * gesture, the sync-health card, per-domain writes, push-then-revalidate …), and two overlapping
+ * calls both read the same pending rows and both POSTed them. Measured harmless for the writes that
+ * matter (completion is stamped `WHERE completed_at IS NULL`, logs upsert by id) but the whole batch
+ * went up twice.
+ *
+ * A call that arrives mid-drain does NOT just get the running drain's result: that drain read the
+ * outbox before this caller's mutation existed, so answering from it would leave the mutation for
+ * some later push. It gets ONE trailing drain instead, shared by every caller that arrives while the
+ * first is running — so the queue is never drained twice at once and nothing queued is skipped.
+ */
+export function pushMutations(userId: string): Promise<PushResult> {
+  const running = pushRunning.get(userId);
+  if (!running) {
+    const run = pushMutationsOnce(userId).finally(() => pushRunning.delete(userId));
+    pushRunning.set(userId, run);
+    return run;
+  }
+  let trailing = pushTrailing.get(userId);
+  if (!trailing) {
+    trailing = running
+      .catch(() => null)
+      .then(() => { pushTrailing.delete(userId); return pushMutations(userId); });
+    pushTrailing.set(userId, trailing);
+  }
+  return trailing;
+}
+
+async function pushMutationsOnce(userId: string): Promise<PushResult> {
   const store = getLocalStore(userId);
   if (!store) return null;
 
@@ -1132,4 +1165,6 @@ export function _resetSyncBackoff(): void {
   consecutive5xx = 0;
   pullBackoffUntil = 0;
   consecutivePullFailures = 0;
+  pushRunning.clear();
+  pushTrailing.clear();
 }

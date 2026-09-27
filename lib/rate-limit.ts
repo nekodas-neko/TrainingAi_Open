@@ -8,6 +8,12 @@ import { getPool, ensureSchema } from '@/lib/data/postgres/client'
 // denying from the next call. Accepted lag: a cold replica can let a few
 // requests through before the first DB round-trip lands. If the DB is
 // unreachable the limiter degrades to today's memory-only behaviour.
+//
+// Also accepted, and decided rather than overlooked (LB-170): the flush runs after the response and
+// nothing awaits it, so a deploy that replaces the container mid-flush drops that increment. There is
+// no shutdown hook to drain it from (no SIGTERM handler, no lifecycle layer — docs/module-map.md §0),
+// and a rate-limit count off by the few in-flight requests of one deploy is the same class as the lag
+// above. Tests drain with `_awaitRateLimitFlushes()`; do not drain in the shared test setup (LB-168).
 
 interface Entry { count: number; resetAt: number }
 
