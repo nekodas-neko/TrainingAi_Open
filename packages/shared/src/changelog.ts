@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.474.2",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a sleep or nap under an hour showed as \"0h\" on the day timeline, with the minutes thrown away. It reads \"45m\" now.",
+      "Durations read the same everywhere — \"55 min\" rather than \"55m\" on some screens. A whole hour now prints as \"7h 00m\".",
+      "Big numbers get their commas back: your steps tile, the calories line on Home and the XP total on More all had a few that did not.",
+    ],
+  },
+  {
     version: "1.474.1",
     date: "2026-09-26",
     changes: [

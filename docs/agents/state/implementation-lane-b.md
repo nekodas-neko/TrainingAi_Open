@@ -1,14 +1,14 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-26 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-165 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
+**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-165 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue.
 
 ## Now
 
-Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert**; eighteen more on 2026-09-25 — the journal is the list.
+Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#1677), **LB-161** (#1685), **RV-207** (#1693, #1695), **LB-162** (#1700), **OR-162 per-switch half** (#1716), **DV-21 + a second dead channel** (#1720), **BF-61 narrowed and handed to DV** (#1722), **TN-85** (#1727), **BF-204 + BF-206** (#1730), **BF-205** (#1739), **BF-208 + the BF-206 revert** (#1741), **RV-208 part one**; eighteen more on 2026-09-25 — the journal is the list.
 
 ## Next
 
-**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Next is **RV-208**…**RV-215**, review sweep 63. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
+**`node scripts/next-item.js --lane B` — run it, do not trust this line.** Next is **RV-209**…**RV-215**, review sweep 63. `RV-208` is PART-DONE and stays queued: its time-casing and `formatKg` halves are **Lane A's** (`app/api/day-timeline/route.ts`, `packages/shared/format/units.ts`), and its palette half is design work of its own. **`TN-82` is NOT simply next**: it removes the two scales from the morning sheet, which is an IA change to a daily screen, so it owes a mockup and a yes first. The queue sat at 0 for a day and a half before this; when it empties, say so and stop rather than inventing work.
 
 ## Blocked / owed
 
@@ -16,6 +16,7 @@ Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#
 
 ## Lessons that cost real time
 
+- **A SWEEP ENTRY IS NOT ONE LANE'S** — RV-208's five items split across Lane A (`app/api`, `packages/shared`), design work and copy. Ship the half you own COMPLETE and write who owns each of the rest onto the entry; do not half-do all five.
 - **`public/cats/` IS BUILD OUTPUT** — the pen backdrops and every cat sprite come from `scripts/collection-art/scenes.mjs` through `build.mjs`, and `collection-sprites.test.ts` fails a hand-edited SVG.
 - **A FIX JUSTIFIED BY A MISREAD OF THE OWNER GETS REVERTED, NOT KEPT BECAUSE IT SHIPPED.** #1730 labelled the Coach FAB on the reading that he had asked what it was; he meant the MOON in the pen backdrop (BF-208). The clearance half was measured from CSS and stands; the restyle was never requested, so it is reverted and filed as `LB-164`. Already-merged is not a reason to keep an unasked-for change to the screen he opens first — and a reading of what someone MEANT is a hypothesis, never to be listed beside a measured finding as though both were established.
 - **DON'T TRUST THE ENTRY — VERIFY ITS PATHS, MECHANISM, AND WHETHER IT CHANGES WHAT RENDERS.**
