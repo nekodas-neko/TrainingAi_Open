@@ -50,3 +50,13 @@ surfaces, delivered through a normal Railway deploy with no APK. The sandbox can
 the muted row and the now-uncoloured number read on the S25 — but neither adds an element, so there
 is no layout risk, and no Known-Issues row is claimed for a device pass that would only confirm a
 colour.
+
+## Also filed: `pnpm test` exits 1 with zero tests failed
+
+Hit twice this session on two unrelated files —
+`EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending`, printed as `Errors 1`
+beside `1111 passed | 0 failed`. Neither reproduced: re-running the named file alone passes, and so
+does the whole suite. It is a vitest worker-teardown race, not a test failure, and it is
+indistinguishable from a real red at a glance — the correct response (read the failure count, then
+re-run once) is exactly the wrong response to a genuine one. Filed as **`LB-168`**.
+

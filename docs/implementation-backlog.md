@@ -485,6 +485,27 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LB-168 — `pnpm test` exits 1 with ZERO tests failed, about one full run in five
+- **Lane: B** (the vitest config / worker teardown).
+- **Added:** 2026-09-27 · hit twice in one session, on two unrelated files.
+- **The signature:** `EnvironmentTeardownError: [vitest-worker]: Closing rpc while
+  "onUserConsoleLog" was pending`, reported as `Errors 1` **beside `1111 passed | 0 failed`**. The
+  process exits non-zero, so `pnpm test` fails and CI's Tests job would go red.
+- **Measured:** twice on 2026-09-27, attributed to `lib/__tests__/user-account-routes.test.ts` the
+  first time and `lib/__tests__/running-plan-routes.test.ts` the second. **Neither reproduces** —
+  re-running the named file alone passes, and re-running the whole suite passes. So it is not
+  file-specific and the attribution is just whichever worker was closing when it happened.
+- **Why it matters more than its rarity suggests:** it is indistinguishable from a real red at a
+  glance, and the correct response (read the failure COUNT, then re-run once) is the exact
+  response that is WRONG for a genuine failure. Every session that meets it pays to work that out.
+- **Where to start:** a worker writing a `console.log` as the run tears down. `vitest`'s
+  `onUserConsoleLog` RPC is still in flight when the worker's channel closes. Candidates, none
+  established: a test logging from an unawaited promise, a `reportServerError` fire-and-forget on a
+  DB path, or a pool/teardown ordering issue. **`silent: true` would hide it rather than fix it**
+  and would also hide the guard scripts' own output, which several tests assert on.
+- **Not the same as `LB-166`** (the E2E 45-minute ceiling) — different job, different mechanism.
+  Both are CI-health, and neither is anyone's feature work, which is why both keep going unowned.
+
 ### [nutrition] LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
 - **Lane: O.** Ungated on purpose: getting the answer IS the work, and `Gate: owner` would park it
   out of the Orchestrator's READY list.

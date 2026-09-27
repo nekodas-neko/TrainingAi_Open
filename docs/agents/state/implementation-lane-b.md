@@ -1,6 +1,6 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-168 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue. (LB-165 = RV-202 ①'s dead rules plan, #1760; LB-166 = the E2E 45-minute ceiling, #1770.)
+**Updated:** 2026-09-27 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-169 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue. (LB-165 = RV-202 ①'s dead rules plan, #1760; LB-166 = the E2E 45-minute ceiling, #1770.)
 
 ## Now
 
@@ -16,6 +16,7 @@ Shipped 2026-09-26: **DV-12** (#1675), **RV-203 ① ③** (#1676), **LB-160** (#
 
 ## Lessons that cost real time
 
+- **`pnpm test` CAN EXIT 1 WITH ZERO TESTS FAILED (LB-168)** — `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending`, printed as `Errors 1` beside `1111 passed | 0 failed`. Twice in one session on two unrelated files; neither reproduced. **Read the failure COUNT, not the exit code, then re-run once** — but never call a real red a flake on this precedent.
 - **AN ENTRY THAT ASKS YOU TO UNDO SOMETHING THE OWNER SPECIFIED IS A QUESTION, NOT A TASK.** RV-212 ④ asked to drop the meal-tile placeholder; `meal-thumb.tsx` quotes his instruction for it in its own docstring (BF-32). Filed as `LB-167`, `Lane: O`, ungated, with a recommendation — the `LB-164` shape. **Grep the component's own comments for his words before implementing a review's "fix".**
 - **WHEN A SIBLING ALREADY SOLVED IT, FOLLOW ITS SPLIT RATHER THAN THE ENTRY.** `energy-card.tsx` had made RV-212 ①'s exact change for its own copy of the number and deliberately KEPT the colour on the " so far"-qualified label — its comment even names the component still doing it wrong. The entry asked for neutral everywhere. Ship the half with precedent, pin the other half, and do not re-litigate a documented decision without new evidence.
 - **A "LINE-THROUGH IN X" SWEEP HAS A SIBLING THAT MUST SURVIVE:** taken ≠ discontinued. `supplements-section` (logged today) was wrong; `manage-supplements-sheet` (`!s.active`) is right. The test pins the survivor.
