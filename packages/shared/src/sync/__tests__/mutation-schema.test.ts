@@ -63,11 +63,11 @@ describe('queueMutation domain coverage', () => {
     const offenders: string[] = []
     for (const root of ROOTS) {
       for (const file of walk(join(cwd, root), [])) {
-        const rel = file.replace(cwd + '/', '')
+        const rel = file.slice(cwd.length + 1).replace(/\\/g, '/')
         if (NOT_SYNC.some(prefix => rel.startsWith(prefix))) continue
         const src = readFileSync(file, 'utf8')
         for (const m of src.matchAll(domainLiteral)) {
-          if (!allowed.has(m[1])) offenders.push(`${file.replace(cwd + '/', '')}: '${m[1]}'`)
+          if (!allowed.has(m[1])) offenders.push(`${rel}: '${m[1]}'`)
         }
       }
     }
