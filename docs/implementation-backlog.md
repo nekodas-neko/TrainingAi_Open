@@ -4024,7 +4024,8 @@ which is the right shape for something that can only be validated by living with
   weigh-in sheet — plus a glance at the weight dial with a keyboard up.
 
 ### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
-- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#1770), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked, ⑥ stays open.**
+- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#1770), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked; ⑥ is now `LB-172`.**
+- **Keep:** ④ only — the header row cannot hold the date and both pills at 384 px, and it is parked on `LB-157` in the `header-row-width` batch. Nothing else here is startable.
 - **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.
   It did not: `hasData` is already on the response, so all three fixes were the card's and the
   banner's own.
@@ -4069,9 +4070,12 @@ which is the right shape for something that can only be validated by living with
      words; there is no `·` character anywhere in the file.
    - **A source grep said "does not reproduce" and that was the wrong conclusion** — the marks are
      real on screen, they are simply not stray. Rendering it is what separated the two.
-6. **Resting HR sits in a score ring with no unit,** styled like the three 0–100 scores beside it,
-   so "58" reads as a score. Add "bpm", or style it differently from the scores. — **STILL OPEN,
-   and it is bigger than one line.** `oura-score-chip-row.tsx` has **four** ring renderers
+6. **Resting HR sits in a score ring with no unit** — **SPLIT OUT to `LB-172` (`Lane: O`) 2026-09-27,
+   because BOTH fixes this item proposes are impossible as written, measured at 384 px.** A cell is
+   **82 px** wide; `"58 bpm"` at the value's own font measures **140 px**, and `"Resting HR (bpm)"`
+   in the label measures **97 px**. What is left is a design fork that wants the owner's eye, so it
+   is its own entry rather than a sub-item of a Lane B entry he will never be routed to. The detail
+   below is kept for the record: `oura-score-chip-row.tsx` has **four** ring renderers
    (`ScoreRailCell`, `ScoreBandCell`, `ScoreMinimal`, `Cell`, chosen by the user's `ringStyle`) and
    **eight** sites consuming `display`. The type already knows — `display: string; // the big value
    (a score, or a bpm for HR)` — so the information exists and only the rendering is missing.
@@ -6398,6 +6402,44 @@ drift.
 - **Verification that gates the ship:** replay the corrector over ~120 days of the owner's history and
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
+
+### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
+- **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
+  Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
+  would park it. Add the gate once he has seen one.
+- **Ask** — owner: should the Resting HR cell carry a small unit caption in the styles that already
+  show a label (and stay ambiguous in the ones that do not), or should it be styled differently from
+  the three score cells outright?
+- **Added:** 2026-09-27 · split out of `RV-211` ⑥ by Lane B after measuring it.
+- **The defect is real.** Three of the four cells on Home are 0–100 scores; the fourth is a heart
+  rate in bpm, drawn in the same ring at the same weight. **"58" reads as a score**, and nothing on
+  the cell says otherwise except the word "Resting HR" underneath.
+- **📏 BOTH FIXES `RV-211` PROPOSED ARE IMPOSSIBLE AS WRITTEN — measured in the harness at 384 px dark,
+  not estimated.** A cell is **82 px** wide.
+  - `"58 bpm"` at the value's own font (34.4 px) measures **140 px** — **1.7× the whole cell**.
+  - `"Resting HR (bpm)"` in the label measures **97 px** against a label that currently measures
+    **60 px** — it overflows the cell by 15 px.
+  - So "add bpm" is not a small change; it is not available at all in either place the entry meant.
+- **What IS geometrically available:** a small caption under the number. The component already draws
+  one there — the cue word, at 7.5 px — and in the **default** style `showDot` is `false`, so that
+  slot renders nothing and is free. A `bpm` caption at ~9 px costs about 22 px under a 46 px number.
+- **⚠ And that is where it stops being an implementer's call: there are NINETEEN ring styles.**
+  `SCORE_RING_STYLES` (`lib/home/home-prefs.ts`) is user-selectable, and **`nolabel` deliberately
+  removes the label because "the glyph is the name"** — a unit caption there fights the premise of
+  the style. `overlap` has no caption slot either. So no single treatment is right for all nineteen,
+  which is the fork:
+  - **(a) The unit appears only where a label already does.** Cheap, honest, and leaves `nolabel`
+    and `overlap` exactly as ambiguous as they are today — which is arguably fine, since choosing
+    those styles is choosing to drop names.
+  - **(b) The HR cell is styled differently from the score cells** — the entry's second option. It
+    fixes every style at once and it changes the visual language of the row he reads daily.
+- **Recommendation: (a)**, and only in the styles that already carry a label. It is the smaller
+  change, it is reversible in one component, and it does not re-open a visual language he has
+  already chosen between nineteen times. **(b) is genuinely better at one thing** — it is the only
+  option that fixes `nolabel`, where the ambiguity is worst because nothing names the metric at all.
+- **Reversal cost: low.** One component, no stored data, no route change.
+- **What is owed before any code:** a mockup of (a) in the default style at 384 px dark, per the
+  large-UI rule. The measurements above are what it should be drawn against.
 
 ### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
 - **✅ FIRST PASS RUN 2026-09-27 (Orchestrator). The 70 was an upper bound and the real number is
@@ -8921,6 +8963,17 @@ drift.
   touches no UI or e2e files, and three peer PRs the same hour reported `success` in **42, 42 and
   52 seconds**. So the suite only runs in full on the PRs that most need it, and that is exactly
   when it exceeds its budget.
+- **⚠ SECOND OCCURRENCE 2026-09-27, AND THIS ONE COST A VERDICT — run 36322982763, PR #1803.**
+  E2E started **13:36:32Z** and was cancelled at **45m17s**, the ceiling again to the second, with
+  no superseding push on that branch. **What is new is the consequence:** that PR ADDED a spec
+  (`e2e/lb159-library-default.spec.ts`), and the job died before reporting, so **the new spec has
+  never been verified in CI** — it is green locally (4 passed, control-run both ways) and on `main`
+  with no CI verdict at all. The first occurrence merely wasted a wait; this one means the suite can
+  no longer confirm a spec on the PR that introduces it, which is the case it exists for.
+  **Two consequences worth acting on rather than noting:** every future spec lands unverified while
+  this stands, and the ceiling is now reached by an ORDINARY PR rather than an unusually large one,
+  so the margin is gone rather than thin. **This raises the entry's priority; it is no longer
+  latent.**
 - **Needs:** LB-149 — that entry's browser-death signature (a 1.0s `newContext` failure before any
   test body) may be the same saturation seen from the other end, or may be unrelated. Neither is
   established and they should be looked at together.
