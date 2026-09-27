@@ -289,6 +289,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-09-27-platform-lane-a-security-cluster.md`](../../handoffs/handoff-2026-09-27-platform-lane-a-security-cluster.md)
+  — **Lane A, the Review-sweep-60 security cluster, 2026-09-27.** TN-78 and BF-211 merged;
+  RV-192, RV-193, RV-195 ② and RV-197 built, CI-green and **owner-gated** (#1779, #1781, #1784,
+  #1789). Two entries could not be built as written and say why: RV-195 ① names a client
+  component that cannot set an httpOnly cookie, and RV-195 ③ needs a column the schema does not
+  have. Carries the `secureCookie`-is-the-salt trap, the separate `check-test-typecheck` gate,
+  and why `pnpm start` cannot boot in the cloud container.
 - **[`2026-08-30-meal-label-style-gate`](../../overview/history-2026-09-10-folded-4.md#2026-08-30-meal-label-style-gate)**
   — 🆕 **LB-19**: the meal-label spec's style gate was releasing on the **previous** style's canvas,
   4 of 4 measured, so its decode loop had effectively never checked three of its four layouts — and
