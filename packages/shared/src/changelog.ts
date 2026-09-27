@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.18",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: on screens opened from a tab \u2014 a night's sleep detail, for instance \u2014 cards scrolled up under the clock with nothing behind them. They now get the same gradient the main tabs have had, fading in as you scroll.",
+    ],
+  },
+  {
     version: "1.477.17",
     date: "2026-09-27",
     changes: [

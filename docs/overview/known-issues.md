@@ -31,6 +31,20 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ The scrim now reaches pushed routes, and no phone has seen it there (DV-22, 2026-09-27)
+
+`/health/sleep` and every other screen opened from a tab scrolled under the status-bar clock with no
+backing: DV-6 mounted the scrim in `tab-shell.tsx`, which a pushed route is not inside. It is mounted
+in the root layout now, and the controller accepts a document scroll — a pushed route has no inner
+scroller, so its scroll event target is the `Document` rather than an Element, which the old handler
+discarded. Verified at 412 px in Chromium (absent at rest, opaque after scrolling, and a tab flip to
+a screen at the top clears it), and **control-run both ways**: without the hoist the scrim is not in
+the DOM at all, and with the hoist but the old controller it stays invisible. **Pass test on the
+S25:** scroll a pushed route and the gradient fades in behind the clock exactly as it does on the
+tabs, in both themes; at rest there is nothing. **What Chromium cannot answer** is whether the
+gradient composites on Samsung's WebView and how it reads against the real status bar — the two
+things the phone is for.
+
 ### [activity][app-shell] ⚠️ Leaving a walk by the back gesture now asks, and the phone is the only place it can be seen (LB-141, 2026-09-27)
 
 The back gesture used to call `reset()` and throw a walk away silently, whatever its length; it now

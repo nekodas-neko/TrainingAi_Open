@@ -8,8 +8,26 @@
 /** Ignore the first few px so a rubber-band bounce at rest does not flash the scrim. */
 export const SCRIM_THRESHOLD = 4
 
-/** The shell marks the panel on show; only its offset may drive the scrim. */
-const ACTIVE_PANEL = '[data-tab-active="true"]'
+/**
+ * The shell marks every panel, on show or not. A scroller drives the scrim unless it belongs to a
+ * panel that is NOT on show — stated as the negative on purpose (DV-22): a pushed route has no
+ * panel ancestor at all, and the positive form excluded it along with the hidden panels.
+ */
+const HIDDEN_PANEL = '[data-tab-active="false"]'
+
+/**
+ * The element whose offset a scroll event is about.
+ *
+ * A tab panel scrolls an inner container, so the target is that Element. **A pushed route scrolls
+ * the document** — measured at 412 px on `/health/sleep`, which has no inner scroller and no panel
+ * — and a document scroll's target is the `Document`, not an Element, so the old early return
+ * discarded it and the scrim could never fire there even once it was mounted.
+ */
+function scrollerFor(target: EventTarget | null): Element | null {
+  if (target instanceof Element) return target
+  if (target instanceof Document) return target.scrollingElement
+  return null
+}
 
 export interface ScrimController {
   /** Capture-phase scroll handler. Register with `addEventListener('scroll', h, true)`. */
@@ -30,22 +48,23 @@ export function createScrimController(paint: (shown: boolean) => void): ScrimCon
     paint(next)
   }
 
-  const inActivePanel = (el: Element) => el.closest(ACTIVE_PANEL) !== null
+  // `document.scrollingElement` is never inside a panel, so a pushed route's document scroll
+  // qualifies by the same rule rather than by a second branch.
+  const drivesScrim = (el: Element) => el.closest(HIDDEN_PANEL) === null
 
   return {
     onScroll(e) {
-      const el = e.target
-      // A document/window scroll is not a panel's, and this app scrolls inner containers anyway.
-      if (!(el instanceof Element)) return
+      const el = scrollerFor(e.target)
+      if (!el) return
       scrollers.add(el)
-      if (inActivePanel(el)) set(el.scrollTop > SCRIM_THRESHOLD)
+      if (drivesScrim(el)) set(el.scrollTop > SCRIM_THRESHOLD)
     },
     reevaluate() {
       for (const el of scrollers) {
         // `isConnected` drops scrollers whose screen has been torn down, so the set cannot pin
         // detached nodes for the life of the shell.
         if (!el.isConnected) { scrollers.delete(el); continue }
-        if (inActivePanel(el) && el.scrollTop > SCRIM_THRESHOLD) { set(true); return }
+        if (drivesScrim(el) && el.scrollTop > SCRIM_THRESHOLD) { set(true); return }
       }
       set(false)
     },

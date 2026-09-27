@@ -7905,7 +7905,7 @@ drift.
 - **Why the logic is not in the component.** Every vitest project here is `environment: 'node'` and
   **cannot transform `.tsx` at all** — measured: importing the component fails at parse. Logic left
   inside it is logic nothing can drive, and on the phone a dead scrim and a mis-scoped one look
-  identical. So the decision lives in a plain `.ts` controller with 12 tests
+  identical. So the decision lives in a plain `.ts` controller with 15 tests
   (`lib/shell/__tests__/dv6-status-bar-scrim-controller.test.ts`, jsdom via a per-file docblock),
   and the component's four wiring constraints are pinned by reading its source. Control runs: with
   `reevaluate` neutered the tab-flip test fails; with the component's `true` capture flag removed
@@ -7913,10 +7913,11 @@ drift.
 - **Keep:** the device look — on the S25, scroll Home and confirm the caption no longer runs through
   the clock, that the scrim is absent at rest, and **how the gradient composes with
   `DynamicBackground`'s sky**, which is the one thing the sandbox cannot judge. Check both themes.
-- **⚑ The PUSHED ROUTES have no scrim — that is `DV-22`, not this entry (sweep 4b, 2026-09-26).**
-  This fix is mounted once in `tab-shell.tsx`, which covers the five tab panels and nothing pushed on
-  top of them, so `/health/sleep` still scrolls under the clock. The fix was scoped narrower than the
-  defect: nothing here regressed and nothing here needs reopening.
+- **⚑ The pushed routes had no scrim — that was `DV-22`, and it SHIPPED 2026-09-27.** This fix was
+  mounted once in `tab-shell.tsx`, which covered the five tab panels and nothing pushed on top of
+  them; the mount is now in `app/layout.tsx` and the controller takes a document scroll, since a
+  pushed route has no inner scroller. Nothing here regressed and nothing here needs reopening — but
+  **the device look below is now owed for a pushed route as well as for Home.**
 
 
 ### [platform] DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs
@@ -8114,29 +8115,6 @@ drift.
     Known-Issues row.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
-
-### [app-shell] DV-22 — the status-bar scrim is wired in the tab shell, so every pushed route scrolls under the clock without it
-
-- **Lane: B** — `components/shell/status-bar-scrim.tsx` is mounted once in `tab-shell.tsx`; a pushed
-  route is not inside that shell, so it gets nothing.
-- **Added:** 2026-09-26 · Device Verification, sweep 4b — observed on `/health/sleep` (S25 · web
-  v1.465.67 · APK 1.465.52 · gesture nav): cards scroll under the status-bar clock with no backing.
-- **This is DV-6's defect on a surface DV-6's fix never reached.** DV-6 shipped the scrim
-  (2026-09-25, v1.465.11) and its own note says *"wired once in `tab-shell.tsx`"* — which was the
-  right call for the five tab panels and is exactly why the pushed routes have none. Nothing
-  regressed; the fix was scoped narrower than the defect.
-- **The look is already decided, so this is placement only.** The owner chose a gradient that fades
-  in on scroll rather than a solid strip (DV-6, 2026-09-23). Reuse that component and controller —
-  do not design a second scrim, and do not make each pushed screen opt in, which is the "a future
-  screen forgets" shape DV-6 deliberately avoided.
-- **Two things to establish before building**, neither of which the sweep answers:
-  ① which layout every pushed route actually shares, if any — if there is no common parent the
-  component can mount in, that choice IS the work;
-  ② whether the controller's capture-phase listener and its per-panel re-read still hold when the
-  scrolling element is a pushed page rather than one of the five panels it remembers.
-- **The device check this OWES once built** (prose, not a `Verify:` field — that field means SHIPPED):
-  scroll a pushed route (`/health/sleep` is the observed one) and confirm the scrim behaves as it does
-  on the tabs — absent at rest, faded in on scroll. Both themes.
 
 ### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
 
