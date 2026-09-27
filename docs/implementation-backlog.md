@@ -3579,7 +3579,7 @@ which is the right shape for something that can only be validated by living with
   weigh-in sheet — plus a glance at the weight dial with a keyboard up.
 
 ### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
-- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#PR), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked, ⑥ stays open.**
+- **✅ ITEMS ①②③ SHIPPED 2026-09-27 (#1770), rendered on the zero-data account. ⑤ IS NOT A DEFECT (below). ④ stays parked, ⑥ stays open.**
 - **Lane: B**, with the Body Battery value to **A** if it comes from the route rather than the card.
   It did not: `hasData` is already on the response, so all three fixes were the card's and the
   banner's own.
