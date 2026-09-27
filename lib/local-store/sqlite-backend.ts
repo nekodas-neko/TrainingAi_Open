@@ -700,6 +700,8 @@ export class SQLiteLocalStore implements LocalStore {
       trainingLoadOts:                (r.training_load_ots as number) ?? null,
       trainingLoadGate:               (r.training_load_gate as string) ?? null,
       trainingLoadHigh:               r.training_load_high == null ? null : Boolean(r.training_load_high),
+      trainingLoadGridLen:            (r.training_load_grid_len as number) ?? null,
+      trainingLoadValidMin:           (r.training_load_valid_min as number) ?? null,
       recoveryIndexHours:             (r.recovery_index_hours as number) ?? null,
       wornHoursBle:                   (r.worn_hours_ble as number) ?? null,
       nightHrvBaselineMs:             (r.night_hrv_baseline_ms as number) ?? null,
@@ -733,13 +735,14 @@ export class SQLiteLocalStore implements LocalStore {
       `INSERT INTO oura_daily_derived
          (day, source, model_versions, sleep_score, sleep_contributors, readiness_score,
           readiness_contributors, readiness_source, activity_score, activity_contributors,
-          active_calories_est, training_load_ots, training_load_gate, training_load_high, recovery_index_hours,
+          active_calories_est, training_load_ots, training_load_gate, training_load_high,
+          training_load_grid_len, training_load_valid_min, recovery_index_hours,
           worn_hours_ble, night_hrv_baseline_ms, illness_flag, illness_score, illness_biomarkers,
           daytime_stress_scaled, stress_high_minutes, recovery_high_minutes, chronic_stress_score,
           chronic_stress_contributors, resilience_level, resilience_daily_stress,
           resilience_daily_restorative_time, resilience_daily_sleep_recovery, resilience_granular,
           resilience_confidence, daytime_stress_coverage_min, chronic_stress_granular_nights, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(day) DO UPDATE SET
          source=excluded.source, model_versions=excluded.model_versions, sleep_score=excluded.sleep_score,
          sleep_contributors=excluded.sleep_contributors, readiness_score=excluded.readiness_score,
@@ -747,7 +750,10 @@ export class SQLiteLocalStore implements LocalStore {
          activity_score=excluded.activity_score, activity_contributors=excluded.activity_contributors,
          active_calories_est=excluded.active_calories_est, training_load_ots=excluded.training_load_ots,
          training_load_gate=excluded.training_load_gate,
-         training_load_high=excluded.training_load_high, recovery_index_hours=excluded.recovery_index_hours,
+         training_load_high=excluded.training_load_high,
+         training_load_grid_len=excluded.training_load_grid_len,
+         training_load_valid_min=excluded.training_load_valid_min,
+         recovery_index_hours=excluded.recovery_index_hours,
          worn_hours_ble=excluded.worn_hours_ble, night_hrv_baseline_ms=excluded.night_hrv_baseline_ms,
          illness_flag=excluded.illness_flag, illness_score=excluded.illness_score,
          illness_biomarkers=excluded.illness_biomarkers, daytime_stress_scaled=excluded.daytime_stress_scaled,
@@ -768,6 +774,7 @@ export class SQLiteLocalStore implements LocalStore {
         record.readinessSource, record.activityScore,
         record.activityContributors != null ? JSON.stringify(record.activityContributors) : null,
         record.activeCaloriesEst, record.trainingLoadOts, record.trainingLoadGate, record.trainingLoadHigh == null ? null : (record.trainingLoadHigh ? 1 : 0),
+        record.trainingLoadGridLen, record.trainingLoadValidMin,
         record.recoveryIndexHours, record.wornHoursBle, record.nightHrvBaselineMs,
         record.illnessFlag, record.illnessScore, record.illnessBiomarkers != null ? JSON.stringify(record.illnessBiomarkers) : null,
         record.daytimeStressScaled, record.stressHighMinutes, record.recoveryHighMinutes, record.chronicStressScore,
@@ -1624,13 +1631,14 @@ export class SQLiteLocalStore implements LocalStore {
         `INSERT INTO oura_daily_derived
            (day, source, model_versions, sleep_score, sleep_contributors, readiness_score,
             readiness_contributors, readiness_source, activity_score, activity_contributors,
-            active_calories_est, training_load_ots, training_load_gate, training_load_high, recovery_index_hours,
+            active_calories_est, training_load_ots, training_load_gate, training_load_high,
+          training_load_grid_len, training_load_valid_min, recovery_index_hours,
             worn_hours_ble, night_hrv_baseline_ms, illness_flag, illness_score, illness_biomarkers,
             daytime_stress_scaled, stress_high_minutes, recovery_high_minutes, chronic_stress_score,
             chronic_stress_contributors, resilience_level, resilience_daily_stress,
             resilience_daily_restorative_time, resilience_daily_sleep_recovery, resilience_granular,
             resilience_confidence, daytime_stress_coverage_min, chronic_stress_granular_nights, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(day) DO UPDATE SET
            source=excluded.source, model_versions=excluded.model_versions, sleep_score=excluded.sleep_score,
            sleep_contributors=excluded.sleep_contributors, readiness_score=excluded.readiness_score,
@@ -1638,7 +1646,10 @@ export class SQLiteLocalStore implements LocalStore {
            activity_score=excluded.activity_score, activity_contributors=excluded.activity_contributors,
            active_calories_est=excluded.active_calories_est, training_load_ots=excluded.training_load_ots,
            training_load_gate=excluded.training_load_gate,
-           training_load_high=excluded.training_load_high, recovery_index_hours=excluded.recovery_index_hours,
+           training_load_high=excluded.training_load_high,
+         training_load_grid_len=excluded.training_load_grid_len,
+         training_load_valid_min=excluded.training_load_valid_min,
+         recovery_index_hours=excluded.recovery_index_hours,
            worn_hours_ble=excluded.worn_hours_ble, night_hrv_baseline_ms=excluded.night_hrv_baseline_ms,
            illness_flag=excluded.illness_flag, illness_score=excluded.illness_score,
            illness_biomarkers=excluded.illness_biomarkers, daytime_stress_scaled=excluded.daytime_stress_scaled,
@@ -1665,6 +1676,7 @@ export class SQLiteLocalStore implements LocalStore {
           r.readinessSource, r.activityScore,
           r.activityContributors != null ? JSON.stringify(r.activityContributors) : null,
           r.activeCaloriesEst, r.trainingLoadOts, r.trainingLoadGate,
+          r.trainingLoadGridLen, r.trainingLoadValidMin,
           r.trainingLoadHigh == null ? null : (r.trainingLoadHigh ? 1 : 0),
           r.recoveryIndexHours, r.wornHoursBle, r.nightHrvBaselineMs, r.illnessFlag, r.illnessScore,
           r.illnessBiomarkers != null ? JSON.stringify(r.illnessBiomarkers) : null,

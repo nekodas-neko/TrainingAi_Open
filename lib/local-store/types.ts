@@ -210,6 +210,8 @@ export interface LocalOuraDailyDerived {
   activeCaloriesEst:              number | null;
   trainingLoadOts:                number | null;
   trainingLoadGate:               string | null;
+  trainingLoadGridLen:            number | null;
+  trainingLoadValidMin:           number | null;
   trainingLoadHigh:               boolean | null;                  // stored as INTEGER 0/1
   recoveryIndexHours:             number | null;
   wornHoursBle:                   number | null;

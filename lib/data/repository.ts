@@ -1505,6 +1505,9 @@ export interface OuraDailyDerivedRow {
   // else is the gate that refused. `string | null` matches its siblings (`illnessFlag`,
   // `readinessSource`) rather than importing the health package's union into the data layer.
   trainingLoadGate: string | null
+  /** LA-161: the MET grid length and valid-minute count the gate above was decided from. */
+  trainingLoadGridLen: number | null
+  trainingLoadValidMin: number | null
   recoveryIndexHours: number | null
   wornHoursBle: number | null
   nightHrvBaselineMs: number | null
