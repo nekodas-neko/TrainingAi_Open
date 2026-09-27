@@ -18,6 +18,11 @@ git worktree add ../TrainingAi_Open-lane-a origin/main
 Start the agent in that directory. Never share one between lanes, and never run a lane from the
 owner's own working copy.
 
+**The same applies to ONE agent running two things at once.** A background suite reads the checkout
+as it goes, so a `git checkout` mid-run makes it test half of each branch. Measured 2026-09-27: a
+test file loaded from one branch ran against `date-utils.ts` from another and failed on a correct
+change. Run the suite in its own worktree, or do not switch branches until it exits.
+
 ## ② One database per agent
 
 `setup.sh` takes `LOCAL_DB_PORT`, `LOCAL_DB_NAME`, `LOCAL_PGDATA` and `LOCAL_PGLOG`, defaulting to the
