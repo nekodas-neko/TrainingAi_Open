@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.20",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a deload week left an exercise at its full working weight when it had no progression style set — Skull Crusher came up at 3 × 30 kg beside four lifts at 52%. Every exercise in the session is lightened now.",
+    ],
+  },
+  {
+    version: "1.477.19",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: the same moment read \"6:40 AM\" on Home's timeline, \"6:40am\" on a day's workout card and \"6:40 am\" on the activity list. All three, and the Body Battery card's time axis, now read \"6:40 am\".",
+    ],
+  },
+  {
     version: "1.477.18",
     date: "2026-09-27",
     changes: [

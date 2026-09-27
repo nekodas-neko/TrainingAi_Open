@@ -3909,16 +3909,21 @@ which is the right shape for something that can only be validated by living with
   is relative age, a different idiom from a duration. Control-run: reinstating the timeline's own
   helper fails it.
 - **STILL OPEN, and two of them are NOT Lane B:**
-  ① **Time-of-day casing is Lane A.** `formatTimeOfDay` emits `6:40am` (`h:mm aaa`); the uppercase
-  `6:40 AM` comes from **`app/api/day-timeline/route.ts:44`**, which formats `h:mm a` server-side.
-  That is `app/api/**`. **Lane: A** — one format string, and the route returning a display string
-  at all is worth a second look while it is open.
-  ② **Unit spacing (`7 × 68kg` against `98 kg`) needs a `formatKg` that emits decimals AS NEEDED.**
-  The default is one decimal, so routing the lift sites through it turns `68kg` into `68.0 kg`,
-  which is worse. `packages/shared/**` is **Lane A**: either an option on `formatKg` or a sibling.
-  Sites waiting on it: `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`,
-  `weights-summary:93`, `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**`
-  is deliberately excluded, as it is for the timezone rules.
+  ① ~~**Time-of-day casing is Lane A.**~~ **✅ SHIPPED 2026-09-27 (Lane A).** The entry's premise was
+  half-wrong, measured: `formatTimeOfDay` emits `6:40 am` WITH a space, and there were THREE forms,
+  not two. `app/api/day-timeline/route.ts` formatted `h:mm a` itself (Home's `6:40 AM`), and a
+  second shared helper, `fmtAest` (`h:mmaaa`, `6:40am`), fed `/api/day-log` (Health → Day) and
+  the Body Battery card. The route now calls `formatTimeOfDay`, and `fmtAest` delegates to it, so
+  all four surfaces read `6:40 am`. **Still their own form, and Lane B's:**
+  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both format minutes-of-day rather than
+  an instant, so they need a minutes-based sibling of `formatTimeOfDay`, not a straight swap.
+  ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
+  SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
+  `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
+  one decimal. `formatKg` also takes `trim`. **The six sites are Lane B's and still to convert:**
+  `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`, `weights-summary:93`,
+  `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**` stays excluded.
   ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
   is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
   Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
@@ -6421,6 +6426,27 @@ drift.
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
 - **Needs:** — nothing.
+- **⚙ SHIPPED 2026-09-28 (Lane A): the deload now reaches an exercise with no style.** Root cause,
+  from production and then the code: Skull Crusher has had **no progression style** since
+  2026-09-10 (`session_exercises.style_id` NULL; its logs carry no `style_id` from that date),
+  and on 09-25 the AI prescription was not driving the load. The four styled exercises took their
+  base style and the Q-185 deload override (`packages/shared/src/workout/session-data.ts`) swapped in
+  the deload style: logged `deloaded`, 2 sets, `planned_pct = 52`. Skull Crusher had a null
+  `progressionStyle`, and that override **required a non-empty one**, so it was skipped: logged
+  `deloaded = false`, 3 × 30 kg, no `planned_pct`. The deload style comes from the goal alone, so
+  the requirement only ever exempted style-less exercises. Removed.
+  **Neither candidate (a) nor (b) above was the mechanism:** the basis was never consulted, and there
+  was no deload pct to misapply. The id-mismatch idea was checked too: the stored prescription's
+  `sessionExerciseId`s match all five current exercises.
+- **Keep:** three things the fix does not touch.
+  ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
+  remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
+  whether a save path can drop a style is the Lane A question.
+  ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
+  TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
+  needs a decision on a default, not a bug fix.
+  ③ **The 57.75 kg PR (2026-08-13) against a current 36.5** still looks inflated, as noted below. It
+  played no part in this bug.
 - **⚙ A SECOND SYMPTOM, same exercise, found 2026-09-27 (Lane A) while decomposing TN-75.**
   Barbell Skull Crusher is the ONLY loaded exercise in September with no `planned_pct` on any
   set — 6 sets across 09-19 and 09-25, including the very Upper session in the table below — and
