@@ -633,13 +633,29 @@ below threshold and left in place for next time.
   now rather than leaving two candidates for the next battery question.
 - **Reversal cost:** none. Two expressions.
 
-### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
+### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
   the **schema half is Lane A's**, and the **merge is the owner's** (outside contributor, storage
   carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
 - **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
   than re-deriving it; the diff read is still Review's.
+- **✅ THE COLLISION IS RESOLVED — the contributor fixed it, verified 2026-09-27 22:56 on head
+  `0bb5a87e`.** This entry said the PR took **288/289**, which `main` already held, and that the
+  later-sorting twin would silently drop the new view. He renumbered to **290/291** and regenerated
+  the twin **after** applying, which is the ordering that matters: the regenerated file carries
+  `training_load_grid_len` and `training_load_valid_min`, so it was generated against a database
+  holding LA-161 rather than against a stale one.
+  **Checked with the tool that owns the question, not by reading the diff:**
+  `node scripts/next-schema-number.js` reports **292** next free, lists 290/291 as claimed by
+  `origin/health-sample-storage` alone, and reports **no collision** on them. CI is **all ten jobs
+  completed and success** on that head, Migration Check included.
+- **What is still owed is the diff read, and only that.** Storage carve-out, outside contributor:
+  **Review** reads it, **the owner merges**. Nothing here is blocking any more.
+- **⚠ Separately, `next-schema-number.js` reports a REAL collision that is OURS, not his** — `273`
+  and `274` are claimed by both `main` (merged, `273_exercise_media_review_status.sql`) and
+  `origin/lane-a/q44-phase3-pr1-table-rename`. That branch must renumber before it can land; the
+  check fails once both are in one tree. Not this entry's work — recorded so it is not lost.
 - **Needs:** — nothing.
 - **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
   `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
