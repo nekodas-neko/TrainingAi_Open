@@ -4020,7 +4020,7 @@ which is the right shape for something that can only be validated by living with
   itself from `window.innerHeight`, which `resizes-content` makes shrink when a keyboard opens. It
   already listens for `resize` and re-snaps, and it is capped at 320 px, so it degrades; worth a
   look during P26 rather than a pre-emptive change.
-- **Keep / Done when:** P26 shows no input or submit button covered, on food review and the
+- **Keep:** the device pass, and it is the whole remaining ask — done when P26 shows no input or submit button covered, on food review and the
   weigh-in sheet — plus a glance at the weight dial with a keyboard up.
 
 ### [app-shell][readiness] RV-211 — Home tells an empty account things that are not true, and draws a few stray marks
@@ -6925,7 +6925,7 @@ drift.
   travel with `onFinish`, every wall-clock field is derived from the clock rather than the plan, and
   below `MIN_WALK_SEC` (60s) the existing end-walk dialog becomes a discard confirm instead of being
   followed by a second prompt.
-- **Keep ①, the owner's:** **three** phantom rows are already in `activity_logs` and nothing marks
+- **Keep:** two things — ① the owner's, below, and ② the device check further down. ① **three** phantom rows are already in `activity_logs` and nothing marks
   them spurious. `b8083d04` (09-24, 40 min, 133 kcal) is the one he reported; Review sweep 57
   measured **two more** — `ea77ce16` (07-30, 30-min interval walk, 0.037 km, pace 49,104 s/km) and
   `a85568a4` (09-14, 22-min treadmill, 74 kcal, HR 65). He soft-deletes them from the activity list,
@@ -6934,7 +6934,7 @@ drift.
   **The signature to find any others is NOT `avg_hr`/`steps` both null** — that finds only 09-24,
   because the older two carry HR from their first ~90 seconds. It is `created_at` falling more than
   2 minutes before `end_time` on the same local day.
-- **Keep ②, the device check:** start a guided walk, end it inside a minute, and confirm the dialog
+- **② The device check:** start a guided walk, end it inside a minute, and confirm the dialog
   offers Discard and no row is written; then end one after a few minutes and confirm the row's
   duration matches the clock; then complete a full walk and confirm it is unchanged. **Lane: DV.**
   The sandbox cannot reach it — `getLocalStore` returns null there, so the branch that writes the
@@ -10158,11 +10158,11 @@ why the count of affected entries always understated the harm.
   Verified by count, since the failure is silent and passes `check-doc-links`: the second fold of
   2026-09-24 left `folded-1` at **26** anchors untouched and wrote **41** into `folded-2`; anchors
   across all history files went 645 → 686, entries 69 → 29.
-- **Keep ①: the additive write is still the better long-term answer** and is not done. One file per
+- **Keep:** two things — ① the additive write, below, and ② the recovery path after it. ① The additive write is still the better long-term answer and is not done. One file per
   day is tidier than N, and it is what makes a same-day fold idempotent rather than merely safe. It
   loses today only because it has to merge two documents correctly and corrupts the archive when it
   does not — which is the failure this entry exists for.
-- **Keep ②: the recovery path, untouched.** Nothing reports which entries a past fold dropped, and
+- **② The recovery path, untouched.** Nothing reports which entries a past fold dropped, and
   #1484's losses are only in git history. That half is unaffected by the fix above.
 - **📊 Second live instance, and the reason the fix could not wait:** it happened again on
   2026-09-24. The 60-entry limit fails for EVERY lane at once, so two lanes started the same fold
