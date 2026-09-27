@@ -1,4 +1,9 @@
 import { getPool } from '@/lib/data/postgres/client'
+import { getRepository } from '@/lib/data'
+import { z } from 'zod'
+
+/** The body of a session delete, for the route and the outbox's `workout_session_delete` alike. */
+export const WorkoutSessionDeleteSchema = z.object({ workoutSessionId: z.string().uuid() }).strict()
 
 /**
  * Soft-deletes a whole workout session and its exercise_logs + set_logs
@@ -82,4 +87,23 @@ export async function deleteWorkoutSession(
   } finally {
     client.release()
   }
+}
+
+/**
+ * Delete a session and re-derive the personal records it contributed to — the whole write, for both
+ * `DELETE /api/workout-sessions` and the outbox's `workout_session_delete` push branch (RV-175).
+ * The reconcile used to live in the route alone, so a delete arriving through the outbox would have
+ * left a PR standing on a session that no longer exists.
+ */
+export async function deleteWorkoutSessionAndReconcile(
+  userId: string,
+  workoutSessionId: string,
+): Promise<{ deleted: boolean }> {
+  const { deleted, exerciseNames } = await deleteWorkoutSession(userId, workoutSessionId)
+  if (!deleted) return { deleted }
+  const repo = await getRepository()
+  for (const name of exerciseNames) {
+    await repo.reconcilePersonalRecord(userId, name)
+  }
+  return { deleted }
 }
