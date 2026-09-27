@@ -63,6 +63,23 @@ shows. Recorded on the entry; not attempted here.
   `isActiveCheckedAt` on a missing row. Control: `!user` → `user == null`.
 - `tsc` 0 · `lint` 0 · `build` 0 · Custom Rules **83 of 83** · full suite below.
 
+## Local run on `pnpm dev` (2026-09-27, second session)
+
+Run on Windows against a fresh local Postgres (all migrations applied, seed loaded), in a real
+browser, so the session cookie rotated the way it does on a phone.
+
+- **A deleted account loses access on the next request.** Signed in through `/sign-in` as a
+  throwaway account, `GET /api/friends` → **200**; `DELETE FROM users` for that row; the same
+  cookie's next `GET /api/friends` → **401**. That closes the "Not exercised" point below about no
+  account ever being deleted, for the local database.
+- **The run is only valid if nothing calls `/api/auth/session` in between.** A first attempt read
+  **200** after the delete, and the cause was the harness: it had called `/api/auth/session`,
+  which re-issues the cookie with `isActiveCheckedAt` stamped, and from then on
+  `refreshIsActiveClaim`'s one-day throttle skips the lookup. Proven by setting
+  `ISACTIVE_RECHECK_MS` to `0` in the working tree: the same session went to 401 at once (then
+  reverted). The app itself has no caller of that endpoint (PS-24 records why that matters), so the
+  clean run above is the one that describes the product.
+
 ## Not exercised
 
 - **No account was actually deleted anywhere.** The lookup is injected, so the test drives the
