@@ -2988,11 +2988,42 @@ which is the right shape for something that can only be validated by living with
   is an assertion that nothing verifies. Where two writers put different shapes in one column,
   the reader takes `unknown` and narrows.
 
+### [workouts] LB-165 — the rules prescription is built, returned, and reaches no screen at all
+- **Lane: A** (`packages/shared/src/ai-periodization/generate-prescription.ts`, plus whichever of
+  `app/api/workout-data/route.ts` / the `/prescribe` route carries the answer out).
+- **Added:** 2026-09-27 · found while building `RV-202 ③`, which needed to know whether a rules
+  plan was ever on screen to label. It is not.
+- **The chain, code-certain end to end — five links, each verified against `main`:**
+  1. `buildRulesPrescription` returns a plan with `source: 'rules'` and `confidence: 0.3`. It is
+     **deliberately not persisted** (`generate-prescription.ts`, the `RV-202` catch): storing it
+     would hold the model off for seven days, which is sound and is not the problem.
+  2. `/prescribe` returns it in the response body.
+  3. **Both client callers ignore that body.** `workout-screen.tsx` checks `res.ok`, invalidates,
+     and refetches; the completion-path caller only invalidates. Neither reads `prescription`.
+  4. `workout-data` reads `aiPeriodizationState?.prescription` — the STORED plan — and fires
+     regeneration as a background single-flight whose result it never consults.
+  5. `isAiPrescriptionPending` is `prescriptionStatus === 'consumed'`, and the rules path never
+     calls `storePrescription`, so the status never flips. The screen stays "pending".
+- **So the lifter's experience is unchanged by `RV-202 ①`**: still the ten 3 s polls, still
+  ~30 s of "Preparing your AI workout…", still the amber "couldn't generate" banner and the base
+  numbers. The entry's measurement (HTTP 200 where there was a 502) was real and was about the
+  ROUTE; the conclusion drawn from it was about a layer it did not test.
+- **Not obviously a bug in the non-persistence decision** — that reasoning holds. The gap is that
+  nothing carries a non-persisted plan out to the caller that paints. Two shapes, both Lane A's to
+  judge: have `workout-data` apply and report the in-process generation's result for this request
+  only, or store it with a same-day expiry so the next open still re-runs the model.
+- **Whichever ships, `RV-202 ③`'s label has a third case waiting for it** (`From your program`,
+  beside `From {date}` and `Base program`) — `components/workout/numbers-source.ts` is where it
+  goes, and it is a one-line addition once a client can see `source`.
+
 ### [workouts] RV-202 — the prescription has no fallback: offline shows stale numbers as "Recommended", a model failure costs ~30 s, and changing the duration re-asks the model
-- **Lane: B.** Items ① and ② shipped 2026-09-26 and were Lane A's; the only remaining work is
-  item ③, the offline label in `workout-screen.tsx` / `pre-workout-screen.tsx`. Re-laned so it
-  stops heading Lane A's READY list, where it cost two sessions a re-derivation.
-  (Was: `Lane: A` … plus **B** for the label.)
+- **✅ ALL THREE ITEMS SHIPPED. ③ landed 2026-09-27 (#1760); the entry stays only for its `Keep:`.**
+- **Lane: B.** Items ① and ② shipped 2026-09-26 and were Lane A's; item ③ was the label in
+  `workout-screen.tsx` / `pre-workout-screen.tsx`. Re-laned so it stopped heading Lane A's READY
+  list, where it cost two sessions a re-derivation. (Was: `Lane: A` … plus **B** for the label.)
+- **Keep:** ① the device look at the label — an amber pill on the screen the owner opens before
+  every workout, and the sandbox can only prove it renders and does not wrap at 412 px. ② the
+  `LB-165` finding below, which is item ①'s and is NOT closed by this.
 - **Added:** 2026-09-25 · Review sweep 61. **Complements RV-65**, which is gated on the owner because it removes the model. This entry removes no model call when the model works, so it is **not** gated.
 - **What:**
   1. **Model failure → 502** (`generate-prescription.ts:316`).
@@ -3046,14 +3077,31 @@ which is the right shape for something that can only be validated by living with
      - **Not done, deliberately:** the re-fit still spends the route's `prescribe:` rate limit,
        which is sized for model calls (20/hour). Splitting the buckets is a separate change; the
        limit is an abuse guard on a DB-heavy path either way.
-  3. **Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.
-     - The pending flag only comes from a server response (`workout-screen.tsx:446`).
-     - **Fix (B):** label the source ("Base program" or "From {date}").
-     - **⚠ Item 1 gave this a second unlabelled source and did not make it worse.** A rules plan
-       carries `source: 'rules'` and nothing renders it, so a model outage now shows the base
-       numbers immediately where it used to show them after ~30 s of "Preparing your AI workout…".
-       Same numbers, same silence, less waiting — but the field this item wants to read now
-       exists, so the label no longer has to be inferred.
+  3. ~~**Offline, the screen shows the last cached or base numbers under "Recommended workout"**, with nothing saying they are not today's.**~~ — **SHIPPED 2026-09-27** (`fix/rv202-label-the-numbers-source`).
+     - The heading now carries an amber pill naming the source: **`From 26 Sept`** for a payload
+       built on an earlier day, **`Base program`** for the on-device mirror. Today's payload is
+       deliberately unlabelled — a permanent note beside "Recommended workout" is furniture, and
+       the lifter would stop reading it on the day it meant something.
+     - **The screen has THREE paint sources, not the two the item names**, and each answers
+       separately: its own `workout-data:<id>` cache, Home's `workout-card:` prefetch, and the
+       on-device program mirror. The two cache seeds now share one `paintSeed` body — they were
+       byte-identical but for the variable — so three replacement sites cover four sources, and
+       `rv202-label-the-numbers-source.test.ts` pins `setExercises`-replacements == sources.
+     - **It reads against the header's own date**, which already prints `Sunday 27 September`. That
+       contrast is the whole value, so the e2e guard asserts the pill does not WRAP below the
+       heading at 412 px, not merely that it exists.
+     - **`isWorkoutDataToday` is the comparison** (it already existed for the `loggedTodayInSession`
+       strip) — but it treats a `dataDate`-less payload as not-today, which is right there and
+       wrong as a label trigger: there is no day to name. `cachedNumbersSource` returns null rather
+       than guessing one.
+     - **What it deliberately does NOT label: a rules plan.** See `LB-165` — there is no such
+       thing on screen to label.
+     - **⚠ THE NOTE THAT USED TO SIT HERE WAS WRONG AND IS RETRACTED (2026-09-27).** It said item ①
+       "now shows the base numbers immediately where it used to show them after ~30 s", and that
+       the `source` field "now exists, so the label no longer has to be inferred". Neither holds:
+       the rules plan is never stored, both client `/prescribe` callers ignore the response body,
+       and `workout-data` reads the stored state — so `source: 'rules'` reaches no screen and
+       nothing about the ~30 s wait changed. Filed as **`LB-165`**.
 - **Not in scope:** computing the prescription on the device, which means moving `signals.ts`'s input gathering onto the local store (L). Revisit after RV-65's measurement says whether the model earns its call at all.
 
 ### [nutrition][app-shell] RV-203 — food capture asks the model before checking the user's own foods
