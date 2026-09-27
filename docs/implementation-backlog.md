@@ -4944,6 +4944,16 @@ unverified"* is now answered: it persists.
     those columns**, after a day of production: a short grid points at the ds window or at
     `dsToMs` dropping rows; a full grid means the floors are being evaluated on something other
     than what is stored.
+  - **Read attempted 2026-09-27 12:14 UTC (Lane A) — premature, not negative.** All 15 days
+    2026-09-13 → 09-27 carry a gate (`insufficient_met` ×13, `scorer_no_output` on 09-25/09-26) and
+    **`training_load_grid_len` / `training_load_valid_min` NULL on every one.** Every gated path in
+    `computeTrainingStress` returns both numbers, and the only other writer — the `oura_daily_derived`
+    `pushMutations` branch — COALESCEs, so it cannot null them. The shared `updated_at` (11:16 UTC,
+    after LA-161 deployed at 05:06) is a device push bumping the row, not the route running. **So the
+    route has not evaluated a day since LA-161 deployed.** The app asks it about TODAY only, when opened
+    (`sync-provider` warm, `training-stress-line`, `training-stress-badge`), so the first row with
+    numbers will be the next day the owner opens the app. Read that day; the older days will never
+    get them without a per-date call.
 
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
