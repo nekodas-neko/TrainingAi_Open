@@ -4623,30 +4623,6 @@ which is the right shape for something that can only be validated by living with
 - **Keep:** the device check. Zone minutes appear on the Activity surfaces, and the new floor
   changes what those read for every past day; nothing here was seen on the phone.
 
-### [platform] LB-170 — the rate limiter's flush outlives the request, and under test it outlived the file
-- **Lane: A** — `lib/rate-limit.ts`. **Added:** 2026-09-27 · split out of `LB-168` once that was root-caused.
-- **Why it is split out rather than a `Keep:` on `LB-168`.** `LB-168` was a CI-health defect and it is
-  fixed; this is a latent behavioural one in Lane A's file with no live symptom. Left inside that
-  entry it would read as verification debt on something already shipped.
-- **What, measured.** `scheduleFlush` fires `(async () => { … })()` and nobody awaits it, so a DB
-  round trip (`ensureSchema` + an upsert on `rate_limits`) continues after the request that started it
-  has been answered. `inFlightFlushes` tracks the promises and **`_awaitRateLimitFlushes()` is already
-  exported for exactly this** — six test files call it. Nothing in the request path does.
-- **How it surfaced:** under vitest the flush landed after its test file had returned, which is how
-  `LB-168`'s teardown race happened. That half is fixed at the logging end, so this is now invisible
-  rather than absent — the write still happens late, it just no longer prints.
-- **Why it may be fine, and why that should be decided rather than assumed.** In production the
-  process is long-lived, so a flush completing after the response is the intended design (the comment
-  at the top of the file says so: the L1 map is the synchronous fast path and the DB is caught up
-  behind it). The question is the **shutdown** case — a Railway deploy replacing the container mid-flush
-  drops that increment silently, which is the same class as the accepted lag already documented there.
-- **What is actually owed:** a judgement, not necessarily a change. Either await the drain on shutdown
-  (there is no cron layer or lifecycle hook here — see `docs/module-map.md` §0, so this may cost more
-  than it saves), or write one line in `lib/rate-limit.ts` recording that a lost increment on deploy
-  is accepted, so the next reader does not re-open it. **Prefer the second unless the first is cheap.**
-- **Do NOT "fix" it by draining in the test setup** — measured on 2026-09-27, that takes the suite
-  from 348 s to 482 s and fails 70 files. `LB-168` has the numbers.
-
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
 - **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
