@@ -1693,6 +1693,17 @@ below threshold and left in place for next time.
   found by reading the diff, not a routing note. **Those three are now the live record; this entry
   is the routing history.** Strike it once the security review is posted rather than working it
   twice.
+- **✅ #1607's SECURITY REVIEW IS POSTED, 2026-09-27** — [the comment](https://github.com/nekodas-neko/TrainingAi_Open/pull/1607#issuecomment-5854224892).
+  No approval given, per his answer. Three findings: no test for the new `responseType: 'token'`
+  branch; no per-token revocation (a leaked bearer is valid 7 days, and the only kill switch
+  deactivates the whole account); and a pre-existing cookie/JWT lifetime mismatch in the same file,
+  split out as `OR-193`. It CONFIRMED the credential is the existing NextAuth session JWT resolved
+  through `lib/auth/bearer-session.ts` with a per-request `isActive` re-read — so the `Q-1a` overlap
+  `BF-212` flagged is **reuse, not duplication**.
+- **⛔ DO NOT STRIKE THIS ENTRY.** An earlier version of this bullet said to strike it once the
+  review was posted. That was written before BugFix added the seven-PR census below, which exists
+  **nowhere else** — `BF-212` records #1607 only. The strike was attempted in #1778 and reverted at
+  the merge conflict; what is owed now is the owner's pass over the five green PRs, not a deletion.
 - **✅ ANSWERED 2026-09-27 — run a security review on `#1607` first, then the owner reads the diff himself.**
   He declined both the approve-if-clean option and the comment-only one. So: **a `/security-review`
   pass, findings posted concisely on the PR, and then it waits for him.** No agent merges it — it is
