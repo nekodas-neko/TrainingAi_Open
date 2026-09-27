@@ -4125,23 +4125,6 @@ which is the right shape for something that can only be validated by living with
 - **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
 
-### [app-shell] LA-156 — Home's streak card should read the schedule, not assume a rest gap of 2
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-216.
-- **The formula is done and shared** — `computeDayStreak` + `streakRestGapFor`
-  (`packages/shared/src/workout/day-streak.ts`), already used by `/api/achievements` and
-  `/api/friends/leaderboard`. What is left is Home's call site.
-- **What:** `app/session-select/compute-streak.ts` still holds its own copy and hardcodes a rest
-  gap of **2**. The shared function was written to be behaviourally identical to it, so nothing
-  on Home changes today — the swap is an import and a signature change (it takes
-  `(trainedDates, todayStr, gap)` rather than `(trainedDays, dayKey)`), and the old file goes.
-- **What the swap FIXES, and why it is not cosmetic:** 2 is the floor, not the answer.
-  `streakRestGapFor` raises it from the user's own schedule, so somebody training Mon+Tue gets 5
-  (BF-122a). Home cannot do that today because it never reads the schedule, so for a weekly user
-  Home under-reports against the achievements page. The owner is on a rotation, where the floor
-  is what applies, which is why this is not urgent for him.
-- **Done when:** Home imports `computeDayStreak`, `app/session-select/compute-streak.ts` is
-  deleted, and Home's number matches `/api/achievements`'s `bestStreak` for the same history.
-
 ### [sleep][app-shell] LA-157 — the Sleep contributors list has uneven gaps that read as empty rows
 - **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · Lane A, remainder of RV-217.
 - **The labels and chevrons are FIXED** (RV-217, 2026-09-27): `hrv`, `hr` and `schedule` now carry
