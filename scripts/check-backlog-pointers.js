@@ -10,8 +10,8 @@
  * Checks:
  *   1. No entry ID is used by two queue entries.
  *   2. Every queue entry heading carries at least one valid [domain] tag.
- *   3. The "Next free Postgres migration" pointer matches the migrations directory.
- *   4. The "Local SQLite schema version" pointer matches lib/sqlite/migrations.ts.
+ *   3. The file still points at `scripts/next-schema-number.js` for the migration and local
+ *      SQLite numbers, which are derived rather than written down (BF-211).
  *   5. Every `Needs:` names an ID that exists, or has existed, somewhere in the tree.
  *   6. No cycle among `Needs:` edges.
  *   7. Every `Gate:` value is one this project knows how to resolve.
@@ -555,39 +555,28 @@ for (const [id, m] of meta) {
   for (const id of seen.keys()) visit(id);
 }
 
-// ---- 3: Postgres migration pointer ----------------------------------------
+// ---- 3: the schema numbers are DERIVED, not written down -------------------
+// There used to be a hand-maintained table here, pinned by this check to max(merged) + 1 — so it
+// could only restate the filenames, never reserve ahead of them, and the reservations it claimed to
+// carry lived in a free-text parenthetical nothing read (BF-211, from issue #1620). It is now
+// `node scripts/next-schema-number.js`, which reads every fetched ref. What remains here is the
+// narrow thing a docs check can still do: make sure the file points at that command, so the
+// removal cannot quietly become "no answer at all".
+const NUMBERS_COMMAND = 'node scripts/next-schema-number.js';
+if (!text.includes(NUMBERS_COMMAND)) {
+  failures.push(
+    `The backlog no longer names \`${NUMBERS_COMMAND}\` — the migration and SQLite numbers are ` +
+      'derived by that command now, and nothing else in this file says where to get them.',
+  );
+}
 const migFiles = fs
   .readdirSync(MIGRATIONS)
   .filter((f) => /^\d+_.*\.sql$/.test(f))
   .map((f) => parseInt(f.match(/^(\d+)/)[1], 10));
 const nextMigration = Math.max(...migFiles) + 1;
-
-const migRow = text.match(/\|\s*Next free Postgres migration\s*\|\s*\*\*(\d+)\*\*/);
-if (!migRow) {
-  failures.push('Live-pointer table is missing its "Next free Postgres migration" row.');
-} else if (parseInt(migRow[1], 10) !== nextMigration) {
-  failures.push(
-    `Migration pointer says ${migRow[1]}, but the directory head is ` +
-      `${nextMigration - 1} so the next free number is ${nextMigration}.`,
-  );
-}
-
-// ---- 4: local SQLite version ----------------------------------------------
 const sqliteSrc = fs.readFileSync(SQLITE, 'utf8');
 const versions = [...sqliteSrc.matchAll(/toVersion:\s*(\d+)/g)].map((m) => parseInt(m[1], 10));
-if (versions.length === 0) {
-  failures.push('Could not read any toVersion from lib/sqlite/migrations.ts.');
-} else {
-  const maxVersion = Math.max(...versions);
-  const sqliteRow = text.match(/\|\s*Local SQLite schema version\s*\|\s*\*\*v(\d+)\*\*/);
-  if (!sqliteRow) {
-    failures.push('Live-pointer table is missing its "Local SQLite schema version" row.');
-  } else if (parseInt(sqliteRow[1], 10) !== maxVersion) {
-    failures.push(
-      `SQLite pointer says v${sqliteRow[1]}, but lib/sqlite/migrations.ts tops out at v${maxVersion}.`,
-    );
-  }
-}
+if (versions.length === 0) failures.push('Could not read any toVersion from lib/sqlite/migrations.ts.');
 
 // ---- report ----------------------------------------------------------------
 if (failures.length) {
@@ -725,5 +714,6 @@ console.log(
   `check-backlog-pointers: OK — ${seen.size} entries, no duplicates, all tagged; ` +
     `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:, ${verifySummary}; ` +
     `batches [${batchSummary || 'none'}]; ${completedSummary}; ` +
-    `migration ${nextMigration}, SQLite v${Math.max(...versions)} match source.`,
+    `merged head: migration ${nextMigration - 1}, SQLite v${Math.max(...versions)} ` +
+      '(run scripts/next-schema-number.js for the next free numbers, branches included).',
 );

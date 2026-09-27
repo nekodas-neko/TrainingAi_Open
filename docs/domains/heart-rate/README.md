@@ -149,7 +149,7 @@ Live at the time of writing (2026-08-05):
   against 60 on the owner's own figures — establish whether that is a deliberate proxy before
   changing it), and the three-surfaces-one-number context question the entry was filed on.
 
-- Handoffs: `ls docs/handoff-*-heart-rate-*.md`
+- Handoffs: `ls docs/handoffs/handoff-*-heart-rate-*.md`
 - Journal: `grep -rl 'live.HR\|HRV\|hr-zone' docs/overview/entries/`
 
 ## Gotchas specific to this domain

@@ -41,7 +41,7 @@ export function TitlePickerSheet({ open, onOpenChange, unlockedAchievementIds, c
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] flex flex-col">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[80dvh] flex flex-col">
         <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
           <SheetTitle>Equip Title</SheetTitle>
         </SheetHeader>

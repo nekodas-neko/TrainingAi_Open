@@ -23,7 +23,7 @@ export function NutritionSettingsSheet({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
         <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
           <SheetTitle>Nutrition Settings</SheetTitle>
         </SheetHeader>

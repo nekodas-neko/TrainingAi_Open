@@ -74,7 +74,7 @@ export function NumberField({
         // `decimal` rather than `numeric`: several of these are fractional on the printout (BMD
         // 1.046, T-score −1.6) and `numeric` gives a keypad with no decimal point on Android.
         inputMode="decimal"
-        type="number"
+        type="number" enterKeyHint="done"
         step={step}
         value={value}
         required={required}

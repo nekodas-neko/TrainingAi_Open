@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(41)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(43)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
@@ -53,6 +53,15 @@ describe('local schema', () => {
   // LB-158, the same three-part rule. Unlike its neighbours this one mirrors no Postgres
   // migration — `food_items.barcode` has been on the server since the column was added — so the
   // ALTER is the only thing that puts it on a device that already has the table.
+  it('v43 adds the training-load grid dimensions by ALTER, not only in the CREATE body', () => {
+    // LA-161. v42 is deliberately skipped — it belongs to an unmerged branch, and a gap is
+    // harmless because the runner applies every entry above the device's current version.
+    const v43 = MIGRATIONS.find(m => m.toVersion === 43)!
+    const sql = v43.statements.join('\n')
+    expect(sql).toContain('ALTER TABLE oura_daily_derived ADD COLUMN training_load_grid_len')
+    expect(sql).toContain('ALTER TABLE oura_daily_derived ADD COLUMN training_load_valid_min')
+  })
+
   it('v41 adds barcode by ALTER, not only in the CREATE body', () => {
     const v41 = MIGRATIONS.find(m => m.toVersion === 41)!
     expect(v41.statements.join('\n')).toContain('ALTER TABLE food_items ADD COLUMN barcode')

@@ -300,6 +300,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     activeCaloriesEst:              (r.activeCaloriesEst as number) ?? null,
     trainingLoadOts:                (r.trainingLoadOts as number) ?? null,
     trainingLoadGate:               (r.trainingLoadGate as string) ?? null,
+    trainingLoadGridLen:            (r.trainingLoadGridLen as number) ?? null,
+    trainingLoadValidMin:           (r.trainingLoadValidMin as number) ?? null,
     trainingLoadHigh:               (r.trainingLoadHigh as boolean) ?? null,
     recoveryIndexHours:             (r.recoveryIndexHours as number) ?? null,
     wornHoursBle:                   (r.wornHoursBle as number) ?? null,

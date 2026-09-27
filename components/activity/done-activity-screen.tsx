@@ -370,7 +370,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
           </p>
           <div className="flex items-center gap-2 rounded-xl border bg-muted/60 px-4 py-3">
             <input
-              type="number"
+              type="number" enterKeyHint="done"
               inputMode="decimal"
               step="0.1"
               min="0"

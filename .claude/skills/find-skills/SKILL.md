@@ -54,7 +54,7 @@ project, it belongs here, in the repo, not in a personal install.
 
 - `find-skills` — this router.
 - `grill-me` — interrogate a plan one question at a time until every open decision is resolved.
-- `handoff` — write `docs/handoff-YYYY-MM-DD-<domain>-<title>.md` so the next session starts cold.
+- `handoff` — write `docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md` so the next session starts cold.
 - `mobile-app-design-standards` — platform-level iOS/Android convention reference.
 - `mobile-app-ui-design` — greenfield mobile screens, flows, mockups.
 - `oura-api` — full Oura v2 Cloud API spec.
@@ -88,7 +88,7 @@ Domain tags are greppable on purpose:
 
 ```bash
 grep -n '^### .*\[sleep\]' projectOverview.md   # open issues for a pillar
-ls docs/handoff-*-sleep-*.md                     # every handoff for a pillar
+ls docs/handoffs/handoff-*-sleep-*.md                     # every handoff for a pillar
 ls docs/superpowers/plans/                       # queued and past plans
 ```
 

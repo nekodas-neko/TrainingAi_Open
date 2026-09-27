@@ -109,7 +109,7 @@ export function GoalTargetsSection({
       <div className="px-4 py-3 space-y-2">
         <Label htmlFor="goals-stepsGoal" className="text-xs text-muted-foreground">Steps Goal</Label>
         <Input
-          type="number"
+          type="number" enterKeyHint="done"
           id="goals-stepsGoal"
           value={stepsGoalStr}
           onChange={e => onStepsGoalChange(e.target.value)}
@@ -157,7 +157,7 @@ export function GoalTargetsSection({
       <div className="px-4 py-3 space-y-2">
         <Label htmlFor="goals-sleepGoal" className="text-xs text-muted-foreground">Sleep Goal (hours)</Label>
         <Input
-          type="number"
+          type="number" enterKeyHint="done"
           id="goals-sleepGoal"
           value={sleepGoalStr}
           onChange={e => onSleepGoalChange(e.target.value)}
@@ -173,7 +173,7 @@ export function GoalTargetsSection({
       <div className="px-4 py-3 space-y-2">
         <Label htmlFor="goals-waterGoal" className="text-xs text-muted-foreground">Daily Water Goal</Label>
         <Input
-          type="number"
+          type="number" enterKeyHint="done"
           id="goals-waterGoal"
           value={waterGoalStr}
           onChange={e => onWaterGoalChange(e.target.value)}
@@ -213,7 +213,7 @@ export function GoalTargetsSection({
       <div className="px-4 py-3 space-y-2">
         <Label htmlFor="goals-calorieGoal" className="text-xs text-muted-foreground">Calorie Goal</Label>
         <Input
-          type="number"
+          type="number" enterKeyHint="done"
           inputMode="decimal"
           id="goals-calorieGoal"
           value={calorieGoalStr}

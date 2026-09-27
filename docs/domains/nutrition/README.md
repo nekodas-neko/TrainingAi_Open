@@ -338,6 +338,12 @@ Live at the time of writing (2026-07-30):
 - The quick-edit sheet fixes and the NUT-10/11 hygiene pass shipped, but interactive verification
   was blocked in the sandbox.
 - Supplement reminders and meal-type reminder cancellation are unverified on device.
+- ⚠️ **The empty meal's header `+` is a 36 px tap target** (`LB-169`, found 2026-09-27,
+  `meal-card.tsx:72`) — under the 48 px floor the rest of the screen holds to. Easy to miss
+  today because an empty meal also shows a full "Add food" card beside it; **it becomes the
+  only way in if `RV-213`'s collapse is taken**, so fix it before or with that entry. `RV-213`
+  itself is mocked up at 384 px dark and waiting on the owner's answer —
+  [`journal`](../../overview/entries/2026-09-27-mockups-home-nutrition-sitting.md).
 
 ## History
 
@@ -351,7 +357,7 @@ Live at the time of writing (2026-07-30):
   case. The e2e drives cancel *then* confirm — cancel first, because a confirm that removes anyway
   passes every happy-path assertion. Device check owed.
 
-- **[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoff-2026-09-02-nutrition-lane-a-session.md)**
+- **[`docs/handoffs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoffs/handoff-2026-09-02-nutrition-lane-a-session.md)**
   — 🆕 **Lane A session, 2026-09-02: ten PRs.** BF-69 stage 1 (supplement contributions, migrations
   254/255, local SQLite v34), LB-48, LB-49's meal-log `scale`, LB-50's prompt fix, LB-18's unscoped
   `Recent` source, plus three CI ratchets and the journal ceiling raise. **Read its Gotchas before
@@ -397,7 +403,7 @@ Live at the time of writing (2026-07-30):
   alongside a name**, and both negatives are what stop the fix rebuilding the bug one layer down.
   **Nothing renders differently yet** — `groupDiaryEntries` still requires a `savedMealId`, and
   changing that is Lane B's half.
-- **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
+- **[`docs/handoffs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoffs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
   — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
   `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
@@ -490,7 +496,7 @@ Live at the time of writing (2026-07-30):
   flip** on identical meal-prep containers (5, 5, 1, 1, 5, 1) and the shipped one is 30 of 30.
 
 
-- **[`docs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
+- **[`docs/handoffs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoffs/handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
   — 🆕 the Meal Plan build-out, Phase 1 through one-tap "I ate this" (v1.282.0 → v1.299.0, fifteen
   merged PRs, migrations 177–183, local SQLite v23–v25). **Start here for anything meal-plan.**
   What it left: **Q-187**, whose four steps have now all shipped — the last on 2026-08-31 (v1.412.0),
@@ -512,12 +518,23 @@ Live at the time of writing (2026-07-30):
   product" — collapsing them told the owner their food was not in the database; and local SQLite
   **v25 has never run on a phone** —
   if Saved Meals comes up blank after an update, revert rather than debug forward.
-- **[`docs/overview/entries/2026-09-26-bf61-web-path-clears.md`](../../overview/entries/2026-09-26-bf61-web-path-clears.md)**
+- **[`2026-09-26-bf61-web-path-clears`](../../overview/history-2026-09-27-folded-2.md#2026-09-26-bf61-web-path-clears)**
   — BF-61. The swipe tray's Delete works on the web at 0/100/300/500 ms after the release, so the
   cause of the device's swallowed press is not in the shared JS. Re-laned to Device Verification
   with a three-step instrumented probe instead of a third speculative fix.
-- Handoffs: `ls docs/handoff-*-nutrition-*.md`
+- Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
+  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/entries/2026-09-27-rv218-nutrition-copy.md)
+  (RV-218's copy bugs: "205 workouts" was 205 kcal, and a signed `net` printed "−1,694 deficit" —
+  sign and word both meaning "under". Also why items ①②④ are Lane A's, established from the route
+  rather than assumed),
+  — including
+  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/entries/2026-09-27-rv212-nutrition-tone.md)
+  (RV-212 ①②: the energy-balance headline stops reading a partial day as a fault, following
+  `energy-card.tsx`'s own earlier split which keeps the colour on the " so far"-qualified label; a
+  taken supplement is muted rather than struck through, while the manage sheet's `!s.active`
+  strikethrough — a different claim — stays. Item ④ went back to the owner as `LB-167`, because
+  `meal-thumb.tsx` records his instruction for the placeholder it asked to remove).
 
 ## Decided, and deliberately not built
 

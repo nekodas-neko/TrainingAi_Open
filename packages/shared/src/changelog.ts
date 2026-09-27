@@ -6,6 +6,80 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.13",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: on a day's workout card, a long exercise name was cut exactly where it stops being recognisable \u2014 \"Chest-Supported Dumbb\u2026\". It wraps to a second line now.",
+    ],
+  },
+  {
+    version: "1.477.12",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the movement line under your calorie bar said \"205 workouts \u00b7 32 steps\" when both numbers were calories. It now says \"205 kcal workouts \u00b7 32 kcal steps\".",
+      "Fixed: a day under your target read \"-1,694 deficit\" \u2014 the minus and the word both meant the same thing. It reads \"1,694 deficit\".",
+    ],
+  },
+  {
+    version: "1.477.11",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when your weekly stats fail to load, the card now says so and offers a retry. It used to show its loading shimmer forever \u2014 until the app was killed \u2014 because a failed request looked exactly like one that had not finished.",
+    ],
+  },
+  {
+    version: "1.477.10",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the session card showed the word \"Dumbbell\" where its icon belongs, in text twice the size of the session name. It draws the icon now, so the session you are choosing is the biggest thing on the card.",
+      "Changed: the card says \"Last done 9 days ago\" rather than \"9 days ago\", which read as when the session was next due.",
+      "Fixed: the recovery chips no longer look cut off against the RECOVERY label \u2014 they fade as they scroll past it.",
+    ],
+  },
+  {
+    version: "1.477.9",
+    date: "2026-09-27",
+    changes: [
+      "Changed: a brisk walk now earns active minutes. The daily zone-minutes goal is the World Health Organization's moderate-activity target, but it was only counting minutes above 134 bpm \u2014 which is where vigorous effort begins, not moderate. The floor is now 108 bpm. Past days are re-scored, and the effect is smaller than it sounds: days meeting the goal go from 1 to 3 in the last month.",
+    ],
+  },
+  {
+    version: "1.477.8",
+    date: "2026-09-27",
+    changes: [
+      "Changed: an afternoon that is only part-eaten no longer reads as a mistake. The energy-balance number stops turning red before the day is over; the verdict beside it still carries its colour, where \"so far\" says what it means.",
+      "Changed: a supplement you have taken is no longer crossed out, which read as cancelled. The green tick says it, and the row is simply dimmed.",
+    ],
+  },
+  {
+    version: "1.477.7",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when the AI coach cannot be reached, the workout screen now shows your program's own numbers instead of sitting on \u201CPreparing your AI workout\u2026\u201D for half a minute and then giving up. The fallback plan was already being built \u2014 nothing was showing it to you. Your coach is tried again a few hours later.",
+    ],
+  },
+  {
+    version: "1.477.6",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a brand-new account is no longer told things that are not true. Home announced a week in review for a week with nothing in it, Body Battery read \"Good\" and 50 with nothing behind it, and the week strip called every past day a rest day before you had a program. All three now say plainly that there is nothing yet.",
+    ],
+  },
+  {
+    version: "1.477.5",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the workout list now says when its numbers are not today's. Offline, or before it has refreshed, the heading carries \"From 26 Sept\" \u2014 or \"Base program\" when it is reading your program rather than a plan \u2014 instead of presenting an older day's sets as today's recommendation.",
+    ],
+  },
+  {
+    version: "1.477.4",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: the keyboard no longer covers the button you are reaching for. Sheets now shrink to make room for it instead of keeping a height that no longer fits, and every number field's Enter key says \"done\" and closes the keyboard.",
+    ],
+  },
+  {
     version: "1.477.2",
     date: "2026-09-27",
     changes: [

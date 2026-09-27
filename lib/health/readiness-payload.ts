@@ -22,13 +22,13 @@ import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines }
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
+import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
+import { accumulateZoneSeconds, activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { computeReadinessComposite, checkinScoreFromEnergy, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
-import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
+import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
@@ -243,6 +243,25 @@ export interface ReadinessScoreResponse {
   ownResilienceLevel: number | null                                          // 1.0-5.0
   ownResilienceBand: 'low' | 'limited' | 'adequate' | 'solid' | 'strong' | null
   ownResilienceConfidence: number | null
+  // LA-158: the day the level above was produced. The level is the most recent one in a 7-day
+  // window, NOT necessarily today's, and the tile had no way to tell the two apart — on
+  // 2026-09-27 it was rendering 09-22's level as current. A surface that shows a number owes
+  // the reader its date whenever the number can be days old.
+  ownResilienceAsOf: string | null                                           // 'YYYY-MM-DD'
+  // LA-158: what was observed when no level could be shown, so the surface can say why instead
+  // of rendering nothing. Deliberately NOT a diagnosis: the payload looks at 7 days while the
+  // model gates on `windowDays`, so a shortfall here is consistent with the coverage gate having
+  // closed without establishing it. The numbers let the surface state what is true —
+  // "N of the last M days had enough daytime coverage; the model needs K of W" — and no more.
+  // `null` for the threshold fields means the resilience constants were not injected on this
+  // request, which is a different thing from a threshold of zero.
+  ownResilienceUnavailable: {
+    daysSeen: number
+    daysMeetingCoverageGate: number | null
+    coverageGateMinutes: number | null
+    minValidDays: number | null
+    modelWindowDays: number | null
+  } | null
 }
 
 /** Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read. */
@@ -339,6 +358,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
   // Latest day with a produced resilience level (today may be too incomplete to resolve one yet).
   const latestResilience = [...derivedTodayRows].reverse().find(r => r.resilienceLevel != null) ?? null
+  // LA-158: when there is no level, record what was actually observed rather than leaving the
+  // surface to render nothing and say nothing. Measured 2026-09-27: resilience had published
+  // nothing since 09-22 and the only reason anyone knew was a query against the table.
+  const resilienceUnavailable = latestResilience?.resilienceLevel != null
+    ? null
+    : observeResilienceCoverage(derivedTodayRows.map(r => r.daytimeStressCoverageMin))
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
   const ouraByDate = toOuraByDate(ouraRows)
 
@@ -442,8 +467,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   if (baselineRhr != null && todayHrRows.length > 0) {
     const maxHr = hrMaxFromAge(ageYears)
     const zones = computeHrZones({ maxHr, restingHr: baselineRhr })
-    zoneMinutesToday = activeMinutesFromZoneSeconds(
-      accumulateZoneSeconds(todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })), zones),
+    zoneMinutesToday = activeMinutesFromReadings(
+      todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
+      zones,
+      moderateIntensityBpm({ maxHr, restingHr: baselineRhr }),
     )
     movedHoursToday = computeMovedHours({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
   }
@@ -947,5 +974,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     ownResilienceLevel:       latestResilience?.resilienceLevel ?? null,
     ownResilienceBand:        latestResilience?.resilienceLevel != null ? resilienceLevelToBand(latestResilience.resilienceLevel) : null,
     ownResilienceConfidence:  latestResilience?.resilienceConfidence ?? null,
+    ownResilienceAsOf:        latestResilience?.day ?? null,
+    ownResilienceUnavailable: resilienceUnavailable,
   } satisfies ReadinessScoreResponse
 }

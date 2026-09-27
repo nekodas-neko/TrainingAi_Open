@@ -76,7 +76,7 @@ function ActivityTypeForm({
 
       <div>
         <p className="text-xs text-muted-foreground mb-1">Sort order</p>
-        <Input type="number" value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-9 w-24" />
+        <Input type="number" enterKeyHint="done" value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-9 w-24" />
       </div>
 
       <div className="flex gap-2 pt-1">

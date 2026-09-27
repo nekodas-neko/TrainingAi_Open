@@ -1,5 +1,6 @@
 'use client'
 
+import { SessionGlyph } from "@/components/session-glyph"
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import { toast } from 'sonner'
@@ -501,7 +502,10 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
         <div className="px-4 py-3 space-y-4">
           {program.sessions.map((session, si) => (
             <div key={si} className="rounded-xl bg-muted p-3 space-y-2">
-              <p className="font-bold text-sm">{session.icon} {session.name}</p>
+              <p className="flex items-center gap-1.5 font-bold text-sm">
+                <SessionGlyph icon={session.icon} palettePosition={si} className="h-4 w-4" />
+                {session.name}
+              </p>
               {session.exercises.map((ex, ei) => {
                 const swapKey = `${si}-${ei}`
                 const alts = getAlternatives(ex)
@@ -720,7 +724,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                   <p className="flex-1 text-sm truncate">{name}</p>
                   <div className="flex items-center gap-1 flex-none">
                     <input
-                      type="number"
+                      type="number" enterKeyHint="done"
                       inputMode="decimal"
                       value={oneRmInputs[name] ?? ''}
                       onChange={e => setOneRmInputs(prev => ({ ...prev, [name]: e.target.value }))}

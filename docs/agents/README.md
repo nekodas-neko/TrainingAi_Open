@@ -40,10 +40,28 @@ causes merge conflicts. §3 is the contract.
 
 ### BugFix
 
-The owner's intake channel. Takes a screenshot, a description, a "why is this doing that", and
-turns it into a backlog entry good enough to implement from: what was observed, on what surface,
+The intake channel — **for the owner AND for anyone else who files something.** Takes a screenshot,
+a description, a "why is this doing that", and turns it into a backlog entry good enough to
+implement from: what was observed, on what surface,
 the code path it traces to, and what evidence would confirm it. Then it merges the docs-only PR and
 waits for the next report.
+
+**Three channels, not one (added 2026-09-27, OR-183).** Spoken reports from the owner;
+`claude_ro.feedback_submissions`, written by *Report an Issue* on `/more`; and **GitHub issues**,
+which nothing read until this was written. A collaborator noticed before we did: *"it's also not
+picking up the issues and PRs I raise … so they're never getting touched/reviewed either"*, and
+`#1620` had sat two days with nothing in the repo referencing it. Read them at session start with
+`list_issues` (state OPEN) and run the same loop — **read → triage → file a backlog entry at a
+priority with a lane → move the watermark** in the baton. **An issue is never answered by replying
+to it**; it becomes a queue entry, or it is recorded as not-a-defect with the reason.
+
+**⚑ BugFix MONITORS all of it — issues and inbound pull requests both** (owner, 2026-09-27,
+OR-185: *"make that part of our rules that we are monitoring github from bugfix"*). It reads
+`list_pull_requests` (open) beside `list_issues` and files an entry for every PR not authored by the
+agent account. **It does not read the diff** — that goes to Review with a `Lane:`, because reviewing
+a patch against this repo's rules is Review's competence. **One watcher, two readers**: a channel
+watched by two roles is a channel where each assumes the other looked, which is the failure this
+whole section exists to fix.
 
 **It does not fix.** The temptation to fix a one-line bug in the intake session is exactly how
 intake stops being reliable — the queue is the record, and a fix that skipped the queue is a fix
@@ -80,6 +98,41 @@ Runs on a weekly cadence rather than on demand. Sweeps the app for bugs, inconsi
 writes the findings up in `docs/reviews/YYYY-MM-DD-<topic>.md`, and files each one as a backlog
 entry. Findings without a backlog entry do not count — `CLAUDE.md`'s **No orphaned findings** rule
 is the whole point of this role.
+
+**Review also owns INBOUND pull requests — PRs opened by anyone other than an agent (added
+2026-09-27, OR-183).** Nothing owned them before: the CI/CD section of `CLAUDE.md` is written
+end-to-end for *our own* PRs (*"when the user pushes a feature branch and opens a PR"*), so a
+collaborator's PR arrived into a channel with no reader. Two sat from 2026-09-25 and were noticed
+only sideways, by `TN-80`, while it was doing something else.
+
+**Review does not watch the channel; BugFix does** (OR-185) and hands each inbound PR over with a
+`Lane:`. Review's job starts at the diff: **read it against this repo's rules and post a review on
+the PR.** Then file what it needs as a backlog entry, the same as any other finding.
+
+**⚑ THE REVIEW COMMENT IS VERY CONCISE — no fluff** (owner, 2026-09-27). He asked for comments to be
+posted *and* for them to be short, which are two instructions and the second is the one that gets
+lost:
+- **No preamble, no praise, no restating what the PR does.** The author wrote it; they know.
+- **One finding per comment.** The problem, the fix, and the `file:line` or the rule that makes it a
+  problem. A finding with no cited rule is an opinion.
+- **Nothing wrong → one line saying so.** Not a summary of everything checked.
+- The Claude Code attribution footer is still required on every posted comment; that is the harness's
+  rule, not padding, and it does not count against the concision.
+
+**A contributor is not the owner.** Write to someone who does not know this repo's conventions: name
+the rule rather than assuming it, and never imply their approach was careless when it is simply not
+what this repo does.
+
+**Review MAY APPROVE an inbound PR; it may NEVER MERGE one** (owner, 2026-09-27). Approving says
+*we read it and nothing blocks* — the useful half, and the thing an author is actually waiting on.
+**Merging is the author's or the owner's, always**: no exception for a green CI run or a one-line
+diff, and the *"merge a tested, CI-green PR without asking"* authority covers **our own** PRs only.
+**Cannot approve → comment and wait for the author.** Do not close it, do not push to their branch,
+do not open a rival PR, and do not merge it because the comment went unanswered. **A stalled PR that
+is theirs stays theirs.**
+
+Two of the standing carve-outs bite on the live ones anyway — `#1607` is **auth** (bearer tokens)
+and `#1608` adds **storage**.
 
 The failure mode to design against is a review that reads source and reports what *should* happen.
 This repo has paid for that repeatedly; the 2026-08-08 review that actually ran the app found two
@@ -242,6 +295,26 @@ lane means *"§3's path rule answers it"*, and that rule only ever resolves to a
 showing untagged work to both implementer lanes is the safe failure it was designed as, while
 showing the same 400 entries to the Orchestrator or the device agent would bury the few genuinely
 theirs.
+
+### Two ways to break the queue with prose (OR-187, 2026-09-27 — both hit in one session)
+
+**⛔ Never write a field's token inside prose.** The field parsers are **first-match-wins** and know
+nothing about quotes, backticks or context. A bullet reading *"which is exactly what `Lane: T` is
+for"* **set that entry's lane to `T`** — before its real `- **Lane: B**` line, so `T` won. Another
+rewrite left the word `Gate:` inside a quoted sentence and `check-backlog-pointers` refused the push,
+correctly, as a decorated field. **The habit: after any edit near a field, read the entry back
+through `parseEntries` and check the resolved value** — do not trust that prose reads as prose. The
+second one was caught by CI; the first was caught only because the value was re-read.
+
+**⚑ A sweep's action list is a hypothesis, not an instruction.** `RV-156` listed about thirty
+Known-Issues rows as ready for the archive. Tested one at a time against the actual rule — *move only
+when nothing is still owed* — **eleven of eleven failed**, one of them describing a live defect and
+one covering an entry still in the queue. The sweep was not careless: it asked *"is this answered
+somewhere?"* while the rule asks *"is anything still owed?"*, and those agree often enough that the
+gap is invisible until tested. **The same shape appeared in the owner-gate triage**, where a good
+fraction of entries said in their own gate text that they were not decisions. **So: when an entry
+hands you a list to act on, re-test each item against the rule before acting** — and when a field
+and its own prose disagree, the prose is usually right and the field is the bug.
 
 **The entry's LETTER and its LANE are different things**, and this is where they diverge most
 visibly: `DV-1` was found by the device agent and carries `Lane: O`, because the work is the
@@ -570,7 +643,7 @@ reading a running session's full transcript. This is the first thing a successor
 answers only: where am I, what is in flight, what is next, what is blocked.
 
 It is deliberately not a narrative. The narrative goes in a dated handoff doc
-(`docs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
+(`docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
 closes a cluster of related work. The two have different jobs — the baton is *state* and is always
 current; the handoff is *history* and is never edited after the fact.
 

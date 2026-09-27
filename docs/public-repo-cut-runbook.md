@@ -105,7 +105,7 @@ directory, which models production but not CI. Without a substitute, deleting th
 ~24 files. Synthetic fixtures now cover it with no credential in CI.
 
 **Still owed before step 6:** `skipIf(!hasRealConstants())` guards on the 16 files listed in
-[`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](handoff-2026-08-16-platform-public-repo-cut-a4b.md).
+[`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md).
 Guard per `describe` — a blanket regex over every top-level `describe` was tried and backed out
 because it over-guards pure-function tests.
 

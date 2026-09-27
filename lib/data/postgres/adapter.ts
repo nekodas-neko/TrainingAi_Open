@@ -5338,6 +5338,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             acwr:                  num(p.acwr),
             trainingLoadHigh:      bool(p.trainingLoadHigh),
             trainingLoadGate:      str(p.trainingLoadGate),
+            trainingLoadGridLen:   int(p.trainingLoadGridLen),
+            trainingLoadValidMin:  int(p.trainingLoadValidMin),
             recoveryIndexHours:    num(p.recoveryIndexHours),
             wornHoursBle:          num(p.wornHoursBle),
             nightHrvBaselineMs:    num(p.nightHrvBaselineMs),

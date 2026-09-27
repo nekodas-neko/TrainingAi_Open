@@ -89,8 +89,8 @@ Review's band 450–499 was exhausted by Q-499. `docs/agents/README.md` says: *"
 already in use** — and my own baton had already written 530–579 into the handover.
 
 The ledger recorded 530–537, 538–542 and 543. **544–551 were also live** — across
-`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
-`docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
+`docs/handoffs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
+`docs/handoffs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
 `docs/domains/devices/README.md` and the backlog — and appeared nowhere in it.
 
 ### The correction that makes this worth filing
