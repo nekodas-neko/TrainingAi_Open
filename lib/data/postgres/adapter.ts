@@ -5229,6 +5229,43 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           }
           await logExerciseFromPayload(userId, parsed.data, userTz)
           processed++
+        } else if (mut.domain === 'exercise_log_edit') {
+          // RV-175. The same function PATCH /api/workout-entry calls. Lazy import for the reason
+          // post-completion-hr below gives: the module reaches back into `@/lib/data`.
+          const { ExerciseLogEditSchema, editExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const parsed = ExerciseLogEditSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_edit payload' })
+            continue
+          }
+          // A miss goes to `errors`, not `processed`: the commonest cause is the log itself still
+          // being in the outbox behind a failed push, which a later attempt resolves. The client's
+          // bounded retries then dead-letter a genuinely orphaned edit (see session_rpe below).
+          if (!await editExerciseLog(userId, parsed.data)) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'No matching exercise log for exercise_log_edit' })
+            continue
+          }
+          processed++
+        } else if (mut.domain === 'exercise_log_delete') {
+          const { ExerciseLogDeleteSchema, deleteExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const parsed = ExerciseLogDeleteSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_delete payload' })
+            continue
+          }
+          // A miss is NOT an error, as with activity_logs (Q-328): a delete re-sent because its
+          // confirmation never landed finds nothing, and the row is gone either way.
+          await deleteExerciseLog(userId, parsed.data.exerciseLogId)
+          processed++
+        } else if (mut.domain === 'workout_session_delete') {
+          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session-reconcile')
+          const parsed = WorkoutSessionDeleteSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_session_delete payload' })
+            continue
+          }
+          await deleteWorkoutSessionAndReconcile(userId, parsed.data.workoutSessionId)
+          processed++
         } else if (mut.domain === 'session_rpe') {
           const rpeCheck = SessionRpeSchema.safeParse(mut.payload)
           if (!rpeCheck.success) {

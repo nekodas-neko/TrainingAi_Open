@@ -3973,16 +3973,35 @@ which is the right shape for something that can only be validated by living with
   not two. `app/api/day-timeline/route.ts` formatted `h:mm a` itself (Home's `6:40 AM`), and a
   second shared helper, `fmtAest` (`h:mmaaa`, `6:40am`), fed `/api/day-log` (Health → Day) and
   the Body Battery card. The route now calls `formatTimeOfDay`, and `fmtAest` delegates to it, so
-  all four surfaces read `6:40 am`. **Still their own form, and Lane B's:**
+  all four surfaces read `6:40 am`. **⚠ A FOURTH FORM IS STILL LIVE AND IT IS LANE A'S — measured 2026-09-27 by running both
+  functions**, not by reading them: `formatTime12h('06:40')` returns **`6:40am`** against
+  `formatTimeOfDay`'s **`6:40 am`**. It lives in `packages/shared/src/date-utils.ts` and feeds
+  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
+  6:40am" surface this entry opened with, still unfixed.** The fix is one character in a Lane A
+  file, so it was not taken here.
+  **Still their own form, and blocked on the same lane:**
   `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
-  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both format minutes-of-day rather than
-  an instant, so they need a minutes-based sibling of `formatTimeOfDay`, not a straight swap.
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both
+  format minutes-of-day rather than an instant, so they need a minutes-based sibling of
+  `formatTimeOfDay` — which is `packages/shared`, i.e. **Lane A's engine half first**, then Lane B
+  converts the two call sites. The entry called these Lane B's; the path rule says otherwise.
   ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
   SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
   `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
-  one decimal. `formatKg` also takes `trim`. **The six sites are Lane B's and still to convert:**
-  `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`, `weights-summary:93`,
-  `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**` stays excluded.
+  one decimal. `formatKg` also takes `trim`. **✅ THE RENDER SITES SHIPPED 2026-09-27 (Lane B) — and the entry's list of six was NINE.**
+  The three it did not name: `next-workout-card`, `week-day-sheet` and `formatVolume`. Eight are
+  lifted loads and now call `formatLoadKg`; `app/profile/[userId]/page.tsx`'s `formatVolume` is
+  **excluded with its reason** — a lifetime tonnage with `kT`/`T`/`kg` tiers, deliberately whole,
+  and spacing only its bottom tier would leave the three disagreeing.
+  `components/ui/__tests__/rv208-one-load-unit-spacing.test.ts` holds it, sibling of the duration
+  guard. **Its first version passed its own control run** — the regex matched only `${x}kg` and
+  half these sites are JSX `{x}kg`, so it was checking less than it claimed; it keys on `}kg` now
+  and is control-run against both forms.
+  **Owed, and NOT obtained:** no render. The seeded account has no weights on any of the eight
+  surfaces, so nothing was seen at 412 px. The residual risk is a wrap, not a wrong value — an
+  added space in two tight cells (`pip-view`'s overlay, `week-day-sheet`'s truncated row).
+  `app/api/**` is excluded from the guard: its five `${x}kg` are LLM prompt text and a Google
+  Calendar description, **Lane A's** and not renders.
   ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
   is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
   Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
@@ -7579,16 +7598,41 @@ drift.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
-### [workouts][platform] RV-175 — editing or deleting a logged exercise or session offline is lost, after a success toast
+### [workouts][platform] LA-165 — the local half of offline exercise edits: pending writes, and the confirm that clears them
+- **Lane: A** — `lib/local-store/sqlite-backend.ts`, `lib/local-store/sync-engine.ts`.
+- **Needs:** — nothing. The server half shipped as RV-175 (2026-09-28): the push domains
+  `exercise_log_edit`, `exercise_log_delete` and `workout_session_delete` exist and call the same
+  functions as the web routes (`lib/workout/exercise-log-edits.ts`, `lib/workout/delete-session-reconcile.ts`).
+- **Added:** 2026-09-28 · Lane A, while building RV-175.
+- **Why the hook cannot just swap `fetch` for `queueMutation` today:**
+  ① `updateExerciseLogLocally`, `deleteExerciseLogLocally` and `deleteWorkoutSessionLocally` all write
+  `sync_status = 'synced'`. That is right for their current callers, which run only after a 2xx. For
+  an offline write it is wrong: `applyDelta` overwrites `synced` rows, so a pull before the push lands
+  would restore the edited sets and **resurrect the deleted log**, which is CLAUDE.md's pending rule.
+  Give each an explicit pending mode, and keep the current behaviour as the default.
+  ② `sync-engine`'s push-confirm switch has no case for the three domains, so a pending row would never
+  flip back to `synced` and would then refuse every later pull. `markWorkoutSynced` / `markSessionSynced`
+  are the models, but `exercise_log_edit` carries only `exerciseLogId`, so it needs an id-only variant.
+  ③ `updateExerciseLogLocally` UPDATEs existing sets and never INSERTs one, so an edit that adds a
+  set shows nothing locally. Inserting under a local id then duplicates against the server's row on the
+  next pull (the server upserts by `(exercise_log_id, set_number)`). Resolve that key before
+  inserting, or the fix trades a missing set for a doubled one.
+- **Done when:** with the store in pending mode, an edit, a log delete and a session delete each
+  survive a pull that arrives before the push, and each row reads `synced` after its push confirms.
 
-- **Lane: A** — a mutation domain for these edits. Lane B for `lib/hooks/use-day-entry-mutations.ts:50,90,132`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **The gap:** PATCH `/api/workout-entry`, DELETE `/api/workout-entry` and DELETE
-  `/api/workout-sessions` are API-first, and mirror to the local store only after a 2xx.
-  `pushMutations` has no domain for them.
-- **Failure:** offline, *"Updated"/"Deleted"* toasts first, then *"Failed to …"*. Nothing is queued,
-  so the edit is gone. That breaks the offline-first checklist's item 1. Only `handleDeleteActivity`
-  in the same hook was converted (Q-328).
+### [workouts] LA-166 — offline edits and deletes of logged work toast success and are lost: queue them instead
+- **Lane: B** — `lib/hooks/use-day-entry-mutations.ts` (`handleEdit`, `handleDelete`, `handleDeleteSession`).
+- **Needs: LA-165**
+- **Added:** 2026-09-28 · Lane A, the client half of RV-175.
+- **What:** the three handlers `fetch` first and mirror locally only after a 2xx, so offline they
+  toast "Updated"/"Deleted", then "Failed to …", and nothing is queued. Once LA-165 lands, write
+  locally in pending mode and `queueMutation` the matching domain: `exercise_log_edit`
+  (`{ exerciseLogId, weights, reps }`), `exercise_log_delete` (`{ exerciseLogId }`) or
+  `workout_session_delete` (`{ workoutSessionId }`). Payload schemas are in
+  `lib/workout/exercise-log-edits.ts` and `lib/workout/delete-session-reconcile.ts`. `handleDeleteActivity` in
+  the same hook is the reference (Q-328).
+- **Done when:** offline, each action toasts once, survives an app restart, and reaches the server on
+  reconnect. **Device check owed** — the local store is null on the web.
 
 ### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
 
