@@ -13,8 +13,15 @@ import { median } from '@trainingai/shared/stats'
 // oura_daily_summary.temp_dev via lib/health/personal-baseline.ts's asymmetric EMA.
 
 const WINDOW = 30 // samples
-const RANGE_THRESHOLD = 250 // 2.50 degC in centi-degC
-const MIN_WINDOWS = 4
+export const RANGE_THRESHOLD = 250 // 2.50 degC in centi-degC
+export const MIN_WINDOWS = 4
+
+/** TN-56: the two constants a replay may bracket. Omitted fields keep the shipped values, so the
+ *  rollup's call (no options) is unchanged. */
+export interface NightlyTemperatureOptions {
+  rangeThresholdCenti?: number
+  minWindows?: number
+}
 
 function median7(buf: number[]): number {
   return [...buf].sort((a, b) => a - b)[3]
@@ -24,7 +31,9 @@ function median7(buf: number[]): number {
  * Nightly temperature (centi-degC) from per-sample skin temps (centi-degC; 0 = invalid).
  * `null` if fewer than 4 valid 30-sample windows passed the range gate.
  */
-export function nightlyTemperatureCentiC(samples: number[]): number | null {
+export function nightlyTemperatureCentiC(samples: number[], opts: NightlyTemperatureOptions = {}): number | null {
+  const rangeThreshold = opts.rangeThresholdCenti ?? RANGE_THRESHOLD
+  const minWindows = opts.minWindows ?? MIN_WINDOWS
   const ring = new Array(7).fill(0)
   let idx = 0
   let winMin = Infinity
@@ -40,7 +49,7 @@ export function nightlyTemperatureCentiC(samples: number[]): number | null {
       winMax = Math.max(winMax, m)
     }
     if ((i + 1) % WINDOW === 0) {
-      if (winMax >= winMin && winMax !== 0 && winMax - winMin < RANGE_THRESHOLD) {
+      if (winMax >= winMin && winMax !== 0 && winMax - winMin < rangeThreshold) {
         maxima.push(winMax)
       }
       winMin = Infinity
@@ -48,7 +57,7 @@ export function nightlyTemperatureCentiC(samples: number[]): number | null {
     }
   }
 
-  if (maxima.length < MIN_WINDOWS) return null
+  if (maxima.length < minWindows) return null
   return Math.min(...maxima)
 }
 
