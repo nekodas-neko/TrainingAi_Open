@@ -6557,6 +6557,38 @@ drift.
 - **First step, and it is a measurement not a fix:** run the full suite three times and record which
   specs differ between runs. A spec that fails in one run and passes in the next is order-dependent;
   the shared database and `workers: 1` make that testable by shuffling order, not by reading code.
+- **✅ FIRST FULL-CI CENSUS TAKEN — run `36396363930` (PR #1893's merge head `3d8ba081`), 2026-09-28.**
+  This is the entry's own first step, run against CI rather than locally, which matters: the
+  order-sensitivity only appears with all ~250 specs sharing one worker and one database, and that is
+  a shape a local subset cannot reproduce.
+  **257 passed · 5 failed · 6 flaky · 1 skipped · 3 did not run · 36.3 min.**
+  - **Failed:** `food-log-swipe-delete:238`, `diary-nested-meal:231`, `or162-canvas-census:30`,
+    `tn35-stress-against-events:98`, `tn3b-stress-on-hr-chart:103`.
+  - **Flaky (passed on retry):** `calorie-progress-bar:102`, `diary-nested-meal:197`,
+    `la164-bodyweight-weight-cell:88`, `single-foods-database-search:62`,
+    `tn25-walk-prescription:74`, `tn53-sparkline-does-not-span-gaps:105`.
+- **⚠ TWO OF THOSE FIVE WERE NOT FLAKE, AND REMOVING THEM IS THE POINT OF RECORDING THIS.** The two
+  stress specs failed **deterministically**, on a schema rename rather than on timing: `LA-114`
+  renamed `oura_daytime_stress_buckets.bucket_start` to `bucket_mid` that same day (migration
+  `202609280647`) and did not sweep the two fixtures that `INSERT` it, so both files died in
+  `beforeAll` with `column "bucket_start" does not exist` before reaching an assertion. **Fixed in
+  this PR** — the sibling-surface half of `LA-114`'s own rename. A census that had counted them as
+  flake would have inflated the flake rate by 40% and pointed the investigation at ordering.
+- **So the flake question is now three specs wide, and `food-log-swipe-delete` is confirmed.** `:238`
+  failed in CI exactly as it did in two of three local runs — the same swipe-gesture timing test, so
+  it is the most reproducible of the set and the right place to start. `tn53:105` appeared as
+  **flaky** here (passed on retry) rather than failing, which is consistent with order-dependence and
+  not with a broken assertion. **New to the list:** `diary-nested-meal` on **two** lines at once
+  (`:231` hard, `:197` flaky) — and `:231` has prior history in this file under two earlier runs
+  (#1280 run 1 and #1377), so it is a long-standing intermittent rather than a new one.
+- **`or162-canvas-census:30` is a measurement instrument, not a feature test** — see `OR-162`, which
+  already records that the census reads 0 canvases in the harness and that the harness cannot answer
+  its question. Its failure belongs to that entry, not to this one; noted here only so the census is
+  complete.
+- **One thing this run settles in `LB-166`'s favour:** at **36.3 min** the suite finished **under**
+  the 45-minute cap, where it had been hitting it. Six specs that each burned a timeout before
+  failing were most of the difference, so clearing `LA-176` bought back roughly the margin the cap
+  was eating.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
