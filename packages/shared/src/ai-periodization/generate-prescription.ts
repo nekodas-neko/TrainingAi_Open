@@ -57,10 +57,11 @@ export type GeneratePrescriptionResult =
 // is generated 2-3× per open (confirmed via the ai_call_log double-trip panel:
 // prescription was the #1 token spender AND the worst double-trip). The dedup collapses
 // concurrent calls (in-flight) and near-simultaneous repeats (a 30s read-through
-// cooldown). Per-process (per Railway replica); a user's rapid requests hit one replica,
-// so the open-burst is caught, and signals don't change within the window so the reused
-// result is identical to a re-run.
-const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(30_000)
+// cooldown). Per-process (per Railway replica), so the two open-time triggers landing on
+// different replicas miss it; `runPrescriptionGeneration` carries a stored-row twin for that
+// (RV-184). Signals don't change within the window, so the reused result is identical to a re-run.
+const JUST_GENERATED_MS = 30_000
+const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(JUST_GENERATED_MS)
 
 // Whole-session deload construction shared by the emergency-deload path and the
 // per-exercise deload's >50%-soreness escalation (see
@@ -324,6 +325,30 @@ async function runPrescriptionGeneration(
 
   if (state.phase === 'baseline' && !state.baselineComplete) {
     return { ok: false, error: 'Baseline not complete', status: 400 }
+  }
+
+  // RV-184. Opening a workout fires two plain generations: `workout-data`'s server-side one and
+  // the client's POST. On different replicas they miss the per-process cooldown above.
+  // Production 2026-09-15 has the pair: identical input, the second starting 5.4 s after the
+  // first had finished, which a shared cache would have answered. The stored row is visible to
+  // every replica, so a plain call (no preset, no completion exclusion: exactly the calls the
+  // cooldown would have collapsed) returns a plan generated under 30 s ago instead of asking the
+  // model again. Anything it cannot vouch for falls through to generation as before: a preset or
+  // custom-length plan, or a slot already consumed or dismissed.
+  const fresh = state.prescription
+  if (
+    fresh && excludeSessionId == null && durationPreset == null &&
+    (fresh.durationPreset == null || fresh.durationPreset === 'standard') &&
+    (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'auto_applied') &&
+    state.prescriptionGeneratedAt != null &&
+    Date.now() - state.prescriptionGeneratedAt.getTime() < JUST_GENERATED_MS
+  ) {
+    return {
+      ok: true,
+      prescription: fresh,
+      prescriptionStatus: state.prescriptionStatus,
+      estimatedSessionDurationMin: fresh.estimatedSessionDurationMin,
+    }
   }
 
   // BF-7 PR 2b — "is this the default?" is now a comparison, not a label test. `!== 'standard'` was
