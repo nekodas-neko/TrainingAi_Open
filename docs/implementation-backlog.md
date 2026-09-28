@@ -2160,6 +2160,14 @@ below threshold and left in place for next time.
   new). `Ran 78 of 78` Custom Rules steps.
 
 ### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
+- **✅ ITEMS 1 AND 2 CLOSED 2026-09-28. Only the merge-time yes remains.**
+  **① RV-213's mockup is no longer owed** — it was drawn on 2026-09-27 and the owner **DECLINED**
+  the change (*"I like the original look; it shows the grouping nicely with the space"*), which is
+  recorded on `RV-213` as a Nutrition design principle rather than a bare no. Nothing further.
+  **② The calorie target is answered** by rejecting the three-number premise; it is `OR-191` now.
+  **③ Unchanged and still the only live item:** a merge-time yes on the six security fixes
+  (`RV-191`, `RV-190`, `RV-192`, `RV-193`, `RV-195`, `RV-196`) **as each PR goes green — not now.**
+- **Ask:** owner — one thing only: a merge-time yes on each of the six security fixes as its PR goes green. Nothing is needed before then.
 - **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
   - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
     Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
@@ -2169,7 +2177,6 @@ below threshold and left in place for next time.
     was parking it. **It ships in one sitting with `LB-163` and `LA-136`**, three Home/Nutrition
     mockups owed to one person.
   - **③ the six security fixes: unchanged** — still a merge-time yes as each PR goes green, not now.
-- **Ask:** owner — unchanged: the RV-213 mockup when it is drawn, and a merge-time yes on the six security fixes as each goes green.
 
 - **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
 - **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
@@ -2264,54 +2271,6 @@ below threshold and left in place for next time.
   least of the owner's time. 3 costs him nothing extra; it only needs DV to know when he trains.
 - **Reversal cost:** nil. This only changes when checks are scheduled.
 
-
-### [platform] RV-170 — the history-row policy has been an unasked paragraph since 09-16; ask it once, with its eight members
-- **✅ THE POLICY IS ANSWERED, 2026-09-24 — he took the split-by-kind recommendation.**
-  **(a) Recompute-from-stored-inputs: YES.** Deterministic, repeatable at will, and it corrects history toward what the current code says.
-  **(b) Hand-edits of rows: NO**, per the `BF-81` precedent where he chose no recompute on 38 rows. Mark them visibly known-bad rather than rewriting them.
-  **This releases `LA-56`, `Q-71` and `LA-68`**, which carried `Needs:` on this entry for exactly that question. All three are recomputes, so they are authorised and are the device agent's to run.
-- **⚠ THIS ENTRY STAYS IN THE QUEUE — the policy is settled and its two riders are not.** `RV-164` (did he mean to apply the 09-14 recommendation of 1,618 kcal? the app still budgets 1,660) and `RV-166` (does a guided or treadmill walk on a prescribed day count as doing the run?) were asked in the same breath and are unanswered. **Do not read the ✅ above as this entry being done** — and do not re-ask the policy, which is.
-- **Ask:** owner — the history-row policy, unasked since 09-16: recompute-from-stored-inputs yes, hand-edits no, per the BF-81 precedent.
-
-- **Lane: O** — an owner question, filed as a task per #1508. It is ungated and near the top.
-- **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **What it is:** OR-118 grouped *"a fix is forward-only; do we edit the history behind it?"* as
-  **`history-row-policy`** on 2026-09-16. But it only ever existed as a paragraph inside Q-298, Q-527
-  and LA-21, never as an `O` entry. Its own text says it *"has been sitting unasked for weeks"*. The
-  census adds members.
-- **Offer the precedent with it:** BF-81 (2026-09-01), where the owner chose **no recompute** on
-  38 rows. A partial re-derivation leaves a mixed-provenance column, and overwriting stored history
-  is irreversible.
-- **Recommendation, first line: split by kind, not by entry.**
-  - **(a) Recompute-from-stored-inputs: YES.** These are deterministic and repeatable at will, and
-    they correct the history toward what the current code says.
-    - 09-23 and 08-27 re-scored once RV-163 lands.
-    - A wide rollup pass for 09-01 → 09-16 stress (RV-169).
-    - Scale composition re-derived at 158 cm (RV-165).
-    - `rederive-baselines` before TN-62's backfill (RV-161 item 1).
-  - **(b) Hand-edits of rows: NO, per BF-81.** Mark them visibly as known-bad rather than rewriting
-    them.
-    - Q-298's **15** zero one-rep-max rows (not 10; the 08-09 and 08-16 Pull clusters sat on
-      deload sessions).
-    - Q-527's 07-29 body-composition row. It now reads 6.2%, which **passes** the 4% screen, so the
-      mark has to be explicit.
-    - LA-21's midnight `started_at` rows.
-    - **3 exercises with logs and no personal-record row** (Cable Curls, Single Arm Cable Row, Machine
-      Calf Raise, all May).
-    - **3 May–July workouts whose first exercise landed in an incomplete sibling session** (06-17,
-      06-21, 07-03; 13 sets). This stopped after 07-03, unexplained.
-    - **07-30's step total of 18,761**, about 3× its neighbours on the Q-56 future-dating day. The
-      known inflated-days row lists only 07-24, 07-27 and 07-28.
-  - Alternatives: all-no, which leaves visibly wrong scores on 09-23/08-27 and a stale DEXA offset;
-    or all-yes, which rewrites irreversible user history on inference.
-  - Reversal cost: (a) is repeatable, (b) is avoided.
-- **Two more owner answers the census needs, same sitting:**
-  - **RV-164:** did he mean to apply the 09-14 recommendation (1,618 kcal)? The app still budgets
-    1,660. **Still his to answer — RV-164 itself shipped 2026-09-24 and left the queue, but that
-    fixed the cause going forward and not the 09-14 row, which is the divergence he is being asked
-    about.**
-  - **RV-166:** does a guided or treadmill walk on a prescribed day count as doing the run?
-    Recommended: yes. It is how he trains (TN-24).
 
 ### [app-shell] RV-113 — the tab switch blanks the panel for 58–109 ms; drop the opacity ramp
 
@@ -6571,7 +6530,54 @@ drift.
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
 
+### [workouts][readiness] LA-175 — Q-279's ACWR switch, re-measured before building: the deload card's direction reversed
+- **Lane: O** — the owner approved a change with measured numbers, and today's measurement differs in
+  direction, so the approval does not cover what would ship.
+- **Ask** — owner: re-measured on today's data, switching to the EWMA makes the early-deload card fire
+  on **17 days instead of 30** (you approved 12 → 15) and the over-exertion taper on **1 instead of 7**
+  (you approved 4 → 1). Still switch?
+- **Added:** 2026-09-28 · Lane A, on picking up Q-279 to build it.
+- **What happened.** The 2026-09-03 review recorded its numbers but not its formula or harness, and its
+  baseline no longer reproduces: over the same 95 days (05-29 → 09-01), the current formula gives
+  mean **1.062**, not 0.919. The data has changed since (corrected volumes, deleted sessions). The
+  EWMA side does reproduce closely (standard 7/28-day EWMA, seeded from the first day: max **1.517**
+  against the review's 1.512, taper **1** against 1), so the formula is almost certainly right. What
+  moved is the baseline it is compared to.
+- **Today's measurement** (the current formula evaluated as live, including today's sessions):
+
+  | 95 days | current | EWMA |
+  |---|---|---|
+  | mean / max | 1.062 / 1.693 | 0.964 / 1.517 |
+  | early-deload, ≥ 1.2 | **30** | **17** |
+  | taper, ≥ 1.5 | 7 | 1 |
+  | 20 days flip at the deload boundary | | |
+
+- **⭐ Recommendation: switch, as decided.** The reason you chose it still holds: it removes the
+  mathematical coupling, and the taper result (a single heavy session no longer trips it) is the same.
+  The difference is that the deload card would fire **less** often rather than slightly more. That is
+  arguably better on this data, because the current formula fires it on nearly a third of days,
+  which dilutes a card meant to be exceptional. It is not evidence either way about injury risk.
+- **Alternative:** keep the current formula. It is better only if you value the card firing often,
+  and it keeps the coupling you decided against.
+- **Reversal cost: low.** One function, three test files, no stored data.
+- **Q-279 waits on this answer** (`Needs: LA-175`). The review's harness should be saved as a script
+  next time, so the same argument can be re-run instead of reconstructed.
+
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
+- **📐 MOCKUP DRAWN 2026-09-28 — [`docs/design/2026-09-28-resting-hr-cell.html`](design/2026-09-28-resting-hr-cell.html)
+  ([hosted](https://claude.ai/artifact/7ngUaPpJieYqDkfBpJAiEC)). Committed, per the convention
+  `LB-135` left behind.** Three panes at 384 px dark: today, (a) the `bpm` caption, (b) the HR cell
+  drawn without a ring. The measurements that rule out both of `RV-211`'s proposals are on the page
+  as a table rather than as prose.
+- **Gate:** owner — the picture exists now, so his pick is the only outstanding thing.
+- **⚑ ONE QUESTION SETTLES IT, and it is not about taste:** does he use the `nolabel` or `overlap`
+  ring style? **In those two, (a) does nothing at all** — `nolabel` removes the label on purpose and
+  `overlap` has no caption slot — so 58 keeps reading as a score with nothing naming the metric.
+  If he uses either, (b) is the only option that works and the recommendation flips. Asked that way
+  on the page.
+- **⚠ Not device-verified.** Drawn from the harness geometry, not screenshotted on the S25 — the row
+  needs live scores. **(b) owes a device look before it ships**, because it changes a shape rather
+  than adding a word.
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
   Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
   would park it. Add the gate once he has seen one.
@@ -6610,10 +6616,29 @@ drift.
   large-UI rule. The measurements above are what it should be drawn against.
 
 ### [workouts] LB-173 — the two "Start Workout" buttons differ, and "use the same variant" does not say which
-- **Lane: O.** A two-line change either way, on two daily paths, with no grounds in the repo for
+- **✅ DECIDED 2026-09-28 by the Orchestrator, NOT put to the owner — DROP the dumbbell from the
+  pre-workout screen's button. Both become text-only.**
+- **⚠ This entry's central claim was wrong, and checking it is what settled this.** It said *"there
+  is nothing in the repo that favours either direction"* and declined to recommend, calling a
+  choice *"dressing a coin toss as analysis"*. That was honest and it was untested — the repo does
+  favour a direction, and the measurement takes one pass.
+  **Measured 2026-09-28 across `components/**` and `app/**`: of 43 full-width primary `<Button>`s,
+  33 are TEXT-ONLY and 10 carry a decorative leading icon — 77%.** (A further 8 render a `Loader2`
+  spinner while saving; those are a state indicator, not a leading icon, and are excluded — counting
+  them would have put the split at 18 v 33 and muddied it.)
+  So the session card's icon-less button is the house convention and the pre-workout screen's is the
+  outlier. **Removing one icon is the change that makes them agree WITH the app**, rather than with
+  each other at a coin toss.
+- **Why this is not the owner's.** It is a restyle that fixes a consistency defect, not an
+  information-architecture change: nothing moves, nothing is added or removed from the screen, and
+  CLAUDE.md's mockup rule explicitly exempts *"an entry that merely restyles a component"*. The
+  2026-09-22 narrowing puts a derivable choice on the agent. **It is not the `LB-164` shape** — that
+  was ADDING a label he had not asked for; this is removing an inconsistency, in the direction the
+  other 33 buttons already point.
+- **Reversal cost: two lines**, and visible on his next workout, so a wrong call corrects itself
+  fast. **Lane B.**
+- **Lane: B.** A two-line change either way, on two daily paths, with no grounds in the repo for
   picking a direction. Ungated: nothing is owed but the answer.
-- **Ask** — owner: should the session card's Start Workout gain the dumbbell icon, or should the
-  pre-workout screen's lose it?
 - **Added:** 2026-09-27 · split out of `RV-214` ⑤ when that entry was cleared.
 - **Measured 2026-09-27:** the card's button is full-width green with **no** icon; the pre-workout
   screen's carries a dumbbell. Review sweep 63 asked for "the same variant" and did not say which,
@@ -6624,81 +6649,23 @@ drift.
   preference, and inventing a reason to prefer one would be dressing a coin toss as analysis.
 - **Reversal cost: two lines.**
 
-### [platform] BF-202 — up to 70 owner decisions are buried inside `Lane: A`/`B` entries, where the routing field cannot see them
-- **✅ FIRST PASS RUN 2026-09-27 (Orchestrator). The 70 was an upper bound and the real number is
-  smaller — but the sweep found three defect CLASSES the count did not predict.**
-  **Measured with `parseEntries`, not a grep over the file:** **422** Lane A/B entries carry no
-  `Ask:`; **54** of those contain owner-decision language; **13** of the 54 already carry
-  `Gate: owner`. Read individually, they fall into four groups.
-- **① Prose about a decision already MADE — no action, and the phrasing is the trap.** `TN-64`,
-  `OR-138`, `PS-17`, `Q-407`, `BF-81` all say *"the owner's call"* about a call he has since made
-  and that the entry records. A keyword scan cannot tell these from a live question, which is why
-  the 70 was never a finding.
-- **② STALE — the answer exists and the entry does not know it. Corrected this pass.**
-  **`RV-165`** said the scale re-derivation at 158 cm was his call; `RV-170` authorised it on
-  2026-09-24 as a limb-(a) recompute. **`Q-298`** said repairing the zero one-rep-max rows was his
-  call; `RV-170` answered it as a limb-(b) hand-edit — **do not rewrite, mark known-bad** — and
-  corrected the count to **15, not 10**. Both entries now carry the answer.
-- **③ ROUTED BY A SENTENCE, NOT A FIELD — the class worth keeping.** **`Q-422` had no `Lane:` field
-  at all**, and `parseEntries` was reading `A` out of the prose *"Tuning proposes and the owner
-  signs off; Lane A implements"*. A routing decision was being made by a phrase nobody wrote as a
-  field. `RV-38` had a real field AND the same prose, and the checker caught the duplicate when one
-  was added — its `Lane: B` half had already shipped. **Five entries were re-laned to `T`**
-  (`Q-422`, `RV-38`, `Q-306`, `Q-420`, `LA-121`): each is a scoring change, and `Lane: T` is the
-  field that says a Tuning proposal is owed before anyone builds it.
-  **`TN-22` is the same class inverted** — it states it *"carries `Gate: owner` … so it parks
-  honestly"* and carries no `Gate:` field, so it claims to park and is READY. Flagged on the entry,
-  deliberately not "fixed", because adding the gate would hide it rather than resolve it.
-- **④ GENUINELY LIVE AND STILL BURIED — the output of this sweep, and what the next owner round
-  draws from.** Each needs splitting into its own `Lane: O` entry or answering in a batch:
-  hiding the readiness score until the check-in is saved (`TN-67`, `TN-50` — a product change);
-  whether a guided or treadmill walk counts as doing a prescribed run (`RV-166`, an unanswered
-  `RV-170` rider); making the E2E job a required check (`LB-149`, `Q-297` — branch protection, a
-  shared system); the destructive-migration group needing one yes (`BF-144`, `LA-71`, `LB-42`);
-  the `event_name` drop (`Q-540`, data-dropping); a second Railway service (`Q-251` — money);
-  the collection tier mapping (`PS-51`); the wallpaper tint default (`BF-145`, `BF-139`, `BF-96`);
-  removing an HTTP surface (`LA-89`); the scanner choice (`LB-38`); the 84-day re-derive
-  (`TN-72`, `TN-74`); and one plain factual question — was *Start Again* pressed before the back
-  press (`BF-168`).
-- **⚠ `LB-13` says something FALSE and it should not be acted on:** *"Correcting the rule needs the
-  owner (CLAUDE.md is not an implementer's to edit)."* The Orchestrator owns the docs and edits
-  `CLAUDE.md` routinely; the owner's carve-out is data, money, auth and scoring, not documentation.
-- **Still owed on this entry:** group ④ is a list, not yet entries. Splitting each into its own
-  `Lane: O` is the second pass. `LA-122` already tracks six of Lane A's and should be reconciled
-  rather than duplicated.
-- **Ask:** owner — nothing to answer here; this is the Orchestrator's sweep. Listed so it is not mistaken for work a lane can start.
-- **Lane: O** — **Added:** 2026-09-26 · BugFix intake. Owner, 2026-09-26: *"any tasks that need responses make sure they are in the lane of orchestrator or sent to the backlog agents."*
-- **Needs:** — nothing.
-
-- **The measurement.** Scanning every queue entry for owner-decision language (*"owner signs"*,
-  *"the owner's call"*, *"not a lane's"*, *"needs the owner"*, *"Tuning proposes"*) in an entry whose
-  `Lane:` is `A` or `B` and which carries **no `Ask:` field**: **70 entries**. `Lane:` is what routes
-  an entry, so a decision inside a Lane A body never reaches the Orchestrator's list and the owner
-  never sees it — the exact shape `BF-201` was just split out of, and the shape `BF-194` was filed
-  about from the other direction.
-- **⚠ 70 is an UPPER BOUND, not a finding.** The scan is a keyword match and will catch prose that
-  merely mentions the owner without a live question — *"the owner decided X in August"* reads the
-  same to a grep as *"the owner must decide X"*. **The work is separating those**, which is exactly
-  the Orchestrator's stated primary job, and is why this is filed rather than swept here: BugFix's
-  remit is turning reports into traced entries, not re-laning the queue.
-- **Worth knowing before the sweep starts:** `LA-122` already exists as a `Reference:` entry naming
-  the six owner decisions Lane A is blocked on, so part of this is tracked and the sweep should
-  reconcile with it rather than duplicate it.
-- **⚑ One likely duplicate spotted in the scan, flagged not merged.** **`RV-65`** — *"the prescription
-  asks a model for numbers that deterministic code t…"* — is Review's earlier statement of what
-  `BF-199` measured this session, and `RV-200`/`RV-202` from sweep 61 cover adjacent ground. **Four
-  entries now describe the same AI-to-logic change from four angles.** Merging or superseding them is
-  a queue decision, so it belongs to whoever runs this sweep; BugFix deliberately left all four
-  standing rather than silently folding another agent's entry into its own.
-- **⭐ Recommend the sweep run in one pass, not opportunistically**, and produce two outputs per
-  entry: either an `Ask:` field added in place (when the decision is genuinely his and the entry is
-  otherwise correctly laned), or the decision split into its own `Lane: O` entry with the buildable
-  half left behind — the shape `BF-201` used. **Do not add `Gate: owner`** while doing it: that parks
-  the entry and removes it from the READY list, which inverts the intent.
-- **Verification:** the scan above returns a number the Orchestrator has read and classified, and
-  every entry it keeps carries either an `Ask:` field or a split-out `O` entry.
-
 ### [workouts] BF-201 — two decisions about the loads he actually trains at, split out of BF-197 and BF-199 so they reach him
+- **↻ RE-LANED TO `T` 2026-09-28 — decision 2 goes to Tuning BEFORE it goes to the owner, and that is
+  a routing call rather than a deferral.**
+  **Why: this entry's own text sets the bar and asking him now would breach it.** It says *"Tuning
+  owes the same thing before anything ships: a proposal stating how many of his past sessions the
+  change would move."* Picking a rep→%1RM table without that number is picking blind — the first
+  thing he would reasonably ask is how much it moves, and the recommendation already turns on
+  exactly that (*"adopt the observed curve … so the switch to rules changes nothing on day one"*,
+  against a textbook table that *"would silently re-weight every session on the day it ships"*).
+  **So the proposal is what makes the question answerable**, and it is cheap: the curve is already
+  measured (12→66, 11→68, 10→70.5, 9→72.5, 8→75, 7→76–77.5, 6→80) and the comparison is arithmetic
+  over stored sessions.
+  **Tuning's deliverable:** how many past sessions each candidate table moves, and by how much in
+  kilograms at his working weights. Then it comes back to him as one question with the impact
+  attached, and Lane A implements.
+  **⚠ Decision 1 is NOT blocked by this** — the p75 finish-early margin is answered and shippable
+  now, with `BF-197`. Do not let the table hold it.
 - **✅ DECISION 1 ANSWERED 2026-09-27 — size the finish-early margin to his 75th percentile.**
   Not a fixed buffer, not zero, and not leaving the double-count in. The margin is derived from his
   own variance so it adapts as he gets faster. **That half is now Lane A** (`BF-197`'s off-by-one
@@ -6706,8 +6673,7 @@ drift.
 - **⚠ DECISION 2 IS STILL OPEN — the rep→%1RM table was not put to him** (dropped for room in the
   2026-09-27 round). It is the other half of this entry and it changes the kilograms on the bar, so
   it stays here.
-- **Ask:** owner — decision 2 only: the rep→%1RM table `BF-199` would replace the prescription's numbers with.
-- **Lane: O** — **Added:** 2026-09-26 · BugFix intake, from the standing rule that a decision sitting INSIDE a `Lane: A` entry is invisible to the Orchestrator, because the lane field is what routes it.
+- **Lane: T** — **Added:** 2026-09-26 · BugFix intake, from the standing rule that a decision sitting INSIDE a `Lane: A` entry is invisible to the Orchestrator, because the lane field is what routes it.
 - **Nothing blocks this and nothing is blocked BY it — deliberately, and there is no `Needs:` field
   on purpose.** The off-by-one duration fix is a correctness bug that should ship without waiting,
   and the prescription entry wants a plan doc first. Only the *numbers* here need him.
@@ -9546,6 +9512,12 @@ drift.
   work.** That is the argument for this ledger continuing to exist after these six clear.
 ### [platform] LB-155 — the bare-`fetch` rule is ENFORCED; 3 sites converted, 10 blocked on a Lane A group entry
 
+- **⚙ LB-156 SHIPPED 2026-09-28 (Lane A): the five keys are registered.** `phase-sets` and
+  `workout-templates` were already in `invalidateProgramStructure`. `day-checkin:` joined
+  `invalidateCheckinAffectsPrescription`, `bedtime-estimate` joined both sleep-writing groups, and
+  `plan-meal-answers:` joined `invalidateNutritionWrite`. **⚠ One thing the conversion must add:**
+  `app/nutrition/use-plan-meal-logging.ts`'s answer POST calls **no** group, so converting its read
+  without making that write call `invalidateNutritionWrite()` caches a stale answer.
 - **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79.
   **Enforcement shipped 2026-09-25** — `scripts/check-bare-api-fetch.js`, wired into Custom Rules.
 - **Needs: LB-156**
@@ -9609,36 +9581,6 @@ drift.
 - **Guard:** `scripts/__tests__/bare-api-fetch-scan.test.ts` pins the SCAN rather than the count —
   the multi-line URL, and all three ways a method can be declared, including the shorthand that
   produced the wrong figure.
-
-### [platform] LB-156 — ten bare-`fetch` conversions are blocked on five cache keys no group clears
-
-- **Lane: A** — `lib/cache-groups.ts` only. **Added:** 2026-09-25 · Lane B, triaging `LB-155`'s
-  remaining conversions and finding it could not do them.
-- **What is owed: register five keys in the groups whose writes change them.** Nothing else — no
-  call site moves in this entry, and the ten conversions are `LB-155`'s to make afterwards.
-  | key | written by | which group needs it |
-  |---|---|---|
-  | `day-checkin:` | the morning and evening check-in POSTs | `invalidateCheckinAffectsPrescription` (`invalidateNutritionWrite` already has it) |
-  | `phase-sets` | `config-screen`'s POST + `DELETE /api/phase-sets/:id` | a group; `invalidateProgramStructure` is the closest fit |
-  | `workout-templates` | `config-screen`'s four template writes | same group |
-  | `bedtime-estimate` | derived from sleep rows | `invalidateBiometrics` / `invalidateOuraSync` |
-  | `plan-meal-answers:` | `POST /api/nutrition/plan-meal-answers` | `invalidateNutritionWrite`, or a narrower one |
-- **⚠ `day-checkin:` shows why this is a real gap and not a formality.** `invalidateNutritionWrite`
-  has cleared that prefix since it was written — **for a key nobody ever created**, because all three
-  readers are bare `fetch`. Meanwhile `invalidateCheckinAffectsPrescription`, which the check-in
-  writes themselves call, does not clear it. So a conversion done without this entry would cache a
-  check-in that a *food log* evicts and a *check-in save* does not: fresh by accident, stale by the
-  write that actually changed it.
-- **Why Lane A and not Lane B.** The standing cache rule obliges registering a new key in the
-  invalidation group of every write that affects it, in the same commit, and forbids an ad-hoc
-  `invalidateCache()` at the call site. `lib/cache-groups.ts` is Lane A's under the path rule, so the
-  engine half goes first — exactly the split §3 describes.
-- **The reverse order also works and may be better**, and it is Lane A's call: ship the group entries
-  as one small PR (this entry), then `LB-155` converts the ten call sites. A group clearing a key that
-  does not exist yet is a no-op, so there is no window where anything is wrong.
-- **Not established:** whether `phase-sets` and `workout-templates` belong in
-  `invalidateProgramStructure` or want their own group. Both are program configuration, which argues
-  for reuse; neither is read outside `config-screen` today, which argues it does not matter yet.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
 
@@ -23371,6 +23313,13 @@ lived context.
   less than a full day (SpO₂/temp night-only windows are the common case). `Gate: device`.
 
 ### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
+- **✅ THE HISTORY-ROW POLICY APPLIES HERE, AND IT SAYS DO NOT REWRITE (owner, 2026-09-24).**
+  Recorded on this entry 2026-09-28 because `RV-170`, which held the policy, is struck — and a check
+  found this was the ONE of its five member entries that never restated it, so the citation would
+  have pointed at nothing.
+  **The rule:** recompute-from-stored-inputs **YES**; **hand-edits of rows NO**, per the `BF-81`
+  precedent where he chose no recompute on 38 rows. **The midnight `started_at` rows here are a
+  hand-edit** — limb (b) — so **mark them visibly known-bad rather than rewriting them.**
 
 - **⚠ ASK THIS AS A POLICY, NOT AS AN ENTRY — `history-row-policy` (grouped 2026-09-16, OR-118).**
   **Q-298** (10 one-rep-max rows), **Q-527** (1 backfilled row) and **LA-21** (7 sessions stamped with
@@ -28092,6 +28041,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [activity][nutrition] Q-524 — two different step goals, and the personalised one contradicts the evidence its own file cites
 
+- **Lane: T** — what remains is a scoring proposal (the derived goal from energy and measured stride),
+  so Tuning owes it before Lane A builds it.
+- **⚙ THE DECIDED HALF SHIPPED 2026-09-28 (Lane A).** `getDailyGoals` now uses `users.steps_goal`
+  when set, and every caller passes it: the Activity Score (readiness payload), the day audit, cardio
+  week and health-insight. Clearing the goal returns to the derived value, which is the "way back"
+  the owner required. **Moved, measured over the owner's last 91 days:** the Activity Score's steps
+  contributor rises on **79 days**, by **+2.2 points on average** (median +1.9, max +5.4), from
+  scores computed after deploy. Stored history is unchanged.
+- **⚠ Part (a), the provenance column, turned out NOT to be needed, and the entry's premise was
+  stale.** `/api/nutrition-goals/recommend` no longer writes `users.steps_goal`; it returns a
+  suggestion. Both writers, the recommendation sheet and Coach, write only when the owner accepts,
+  and under his rule that makes it manual. So every stored value is manual or accepted, NULL means
+  "use derived", and no automated path can overwrite it. **If an automatic writer is ever added,
+  this stops holding** and the column becomes necessary.
+- **Still open, for Tuning:** part (b), deriving the goal from BMR-scaled walking energy and measured
+  stride, and making `DEFAULT_STEP_GOAL` (8,000) agree with whichever derived value wins.
+
 - **Branch:** `fix/reconcile-step-goals`
 - **Plan:** none — **this needs an owner decision first** (which number wins), then a one-line change.
   Evidence: [`docs/reviews/2026-08-19-activity-contributor-audit.md`](reviews/2026-08-19-activity-contributor-audit.md) §3.
@@ -28311,7 +28277,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   1.53, 1.63) as steps fell — so the recommender tracked the decline **less than proportionally**
   rather than chasing it down one-for-one. The monotone 7,000 → 6,000 → 5,000 sequence and the absent
   evidence anchor are the findings; a fitted slope is not.
-- **Lane: A** — added 2026-09-24 (Tuning). This entry was fully decided on 2026-08-19 and signed off
+- **Previously Lane A** (re-laned to T on 2026-09-28, see the top) — added 2026-09-24 (Tuning). This entry was fully decided on 2026-08-19 and signed off
   again on 2026-08-31 with *"Lane A has everything it needs; nothing further is gated on the owner"*,
   and it carried **no `Lane:` field at all**, so `next-item.js` read it as UNCLASSIFIED and no
   implementer was ever offered it. The path rule resolves it with no ambiguity — `packages/shared/**`,
@@ -29131,6 +29097,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts][readiness] Q-279 — ACWR drives two user-facing behaviours on evidence that has substantially collapsed
 
+- **Needs: LA-175** — re-measured 2026-09-28 before building; the approved numbers no longer hold (see LA-175).
+
 > **⚑ MEASURED BEFORE BUILDING (2026-09-03, Lane A) —**
 > [`review`](reviews/2026-09-03-acwr-ewma-day-shift.md). Piece 2 is *"a contained change to one
 > shared function"*, which is true of the code and not of the consequence: ACWR drives two
@@ -29800,7 +29768,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [activity][devices] Q-231 — the "Exercise detected" card can never show anything again; its only writer was the Oura Cloud sync
 
-- **Lane:** A
+- **⚙ RE-SEQUENCED 2026-09-28 (Lane A): the SURFACE half goes first, the reverse of the usual order.**
+  Removing `/api/oura/workouts` first would leave the card's GET and the review sheet's three PATCHes
+  (`exercise-review-sheet.tsx:194,209,232`) hitting a 404. So Lane B removes the card, its mount in
+  `session-select-content.tsx`, and the sheet's `source === 'oura'` branches. Lane A then removes the
+  route, the `day-timeline` walk filter and `lib/oura/types.ts`'s `OuraWorkout`. **Keep
+  `repo.getOuraWorkouts`:** `compute-hr-recovery-profile.ts` reads the frozen rows as HR-recovery
+  episode anchors, so removing it would change a computed profile, which is a separate scoring question.
+- **Lane:** B — the surface half first (see the re-sequencing note); Lane A's route/type removal follows.
 - **Branch:** `fix/detected-activity-has-no-source`
 - **✅ ANSWERED 2026-09-25 — RETIRE THE CARD.** The owner: *"If its not being used because we don't
   use the oura sync then get rid of it."* A conditional yes, and **the condition was checked before

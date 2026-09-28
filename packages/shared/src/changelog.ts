@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.30",
+    version: "1.477.31",
     date: "2026-09-28",
     changes: [
       "Fixed: with no connection, editing or deleting a logged exercise \u2014 or deleting a whole session \u2014 said it had saved and then said it had failed, and the change was lost. All three are now saved on the phone straight away and sent when you are back online, the way deleting an activity already worked.",
+    ],
+  },
+  {
+    version: "1.477.30",
+    date: "2026-09-28",
+    changes: [
+      "Your own step goal is now the one number everywhere, including the Activity Score and the cardio week. Clear it to go back to the suggested goal. The Activity Score's steps part reads a little higher on days short of 10,000 steps.",
     ],
   },
   {
