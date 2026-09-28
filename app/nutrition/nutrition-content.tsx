@@ -1,5 +1,6 @@
 "use client";
 
+import type { WeeklyDay } from '@/components/nutrition/weekly-nutrition-days';
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
 import { useSearchParams } from "next/navigation";
@@ -107,7 +108,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // which is how yesterday's meals rendered on a fresh today after swiping back (Q-245).
   const logsDateRef = useRef<string | null>(null);
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
-  const [weeklyData, setWeeklyData] = useState<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>([]);
+  const [weeklyData, setWeeklyData] = useState<WeeklyDay[]>([]);
   const [adherence, setAdherence] = useState<NutritionAdherenceResponse | null>(null);
   const [todayWaterMl, setTodayWaterMl] = useState<number | null>(null);
   const [waterLogOpen, setWaterLogOpen] = useState(false);
@@ -155,7 +156,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     if (food) { setLogs(Array.isArray(food) ? food : []); logsDateRef.current = today; }
     const tgts = readCacheSync<NutritionTargets>('nutrition-targets');
     if (tgts) setTargets(tgts);
-    const weekly = readCacheSync<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>('nutrition-weekly-summary');
+    const weekly = readCacheSync<WeeklyDay[]>('nutrition-weekly-summary');
     if (weekly) setWeeklyData(Array.isArray(weekly) ? weekly : []);
     const cachedAdherence = readCacheSync<NutritionAdherenceResponse>('nutrition-adherence');
     if (cachedAdherence) setAdherence(cachedAdherence);

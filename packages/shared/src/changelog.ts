@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.6",
+    date: "2026-09-28",
+    changes: [
+      "The 7-day nutrition chart now always shows seven days, with days you didn't log drawn as empty. Its average counts only the days you logged, and today's bar is the one highlighted.",
+    ],
+  },
+  {
     version: "1.481.5",
     date: "2026-09-28",
     changes: [
