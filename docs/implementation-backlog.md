@@ -963,7 +963,11 @@ below threshold and left in place for next time.
   300 (yearly), then 900. The costs and the per-user decay rule are in the plan.
 - **④ Re-score history from scratch under v2?** **Recommendation: yes.** v1 has been live about two
   weeks, and preserving v1-era cats means versioning the rules per date span, a real piece of work
-  for little. The cost: the counts he has seen change on the day PS-49 deploys.
+  for little. The cost: the counts he has seen change on the day the v2 surface ships.
+  **What they change TO, measured on his real history 2026-09-28:** workouts T1 4 · T2 1 · T3 4
+  (unchanged); steps T1 4 · T2 1 · T3 5 → T3 2 · T4 1 · T5 1; and a new Health cat at T1 1 · T2 1 ·
+  T4 2. The engine already computes v2 beside v1 (PS-49), so answering ④ is all the surface switch
+  waits on.
 
 ### [app-shell] PS-53 — review the finished cat-collection designs, and decide what awards what
 
@@ -15080,25 +15084,35 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   service worker has cached `/cats/`.
 - **Reversal cost:** delete `public/cats/` and point `CatSprite` back at the glyph.
 
-### [app-shell] PS-49 — collection rules v2: four classes, 3→1 merges, a daily drain that movement counteracts
+### [app-shell] PS-49 — collection rules v2: switch the surface to the v2 block the engine now returns
 
-- **Lane:** A (engine: `packages/shared/src/collection/ladder.ts`, `app/api/collection/route.ts`,
-  a new one-column step-totals read), then B for the surface copy. **Added:** 2026-09-26 · PS
-  session, from the owner's brief.
+- **Lane: B** — `components/home/collection-*.ts(x)`, `app/collection/**`. Re-laned 2026-09-28: the
+  engine half shipped (below).
+- **Needs:** PS-48 — switching the surface IS the re-score of the owner's history (PS-48 ④), and the
+  Rogue's numbers (②) are still his to set.
+- **Added:** 2026-09-26 · PS session, from the owner's brief.
 - **Plan:** [`docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md`](superpowers/plans/2026-09-26-cat-collection-rules-v2.md).
-- **The steps and workout halves can start now.** Ranger: 5,000 steps per T1, 1,000 drained every
-  day. Tank: 1 workout per T1, drained one workout per rest-target days. Both are the owner's
-  numbers (2026-09-26), marked provisional by him. The Health cat (Cleric art) faucet is defined — see the
-  plan — and can be built with them. The cardio (Rogue) faucet waits on PS-48, and the route returns `null` for them until then.
-- **Keep the lineage fold (third collection PR).** `replayCollection` now tracks named cats; new
-  constants are compatible, a replacement fold is not. Rares attach as `shiny` on a merged cat.
-- **No migration.** The collection is replayed, so bumping `COLLECTION_RULES_VERSION` to 2 re-scores
-  all history. That rewrite is the owner's intent, not an accident. PS-48 asks whether v1-era cats
-  should be preserved instead (recommendation: no).
-- **Measure the owner's own result on production before merging, and put it in the PR.** He asked
-  for exactly this. The PS session could not: the query secret was unavailable on that machine.
-- **Reversal cost:** low as code (the version constant and one fold); visible as behaviour, because
-  every cat count the owner has seen changes on deploy.
+- **✔ ENGINE SHIPPED 2026-09-28 (Lane A), BESIDE v1 rather than in place of it.**
+  - `GET /api/collection` still returns v1's `collections` unchanged, plus a `v2` block:
+    `{ rulesVersion: 2, collections: { workout, steps, health, cardio: null } }`.
+  - Tank: v1's rest-allowance fold on the 5 · 4 · 5 · 3 · 3 ladder.
+  - Ranger and Health cat: `replayBankCollection`, a daily-draining bank that feeds the existing
+    named-cat fold, so names and lineage survive. 3 → 1 merges, six tiers each.
+  - Nothing the owner sees changes until the surface reads `v2`.
+- **What is left (Lane B):** read `v2.collections` instead of `collections`, add the Health cat
+  class (Cleric art, six tiers drawn) and a Rogue placeholder for `cardio: null`, and quote the
+  engine's constants in the copy as today. Then a Lane A cleanup removes v1's `LADDERS`/fold.
+- **The owner's own result, measured on his production history (snapshot, 2026-09-28)** — put it
+  to him with PS-48 ④:
+
+  | | v1 today | v2 |
+  |---|---|---|
+  | Workouts (Tank) | T1 4 · T2 1 · T3 4 | T1 4 · T2 1 · T3 4 (no T4 yet: 102 trained days, 13 decays) |
+  | Steps (Ranger) | T1 4 · T2 1 · T3 5 | T3 2 · T4 1 · T5 1 (bank 633k steps = 126 T1) |
+  | Health cat | — | T1 1 · T2 1 · T4 2 (174 points = 58 T1) |
+
+  The plan's estimate of ~120 Ranger T1 from stale aggregates matched: 126.
+- **Rares and lucky procs are not built.** Their rates are the plan's proposal, not the owner's.
 
 ### [app-shell] PS-52 — make people attached to their cats: pick which of these to build next
 

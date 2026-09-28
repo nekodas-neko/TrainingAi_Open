@@ -882,6 +882,10 @@ export interface WorkoutRepository {
   listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
   listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  /** PS-49 — the collection v2 faucets. Narrow on purpose (RV-63): a date, and steps where needed. */
+  listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]>
+  listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
   listRestDays(userId: string, from: string, to: string): Promise<string[]>
 

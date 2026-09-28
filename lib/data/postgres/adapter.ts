@@ -2073,6 +2073,45 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => r.date)
   }
 
+  /** PS-49 — per-day step totals for the Ranger's bank. */
+  async listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        gt(s.bodyMetrics.steps, 0),
+        isNull(s.bodyMetrics.deletedAt),
+      ))
+      .orderBy(asc(s.bodyMetrics.date))
+    return rows.map(r => ({ date: r.date, steps: Number(r.steps) }))
+  }
+
+  /** PS-49 — days with at least one live food log (a Health cat point). */
+  async listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.selectDistinct({ date: s.foodLogs.date }).from(s.foodLogs)
+      .where(and(
+        eq(s.foodLogs.userId, userId),
+        gte(s.foodLogs.date, from),
+        lte(s.foodLogs.date, to),
+        isNull(s.foodLogs.deletedAt),
+      ))
+    return rows.map(r => String(r.date))
+  }
+
+  /** PS-49 — days with a recorded weight (a Health cat point). */
+  async listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        isNotNull(s.bodyMetrics.weightKg),
+        isNull(s.bodyMetrics.deletedAt),
+      ))
+    return rows.map(r => r.date)
+  }
+
   async listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]> {
     const rows = await this.db.select().from(s.bodyMetrics)
       .where(and(
