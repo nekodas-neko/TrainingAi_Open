@@ -490,6 +490,27 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] LB-177 — migration 295's test throws on the local DB URL this sandbox actually writes
+
+- **Lane: A** — `lib/data/postgres/__tests__/la143-backfill-exercise-ids.test.ts`.
+- **Added:** 2026-09-28 · Lane B, hit while re-gating LA-166 after merging the base that carried it.
+- **What:** with the `DATABASE_URL` that `scripts/local-db/setup.sh` writes — a **Unix socket**,
+  `postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433` — the file throws
+  `TypeError: Invalid URL`, then `Cannot read properties of undefined (reading 'query')` in its
+  teardown. Its two tests report **skipped**, but the file FAILS, so `pnpm test` exits 1 against a
+  suite with zero failing tests. On a TCP URL it passes 2/2.
+- **Why it matters beyond one file:** that exit code is indistinguishable from the LB-168 symptom
+  (`pnpm test` exits 1 with `0 failed`), which cost a day to root-cause. The next lane to hit it
+  will start there.
+- **It is a third instance of a documented class.** CLAUDE.md already warns that
+  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` need a TCP URL because
+  they rewrite the URL's credentials — those two **skip loudly** instead of throwing, which is the
+  behaviour this one is missing.
+- **Fix shape:** detect the socket URL and skip the file the way its two siblings do, rather than
+  constructing a `new URL()` from it. Whether the local default should simply be TCP is the larger
+  question and is not this entry's.
+- **Reversal cost:** none — a guard in one test file.
+
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
 - **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
   can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
@@ -618,34 +639,6 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
-### [devices] BF-216 — three BLE reads still go through `.buffer`, which ignores the view's offset
-
-- **✅ THE PAIRING SCREEN SHIPPED 2026-09-28 (Lane B).** `chest-strap-pairing.tsx` reads
-  `batt.getUint8(0)` (guarded on `byteLength`, since it throws on an empty view where the old
-  `[0] ?? null` yielded null) and decodes the firmware view rather than its buffer.
-  `components/settings/__tests__/bf216-ble-view-offset.test.ts` holds it and **demonstrates the
-  defect rather than asserting a style**: on a `DataView(backing, 2, 1)` the old read returns the
-  filler byte and `getUint8(0)` returns the real one.
-- **Lane: A** — re-laned 2026-09-28. **The three that remain are device pipelines**, which §3 of the
-  agents contract puts in Lane A, so Lane B could not take them:
-  | site | read |
-  |---|---|
-  | `lib/colmi-ble/ble.ts:180` | `new Uint8Array(view.buffer)` — the V1 notification frame |
-  | `lib/colmi-ble/ble.ts:190` | `Array.from(new Uint8Array(view.buffer))` — the V2 big-data chunk |
-  | `lib/live-hr/chest-strap-source.ts:233` | `new Uint8Array(value.buffer)` — **the live HR measurement** |
-- **Not in scope:** `ble.ts:215`'s WRITE (`new DataView(bytes.buffer)`) builds its own array rather
-  than receiving one, so it owns the buffer it reads.
-- **Added:** 2026-09-27 · BugFix, found while tracing `BF-215`. **Not the cause of that report** —
-  every recorded reading came from the native path, which is correct.
-- **Latent rather than live, and worth fixing anyway.** `@capacitor-community/bluetooth-le` builds
-  its `DataView` from a fresh buffer today, so the offset is 0 and the read happens to be right.
-  That is a property of the plugin's current implementation, not of the API contract, and it is one
-  version bump away from silently changing.
-- **The guard already lists these two files by name** and fails if one stops matching — so fixing a
-  site means striking it from `LANE_A_DEBT` in the same commit, which is the reminder rather than a
-  chore.
-- **Reversal cost:** none. Three expressions.
-
 ### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
@@ -743,6 +736,19 @@ below threshold and left in place for next time.
 - **Added:** 2026-09-27 · BugFix.
 
 ### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
+- **✅ UNBLOCKED 2026-09-28 — APPLY 1,618 kcal. The 2026-09-14 recommendation was meant to be applied;
+  1,660 is only the number that was already there.**
+  So the deficit term is settled and the single-number formula can be built:
+  **`RMR + live activity − the deficit for the weight goal`**, recomputed as the day goes on.
+  **The other two numbers come off the screen** — he asked for one, and three unlabelled figures is
+  the confusion `RV-218` filed.
+  **⚠ Applying 1,618 is a WRITE to his live targets, so it follows the standing policy:** verified
+  snapshot first, affected rows against prediction, stop on a mismatch. It is an update, not a
+  delete, so no second confirmation is needed.
+  **Sequence this with `LA-126` and `OR-201`.** `LA-126` is the device agent accepting the
+  post-`RV-66` recommendation, and `OR-201` is his instruction that a computable target should not
+  need a tap at all. **Do not apply 1,618 by hand AND have DV accept a recommendation** — that is
+  two writes racing on the same field. Whoever goes first states which number landed.
 
 - **Lane: A** — the formula lives in shared/server code, so the engine half goes first by the path
   rule; the display half is Lane B and follows in the same batch.
@@ -768,7 +774,6 @@ below threshold and left in place for next time.
   term changes, so `LA-126` should be cleared in the same sitting as `RV-164`.
 - **Reversal cost:** the formula is one function and the display is one component. Low — but it is a
   number he reads every day, so it owes the device-verification gate, not just a green `pnpm dev`.
-- **Ask:** owner — one line: was the 09-14 recommendation of 1,618 kcal meant to be applied? The app still budgets 1,660, and the deficit term cannot be right until that is settled.
 
 
 ### [platform] OR-192 — the owner set a 30-day retention instinct; answer whether the raw archive is the exception before re-asking him
@@ -939,6 +944,35 @@ below threshold and left in place for next time.
   default is computed.
 - **Reversal cost: low while it is a default, high once the manual field is removed.** Keep the
   override until the derived number has been right for a month.
+
+
+### [platform] OR-202 — `next-schema-number.js` prints an unreadable wall, and it is the tool we tell contributors to run
+
+- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, found while answering an outside
+  contributor's question about the migration-numbering workflow (`jsboiss`, issue #1620).
+- **Two defects, one already fixed here.**
+  **① FIXED 2026-09-28:** `check-migration-numbers.js` and `migration-claims.js` told the
+  reader to run **`node scripts/next-migration-number.js`**, which **does not exist** — the file is
+  `next-schema-number.js`. That message is what a contributor sees when the duplicate check fails,
+  so the one moment the guidance matters most, it named a missing script. The script also
+  mislabelled itself in its own no-refs fallback. Three references corrected.
+  **② OPEN, and the reason for this entry:** the tool's output is effectively unreadable. A single
+  run prints lines hundreds of characters wide — number `274` alone reports the *same* filename
+  across **44 branches** — because dozens of stale branches still carry the 59
+  `claude_ro_views_*` migrations that `BF-214` deleted on 2026-09-27. Every one is a phantom: the
+  pattern no longer exists on `main`.
+- **Why it matters beyond tidiness.** A real collision is in there — `284: merged 284_sleep_verdicts
+  vs origin/health-sample-storage: 284_apple_health_samples` — and it is invisible between two
+  paragraphs of noise. A tool whose true finding cannot be seen is not doing its job, and this is
+  the one we point outside contributors at.
+- **Recommendation: collapse identical claims and ignore branches whose only claim is a deleted
+  pattern.** Print `274: 44 branches, same file` on one line rather than 44 names, and skip a
+  number whose claimants are all `claude_ro_views_*`, since no such migration can be valid now —
+  `claude-ro-views-file.test.ts` fails any PR that adds one.
+  **Alternative — prune the stale branches instead.** Cleaner in principle and it fixes the cause;
+  against it, the branches are other agents' unmerged work and the tool should be robust to them
+  existing. Do both eventually; do the output first, because it is the half that is safe.
+- **Reversal cost: low** — read-only reporting script, never a CI gate.
 
 
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
@@ -1699,17 +1733,27 @@ below threshold and left in place for next time.
 - **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
 
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
+- **✅ ANSWERED 2026-09-28 — the check-in ANNOUNCES its estimate and he corrects it in one tap.**
+  Stop asking for Recovery and Sleep quality outright. He took this over keeping the current ask and
+  over the announce-only-when-confident variant.
+  **Why it fits what he has already decided:** ratings move to outlier-only prompting (`TN-67`) and
+  his rating stops feeding the readiness score (`OR-200`), so the morning stops being a
+  questionnaire in three consistent steps rather than one.
+  **⚠ THE HONEST COST, and it must be carried into the build rather than forgotten:** announcing
+  shows him the app's guess first, so a correction is anchored by it. That is the same anchoring
+  that contaminated 62 days of `energy_level` and it does not disappear here — **it changes shape**:
+  a correction is a stronger signal than a rating precisely because he only acts when the app is
+  wrong, but silence is then ambiguous between *"right"* and *"not looked at"*.
+  **So the build must distinguish an explicit accept from an un-touched default** — the `touched`
+  flag convention `sleepQualityFeel` already uses (`TN-57`). Without it, every unopened morning
+  reads as agreement and the validation problem comes back wearing this feature's clothes.
 
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, three frames — the sheet as it
   is, an ordinary night (quiet line), an outlier night (prominent, numbers first): <https://claude.ai/artifact/Wx6SNHDTMVRBhJbCGctTAZ>.
   The temporary code was reverted; `git diff origin/main` is empty.
-- **Gate: owner** — this removes two inputs from a screen he opens daily, which CLAUDE.md gates on a
+- **Gate cleared 2026-09-28** — he chose announce-and-correct. Nothing further is owed by him; what remains is the build, including the touched-flag distinction above.
   mockup and a yes. `TN-85`'s `Keep:` ② already said so.
-- **Ask** — owner: should the morning check-in stop asking for Recovery and Sleep quality and state its
-  own verdict instead, and does **Recovery** go with it? `Ask:` rather than position, because
-  `Gate: owner` alone would sink this into PARKED where an owner answer is indistinguishable from a
-  device check.
 - **⚠ A GAP THE MOCKUP EXPOSED, AND THE PLAN DOES NOT ADDRESS IT.** `sleep-verdict` is the only verdict
   that exists — there is no recovery verdict, and nothing measures one. So "replace the two scales"
   is really **two different changes**: sleep gets an announcement that can be corrected, and
@@ -6379,10 +6423,17 @@ drift.
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
 ### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
-- **Lane: O** — a product preference: what the app should prescribe, not how.
-- **Ask** — owner: for Chin-Up, Pull-Up, Hanging Leg Raise and other bodyweight movements, should the
-  workout screen prescribe a target (reps per set) the way it does for loaded lifts, or only record
-  what you did?
+- **✅ ANSWERED 2026-09-28 — PRESCRIBE REPS ONLY on bodyweight movements, and record them as the plan.**
+  Chin-Up, Pull-Up, Hanging Leg Raise and the rest get a rep target the way loaded lifts get a
+  weight, using the rep max the app already stores and inverts. **`planned_pct` stays empty** — it
+  is a percentage of a lifted 1RM and there is no load to take a percentage of. No new column.
+  He declined record-only (which leaves them outside every adherence figure) and declined planning
+  them as added weight (which misstates an unweighted set as 0 kg).
+  **What this unblocks:** 23 of September's 49 unplanned sets are bodyweight, so Tuning stops
+  quoting adherence over loaded sets only. **Say so when the first figure moves** — adherence will
+  change the day this ships, and it will look like a regression if nobody names the cause.
+  **Back to Lane A** (`TN-75`'s parent work).
+- **Lane: A** — a product preference: what the app should prescribe, not how.
 - **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
 - **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
   rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
@@ -6397,12 +6448,21 @@ drift.
   already stored changes.
 
 ### [nutrition] LA-172 — how should the app tell that a planned meal was eaten, when no plan meal has a meal type?
-- **Lane: O** — a decision about which food counts toward a plan, which moves the calorie totals the
+- **✅ ANSWERED 2026-09-28 — BOTH, and the answer is wider than option (a).**
+  Verbatim: *"Give it a type by its time; as well as what its tagged with."*
+  **① Derive the meal type from `suggested_time`** — 11:40 becomes Lunch — at plan creation, and
+  **once as a backfill for the 8 existing plan meals**, all of which have `meal_type_id` NULL.
+  **② AND honour an explicit tag where one exists.** A tag the owner sets WINS over the derived
+  type; the time is the default, not the authority.
+  So a plan meal's type resolves as **tag → derived-from-time → none**, and the plan screen can show
+  *"Lunch · Turkey and Rice Bowl"* with the derived value visible and correctable, which is what
+  makes a wrong derivation fixable instead of invisible.
+  **He did NOT take window-matching by log time** — that silently stops counting a real meal on any
+  day he eats late, with nothing on screen explaining why.
+  **The backfill is an UPDATE**, covered by the standing production policy: snapshot, affected rows
+  against prediction, stop on mismatch. **Unblocks `BF-203a`.**
+- **Lane: A** — a decision about which food counts toward a plan, which moves the calorie totals the
   owner reads.
-- **Ask** — owner: when the app checks whether you ate a planned meal, should it (a) give each plan
-  meal the meal type its suggested time falls in (so "Turkey and Rice Bowl" at 11:40 becomes Lunch)
-  and count any food logged under that type, or (b) match by when you logged, within a window
-  around the suggested time?
 - **Added:** 2026-09-28 · Lane A, blocking BF-203a.
 - **What was found:** all 8 of the owner's plan meals have `meal_type_id` NULL. They carry a name,
   targets and a `suggested_time` (07:00, 11:40, 16:20 …), but no meal type. Anything that matches
@@ -7776,20 +7836,6 @@ drift.
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
 
-### [workouts] LA-166 — offline edits and deletes of logged work toast success and are lost: queue them instead
-- **Lane: B** — `lib/hooks/use-day-entry-mutations.ts` (`handleEdit`, `handleDelete`, `handleDeleteSession`).
-- **Needs: LA-165**
-- **Added:** 2026-09-28 · Lane A, the client half of RV-175.
-- **What:** the three handlers `fetch` first and mirror locally only after a 2xx, so offline they
-  toast "Updated"/"Deleted", then "Failed to …", and nothing is queued. Once LA-165 lands, write
-  locally in pending mode and `queueMutation` the matching domain: `exercise_log_edit`
-  (`{ exerciseLogId, weights, reps }`), `exercise_log_delete` (`{ exerciseLogId }`) or
-  `workout_session_delete` (`{ workoutSessionId }`). Payload schemas are in
-  `lib/workout/exercise-log-edits.ts` and `lib/workout/delete-session-reconcile.ts`. `handleDeleteActivity` in
-  the same hook is the reference (Q-328).
-- **Done when:** offline, each action toasts once, survives an app restart, and reaches the server on
-  reconnect. **Device check owed** — the local store is null on the web.
-
 ### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
 
 - **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
@@ -7912,30 +7958,6 @@ drift.
 - **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
   Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
   across the 3 modules now take the user's zone.
-
-### [platform][app-shell] LB-150 — the "today" cache envelope rolls over at Brisbane midnight for every user
-
-- **Lane: A** — `lib/sqlite/cache.ts` (Lane B found it; the letter records the finder, the lane the builder).
-- **Added:** 2026-09-25 · found reading `cachedFetchToday` while working RV-183's remaining half.
-- **`unwrapToday` compares `envelope.date !== todayInTz()`** (`cache.ts:546`) and the writer stamps
-  `todayInTz()` (`:603`) — **both the bare Brisbane default**. They agree with each other, which is
-  why this is invisible in every test and to the owner, and why the sync-provider's recent
-  writer/reader fix (which corrected a genuine *disagreement*) did not touch it.
-- **What it costs a user outside Brisbane.** The envelope exists to stop yesterday's data painting
-  as today's. It rolls at **Brisbane** midnight, while every server route computes "today" in the
-  **user's** zone. Between the user's midnight and Brisbane's, a cached reading from the user's
-  previous day still satisfies the guard and is served as current — 14 hours a day in New York, the
-  same window Q-478 measured for the guards commented directly below this one.
-- **The comment two lines under it already states this rule** for `isBodyMetadataFresh` and
-  `isWorkoutDataToday` — *"Omit it and the comparison silently becomes 'is the server's date equal
-  to Brisbane's date'"*. `unwrapToday` is the one that does not take a `tz` at all.
-- **Population:** ~10 keys write the envelope (`readiness-score`, `body-battery`, `next-session`,
-  `supplements`, `weekly-stats-rt`, `cardio-week`, `oura-stats`, `running-plan`,
-  `health-trends-summary`) and ~14 read it via `readTodayCacheSync`, adding `training-load`,
-  `training-stress`, `progress-summary` and `weekly-stats`.
-- **Both sides must change together.** Stamping in the user's zone while reading in Brisbane (or
-  the reverse) is strictly worse than the current self-consistent state — it makes the entry
-  unreadable the moment it lands, which is the failure the sync-provider fix was written to undo.
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
@@ -15878,47 +15900,6 @@ Not a decision for a queue pass: option 1 changes how every request in the app i
 > - **`GET /` no longer redirects a deactivated session.** `app/(home)/page.tsx` has no server
 >   `auth()` call, so it serves the client shell (200) and every data call behind it answers 401.
 >   Data stays protected; the sentence above saying `/` goes to a `/sign-in` redirect is out of date.
-
-### [platform] LA-61 — three email lookups on the OAuth path skip the normalisation the write applies
-- **✅ APPROVED 2026-09-28 — normalise on the way IN, and add the functional index. Both.**
-  The durable fix over patching the three known lookup sites: every future lookup is correct by
-  construction rather than by someone remembering. He took it over the smaller diff and over
-  leaving it as a single-user non-issue.
-  **It needs a one-off backfill of existing rows** — an UPDATE, not a delete, so it is authorised
-  under the 2026-09-27 production policy: verified snapshot first, affected rows against
-  prediction, stop on a mismatch. **Not a data-dropping change; no second confirmation needed.**
-  **⚠ Auth path — do not batch it with anything.** It touches Google sign-in, which is the owner's
-  carve-out area even when the change itself is mechanical.
-
-- **Lane:** A — `auth.ts` signIn callback, `lib/data/postgres/adapter.ts` (`getUserByEmail`).
-- **Added:** 2026-09-06, found while fixing PS-25's rate-limit key.
-- **Gate cleared 2026-09-28** — answered; normalise-in plus the functional index is approved.
-  than gaining them.
-
-Registration **writes** `email.toLowerCase().trim()`, and `getUserByEmail` compares with a plain
-`eq`, so the lookup is case- and whitespace-sensitive. Three sites on the Google path pass the raw
-provider value: `getUserByEmail(user.email!)`, `isInvited(user.email!)`, and
-`upsertUser({ email: user.email! })`. Two consequences, both silent:
-
-- **A duplicate account.** If the provider ever returns an address whose case differs from the
-  stored one, the link lookup misses and `upsertUser` creates a second row for the same person.
-- **A missed invite.** `isInvited` compares the same way, so an invite recorded in one case does not
-  match a sign-in in another, and the user lands in `/pending` with no explanation.
-
-Google normalises to lowercase in practice, which is why this has never fired. That is a property of
-someone else's service, not of this code.
-
-**Do NOT fix it by normalising the input.** Any row already stored non-normalised stops matching, and
-this endpoint cannot see how many such rows exist — `claude_ro` is row-scoped to the owner, so a
-count from the admin query proves nothing about anyone else's. Normalising the *comparison* instead
-(`lower(email) = lower($1)`) can only gain matches, never lose them.
-
-**That is the schema decision.** `users.email` is unique, and a `lower()` comparison does not use a
-plain b-tree index on `email` — it wants `CREATE INDEX ... ON users (lower(email))`, and arguably a
-unique one, which would then **fail to create** if two rows already differ only by case. That failure
-is information worth having, but it is a migration that can refuse to apply, so it is the owner's
-call rather than a queue pass. Alternative: leave lookups as they are and add the normalisation to
-`upsertUser`'s write only, which stops new divergence without touching matching.
 
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
 

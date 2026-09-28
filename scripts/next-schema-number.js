@@ -62,7 +62,7 @@ try {
     .split('\n')
     .filter((r) => r && !r.endsWith('/HEAD') && r !== 'origin/main');
 } catch {
-  console.log('next-migration-number: no git refs readable — falling back to the working tree alone.');
+  console.log('next-schema-number: no git refs readable — falling back to the working tree alone.');
 }
 
 const merged = filesIn('origin/main');

@@ -6,7 +6,24 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
+> `grep -n '^### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
+
+The three handlers in `use-day-entry-mutations.ts` used to `fetch` first and mirror locally only
+after a 2xx, so offline they toasted "Updated"/"Deleted", then "Failed to …", and queued nothing —
+the change was simply lost. They now write locally in pending mode and queue `exercise_log_edit`,
+`exercise_log_delete` or `workout_session_delete`, the same shape `handleDeleteActivity` has had
+since Q-328. **Nothing in the sandbox can exercise this:** `getLocalStore` returns null on the web,
+so every run here takes the fetch fallback, and the repo has no React hook renderer — the guards are
+source-level, plus Lane A's engine tests from LA-165.
+
+**Pass test on the S25, in aeroplane mode:** edit a logged exercise, delete one, and delete a whole
+session. Each should toast **once**, stay changed after force-quitting and reopening the app, and
+reach the server when the connection returns. **One known difference from the online path:** deleting
+a session's last exercise leaves the empty session shell visible on that device until the next pull
+reaps it. Online the response says the server cascaded; offline nothing can know that, and queuing a
+second `workout_session_delete` to close the window would double-delete whenever the guess is wrong.
+
+### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
 
 `chest-strap-pairing.tsx` read the battery level as `new Uint8Array(batt.buffer)[0]`, which discards
 the `DataView`'s offset; it now reads `batt.getUint8(0)`. **Today's value is identical** — the BLE

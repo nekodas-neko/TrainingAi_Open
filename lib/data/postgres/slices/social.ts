@@ -1,5 +1,6 @@
-import { eq, and, or, desc } from 'drizzle-orm'
+import { eq, and, or, desc, sql } from 'drizzle-orm'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
+import { normalizeEmail } from '@trainingai/shared/validation/email'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
@@ -47,7 +48,8 @@ export async function listFriendships(db: Db, userId: string): Promise<Friendshi
 export async function sendFriendRequest(db: Db, requesterId: string, emailOrCode: string): Promise<Friendship> {
   const upper = emailOrCode.toUpperCase()
   const [target] = await db.select().from(s.users)
-    .where(or(eq(s.users.email, emailOrCode), eq(s.users.friendCode, upper)))
+    // LA-61: stored emails are normalised, so the typed one must be too, or a capital letter misses.
+    .where(or(eq(sql`lower(${s.users.email})`, normalizeEmail(emailOrCode)), eq(s.users.friendCode, upper)))
     .limit(1)
   if (!target) throw new NotFoundError('User')
   if (target.id === requesterId) throw new UserFacingError('Cannot add yourself')

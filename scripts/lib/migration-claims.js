@@ -6,7 +6,7 @@
 // author a number that is already spoken for. That is #1608: an outside contributor derived 284/285
 // from what they could see, and 284/285 were taken by a branch that merged first.
 //
-// Pure so it can be tested without a repository; the git reading lives in next-migration-number.js.
+// Pure so it can be tested without a repository; the git reading lives in next-schema-number.js.
 
 // Already on disk and already applied — each pair is independent, so the ambiguous order is
 // harmless and renaming them now would re-run them. Never add to this list to silence a new
