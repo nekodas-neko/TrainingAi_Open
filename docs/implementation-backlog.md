@@ -3817,6 +3817,28 @@ which is the right shape for something that can only be validated by living with
   only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
+### [app-shell][platform] LB-183 — one time-of-day form: a fourth is still live, and two more wait on a minutes-based helper
+
+- **Lane: A** — `packages/shared/src/date-utils.ts`. **Added:** 2026-09-28 · Lane B, split out of
+  `RV-208` ① on shipping that entry's ③.
+- **Why it is its own entry:** it was written inside `RV-208`, which is `Lane: B`. The lane field is
+  what routes work, so a Lane A item described in a Lane B entry reaches nobody — the same shape
+  CLAUDE.md calls out for an owner question buried in another entry. `RV-208` ① had already been
+  marked *"NOT Lane B"* in prose and still sat in Lane B's queue.
+- **The fourth form, measured 2026-09-27 by RUNNING both functions rather than reading them:**
+  `formatTime12h('06:40')` returns **`6:40am`**; `formatTimeOfDay` returns **`6:40 am`**. It feeds
+  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
+  6:40am" surface `RV-208` opened with.** One character in a `packages/shared` file.
+- **Two more are blocked on a helper that does not exist yet.**
+  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis) both
+  format **minutes-of-day**, not an instant, so `formatTimeOfDay` cannot take them as-is. They need
+  a minutes-based sibling in `packages/shared` — Lane A's engine half first; Lane B then converts
+  the two call sites, which are in its own tree.
+- **Do not "fix" the two call sites by reaching for `formatTimeOfDay`**: it takes an instant, and a
+  minutes-of-day value turned back into a `Date` is the timezone bug this repo keeps re-finding —
+  `formatClock`'s own header says so.
+
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
   **not** a one-off. Review sweep 63 flagged Nutrition's "I've finished logging" as the only
@@ -3858,12 +3880,10 @@ which is the right shape for something that can only be validated by living with
   `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
   6:40am" surface this entry opened with, still unfixed.** The fix is one character in a Lane A
   file, so it was not taken here.
-  **Still their own form, and blocked on the same lane:**
-  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
-  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both
-  format minutes-of-day rather than an instant, so they need a minutes-based sibling of
-  `formatTimeOfDay` — which is `packages/shared`, i.e. **Lane A's engine half first**, then Lane B
-  converts the two call sites. The entry called these Lane B's; the path rule says otherwise.
+  **➡ MOVED OUT 2026-09-28 to `LB-183` (`Lane: A`).** It stayed described here and invisible there:
+  this entry is `Lane: B`, and the lane field is what routes work, so Lane A was never going to see
+  a Lane A item written inside it. Same reasoning CLAUDE.md gives for an owner question buried in
+  another entry. The two minutes-of-day formatters that wait on it moved with it.
   ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
   SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
   `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
@@ -3881,13 +3901,20 @@ which is the right shape for something that can only be validated by living with
   added space in two tight cells (`pip-view`'s overlay, `week-day-sheet`'s truncated row).
   `app/api/**` is excluded from the guard: its five `${x}kg` are LLM prompt text and a Google
   Calendar description, **Lane A's** and not renders.
-  ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
-  is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
-  Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
-  `--accent-cyan/purple/green`, and **purple and green collide with session slots 2 and 5**. Only
-  four accent tokens exist; giving the categories a non-clashing set means adding two to
-  `app/globals.css` with contrast checked there. Lane B, but it is design work rather than a
-  rename — it deserves its own pass, not a tail-end of this one.
+  ③ ~~**The movement-category palette needs two new hues.**~~ **✅ SHIPPED 2026-09-28 (Lane B) — and
+  the "two new hues" premise was not available.** The clash was real and worse than stated:
+  `legs` was `--accent-green`, **0°** from session green, and `pull` was `--accent-purple`, **10°**
+  from session purple and **20°** from session indigo. But a replacement hue must clear TWO systems
+  — `SESSION_PALETTE`'s six Tailwind hues *and* this app's four `--accent-*` tokens, nine
+  constraints on a 360° wheel. **Scanned rather than judged: the only band clear of all nine at 40°
+  is ~345–347°**, room for one hue, not two; a three-hue set exists only at 30° gaps, one of them
+  wedged exactly between amber and green. So the colour stopped carrying the identity, which it
+  never had to — every row already renders `PATTERN_LABEL` beside its bar, so hue was redundant
+  encoding. One accent for all three cannot collide, and stays correct when he reorders his
+  sessions, which the old map could not.
+  `components/health/__tests__/rv208-movement-category-hues.test.ts` asserts the ARITHMETIC against
+  `globals.css` and `SESSION_PALETTE`, not the literals; control-run against the old palette, against
+  the subtler `pull` half alone, and against a raw Tailwind session name.
   ④ **Dates** (`25 Sept` / `Saturday 26 September` / `September 2026`) and ⑤ **brand-in-food-name**
   are copy decisions, untouched here.
 - **A question this raised and did not answer:** every separator site uses a bare
