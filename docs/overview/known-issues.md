@@ -31,6 +31,27 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep][app-shell] The rebuilt morning check-in is NOT device-verified, and its save path is the untested half
+
+- **Shipped 2026-09-28 (TN-82, v1.480.0), web-verified only.** `components/morning-checkin-sheet.tsx`
+  no longer asks for sleep quality or recovery; it announces the night's verdict and takes a one-tap
+  correction. The sheet is the **canonical daily surface** and the local store is on its write path,
+  but `getLocalStore` returns null in the web sandbox, so every test run took the **API fallback**
+  and `store.upsertDayCheckin` + `queueMutation` never executed for this payload.
+- **What a device pass must answer**, most likely to fail first:
+  1. **Save with no verdict to announce** (a day before the baseline fills). A row must still be
+     written. If it is not, `dayCheckinHasAnswers` rejected it — a 400, or a no-retry poison pill in
+     the outbox — and the sheet will re-prompt every visit, because auto-open keys on a row existing.
+  2. **Correct it offline**, then reopen the sheet. The chip must still be selected, and Home's sleep
+     line (LA-136) must show the corrected word.
+  3. **Save without touching the announcement.** `sleep_verdicts.response_state` must stay `none`,
+     NOT `acknowledged` — Save is the reflex, not assent, and promoting it destroys the instrument.
+  4. The announcement's prominent and quiet forms at 384 px in a Samsung WebView, including whether
+     five correction chips wrap acceptably.
+- **Why it is here rather than in a lane:** nothing is known to be broken. This is the device gate the
+  canonical-runtime rule owes for a change touching an offline-first domain, recorded because no
+  device was available in-session. It is the same sitting TN-85's `Keep:` ① already owes.
+
 ### [sleep][app-shell] Home's sleep line is NOT device-verified, and the offline path is the untested half
 
 - **Shipped 2026-09-28 (LA-136, v1.479.0), web-verified only.** `components/home/sleep-feel-line.tsx`

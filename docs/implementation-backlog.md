@@ -1645,12 +1645,12 @@ below threshold and left in place for next time.
   that navigates, so a control within it is a button inside a button — invalid, and what
   `check-nested-buttons.js` fails on. It is also hidden in section-edit mode: the editor is about
   layout, and a live control does not belong in a rearranging surface.
-- **Keep:** ① the device look, with `TN-82`'s APK pass — the note is new furniture on the owner's
-  daily screen and no sandbox drives a Samsung WebView. ② `TN-82` itself, which is now the MODAL
-  half only: its removal of the two scales is an information-architecture change to a daily screen,
-  so per CLAUDE.md it owes a mockup and a yes before any code. This entry deliberately removed
-  nothing. **The mockup was produced and shown 2026-09-27** — three frames from the running app,
-  linked on `TN-82` — so what is outstanding there is the ANSWER, not the picture. Do not draw a
+- **Keep:** ① the device look, with the APK pass `TN-82` left owed (it shipped 2026-09-28) — the note is new furniture on the owner's
+  daily screen and no sandbox drives a Samsung WebView. ② nothing further from `TN-82`, which
+  **SHIPPED 2026-09-28**: the mockup was shown 2026-09-27, he answered on the 28th, and the sheet
+  now announces and is corrected in one tap with both scales removed. What that entry left owed is
+  the APK pass folded into ① above. Kept here only so the mockup-then-yes sequence is not re-run:
+  the picture exists and was answered. Do not draw a
   second one. ③ two wording deviations from `TN-84`'s draft, recorded on that entry for the owner.
 
 
@@ -1733,78 +1733,6 @@ below threshold and left in place for next time.
   wording is wrong he says so and it changes in a one-line PR — which is the argument for shipping the
   draft rather than waiting on it.
 - **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
-
-### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
-- **✅ ANSWERED 2026-09-28 — the check-in ANNOUNCES its estimate and he corrects it in one tap.**
-  Stop asking for Recovery and Sleep quality outright. He took this over keeping the current ask and
-  over the announce-only-when-confident variant.
-  **Why it fits what he has already decided:** ratings move to outlier-only prompting (`TN-67`) and
-  his rating stops feeding the readiness score (`OR-200`), so the morning stops being a
-  questionnaire in three consistent steps rather than one.
-  **⚠ THE HONEST COST, and it must be carried into the build rather than forgotten:** announcing
-  shows him the app's guess first, so a correction is anchored by it. That is the same anchoring
-  that contaminated 62 days of `energy_level` and it does not disappear here — **it changes shape**:
-  a correction is a stronger signal than a rating precisely because he only acts when the app is
-  wrong, but silence is then ambiguous between *"right"* and *"not looked at"*.
-  **So the build must distinguish an explicit accept from an un-touched default** — the `touched`
-  flag convention `sleepQualityFeel` already uses (`TN-57`). Without it, every unopened morning
-  reads as agreement and the validation problem comes back wearing this feature's clothes.
-
-- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
-  Rendered from the *running app* at **384 px dark** rather than drawn, three frames — the sheet as it
-  is, an ordinary night (quiet line), an outlier night (prominent, numbers first): <https://claude.ai/artifact/Wx6SNHDTMVRBhJbCGctTAZ>.
-  The temporary code was reverted; `git diff origin/main` is empty.
-- **Gate cleared 2026-09-28** — he chose announce-and-correct. Nothing further is owed by him; what remains is the build, including the touched-flag distinction above.
-  mockup and a yes. `TN-85`'s `Keep:` ② already said so.
-- **⚠ A GAP THE MOCKUP EXPOSED, AND THE PLAN DOES NOT ADDRESS IT.** `sleep-verdict` is the only verdict
-  that exists — there is no recovery verdict, and nothing measures one. So "replace the two scales"
-  is really **two different changes**: sleep gets an announcement that can be corrected, and
-  **Recovery loses its input with nothing in its place**. Only building it made that visible.
-  **Recommendation: remove Recovery too**, on the plan's own measurement — `perceived_recovery` has
-  **0 touched answers in 102 check-ins**, so it costs a reading that has never once been taken. The
-  alternative (keep Recovery, drop only Sleep quality) leaves one scale beside the announcement, which
-  is the arrangement §1 argues against.
-- **⚠ Do NOT argue this from `vs_yesterday` — it collected 2 of 82.** The first draft of the mockup
-  said "the sheet still asks *Compared to yesterday*, which is the same question in the form you
-  actually answer". The plan's own table refutes that: `vs_yesterday` was placed first specifically to
-  escape the two scales and **decayed to zero like the other two**. The honest argument is that asking
-  has failed in three forms and three positions, not that one of them works.
-- **The copy is `TN-84`'s and is NOT settled by this mockup.** The frames use the wording
-  `verdictCopy()` already ships (TN-85), so what he is approving here is the *shape* — scales out,
-  announcement in — not the sentence.
-
-- **Lane: B** — `components/morning-checkin-sheet.tsx`. **Added:** 2026-09-26.
-- **Needs:** — cleared 2026-09-26. LA-149 shipped the announce path: `GET /api/sleep-verdict`
-  returns the night's verdict (computed and frozen on first read, `null` with
-  `baselineNightsRequired` when there is nothing honest to say) and `POST` records
-  `acknowledged`/`corrected`. It reads through `nightSessions()`, so TN-83's nap problem does not
-  reach the surface. **Startable.** The route never writes a `touched` flag — the correction's
-  VALUE is the check-in save path's to write (TN-57).
-- **Plan:** [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md)
-- **No question is ever asked.** Ordinary day: **one quiet line** stating it was filled as normal, no
-  interaction demanded. Outlier day: **prominent, and it states the reason** ("slept 5h10, 90 min later
-  than usual — marked this poor"), one tap to correct, and a deliberate dismissal recorded as
-  acknowledgement. The reason is load-bearing: a verdict with no stated cause cannot be argued with.
-- **This REPLACES the two scales rather than joining them.** **Asking** is the intervention that has
-  failed three times (see `OR-171`'s amendment for the month-by-month decay); 82 consecutive saves have
-  trained a reflex of hitting **Save** without reading, and a fourth field inherits it.
-- **Also covers scores that feel wrong** (owner: *"I think the above structure would work for this
-  too"*) — and under this design they are **the same feature**, because a correction *is* the report
-  that the score felt wrong. He never has to remember to report anything, which was the original
-  problem (*"If I remember; I will let you know"*).
-- **The failure mode to watch is him not reading it** — see `OR-171`'s guard. That is why the quiet line
-  stays quiet and the loud one stays rare: announce loudly twice a week and it becomes wallpaper.
-- **⚠ READ `TN-85` BEFORE BUILDING THIS.** The sheet this entry targets auto-opens **once** a day, only
-  on `/session-select`, and is retired for the day `onClose` — so as things stand the announcement gets
-  one showing on a surface with a three-month record of reflexive dismissal. `TN-85` recommends a
-  durable second home for the verdict; building this entry modal-only makes near-zero corrections
-  uninterpretable.
-- **The announcement copy is the owner's, and it is now its own entry — `TN-84`, `Lane: O`.** Split out
-  2026-09-26 on the owner's instruction that anything needing him is routed to the Orchestrator rather
-  than asked in a Tuning session. It does **not** block this build: ship with the drafted copy in
-  `TN-84` and swap in whatever he settles on.
-- **Device:** the morning sheet is the canonical daily surface and the local store is on the write
-  path, so the pass needs the APK, not `pnpm dev`.
 
 ### [platform] OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
 
