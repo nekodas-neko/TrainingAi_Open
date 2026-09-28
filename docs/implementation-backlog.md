@@ -490,6 +490,50 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
+- **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
+  can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
+  owner's admin session, and a sandbox session does not. Work them in this order: ① to ③ change
+  production data and are authorised, and ④ and ⑤ are device checks.
+- **Added:** 2026-09-28 · Lane A.
+- **① Body Battery re-derive (TN-72) — after #1835 is on `main`.** The owner approved it on
+  2026-09-27, and the standing policy covers a backfill with a snapshot. Steps:
+  (a) Save the pre-image: `SELECT * FROM claude_ro.body_battery_daily ORDER BY date` through
+  `/api/admin/db-query`, written to a dated file in `scripts/device/` output. A derived table,
+  plus this copy, is the restore path.
+  (b) Dry-run in 31-day pages from inside the app's WebView:
+  `fetch('/api/admin/rederive-body-battery?from=<d>&to=<d+30>',{method:'POST'}).then(r=>r.json())`,
+  covering the whole stored range (about three pages).
+  (c) Record each page's `summary` (written, end-value delta, recomputed end distribution) on
+  **TN-72**. That is the "how many days move and by how much" the owner asked for.
+  (d) Re-run each page with `&dryRun=false`, and **stop if `written` differs from the dry run.**
+  (e) Re-read the table and confirm every re-derived row carries the v6 `model_version`.
+  **Pass:** stored days all v6, and the numbers are on TN-72.
+- **② One full-window rollup, to restore thinned workout HR (LA-168).** `POST
+  /api/oura-ble/samples/redecode` (admin; it queues a job, so poll `GET …/redecode?jobId=`). The HR
+  series only rewrites the last 14 days, so only sessions from about 09-14 recover, and older ones
+  stay at 5-minute bins. **Before and after:** for 09-17, 09-20, 09-22 and 09-24, compare the
+  `oura_heartrate` rows in each workout window with `workout_hr_stats.readings_count` (the query is
+  in LA-168's journal entry, `docs/overview/entries/2026-09-28-lane-a-la168-*`). **Pass:** the
+  ring-only sessions in the window return to 15-second spacing. It keeps the rollup worker busy
+  for minutes, so run it with nothing else in flight.
+- **③ Delete the bogus 24 Sept 09:18 treadmill walk (DV-19).** 40 min, 133 kcal, no steps or HR,
+  server id `b8083d04`. Delete it in the app's activity list, not by SQL. The owner listed it as
+  his to-do and handed it over with the instruction above. **Pass:** Health → Training lists that
+  walk once, and the phone's local store no longer holds `4b5c23e0` (the orphan retires when the
+  server row changes).
+- **④ Device check — LA-165.** Log a workout, set its RPE, keep the app open five minutes: the
+  outbox shows no re-queued `workout_log` for that session. Before the fix it showed one per
+  exercise. Known-Issues row: *"A session given an RPE now returns to 'synced'"*.
+- **⑤ Device check — DV-19.** Airplane mode, then save an activity at the same minute as one the
+  server already holds. Reconnect, pull, and the list shows **one** row. Known-Issues row: *"The
+  phone now retires an activity row the server merged away"*.
+- **Answers:** VERIFIED / FAILED / COULD NOT CHECK per item, with screen and navigation mode. A
+  FAILED goes back to Lane A with what reproduces it. When all five have answers, strike the
+  matching Known-Issues rows and TN-72's `Keep:`.
+- **NOT DV's, and still the owner's:** BF-214's approval (#1795), a progression style for Barbell
+  Skull Crusher (a preference), LA-169 (bodyweight plans), fresh S3 keys, and the held security PRs.
+
 ### [platform] LB-168 — `pnpm test` exits 1 with ZERO tests failed, about one full run in five
 - **✅ FIXED 2026-09-27 — root-caused to ONE emitter and closed in `vitest.setup.ts`. This entry
   stays queued only for the `Keep:` below.**
