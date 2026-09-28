@@ -6575,6 +6575,35 @@ drift.
   reproduces across runs, and its data inputs turn out to be isolated. That makes **load/timing**
   the live hypothesis for it, which is exactly what the retained first-attempt error would confirm
   or kill.
+- **✅ `tn53:105` ROOT-CAUSED AND FIXED 2026-09-28 — and it was never order-dependence.**
+  Reading the retained first attempt (as the step above says to) answered it immediately. The error
+  is not a timeout and not a wrong count — **the note is absent entirely**:
+  `Expected substring: "3 days missing"` · `Received string: "Resting Heart Rate — 14 days"`. So the
+  chart saw **zero** gaps.
+  - **Cause: `scripts/local-db/seed.sql` gives EVERY one of the last 14 days a
+    `resting_heart_rate` (58).** The spec seeded its four readings with `ON CONFLICT DO UPDATE` and
+    never cleared the rest, so on a freshly seeded database the window is full and there is no gap
+    to disclose. A spec cannot assert a gap it does not create.
+  - **That is the whole flaky signature, and it is deterministic.** CI seeds a **new** database every
+    run → attempt 1 meets a full window and fails; the spec's own `afterAll` then NULLs those seeded
+    values; the retry re-runs `beforeAll` against an empty window and **passes**. Hence "flaky" in
+    all three censuses rather than failing outright.
+  - **And it is why it could never reproduce locally.** A local database is persistent, so one
+    earlier run had already emptied it. Measured 2026-09-28: **0 of 15** rows in the window carried
+    a reading locally, against **15 of 15** on a fresh seed. Restoring `resting_heart_rate = 58`
+    across the window reproduced the CI failure exactly, byte for byte.
+  - **Fix:** `beforeAll` NULLs `resting_heart_rate` across the whole window before seeding its four,
+    so the spec is independent of the seed and idempotent. Control-run both ways against the
+    restored fresh-seed state: unfixed **fails** with the CI error, fixed **passes**.
+  - **Sibling sweep, clean:** of the specs that both seed `body_metrics` and mention an absence,
+    only this one asserts on a *rendered* absence — `metric-bounds-at-keyboard` and
+    `reta-weight-response` match on prose and an error message.
+- **⚑ SO THE REMAINING CHURN HAS A BETTER HYPOTHESIS THAN ORDER: SEED-STATE DEPENDENCE.** The real
+  asymmetry is not which spec ran first — it is that **CI runs against a database seeded minutes
+  earlier, while a local database has been mutated by every previous run**. Any spec whose assertion
+  depends on an absence, or on the seed's exact values, is a different test in the two environments,
+  and `tn53` proves the shape. **The cheap probe is `pnpm db:local` (rebuild) followed by the full
+  suite** — that reproduces CI's starting conditions locally, which shuffling order does not.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
