@@ -6,7 +6,15 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
+> `grep -n '^### [nutrition][devices] ⚠️ The device's food reads now return the stored picture, and no phone has run them (LA-36, 2026-09-28)
+
+`searchFoodItems`, the recent-foods read and the day's logs now select and map `image_data_uri` on
+the device's SQLite. Nothing renders it yet, so the screen should look the same. What could break is
+the read itself. The queries are plain SQLite and pass on `node:sqlite`, but the Capacitor plugin
+is not that engine. **Pass test on the S25:** open Nutrition, search foods, open Recent, and scroll a
+logged day. All three must list as before, with no error toast and no empty list.
+
+### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
 
 The three handlers in `use-day-entry-mutations.ts` used to `fetch` first and mirror locally only
 after a 2xx, so offline they toasted "Updated"/"Deleted", then "Failed to …", and queued nothing —
@@ -22,6 +30,20 @@ reach the server when the connection returns. **One known difference from the on
 a session's last exercise leaves the empty session shell visible on that device until the next pull
 reaps it. Online the response says the server cascaded; offline nothing can know that, and queuing a
 second `workout_session_delete` to close the window would double-delete whenever the guess is wrong.
+
+### [devices][heart-rate] ⚠️ Health Connect HRV, SpO₂ and the HR series now convert, and no phone has run it (LA-115, 2026-09-28)
+
+The Health Connect plugin's `RecordConverter` had no branch for three types the sync reads:
+`HeartRateVariabilityRmssd`, `OxygenSaturation` and `HeartRateSeries`. It returned
+`record.toString()` for them, so every field read as `undefined` and the date filter dropped every
+record, silently. The patch adds the three branches, with field names read from
+connect-client 1.1.0-alpha11's own sources jar. It compiles locally, and a deliberate typo fails
+the compile, which proves the patched file is the one built. **It is Kotlin, so it reaches the phone
+only in the CI-built APK that this merge publishes.** **Pass test on the S25:** install that APK,
+confirm Health Connect grants HRV and SpO₂, and run a sync with the ring's overnight data present.
+Then show a non-null HRV or SpO₂ from `health_connect` in `body_metrics`. The ring outranks Health
+Connect in the ranked merge, so check `source_map` or read the sync's own output: a zero in
+`source_map` alone proves nothing.
 
 ### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
 
@@ -2594,10 +2616,9 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
   carries little signal — **not** a reason to re-wire the override.
 - **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
   imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
-  (`bucket_start` stores the bucket midpoint — **documented, not fixed**: the rename was attempted
-  and reverted because every historical `claude_ro` view migration names the old column and CI
-  replays them all. `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid needs 15
-  minutes added).
+  (the stress bucket column holds the midpoint; **renamed to `bucket_mid` on 2026-09-28** once
+  BF-214 had removed the view migrations that blocked it. A join on the :00/:30 grid still subtracts
+  15 minutes, but the name now says so).
 - **What shipped (v1.457.2).** `buildDaytimeStressSeriesFromModel` drops sleeping buckets **before**
   `scoreStressPoints`, so they reach neither the levels nor the day-median baseline. The ordering is
   the fix: filtering only the summary would drop them from the count and leave the waking buckets

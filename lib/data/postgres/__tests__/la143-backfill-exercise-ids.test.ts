@@ -22,6 +22,9 @@ describe.skipIf(!canRun)('migration 295 — backfill session_exercises.exercise_
     await admin.query(`DROP DATABASE IF EXISTS ${PROBE_DB} WITH (FORCE)`)
     await admin.query(`CREATE DATABASE ${PROBE_DB}`)
     probe = new Pool({ connectionString: withDatabase(process.env.DATABASE_URL!, PROBE_DB), max: 1 })
+    // Teardown drops this database WITH (FORCE), which terminates any client still closing with
+    // 57P01. Without a listener that error is unhandled and fails the whole run (seen on CI).
+    probe.on('error', () => {})
   })
 
   afterAll(async () => {

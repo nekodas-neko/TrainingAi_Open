@@ -1492,17 +1492,10 @@ export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
    * The bucket's MIDPOINT, not its start — `daytimeHrvEstimatesPerBucket` emits
    * `t = bStart + bucketMs / 2` and that is what is written here.
    *
-   * **The SQL column is still `bucket_start` and cannot be renamed** (LA-114). Every historical
-   * `claude_ro` view migration selects `t.bucket_start`, and they are replayed against the final
-   * schema by Migration Check's idempotency step, so a rename fails all of them — and editing an
-   * already-applied migration is forbidden because `ensureSchema` tracks by filename. Migration 275
-   * carries the full reasoning and a `COMMENT ON COLUMN` so the database says so too.
-   *
-   * The property is named for what it holds so TypeScript, at least, does not lie. A join on the
-   * :00/:30 grid against the raw column returns zero rows, which reads as missing data rather than
-   * a 15-minute offset — that is the defect, and it survives in `claude_ro`.
+   * The SQL column was `bucket_start` until LA-114 renamed it to `bucket_mid` (migration
+   * 202609280647). A join against a series on the :00/:30 grid must subtract 15 minutes first.
    */
-  bucketMid:   timestamp('bucket_start', { withTimezone: true }).notNull(),
+  bucketMid:   timestamp('bucket_mid', { withTimezone: true }).notNull(),
   level:       doublePrecision('level').notNull(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.bucketMid] })])
