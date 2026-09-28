@@ -2131,6 +2131,16 @@ below threshold and left in place for next time.
   **③ Unchanged and still the only live item:** a merge-time yes on the six security fixes
   (`RV-191`, `RV-190`, `RV-192`, `RV-193`, `RV-195`, `RV-196`) **as each PR goes green — not now.**
 - **Ask:** owner — one thing only: a merge-time yes on each of the six security fixes as its PR goes green. Nothing is needed before then.
+- **⚑ FOUR ARE BUILT AND WAITING (Lane A, 2026-09-28).** Each is a draft PR, tested and exercised on
+  `pnpm dev`. A yes flips it ready and it merges on green:
+  - **RV-191** → #1912: only a provable PNG/JPEG/WebP is accepted, and the admin panel opens a blob of
+    it, never the stored string;
+  - **RV-190** → #1914: every admin read-only query runs in a rolled-back, scrubbed transaction;
+  - **RV-193** → #1916: the Google refresh token stays in the encrypted JWT;
+  - **RV-197** → #1915: WebSockets are allowed by the CSP only in dev. It was not on the list of six,
+    but it is a security change, so it waits for the same yes.
+
+  RV-192, RV-195 and RV-196 are not built yet.
 - **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
   - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
     Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
