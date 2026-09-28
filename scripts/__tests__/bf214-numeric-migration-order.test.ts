@@ -15,8 +15,13 @@ const { surveyClaims, minuteStamp } = require('../lib/migration-claims.js')
 const onDisk = readdirSync(join(process.cwd(), 'lib/data/postgres/migrations')).filter(f => f.endsWith('.sql'))
 
 describe('migration apply order (BF-214 ②)', () => {
-  it('leaves every existing migration exactly where a string sort put it', () => {
-    expect(sortMigrationFiles(onDisk)).toEqual([...onDisk].sort())
+  it('leaves every numbered migration exactly where a string sort put it, and runs every timestamped one after them', () => {
+    // The `NNN_` files are what production applied under the old string sort, so their order must
+    // not move. Timestamped files (BF-214 ②) sort after all of them.
+    const sorted = sortMigrationFiles(onDisk)
+    const numbered = onDisk.filter(f => /^\d{3}_/.test(f))
+    expect(sorted.slice(0, numbered.length)).toEqual([...numbered].sort())
+    expect(sorted.slice(numbered.length).every(f => /^\d{12}_/.test(f))).toBe(true)
   })
 
   it('puts a timestamp-named migration after every numbered one, and orders timestamps by time', () => {

@@ -62,6 +62,7 @@ const REPLAY = process.argv.includes('--replay')
 // migration path re-runs it.
 const REPLAY_EXEMPT = new Map([
   ['001_initial.sql', '002 renamed the column its cardio_sessions FK references'],
+  ['275_stress_bucket_column_comment.sql', 'comments on bucket_start, which LA-114 renamed to bucket_mid'],
 ])
 
 // BF-214 ②: by the leading integer, then filename — the twin of ensureSchema's sortMigrationFiles
