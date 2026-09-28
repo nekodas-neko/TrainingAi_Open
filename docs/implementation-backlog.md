@@ -33624,45 +33624,6 @@ intake traced it, it did not design it.
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
 
-### [platform] LA-137 — generalise the delta/applyDelta column guard, with the false positives that defeated the first attempt
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · found by Lane A while shipping RV-172.
-- **Lane: A** — `lib/local-store/`, `lib/data/postgres/adapter.ts`, a new `scripts/check-*.js`.
-- **The invariant is real and general.** `applyDelta` writes `col = excluded.col` unconditionally,
-  so any column it writes that the delta select omits is not left alone — it is nulled, on every
-  pull, for ever. RV-172 found three instances of that (`supplement_logs.taken_at` plus the vial
-  triple, `exercise_logs.exercise_deloaded`, and `food_items` reading a field the server has never
-  had). Three in one sweep is a class, not a coincidence, and the remaining tables were checked by
-  hand rather than by anything that will still be true next month.
-- **RV-172 shipped the SPECIFIC guard only**
-  (`lib/local-store/__tests__/rv172-delta-carries-what-applydelta-writes.test.ts`) — it pins the
-  three regressions that actually happened and nothing else. The general version was written first
-  and **withdrawn for false positives**, which is why this entry exists rather than the check.
-- **The four traps, so the next attempt does not rediscover them:**
-  - **`INSERT INTO` tracking bleeds between statements.** Scanning the file linearly and attributing
-    every `col=excluded.col` to the most recent `INSERT INTO` made `supplements` inherit
-    `supplement_logs`' `taken_at`. Statements must be bounded, not accumulated.
-  - **The SQL literal's end is not the next backtick.** The supplement upsert interpolates
-    `${isMeal ? ` … ` : ` … `}`, whose branches are themselves template literals — so the first
-    backtick after the `INSERT` is a NESTED one, and slicing there truncates the statement before
-    `taken_at`, the exact column the guard exists to protect. Terminate on the backtick that opens
-    the params array (`` `,\n[ ``).
-  - **Every table has TWO upserts with an `excluded` clause** — the pull one in `applyDeltaBody` and
-    a local-write one. Picking the first by position reads whichever the file happens to list first;
-    scope to the enclosing function instead.
-  - **Snake→camel splitting produces junk columns.** `1rm` yields `rm`; `_bpm` and `max_est`
-    survived as phantom column names.
-- **And the trap that is not about parsing: a comment explaining a defect contains the defect.** A
-  note reading *"this used to read `toIso(r.updatedAt)`"* matches a search for exactly that and
-  fails a file the code passes. This bit three separate guards in one day (TN-66's prompt guard,
-  RV-143's entry parser, RV-172's own test). Strip `//` lines before matching; do not reword around
-  it, because the next comment will not know to.
-- **Done looks like:** a Custom Rules step that reads every `applyDeltaBody` upsert, resolves its
-  `excluded` columns, and fails when one is absent from the matching delta select or pull mapper —
-  with a **baseline of zero** and no skipped-site count, or, if sites must be skipped, the count
-  printed so a clean run is never mistaken for full coverage (the fetch-once scanner's lesson).
-  A guard that cries wolf is worse than no guard; this repo has paid for that twice.
-
 ### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-18 · found by Lane A while shipping RV-59.

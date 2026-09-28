@@ -177,7 +177,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     syncStatus:  'synced' as const,
     // Q-131: present on both ends' schemas but dropped here, so a restored device replayed its
     // outbox with no program-session link and fell back to matching by name.
-    sessionId:      r.sessionId ? String(r.sessionId) : null,
+    // LA-137: the server's `session_id` column is the Drizzle property `programSessionId`, so that is
+    // the key the pull JSON carries. Reading `r.sessionId` alone bound NULL over the link on every pull.
+    sessionId:      (r.programSessionId ?? r.sessionId) ? String(r.programSessionId ?? r.sessionId) : null,
     intensityMode:  r.intensityMode ? String(r.intensityMode) : null,
     wasOverride:    Boolean(r.wasOverride),
   } satisfies LocalWorkoutSession));
@@ -585,6 +587,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     vsYesterday:       (r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday) ?? null,
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
+    // LA-137: selected by the server and never mapped, so a completion made on another device never
+    // arrived (applyDelta COALESCEs this column, so the local value survived; the remote one did not).
+    foodLoggingCompletedAt: r.foodLoggingCompletedAt ? toIso(r.foodLoggingCompletedAt) : null,
     updatedAt:         toIso(r.updatedAt),
     deletedAt:         r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:        'synced' as const,
