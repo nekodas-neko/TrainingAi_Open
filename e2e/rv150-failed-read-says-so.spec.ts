@@ -71,3 +71,18 @@ test('a healthy cold start shows the real account, not the failure lines', async
   await expect(page.getByText(/Couldn.t load your readings/)).toHaveCount(0)
   await expect(page.getByText(/Couldn.t load your tests and scans/)).toHaveCount(0)
 })
+
+test('Home names the body battery it could not load, instead of dropping the card', async ({ page }) => {
+  // LB-175. Every other read on Home already degrades honestly — an em dash for a number, its own
+  // line for the timeline and the weekly recap. This card was the one section that just vanished.
+  await openCold(page, '/')
+  await expect(page.getByText(/Couldn.t load your body battery/)).toBeVisible({ timeout: 30_000 })
+})
+
+test('a healthy cold Home shows the card, not the line', async ({ page }) => {
+  await coldStart(page)
+  await page.goto('/')
+  // Waits for the screen to settle rather than for the card, which a zero-data account may not show.
+  await expect(page.getByText(/Couldn.t load today.s timeline/)).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByText(/Couldn.t load your body battery/)).toHaveCount(0)
+})

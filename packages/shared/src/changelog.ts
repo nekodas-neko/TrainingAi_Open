@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.29",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: when Home could not reach the server and had nothing saved yet, the body battery card just disappeared. It now says it could not load, the way the rest of the screen already did.",
+    ],
+  },
+  {
     version: "1.477.28",
     date: "2026-09-28",
     changes: [

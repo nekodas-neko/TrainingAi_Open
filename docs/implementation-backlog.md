@@ -8492,28 +8492,34 @@ drift.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
 
-### [app-shell][activity] LB-175 — two surfaces still read as an empty account when their reads fail cold
+### [app-shell][heart-rate][body] LB-176 — Health tells him "No data" and "add your height, age and sex" when the read failed
 
-- **Lane: B** — `app/session-select/session-select-content.tsx` (Home), then the Health tab.
-- **Added:** 2026-09-27 · Lane B, measured while shipping RV-150's fix.
-- **What:** RV-150's device sweep tested a WARM app and found nothing visible changed anywhere. The
-  case it names as untested — a failure with **no cache** — was measured at 412 px by clearing
-  storage and failing every `GET /api/*`, and it is a different answer. Three surfaces were fixed in
-  that PR; these two are what is left.
-  | surface | under a cold failure | honest? |
-  |---|---|---|
-  | Home | *"Your week in review didn't load"*, *"Couldn't load today's timeline"*, em dashes for the numbers | **yes** — the reference for this class |
-  | Home · body battery | the whole **BODY BATTERY** card and its explainer are absent | no |
-  | Home · greeting | *"Good morning, <name>."* and the avatar initials are absent | no |
-  | Health | 8 honest failure lines, but **GOALS**, **ESTIMATED 1RM** and **AVG DURATION** are absent | partly |
-- **Why it is not a one-line fix:** the leaf cards do not fetch. `body-battery-card.tsx` takes its
-  series as a prop and returns null under two points; `{bodyBattery && <BodyBatteryCard …>}` in the
-  parent is what removes it. The owner of each read is the screen, so the fix is one flag per read in
-  `session-select-content.tsx`, not an `onError` on a card.
-- **Done when:** a cold start with the reads failing names each absent section on Home and Health,
-  the way `/more/details` now does. `e2e/rv150-failed-read-says-so.spec.ts` is the shape to extend —
-  it must keep a healthy-cold-start case, or a component that always renders the line passes.
-- **Not in scope:** Nutrition's cold-start zeros, which are on `RV-103`.
+- **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`.
+- **Added:** 2026-09-28 · Lane B, measured while closing `LB-175`. **This replaces that entry's
+  Health row, which was wrong** — see below.
+- **Health degrades honestly where it was built to.** Cold, with every `GET /api/*` failing at
+  412 px, it prints **seven** explicit failure lines: the HR recovery profile, the ring, the weekly
+  stats (with Try again), AI Periodization, movement balance, the trend view, and strength progress.
+  Two of the three sections `LB-175` called silently absent are among them — the heading goes, but a
+  line replaces it.
+- **What is NOT honest is the empty-state copy under them.** These read as facts about his account
+  when they are facts about a failed request:
+  - `BURNED`, `BMI`, `BALANCE`, `RESTING HR`, `HRV`, `SPO₂` — all **"No data"**.
+  - *"No HR captured yet today — the ring records periodically while worn."* — explains an absence
+    that did not happen.
+  - *"No activities this week"*, *"Log body weight to see trend"*, *"No nutrition/activity trends
+    yet"*, *"Not enough data"*.
+  - **The worst one: "Set up your energy budget — Add your height, age and sex in Profile."** It
+    tells the owner to redo something he did months ago, because one read did not land.
+- **`GOALS` is the only section that still vanishes in silence.**
+  `goals-progress-card.tsx` takes its rows as props and `return null`s when it has none, so the fix
+  is a flag on whichever read in `health-content.tsx` feeds it, not an `onError` on the card.
+- **Why this is its own entry:** it is one shape repeated across a dozen cells, and the fix is a
+  decision about what an empty metric cell should say when the read failed — not the per-card
+  `onError` that `RV-150` and `LB-175` were. Settle the copy once and apply it.
+- **Done when:** a cold start with the reads failing shows no cell claiming "No data" and no card
+  instructing him to enter details he already has. `e2e/rv150-failed-read-says-so.spec.ts` is the
+  shape to extend; keep a healthy-cold-start case or a component that always renders the line passes.
 
 ### [platform] RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
 
