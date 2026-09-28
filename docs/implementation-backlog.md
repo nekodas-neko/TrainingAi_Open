@@ -9528,6 +9528,12 @@ drift.
   work.** That is the argument for this ledger continuing to exist after these six clear.
 ### [platform] LB-155 — the bare-`fetch` rule is ENFORCED; 3 sites converted, 10 blocked on a Lane A group entry
 
+- **⚙ LB-156 SHIPPED 2026-09-28 (Lane A): the five keys are registered.** `phase-sets` and
+  `workout-templates` were already in `invalidateProgramStructure`. `day-checkin:` joined
+  `invalidateCheckinAffectsPrescription`, `bedtime-estimate` joined both sleep-writing groups, and
+  `plan-meal-answers:` joined `invalidateNutritionWrite`. **⚠ One thing the conversion must add:**
+  `app/nutrition/use-plan-meal-logging.ts`'s answer POST calls **no** group, so converting its read
+  without making that write call `invalidateNutritionWrite()` caches a stale answer.
 - **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79.
   **Enforcement shipped 2026-09-25** — `scripts/check-bare-api-fetch.js`, wired into Custom Rules.
 - **Needs: LB-156**
@@ -9591,36 +9597,6 @@ drift.
 - **Guard:** `scripts/__tests__/bare-api-fetch-scan.test.ts` pins the SCAN rather than the count —
   the multi-line URL, and all three ways a method can be declared, including the shorthand that
   produced the wrong figure.
-
-### [platform] LB-156 — ten bare-`fetch` conversions are blocked on five cache keys no group clears
-
-- **Lane: A** — `lib/cache-groups.ts` only. **Added:** 2026-09-25 · Lane B, triaging `LB-155`'s
-  remaining conversions and finding it could not do them.
-- **What is owed: register five keys in the groups whose writes change them.** Nothing else — no
-  call site moves in this entry, and the ten conversions are `LB-155`'s to make afterwards.
-  | key | written by | which group needs it |
-  |---|---|---|
-  | `day-checkin:` | the morning and evening check-in POSTs | `invalidateCheckinAffectsPrescription` (`invalidateNutritionWrite` already has it) |
-  | `phase-sets` | `config-screen`'s POST + `DELETE /api/phase-sets/:id` | a group; `invalidateProgramStructure` is the closest fit |
-  | `workout-templates` | `config-screen`'s four template writes | same group |
-  | `bedtime-estimate` | derived from sleep rows | `invalidateBiometrics` / `invalidateOuraSync` |
-  | `plan-meal-answers:` | `POST /api/nutrition/plan-meal-answers` | `invalidateNutritionWrite`, or a narrower one |
-- **⚠ `day-checkin:` shows why this is a real gap and not a formality.** `invalidateNutritionWrite`
-  has cleared that prefix since it was written — **for a key nobody ever created**, because all three
-  readers are bare `fetch`. Meanwhile `invalidateCheckinAffectsPrescription`, which the check-in
-  writes themselves call, does not clear it. So a conversion done without this entry would cache a
-  check-in that a *food log* evicts and a *check-in save* does not: fresh by accident, stale by the
-  write that actually changed it.
-- **Why Lane A and not Lane B.** The standing cache rule obliges registering a new key in the
-  invalidation group of every write that affects it, in the same commit, and forbids an ad-hoc
-  `invalidateCache()` at the call site. `lib/cache-groups.ts` is Lane A's under the path rule, so the
-  engine half goes first — exactly the split §3 describes.
-- **The reverse order also works and may be better**, and it is Lane A's call: ship the group entries
-  as one small PR (this entry), then `LB-155` converts the ten call sites. A group clearing a key that
-  does not exist yet is a no-op, so there is no window where anything is wrong.
-- **Not established:** whether `phase-sets` and `workout-templates` belong in
-  `invalidateProgramStructure` or want their own group. Both are program configuration, which argues
-  for reuse; neither is read outside `config-screen` today, which argues it does not matter yet.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
 
@@ -29782,7 +29758,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [activity][devices] Q-231 — the "Exercise detected" card can never show anything again; its only writer was the Oura Cloud sync
 
-- **Lane:** A
+- **⚙ RE-SEQUENCED 2026-09-28 (Lane A): the SURFACE half goes first, the reverse of the usual order.**
+  Removing `/api/oura/workouts` first would leave the card's GET and the review sheet's three PATCHes
+  (`exercise-review-sheet.tsx:194,209,232`) hitting a 404. So Lane B removes the card, its mount in
+  `session-select-content.tsx`, and the sheet's `source === 'oura'` branches. Lane A then removes the
+  route, the `day-timeline` walk filter and `lib/oura/types.ts`'s `OuraWorkout`. **Keep
+  `repo.getOuraWorkouts`:** `compute-hr-recovery-profile.ts` reads the frozen rows as HR-recovery
+  episode anchors, so removing it would change a computed profile, which is a separate scoring question.
+- **Lane:** B — the surface half first (see the re-sequencing note); Lane A's route/type removal follows.
 - **Branch:** `fix/detected-activity-has-no-source`
 - **✅ ANSWERED 2026-09-25 — RETIRE THE CARD.** The owner: *"If its not being used because we don't
   use the oura sync then get rid of it."* A conditional yes, and **the condition was checked before

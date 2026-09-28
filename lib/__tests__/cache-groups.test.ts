@@ -111,6 +111,25 @@ describe('cache group helpers', () => {
     ]))
   })
 
+  // LB-156 — each key is cleared by the group its WRITER calls, not merely by some group.
+  it('the check-in group clears day-checkin:, which is what a check-in save changes', async () => {
+    await invalidateCheckinAffectsPrescription()
+    expect(invalidated).toContain('day-checkin:')
+  })
+
+  it('both sleep-writing groups clear bedtime-estimate, which is derived from sleep rows', async () => {
+    await invalidateBiometrics()
+    expect(invalidated).toContain('bedtime-estimate')
+    invalidated.length = 0
+    await invalidateOuraSync()
+    expect(invalidated).toContain('bedtime-estimate')
+  })
+
+  it('the nutrition group clears plan-meal-answers:', async () => {
+    await invalidateNutritionWrite()
+    expect(invalidated).toContain('plan-meal-answers:')
+  })
+
   it('invalidateFriends clears the friends- prefix', async () => {
     await invalidateFriends()
     expect(invalidated).toEqual(expect.arrayContaining(['friends-']))
