@@ -6535,11 +6535,11 @@ drift.
 - **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
   today's state exactly.
 
-### [platform][workouts] LA-173 — four things Lane A needs from the owner (two merge yeses, a style, a key)
+### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
 - **Ask** — owner: four answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge LA-142
   (#1849), and close #1749? ③ Which progression style should Barbell Skull Crusher use? ④ Can fresh
-  storage keys go into Railway?
+  storage keys go into Railway? ⑤ Merge TN-56 (#1902)?
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6565,6 +6565,12 @@ drift.
 - **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
+
+- **⑤ TN-56 (#1902): the admin replay endpoint Tuning needs. ⭐ Recommend: yes.** Held only because
+  it touches authorisation: `/api/admin/db-query`'s auth moved into one shared helper
+  (`lib/admin/claude-token-auth.ts`), with identical logic and the same rate key, and the new
+  `/api/admin/replay` uses it. The replay reads the owner's own data and writes nothing. The 87
+  existing db-query/admin-guard tests pass unchanged. Reversal: revert the PR.
 
 ### [workouts][readiness] LA-175 — Q-279's ACWR switch, re-measured before building: the deload card's direction reversed
 - **Lane: O** — the owner approved a change with measured numbers, and today's measurement differs in
@@ -9733,6 +9739,17 @@ drift.
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
+
+- **✔ BUILT 2026-09-28 (Lane A), PR #1902, HELD for the owner (LA-173 ⑤) because it shares
+  db-query's auth.** `POST /api/admin/replay` and the registry in `lib/tuning/replay/registry.ts`.
+  The first function is `nightly-temperature` (`RANGE_THRESHOLD`, `MIN_WINDOWS`). On the owner's
+  real data the defaults reproduce production on 15 of 17 comparable nights. The two that miss
+  are nights `sleep_sessions` stores as a daytime nap.
+- **Keep: register the rest, one at a time.** Each needs its constant made overridable where it lives
+  (an options argument defaulting to the shipped value), then an entry. Still to add:
+  `MET_ACTIVE_THRESHOLD` (`metActiveWindows` already takes it), `APNEA_THRESHOLD` (sleepnet
+  inference), `NIGHT_BAND_*` (`sleep-night.ts`), `CONSISTENCY_*` (`meal-timing.ts`),
+  `LOW_CONFIDENCE_THRESHOLD`, and the 19 sleep-staging constants. Tuning says which comes first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a
   paragraph inside a `Reference:` entry and therefore printed under *read, do not build*.
