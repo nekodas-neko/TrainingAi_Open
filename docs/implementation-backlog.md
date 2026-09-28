@@ -6604,6 +6604,26 @@ drift.
   depends on an absence, or on the seed's exact values, is a different test in the two environments,
   and `tn53` proves the shape. **The cheap probe is `pnpm db:local` (rebuild) followed by the full
   suite** — that reproduces CI's starting conditions locally, which shuffling order does not.
+- **✅ A THIRD CAUSE, MEASURED 2026-09-28 — AND IT IS NOT IN THE SPECS AT ALL.** The E2E run on
+  `937bae10` (the `tn53` fix, run `36450249635`) failed `tn82-checkin-announce-and-correct`. Reading
+  its retained screenshot: Home had crashed to the error boundary with
+  **`Failed to load chunk /_next/static/chunks/components_activity_exercise-detected-card_tsx_….js`
+  … (next/dynamic entry, async loader)**. The assertions never ran; the spec reported
+  *"the sheet never auto-opened"*, which reads as a broken feature.
+  - **This is a dev-server chunk-load failure**, not a test defect and not a product defect: `pnpm
+    e2e` runs against `next dev`, which compiles on demand, so a request for a `next/dynamic` chunk
+    can fail while it is being built — under a 36-minute single-worker run, on whichever spec happens
+    to be on Home at that moment.
+  - **It explains the CHURN directly.** The flaky list is almost entirely different each run, which
+    no per-spec defect accounts for. A failure that lands on *whatever is running* does.
+  - **The tell to look for:** an assertion failing with "element(s) not found" on a screen that
+    should plainly be there, plus a screenshot of the error boundary. Three of the six specs in that
+    run's `test-results/` touch Home.
+  - **Not fixed here, and the fix is a real decision rather than a tidy-up.** The candidates are
+    dropping `next/dynamic` for that card (it carries `ssr: false` for a reason), building the app
+    for E2E instead of running `next dev`, or teaching the boundary to retry a chunk load. Each has
+    a cost outside this entry's scope.
+  - **`tn53` is NOT in that run's failures** — the seed-state fix above holds on CI.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
@@ -8748,53 +8768,6 @@ drift.
 - **Keep:** the device look — a 150 ms crossfade on the owner's own screen is a feel judgement, and
   the sandbox can only prove the primitive is wired in.
 
-### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
-- **✅ CLOSED 2026-09-28 — SUPERSEDED, not completed.** This entry's job was exporting the
-  2026-09-22 Home mockup from the Orchestrator's chat to the repo. **That artefact is
-  unrecoverable** — the session is gone and nothing in `docs/design/` holds it — so it was
-  **redrawn** instead: [`docs/design/2026-09-28-home-banner-stack.html`](design/2026-09-28-home-banner-stack.html),
-  linked from `RV-119`, which is where the remaining decision lives.
-- **The rule it leaves behind, which is the durable part:** a mockup is not shown until it is in
-  `docs/design/`. An approval whose artefact lives only in a transcript records that a decision
-  happened and loses what was decided — `RV-119` sat unbuildable for six days on exactly that.
-  **Strike this entry.**
-- **✅ THE CLASS IS FIXED FOR THE 2026-09-27 BATCH, though this entry's own artefact is still lost.**
-  Four mockups (`LB-163`, `LA-136`, `RV-213`, `RV-166`) were produced and **committed to the repo**
-  as [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html)
-  rather than shown only in a chat, which is exactly the failure this entry records. **The
-  convention to follow: a mockup is not shown until it is in `docs/design/`** — an approval whose
-  artefact lives in a transcript is an approval no implementer can build to.
-  **What is STILL owed here is unchanged:** the 2026-09-22 Home IA mockup that `RV-119` was approved
-  against was never saved and cannot be recovered from this repo. That one has to be redrawn.
-
-- **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
-- **RV-119, RV-117 and RV-118 all carry "Owner gate SATISFIED 2026-09-22 — mockup shown at 384 px
-  dark … Build to it; a departure from it needs a fresh yes."** The mockup is not in the repo.
-  Searched: nothing in `docs/design/` from that date, and the sweep write-up describes the problems
-  rather than the approved layouts.
-- **⚠ CORRECTED 2026-09-23 by the owner: the artefact is NOT lost — it is in the Orchestrator's
-  chat.** So this is an EXPORT gap, not a design to redo, and the recovery is cheap: that session
-  still holds what he approved. The three entries are re-channelled `Lane: O` asking the
-  Orchestrator to save it under `docs/design/` and hand them back to `B`.
-- **That makes the rule below more worth having, not less.** A mockup living only in one session's
-  transcript is invisible to every other agent, and to the owner himself later; the repo is the only
-  shared memory.
-- **So the instruction cannot be followed.** "Build to it" and "a departure needs a fresh yes" both
-  require knowing what *it* was. An implementer either invents a layout — the precise departure the
-  gate exists to prevent — or re-asks the owner something he already answered. **This blocked
-  RV-119's collapse today**, and will block RV-117 and RV-118 identically.
-- **The gate rule already says how to avoid it and does not say to keep it.** CLAUDE.md requires a
-  mockup "presented and a yes returned before any code", shown "at the real 384 px dark viewport,
-  not a description of it" — and `docs/design/` is where seven earlier rounds were kept
-  (`2026-08-07-score-row-mockups*.html`, `2026-08-18-nutrition-rework-mockups.html`, …). The habit
-  exists; this sweep skipped it.
-- **Proposed rule, Orchestrator's to accept:** a `Gate: owner` entry may only be marked satisfied
-  alongside a path to the artefact under `docs/design/`. An approval whose artefact is gone should
-  read as NOT satisfied, because that is the state an implementer is actually in.
-- **Cheap to fix going forward, and the reversal is nil** — it is one saved file per mockup round.
-  What it prevents is a lane building a Home layout the owner never saw and only finding out when he
-  opens the app.
-
 ### [readiness][body] RV-117 — Health → Body shows two different energy answers nine cards apart
 
 - **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
@@ -8842,81 +8815,6 @@ drift.
 - **What is lost:** the goal bars are Progress's subject, so **Progress becomes a 4-card tab.** Say
   that out loud before doing it.
 - Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
-
-### [app-shell] RV-119 — seven independent banners stack above Home's first real content
-- **📐 REDRAWN 2026-09-28 — [`docs/design/2026-09-28-home-banner-stack.html`](design/2026-09-28-home-banner-stack.html)
-  ([hosted](https://claude.ai/artifact/V3PRnnjchdhAA9nXYwgXLt)). Committed, so it cannot be lost a
-  second time. **`LB-135`'s export is superseded** — the 2026-09-22 artefact is unrecoverable, so
-  it was redrawn rather than found.
-- **The agreed split is UNCHANGED and is not re-asked:** illness advisory and early deload stay
-  full-width; exercise-detected, goals check-in, day-in-review and weekly recap collapse. The APK
-  banner is already shipped as removed, so it is six, not seven.
-  **Verified against `main` 2026-09-28, not taken from the entry:**
-  `app/session-select/session-select-content.tsx:1128–1192` renders `IllnessAdvisoryBanner`, the
-  auto-detected walk/run prompt, the `earlyDeloadRecommended` banner, `showGoalsCheckin`, the
-  day-review `DismissibleBanner` and `WeeklyRecapBanner`, in that order.
-- **✅ PICKED 2026-09-28 — A, ONE COMBINED STRIP.** The owner chose A off the redrawn page: the four
-  collapsing banners (exercise-detected, goals check-in, day-review, weekly recap) become a single
-  strip; illness advisory and early deload stay full-width. **Build A. The fork is closed — do not
-  re-open B**, whose only advantage was keeping each banner independently dismissible.
-- **⚠ What the strip owes, and it is the known cost of A:** the four lose their individual dismiss
-  affordance. Decide the strip's own dismiss behaviour as part of the build and say what you chose;
-  that is a structural call, not a second owner question.
-- **⚠ Heights on the page are drawn to scale relative to one another, NOT measured on the device.**
-  A live screenshot needs all six conditions true at once, which no sandbox can arrange. Whichever
-  treatment he picks owes a device look at the real stack before it is called done.
-- **✅ ANSWERED 2026-09-28 (the earlier question, now superseded by the pick above) — REDRAW the
-  mockup and re-approve. Do not build to the 2026-09-22 approval.**
-  He chose redrawing over building to the described split. The reasoning stands on its own: the
-  approval survives and the artefact does not, so *"build to it"* is not actionable, and a lane can
-  implement the description exactly and still produce a Home he dislikes — the failure the mockup
-  rule exists to prevent.
-  **Orchestrator draws it**, same shape as the 2026-09-27 batch that worked: before/after at 384 px
-  dark, committed to `docs/design/` so it cannot be lost a second time.
-  **What the drawing must show:** two banners staying full-width (illness advisory, early deload)
-  and four collapsing (exercise-detected, goals check-in, day-review, weekly recap) — **five in the
-  original, minus the APK banner, which has already shipped as removed.** The open question the
-  picture has to answer is what a *collapsed strip* actually looks like, which is the part no
-  description settles.
-  **`LB-135` stays open** — its job was exporting the lost artefact, and the artefact is
-  unrecoverable, so the redraw supersedes the export.
-
-
-- **Lane: B** — returned 2026-09-28, both blockers cleared: the mockup was redrawn and committed
-  (the 2026-09-22 artefact was unrecoverable, so `LB-135`'s export is superseded), and the owner
-  has picked A off it. `app/session-select/session-select-content.tsx:1128-1193`.
-  **Added:** 2026-09-22 · Review sweep 53.
-- **Owed at the end, not before:** a device look at the real stack, per the scale warning above.
-- **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
-  are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
-- **⚠ THE MOCKUP IT SAYS TO BUILD TO WAS NOT PRESERVED, so "build to it" is not actionable.**
-  Searched 2026-09-23: nothing in `docs/design/` from that date, and the sweep write-up
-  (`docs/reviews/2026-09-22-sweep-53-…`) describes the problem, not the approved layout. The
-  approval is recorded; the artefact it approved is not. **Any session that picks this up hits the
-  same wall** — filed as **LB-135**.
-- **PARTIALLY SHIPPED 2026-09-23** (`fix/home-ia-merge-part1`): **the APK banner is gone**, with its
-  `apkBannerDismissed` state, its `apk-banner-dismissed` key and the now-unused `Download` and `X`
-  imports. That half needed no design judgement — the entry states the reason outright and the
-  canonical runtime *is* the APK, with the same download row at More → About.
-- **STILL OWED — the collapse, and it needs the owner before code.** Two stay full-width (illness
-  advisory, early deload); four collapse (exercise-detected, goals check-in, day-review, weekly
-  recap — five in the entry, minus the APK banner now removed). What a "collapsed strip" LOOKS like
-  is the part the missing mockup specified, and inventing it is exactly the departure this entry
-  says needs a fresh yes. Re-make the mockup at 384 px dark, **save it under `docs/design/`**, and
-  get the yes before building.
-- **Batch:** `home-ia-merge`
-- Illness advisory · exercise-detected · early-deload · APK download · goals check-in · day-review ·
-  weekly recap. Each self-hides and each is individually correct; **the failure is cumulative.** On
-  a Monday after a detected walk with an early-deload flag, the owner scrolls past five cards to
-  reach the recommendation — which is why he opens Home.
-- **⚠ Do NOT collapse all seven.** The illness advisory and early-deload are things he should see
-  *today*; putting them in a dismissible strip beside an APK banner makes them easy to miss. Split
-  by severity: those two stay full-width, the other five collapse.
-- **The APK banner should simply go** — the canonical runtime *is* the APK, and the same download
-  row already exists at More → About.
-- **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
-  `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
-  whoever takes it should do both rather than extract twice.
 
 ### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
 

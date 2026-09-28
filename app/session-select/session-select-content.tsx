@@ -49,21 +49,14 @@ import { PullToSync } from "@/components/pull-to-sync";
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
-import { EarlyDeloadCard } from "@/components/home/early-deload-card";
-import { GoalsCheckinCard } from "@/components/home/goals-checkin-card";
-import { WeeklyRecapBanner } from "@/components/weekly-recap-banner";
-import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { HomeCardWidget } from "@/components/home/home-card-widget";
 import type { CardSectionKey } from "@/components/home/home-card-widget";
 import { OuraScoreChipRow } from "@/components/oura-score-chip-row";
 import { IllnessAdvisoryBanner } from "@/components/home/illness-advisory-banner";
+import { HomeBannerStack } from "@/components/home/home-banner-stack";
 import { BodyBatteryCard } from "@/components/body-battery-card";
 import { HomeDayTimeline } from "@/components/home-day-timeline";
 import { initialsOf } from '@/lib/initials';
-const ExerciseDetectedCard = dynamic(
-  () => import("@/components/activity/exercise-detected-card").then(m => ({ default: m.ExerciseDetectedCard })),
-  { ssr: false },
-);
 const ExerciseReviewSheet = dynamic(
   () => import("@/components/activity/exercise-review-sheet").then(m => ({ default: m.ExerciseReviewSheet })),
   { ssr: false },
@@ -1149,42 +1142,23 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             </div>
           )}
 
-        {/* ── Auto-detected walk/run review prompt (hides itself when none pending) ── */}
-        <div className="mx-4">
-          <ExerciseDetectedCard onReview={handleExerciseDetectedReview} />
-        </div>
-
-        {readiness?.earlyDeloadRecommended && !earlyDeloadDismissed && (
-          <div className="mx-4 mb-3">
-            <EarlyDeloadCard
-              onConfirm={handleEarlyDeloadConfirm}
-              onDismiss={handleEarlyDeloadDismiss}
-              reason={readiness.earlyDeload}
-            />
-          </div>
-        )}
-
-        {showGoalsCheckin && (
-          <div className="mx-4 mb-3">
-            <GoalsCheckinCard onReviewNow={handleGoalsReviewNow} onRemindLater={handleGoalsRemindLater} />
-          </div>
-        )}
-
-        {!dayReviewDismissed && (
-          <DismissibleBanner
-            title="Your day in review is ready"
-            // Q-112a — one door. This opened a second, thinner review only Home had; the real one
-            // lives on Nutrition, with the meal types, logs and targets it needs.
-            onActivate={() => navigateToTab(router, "/nutrition?review=day")}
-            onDismiss={() => {
-              localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
-              setDayReviewDismissed(true);
-            }}
-          />
-        )}
-
-        {/* ── Weekly recap notification (self-hides once dismissed or generated) ── */}
-        <WeeklyRecapBanner />
+        {/* ── RV-119: early deload full-width, the other four behind one strip ── */}
+        <HomeBannerStack
+          readiness={readiness}
+          earlyDeloadDismissed={earlyDeloadDismissed}
+          onEarlyDeloadConfirm={handleEarlyDeloadConfirm}
+          onEarlyDeloadDismiss={handleEarlyDeloadDismiss}
+          onExerciseDetectedReview={handleExerciseDetectedReview}
+          showGoalsCheckin={showGoalsCheckin}
+          onGoalsReviewNow={handleGoalsReviewNow}
+          onGoalsRemindLater={handleGoalsRemindLater}
+          dayReviewDismissed={dayReviewDismissed}
+          onDayReviewActivate={() => navigateToTab(router, "/nutrition?review=day")}
+          onDayReviewDismiss={() => {
+            localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
+            setDayReviewDismissed(true);
+          }}
+        />
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">

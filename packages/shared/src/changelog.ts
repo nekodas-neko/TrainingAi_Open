@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.0",
+    date: "2026-09-28",
+    changes: [
+      "Changed: Home no longer stacks notifications above the thing you opened it for. The four \u201cready for you\u201d ones \u2014 an activity to review, the goals check-in, your day in review and your week in review \u2014 now sit behind one row that says how many are waiting; tap it to open them in place. Warnings you should see today, signs of illness and an early deload, still get their own full-width card.",
+    ],
+  },
+  {
     version: "1.480.1",
     date: "2026-09-28",
     changes: [
