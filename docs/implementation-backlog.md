@@ -490,27 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] LB-177 — migration 295's test throws on the local DB URL this sandbox actually writes
-
-- **Lane: A** — `lib/data/postgres/__tests__/la143-backfill-exercise-ids.test.ts`.
-- **Added:** 2026-09-28 · Lane B, hit while re-gating LA-166 after merging the base that carried it.
-- **What:** with the `DATABASE_URL` that `scripts/local-db/setup.sh` writes — a **Unix socket**,
-  `postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433` — the file throws
-  `TypeError: Invalid URL`, then `Cannot read properties of undefined (reading 'query')` in its
-  teardown. Its two tests report **skipped**, but the file FAILS, so `pnpm test` exits 1 against a
-  suite with zero failing tests. On a TCP URL it passes 2/2.
-- **Why it matters beyond one file:** that exit code is indistinguishable from the LB-168 symptom
-  (`pnpm test` exits 1 with `0 failed`), which cost a day to root-cause. The next lane to hit it
-  will start there.
-- **It is a third instance of a documented class.** CLAUDE.md already warns that
-  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` need a TCP URL because
-  they rewrite the URL's credentials — those two **skip loudly** instead of throwing, which is the
-  behaviour this one is missing.
-- **Fix shape:** detect the socket URL and skip the file the way its two siblings do, rather than
-  constructing a `new URL()` from it. Whether the local default should simply be TCP is the larger
-  question and is not this entry's.
-- **Reversal cost:** none — a guard in one test file.
-
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
 - **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
   can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
@@ -837,8 +816,25 @@ below threshold and left in place for next time.
 
 ### [platform] OR-196 — docs-only PRs run the full suite, and the obvious fix would block every merge
 
-- **Lane: A** · **Added:** 2026-09-27 · Orchestrator. Lane assignment is by the residual rule rather
-  than a path list — CI config is neither lane's named territory; Lane A claims it as platform.
+- **⚑ OWNER DECISION (Lane A, 2026-09-28): may a docs-only PR skip the expensive half of the
+  required checks?** Recommendation: **yes, with the design below.** Measured on #1865, a docs-only
+  PR from today: **21 billed minutes** (4 test shards 2–3 min each, Build 3.6 min, and the rest at
+  about 1 min each). The design would cost about 7.
+  - **Design (drafted, then deliberately not committed).** A `Changes` job lists the PR's files
+    through the API. Old paths of renames are included, so moving code into `docs/` doesn't count
+    as docs. It outputs `code=false` only when every path is under `docs/` or ends `.md`. Lint,
+    Build and Migration Check still RUN and REPORT, but skip their steps. The four shards are not
+    required checks and are skipped outright. `Tests` then runs `scripts/__tests__`, where the
+    tests that read the real backlog live. Custom Rules and E2E are unchanged. **It fails safe:**
+    a failed `Changes` job, an unreadable file list, or ≥3,000 files runs everything.
+  - **Why it came back to you.** Lane A's tooling refused the edit as a CI bypass: it makes
+    *required* checks pass without running their work on a class of PR. That is a real change to
+    what "green" means. The owner decides that, not an agent.
+  - **Alternative:** leave it. This is what the workflow's own comment chose (*"correctness over a
+    few saved minutes"*), and it still costs nothing but minutes.
+  - **Reversal cost:** one workflow file and one small script.
+- **Lane: O** (was A). On a yes, Lane A builds it from the design above.
+- **Added:** 2026-09-27 · Orchestrator.
 - **The waste is real.** `.github/workflows/ci.yml` has no `paths-ignore`, so a markdown-only PR runs
   Lint, Tests, Build, Migration Check and Custom Rules. Most Orchestrator, Review, BugFix and Tuning
   PRs are markdown-only, which is most PRs.
@@ -944,35 +940,6 @@ below threshold and left in place for next time.
   default is computed.
 - **Reversal cost: low while it is a default, high once the manual field is removed.** Keep the
   override until the derived number has been right for a month.
-
-
-### [platform] OR-202 — `next-schema-number.js` prints an unreadable wall, and it is the tool we tell contributors to run
-
-- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, found while answering an outside
-  contributor's question about the migration-numbering workflow (`jsboiss`, issue #1620).
-- **Two defects, one already fixed here.**
-  **① FIXED 2026-09-28:** `check-migration-numbers.js` and `migration-claims.js` told the
-  reader to run **`node scripts/next-migration-number.js`**, which **does not exist** — the file is
-  `next-schema-number.js`. That message is what a contributor sees when the duplicate check fails,
-  so the one moment the guidance matters most, it named a missing script. The script also
-  mislabelled itself in its own no-refs fallback. Three references corrected.
-  **② OPEN, and the reason for this entry:** the tool's output is effectively unreadable. A single
-  run prints lines hundreds of characters wide — number `274` alone reports the *same* filename
-  across **44 branches** — because dozens of stale branches still carry the 59
-  `claude_ro_views_*` migrations that `BF-214` deleted on 2026-09-27. Every one is a phantom: the
-  pattern no longer exists on `main`.
-- **Why it matters beyond tidiness.** A real collision is in there — `284: merged 284_sleep_verdicts
-  vs origin/health-sample-storage: 284_apple_health_samples` — and it is invisible between two
-  paragraphs of noise. A tool whose true finding cannot be seen is not doing its job, and this is
-  the one we point outside contributors at.
-- **Recommendation: collapse identical claims and ignore branches whose only claim is a deleted
-  pattern.** Print `274: 44 branches, same file` on one line rather than 44 names, and skip a
-  number whose claimants are all `claude_ro_views_*`, since no such migration can be valid now —
-  `claude-ro-views-file.test.ts` fails any PR that adds one.
-  **Alternative — prune the stale branches instead.** Cleaner in principle and it fixes the cause;
-  against it, the branches are other agents' unmerged work and the tool should be robust to them
-  existing. Do both eventually; do the output first, because it is the half that is safe.
-- **Reversal cost: low** — read-only reporting script, never a CI gate.
 
 
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
@@ -7794,46 +7761,6 @@ drift.
   purpose.** The check also turned up LA-168 (fixed 2026-09-28): the raw HR under ring-only workouts has thinned since
   the snapshots were taken, so this route's live re-derivation and the recap's stored number have
   drifted apart.
-
-
-### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
-
-- **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/clock.ts`, `lib/oura-ble/rollup/run.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **SHIPPED 2026-09-25, part ① of three** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-noop-backfill)):
-  the backfill `UPDATE` is deleted. Re-measured that day before removing it — **4,932 calls, 90 s,
-  8.0% of all database time, 0 rows updated**, and `measured_at` has **0 nulls**. Safe because a NULL
-  can no longer be written: one insert path, a non-null anchor by construction, and
-  `oura-raw-sample-measured-at.test.ts` now pins that across the first-ever batch, an epoch open and
-  a history re-drain. **The column is NOT dropped** — that is a data-dropping migration and the
-  owner's.
-- **SHIPPED ② 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-clock-offset-sql)):
-  `getOuraClockOffsets` returns each epoch's robust offset as one row. Five adapter read paths that
-  only convert timestamps now take it; the rollup and three others keep the series, which they
-  genuinely need. **19–27 ms warm against the series read's ~48 ms.**
-- **⚠ The entry's ATTRIBUTION of ② was wrong, and so was the first fix I measured.** It read the cost
-  as one number across three functions. Measured separately: **all 9.4% is `getOuraClockAnchors`**
-  (2,190 calls, 48.45 ms, 106 s); `getOuraClockEpochHead` is 1.80 ms and `getNewestOuraClockAnchorByUtc`
-  1.71 ms, 0.8% apiece — so the proposed index and `LIMIT 1` bought at most 1.6% and left the 9.4%.
-  The expensive one could not become `LIMIT 1` either: LA-139 moved four call sites onto the full
-  series because a single newest anchor was the wrong offset. **And the obvious aggregate is a
-  REGRESSION** — `row_number() OVER (PARTITION BY epoch …)` measured **53–67 ms**, worse than the
-  read it replaces, because it sorts all 12,591 rows. Only the count-then-top-N shape wins.
-- **SHIPPED ③ 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-hr-rollup-churn)): the
-  rollup upserts the HR window first, then deletes only the timestamps that left it. Re-measured
-  before the change — **628,197 inserts and 574,974 deletes against 140,181 live rows, 95 updates**
-  (the entry's 535k/137k, grown).
-- **⚠ The entry's fix for ③ — "upsert with `IS DISTINCT FROM`" — was ALREADY DONE**, and had been
-  since review B1/R1: `upsertOuraHeartrate` carries `ON CONFLICT … DO UPDATE … WHERE bpm IS DISTINCT
-  FROM excluded.bpm`, written so an idempotent re-roll does not bump `updated_at` and re-send the
-  point over the Track-B sync. The defect was the blanket `DELETE … WHERE source = 'ble' AND
-  timestamp >= cutoff` running immediately **in front of it**, which removed exactly the rows about
-  to be written — so the conflict target never matched, every row was a fresh insert, and the guard
-  never applied. Reordering restores behaviour the upsert already had.
-- **`oura_heartrate_pkey` is still 7 MB with 0 scans** against the unique key's 792,453. Dropping a
-  primary key is a migration and ships alone; not done here.
-- **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
-  not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
 
 ### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
