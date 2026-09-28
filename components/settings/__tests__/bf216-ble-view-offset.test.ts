@@ -48,16 +48,11 @@ describe('BF-216 — the two reads differ, which is the whole point', () => {
 
 describe('BF-216 — no BLE read goes through `.buffer`', () => {
   /**
-   * Named with their reason rather than quietly skipped. All three take a `DataView` from the BLE
-   * plugin and read `.buffer`, so all three carry this defect — but `lib/colmi-ble/**` and
-   * `lib/live-hr/**` are **device pipelines, which §3 of the agents contract puts in Lane A**. They
-   * are listed on the BF-216 entry for that lane, and this exemption is what keeps them visible
-   * instead of looking clean.
-   *
-   * `lib/colmi-ble/ble.ts`'s WRITE path (`new DataView(bytes.buffer)`) is not in scope: it builds
-   * its own array rather than receiving one, so it owns the buffer it reads.
+   * The device pipelines, fixed by Lane A. Each receives a `DataView` from the BLE plugin and now
+   * reads `new Uint8Array(v.buffer, v.byteOffset, v.byteLength)`. `lib/colmi-ble/ble.ts`'s WRITE path
+   * (`new DataView(bytes.buffer)`) is not in scope: it builds its own array, so it owns the buffer.
    */
-  const LANE_A_DEBT = ['lib/colmi-ble/ble.ts', 'lib/live-hr/chest-strap-source.ts']
+  const PIPELINES = ['lib/colmi-ble/ble.ts', 'lib/live-hr/chest-strap-source.ts']
 
   it('the pairing screen reads through the view', () => {
     const code = src('components/settings/chest-strap-pairing.tsx')
@@ -66,9 +61,10 @@ describe('BF-216 — no BLE read goes through `.buffer`', () => {
     expect(code).toMatch(/\.getUint8\(0\)/)
   })
 
-  it('and the debt this could not reach is still exactly where it was', () => {
-    // If one of these is fixed, drop it from the list — the failure is the reminder to do so.
-    const still = LANE_A_DEBT.filter(f => /new Uint8Array\(\w+\.buffer\)/.test(src(f)))
-    expect(still, 'BF-216 names these for Lane A').toEqual(LANE_A_DEBT)
+  it('and so do the device pipelines', () => {
+    for (const f of PIPELINES) {
+      expect(src(f), f).not.toMatch(/new Uint8Array\(\w+\.buffer\)/)
+      expect(src(f), f).toMatch(/new Uint8Array\((\w+)\.buffer, \1\.byteOffset, \1\.byteLength\)/)
+    }
   })
 })
