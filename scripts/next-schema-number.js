@@ -71,9 +71,9 @@ const branches = refs.map((ref) => ({ ref, files: filesIn(ref) }));
 // The working tree is a claim like any other — a migration written but not yet committed counts.
 branches.push({ ref: 'working tree', files: worktree });
 
-const { next, reserved, collisions } = surveyClaims(base, branches);
+const { next, reserved, collisions } = surveyClaims(base, branches, undefined, new Date());
 
-console.log(`Next free Postgres migration number: ${next}`);
+console.log(`Next free Postgres migration number: ${next}   (name the file ${next}_<what_it_does>.sql)`);
 console.log(
   `  ${base.length} on ${merged.length ? 'origin/main' : 'the working tree'}, ` +
     `${refs.length} other ref(s) read.`,

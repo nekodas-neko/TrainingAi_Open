@@ -64,10 +64,17 @@ const REPLAY_EXEMPT = new Map([
   ['001_initial.sql', '002 renamed the column its cardio_sessions FK references'],
 ])
 
+// BF-214 ②: by the leading integer, then filename — the twin of ensureSchema's sortMigrationFiles
+// in lib/data/postgres/client.ts (read the reason there). A test holds the two to one order.
+function sortMigrationFiles(files) {
+  const lead = f => Number((/^(\d+)/.exec(f) || [, 0])[1])
+  return [...files].sort((a, b) => lead(a) - lead(b) || (a < b ? -1 : a > b ? 1 : 0))
+}
+
 async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const migrationsDir = join(__dirname, '../../lib/data/postgres/migrations')
-  const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort()
+  const files = sortMigrationFiles(readdirSync(migrationsDir).filter(f => f.endsWith('.sql')))
 
   // Same shape as ensureSchema's, so the two agree on what "applied" means.
   await pool.query(`
@@ -175,7 +182,11 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error(err)
-  process.exit(1)
-})
+if (require.main === module) {
+  main().catch(err => {
+    console.error(err)
+    process.exit(1)
+  })
+}
+
+module.exports = { sortMigrationFiles }

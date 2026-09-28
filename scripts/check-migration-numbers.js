@@ -35,6 +35,6 @@ if (collisions.length > 0) {
 
 console.log(
   `check-migration-numbers: ${byNumber.size} numbers, no new collisions. ` +
-    'For the next free number run `node scripts/next-schema-number.js`, which also sees ' +
+    'For the next prefix run `node scripts/next-schema-number.js`, which also sees ' +
     'numbers claimed by branches that have not merged.',
 );
