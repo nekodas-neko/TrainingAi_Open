@@ -2128,77 +2128,6 @@ below threshold and left in place for next time.
 - **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
   new). `Ran 78 of 78` Custom Rules steps.
 
-### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
-- **✅ ITEMS 1 AND 2 CLOSED 2026-09-28. Only the merge-time yes remains.**
-  **① RV-213's mockup is no longer owed** — it was drawn on 2026-09-27 and the owner **DECLINED**
-  the change (*"I like the original look; it shows the grouping nicely with the space"*), which is
-  recorded on `RV-213` as a Nutrition design principle rather than a bare no. Nothing further.
-  **② The calorie target is answered** by rejecting the three-number premise; it is `OR-191` now.
-  **③ Unchanged and still the only live item:** a merge-time yes on the six security fixes
-  (`RV-191`, `RV-190`, `RV-192`, `RV-193`, `RV-195`, `RV-196`) **as each PR goes green — not now.**
-- **✅ STANDING YES GIVEN 2026-09-28 — the four built security PRs merge on green WITHOUT coming
-  back to him.** `#1912` (RV-191, feedback-screenshot validation), `#1914` (RV-190, rolled-back
-  admin queries), `#1916` (RV-193, refresh token in the encrypted JWT) and `#1915` (RV-197,
-  dev-only WebSocket CSP).
-  **⛔ The yes is CONDITIONAL on two things, and neither is the merge button.** Each PR merges only
-  when its required checks are green **and** the pre-merge check it names in its own body is done —
-  `#1912` still owes an authenticated `pnpm dev` pass of the admin panel, which no CI job covers.
-  **It does not extend to `RV-192`, `RV-195` or `RV-196`, which are not built**; those come back
-  when they are, and `RV-192` additionally carries a product option (dropping password sign-up)
-  that is a separate question.
-  **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
-  and what each changes, and chose a standing yes over four interruptions.
-- **⚑ ALL SEVEN ARE BUILT. ONE PR EACH; review these (corrected 2026-09-29):**
-  - **RV-190** → **#1672**: every read-only query runs in a rolled-back transaction, reset on the way
-    in, and mutation-tested;
-  - **RV-191** → **#1671**: images are validated by their bytes (feedback and avatar), and the admin
-    thumbnail zooms in place;
-  - **RV-192** → **#1779**: an invite is not proof of the inbox, and linking Google clears the
-    password;
-  - **RV-193** → **#1781**: the refresh token is read server-side, never from the session;
-  - **RV-195** → **#1784** (② deleted users) **+ #1930** (① mobile sign-in bound to its tab, ③
-    pending friend requests masked);
-  - **RV-196 + OR-159** → **#1755**: native dialogs for the ring key (now including `setKey`),
-    uploads limited to the app's origin, and the cookie **and ring key** kept out of backup. Needs an
-    APK;
-  - **RV-197** → **#1789**: WebSockets are allowed by the CSP only in dev.
-- **⚠ DUPLICATES, DO NOT REVIEW: #1912, #1914, #1915, #1916 and #1931.** A Lane A session on
-  2026-09-28/29 rebuilt RV-190/191/193/197/192 without noticing the PRs above, and listed its own
-  here. Each is a strictly weaker copy of the original, compared diff by diff. They should be
-  closed; closing waits on the owner's OK, per the PR-closing rule. The session's two genuine
-  additions were folded into #1930 and #1755 instead.
-- **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
-  - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
-    Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
-    deficit for weight goal"*. **Filed as `OR-191`** with the measurement and the blocking input
-    (`RV-164`'s 1,618-vs-1,660). This item is closed here; do not re-ask it.
-  - **① RV-213's mockup: still owed, and it is now UNGATED** — the mockup is the work, and the gate
-    was parking it. **It ships in one sitting with `LB-163` and `LA-136`**, three Home/Nutrition
-    mockups owed to one person.
-  - **③ the six security fixes: unchanged** — still a merge-time yes as each PR goes green, not now.
-
-- **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
-- **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
-- **1. RV-213: a mockup, before it is built.** Empty meal slots on Nutrition take a full card each, with two add controls. Lane B produces a before/after at 384 px, and the owner says yes or no.
-  - **Recommendation:** one compact row per empty meal, with its name and a single `+`.
-  - The same shape as RV-207 ⑥'s Log-tile mockup (the Lane O entry Lane B split out). **Show both in one sitting.**
-- **2. RV-218: which number is the day's calorie target.**
-  - The ring shows 1,534 (resting plus movement). The explainer names a goal of 1,660 and a budget of 1,356.
-  - **Recommendation:** the ring shows the budget the explainer already defends. The goal stays as the reference line, and the third number goes. The owner confirms which one he reads as "today's target".
-  - RV-218's copy bugs ("205 workouts", "-1,694 deficit", missing zero days) need no answer and can ship first.
-- **3. A merge-time yes on the security fixes.** These are needed **when each PR is green, not now**:
-  - **RV-191** (the feedback screenshot);
-  - **RV-190** (admin query session state; build it before OR-138);
-  - **RV-192** (registration). **It also carries one product option:** drop password sign-up entirely, since every current user signs in with Google. The recommendation is to keep it and verify email.
-  - **RV-193** (refresh token in the session);
-  - **RV-195** (three low auth gaps);
-  - **RV-196** (the ring-key plugin; needs an APK).
-- **Already asked elsewhere, listed so nothing is lost:**
-  - **RV-199 ②:** the GitHub "keep my email private" setting, which only the owner can flip.
-  - **RV-65:** whether the prescription keeps its model call, which is gated on the owner in Lane A.
-  - **OR-176** is answered: a standing yes for DV's three settings probes.
-- **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
-
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **✅ CLOSED 2026-09-28 — the last item is answered: PS-17 MOVES UP, and stays up.**
   He confirmed the 2026-09-25 promotion rather than reversing it: a phantom afternoon *"sleep"*
@@ -3336,48 +3265,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
-- **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
-- **⚠ AUTH — the owner confirms before this merges.**
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:**
-  - Registering with an email that has been **invited but not yet registered** activates the account
-    immediately (`isActive = isInvited(email)`). Nothing proves the registrant owns that inbox.
-  - When the real person later signs in with Google, the signIn callback links Google onto that
-    existing password account. The password that created the account keeps working.
-- **Who and what:** anyone who knows an invited address can take the invite. When the invitee then
-  signs in with Google, they land in an account whose password someone else holds. The owner's own
-  account is not exposed, because registering an existing email returns 409. Reasoned from source;
-  not executed.
-- **Fix shape (recommended first):**
-  1. Do not treat an invite as proof of email ownership. A password account stays inactive until the
-     email is verified.
-  2. When Google links onto a password account, clear `password_hash` unless the email is verified,
-     or require the password before linking.
-- **Alternatives:** drop email and password registration and keep only Google, since every current
-  user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
-- **✅ BOTH HALVES OF THE TAKEOVER PATH ARE CLOSED (Lane A, 2026-09-27) — but NOT by verifying
-  email, because there is nothing in this repository that can send one.** `createEmailUser` no
-  longer defaults `isActive` to `isInvited(email)`; a password account starts inactive and the owner
-  activates it. `linkOAuthAccount` clears `password_hash` as it links. Google sign-in still honours
-  the invite through `upsertUser`, and that stays right: **Google has verified the address, so there
-  the invite IS being matched against a proven owner.** The asymmetry is the whole fix.
-- **Why clearing the password is safe rather than destructive.** It runs only on the FIRST Google
-  sign-in for a row with no `oauthSub`, and the person triggering it is signing in with Google at
-  that moment, so they are not locked out. The owner's own account already carries an `oauthSub`, so
-  the branch cannot fire for him. `auth.ts:57` already returns null on a falsy hash, so a cleared
-  password is a refusal and not an empty one — pinned by a test, because the fix would be worse than
-  useless if null meant "no password required".
-- **How this survived a test file named for it.** `lib/__tests__/register-inactive.test.ts` is
-  titled *"accounts must start inactive/pending"* and asserts that the **route** passes no `isActive`
-  override — leaving activation to `isInvited`, which is the defect. A test named for a property,
-  asserting something weaker.
-- **Keep: fix 1 as the entry actually words it — real email verification — is NOT done, and it is
-  the owner's.** It needs a mail provider (none exists: no nodemailer/Resend/SES anywhere), a
-  secret, a token table and a verification screen. **Ask him the product question first**, because
-  the entry's own alternative may be the answer: every current user signs in with Google, so
-  dropping password registration outright would close this without building any of it.
-
 ### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
 - **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
 - **Needs: RV-192**
@@ -3393,35 +3280,6 @@ which is the right shape for something that can only be validated by living with
   calling the router by hand did. Fast Refresh rebuilds were logged around each submit, so it may
   be a dev-only artefact. It needs one run against a production build before anyone treats it as a
   bug, because if it is real the toast above is never seen at all.
-
-### [platform] RV-193 — the Google refresh token is copied into the session JSON that page scripts can read
-- **Lane: A** — `auth.config.ts:51`, `app/api/log-calendar-event/route.ts:22`.
-- **⚠ AUTH — the owner confirms before this merges.** The change is one line.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** the refresh token belongs in the encrypted, httpOnly JWT, and it is there. It is **also**
-  copied to `session.refreshToken`, which `GET /api/auth/session` returns to page JavaScript. No
-  client code uses it; its only consumer runs on the server.
-- **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
-  token is long-lived, can write to Google Calendar, and outlives sign-out.
-- **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
-- **✅ SHIPPED (Lane A, 2026-09-27) — and it is not one line.** The line is gone from
-  `auth.config.ts`'s session callback and from the `Session` interface in `types/next-auth.d.ts`;
-  the JWT keeps it. The route reads it through a new `lib/auth/session-token.ts`.
-- **Why a shared module rather than a `getToken()` call in the route.** Auth.js derives the
-  decryption **salt from the cookie NAME**, so `secureCookie` is load-bearing: get it wrong and
-  every valid token reads as invalid, the route answers a plain 401, and every workout completion
-  stops reaching the calendar with nothing in the logs. That exact pairing was already solved in
-  `bearer-session.ts` and commented on in `request-error.ts`; a second hand-rolled copy is how it
-  drifts. `bearerSession` now calls the shared reader too.
-- **Both halves are tested against a REALLY encrypted token**, not a mocked decode: one that the
-  session the browser receives no longer carries the claim, driven through the real
-  `authConfig.callbacks.session`; one that the server still reads it back from a cookie minted with
-  `encode()`. The second is the test that would catch the silent death above.
-- **`bearerSession` builds its session by running that same callback**, so the mobile path loses the
-  claim identically — deliberate, and worth stating because it is not visible from the diff.
-- **The route's authorisation semantics are unchanged**: no refresh token is still 401, which is
-  what a signed-in user who never granted the calendar scope gets. A second test now pins the
-  signed-out case separately, because the two conditions became independent.
 
 ### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
 
@@ -3440,51 +3298,6 @@ which is the right shape for something that can only be validated by living with
     for an outgoing row by design.
 - **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
   "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
-
-### [platform] RV-195 — three low-severity auth and social gaps, one PR
-- **Lane: A.** **⚠ AUTH — the owner confirms before this merges.**
-- **① and ③ BUILT 2026-09-29 in #1930. ② is #1784**, from an earlier Lane A session. This entry
-  leaves the queue when #1784 merges.
-- **Added:** 2026-09-24 · Review sweep 60.
-1. **Mobile sign-in challenge is not bound to the browser that started it** (`app/auth-mobile-bridge/page.tsx`).
-   Exploiting it needs a malicious app on the phone plus a tapped link. Fix: `/mobile-signin` sets a
-   short-lived httpOnly cookie holding the challenge, and the bridge mints a token only if the query
-   value matches that cookie.
-2. **A deleted user stays signed in** (`lib/auth/is-active-refresh.ts`). A missing row is treated as
-   "no change". Fix: `auth()` returns null when the lookup succeeds and finds no row. The fail-open
-   for database outages stays.
-3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
-   `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
-   only what the requester typed.
-- **② SHIPPED (Lane A, 2026-09-27). ① and ③ are NOT, and each for a reason the entry could not have
-  known. The "one PR" line does not survive them — this is three items, shipping separately.**
-- **② was one line and the old comment argued against it.** `is-active-refresh.ts` read *"a missing
-  row is not evidence of deactivation"* and returned the token untouched, so a deleted account
-  stayed signed in until its token expired — up to seven days. What makes the inversion safe is
-  already in the code: a database outage **throws** and is caught, where the claim stands and nobody
-  is signed out by a blip; reaching the `!user` branch means the query ran and answered "no such
-  user" (`getUserById` returns null only for a non-matching id). The two cases the comment conflated
-  were separated by the language all along. Its test is inverted in place, keeping its intent.
-- **⛔ ① CANNOT BE BUILT WHERE THE ENTRY SAYS, and the alternative costs an APK.**
-  `app/mobile-signin/page.tsx` is a **client** component (`"use client"`, it calls `signIn()` in an
-  effect) — it cannot set an httpOnly cookie, and Next 15 forbids `cookies().set()` during a page
-  render, so making it a server component does not help either. The shapes that work:
-  **(a)** a route handler that sets the cookie and redirects — but then the URL the Android app
-  opens changes, which is a Kotlin change and a **new APK**, the one cost the entry does not
-  mention; **(b)** the client page `POST`s to a small route before calling `signIn`, keeping the
-  URL — no APK, and **it is worth checking whether it actually defends anything**, since a Chrome
-  Custom Tab shares Chrome's cookie jar, so an attacker able to open a URL in that browser sets the
-  cookie to their own challenge and the binding holds for them. **This wants the threat model
-  restated before code.** Recommend (b) only if that question resolves; otherwise the real defence
-  is elsewhere and this entry is describing the wrong control.
-- **⚠ ③ IS NOT SYMMETRIC, and "return only what the requester typed" cannot be done on the list
-  path.** Redaction must apply **only when the viewer is the requester** — the addressee has to see
-  who is asking or they cannot decide, and `rowToFriendship` does not know the viewer.
-  And the typed string is **not stored**: `sendFriendRequest` has `emailOrCode` and can echo it,
-  `listFriendships` has nothing, so an outgoing pending request would render blank where a name is
-  today. Storing it is a column, and **a migration ships alone and is never batched**. So ③ is
-  (i) a migration adding the typed identifier, (ii) a viewer-aware redaction, and (iii) a Lane B
-  change to what a pending outgoing row shows. Not one line, and not this PR.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
@@ -3518,32 +3331,6 @@ which is the right shape for something that can only be validated by living with
      are explicit buttons in the debug console, so the cost is one deliberate extra tap.
 - **Keep:** the device check (Known Issues: "native security batch"), which includes confirming the ring still uploads after the update. Owner confirmation was given 2026-09-29. The dialog
   appears and is answerable, and ring/scale/strap ingest still reaches the server afterwards.
-
-### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
-- **Lane: A** — `lib/security/csp.ts` and its existing test.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** `connect-src` ends in `wss: ws:`. No `WebSocket` is used anywhere in
-  app/components/lib/packages; the only consumer is dev HMR. `connect-src` is the directive that would
-  otherwise stop injected script from sending data off-origin.
-- **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
-  `generativelanguage.googleapis.com` at the same time.
-- **✅ SHIPPED (Lane A, 2026-09-27), both halves, exactly as written — the entry is right and its
-  evidence reproduces.** No `WebSocket` is constructed anywhere in `app/`, `components/`, `lib/` or
-  `packages/`, and there is no ws client in `package.json`.
-- **The stronger check, because a source grep cannot see a dependency:** built the app and grepped
-  the **emitted client bundles** (`.next/static`). Zero hits for `generativelanguage`, zero for
-  `WebSocket(`, and zero `ws://`/`wss://` literals of any kind. Nothing the browser ships wants
-  either of the things removed.
-- **`ws: wss:` is kept for dev rather than deleted** — the HMR socket is a real consumer. If a
-  production feature ever needs one, **name its host** (`wss://host`); do not restore the scheme.
-- **The enumerating test was loosened while being extended, deliberately.** `dev and production
-  differ only in …` compared exact strings, so it failed when the two ws schemes were merely
-  reordered — a change that changes nothing. It strips them by pattern now and still catches the
-  thing worth catching: a THIRD difference nobody decided on. Found by the mutation pass's
-  equivalent control, which is what that control is for.
-- **NOT verified against a running production server.** `pnpm start` cannot boot in the sandbox —
-  the instrumentation hook needs S3 credentials for the vendored model constants — so the header
-  was read from `buildCsp(false)` and from the bundles, never off the wire.
 
 ### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
 - **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
