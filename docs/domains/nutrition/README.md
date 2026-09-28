@@ -520,12 +520,12 @@ Live at the time of writing (2026-07-30):
   with a three-step instrumented probe instead of a third speculative fix.
 - Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
-  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/entries/2026-09-27-rv218-nutrition-copy.md)
+  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv218-nutrition-copy)
   (RV-218's copy bugs: "205 workouts" was 205 kcal, and a signed `net` printed "−1,694 deficit" —
   sign and word both meaning "under". Also why items ①②④ are Lane A's, established from the route
   rather than assumed),
   — including
-  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/entries/2026-09-27-rv212-nutrition-tone.md)
+  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv212-nutrition-tone)
   (RV-212 ①②: the energy-balance headline stops reading a partial day as a fault, following
   `energy-card.tsx`'s own earlier split which keeps the colour on the " so far"-qualified label; a
   taken supplement is muted rather than struck through, while the manage sheet's `!s.active`
