@@ -31,6 +31,22 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] Home's banner registry has no guard against an unstable `report`
+
+- **The crash it prevents shipped and was fixed the same day** (RV-119 in v1.481.0, fixed in
+  v1.481.2): `report` was rebuilt on every presence change, the reporting effect depends on it, so a
+  banner whose presence changed after mount re-ran every other banner's effect — **"Maximum update
+  depth exceeded"**, Home on the root error boundary.
+- **What is missing:** nothing fails if `report` becomes unstable again. The protection is
+  `card-429-error-state.spec.ts`, which only catches it when a banner's presence genuinely changes
+  during a run. A stability test would need a React renderer for components, which this repo does
+  not use.
+- **Not device-verified, and the crash was never seen on the device.** The reproduction is a 429 stub
+  on `/api/weekly-digest`. Nothing about the loop requires a *failure* — only a presence change — so
+  real timing could reach it; whether it does is unknown.
+- **If a Home crash is ever reported,** this is the first thing to check: open Home with a banner
+  that resolves late and watch for the error boundary.
+
 ### [app-shell] Home's banner strip is NOT device-verified, and the multi-banner case was never rendered
 
 - **Shipped 2026-09-28 (RV-119, v1.481.0), web-verified with ONE banner present.** The four

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { type CollapsingBanner } from '@/components/home/home-banner-keys'
 
@@ -33,15 +33,30 @@ const BannerPresenceContext = createContext<Registry | null>(null)
 export function HomeBannerPresenceProvider({ children }: { children: React.ReactNode }) {
   const [present, setPresent] = useState<ReadonlySet<CollapsingBanner>>(() => new Set())
 
-  const value = useMemo<Registry>(() => ({
-    present,
-    report: (key, isPresent) => setPresent(prev => {
-      if (prev.has(key) === isPresent) return prev   // no state write, so no render loop
+  // ⛔ `report` MUST be stable, and this is not a micro-optimisation — an unstable one crashes Home.
+  //
+  // It lived inside the `useMemo` below, so it was rebuilt every time `present` changed. The
+  // reporting effect lists it as a dependency (it must: a stale `report` would write into a dead
+  // provider), so every presence change re-ran EVERY banner's effect, each of which calls `report`
+  // again. With a banner whose presence legitimately changes after mount — a weekly recap going
+  // loading → error is the case that found this — that is an unbounded cycle, and Home dies with
+  // **"Maximum update depth exceeded"** on the root error boundary.
+  //
+  // The `prev.has(key) === isPresent` bail-out does not save it: it prevents a state WRITE, but the
+  // effects have already been re-scheduled by the identity change before any of them runs.
+  //
+  // `useState`'s setter is itself stable, so an empty dependency list here is correct rather than a
+  // lint appeasement.
+  const report = useCallback<Registry['report']>((key, isPresent) => {
+    setPresent(prev => {
+      if (prev.has(key) === isPresent) return prev   // no state write, so no extra render
       const next = new Set(prev)
       if (isPresent) next.add(key); else next.delete(key)
       return next
-    }),
-  }), [present])
+    })
+  }, [])
+
+  const value = useMemo<Registry>(() => ({ present, report }), [present, report])
 
   return <BannerPresenceContext.Provider value={value}>{children}</BannerPresenceContext.Provider>
 }
