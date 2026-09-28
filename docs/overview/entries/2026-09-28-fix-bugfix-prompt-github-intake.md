@@ -41,3 +41,33 @@ assumption.
 
 **Not exercised:** documentation only, no code. Gates: `Ran 83 of 83` Custom Rules,
 `check-doc-links: OK (897 files)`.
+
+---
+
+## The owner asked the better question, and the answer was no
+
+*"Will this method acknowledge and comment/review his PRs? Cause from his end it just goes silent."*
+
+Checked, and he is right twice over.
+
+**The chain was broken at BOTH links, not one.** `docs/agents/prompts/review.md` mentions inbound
+PRs **zero times** — the same drift found in BugFix's prompt. Review owns inbound PRs per
+`README` §1 and its own pickup prompt never said so, so the contract's *"post a review on the PR"*
+had no session being told to do it. Fixed here: the Review prompt now puts inbound PRs **before**
+the weekly sweep, with the concision rules, the may-approve-never-merge rule, and the note that a
+contributor is not the owner.
+
+**And even with both prompts fixed, there was no acknowledgement.** BugFix files an entry — which
+is internal and invisible to the author — and the first thing the contributor would see is a full
+review, whenever a Review session next runs. A weekly sweep is not a response time.
+
+So BugFix now **acknowledges on the PR in the same session it files**: one comment, two lines, the
+entry id, explicitly *receipt rather than verdict* — no opinion on the diff, no promise of a merge,
+because pre-empting Review is its own failure. **Filing silently is the defect, not the fix.**
+
+## The pattern worth naming
+
+Three documents said the intake worked. **No session was told to do it**, in either role. A rule
+written into the contract and absent from the pickup prompt is a rule that does not run, and
+nothing checks that the two agree — this is the second instance found by reading in one sitting.
+The remaining five prompts are unaudited.

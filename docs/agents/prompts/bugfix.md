@@ -36,7 +36,14 @@ A previous session may have run under this name; if so, its baton is waiting for
 only arrive in chat, and two of the three are silent — nobody chases you for them.
 
 1. **GitHub — `list_issues` (state OPEN) and `list_pull_requests` (open).** File an entry for every
-   issue, and for **every PR you did not author**. **⛔ This channel went unread entirely until
+   issue, and for **every PR you did not author**.
+   **⚑ ACKNOWLEDGE IT ON THE PR OR ISSUE THE SAME SESSION — one comment, two lines.** Say it has
+   been picked up and give the entry id, so the author can see it exists. **Filing silently IS the
+   defect, not the fix:** the entry is internal, an author cannot see the queue, and from their
+   side an unacknowledged PR is indistinguishable from an ignored one. The contributor's second
+   complaint was exactly this — *"from his end it just goes silent"*. Review posts the real review
+   afterwards; **this is receipt, not verdict**, so give no opinion on the diff and promise no
+   merge. **⛔ This channel went unread entirely until
    2026-09-25**, and an outside contributor said so: *"it's also not picking up the issues and PRs
    I raise to your Training app, so they're never getting touched/reviewed either."* Three of his
    items sat four days. **An inbound PR is not ours to merge** — the ceiling is review, comment,

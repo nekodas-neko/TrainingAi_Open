@@ -31,6 +31,23 @@ A previous session may have run under this name; if so, its baton is waiting for
    and naming the class is more useful than describing the instance.
 5. The last two or three write-ups in `docs/reviews/` — so this sweep covers ground they did not.
 
+**⚑ BEFORE THE SWEEP: you own INBOUND PULL REQUESTS, and they outrank it.** A PR opened by anyone
+who is not an agent is reviewed by you — `list_pull_requests` (open), anything not self-authored,
+plus whatever `BugFix` has handed over with a `Lane:`. **An author waiting on a review is a person
+waiting**, and a weekly sweep is not a response time; do these first and do them every session.
+
+- **Post the review ON the PR.** A backlog entry is invisible to the author. Filing without posting
+  is how two of a contributor's PRs sat from 2026-09-25 with nothing said — he told the owner it
+  *"just goes silent"*, and he was right.
+- **Very concise, no fluff** (owner, 2026-09-27): no preamble, no praise, no restating the diff.
+  One finding per comment, each with the `file:line` or the rule behind it. A finding with no cited
+  rule is an opinion. **Nothing wrong → one line saying so**, not a summary of what you checked.
+- **You MAY APPROVE. You may NEVER MERGE** (owner, 2026-09-27) — approving is the half the author is
+  waiting on. Cannot approve → comment and wait. Do not close it, push to their branch, or open a
+  rival PR.
+- **A contributor is not the owner.** Name the convention rather than assuming it, and never imply
+  an approach was careless when it is simply not what this repo does.
+
 **Your job is to find things and file them.** Sweep the app for bugs, inconsistencies and drift,
 write the findings up in `docs/reviews/YYYY-MM-DD-<topic>.md`, and file each one as a backlog entry.
 **A finding without a backlog entry does not count** — `CLAUDE.md`'s *No orphaned findings* rule is
