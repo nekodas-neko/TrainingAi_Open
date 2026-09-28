@@ -6565,11 +6565,11 @@ drift.
 - **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
   today's state exactly.
 
-### [platform][workouts] LA-173 — four things Lane A needs from the owner (two merge yeses, a style, a key)
+### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
 - **Ask** — owner: four answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge LA-142
   (#1849), and close #1749? ③ Which progression style should Barbell Skull Crusher use? ④ Can fresh
-  storage keys go into Railway?
+  storage keys go into Railway? ⑤ Merge TN-56 (#1902)?
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6595,6 +6595,13 @@ drift.
 - **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
+
+- **⑤ TN-56 (#1902, draft): the admin replay endpoint Tuning needs. ⭐ Recommend: yes.** Held only
+  because it touches authorisation: `/api/admin/db-query`'s auth moved into one shared helper
+  (`lib/admin/claude-token-auth.ts`), with identical logic and the same rate key, and the new
+  `/api/admin/replay` uses it. The replay reads the owner's own data and writes nothing. On his
+  real data its defaults reproduce production on 15 of 17 nights. The 87 existing
+  db-query/admin-guard tests pass unchanged. Reversal: revert the PR.
 
 ### [workouts][readiness] LA-175 — Q-279's ACWR switch, re-measured before building: the deload card's direction reversed
 - **Lane: O** — the owner approved a change with measured numbers, and today's measurement differs in
