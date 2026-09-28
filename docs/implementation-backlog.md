@@ -9769,23 +9769,6 @@ drift.
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
-### [platform] RV-78 — `/api/next-session` serialises two independent queries, and one card fetches with no seed
-
-- **Lane:** A — `app/api/next-session/route.ts:14,18,30`; plus
-  `components/nutrition/reta/weight-response-card.tsx:53`. **Added:** 2026-09-20 · Review sweep 51.
-- `getSessionPeriodization` (`:18`) and `getExerciseMuscleAssignments` (`:30`) both depend on `:14`'s
-  result but **not on each other**, and run in series on Home's most-refetched endpoint
-  (`NEXT_SESSION_TTL = TTL_SHORT`, refetched on every tab entry).
-- Separately, `weight-response-card.tsx:53` is the **only** component across `components/health`,
-  `components/nutrition`, `app/more` and the tab screens that calls `cachedFetch` with no
-  `readCacheSync` seed — the last instant-paint gap in that set. It lives inside `reta/vial-sheet.tsx`,
-  so it costs a skeleton flash when that sheet opens.
-- **Fix:** wrap the two reads in one `Promise.all` keyed off the resolved session; add a seed to the
-  card or convert it to `useCachedValue`.
-- **Not established:** neither query was timed, so on a dataset this size the saving may be
-  single-digit milliseconds. Filed for the shape, not a measured win.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** lines are now `next-session/route.ts:14,19,31`. **The two queries are not independent**: `:31` runs on the list already filtered at `:25`, so a naive `Promise.all` passes the wrong list. Fetch assignments for the unfiltered list, then filter. `weight-response-card.tsx:53` is only the no-local-store fallback, so there is no flash on the APK; drop the card half.
-
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a

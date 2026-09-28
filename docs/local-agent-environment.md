@@ -68,12 +68,15 @@ survives from one PR to the next. The shape that gives it:
   database written in instead, with `DATABASE_SSL=false`. A command run there with no override
   reaches `trainingai_lane_a`, never Railway, and the per-command overrides below stop being
   load-bearing.
-- **One database per lane on the Docker server**, `trainingai_lane_a` on 5434. `pnpm db:rebuild`
-  resets it to migrations plus the seed. `pnpm db:snapshot` loads the owner's production rows into
-  it for prod-shaped testing:
+- **Two databases per lane on the Docker server (5434), kept apart on purpose.**
+  `trainingai_lane_a` is the seeded one the test suite runs against, and `pnpm db:rebuild` resets it
+  to migrations plus the seed. `trainingai_lane_a_snapshot` holds the owner's production rows for
+  prod-shaped work (`pnpm dev` against real data, reproducing a drifted-row bug). They are separate
+  because a snapshot load TRUNCATEs every table, and the suite writes its own fixtures, so neither
+  can share a database with the other. Rebuild the snapshot database, then load it:
 
   ```bash
-  LOCAL_DB_PORT=5434 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a \
+  LOCAL_DB_PORT=5434 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a_snapshot \
   SNAPSHOT_URL='https://trainingai-production.up.railway.app/api/admin/db-snapshot?bulk=0' \
   ADMIN_SNAPSHOT_SECRET=<from .env.local> node scripts/local-db/snapshot.js
   ```
@@ -82,7 +85,11 @@ survives from one PR to the next. The shape that gives it:
   `bulk=<days>` asks for them. It refuses a stream the server reports as failed, and it rolls back
   on any count mismatch, so a bad load leaves the database as it was. **Rebuild before a migration
   rehearsal, and snapshot when a bug needs real data.** The fresh seed is exactly what hides drifted
-  production rows.
+  production rows. A load on 2026-09-28 brought 120 sessions, 1,317 sets, 127 nights and 91 Body
+  Battery days.
+- **vitest does not read `.env.local`.** A DB-gated test skips quietly unless `DATABASE_URL` is
+  exported, even in the lane worktree. Run the suite as
+  `DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a DATABASE_SSL=false npx vitest run`.
 
 ## `.env.local` on a developer machine holds production URLs
 
