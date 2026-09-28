@@ -10,7 +10,7 @@
 //
 // Runs only against a real Postgres. CI's "Tests" job DOES set DATABASE_URL, so these run there.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -62,7 +62,7 @@ describe.skipIf(!canRun)('migration 186 — the Q-115 deload straggler (Q-228)',
     await seedLog('2026-07-30T21:59:49.754Z', false, 78.75, 63)    // the real max before it
     await seedLog('2026-08-06T21:45:00Z', false, 85.75, 44.5)      // same values, NOT flagged
 
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
   })
 
   afterAll(async () => {
@@ -97,7 +97,10 @@ describe.skipIf(!canRun)('migration 186 — the Q-115 deload straggler (Q-228)',
   })
 
   it('is idempotent — a second run changes nothing', async () => {
-    const res = await pool.query(migrationSql())
+    // runMigrationSql prefixes a LOCK, so the query is multi-statement and answers an array; the
+    // migration's own result is the last one.
+    const results = await runMigrationSql(pool, migrationSql()) as unknown as import('pg').QueryResult | import('pg').QueryResult[]
+    const res = Array.isArray(results) ? results[results.length - 1] : results
     expect(res.rowCount).toBe(0)
     expect((await read('2026-08-06T21:41:20.634Z')).est).toBe(0)
   })

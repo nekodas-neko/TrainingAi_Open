@@ -10,7 +10,7 @@
 //
 // Runs only against a real Postgres. CI's "Tests" job DOES set DATABASE_URL, so these run there.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -62,20 +62,20 @@ describe.skipIf(!canRun)('migration 155 — cold-baseline temperature deviation 
 
   it('clears the deviation on a cold row', async () => {
     await seed('2026-07-09', 2, 17.0) // the real production value
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     expect(await devOn('2026-07-09')).toBeNull()
   })
 
   it('keeps the deviation once the baseline is mature', async () => {
     await seed('2026-07-25', 19, 0.38)
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     expect(Number(await devOn('2026-07-25'))).toBeCloseTo(0.38, 5)
   })
 
   it('treats exactly 14 nights as mature, matching the illness radar’s gate', async () => {
     await seed('2026-07-20', 14, 0.5)
     await seed('2026-07-19', 13, 0.9)
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     expect(Number(await devOn('2026-07-20'))).toBeCloseTo(0.5, 5)
     expect(await devOn('2026-07-19')).toBeNull()
   })
@@ -83,8 +83,8 @@ describe.skipIf(!canRun)('migration 155 — cold-baseline temperature deviation 
   it('is idempotent — a second run matches nothing', async () => {
     await seed('2026-07-09', 2, 17.0)
     await seed('2026-07-25', 19, 0.38)
-    await pool.query(migrationSql())
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
+    await runMigrationSql(pool, migrationSql())
     expect(await devOn('2026-07-09')).toBeNull()
     expect(Number(await devOn('2026-07-25'))).toBeCloseTo(0.38, 5)
   })
@@ -96,7 +96,7 @@ describe.skipIf(!canRun)('migration 155 — cold-baseline temperature deviation 
       `INSERT INTO oura_daily_summary (user_id, date, n_history, temp_dev_c, temp_baseline_mean_x8, temp_baseline_dev_x8)
        VALUES ($1, '2026-07-09', 2, 17.0, 1480, 2102)`,
       [TEST_USER_ID])
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const { rows } = await pool.query(
       `SELECT temp_baseline_mean_x8, temp_baseline_dev_x8 FROM oura_daily_summary
         WHERE user_id = $1 AND date = '2026-07-09'`, [TEST_USER_ID])

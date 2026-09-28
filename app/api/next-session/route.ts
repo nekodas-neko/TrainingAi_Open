@@ -13,10 +13,19 @@ export async function GET() {
   const repo = await getRepository();
   const recommendation = await repo.getNextSession(userId, tz);
 
-  // Reflect a Workout Review "drop this cycle" in the home card's exercise count / duration
-  // estimate, matching what the workout screen will actually show.
   if (recommendation.session) {
-    const state = await repo.getSessionPeriodization(userId, recommendation.session.id);
+    // RV-78: the two reads are fetched together. Assignments are asked for the UNFILTERED list,
+    // because the drop below depends on the prescription and would otherwise serialise them, and
+    // then trimmed to what survives the drop, so the response is exactly what it was.
+    const [state, assignments] = await Promise.all([
+      repo.getSessionPeriodization(userId, recommendation.session.id),
+      // Q-115-followup: lets the sore-muscle check-in predict the same whole-session escalation
+      // computePerExerciseDeload applies server-side, instead of guessing from the flat
+      // muscleGroups list (no main/secondary role information).
+      repo.getExerciseMuscleAssignments(recommendation.session.exercises.map(e => e.exerciseName)),
+    ]);
+    // Reflect a Workout Review "drop this cycle" in the home card's exercise count / duration
+    // estimate, matching what the workout screen will actually show.
     const p = state?.prescription;
     if (p?.droppedExerciseIds?.length && state && prescriptionDrivesLoad(p.phaseAction, state.prescriptionStatus)) {
       const dropped = new Set(p.droppedExerciseIds);
@@ -25,11 +34,9 @@ export async function GET() {
         exercises: recommendation.session.exercises.filter(e => !dropped.has(e.id)),
       };
     }
-    // Q-115-followup: lets the sore-muscle check-in predict the same whole-session escalation
-    // computePerExerciseDeload applies server-side, instead of guessing from the flat
-    // muscleGroups list (no main/secondary role information).
-    recommendation.muscleAssignmentsByExercise = await repo.getExerciseMuscleAssignments(
-      recommendation.session.exercises.map(e => e.exerciseName),
+    const kept = new Set(recommendation.session.exercises.map(e => e.exerciseName));
+    recommendation.muscleAssignmentsByExercise = Object.fromEntries(
+      Object.entries(assignments).filter(([name]) => kept.has(name)),
     );
   }
 

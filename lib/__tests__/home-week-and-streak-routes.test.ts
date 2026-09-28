@@ -133,11 +133,33 @@ describe('/api/next-session', () => {
       prescription: { phaseAction: 'stay', droppedExerciseIds: ['e2'] },
     })
 
+    getExerciseMuscleAssignments.mockResolvedValue({ Bench: [{ muscle: 'chest' }], Row: [{ muscle: 'back' }] })
+
     const body = await (await getNextSessionRoute()).json()
     expect(body.session.exercises.map((e: Row) => e.id)).toEqual(['e1'])
-    // The muscle lookup runs on what SURVIVED the drop, so the sore-muscle check-in predicts the
-    // same escalation the server will apply.
-    expect(getExerciseMuscleAssignments).toHaveBeenCalledWith(['Bench'])
+    // The assignments carried are only for what SURVIVED the drop, so the sore-muscle check-in
+    // predicts the same escalation the server will apply. RV-78 fetches them for the whole list, in
+    // parallel with the prescription, and trims afterwards.
+    expect(Object.keys(body.muscleAssignmentsByExercise)).toEqual(['Bench'])
+  })
+
+  it('reads the prescription and the muscle assignments together, not one after the other (RV-78)', async () => {
+    getNextSession.mockResolvedValue({
+      session: { id: 'ps-1', exercises: [{ id: 'e1', exerciseName: 'Bench' }] },
+      isRestDay: false,
+    })
+    // The prescription read only resolves once the assignments read has STARTED. Serialised, the
+    // route would wait on it forever; the timeout makes that a failure instead of a hang.
+    let assignmentsStarted!: () => void
+    const started = new Promise<void>(r => { assignmentsStarted = r })
+    getExerciseMuscleAssignments.mockImplementation(async () => { assignmentsStarted(); return {} })
+    getSessionPeriodization.mockImplementation(async () => { await started; return null })
+
+    const res = await Promise.race([
+      getNextSessionRoute(),
+      new Promise<'serialised'>(r => setTimeout(() => r('serialised'), 1_000)),
+    ])
+    expect(res).not.toBe('serialised')
   })
 
   // A pending recovery decision is advisory: it is shown, not applied, until it is accepted.

@@ -4,7 +4,7 @@ import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { hrReserve } from '@trainingai/shared/health/hr-zones'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfile, type HrProfile } from '@trainingai/shared/health/hr-profile'
 import type { ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 // Personal HR-zone anchors for the live workout chart. Every value here now comes from the
@@ -21,7 +21,7 @@ export interface HrProfileResponse {
   /** Age-predicted (220 - age), for showing the estimate alongside the resolved value. */
   estimatedMax: number
   workingMax: number
-  workingMaxSource: 'observed' | 'estimated'
+  workingMaxSource: HrProfile['maxHrSource']
   /** Anchor for reachable targets — see HrProfile.targetAnchorMax. */
   targetAnchorMax: number
 }

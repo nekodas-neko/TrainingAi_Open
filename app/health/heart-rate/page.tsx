@@ -33,6 +33,7 @@ export default function HeartRateDetailPage() {
   const [data, setData] = useState<ReadinessScoreResponse | null>(null);
   const [trends, setTrends] = useState<HealthTrendsResponse | null>(null);
   const [hrReadings, setHrReadings] = useState<HrReading[]>([]);
+  const [hrFailed, setHrFailed] = useState(false);
   const [sleepWindow, setSleepWindow] = useState<HrSleepWindow | null>(null);
   // Seed synchronously from cache before paint — in a useLayoutEffect, never a useState lazy
   // initializer (cache reads in initializers caused hydration mismatches, session 165). The
@@ -67,7 +68,11 @@ export default function HeartRateDetailPage() {
       d => {
         if (d?.readings?.length) setHrReadings(d.readings)
         setSleepWindow(d?.sleep ?? null)
+        setHrFailed(false)
       },
+      // LB-176 — same line, same fix as `hr-day-card.tsx`: do not explain an absence that did not
+      // happen. This page is the sibling surface for that card and carries the identical copy.
+      { onError: () => setHrFailed(true) },
     ).catch(() => {});
   }, [today]);
 
@@ -143,7 +148,11 @@ export default function HeartRateDetailPage() {
           {hrReadings.length > 0 ? (
             <HrDayChart readings={hrReadings} date={today} sleepWindow={sleepWindow} stressSeries={stress?.series} stressTimezone={tz} />
           ) : (
-            <p className="text-xs text-muted-foreground">No HR captured yet today — the ring records periodically while worn.</p>
+            <p className="text-xs text-muted-foreground">
+              {hrFailed
+                ? "Couldn't load today's heart rate."
+                : 'No HR captured yet today — the ring records periodically while worn.'}
+            </p>
           )}
         </div>
 

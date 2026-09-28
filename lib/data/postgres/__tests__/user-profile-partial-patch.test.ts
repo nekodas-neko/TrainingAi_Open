@@ -53,10 +53,12 @@ describe.skipIf(!canRun)('updateUserProfile is a real partial update', () => {
     expect(r.activity_level).toBe('moderate')
     expect(r.display_name).toBe('Owner')
     expect(r.height_cm).toBe(160)
-    // `pg` hands back a Date for a `date` column in a raw query, not the string it was written as.
-    // Compared as an instant rather than sliced to a string — slicing an ISO string is the banned
-    // UTC-date pattern, and `check:rules` is right to refuse it even here.
-    expect(r.date_of_birth).toEqual(new Date('1993-06-15T00:00:00.000Z'))
+    // `pg` hands back a Date for a `date` column in a raw query, not the string it was written as —
+    // at LOCAL midnight, so as an instant it is 00:00Z on CI and 14:00Z the day before on a machine
+    // in Brisbane (LA-163). Compared as calendar parts in that same local zone, which is what the
+    // column means; slicing an ISO string is the banned UTC-date pattern.
+    const dob = r.date_of_birth as Date
+    expect([dob.getFullYear(), dob.getMonth() + 1, dob.getDate()]).toEqual([1993, 6, 15])
     expect(Number(r.weight_goal_kg)).toBe(60)
     expect(r.sex).toBe('male')
     expect(r.fitness_goal).toBe('recomp')

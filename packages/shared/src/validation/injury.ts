@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isCalendarDate } from '../date-utils'
 
 // Q-484: `POST /api/injuries` had no schema at all while `PATCH /api/injuries/[id]` beside it had a
 // complete one — same table, same fields. A 10 MB `notes` was accepted and stored; `muscleName` was
@@ -20,8 +21,8 @@ const FIELDS = {
   // nothing was broken; the point is that the failure mode is silent, not that it had fired.
   // Callers normalise to dashes before writing — the column is a DATE and `2026/08/09` is
   // DateStyle-dependent, so it must not reach the driver as-is.
-  startedDate:  z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
-  resolvedDate: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).nullable(),
+  startedDate:  z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
+  resolvedDate: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date').nullable(),
 }
 
 /** SEC-I4: the web PATCH forwarded an unvalidated body — the adapter key-whitelists columns (no mass

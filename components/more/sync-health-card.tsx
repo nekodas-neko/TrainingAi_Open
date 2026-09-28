@@ -36,6 +36,9 @@ const DOMAIN_LABELS: Record<PendingMutation['domain'], string> = {
   plan_meal_answers:  'Planned meal answer',
   manual_bedtime:     'Bedtime you entered',
   rest_days:          'Rest day you chose',
+  exercise_log_edit:      'Edited exercise',
+  exercise_log_delete:    'Deleted exercise',
+  workout_session_delete: 'Deleted workout',
 };
 
 export function SyncHealthCard({ userId }: { userId?: string }) {

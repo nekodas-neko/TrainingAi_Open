@@ -656,31 +656,31 @@ domain, a native plugin, safe-area, gestures, or notifications, the merge gate i
 smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
 explicit Known-Issues row in `docs/overview/known-issues.md` marking the change NOT verified on device.
 
-## Migrations that add a table or column — the `claude_ro` twin, and the two tests that catch it
+## Migrations that add a table or column — regenerate `claude-ro-views.sql` in the same PR
 
 `claude_ro` is **default-deny**: a table with no view is unreadable, and the generator emits an
-explicit column list, so a new column on a covered table is invisible to `/api/admin/db-query` until
-the views are rebuilt. Every migration adding a table or column ships its twin **in the same PR**:
+explicit column list, so a new column is invisible to `/api/admin/db-query` until the views are
+rebuilt. Every migration that adds or drops a table or column regenerates the one file, in place:
 
 ```
-node scripts/next-schema-number.js     # what <NEXT-FREE> is — fetches, and reads every branch
-LOCAL_DATABASE_URL=<tcp url> CLAUDE_RO_OWNER_USER_ID=<uuid> \
-  node scripts/generate-claude-ro-views.js \
-  > lib/data/postgres/migrations/<NEXT-FREE>_claude_ro_views_<reason>.sql
+LOCAL_DATABASE_URL=<tcp url> CLAUDE_RO_OWNER_USER_ID=<uuid> node scripts/generate-claude-ro-views.js \
+  > lib/data/postgres/claude-ro-views.sql
 ```
 
-**Take the number from that command — not `ls | tail -1`, not a line in a doc.** A number is reserved
-by the branch holding the file, and an open PR's file is not in the merged tree: `#1608` holds 288/289
-against `main`'s own 288/289 right now (#1620 → BF-211). Always a NEW number (`ensureSchema` tracks by
-filename, so an edited applied migration is skipped forever); diff the twin against its predecessor,
-and **the owner's id must not appear** (Q-456) — views scope on `current_setting('app.claude_ro_owner', true)`.
+**It is not a migration (BF-214, 2026-09-27): overwrite it, and take no number for it.** It was
+re-issued under a new number on every schema change — 59 copies, 92% of the migration corpus — and
+two copies landing together silently destroyed each other. `ensureSchema` and `migrate.js` apply it
+after the migrations whenever its content hash is not in `schema_migrations`. **Never add a
+migration that creates or drops the `claude_ro` schema**: `claude-ro-views-file.test.ts` fails on
+one, and on a file that differs from what the generator emits, so a forgotten column fails CI. Name a
+migration from `node scripts/next-schema-number.js`: a UTC minute, `YYYYMMDDHHMM_<what>.sql` (BF-214 ②;
+appliers sort by leading integer). **The owner's id must not appear in the file** (Q-456).
 
-**⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (this line omitted it until
-LA-161, 2026-09-27). The wrong one does not fail — it generates against the session's dev database,
-and if that has had anything hand-applied, the twin drops real columns. Build a scratch database
-(`CREATE DATABASE` + `node scripts/local-db/migrate.js`) if in doubt.
+**⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (LA-161). The wrong one does not
+fail: it reads the session's dev database, and anything hand-applied there reaches the file. Build a
+scratch database (`CREATE DATABASE` + `node scripts/local-db/migrate.js`) if in doubt.
 
-**⚠ The two tests that catch a missed twin are NOT "CI-only", and believing they were cost a red
+**⚠ The two role/export tests are NOT "CI-only", and believing they were cost a red
 run on 2026-09-20 (TN-54).** `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`
 skip under the full suite, but **not** because local dev lacks the `claude_readonly` role — the
 first one provisions that role itself. They need a **TCP** `DATABASE_URL`: the test reconnects as

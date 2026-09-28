@@ -47,6 +47,8 @@ export interface ApkRelease {
   version: string | null
   /** Commit the APK was built from, short form. Diagnostic only. */
   sha: string | null
+  /** When the current APK was built. BF-111: the APK ASSET's `updated_at`, not the release's
+   *  `published_at` — see `mapApkRelease`. */
   publishedAt: string | null
   apkUrl: string | null
 }
@@ -74,7 +76,7 @@ interface RawRelease {
   name?: string | null
   body?: string | null
   published_at?: string | null
-  assets?: { name: string; browser_download_url: string }[]
+  assets?: { name: string; browser_download_url: string; updated_at?: string | null }[]
 }
 
 /** Release JSON -> the four things we use. Split out so it can be tested without the network. */
@@ -83,7 +85,11 @@ export function mapApkRelease(release: RawRelease): ApkRelease {
   return {
     version: parseNativeReleaseVersion(release.name, release.body),
     sha: parseNativeReleaseSha(release.body),
-    publishedAt: release.published_at ?? null,
+    // BF-111. The rolling release is created once and its asset re-uploaded on every publish, so
+    // `published_at` never moves: measured 2026-09-28, the release reads 2026-08-23 while its APK was
+    // uploaded 2026-09-25. Every build since the first printed "built 23 Aug". The asset's
+    // `updated_at` is the build's own date; the release date is only a fallback with no asset.
+    publishedAt: apk?.updated_at ?? release.published_at ?? null,
     apkUrl: apk?.browser_download_url ?? null,
   }
 }
@@ -97,9 +103,11 @@ export async function fetchLatestApkRelease(): Promise<ApkRelease | null> {
 }
 
 /**
- * As `fetchLatestApkRelease`, but says *why* it failed. The release is deleted and recreated on
- * every publish, so a lookup landing in that window legitimately 404s — which is a transient
- * condition the owner should not go looking for a cause behind.
+ * As `fetchLatestApkRelease`, but says *why* it failed. A lookup can land while the workflow is
+ * replacing the APK asset and briefly see none, which is a transient condition the owner should not
+ * go looking for a cause behind. (This said the release is "deleted and recreated on every publish";
+ * measured 2026-09-28 it is not. It was created on 2026-08-23 and only its asset is replaced, which
+ * is BF-111.)
  */
 export async function lookupLatestApkRelease(): Promise<{ release: ApkRelease | null; status: ApkReleaseStatus }> {
   // No token needed since the repository went public (Q-49). It used to be required — an

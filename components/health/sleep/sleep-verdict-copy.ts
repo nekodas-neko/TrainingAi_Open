@@ -145,3 +145,24 @@ export function verdictCopy(v: StoredSleepVerdict): VerdictCopy {
   const evidence = clauses.length > 0 ? `${CAPITALISE(clauses.join(', '))}. ` : ''
   return { line: `${evidence}Marked this a ${word} night.`, prominent: true }
 }
+
+/**
+ * The verdict the app announced → the 1–5 it stores on the check-in (TN-82).
+ *
+ * **`sleepQualityFeel` runs 1 = slept great … 5 = terrible**, the opposite direction to the scale's
+ * own screen labels, so the three verdicts land in the middle three positions: a verdict is never
+ * the app claiming his best or worst night, only that the night was good, ordinary or poor against
+ * his own bands.
+ *
+ * **One home on purpose.** This is written to the database, so a second copy that disagreed would
+ * put two meanings in one column — the failure `storedOrderLabels` already exists to prevent on the
+ * label side.
+ *
+ * ⛔ **Whatever writes this value writes `touched: false` with it.** The plan's hard constraint
+ * (§4): only a correction sets `touched: true`. An auto-fill that flags itself as touched destroys
+ * the variable this whole design exists to create, and re-creates TN-57 — 91 days of a default
+ * presented back as the owner's own answer.
+ */
+export function verdictToStoredFeel(verdict: SleepVerdict): number {
+  return verdict === 'good' ? 2 : verdict === 'poor' ? 4 : 3
+}

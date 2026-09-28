@@ -38,7 +38,7 @@ Q-525."* Checking whether the rebuild had happened is what turned up the real fi
 | **TN-1 filed** — instrument the granular layer before relaxing any threshold | `docs/implementation-backlog.md` |
 | Session-start size read now splits exact sizes from estimated row counters | `CLAUDE.md` |
 | Baton rewritten at the top; the rule that caused the misread replaced in place | `docs/agents/state/tuning.md` |
-| Journal entry | `docs/overview/entries/2026-08-20-tuning-retract-daily-summary-wipe.md` |
+| Journal entry | `docs/overview/history-2026-08-18.md#2026-08-20-tuning-retract-daily-summary-wipe` |
 | Review linked from both pillar indexes | `docs/domains/{readiness,devices}/README.md` |
 
 ## The finding, in short

@@ -26,6 +26,7 @@ export function HrDayCard() {
   const [hrReadings, setHrReadings] = useState<HrReading[]>([])
   const [sleepWindow, setSleepWindow] = useState<HrSleepWindow | null>(null)
   const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([])
+  const [failed, setFailed] = useState(false)
   // TN-3b — the owner wants stress readable against heart rate on the same clock. Same key the
   // standalone strip uses, so `cachedFetch` de-dupes and this costs no extra request.
   const { data: stress } = useStressDay(today)
@@ -58,7 +59,11 @@ export function HrDayCard() {
       d => {
         if (d?.readings?.length) setHrReadings(d.readings)
         setSleepWindow(d?.sleep ?? null)
+        setFailed(false)
       },
+      // LB-176. Without this the card explained an absence that did not happen — *"the ring records
+      // periodically while worn"* is a fact about the ring, printed because a request failed.
+      { onError: () => setFailed(true) },
     )
     void cachedFetch<{ sessions: WorkoutSession[] }>(
       `workout-sessions-day:${today}`, `/api/workout-sessions/day?date=${today}`, TTL_MEDIUM,
@@ -75,7 +80,11 @@ export function HrDayCard() {
       {hrReadings.length > 0 ? (
         <HrDayChart readings={hrReadings} date={today} workoutSessions={workoutSessions} sleepWindow={sleepWindow} stressSeries={stress?.series} stressTimezone={tz} />
       ) : (
-        <p className="text-xs text-muted-foreground">No HR captured yet today — the ring records periodically while worn.</p>
+        <p className="text-xs text-muted-foreground">
+          {failed
+            ? "Couldn't load today's heart rate."
+            : 'No HR captured yet today — the ring records periodically while worn.'}
+        </p>
       )}
     </div>
   )

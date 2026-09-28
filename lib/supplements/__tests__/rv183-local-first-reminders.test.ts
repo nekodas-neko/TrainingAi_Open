@@ -73,12 +73,32 @@ describe('RV-183 — the reconcile reads the device first', () => {
 })
 
 describe('RV-183 — the More tab no longer claims a free re-show', () => {
-  it('neither of its fetches passes freshWithinTtl, so the old comment was false', () => {
+  /**
+   * This asserted that NEITHER fetch passed `freshWithinTtl`, as a tripwire: its comment said the flag
+   * must not appear until CLAUDE.md's written invalidation proof existed. **The tripwire fired on
+   * exactly the change it was watching for, and the proof was then written** — `more-seasons` is a pure
+   * read of two stored tables with no writer anywhere in the repo, so it now carries the flag
+   * (2026-09-28). The condition was satisfied rather than bypassed, so this narrows to the half that is
+   * still unproven instead of being deleted.
+   *
+   * `app/__tests__/rv183-more-seasons-ttl.test.ts` owns the proof itself and fails if any of it stops
+   * holding. What stays here is the part this file has always been about: the More screen's two keys.
+   */
+  it('still fetches both keys', () => {
     const src = code('app/more/more-content.tsx')
     expect(src).toMatch(/'more-user-profile'/)
     expect(src).toMatch(/'more-seasons'/)
-    // If someone adds freshWithinTtl here, the corrected comment above it goes stale in the other
-    // direction — and CLAUDE.md wants a written invalidation proof before that happens.
-    expect(src).not.toMatch(/freshWithinTtl/)
+  })
+
+  it('more-user-profile still pays for its re-show, because it has no proof yet', () => {
+    // Its payload carries `countWorkoutSessions()` — a derivation no completion-path group clears —
+    // so the flag here would be up to 30 minutes of a stale identity block. `LB-180` removes that
+    // dead field; until it lands this must keep revalidating.
+    const src = code('app/more/more-content.tsx')
+    const at = src.indexOf("'more-user-profile', '/api/user/profile'")
+    const next = src.indexOf("'more-seasons', '/api/seasons'")
+    expect(at).toBeGreaterThan(-1)
+    expect(at, 'the two calls swapped order — re-bound this slice').toBeLessThan(next)
+    expect(src.slice(at, next), 'see LB-180 before flagging this one').not.toMatch(/freshWithinTtl/)
   })
 })

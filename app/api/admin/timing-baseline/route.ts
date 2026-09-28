@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 
 // One date.
 const MAX_BODY_BYTES = 4 * 1024
@@ -26,7 +27,7 @@ export async function GET() {
 // Both separators — see Q-130; localDateString() emits slashes.
 // `.strict()` (Q-464): the one client, `components/admin/time-audit-card.tsx`, sends exactly
 // `{ date }`. A mistyped key here would otherwise be dropped and answered `200`.
-const bodySchema = z.object({ date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).nullable() }).strict()
+const bodySchema = z.object({ date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date').nullable() }).strict()
 
 export async function POST(req: NextRequest) {
   const session = await auth()

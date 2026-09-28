@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { useReportBannerPresence } from '@/components/home/home-banner-presence'
 import { invalidateOuraWorkoutReview } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
@@ -46,6 +47,10 @@ export function ExerciseDetectedCard({ onReview }: Props) {
       })
     }
   }, [detected, addOuraSession])
+
+  // RV-119 — above the early return, because a hook cannot be skipped. Outside Home's provider this
+  // is a no-op, so the card still works wherever else it is rendered.
+  useReportBannerPresence('exerciseDetected', pendingSessions.length > 0)
 
   if (!pendingSessions.length) return null
 

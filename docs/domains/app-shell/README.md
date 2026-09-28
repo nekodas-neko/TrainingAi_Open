@@ -30,7 +30,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   notification retarget. **RV-201 then removed the model entirely (2026-09-26)** — the route is a
   `GET`, the prose comes from `buildWeeklyDigestText`, and Home's banner and the week page share
   one cached `weekly-digest:<week>` entry, which is what lets the page paint without a network.
-  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md).
+  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/history-2026-09-27-folded-3.md#2026-09-26-rv201-weekly-digest-offline).
   Read §1 before touching the plan, because three of the original backlog entry's claims about the
   code were stale even then.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
@@ -487,27 +487,27 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
-- **[`docs/overview/entries/2026-09-27-rv215-loading-states.md`](../../overview/entries/2026-09-27-rv215-loading-states.md)**
+- **[`2026-09-27-rv215-loading-states`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv215-loading-states)**
   — RV-215 ①. Weekly stats' skeleton could not end on a failed fetch (`cachedFetchToday` swallows
   `!res.ok` without `onError`); the error branch must be checked BEFORE `loading`, because a
   failure leaves `data` null and the skeleton would otherwise still win. Also why item ②'s "12
   components" count is unreliable — a `return null` while loading is a defer, not a vanish.
-- **[`docs/overview/entries/2026-09-27-rv211-empty-account-claims.md`](../../overview/entries/2026-09-27-rv211-empty-account-claims.md)**
+- **[`2026-09-27-rv211-empty-account-claims`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv211-empty-account-claims)**
   — RV-211 ①②③. Home's empty-account states: no week-in-review banner for an empty week, Body
   Battery's "No data yet" instead of a band, "—" instead of "rest" with no program. Also why item ⑤
   is **not** a defect — the "stray dot" is one of 18 `Math.random()` background stars — and why the
   progress bar (which no source guard caught) is the case for the e2e render.
-- **[`docs/overview/entries/2026-09-27-rv210-keyboard-and-viewport.md`](../../overview/entries/2026-09-27-rv210-keyboard-and-viewport.md)**
+- **[`2026-09-27-rv210-keyboard-and-viewport`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv210-keyboard-and-viewport)**
   — RV-210. `interactive-widget=resizes-content`, all 23 `vh` sheet heights to `dvh` (22 others were
   already there — an unrecorded 22/23 split), and `enterKeyHint="done"` on all 42 numeric inputs.
   Guarded by `check-keyboard-viewport.js`, which holds both source conditions at once because either
   alone is a half-fix. **None of it is verifiable in the sandbox** — no soft keyboard exists there.
-- **[`docs/overview/entries/2026-09-27-rv209-type-scale-floor.md`](../../overview/entries/2026-09-27-rv209-type-scale-floor.md)**
+- **[`2026-09-27-rv209-type-scale-floor`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv209-type-scale-floor)**
   — RV-209 steps 1–2. `--text-2xs: 11px` is the floor of the type scale (42 sizes, 1,035 uses under
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
-- **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
+- **[`2026-09-27-rv208-numbers-and-durations`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv208-numbers-and-durations)**
   — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
   casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
@@ -581,3 +581,24 @@ Live at the time of writing (2026-07-30):
   Defaults a call site must not be able to break belong on an **inner** element it cannot reach;
   `components/ui/sheet.tsx` does this for the close button's 64px corner and says why. Related:
   `SheetContent side="bottom"` bakes the bottom inset and `p-0` does not strip it.
+
+- **[`2026-09-28-movement-balance-palette-clash`](../../overview/entries/2026-09-28-movement-balance-palette-clash.md)**
+  — **RV-208 ③: category colours stopped borrowing session colours, and the hue space is
+  over-subscribed.** Movement Balance coloured `legs` `--accent-green` (**0°** from session green)
+  and `pull` `--accent-purple` (**10°** from session purple, **20°** from indigo), while the calendar
+  two cards up colours sessions by POSITION — so the same three words carried two maps, transposed.
+  **The entry's "add two new hues" was not available:** a candidate must clear `SESSION_PALETTE`'s
+  six Tailwind hues *and* four `--accent-*` tokens, and scanning the wheel leaves one comfortable
+  band (~345°) at 40° separation. So the rows keep their labels and share one accent — hue was
+  redundant encoding. `rv208-movement-category-hues.test.ts` asserts the arithmetic against
+  `globals.css`, not the literals. **Before adding any category palette, scan both systems first.**
+
+- **[`2026-09-28-home-banner-strip`](../../overview/entries/2026-09-28-home-banner-strip.md)**
+  — **RV-119: Home's banners split by severity, four behind one strip.** Illness advisory and early
+  deload stay full-width; activity-to-review, goals check-in, day review and weekly recap collapse.
+  **Read this before adding any Home banner:** two of the four decide their own visibility and
+  `return null`, so the strip counts a **registry** they report into
+  (`useReportBannerPresence`) rather than anything the parent can see — and the two the stack
+  controls are reported by the stack, which is the half that undercounts the strip **silently** when
+  missed. The four are hidden, never unmounted: that is what keeps them in the registry *and* keeps
+  their own dismiss controls, which the entry expected to lose.

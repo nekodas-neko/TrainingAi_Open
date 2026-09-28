@@ -1,27 +1,33 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { createScrimController } from '@/lib/shell/status-bar-scrim-controller'
 
 /**
- * DV-6 — a gradient behind the status bar, once, in the shell.
+ * DV-6 — a gradient behind the status bar, once, for the whole app.
  *
  * The owner was offered a solid strip and chose the fade, so the app stays edge-to-edge and nothing
- * loses the ~28 px a flat backing costs. It lives here rather than on each screen because a
- * per-screen scrim is a rule every future screen can forget — which is how the defect reached a
- * device sweep in the first place.
+ * loses the ~28 px a flat backing costs. It lives in the ROOT LAYOUT rather than on each screen
+ * because a per-screen scrim is a rule every future screen can forget — which is how the defect
+ * reached a device sweep in the first place. DV-6 mounted it in `tab-shell.tsx`, one layer too low:
+ * a pushed route is not inside that shell, so `/health/sleep` scrolled under the clock with no
+ * backing at all (DV-22). `app/layout.tsx` is the only parent every route shares — this app has
+ * exactly one layout file.
  *
- * **There is no document scroll to listen to.** Every tab scrolls its own inner container (three
- * through `PullToSync`, Nutrition its own), and `scroll` does not bubble. It *does* reach a
- * listener registered in the CAPTURE phase on an ancestor, which is what lets one listener here
- * cover all five panels with no per-screen opt-in.
+ * **Scroll does not bubble**, but it does reach a listener registered in the CAPTURE phase on an
+ * ancestor, which is what lets one listener here cover every screen with no per-screen opt-in. The
+ * two kinds of screen scroll differently and the controller handles both: a tab scrolls its own
+ * inner container (three through `PullToSync`, Nutrition its own), a pushed route scrolls the
+ * document itself.
  *
  * The decision logic is in `lib/shell/status-bar-scrim-controller.ts` so it can be tested — the
  * vitest projects here cannot transform `.tsx`. Opacity is written straight to the node rather
  * than held in state: this runs on every scroll frame on a Samsung WebView.
  */
-export function StatusBarScrim({ activeKey }: { activeKey: string }) {
+export function StatusBarScrim() {
   const ref = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
 
   useEffect(() => {
     const controller = createScrimController(shown => {
@@ -30,8 +36,22 @@ export function StatusBarScrim({ activeKey }: { activeKey: string }) {
     })
     controller.reevaluate()
     document.addEventListener('scroll', controller.onScroll, true)
-    return () => document.removeEventListener('scroll', controller.onScroll, true)
-  }, [activeKey])
+
+    // Two things change what is on screen WITHOUT firing a scroll event, and each needs its own
+    // signal now that there is no `activeKey` prop to key the effect on.
+    //
+    // A route change is `pathname`, above. A TAB change is not: the shell swaps panels with a raw
+    // `history.replaceState`, which the App Router does not observe, so `usePathname` cannot be
+    // relied on for it. The attribute the shell flips is the signal, and an `attributeFilter`
+    // observer fires only for that attribute rather than on every render in the subtree.
+    const observer = new MutationObserver(() => controller.reevaluate())
+    observer.observe(document.body, { subtree: true, attributeFilter: ['data-tab-active'] })
+
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('scroll', controller.onScroll, true)
+    }
+  }, [pathname])
 
   return (
     <div

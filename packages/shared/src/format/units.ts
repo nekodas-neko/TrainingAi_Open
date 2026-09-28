@@ -39,10 +39,24 @@ function roundTo(value: number, decimals: number): number {
  * `decimals` for a surface that genuinely wants more or less — the stats grid's whole-number
  * summary is a deliberate choice, not drift, so it asks for `0` rather than being overridden here.
  */
-export function formatKg(kg: number, opts?: { decimals?: number; unit?: boolean }): string {
+export function formatKg(kg: number, opts?: { decimals?: number; unit?: boolean; trim?: boolean }): string {
   const decimals = opts?.decimals ?? 1
-  const value = roundTo(kg, decimals).toFixed(decimals)
+  const fixed = roundTo(kg, decimals).toFixed(decimals)
+  // `trim` drops trailing zeros AFTER rounding: 68.0 → "68", 67.50 → "67.5". Off by default, because
+  // a tabular column of body weights wants the padding (see the tests).
+  const value = opts?.trim ? String(Number(fixed)) : fixed
   return opts?.unit === false ? value : `${value} kg`
+}
+
+/**
+ * A lifted load, as `68 kg` / `67.5 kg` / `71.25 kg` (RV-208 ②).
+ *
+ * Not `formatKg`'s default: a padded tenth turns a set's `68kg` into `68.0 kg`, which is worse, and
+ * rounding to one decimal turns a 1.25 kg plate step into `71.3`. Two decimals, trimmed, is exact for
+ * every plate increment and shows none that are not there.
+ */
+export function formatLoadKg(kg: number, opts?: { unit?: boolean }): string {
+  return formatKg(kg, { decimals: 2, trim: true, unit: opts?.unit })
 }
 
 /**

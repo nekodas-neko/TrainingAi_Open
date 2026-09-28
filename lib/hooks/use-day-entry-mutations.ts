@@ -42,30 +42,45 @@ export function useDayEntryMutations(
     const ex = editEx;
     const date = currentDate();
     setMutating(true);
-    // Feedback-first (PERF-10): close + toast synchronously, don't wait on the
-    // network round-trip.
-    toast.success("Updated");
-    setEditEx(null);
+    const store = userId ? getLocalStore(userId) : null;
+    const sets = ex.weights.map((weightKg, i) => ({
+      setNumber: i + 1, weightKg, reps: ex.reps[i] ?? 0,
+    }));
     try {
+      if (store) {
+        // LA-166: write locally in PENDING mode and queue, so this survives offline. It used to
+        // `fetch` first and mirror only after a 2xx, which offline toasted "Updated", then
+        // "Failed to update", and queued nothing — the edit was simply gone.
+        //
+        // `pending`, not the default `synced`: a row left synced is one a pull may clobber before
+        // the push lands. It moves to synced on push confirmation.
+        await store.updateExerciseLogLocally(ex.ex.exerciseLogId, sets, { pending: true });
+        await store.queueMutation({
+          userId: userId!, domain: 'exercise_log_edit', date: todayInTz(tz),
+          payload: { exerciseLogId: ex.ex.exerciseLogId, weights: ex.weights, reps: ex.reps },
+        });
+        // Feedback fires after the LOCAL write, never after the network — the saves-feel-instant
+        // rule, and offline there is no network to wait for.
+        toast.success("Updated");
+        setEditEx(null);
+        await invalidateWorkoutSummaries().catch(() => {});
+        onChanged(date);
+        pushThenRevalidate(userId!, async () => {
+          await invalidateWorkoutSummaries().catch(() => {});
+          onChanged(currentDate());
+        });
+        return;
+      }
+      // Web fallback, logic-free by policy: the sandbox has no local store, so `pnpm dev` still
+      // renders. It carries no defaults or semantics the device path lacks.
+      toast.success("Updated");
+      setEditEx(null);
       const res = await fetch("/api/workout-entry", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exerciseLogId: ex.ex.exerciseLogId, weights: ex.weights, reps: ex.reps }),
       });
       if (!res.ok) throw new Error();
-      // Mirror into the local store so this device's own render reflects the edit
-      // immediately instead of waiting for the next pull (SYNC-R4).
-      if (userId) {
-        const store = getLocalStore(userId);
-        if (store) {
-          // intensityPct omitted (not set to null) — the server recomputes it from the
-          // new weights/1RM; the mirror must not clobber that with a bare null (SYNC-4).
-          const sets = ex.weights.map((weightKg, i) => ({
-            setNumber: i + 1, weightKg, reps: ex.reps[i] ?? 0,
-          }));
-          await store.updateExerciseLogLocally(ex.ex.exerciseLogId, sets);
-        }
-      }
       // weights-summary/strength-trend/exercise-history/progress-summary all derive from this edit
       // too, not just the mid-session-log subset invalidateExerciseLogged covers (CCH-2/SYN-9).
       await invalidateWorkoutSummaries().catch(() => {});
@@ -77,37 +92,49 @@ export function useDayEntryMutations(
       onChanged(date);
     }
     finally { setMutating(false); }
-  }, [editEx, currentDate, onChanged, userId]);
+  }, [editEx, currentDate, onChanged, userId, tz]);
 
   const handleDeleteExercise = useCallback(async () => {
     if (!deleteEx) return;
     const ex = deleteEx;
     const date = currentDate();
     setMutating(true);
-    toast.success("Deleted");
-    setDeleteEx(null);
+    const store = userId ? getLocalStore(userId) : null;
     try {
+      if (store) {
+        // LA-166, same shape as the edit above and as `handleDeleteActivity` (Q-328).
+        //
+        // **The session cascade is deliberately NOT mirrored here.** Online, the response says
+        // whether this was the session's last exercise and the shell is tombstoned with it. Offline
+        // nothing can know that, and the server's own `deleteExerciseLog` cascades when the push
+        // lands — so an empty session can linger on this device until the next pull reaps it.
+        // Queuing a second `workout_session_delete` to close that window would double-delete
+        // whenever the guess is wrong, which is worse than a shell that self-heals.
+        await store.deleteExerciseLogLocally(ex.exerciseLogId, { pending: true });
+        await store.queueMutation({
+          userId: userId!, domain: 'exercise_log_delete', date: todayInTz(tz),
+          payload: { exerciseLogId: ex.exerciseLogId },
+        });
+        toast.success("Deleted");
+        setDeleteEx(null);
+        await invalidateWorkoutSummaries().catch(() => {});
+        onChanged(date);
+        pushThenRevalidate(userId!, async () => {
+          await invalidateWorkoutSummaries().catch(() => {});
+          onChanged(currentDate());
+        });
+        return;
+      }
+      // Web fallback, logic-free by policy: the sandbox has no local store, so `pnpm dev` still
+      // renders. It carries no defaults or semantics the device path lacks.
+      toast.success("Deleted");
+      setDeleteEx(null);
       const res = await fetch("/api/workout-entry", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exerciseLogId: ex.exerciseLogId }),
       });
       if (!res.ok) throw new Error();
-      const resBody = await res.json().catch(() => null) as { sessionDeleted?: boolean } | null;
-      // Mirror into the local store so it vanishes from this device's own render
-      // immediately instead of resurrecting until the next pull (SYNC-R4). If this
-      // was the session's last exercise, the server also tombstoned the whole
-      // session (SYN-2) — mirror that too, or the empty shell lingers locally.
-      if (userId) {
-        const store = getLocalStore(userId);
-        if (store) {
-          if (resBody?.sessionDeleted && ex.workoutSessionId) {
-            await store.deleteWorkoutSessionLocally(ex.workoutSessionId);
-          } else {
-            await store.deleteExerciseLogLocally(ex.exerciseLogId);
-          }
-        }
-      }
       // Deleting a session decrements its AI-periodization phase counter server-side;
       // clear the derived caches (periodization overview, training load, timeline, …)
       // so the stale "N sessions" count refreshes instead of sticking for 30 min.
@@ -119,29 +146,41 @@ export function useDayEntryMutations(
       onChanged(date);
     }
     finally { setMutating(false); }
-  }, [deleteEx, currentDate, onChanged, userId]);
+  }, [deleteEx, currentDate, onChanged, userId, tz]);
 
   const handleDeleteSession = useCallback(async () => {
     if (!deleteSession) return;
     const session = deleteSession;
     const date = currentDate();
     setMutating(true);
-    toast.success("Session deleted");
-    setDeleteSession(null);
+    const store = userId ? getLocalStore(userId) : null;
     try {
+      if (store) {
+        await store.deleteWorkoutSessionLocally(session.id, { pending: true });
+        await store.queueMutation({
+          userId: userId!, domain: 'workout_session_delete', date: todayInTz(tz),
+          payload: { workoutSessionId: session.id },
+        });
+        toast.success("Session deleted");
+        setDeleteSession(null);
+        await invalidateWorkoutSummaries().catch(() => {});
+        onChanged(date);
+        pushThenRevalidate(userId!, async () => {
+          await invalidateWorkoutSummaries().catch(() => {});
+          onChanged(currentDate());
+        });
+        return;
+      }
+      // Web fallback, logic-free by policy: the sandbox has no local store, so `pnpm dev` still
+      // renders. It carries no defaults or semantics the device path lacks.
+      toast.success("Session deleted");
+      setDeleteSession(null);
       const res = await fetch("/api/workout-sessions", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workoutSessionId: session.id }),
       });
       if (!res.ok) throw new Error();
-      // Mirror into the local store (SYN-2) so the empty session shell disappears
-      // from this device's own render immediately instead of resurrecting until
-      // the next pull.
-      if (userId) {
-        const store = getLocalStore(userId);
-        if (store) await store.deleteWorkoutSessionLocally(session.id);
-      }
       // Deleting a whole session shifts phase counters, training load, timeline
       // and history counts — clear derived caches so they don't serve stale totals.
       await invalidateWorkoutSummaries().catch(() => {});
@@ -152,7 +191,7 @@ export function useDayEntryMutations(
       onChanged(date);
     }
     finally { setMutating(false); }
-  }, [deleteSession, currentDate, onChanged, userId]);
+  }, [deleteSession, currentDate, onChanged, userId, tz]);
 
   const handleDeleteActivity = useCallback(async () => {
     if (!deleteActivity) return;

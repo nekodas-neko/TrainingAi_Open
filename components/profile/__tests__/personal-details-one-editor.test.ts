@@ -93,7 +93,7 @@ function writersOf(field: string): string[] {
       const src = code(file)
       if (!src.includes('/api/user/profile')) continue
       if (!/method:\s*'PATCH'/.test(src)) continue
-      if (new RegExp(`\\b${field}\\s*:`).test(requestBodies(src))) found.push(file.slice(ROOT.length + 1))
+      if (new RegExp(`\\b${field}\\s*:`).test(requestBodies(src))) found.push(file.slice(ROOT.length + 1).replace(/\\/g, '/'))
     }
   }
   return found.sort()

@@ -1720,6 +1720,9 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   activityScore: 'activity_score', activityContributors: 'activity_contributors', activeCaloriesEst: 'active_calories_est',
   trainingLoadOts: 'training_load_ots', trainingLoadHigh: 'training_load_high', trainingLoadGate: 'training_load_gate',
   trainingLoadGridLen: 'training_load_grid_len', trainingLoadValidMin: 'training_load_valid_min',
+  // LA-170. Server-only on the same terms as `acwr` below: absent from the device mirror, so a device
+  // never sends it and the COALESCE leaves the route's stamp alone.
+  trainingLoadEvaluatedAt: 'training_load_evaluated_at',
   // TN-64(a). Present here and in the pushMutations branch, so a device that sends it is honoured
   // and the `DERIVED_COLS` drift tripwire is satisfied — but deliberately absent from the DEVICE's
   // local mirror, because nothing there computes or reads it. A device therefore never sends it,
@@ -1788,6 +1791,7 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     trainingLoadGate: r.trainingLoadGate,
     trainingLoadGridLen: r.trainingLoadGridLen,
     trainingLoadValidMin: r.trainingLoadValidMin,
+    trainingLoadEvaluatedAt: r.trainingLoadEvaluatedAt ?? null,
     recoveryIndexHours: r.recoveryIndexHours,
     wornHoursBle: r.wornHoursBle,
     nightHrvBaselineMs: r.nightHrvBaselineMs,
@@ -2167,7 +2171,7 @@ export async function replaceDaytimeStressBuckets(
       //
       // `setWhere` is scoped to the user per CLAUDE.md's standing rule for `onConflictDoUpdate`
       // arms. **It is redundant here, and that is recorded rather than left to look load-bearing**
-      // — the primary key is `(user_id, bucket_start)`, so one user's insert cannot conflict with
+      // — the primary key is `(user_id, bucket_mid)`, so one user's insert cannot conflict with
       // another user's row. Verified by deleting this line and re-running the suite: nothing
       // changed. It stays as cheap insurance against the key ever narrowing.
       setWhere: eq(s.ouraDaytimeStressBuckets.userId, userId),

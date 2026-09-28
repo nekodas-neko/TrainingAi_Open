@@ -50,7 +50,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows, program,
-    hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin,
+    hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin, userGoals,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
@@ -69,6 +69,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     // finding Q-16) — it sits in the audit context so "what the model said" and "what it felt
     // like" are readable side by side on the same day.
     repo.getDayCheckin(userId, date, 'morning'),
+    // Q-524: the audit must score steps against the same goal the live route does.
+    repo.getUserGoals(userId).catch(() => null),
   ])
 
   // Everything below is scoped to the audited day, never "today".
@@ -106,6 +108,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     ageYears,
     sex: user?.sex ?? null,
     activityLevel: user?.activityLevel ?? null,
+    stepsGoal: userGoals?.stepsGoal ?? null,
   }
   const goals = getDailyGoals(goalProfile)
 

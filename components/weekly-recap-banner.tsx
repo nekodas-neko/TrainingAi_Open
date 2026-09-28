@@ -6,6 +6,7 @@ import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useReportBannerPresence } from "@/components/home/home-banner-presence";
 import { WEEKLY_DIGEST_TTL } from "@trainingai/shared/cache-ttl";
 import type { WeeklyDigestMetrics } from "@trainingai/shared/health/weekly-digest-metrics";
 import { weekHasAnything } from "@/components/health/week/week-has-data";
@@ -86,6 +87,12 @@ function WeeklyRecapBannerContent(
     setError(false);
     setReloadToken(t => t + 1);
   }, []);
+
+  // RV-119 — reported from the CHILD, not the parent: the parent knows only `dismissed`, while
+  // whether a recap exists at all is decided here. A dismissed week does not mount this component,
+  // so the hook's own cleanup takes it out of the strip. Above every early return, as hooks must be.
+  const hasSomethingToSay = (isLoading || !!content || error) && !emptyWeek
+  useReportBannerPresence('weeklyRecap', hasSomethingToSay)
 
   if (!isLoading && !content && !error) return null;
   // Nothing happened, so there is nothing to announce. Safe above the error branch below: a failed
