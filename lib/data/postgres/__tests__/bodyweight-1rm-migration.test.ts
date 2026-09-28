@@ -8,7 +8,7 @@
 // Runs only against a real Postgres. NOTE: CI's "Tests" job DOES set DATABASE_URL, so these run
 // there; reproduce CI locally by setting it too, or vitest silently skips ~49 tests.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -84,7 +84,7 @@ describe.skipIf(!canRun)('migration 148 — bodyweight PR re-derive (Q-12)', () 
       [USER_A, USER_B, EX_NAME],
     )
 
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     const rows = (await pool.query(
       `SELECT user_id, estimated_1rm, achieved_at FROM personal_records WHERE exercise_name = $1`,
@@ -101,7 +101,7 @@ describe.skipIf(!canRun)('migration 148 — bodyweight PR re-derive (Q-12)', () 
     const before = (await pool.query(
       `SELECT user_id, estimated_1rm, achieved_at FROM personal_records WHERE exercise_name = $1 ORDER BY user_id`,
       [EX_NAME])).rows
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const after = (await pool.query(
       `SELECT user_id, estimated_1rm, achieved_at FROM personal_records WHERE exercise_name = $1 ORDER BY user_id`,
       [EX_NAME])).rows
@@ -119,7 +119,7 @@ describe.skipIf(!canRun)('migration 148 — bodyweight PR re-derive (Q-12)', () 
        VALUES ($1, $2, 400, 320, 0, now())`,
       [ws.rows[0].id, EX_NAME],
     )
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const [row] = (await pool.query(
       `SELECT estimated_1rm FROM personal_records WHERE user_id = $1 AND exercise_name = $2`,
       [USER_A, EX_NAME])).rows
@@ -131,7 +131,7 @@ describe.skipIf(!canRun)('migration 148 — bodyweight PR re-derive (Q-12)', () 
     // rather than error or touch unrelated logs.
     const before = (await pool.query(
       `SELECT count(*)::int AS n FROM exercise_logs WHERE exercise_name = $1`, [EX_NAME])).rows[0].n
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const after = (await pool.query(
       `SELECT count(*)::int AS n FROM exercise_logs WHERE exercise_name = $1`, [EX_NAME])).rows[0].n
     expect(after).toBe(before)
