@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.4",
+    date: "2026-09-28",
+    changes: [
+      "Fixed (needs the new app version): coming back to the app could show a mostly blank screen until you scrolled. The app now makes the screen re-measure itself as it comes back. If you still see a blank screen, it records which part was stuck so the next fix can target it.",
+    ],
+  },
+  {
     version: "1.478.3",
     date: "2026-09-28",
     changes: [
