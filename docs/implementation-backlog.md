@@ -946,35 +946,6 @@ below threshold and left in place for next time.
   override until the derived number has been right for a month.
 
 
-### [platform] OR-202 — `next-schema-number.js` prints an unreadable wall, and it is the tool we tell contributors to run
-
-- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, found while answering an outside
-  contributor's question about the migration-numbering workflow (`jsboiss`, issue #1620).
-- **Two defects, one already fixed here.**
-  **① FIXED 2026-09-28:** `check-migration-numbers.js` and `migration-claims.js` told the
-  reader to run **`node scripts/next-migration-number.js`**, which **does not exist** — the file is
-  `next-schema-number.js`. That message is what a contributor sees when the duplicate check fails,
-  so the one moment the guidance matters most, it named a missing script. The script also
-  mislabelled itself in its own no-refs fallback. Three references corrected.
-  **② OPEN, and the reason for this entry:** the tool's output is effectively unreadable. A single
-  run prints lines hundreds of characters wide — number `274` alone reports the *same* filename
-  across **44 branches** — because dozens of stale branches still carry the 59
-  `claude_ro_views_*` migrations that `BF-214` deleted on 2026-09-27. Every one is a phantom: the
-  pattern no longer exists on `main`.
-- **Why it matters beyond tidiness.** A real collision is in there — `284: merged 284_sleep_verdicts
-  vs origin/health-sample-storage: 284_apple_health_samples` — and it is invisible between two
-  paragraphs of noise. A tool whose true finding cannot be seen is not doing its job, and this is
-  the one we point outside contributors at.
-- **Recommendation: collapse identical claims and ignore branches whose only claim is a deleted
-  pattern.** Print `274: 44 branches, same file` on one line rather than 44 names, and skip a
-  number whose claimants are all `claude_ro_views_*`, since no such migration can be valid now —
-  `claude-ro-views-file.test.ts` fails any PR that adds one.
-  **Alternative — prune the stale branches instead.** Cleaner in principle and it fixes the cause;
-  against it, the branches are other agents' unmerged work and the tool should be robust to them
-  existing. Do both eventually; do the output first, because it is the half that is safe.
-- **Reversal cost: low** — read-only reporting script, never a CI gate.
-
-
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
 
 - **Lane: O** · **Added:** 2026-09-26 · PS session (cat collection art). Ungated on purpose: getting
