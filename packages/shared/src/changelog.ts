@@ -6,6 +6,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.1",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: every card on Home was announced to screen readers as a disabled button and took a keyboard tab stop that did nothing \u2014 a side effect of making the sections drag-to-reorder. They are now only announced that way while you are actually rearranging them.",
+    ],
+  },
+  {
+    version: "1.478.0",
+    date: "2026-09-28",
+    changes: [
+      "New: opening the app, or coming back to it, now asks your ring for its latest data instead of waiting for the hourly sync. Your sleep, heart rate and steps fill in 10–40 seconds after opening, not on the first screen. It only happens if the ring hasn't synced in the last 10 minutes, so switching apps back and forth costs one sync. Needs the new app version.",
+    ],
+  },
+  {
+    version: "1.477.34",
+    date: "2026-09-28",
+    changes: [
+      "The Norwegian 4×4 run now describes its intervals the way the app actually sets them: Zone 4–5, meaning 80–100% of your heart-rate reserve. It used to say 85–95% of max heart rate, which is about 20 bpm below the target it gave you.",
+    ],
+  },
+  {
+    version: "1.477.33",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: an exercise added without choosing a role used to become a Main lift, loaded at the heaviest percentage with a to-failure last set. It is now Accessory until you change it, so a movement nobody classified is under-loaded rather than over-loaded. Roles you have already set are not touched.",
+    ],
+  },
+  {
     version: "1.477.32",
     date: "2026-09-28",
     changes: [

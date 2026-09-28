@@ -39,8 +39,16 @@ test('an account with no data gets the Limited data badge, and the payload agree
   await page.goto('/')
   await settleRouteBoundary(page)
 
-  const badge = page.getByText('Limited data').first()
-  await expect(badge, 'the card must qualify a number it cannot support').toBeVisible({ timeout: 60_000 })
+  // **"No data yet", not "Limited data" (LA-176).** This asserted the badge until 2026-09-28 and had
+  // been failing since RV-211 ② made the treatment STRONGER for exactly this case: with
+  // `hasData: false` the card drops the band, the figure and the trend, and says "No data yet" —
+  // and suppresses the badge as `lowData && !noData`, calling it *"redundant beside 'No data yet',
+  // which is the stronger statement of the same thing"*. RV-38's requirement is unchanged and still
+  // asserted; what satisfies it moved. A sparse-but-present day still gets the badge, which is
+  // `lowData`'s remaining job and is not this fixture.
+  const qualifier = page.getByText('No data yet').first()
+  await expect(qualifier, 'the card must qualify a number it cannot support').toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText('Limited data'), 'the weaker qualifier must not appear beside it').toHaveCount(0)
 
   // The payload half. Asserted AFTER the badge so a failure reads "the card is wrong" rather than
   // "the fixture is wrong" — and so the wait above has already given the response time to land.

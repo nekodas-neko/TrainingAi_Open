@@ -79,15 +79,22 @@ test('the library toggle is offered, and says something different from the check
 
   const toggle = page.getByRole('switch', { name: 'Let the plan use my saved meals' })
   await expect(toggle).toBeVisible()
-  // Off by default: on changes what every generation returns, so it is the user's call.
-  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  // **On by default for an account that HAS saved meals (LB-159).** This asserted `false` until
+  // 2026-09-28 and had been wrong since LB-159 shipped the day before — the seeded account has a
+  // library, so the toggle starts on and the spec failed on every full CI run. It stays off for an
+  // empty library, where it would change nothing; `lb159-library-default.spec.ts` owns that half.
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
 
   // The two controls must not read as the same question. Ticking a meal FORCES it in; the toggle
-  // lets the planner choose — that distinction is the entry's stated requirement.
+  // lets the planner choose — that distinction is the entry's stated requirement, and it is the
+  // paragraph under this heading that carries it.
   await expect(page.getByText('Always include these')).toBeVisible()
-  await toggle.tap()
-  await expect(toggle).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByText(/Ticking a meal forces it in/)).toBeVisible()
+
+  // Both directions, so this still fails if the switch stops switching.
+  await toggle.tap()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByText(/These go into the plan exactly as you saved them/)).toBeVisible()
 })
 
 test('lowering the meal count names the pins that no longer fit instead of dropping them', async ({ page }) => {
