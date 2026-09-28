@@ -47,6 +47,20 @@ describe('computeVolumeAcwr', () => {
     const sessions = [s(daysAgo(10), 500), s(daysAgo(6), 1000), s(daysAgo(2), 3000)]
     expect(computeVolumeAcwr(sessions, todayMid).typicalSessionVolumeKg).toBe(1000)
   })
+
+  // The case above has an ODD count, so it passed under both tie-breaks and pinned neither.
+  // Until LA-151 this took the UPPER of the two middles, which over the owner's real sessions
+  // ran high on 39% of rolling windows — always upward, by up to 21%.
+  it('averages the two middle sessions on an even count, rather than taking the upper', () => {
+    const sessions = [s(daysAgo(10), 500), s(daysAgo(8), 1000), s(daysAgo(6), 3000), s(daysAgo(2), 5000)]
+    expect(computeVolumeAcwr(sessions, todayMid).typicalSessionVolumeKg).toBe(2000)
+  })
+
+  it('reports 0 for a window with no sessions, which the gates already exclude', () => {
+    const r = computeVolumeAcwr([], todayMid)
+    expect(r.typicalSessionVolumeKg).toBe(0)
+    expect(r.acwr, 'an empty window must not produce a ratio').toBe(null)
+  })
 })
 
 describe('acwrBand', () => {

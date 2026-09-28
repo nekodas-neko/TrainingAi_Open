@@ -3,12 +3,13 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { savedMealToEntries, matchSavedMeals } from '../saved-meal-flatten'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** These files explain the nesting decision in prose, so a raw-source match would pass on comments. */
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 const food = (id: string, name: string, calories: number): FoodItem =>
   ({ id, name, calories, proteinG: 0, carbsG: 0, fatG: 0, servingSizeG: 100 } as unknown as FoodItem)

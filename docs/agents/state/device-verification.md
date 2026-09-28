@@ -4,28 +4,33 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-24 · **By:** the sweep-3 session (`device/sweep-3`) · **Next ID:** `DV-19`
+**Updated:** 2026-09-28 · **By:** the Orchestrator, adding the sitting plan under **Next** only —
+**the sweep state above and the rules below are the sweep-4b session's (`device/sweep-4b`,
+2026-09-26) and are untouched.** · **Next ID:** `DV-20`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
 
 - **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`.
-- **Sweep 3 ran** (journal `2026-09-24-device-sweep-3.md`). Answered and closed: RV-128 (answer on
-  RV-113), RV-129 (→ **DV-17**). Verified and removed: BF-95, BF-161, OR-118.
-- **New for Lane B:** DV-16 (phantom "Leave workout?" after a finished workout), DV-17 (meal-plan
-  skeleton on every visit), DV-18 (broken admin reference image). **DV-15 now 3 reproductions**,
-  with a likely mechanism on the entry (Lane A). **BF-61's immediate tap fails.**
-- **DV-12 has a lead** (chart.js label re-measure on every tap); **BF-22 is narrowed** (tab switching
-  does not leak). Phone still on three-button nav.
-
+- **Sweeps 4a + 4b ran** (journals `2026-09-26-device-sweep-4a.md` / `-4b.md`). 15 entries closed.
+  **Still failing:** DV-12 (OR-162 names the two HR-today charts), BF-61 ① (taps <300 ms swallowed),
+  RV-186 ②/③. **New / widened:** DV-19 (one walk, three rows); **DV-8 is common** (36 food delete
+  tombstones stuck `pending`); no `health-alerts` channel (RV-155). Q-11 ran and filled nothing.
+- **Phone:** gesture nav, APK 1.465.52. RV-205/206 gallery: private Artifact (URL on RV-205).
 **Now:** nothing running; the phone is the owner's. I message him with 🔴 before the next sitting.
 
 ## Next
 
-Carry into sweep 4: RV-125 re-run with per-visit attribution; BF-22's counter around writes, sheets,
-pushed routes and sync; BF-49's food row and Health's own timeline; BF-61's meal-list half; Q-300's
-local-vs-server source. Plus: DV-6's look and DV-11's TalkBack (owner), and the admin console items
-(Q-316, BF-10, Q-544, LB-5) **only after DV-13 is closed**.
+**The sitting plan is [`docs/device-sitting-plan-2026-09-28.md`](../../device-sitting-plan-2026-09-28.md)** —
+five sittings, **ordered so the ones most likely to FAIL come first**, covering the 126 owed checks
+and the 10 entries blocked until the phone answers. **Start at Sitting 1** (known failures and
+regressions: `BF-61` ①, `DV-12`/`OR-162`, `RV-186` ②/③, `DV-19`, `DV-8`, `RV-150`, `BF-22`).
+
+**⛔ Outranks the plan's order:** the admin console waits for `DV-13`, and until it closes **never
+open `/admin/oura-ble`** — that parks the whole `admin-console-sitting` batch.
+
+Also still owed from sweeps 4a/4b, folded into the plan: `RV-206` P29–P31 and P35–P38; `RV-155`
+station C and the rest of B/D/E/F; `BF-61`'s meal-list half; `DV-18`'s still-frame half.
 
 ## Rules for every message and every input
 
@@ -45,7 +50,8 @@ RV-45-style throwaway create/delete. **Only what a check needs.** Tooling upgrad
 - **`/api/workout-sessions/day`'s `sessionId` is the PROGRAM session**, not a workout id.
 - **A request count lies for local-first screens** — read the visible number too.
 - **`/api/nutrition/food-logs` returns a bare ARRAY**; **block SW fetches with `Network.setBlockedURLs`**.
-- **After any food delete, re-read the local row** — DV-15 resurrects about one in three.
+- **After any food delete, re-read the local row** (DV-15 fixed; DV-8 leaves some `pending`).
+- **With gesture nav on, start raw swipes at x ≥ 100** — under ~24 px is Android's back gesture.
 - **Captures never leave this machine as images** — the repo is public.
 
 **Claimed paths:** `scripts/device/**` — mine for good (the role owns the harness).

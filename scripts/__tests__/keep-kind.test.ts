@@ -136,3 +136,51 @@ describe('keepIsSettled — the check already happened', () => {
     expect(keepIsSettled({ text: 'the device check, and only that.', gate: null }, [line])).toBe(true)
   })
 })
+
+// LB-161 — the rule's second blind spot, and it is the mirror of the first.
+//
+// Broadening to FAILED (above) made every entry FOUND by a device failure look settled, because the
+// failure IS the original report. DV-2 opens with `❌ FAILED ON THE S25, 2026-09-23`, ships its fix
+// on 09-25, and correctly keeps a `Keep:` for the pass test on that fix — and the advisory told the
+// reader to strike it. An advisory that argues against the entries someone has already got right is
+// one that gets scrolled past, which is the same failure mode the DONE acknowledgement exists for.
+//
+// Position is the evidence, not dates: plenty of these lines carry none, and a date on an outcome
+// can be the date of the report rather than of the look.
+describe('keepIsSettled — an outcome that predates the fix is the original report', () => {
+  const RESIDUE = { text: 'the device pass test above, unchanged.', gate: null } as const
+  const FAILED = '- **❌ FAILED ON THE S25, 2026-09-23.** The dialog absorbed the back.'
+  const FIXED = '- **✅ FIXED 2026-09-25 (v1.465.61), same mechanism as BF-165.**'
+  const VERIFIED = '- **✅ VERIFIED ON THE S25, 2026-09-25** (owner pass): it leaves.'
+
+  it('stays quiet on the DV-2 shape — device-found, then fixed, pass test still owed', () => {
+    expect(keepIsSettled(RESIDUE, [FAILED, FIXED])).toBe(false)
+  })
+
+  it('still fires once a look happens AFTER the fix', () => {
+    expect(keepIsSettled(RESIDUE, [FAILED, FIXED, VERIFIED])).toBe(true)
+  })
+
+  it('still fires when a look is recorded and no fix is claimed at all', () => {
+    expect(keepIsSettled(RESIDUE, [VERIFIED])).toBe(true)
+  })
+
+  // The marker must be the decorated line an implementer writes, not prose about a future fix —
+  // otherwise "ships as one fix with BF-165", which DV-2 also contains, would suppress the rule
+  // wherever it happened to sit.
+  it('does not treat prose about a fix as a shipped marker', () => {
+    const prose = '- **🔎 Re-read against `main` 2026-09-24:** ships as one fix with BF-165.'
+    expect(keepIsSettled(RESIDUE, [VERIFIED, prose])).toBe(true)
+  })
+
+  it('accepts the ⚠ half-shipped marker too, which is how a partial fix is written here', () => {
+    expect(keepIsSettled(RESIDUE, [FAILED, '- **⚠ SHIPPED 2026-09-25 — half of it.**'])).toBe(false)
+  })
+
+  // Both on ONE line, which is how a small entry records a same-day fix-and-look. The comparison
+  // is strictly greater-than for this: the look did happen, so the residue IS settled, and `>=`
+  // would suppress the advisory on exactly the entries it should fire for.
+  it('fires when one line records both the fix and the look', () => {
+    expect(keepIsSettled(RESIDUE, ['- **✅ FIXED and VERIFIED ON THE S25, 2026-09-25.**'])).toBe(true)
+  })
+})

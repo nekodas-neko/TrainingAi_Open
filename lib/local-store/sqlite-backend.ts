@@ -14,6 +14,7 @@ import type { LogExercisePayload } from '@trainingai/shared/workout/log-exercise
 import { resolveLoggedDose } from '@trainingai/shared/nutrition/supplement-dose-freeze';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
 /**
  * The local `ingredients` column is a TEXT mirror of the server's JSONB. A row written by an older
@@ -60,12 +61,31 @@ function foodItemRowToItem(r: Record<string, unknown>): FoodItem {
     sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
     satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
     source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
-    // `image_data_uri` is deliberately NOT read here — see LA-36. It is stored locally and the
-    // server's own searchFoodItems returns it, so the device's local-first read is the one surface
-    // that loses the picture. Fixing that is a visible change on two Lane B screens and wants its
-    // own entry rather than riding a de-duplication PR.
+    barcode: r.barcode ? String(r.barcode) : undefined,
+    // LA-36: the picture BF-35 stores as bytes so it renders offline. The server's rowToFoodItem
+    // returns it from every read, and the local-first read now does too.
+    imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
     region: '', createdAt: new Date(String(r.updated_at)),
   };
+}
+
+/**
+ * Is a mutation OTHER than the ones being confirmed still queued for this row? The confirm guards
+ * (SYN-7) skip flipping a row to 'synced' while one is, so a pull cannot revert an edit still on
+ * its way. **The confirm loop runs BEFORE `deleteMutations` removes the batch**, so without
+ * `confirmingIds` every guard counted the mutation it was confirming and never fired: a session
+ * given an RPE stayed 'pending' for good, until the stranded-workout sweep re-pushed its every
+ * exercise five minutes later just to flip it back (found building LA-165).
+ */
+async function otherQueuedMutations(domains: string[], rowId: string, confirmingIds: string[]): Promise<boolean> {
+  const inDomains = domains.map(() => '?').join(',')
+  const notMine = confirmingIds.length ? ` AND id NOT IN (${confirmingIds.map(() => '?').join(',')})` : ''
+  const [{ cnt }] = await querySQL<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM mutations_outbox
+      WHERE domain IN (${inDomains}) AND payload LIKE '%' || ? || '%'${notMine}`,
+    [...domains, rowId, ...confirmingIds],
+  )
+  return Number(cnt) > 0
 }
 
 export class SQLiteLocalStore implements LocalStore {
@@ -533,14 +553,8 @@ export class SQLiteLocalStore implements LocalStore {
   // applyDelta's synced-row overwrite branch. The LIKE match mirrors
   // getStrandedPendingWorkouts's existing pattern (every relevant payload embeds
   // the workoutSessionId uuid).
-  async markSessionSynced(workoutSessionId: string): Promise<void> {
-    const [{ cnt }] = await querySQL<{ cnt: number }>(
-      `SELECT COUNT(*) AS cnt FROM mutations_outbox
-        WHERE domain IN ('workout_log','session_rpe','complete_workout')
-          AND payload LIKE '%' || ? || '%'`,
-      [workoutSessionId],
-    );
-    if (Number(cnt) > 0) return;
+  async markSessionSynced(workoutSessionId: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['workout_log', 'session_rpe', 'complete_workout'], workoutSessionId, confirmingIds)) return;
     await runSQL(
       `UPDATE workout_sessions SET sync_status='synced' WHERE id=?`,
       [workoutSessionId],
@@ -699,6 +713,8 @@ export class SQLiteLocalStore implements LocalStore {
       trainingLoadOts:                (r.training_load_ots as number) ?? null,
       trainingLoadGate:               (r.training_load_gate as string) ?? null,
       trainingLoadHigh:               r.training_load_high == null ? null : Boolean(r.training_load_high),
+      trainingLoadGridLen:            (r.training_load_grid_len as number) ?? null,
+      trainingLoadValidMin:           (r.training_load_valid_min as number) ?? null,
       recoveryIndexHours:             (r.recovery_index_hours as number) ?? null,
       wornHoursBle:                   (r.worn_hours_ble as number) ?? null,
       nightHrvBaselineMs:             (r.night_hrv_baseline_ms as number) ?? null,
@@ -732,13 +748,14 @@ export class SQLiteLocalStore implements LocalStore {
       `INSERT INTO oura_daily_derived
          (day, source, model_versions, sleep_score, sleep_contributors, readiness_score,
           readiness_contributors, readiness_source, activity_score, activity_contributors,
-          active_calories_est, training_load_ots, training_load_gate, training_load_high, recovery_index_hours,
+          active_calories_est, training_load_ots, training_load_gate, training_load_high,
+          training_load_grid_len, training_load_valid_min, recovery_index_hours,
           worn_hours_ble, night_hrv_baseline_ms, illness_flag, illness_score, illness_biomarkers,
           daytime_stress_scaled, stress_high_minutes, recovery_high_minutes, chronic_stress_score,
           chronic_stress_contributors, resilience_level, resilience_daily_stress,
           resilience_daily_restorative_time, resilience_daily_sleep_recovery, resilience_granular,
           resilience_confidence, daytime_stress_coverage_min, chronic_stress_granular_nights, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(day) DO UPDATE SET
          source=excluded.source, model_versions=excluded.model_versions, sleep_score=excluded.sleep_score,
          sleep_contributors=excluded.sleep_contributors, readiness_score=excluded.readiness_score,
@@ -746,7 +763,10 @@ export class SQLiteLocalStore implements LocalStore {
          activity_score=excluded.activity_score, activity_contributors=excluded.activity_contributors,
          active_calories_est=excluded.active_calories_est, training_load_ots=excluded.training_load_ots,
          training_load_gate=excluded.training_load_gate,
-         training_load_high=excluded.training_load_high, recovery_index_hours=excluded.recovery_index_hours,
+         training_load_high=excluded.training_load_high,
+         training_load_grid_len=excluded.training_load_grid_len,
+         training_load_valid_min=excluded.training_load_valid_min,
+         recovery_index_hours=excluded.recovery_index_hours,
          worn_hours_ble=excluded.worn_hours_ble, night_hrv_baseline_ms=excluded.night_hrv_baseline_ms,
          illness_flag=excluded.illness_flag, illness_score=excluded.illness_score,
          illness_biomarkers=excluded.illness_biomarkers, daytime_stress_scaled=excluded.daytime_stress_scaled,
@@ -767,6 +787,7 @@ export class SQLiteLocalStore implements LocalStore {
         record.readinessSource, record.activityScore,
         record.activityContributors != null ? JSON.stringify(record.activityContributors) : null,
         record.activeCaloriesEst, record.trainingLoadOts, record.trainingLoadGate, record.trainingLoadHigh == null ? null : (record.trainingLoadHigh ? 1 : 0),
+        record.trainingLoadGridLen, record.trainingLoadValidMin,
         record.recoveryIndexHours, record.wornHoursBle, record.nightHrvBaselineMs,
         record.illnessFlag, record.illnessScore, record.illnessBiomarkers != null ? JSON.stringify(record.illnessBiomarkers) : null,
         record.daytimeStressScaled, record.stressHighMinutes, record.recoveryHighMinutes, record.chronicStressScore,
@@ -1044,7 +1065,7 @@ export class SQLiteLocalStore implements LocalStore {
         styleId:      r.style_id ? String(r.style_id) : null,
         muscleGroups: JSON.parse(String(r.muscle_groups ?? '[]')),
         position:     Number(r.position),
-        exerciseRole: String(r.exercise_role ?? 'primary'),
+        exerciseRole: String(r.exercise_role ?? UNCLASSIFIED_EXERCISE_ROLE),
         supersetGroup: r.superset_group != null ? Number(r.superset_group) : null,
       })),
       styles:    styleRows.map(r => ({
@@ -1244,6 +1265,43 @@ export class SQLiteLocalStore implements LocalStore {
         record.deletedAt, record.syncStatus,
       ],
     );
+  }
+
+  // RV-174 — see the interface. The mirror is read-only (nothing on the device creates a program or a
+  // style), so there is no pending local row a prune could destroy.
+  async pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number> {
+    let removed = 0
+    if (programIds) {
+      const keep = new Set(programIds)
+      const stale = (await querySQL<{ id: string }>(`SELECT id FROM local_programs`))
+        .map(r => r.id).filter(id => !keep.has(id))
+      if (stale.length) {
+        const ph = stale.map(() => '?').join(',')
+        await runSQL(
+          `DELETE FROM session_exercises WHERE session_id IN
+             (SELECT id FROM program_sessions WHERE program_id IN (${ph}))`, stale)
+        await runSQL(
+          `DELETE FROM schedule_days WHERE schedule_id IN
+             (SELECT id FROM schedules WHERE program_id IN (${ph}))`, stale)
+        await runSQL(`DELETE FROM program_sessions WHERE program_id IN (${ph})`, stale)
+        await runSQL(`DELETE FROM schedules WHERE program_id IN (${ph})`, stale)
+        await runSQL(`DELETE FROM local_programs WHERE id IN (${ph})`, stale)
+        removed += stale.length
+      }
+    }
+    if (styleIds) {
+      const keep = new Set(styleIds)
+      const stale = (await querySQL<{ id: string }>(`SELECT id FROM local_progression_styles`))
+        .map(r => r.id).filter(id => !keep.has(id))
+      if (stale.length) {
+        const ph = stale.map(() => '?').join(',')
+        await runSQL(`DELETE FROM style_sets WHERE style_id IN (${ph})`, stale)
+        await runSQL(`UPDATE session_exercises SET style_id = NULL WHERE style_id IN (${ph})`, stale)
+        await runSQL(`DELETE FROM local_progression_styles WHERE id IN (${ph})`, stale)
+        removed += stale.length
+      }
+    }
+    return removed
   }
 
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
@@ -1504,6 +1562,14 @@ export class SQLiteLocalStore implements LocalStore {
       if (r.deletedAt) {
         await runSQL(`DELETE FROM set_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
+        // LA-165: a set added by an offline edit is inserted locally under a local id, and the
+        // server mints its own when it upserts by (exercise_log_id, set_number). Without this, the
+        // pull would leave both rows — one set shown twice. Only a SYNCED local row gives way; a
+        // pending one is still on its way to the server and a pull must never revert it.
+        await runSQL(
+          `DELETE FROM set_logs WHERE exercise_log_id = ? AND set_number = ? AND id <> ? AND sync_status = 'synced'`,
+          [r.exerciseLogId, r.setNumber, r.id],
+        );
         await runSQL(
           `INSERT INTO set_logs
              (id, exercise_log_id, set_number, weight_kg, reps,
@@ -1623,13 +1689,14 @@ export class SQLiteLocalStore implements LocalStore {
         `INSERT INTO oura_daily_derived
            (day, source, model_versions, sleep_score, sleep_contributors, readiness_score,
             readiness_contributors, readiness_source, activity_score, activity_contributors,
-            active_calories_est, training_load_ots, training_load_gate, training_load_high, recovery_index_hours,
+            active_calories_est, training_load_ots, training_load_gate, training_load_high,
+          training_load_grid_len, training_load_valid_min, recovery_index_hours,
             worn_hours_ble, night_hrv_baseline_ms, illness_flag, illness_score, illness_biomarkers,
             daytime_stress_scaled, stress_high_minutes, recovery_high_minutes, chronic_stress_score,
             chronic_stress_contributors, resilience_level, resilience_daily_stress,
             resilience_daily_restorative_time, resilience_daily_sleep_recovery, resilience_granular,
             resilience_confidence, daytime_stress_coverage_min, chronic_stress_granular_nights, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(day) DO UPDATE SET
            source=excluded.source, model_versions=excluded.model_versions, sleep_score=excluded.sleep_score,
            sleep_contributors=excluded.sleep_contributors, readiness_score=excluded.readiness_score,
@@ -1637,7 +1704,10 @@ export class SQLiteLocalStore implements LocalStore {
            activity_score=excluded.activity_score, activity_contributors=excluded.activity_contributors,
            active_calories_est=excluded.active_calories_est, training_load_ots=excluded.training_load_ots,
            training_load_gate=excluded.training_load_gate,
-           training_load_high=excluded.training_load_high, recovery_index_hours=excluded.recovery_index_hours,
+           training_load_high=excluded.training_load_high,
+         training_load_grid_len=excluded.training_load_grid_len,
+         training_load_valid_min=excluded.training_load_valid_min,
+         recovery_index_hours=excluded.recovery_index_hours,
            worn_hours_ble=excluded.worn_hours_ble, night_hrv_baseline_ms=excluded.night_hrv_baseline_ms,
            illness_flag=excluded.illness_flag, illness_score=excluded.illness_score,
            illness_biomarkers=excluded.illness_biomarkers, daytime_stress_scaled=excluded.daytime_stress_scaled,
@@ -1664,6 +1734,7 @@ export class SQLiteLocalStore implements LocalStore {
           r.readinessSource, r.activityScore,
           r.activityContributors != null ? JSON.stringify(r.activityContributors) : null,
           r.activeCaloriesEst, r.trainingLoadOts, r.trainingLoadGate,
+          r.trainingLoadGridLen, r.trainingLoadValidMin,
           r.trainingLoadHigh == null ? null : (r.trainingLoadHigh ? 1 : 0),
           r.recoveryIndexHours, r.wornHoursBle, r.nightHrvBaselineMs, r.illnessFlag, r.illnessScore,
           r.illnessBiomarkers != null ? JSON.stringify(r.illnessBiomarkers) : null,
@@ -1720,6 +1791,18 @@ export class SQLiteLocalStore implements LocalStore {
          r.segments ? JSON.stringify(r.segments) : null,
          r.updatedAt],
       );
+      // DV-19. The server holds one activity per (date, start_time) and a push that collides
+      // merges into the row already there, under THAT row's id. The device's own row is confirmed
+      // `synced` and never comes back from the server, so it stays beside this one for good and
+      // the walk lists twice. Once the server's row for that minute is here, any other synced
+      // row at the same minute is that orphan. A pending one is still on its way and is kept.
+      if (r.startTime) {
+        await runSQL(
+          `DELETE FROM activity_logs WHERE date = ? AND id <> ? AND sync_status = 'synced'
+             AND (CASE WHEN length(start_time) = 5 THEN start_time || ':00' ELSE substr(start_time, 1, 8) END) = ?`,
+          [r.date, r.id, r.startTime.length === 5 ? `${r.startTime}:00` : r.startTime.slice(0, 8)],
+        );
+      }
     }
 
     for (const r of delta.fitnessTests ?? []) {
@@ -2143,43 +2226,61 @@ export class SQLiteLocalStore implements LocalStore {
     );
   }
 
-  // Mirrors this device's own render after the web PATCH/DELETE round-trip already
-  // succeeded — local matches server at this exact instant, so these write
-  // sync_status='synced' (not 'pending'). Marking them pending would strand the row:
-  // every future pull is gated behind `WHERE sync_status='synced'` (SYNC-4), so a
-  // never-flipped-back-to-synced row would permanently block re-syncing this record.
-  async deleteExerciseLogLocally(exerciseLogId: string): Promise<void> {
+  // Two modes (LA-165). The DEFAULT mirrors a write the server already confirmed — the web PATCH/
+  // DELETE round-trip succeeded — so local matches server at this instant and the rows are
+  // 'synced'. `pending: true` is an OFFLINE write that is queued: the rows must refuse a pull until
+  // the push confirms, because `applyDelta` overwrites only 'synced' rows and a pull that arrived
+  // first would restore the old sets or resurrect the deleted log. The push-confirm switch in
+  // sync-engine flips them back via markExerciseLogSynced / markWorkoutSessionTreeSynced — which is
+  // what keeps a pending row from blocking every later pull, the reason this was 'synced'-only.
+  async deleteExerciseLogLocally(exerciseLogId: string, opts?: { pending?: boolean }): Promise<void> {
+    const status = opts?.pending ? 'pending' : 'synced';
     const now = new Date().toISOString();
     await runSQL(
-      `UPDATE exercise_logs SET deleted_at=?, sync_status='synced', updated_at=? WHERE id=?`,
-      [now, now, exerciseLogId],
+      `UPDATE exercise_logs SET deleted_at=?, sync_status=?, updated_at=? WHERE id=?`,
+      [now, status, now, exerciseLogId],
     );
     await runSQL(
-      `UPDATE set_logs SET deleted_at=?, sync_status='synced' WHERE exercise_log_id=?`,
-      [now, exerciseLogId],
+      `UPDATE set_logs SET deleted_at=?, sync_status=? WHERE exercise_log_id=?`,
+      [now, status, exerciseLogId],
     );
   }
 
   async updateExerciseLogLocally(
     exerciseLogId: string,
     sets: Array<{ setNumber: number; weightKg: number; reps: number; intensityPct?: number | null }>,
+    opts?: { pending?: boolean },
   ): Promise<void> {
+    const status = opts?.pending ? 'pending' : 'synced';
     const now = new Date().toISOString();
-    await runSQL(`UPDATE exercise_logs SET sync_status='synced', updated_at=? WHERE id=?`, [now, exerciseLogId]);
+    await runSQL(`UPDATE exercise_logs SET sync_status=?, updated_at=? WHERE id=?`, [status, now, exerciseLogId]);
     for (const set of sets) {
-      if (set.intensityPct === undefined) {
-        // Omitted (not explicitly cleared) — preserve whatever the server recomputed
-        // rather than clobbering it with a bare null (SYNC-4).
+      const existing = await querySQL<{ id: string }>(
+        `SELECT id FROM set_logs WHERE exercise_log_id=? AND set_number=?`, [exerciseLogId, set.setNumber],
+      );
+      if (existing.length === 0) {
+        // LA-165: an edit that ADDS a set used to update nothing, so the new set never appeared on
+        // this device until a pull. The server upserts by (exercise_log_id, set_number) and mints
+        // its own id; applyDelta drops this local row in favour of that one once both are synced.
         await runSQL(
-          `UPDATE set_logs SET weight_kg=?, reps=?, updated_at=?, sync_status='synced'
+          `INSERT INTO set_logs (id, exercise_log_id, set_number, weight_kg, reps, intensity_pct, updated_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [crypto.randomUUID(), exerciseLogId, set.setNumber, set.weightKg, set.reps, set.intensityPct ?? null, now, status],
+        );
+      } else if (set.intensityPct === undefined) {
+        // Omitted (not explicitly cleared) — preserve whatever the server recomputed
+        // rather than clobbering it with a bare null (SYNC-4). `deleted_at=NULL` mirrors the
+        // server's upsert, which resurrects a set the edit re-adds.
+        await runSQL(
+          `UPDATE set_logs SET weight_kg=?, reps=?, updated_at=?, deleted_at=NULL, sync_status=?
            WHERE exercise_log_id=? AND set_number=?`,
-          [set.weightKg, set.reps, now, exerciseLogId, set.setNumber],
+          [set.weightKg, set.reps, now, status, exerciseLogId, set.setNumber],
         );
       } else {
         await runSQL(
-          `UPDATE set_logs SET weight_kg=?, reps=?, intensity_pct=?, updated_at=?, sync_status='synced'
+          `UPDATE set_logs SET weight_kg=?, reps=?, intensity_pct=?, updated_at=?, deleted_at=NULL, sync_status=?
            WHERE exercise_log_id=? AND set_number=?`,
-          [set.weightKg, set.reps, set.intensityPct, now, exerciseLogId, set.setNumber],
+          [set.weightKg, set.reps, set.intensityPct, now, status, exerciseLogId, set.setNumber],
         );
       }
     }
@@ -2188,28 +2289,47 @@ export class SQLiteLocalStore implements LocalStore {
     // removed.
     const maxSetNumber = sets.length > 0 ? Math.max(...sets.map(s => s.setNumber)) : 0;
     await runSQL(
-      `UPDATE set_logs SET deleted_at=?, sync_status='synced' WHERE exercise_log_id=? AND set_number>? AND deleted_at IS NULL`,
-      [now, exerciseLogId, maxSetNumber],
+      `UPDATE set_logs SET deleted_at=?, sync_status=? WHERE exercise_log_id=? AND set_number>? AND deleted_at IS NULL`,
+      [now, status, exerciseLogId, maxSetNumber],
     );
   }
 
-  // Mirrors a whole-session delete (SYN-1/SYN-2) — called only after the awaited web
-  // DELETE already succeeded, so 'synced' (not 'pending'), same reasoning as
-  // deleteExerciseLogLocally above.
-  async deleteWorkoutSessionLocally(workoutSessionId: string): Promise<void> {
+  // Mirrors a whole-session delete (SYN-1/SYN-2); modes as above.
+  async deleteWorkoutSessionLocally(workoutSessionId: string, opts?: { pending?: boolean }): Promise<void> {
+    const status = opts?.pending ? 'pending' : 'synced';
     const now = new Date().toISOString();
     await runSQL(
-      `UPDATE workout_sessions SET deleted_at=?, sync_status='synced', updated_at=? WHERE id=?`,
-      [now, now, workoutSessionId],
+      `UPDATE workout_sessions SET deleted_at=?, sync_status=?, updated_at=? WHERE id=?`,
+      [now, status, now, workoutSessionId],
     );
     await runSQL(
-      `UPDATE exercise_logs SET deleted_at=?, sync_status='synced', updated_at=? WHERE workout_session_id=?`,
-      [now, now, workoutSessionId],
+      `UPDATE exercise_logs SET deleted_at=?, sync_status=?, updated_at=? WHERE workout_session_id=?`,
+      [now, status, now, workoutSessionId],
     );
     await runSQL(
-      `UPDATE set_logs SET deleted_at=?, sync_status='synced'
+      `UPDATE set_logs SET deleted_at=?, sync_status=?
        WHERE exercise_log_id IN (SELECT id FROM exercise_logs WHERE workout_session_id=?)`,
-      [now, workoutSessionId],
+      [now, status, workoutSessionId],
+    );
+  }
+
+  // LA-165 push-confirms. Each waits while another queued mutation still names the row — two edits
+  // queued back to back must not have the first's confirm unguard the second (markSessionSynced's
+  // rule, for the same reason).
+  async markExerciseLogSynced(exerciseLogId: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['workout_log', 'exercise_log_edit', 'exercise_log_delete'], exerciseLogId, confirmingIds)) return;
+    await runSQL(`UPDATE exercise_logs SET sync_status='synced' WHERE id=?`, [exerciseLogId]);
+    await runSQL(`UPDATE set_logs SET sync_status='synced' WHERE exercise_log_id=?`, [exerciseLogId]);
+  }
+
+  async markWorkoutSessionTreeSynced(workoutSessionId: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['workout_log', 'session_rpe', 'complete_workout', 'workout_session_delete'], workoutSessionId, confirmingIds)) return;
+    await runSQL(`UPDATE workout_sessions SET sync_status='synced' WHERE id=?`, [workoutSessionId]);
+    await runSQL(`UPDATE exercise_logs SET sync_status='synced' WHERE workout_session_id=?`, [workoutSessionId]);
+    await runSQL(
+      `UPDATE set_logs SET sync_status='synced'
+       WHERE exercise_log_id IN (SELECT id FROM exercise_logs WHERE workout_session_id=?)`,
+      [workoutSessionId],
     );
   }
 
@@ -2285,19 +2405,26 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(
       `INSERT INTO food_items
          (id, name, brand, serving_size_g, calories, protein_g, carbs_g, fat_g,
-          fiber_g, sugar_g, sodium_mg, sat_fat_g, source, image_data_uri, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          fiber_g, sugar_g, sodium_mg, sat_fat_g, source, barcode, image_data_uri, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, brand=excluded.brand, serving_size_g=excluded.serving_size_g,
          calories=excluded.calories, protein_g=excluded.protein_g, carbs_g=excluded.carbs_g,
          fat_g=excluded.fat_g, fiber_g=excluded.fiber_g, sugar_g=excluded.sugar_g,
          sodium_mg=excluded.sodium_mg, sat_fat_g=excluded.sat_fat_g, source=excluded.source,
+         -- LB-158. COALESCE rather than excluded.barcode, and it is the one column here that
+         -- differs. A barcode is known ONLY at the scan; every other write path -- logging the
+         -- same food again from Recent, a saved meal, a pull for a row the server has no code
+         -- for -- offers null, and letting excluded win would let any of them erase it. A
+         -- product's code does not change, so there is no update this drops.
+         barcode=COALESCE(excluded.barcode, food_items.barcode),
          image_data_uri=excluded.image_data_uri,
          updated_at=excluded.updated_at`,
       [
         record.id, record.name, record.brand, record.servingSizeG, record.calories,
         record.proteinG, record.carbsG, record.fatG, record.fiberG, record.sugarG,
-        record.sodiumMg, record.satFatG, record.source, record.imageDataUri, record.updatedAt,
+        record.sodiumMg, record.satFatG, record.source, record.barcode, record.imageDataUri,
+        record.updatedAt,
       ],
     );
   }
@@ -2310,7 +2437,7 @@ export class SQLiteLocalStore implements LocalStore {
       `SELECT fl.id, fl.date, fl.meal_type_id, fl.food_item_id, fl.quantity_multiplier, fl.logged_at,
               fl.saved_meal_id, fl.meal_group_id, fl.meal_group_name,
               fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g, fi.carbs_g, fi.fat_g,
-              fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source
+              fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source, fi.image_data_uri
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
         WHERE fl.date = ? AND fl.deleted_at IS NULL
@@ -2340,6 +2467,7 @@ export class SQLiteLocalStore implements LocalStore {
           sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
           sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
           satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+          imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
           source: (r.source ? String(r.source) : 'manual') as 'ai' | 'barcode' | 'manual' | 'text',
           region: '', createdAt: new Date(String(r.logged_at)),
         },
@@ -2365,6 +2493,21 @@ export class SQLiteLocalStore implements LocalStore {
           [],
         );
     return rows.map(foodItemRowToItem);
+  }
+
+  /**
+   * LB-158. The saved food carrying this exact code, newest first so a later re-scan that created
+   * a second row wins. Trimmed rather than normalised: a code is digits, and the two writers of
+   * this column (the scan call sites) both hand over what the scanner read.
+   */
+  async getFoodItemByBarcode(barcode: string): Promise<FoodItem | null> {
+    const code = barcode.trim();
+    if (!code) return null;
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT * FROM food_items WHERE barcode = ? ORDER BY updated_at DESC LIMIT 1`,
+      [code],
+    );
+    return rows.length ? foodItemRowToItem(rows[0]) : null;
   }
 
   // BF-38. Every row the user already has at this exact calorie count — the candidate set the
@@ -2406,7 +2549,7 @@ export class SQLiteLocalStore implements LocalStore {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT fi.id, fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g,
               fi.carbs_g, fi.fat_g, fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g,
-              fi.source, fi.updated_at
+              fi.source, fi.image_data_uri, fi.updated_at
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
         WHERE ${mealTypeId ? 'fl.meal_type_id = ? AND ' : ''}fl.deleted_at IS NULL
@@ -2428,6 +2571,7 @@ export class SQLiteLocalStore implements LocalStore {
         sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
         sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
         satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+        imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
         source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
         region: '', createdAt: new Date(String(r.updated_at)),
       } satisfies FoodItem);
@@ -3266,6 +3410,46 @@ export class SQLiteLocalStore implements LocalStore {
       healed++;
     }
     return healed;
+  }
+
+  /**
+   * DV-8 heal: food-log DELETE tombstones left `pending` with no outbox entry.
+   *
+   * The cause is fixed — `pushMutations` now confirms each row before clearing its outbox entry —
+   * but 36 rows spanning 14 days were already stranded on the phone when it was found, and a row
+   * with no outbox entry is retried by nothing. `applyDelta` cannot correct them either: it only
+   * overwrites `synced` rows, so a `pending` tombstone is invisible to every other repair path.
+   *
+   * **Re-queue, never mark synced.** A stranded tombstone looks exactly like one whose mutation
+   * was never queued at all, and marking that synced drops a delete the server never saw — the
+   * food comes back on the next device and the calories with it. Re-pushing costs nothing: the
+   * server arm soft-deletes by id, so a second delete of an already-deleted row is a no-op.
+   *
+   * The cutoff is the same grace period `getStrandedPendingWorkouts` uses, and for the same
+   * reason: a row whose push is still in flight has no outbox entry either for that moment, and
+   * sweeping it would queue a duplicate.
+   */
+  async requeueStrandedFoodTombstones(userId: string, cutoffIso: string): Promise<number> {
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT id, date FROM food_logs fl
+        WHERE fl.sync_status='pending' AND fl.deleted_at IS NOT NULL
+          AND fl.updated_at < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM mutations_outbox mo
+             WHERE mo.user_id = ? AND mo.domain='food_logs'
+               AND mo.payload LIKE '%' || fl.id || '%'
+          )`,
+      [cutoffIso, userId],
+    );
+    for (const r of rows) {
+      await runSQL(
+        `INSERT INTO mutations_outbox (id, user_id, domain, date, payload, created_at, attempts, last_error, status, next_retry_at)
+         VALUES (?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),0,NULL,'pending',NULL)`,
+        [crypto.randomUUID(), userId, 'food_logs', String(r.date),
+         JSON.stringify({ id: String(r.id), deleted: true })],
+      );
+    }
+    return rows.length;
   }
 
   async deleteMutations(ids: string[]): Promise<void> {

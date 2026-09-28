@@ -87,5 +87,9 @@ describe.each(CASES)('$check ignores its banned pattern inside a comment', ({ ch
     // "this check never looked at that file", which is the reading that makes the whole pass wrong.
     expect(asCode, `fixture for ${check} must trigger it in ${file}`).not.toEqual(clean)
     expect(asComment, `${check} counts its banned pattern inside a comment`).toEqual(clean)
-  }, 30_000)
+    // 120 s, not 30 (LA-163). `check-hex-literals` measured 15 s per run on Windows against ~6 s on
+    // Linux, and this runs it three times. Profiled: 98% of it is `spawnSync` — `lib/base-ref.js`
+    // starts one `git show` per file for the base comparison, and a process spawn costs far more on
+    // Windows. Batching those reads would speed every ratchet; until then this is the honest limit.
+  }, 120_000)
 })

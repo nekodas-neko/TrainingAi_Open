@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** RV-86 / RV-87. Two screens rendered a failed fetch as a measured zero: the home Streak card
  *  painted "0 days, 0 / 5 sessions" from a `{}` that meant "the request failed", and the Profile
@@ -17,7 +18,7 @@ const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 
 /** Source with comments stripped, so a gate named in prose is not mistaken for one in code. */
 function code(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  return stripComments(src)
 }
 
 describe('the gate can only be raised by a successful read', () => {

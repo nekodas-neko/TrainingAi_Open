@@ -167,6 +167,13 @@ export interface NutritionScanResult {
    * would be gating on LLM output.
    */
   origin?: 'barcode' | 'search' | 'photo'
+  /**
+   * LB-158. The code that identified this product, echoed by `/api/nutrition/barcode`. Same
+   * reason as `origin` above: the caller builds a `food_items` row several steps later, and the
+   * code is not recoverable from anything else on this object. `food_items.barcode` has existed
+   * since the column was added and held nothing — 341 rows, zero codes, 42 of them scanned.
+   */
+  barcode?: string
 }
 
 // ── Meal Plan (Q-186) ──────────────────────────────────────────────────────────

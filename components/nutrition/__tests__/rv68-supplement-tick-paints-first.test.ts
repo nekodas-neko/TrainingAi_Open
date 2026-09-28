@@ -47,9 +47,14 @@ describe('RV-68 — the supplement tick paints before the writes, not after', ()
   it('the in-flight guard is released when the write settles, not with the paint', () => {
     // Releasing it with the paint would re-open the double-tap window that once turned five taps
     // into four complete-workout POSTs. The user gets the tick back immediately; not the tap.
+    //
+    // **Matched on the release rather than on one spelling of it (RV-207 ③).** This read
+    // `indexOf('setToggling(null)')`, which broke the moment the guard became a per-id Set —
+    // a legitimate refactor, and the property below was true throughout. A literal is the wrong
+    // thing to pin when what matters is *where* the call sits.
     const body = toggleLogBody()
     const paint = body.indexOf('applyOptimistic()')
-    const release = body.indexOf('setToggling(null)')
+    const release = body.search(/setToggling\((?!prev => new Set\(prev\)\.add)/)
     expect(release, 'the guard is never released — the row would stay dead').toBeGreaterThan(-1)
     expect(release).toBeGreaterThan(paint)
     expect(body.slice(release - 200, release)).toMatch(/finally\s*\{/)

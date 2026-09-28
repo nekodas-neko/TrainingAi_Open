@@ -28,6 +28,67 @@ export function __clearResilienceConstants(): void {
   cCache = null
 }
 
+/**
+ * The publish gate's thresholds, or null when the constants have not been injected.
+ *
+ * LA-158: a surface that shows nothing has to be able to say WHY it shows nothing, and the three
+ * numbers behind that sentence are model constants — so they are read here rather than restated
+ * at the call site (One Formula, One Place). Returns null instead of throwing, unlike `C_()`:
+ * a readiness payload that cannot name the gate must still render, and the resilience constants
+ * are injected on the rollup path rather than on every request.
+ */
+export function resilienceGateThresholds(): {
+  coverageMinutes: number
+  minValidDays: number
+  windowDays: number
+} | null {
+  if (!cCache) return null
+  return {
+    coverageMinutes: cCache.minDaytimeStressHours * 60,
+    minValidDays: cCache.windowMinLength,
+    windowDays: cCache.windowLength,
+  }
+}
+
+export interface ResilienceCoverageObservation {
+  daysSeen: number
+  daysMeetingCoverageGate: number | null
+  coverageGateMinutes: number | null
+  minValidDays: number | null
+  modelWindowDays: number | null
+}
+
+/**
+ * What a surface can honestly say when no resilience level was produced (LA-158).
+ *
+ * Deliberately an OBSERVATION rather than a diagnosis. The caller typically holds fewer days than
+ * `windowDays`, so a shortfall here is consistent with the publish gate having closed without
+ * establishing it — and the caller must not turn "I can see 2 good days out of 7" into "the
+ * coverage gate is why". It returns the numbers that make a true sentence ("N of the last M days
+ * had enough daytime coverage; the model needs K of W") and nothing beyond them.
+ *
+ * A null threshold means the constants were not injected on this path, which is a different thing
+ * from a threshold of zero — hence null rather than a fallback number.
+ */
+export function observeResilienceCoverage(
+  coverageMinutesByDay: readonly (number | null | undefined)[],
+): ResilienceCoverageObservation {
+  const gate = resilienceGateThresholds()
+  return {
+    daysSeen: coverageMinutesByDay.length,
+    daysMeetingCoverageGate: gate
+      // The `!= null` is belt-and-braces and a mutation pass confirmed it: dropping it is
+      // equivalent, because `null >= n` and `undefined >= n` are both false. Kept so the filter
+      // does not silently depend on null coercing to 0 — and noted so nobody reads it as
+      // load-bearing and writes a test that cannot fail.
+      ? coverageMinutesByDay.filter(m => m != null && m >= gate.coverageMinutes).length
+      : null,
+    coverageGateMinutes: gate?.coverageMinutes ?? null,
+    minValidDays: gate?.minValidDays ?? null,
+    modelWindowDays: gate?.windowDays ?? null,
+  }
+}
+
 // Throws rather than defaulting, deliberately — the same call the disk loader used to make. This
 // port is pinned to a captured golden vector; with no constants it would emit plausible, wrong
 // resilience scores rather than fail.

@@ -18,6 +18,8 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { toast } from "sonner";
 import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
+import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
+import { useHomeSectionDrag } from "@/lib/hooks/use-home-section-drag";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import dynamic from "next/dynamic";
 import { CoachFab } from "@/components/coach/coach-fab";
@@ -47,20 +49,14 @@ import { PullToSync } from "@/components/pull-to-sync";
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
-import { EarlyDeloadCard } from "@/components/home/early-deload-card";
-import { GoalsCheckinCard } from "@/components/home/goals-checkin-card";
-import { WeeklyRecapBanner } from "@/components/weekly-recap-banner";
-import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { HomeCardWidget } from "@/components/home/home-card-widget";
 import type { CardSectionKey } from "@/components/home/home-card-widget";
 import { OuraScoreChipRow } from "@/components/oura-score-chip-row";
 import { IllnessAdvisoryBanner } from "@/components/home/illness-advisory-banner";
+import { HomeBannerStack } from "@/components/home/home-banner-stack";
 import { BodyBatteryCard } from "@/components/body-battery-card";
 import { HomeDayTimeline } from "@/components/home-day-timeline";
-const ExerciseDetectedCard = dynamic(
-  () => import("@/components/activity/exercise-detected-card").then(m => ({ default: m.ExerciseDetectedCard })),
-  { ssr: false },
-);
+import { initialsOf } from '@/lib/initials';
 const ExerciseReviewSheet = dynamic(
   () => import("@/components/activity/exercise-review-sheet").then(m => ({ default: m.ExerciseReviewSheet })),
   { ssr: false },
@@ -84,9 +80,10 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
-import { computeStreak } from "./compute-streak";
+import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
+import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 
 // Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
@@ -137,6 +134,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const localDay = useLocalDay();
   // Bound once so the identity is stable for the children that take it as a prop.
   const dayKey = useCallback((daysAgo = 0) => dayKeyInTz(tz, daysAgo), [tz]);
+  const [streakSchedule, setStreakSchedule] = useState<StreakSchedule>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
@@ -164,7 +162,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const sectionOrderRef = useRef<SectionKey[]>(buildDefaultOrder([]));
   const [hiddenSections, setHiddenSections] = useState<Set<SectionKey>>(() => new Set());
   const [readiness, setReadiness] = useState<import('@/app/api/readiness-score/route').ReadinessScoreResponse | null>(null)
-  const [bodyBattery, setBodyBattery] = useState<import('@/app/api/body-battery/route').BodyBatteryResponse | null>(null)
+  const { battery: bodyBattery, failed: bodyBatteryFailed } = useBodyBattery(refreshTick)
   const [weeklyTarget, setWeeklyTarget] = useState(5)
   const [isAiDynamic, setIsAiDynamic] = useState(false)
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null)
@@ -312,11 +310,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       if (cachedReadiness) setReadiness(cachedReadiness);
     } catch { /* ignore */ }
 
-    try {
-      const cachedBattery = readTodayCacheSync<import('@/app/api/body-battery/route').BodyBatteryResponse>('body-battery');
-      if (cachedBattery) setBodyBattery(cachedBattery);
-    } catch { /* ignore */ }
-
     // Seed mood from cache so the recommendation card shows immediately instead
     // of "Loading…". null means "no mood logged today" (or cache miss) — both
     // correctly show the check-in card, which is replaced by actual data once
@@ -441,6 +434,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const handleNavigateStats = useCallback(() => navigateToTab(router, "/health?tab=training"), [router]);
   const handleNavigateHealthBody = useCallback(() => navigateToTab(router, "/health?tab=body"), [router]);
   const handleOpenWaterLog = useCallback(() => setWaterLogOpen(true), []);
+  // TN-85 — a correction has to land somewhere it can be acted on, and the value lives on the
+  // morning check-in's sleep scale (TN-57 owns writing it). `useCallback` because `HomeCardWidget`
+  // is memoised and an inline arrow would defeat it on every render of the section list.
+  const handleCorrectSleepVerdict = useCallback(() => setMorningCheckinOpen(true), []);
+
+  // BF-205 — the drag that the "Reorder sections" button was always missing.
+  const sectionDrag = useHomeSectionDrag(sectionOrderRef, setSectionOrder);
   const hrData = useMemo(
     () => (ouraHrReadings.length > 0 ? { readings: ouraHrReadings, workoutSessions: ouraWorkoutSessions, sleep: ouraSleepWindow } : null),
     [ouraHrReadings, ouraWorkoutSessions, ouraSleepWindow],
@@ -530,6 +530,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
+            setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
             if (!aiDynamic && metaData?.program?.schedule) {
               setWeeklyTarget(getScheduledSessionsPerWeek(metaData.program as unknown as Program));
             }
@@ -805,13 +806,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   }, [userId, tz, localDay]);
 
   useEffect(() => {
-    cachedFetchToday<import('@/app/api/body-battery/route').BodyBatteryResponse>(
-      'body-battery', '/api/body-battery', BODY_BATTERY_TTL,
-      d => { if (d) setBodyBattery(d) },
-    ).catch(() => {});
-  }, [refreshTick]);
-
-  useEffect(() => {
     if (activeCardWidgets.includes("acwrWidget")) {
       cachedFetchToday<TrainingLoadResponse>(
         'training-load', '/api/training-load', TTL_MEDIUM,
@@ -1029,7 +1023,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     });
   }, [trainedDays, tz]);
 
-  const streak = useMemo(() => computeStreak(trainedDays, dayKey), [trainedDays]);
+  const streak = useMemo(() => computeStreak(trainedDays, todayInTz(tz), streakSchedule), [trainedDays, tz, streakSchedule]);
 
   // This Week: Mon → today count (not rolling 7-day)
   const weekSessionCount = useMemo(
@@ -1046,7 +1040,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       <PullToSync
         onSync={handlePullSync}
         scrollKey="home"  // RV-112 — Home and More shared one scroll slot; see more-content.tsx.
-        scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-nav-safe"
+        // BF-206: `pb-fab-safe`, not `pb-nav-safe` — this screen mounts `CoachFab`, whose 56 px sits
+        // above everything pb-nav-safe reserves, so the last row of the scroll could never clear it.
+        scrollClassName="flex-1 overflow-y-auto overflow-x-hidden pb-fab-safe"
         className="flex-1 flex flex-col overflow-hidden"
       >
         <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-30"><Meteors number={10} /></div>
@@ -1087,7 +1083,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             <div className="relative flex-none">
               <button
                 onClick={() => navigateToTab(router, "/more")}
-                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border hover:border-brand transition"
+                className="tap-dense tap-target-44 relative h-9 w-9 rounded-full flex items-center justify-center overflow-hidden border-2 border-border transition-[transform,border-color] duration-100 active:scale-95 active:border-brand motion-reduce:active:scale-100 motion-reduce:transition-none"
                 style={{ background: "var(--brand-card-bg)" }}
                 aria-label="Profile"
               >
@@ -1096,7 +1092,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                     unoptimized={userAvatar.startsWith('data:')} className="object-cover" />
                 ) : (
                   <span className="text-xs font-bold" style={{ color: "var(--color-brand)" }}>
-                    {displayName ? displayName.slice(0, 2).toUpperCase() : "?"}
+                    {initialsOf(displayName)}
                   </span>
                 )}
               </button>
@@ -1134,47 +1130,39 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}
 
         {/* ── Body Battery ── */}
-        {bodyBattery && <BodyBatteryCard battery={bodyBattery} />}
+        {bodyBattery
+          ? <BodyBatteryCard battery={bodyBattery} />
+          // Only when there is nothing cached to show: a stale arc beats a banner, and this screen's
+          // other reads take the same posture.
+          : bodyBatteryFailed && (
+            <div className="mx-4 mb-3 rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs text-muted-foreground">
+                Couldn&rsquo;t load your body battery &mdash; pull to refresh.
+              </p>
+            </div>
+          )}
 
-        {/* ── Auto-detected walk/run review prompt (hides itself when none pending) ── */}
-        <div className="mx-4">
-          <ExerciseDetectedCard onReview={handleExerciseDetectedReview} />
-        </div>
-
-        {readiness?.earlyDeloadRecommended && !earlyDeloadDismissed && (
-          <div className="mx-4 mb-3">
-            <EarlyDeloadCard
-              onConfirm={handleEarlyDeloadConfirm}
-              onDismiss={handleEarlyDeloadDismiss}
-              reason={readiness.earlyDeload}
-            />
-          </div>
-        )}
-
-        {showGoalsCheckin && (
-          <div className="mx-4 mb-3">
-            <GoalsCheckinCard onReviewNow={handleGoalsReviewNow} onRemindLater={handleGoalsRemindLater} />
-          </div>
-        )}
-
-        {!dayReviewDismissed && (
-          <DismissibleBanner
-            title="Your day in review is ready"
-            // Q-112a — one door. This opened a second, thinner review only Home had; the real one
-            // lives on Nutrition, with the meal types, logs and targets it needs.
-            onActivate={() => navigateToTab(router, "/nutrition?review=day")}
-            onDismiss={() => {
-              localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
-              setDayReviewDismissed(true);
-            }}
-          />
-        )}
-
-        {/* ── Weekly recap notification (self-hides once dismissed or generated) ── */}
-        <WeeklyRecapBanner />
+        {/* ── RV-119: early deload full-width, the other four behind one strip ── */}
+        <HomeBannerStack
+          readiness={readiness}
+          earlyDeloadDismissed={earlyDeloadDismissed}
+          onEarlyDeloadConfirm={handleEarlyDeloadConfirm}
+          onEarlyDeloadDismiss={handleEarlyDeloadDismiss}
+          onExerciseDetectedReview={handleExerciseDetectedReview}
+          showGoalsCheckin={showGoalsCheckin}
+          onGoalsReviewNow={handleGoalsReviewNow}
+          onGoalsRemindLater={handleGoalsRemindLater}
+          dayReviewDismissed={dayReviewDismissed}
+          onDayReviewActivate={() => navigateToTab(router, "/nutrition?review=day")}
+          onDayReviewDismiss={() => {
+            localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
+            setDayReviewDismissed(true);
+          }}
+        />
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">
+          <DragDropProvider sensors={[PointerSensor]} onDragOver={sectionDrag.onDragOver} onDragEnd={sectionDrag.onDragEnd}>
           {sectionOrder.filter(key => !hiddenSections.has(key)).map((key, idx) => {
             const content = (() => {
               // Every `card_*` key routes to the one component, which no-ops on a key the user has
@@ -1182,6 +1170,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               // rendered nothing until someone remembered to add its line.
               if (key.startsWith("card_")) return (
                 <HomeCardWidget
+                  userId={userId}
                   sectionKey={key as CardSectionKey}
                   sectionEditMode={sectionEditMode}
                   activeCardWidgets={activeCardWidgets}
@@ -1203,6 +1192,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   muscleData={muscleRecovery}
                   hrData={hrData}
                   setMoodSheetOpen={setMoodSheetOpen}
+                  onCorrectSleepVerdict={handleCorrectSleepVerdict}
                 />
               );
               switch (key) {
@@ -1311,11 +1301,12 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             })();
             if (content === null) return null;
             return (
-              <HomeSortableSection key={key} id={key} editMode={sectionEditMode} onHide={handleHideSection}>
+              <HomeSortableSection key={key} id={key} index={idx} editMode={sectionEditMode} onHide={handleHideSection}>
                 {content}
               </HomeSortableSection>
             );
           })}
+          </DragDropProvider>
         </div>}
 
         {/* ── Hidden sections restore panel (edit mode only) ── */}

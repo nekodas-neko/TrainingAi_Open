@@ -190,6 +190,9 @@ export function HealthScoreDetail({
           illnessFlag: null, illnessScore: null, illnessBiomarkers: null,
           illnessSuppression: 0, illnessAdvisory: null,
           ownResilienceLevel: null, ownResilienceBand: null, ownResilienceConfidence: null,
+          // LA-158 added these to the payload; this offline fallback carries them so the
+          // object stays a complete ReadinessScoreResponse. Rendering them is Lane B's.
+          ownResilienceAsOf: null, ownResilienceUnavailable: null,
         } satisfies ReadinessScoreResponse));
       }).catch(() => {});
     }

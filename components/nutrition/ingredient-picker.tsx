@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { FoodItem, NutritionScanResult, SavedMeal } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
+import { lookupBarcode } from '@trainingai/shared/nutrition/barcode-lookup'
 import { getLocalStore } from '@/lib/local-store'
 import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
 import { IngredientSearch } from './ingredient-search'
@@ -165,14 +166,18 @@ export function IngredientPicker({
     }
     setLookingUp(true)
     try {
-      const res = await fetch(`/api/nutrition/barcode?code=${encodeURIComponent(code)}`)
-      const data = await res.json()
-      // The route draws the distinction, so keep it: a database that is down is not a product that
-      // does not exist, and telling the user the second when it is the first sends them to re-scan.
-      if (data.unavailable) { toast.error('The food database is not responding. Try again, or add it by hand.'); return }
-      if (!res.ok) { toast.error('Barcode lookup failed.'); return }
-      if (data.notFound) { toast.error('That barcode is not in the database. Add it by hand, or photograph the label.'); return }
-      const scan = data as NutritionScanResult
+      // LB-158. The user's own saved foods first, so re-scanning a tin they already have resolves
+      // with no network at all. The route draws the unavailable/notFound distinction and this
+      // keeps it: a database that is down is not a product that does not exist, and telling the
+      // user the second when it is the first sends them to re-scan.
+      const found = await lookupBarcode(code, userId)
+      if (found.kind === 'unavailable') { toast.error('The food database is not responding. Try again, or add it by hand.'); return }
+      if (found.kind === 'error') { toast.error(offlineHint() ?? 'Barcode lookup failed.'); return }
+      if (found.kind === 'notFound') { toast.error('That barcode is not in the database. Add it by hand, or photograph the label.'); return }
+      // Already in the library — add that row rather than creating a second one for the same
+      // product. BF-38's duplicate check would collapse it anyway; this never makes the duplicate.
+      if (found.localItem) { accept(found.localItem); return }
+      const scan = found.result
       accept(await createFoodItem({
         name: scan.name,
         brand: scan.brand,
@@ -186,6 +191,8 @@ export function IngredientPicker({
         sodiumMg: scan.sodiumMg,
         satFatG: scan.satFatG,
         source: 'barcode',
+        // LB-158. The code, so the next scan of this product can be answered from the library.
+        barcode: scan.barcode ?? code,
         // OR-108. The lookup already fetched Open Food Facts' thumbnail and capped it — dropping it
         // here is why every barcode-scanned food was imageless. `capture-actions.tsx` hands the whole
         // response to `onScanResult`, so its copy of this path was never missing it; this one rebuilds

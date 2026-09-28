@@ -1,8 +1,9 @@
+import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema'
 import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, MoodLog,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, MoodLog,
   NextSessionRecommendation, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -258,6 +259,11 @@ export interface SyncDelta {
   scheduleDays:       unknown[];
   progressionStyles:  unknown[];
   styleSets:          unknown[];
+  // RV-174: every program and style id the user HAS, on every page, whatever changed. Both are hard
+  // deletes with no tombstone, so the delta above can say what changed but never what is gone; the
+  // device prunes its read-only mirror to these. Optional so a delta without them prunes nothing.
+  programRoster?:         string[];
+  progressionStyleRoster?: string[];
   bodyMetrics:        unknown[];
   sleepSessions:      unknown[];
   moodLogs:           unknown[];
@@ -316,28 +322,10 @@ export interface BloodPanel {
 
 export type BloodPanelInput = Omit<BloodPanel, 'id'> & { id?: string }
 
-export type MutationDomain =
-  | 'body_metrics'
-  | 'mood_logs'
-  | 'food_logs'
-  | 'food_items'
-  | 'supplement_logs'
-  | 'injuries'
-  | 'supplements'
-  | 'activity_logs'
-  | 'fitness_tests'
-  | 'prescribed_run'
-  | 'workout_log'
-  | 'day_checkins'
-  | 'session_rpe'
-  | 'complete_workout'
-  | 'saved_meals'
-  | 'oura_daily_summary'
-  | 'oura_daily_derived'
-  | 'sleep_session'
-  | 'plan_meal_answers'
-  | 'manual_bedtime'
-  | 'rest_days';
+// Derived, not listed (RV-175): this was a hand-kept copy of SYNCED_MUTATION_DOMAINS, identical to it
+// member for member, and adding a domain meant remembering both. The canonical list's own comment
+// says every domain type derives from it so the two cannot drift; this one had not.
+export type MutationDomain = SyncedMutationDomain
 
 export interface FitnessTest {
   id: string
@@ -721,6 +709,13 @@ export interface WorkoutRepository {
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
+
+  // TN-81 — the app's announced sleep verdict. `upsertSleepVerdict` is idempotent per
+  // (user, date) and deliberately does NOT touch `response_state`: re-announcing the same night
+  // must never erase the fact that he already answered it.
+  getSleepVerdict(userId: string, date: string): Promise<SleepVerdictRecord | null>
+  upsertSleepVerdict(userId: string, record: Omit<SleepVerdictRecord, 'responseState'>): Promise<void>
+  setSleepVerdictResponse(userId: string, date: string, state: 'acknowledged' | 'corrected'): Promise<boolean>
   /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
    *  when no session for that date exists; this never creates one. Read only by the bedtime
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
@@ -758,6 +753,9 @@ export interface WorkoutRepository {
   listRecentPersonalRecords(userId: string, from: Date, to: Date): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date; exerciseType: string | null }[]>
   // All-time best estimated1rm per exercise, keyed by exercise name.
   listPersonalRecords(userId: string): Promise<Map<string, number>>
+  // LB-95: every all-time record WITH the date it was achieved, newest first — for a surface that
+  // must say when each value was read. `listPersonalRecords` drops the date and keeps its callers.
+  listPersonalRecordsDated(userId: string): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date }[]>
   // All-time max reps logged per exercise, keyed by exercise name.
   listMaxReps(userId: string): Promise<Map<string, number>>
   // Second-most-recent estimated 1RM per exercise, keyed by exercise name (for trend detection).
@@ -884,6 +882,10 @@ export interface WorkoutRepository {
   listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
   listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  /** PS-49 — the collection v2 faucets. Narrow on purpose (RV-63): a date, and steps where needed. */
+  listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]>
+  listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
   listRestDays(userId: string, from: string, to: string): Promise<string[]>
 
@@ -1177,6 +1179,10 @@ export interface WorkoutRepository {
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
   /** RV-45: false when nothing matched. */
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
+  /** TN-46: administered doses of VIAL-DOSED supplements in [from, to]. The dose is the log's own
+   *  `amount`/`unit`, never `supplements.dose` (the vial). Vial-dosed only, so a daily oral
+   *  supplement does not annotate every day. */
+  listDoseEvents(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/dose-context').DoseEvent[]>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
@@ -1498,6 +1504,11 @@ export interface OuraDailyDerivedRow {
   // else is the gate that refused. `string | null` matches its siblings (`illnessFlag`,
   // `readinessSource`) rather than importing the health package's union into the data layer.
   trainingLoadGate: string | null
+  /** LA-161: the MET grid length and valid-minute count the gate above was decided from. */
+  trainingLoadGridLen: number | null
+  trainingLoadValidMin: number | null
+  /** LA-170: when the training-load verdict was computed. Server-only, like `acwr`. */
+  trainingLoadEvaluatedAt: Date | null
   recoveryIndexHours: number | null
   wornHoursBle: number | null
   nightHrvBaselineMs: number | null

@@ -20,6 +20,7 @@ import { DragDropProvider, PointerSensor, type DragOverEvent } from "@dnd-kit/re
 import type { ProgressionStyle } from "@trainingai/shared/types";
 import type { ExerciseRole, PhaseSetWithPhases } from "@trainingai/shared/types/program";
 import type { EditablePhase } from "@/components/config/phase-editor";
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
 export interface EditableSet { pct: number; reps: number; restSec?: number; useFor1rm?: boolean }
 export interface EditableExercise {
@@ -812,10 +813,10 @@ export function ProgramEditorSheet({
                                               key={role}
                                               type="button"
                                               onClick={() => updateExerciseRole(si, ei, role)}
-                                              aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                                              aria-pressed={(ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role}
                                               className={cn(
                                                 "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
-                                                (ex.exerciseRole ?? 'primary') === role
+                                                (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role
                                                   ? "bg-brand text-brand-foreground border-brand font-semibold"
                                                   : "bg-muted text-muted-foreground border-border hover:bg-background"
                                               )}

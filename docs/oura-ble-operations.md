@@ -314,9 +314,10 @@ never these docs for **BLE** field names, which come from the `open_oura` Rust s
   migration that buys nothing.
 - **`lib/oura/cloud-freshness.ts`** — the single `OURA_CLOUD_REKEY_DATE` constant. It makes no
   network call; it is how two live readiness paths know a Cloud-dated value is a frozen snapshot.
-- **The six surviving routes under `app/api/oura/`** — `hr-data`, `hr-day`, `hr-sync`, `hr-window`,
-  `workouts`, `stats` — all local reads despite the `/oura/` prefix. `hr-sync` in particular is BLE
-  **attribution**, not a Cloud pull.
+- **The five surviving routes under `app/api/oura/`** — `hr-data`, `hr-day`, `hr-window`, `workouts`,
+  `stats` — all local reads despite the `/oura/` prefix. A sixth, `hr-sync`, was deleted as dead on
+  2026-09-28 (LA-89): it was BLE attribution with no caller, and `complete-workout` runs the same
+  pipeline in-process.
 
 **`oura_workouts` is read-only history now.** Its only writer was the Cloud sync; the owner's newest
 row is 2026-07-05 and the "Exercise detected" card's unreviewed query only looks back 30 days, so

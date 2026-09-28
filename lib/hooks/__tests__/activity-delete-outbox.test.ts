@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = path.resolve(__dirname, '../../..')
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
@@ -21,11 +22,6 @@ function handlerBody(src: string, name: string): string {
   const after = src.slice(i + decl.length)
   const j = after.indexOf('= useCallback(')
   return j === -1 ? after : after.slice(0, j)
-}
-
-/** Line and block comments removed, so an assertion cannot be satisfied by prose about the code. */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
 describe('the activity delete is offline-capable', () => {

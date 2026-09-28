@@ -164,3 +164,14 @@ export const COLLECTION_TTL = TTL_SHORT;
  * `invalidateOuraSync`) rather than waiting on this number.
  */
 export const DAY_REVIEW_WEEK_WINDOW_TTL = TTL_MEDIUM;
+
+/**
+ * The completed week's recap (RV-201). `TTL_LONG` because the key carries the recap week's Monday
+ * and that week is **over** — its sessions, PRs, HRV and weight are settled, so there is nothing
+ * for a shorter expiry to catch that the three invalidation groups do not already clear.
+ *
+ * Read at two sites — the Home banner and `/health/week` — which is what makes the named constant
+ * mandatory rather than two spellings of the same number. They are the same request: whichever
+ * loads first pays for it and the other paints from cache.
+ */
+export const WEEKLY_DIGEST_TTL = TTL_LONG;

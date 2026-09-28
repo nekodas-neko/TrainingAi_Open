@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { MotionConfig } from "motion/react";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { HealthConnectProvider } from "@/components/health-connect-provider";
+import { StatusBarScrim } from "@/components/shell/status-bar-scrim";
 import { MobileAuthHandler } from "@/components/mobile-auth-handler";
 import { SyncProvider } from "@/components/sync-provider";
 import { TabSwipeNavigator } from "@/components/shell/tab-swipe-navigator";
@@ -125,6 +126,12 @@ export const viewport: Viewport = {
   // that gesture entirely so the view can never get stuck zoomed.
   maximumScale: 1,
   userScalable: false,
+  // Let the soft keyboard shrink the LAYOUT viewport, not just the visual one (RV-210). The
+  // Android default is `resizes-visual`: the page keeps its full height and the keyboard is
+  // drawn over it, so a bottom sheet sized in viewport units keeps a height that no longer
+  // fits, and its submit button sits underneath the keyboard. `resizes-content` resizes both,
+  // which is what makes `dvh` sheet heights and `pb-safe-action` clearances respond at all.
+  interactiveWidget: "resizes-content",
   viewportFit: "cover",
   themeColor: "#09090b",
 };
@@ -164,6 +171,10 @@ export default async function RootLayout({
               <ErrorReporter />
               <NavTimingProbe />
               <main className="relative z-[1] h-full">{children}</main>
+              {/* DV-22: outside <main> on purpose — it is z-40 at the root level, so it paints
+                  over the page (z-[1]) and under the warning banners (z-[60]), which is the
+                  same order it had inside the tab shell. */}
+              <StatusBarScrim />
               <Toaster />
               <OfflineIndicator />
               <LocalStoreDeadBanner />

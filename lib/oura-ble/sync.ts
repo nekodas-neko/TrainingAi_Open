@@ -80,3 +80,25 @@ export async function syncOuraRing(): Promise<void> {
     /* not connected / mid-drain / no key — best effort, the hourly drain still runs */
   }
 }
+
+/** How recently the ring must have drained for opening the app not to drain it again (BF-187).
+ *  Not tuned: it makes the first open of the morning always drain while a burst of tab switches
+ *  costs one drain. If it reads wrong in use, that is a finding about the number. */
+export const OPEN_DRAIN_MAX_AGE_MS = 10 * 60_000
+
+/**
+ * BF-187: the app-open / resume trigger. Asks the service to drain only if it has not drained
+ * within `maxAgeMs`, then settles and announces exactly as the pull-to-refresh path does. A no-op
+ * on the web, when the service is stopped, and on an APK too old to have the method: the hourly
+ * autonomous drain still runs there, which is today's behaviour.
+ */
+export async function syncOuraRingIfStale(maxAgeMs = OPEN_DRAIN_MAX_AGE_MS): Promise<void> {
+  const ble = await getOuraBle()
+  if (!ble) return
+  try {
+    const { result } = await ble.plugin.drainIfStale({ maxAgeMs })
+    if (result === 'started') void afterDrainSettles(ble.plugin)
+  } catch {
+    /* older APK without drainIfStale, or not connected — the hourly drain still runs */
+  }
+}

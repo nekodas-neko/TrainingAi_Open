@@ -1,6 +1,10 @@
 "use client";
 
+import { TriangleAlertIcon } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
 import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
+import { formatMinutes } from '@trainingai/shared/format/units'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
@@ -18,6 +22,10 @@ interface WeeklyStatsHubProps {
   data: WeeklyStatsResponse | null;
   loading: boolean;
   sessions?: ProgramSession[];
+  /** The fetch failed. `cachedFetchToday` swallows `!res.ok`, so without this the card's own
+   *  `loading` flag (`data === null`) stays true and the skeleton runs forever (RV-215 ①). */
+  error?: boolean;
+  onRetry?: () => void;
 }
 
 // Leaf component owning its own useCountUp tick (PERF-8) — hoisting the count-up
@@ -28,8 +36,21 @@ function CountUpValue({ target, fallback }: { target: number | null; fallback: n
   return <>{value != null ? Math.round(value) : fallback}</>;
 }
 
-export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubProps) {
+export function WeeklyStatsHub({ data, loading, sessions = [], error, onRetry }: WeeklyStatsHubProps) {
   const tz = useUserTimezone();
+  // Before `loading`: a failed fetch leaves `data` null, so both would be true and the skeleton
+  // would win — which is the defect, not a tie-break.
+  if (error) {
+    return (
+      <EmptyState
+        icon={TriangleAlertIcon}
+        title="Couldn't load your weekly stats"
+        action={onRetry && (
+          <Button variant="outline" size="sm" onClick={onRetry}>Try again</Button>
+        )}
+      />
+    );
+  }
   if (loading) {
     return (
       <div className="space-y-3">
@@ -55,7 +76,9 @@ export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubP
     // for every non-zero week. It moves to the `unit` line, which already exists and is where the
     // other three tiles put theirs. (`/api/weekly-stats` rounds, so there is no fractional case.)
     { label: "Volume",       value: data.totalVolumeKg > 0 ? data.totalVolumeKg.toLocaleString() : "—", unit: "kg lifted" },
-    { label: "Avg Duration", value: data.avgDurationMin != null ? `${data.avgDurationMin}m` : "—",          unit: "per session" },
+    // RV-208: `55m` against `55 min` elsewhere. The unit goes on the `unit` line like Volume's
+    // above, so the form agrees with the rest of the app without widening a 74px cell.
+    { label: "Avg Duration", value: data.avgDurationMin != null ? formatMinutes(data.avgDurationMin, { unit: false }) : "—", unit: "min per session" },
   ];
 
   return (

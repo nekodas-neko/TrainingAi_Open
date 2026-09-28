@@ -163,6 +163,15 @@ describe('/api/nutrition/barcode', () => {
     expect(body.calories).toBe(160)  // 64 kcal/100 ml over a 250 ml serving
   })
 
+  // LB-158: the code itself, for the same reason as the origin above — the caller builds a
+  // `food_items` row several steps later and nothing else on the response identifies WHICH
+  // product this is. The column has existed the whole time and held nothing: 341 of the owner's
+  // rows, zero codes, 42 of them scanned.
+  it('echoes the code it was given, so the stored row can record which product it is', async () => {
+    offFetchJson.mockResolvedValue({ status: 1, product: offProduct() })
+    expect((await (await barcode()).json()).barcode).toBe(CODE)
+  })
+
   // BF-35: the bytes, not the URL — `food_items` is read local-first and a URL renders nothing
   // offline. And a missing image must never turn a working scan into a failed one.
   it('carries the thumbnail bytes, and still succeeds without them', async () => {

@@ -210,6 +210,8 @@ export interface LocalOuraDailyDerived {
   activeCaloriesEst:              number | null;
   trainingLoadOts:                number | null;
   trainingLoadGate:               string | null;
+  trainingLoadGridLen:            number | null;
+  trainingLoadValidMin:           number | null;
   trainingLoadHigh:               boolean | null;                  // stored as INTEGER 0/1
   recoveryIndexHours:             number | null;
   wornHoursBle:                   number | null;
@@ -472,6 +474,8 @@ export interface LocalFoodItem {
   sodiumMg:     number | null;
   satFatG:      number | null;
   source:       string | null;
+  /** LB-158. The scanned product code, mirrored so a re-scan resolves from the store. */
+  barcode:      string | null;
   /** BF-35. The capped thumbnail, mirrored so a food row draws its picture with no network. */
   imageDataUri: string | null;
   updatedAt:    string;

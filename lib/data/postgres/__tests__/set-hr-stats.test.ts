@@ -1,7 +1,7 @@
 // Per-set HR snapshot round-trip (migration 139). Proves the real Drizzle path against Postgres: the
 // rich set-detail query, the fuller-wins COALESCE upsert, the per-session + per-exercise reads, and
 // the missing-list backfill work-list. Runs only with a local dev Postgres — skips cleanly in CI.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import type { SetHrRow } from '@trainingai/shared/workout/set-hr-stats'
 import { computeWorkoutHr } from '@trainingai/shared/workout/compute-workout-hr'
 
@@ -39,6 +39,21 @@ describe.skipIf(!canRun)('set_hr_stats round-trip', () => {
   let pool: import('pg').Pool
   let repo: import('@/lib/data/repository').WorkoutRepository
 
+  /**
+   * LA-150: the missing-list now skips a session that ENDED before the first heart-rate reading,
+   * because nothing could ever fill it. These cases are about the work list's coverage rule, so
+   * they need one reading older than both fixture sessions — without it every `toContain` below
+   * would fail for the wrong reason, and every `not.toContain` would pass for it.
+   *
+   * Ten days back: comfortably older than the 2- and 3-day-old sessions and far outside any set
+   * window, so it cannot contribute a reading to a computed row.
+   */
+  const seedHeartrateAnchor = () => pool.query(
+    `INSERT INTO oura_heartrate (user_id,timestamp,bpm,source)
+     VALUES ($1, now() - interval '10 days', 60, 'test') ON CONFLICT DO NOTHING`, [U])
+
+  beforeEach(async () => { if (canRun) await seedHeartrateAnchor() })
+
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
     const { getRepository } = await import('@/lib/data')
@@ -48,6 +63,7 @@ describe.skipIf(!canRun)('set_hr_stats round-trip', () => {
       `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1,$2,'x','Australia/Brisbane')
        ON CONFLICT (id) DO NOTHING`, [U, `sethr-${U}@example.com`])
     await pool.query(`DELETE FROM workout_sessions WHERE user_id=$1`, [U])
+    await seedHeartrateAnchor()
     await pool.query(
       `INSERT INTO workout_sessions (id,user_id,session_name,started_at,completed_at,phase_type)
        VALUES ($1,$2,'Push', now()-interval '2 days', now()-interval '2 days'+interval '1 hour','peak')`,

@@ -3,7 +3,7 @@
 // fuller-wins upsert, the missing-list backfill work-list, and the 90-day rr prune.
 //
 // Runs only against a real local dev Postgres — skips cleanly in CI without DATABASE_URL.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-0000000ba771'
@@ -27,6 +27,20 @@ describe.skipIf(!canRun)('workout HR stats + rr retention', () => {
     await pool.query(`DELETE FROM workout_hr_stats WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM rr_intervals WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1`, [TEST_USER_ID])
+  })
+
+  /**
+   * LA-150: the missing-list now skips a session that ENDED before the first heart-rate reading,
+   * because no compute could ever fill it. These cases are about the list's coverage rule, so they
+   * need one reading older than the oldest fixture session (5 days) — without it the list would be
+   * empty and every case here would pass or fail for the wrong reason.
+   */
+  beforeEach(async () => {
+    if (!canRun) return
+    await pool.query(
+      `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source)
+       VALUES ($1, now() - interval '30 days', 60, 'test') ON CONFLICT DO NOTHING`, [TEST_USER_ID])
   })
 
   afterAll(async () => {
@@ -34,6 +48,7 @@ describe.skipIf(!canRun)('workout HR stats + rr retention', () => {
     await pool.query(`DELETE FROM workout_hr_stats WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM rr_intervals WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
   })
 

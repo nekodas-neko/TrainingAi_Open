@@ -1,9 +1,19 @@
 import { runTrainingStressScore } from '@/lib/oura-models/inference/ots'
 import { deriveVo2Max, type Vo2MaxInputs } from '@trainingai/shared/health/vo2max'
 
+/**
+ * LA-161: every result carries the two numbers the MET floors are evaluated against. They are
+ * returned rather than recomputed by the caller so that what gets persisted is what the gate
+ * actually saw — a second computation of the same thing is a second thing to drift.
+ */
+export interface MetGridDimensions {
+  metGridLen: number
+  metValidMin: number
+}
+
 export type TrainingStressResult =
-  | { status: 'ok'; ots: number; high: boolean; vo2max: number | null; vo2maxMethod: string | null }
-  | { status: 'gated'; reason: 'readiness_learning' | 'no_readiness' | 'insufficient_met' | 'no_profile' | 'scorer_no_output' }
+  | ({ status: 'ok'; ots: number; high: boolean; vo2max: number | null; vo2maxMethod: string | null } & MetGridDimensions)
+  | ({ status: 'gated'; reason: 'readiness_learning' | 'no_readiness' | 'insufficient_met' | 'no_profile' | 'scorer_no_output' } & MetGridDimensions)
 
 export interface TrainingStressInputs {
   startTimestampMs: number
@@ -65,11 +75,16 @@ export function metGridFromDaytimeSamples(
  *  the MET series. Gates (returns a reason, never fabricates) when readiness is missing/learning,
  *  the profile is incomplete, or there isn't enough MET signal. Pure — the route does the DB IO. */
 export function computeTrainingStress(i: TrainingStressInputs): TrainingStressResult {
-  if (i.readiness == null) return { status: 'gated', reason: 'no_readiness' }
-  if (i.readinessProvisional) return { status: 'gated', reason: 'readiness_learning' }
-  if (i.age == null || i.sex == null || i.rhr == null) return { status: 'gated', reason: 'no_profile' }
+  // LA-161: computed before the first gate, not beside the MET one, so the three earlier gates
+  // also record what the day's MET input looked like. A row that reads `no_readiness` with a
+  // 1400-minute grid says something different from one with a 90-minute grid.
   const validMin = i.metsPerMinute.filter(v => v != null && v >= 0.9).length
-  if (i.metsPerMinute.length < 720 || validMin < 360) return { status: 'gated', reason: 'insufficient_met' }
+  const dims: MetGridDimensions = { metGridLen: i.metsPerMinute.length, metValidMin: validMin }
+
+  if (i.readiness == null) return { status: 'gated', reason: 'no_readiness', ...dims }
+  if (i.readinessProvisional) return { status: 'gated', reason: 'readiness_learning', ...dims }
+  if (i.age == null || i.sex == null || i.rhr == null) return { status: 'gated', reason: 'no_profile', ...dims }
+  if (i.metsPerMinute.length < 720 || validMin < 360) return { status: 'gated', reason: 'insufficient_met', ...dims }
 
   const vo2 = deriveVo2Max(i.vo2maxInputs)
   const biologicalSex = i.sex === 'female' ? -1 : i.sex === 'male' ? 1 : 0
@@ -88,6 +103,6 @@ export function computeTrainingStress(i: TrainingStressInputs): TrainingStressRe
   // nothing and the reason named the wrong half of the pipeline.
   //
   // A distinct reason costs one string and makes the next day of production say which half it is.
-  if (!out) return { status: 'gated', reason: 'scorer_no_output' }
-  return { status: 'ok', ots: out.ots, high: out.high, vo2max: vo2.value, vo2maxMethod: vo2.method }
+  if (!out) return { status: 'gated', reason: 'scorer_no_output', ...dims }
+  return { status: 'ok', ots: out.ots, high: out.high, vo2max: vo2.value, vo2maxMethod: vo2.method, ...dims }
 }

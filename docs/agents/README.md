@@ -40,10 +40,42 @@ causes merge conflicts. §3 is the contract.
 
 ### BugFix
 
-The owner's intake channel. Takes a screenshot, a description, a "why is this doing that", and
-turns it into a backlog entry good enough to implement from: what was observed, on what surface,
+The intake channel — **for the owner AND for anyone else who files something.** Takes a screenshot,
+a description, a "why is this doing that", and turns it into a backlog entry good enough to
+implement from: what was observed, on what surface,
 the code path it traces to, and what evidence would confirm it. Then it merges the docs-only PR and
 waits for the next report.
+
+**Three channels, not one (added 2026-09-27, OR-183).** Spoken reports from the owner;
+`claude_ro.feedback_submissions`, written by *Report an Issue* on `/more`; and **GitHub issues**,
+which nothing read until this was written. A collaborator noticed before we did: *"it's also not
+picking up the issues and PRs I raise … so they're never getting touched/reviewed either"*, and
+`#1620` had sat two days with nothing in the repo referencing it. Read them at session start with
+`list_issues` (state OPEN) and run the same loop — **read → triage → file a backlog entry at a
+priority with a lane → move the watermark** in the baton. **An issue is never answered by replying
+to it**; it becomes a queue entry, or it is recorded as not-a-defect with the reason.
+
+**⚑ BugFix OWNS GitHub end to end — it monitors, reviews, and answers** (owner, 2026-09-27
+OR-185 for the monitoring; **extended 2026-09-28**: *"I think bugfix should be able to review PR's
+right? and update the PR/issue in github without sending to Review"*). It reads
+`list_pull_requests` (open) beside `list_issues`, files an entry for every PR not authored by the
+agent account, **reads the diff, and posts the review itself.**
+
+**⚠ IT USED TO HAND THE DIFF TO REVIEW, AND THAT HANDOFF WAS THE DEFECT.** The split — BugFix
+watches, Review reads — meant the first visible response waited on a *weekly sweep*, so a
+contributor saw nothing for days. He said so: *"from his end it just goes silent."* **One role, one
+channel, one response.** BugFix already traces a symptom to `file:line` and already knows the
+recurring bug classes; reading a patch against the same rules is the same competence, not a new one.
+
+**⛔ IT DOES NOT ESCALATE, INCLUDING ON AUTH — struck by the owner 2026-09-28** the same day it was
+proposed: *"bugfix can be enough to review PR's as they are technically 'bugfixes'"*. BugFix's
+review is the review, on every inbound PR without exception. **Do not re-add a second-reader rule**
+for auth, sessions, secrets or migrations; the Orchestrator suggested exactly that and it was
+declined, and a handoff re-introduced anywhere is the thing that made a contributor wait.
+**Run `/security-review` inside the BugFix session** when a diff warrants it — that is a tool this
+role already has, not a handoff — and post the findings in the same response.
+**What does NOT change:** the merge is still never ours (below), and auth remains the owner's
+carve-out **for merging**, which is his call and not a routing step.
 
 **It does not fix.** The temptation to fix a one-line bug in the intake session is exactly how
 intake stops being reliable — the queue is the record, and a fix that skipped the queue is a fix
@@ -80,6 +112,50 @@ Runs on a weekly cadence rather than on demand. Sweeps the app for bugs, inconsi
 writes the findings up in `docs/reviews/YYYY-MM-DD-<topic>.md`, and files each one as a backlog
 entry. Findings without a backlog entry do not count — `CLAUDE.md`'s **No orphaned findings** rule
 is the whole point of this role.
+
+**⚠ REVIEW NO LONGER OWNS INBOUND PULL REQUESTS — BugFix does, end to end (owner, 2026-09-28).**
+This section assigned them to Review on 2026-09-27 (OR-183) because nothing owned them at all: the
+CI/CD section of `CLAUDE.md` is written for *our own* PRs (*"when the user pushes a feature branch
+and opens a PR"*), so a collaborator's arrived into a channel with no reader, and two sat from
+2026-09-25 noticed only sideways by `TN-80`.
+
+**Fixing the ownership did not fix the silence, because the handoff replaced it.** BugFix watched
+and Review read, so the first visible response waited on a weekly sweep. See §1 — BugFix now reads
+the diff and posts the review itself.
+
+**What Review keeps here: NOTHING.** An escalation path for auth/secret/migration PRs was proposed
+and **struck by the owner on 2026-09-28** — *"bugfix can be enough to review PR's as they are
+technically 'bugfixes'"*. Review has no role in an inbound PR at all. Where a diff warrants deeper
+scrutiny, BugFix runs `/security-review` in its own session; that is a tool, not a handoff.
+
+**The rules below apply to whoever is posting** — they were written for Review and are now BugFix's
+in the ordinary case.
+
+**⚑ THE REVIEW COMMENT IS VERY CONCISE — no fluff** (owner, 2026-09-27). He asked for comments to be
+posted *and* for them to be short, which are two instructions and the second is the one that gets
+lost:
+- **No preamble, no praise, no restating what the PR does.** The author wrote it; they know.
+- **One finding per comment.** The problem, the fix, and the `file:line` or the rule that makes it a
+  problem. A finding with no cited rule is an opinion.
+- **Nothing wrong → one line saying so.** Not a summary of everything checked.
+- The Claude Code attribution footer is still required on every posted comment; that is the harness's
+  rule, not padding, and it does not count against the concision.
+
+**A contributor is not the owner.** Write to someone who does not know this repo's conventions: name
+the rule rather than assuming it, and never imply their approach was careless when it is simply not
+what this repo does.
+
+**The reviewing agent MAY APPROVE an inbound PR; it may NEVER MERGE one** (owner, 2026-09-27 —
+and since 2026-09-28 the reviewing agent is normally BugFix). Approving says
+*we read it and nothing blocks* — the useful half, and the thing an author is actually waiting on.
+**Merging is the author's or the owner's, always**: no exception for a green CI run or a one-line
+diff, and the *"merge a tested, CI-green PR without asking"* authority covers **our own** PRs only.
+**Cannot approve → comment and wait for the author.** Do not close it, do not push to their branch,
+do not open a rival PR, and do not merge it because the comment went unanswered. **A stalled PR that
+is theirs stays theirs.**
+
+Two of the standing carve-outs bite on the live ones anyway — `#1607` is **auth** (bearer tokens)
+and `#1608` adds **storage**.
 
 The failure mode to design against is a review that reads source and reports what *should* happen.
 This repo has paid for that repeatedly; the 2026-08-08 review that actually ran the app found two
@@ -225,13 +301,43 @@ be awake — **the queue is the channel, and an entry outlives the session that 
 | `A` / `B` | Implementation | code, decided by §3's path rule |
 | `O` | Orchestrator | the queue and docs themselves, CI config, repo settings — **and anything needing the owner or a round of thinking before it can be built** |
 | `DV` | Device Verification | work whose *deliverable* needs the phone |
+| `T` | Tuning | a scoring change that owes a PROPOSAL before anyone may build it |
 | `?` | nobody yet | "I could not tell" — surfaces to a human rather than being guessed |
 
-**`O` and `DV` see only what is tagged for them; `A` and `B` also see the untagged.** An unstated
+**`T` was added 2026-09-26 (OR-178) because a correct triage could not act on itself.** Fifteen
+scoring entries owed a Tuning proposal, not the owner's signature — three separate sweeps reached
+that conclusion and none could record it. Removing their wrong `Gate: owner` would have released
+them into Lane A's READY list, and a scoring change with no proposal is precisely what Lane A must
+not pick up, so the wrong field was also the only brake in reach. They were parked on a placeholder
+`Needs: OR-150` instead, which stated a dependency that did not exist. `T` is the brake that says
+the true reason. **A `T` entry names its implementation lane in prose**; Tuning re-lanes it to `A`
+or `B` when the proposal exists, so the lane still answers *who acts next*.
+
+**`O`, `DV` and `T` see only what is tagged for them; `A` and `B` also see the untagged.** An unstated
 lane means *"§3's path rule answers it"*, and that rule only ever resolves to an implementer — so
 showing untagged work to both implementer lanes is the safe failure it was designed as, while
 showing the same 400 entries to the Orchestrator or the device agent would bury the few genuinely
 theirs.
+
+### Two ways to break the queue with prose (OR-187, 2026-09-27 — both hit in one session)
+
+**⛔ Never write a field's token inside prose.** The field parsers are **first-match-wins** and know
+nothing about quotes, backticks or context. A bullet reading *"which is exactly what `Lane: T` is
+for"* **set that entry's lane to `T`** — before its real `- **Lane: B**` line, so `T` won. Another
+rewrite left the word `Gate:` inside a quoted sentence and `check-backlog-pointers` refused the push,
+correctly, as a decorated field. **The habit: after any edit near a field, read the entry back
+through `parseEntries` and check the resolved value** — do not trust that prose reads as prose. The
+second one was caught by CI; the first was caught only because the value was re-read.
+
+**⚑ A sweep's action list is a hypothesis, not an instruction.** `RV-156` listed about thirty
+Known-Issues rows as ready for the archive. Tested one at a time against the actual rule — *move only
+when nothing is still owed* — **eleven of eleven failed**, one of them describing a live defect and
+one covering an entry still in the queue. The sweep was not careless: it asked *"is this answered
+somewhere?"* while the rule asks *"is anything still owed?"*, and those agree often enough that the
+gap is invisible until tested. **The same shape appeared in the owner-gate triage**, where a good
+fraction of entries said in their own gate text that they were not decisions. **So: when an entry
+hands you a list to act on, re-test each item against the rule before acting** — and when a field
+and its own prose disagree, the prose is usually right and the field is the bug.
 
 **The entry's LETTER and its LANE are different things**, and this is where they diverge most
 visibly: `DV-1` was found by the device agent and carries `Lane: O`, because the work is the
@@ -560,7 +666,7 @@ reading a running session's full transcript. This is the first thing a successor
 answers only: where am I, what is in flight, what is next, what is blocked.
 
 It is deliberately not a narrative. The narrative goes in a dated handoff doc
-(`docs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
+(`docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
 closes a cluster of related work. The two have different jobs — the baton is *state* and is always
 current; the handoff is *history* and is never edited after the fact.
 

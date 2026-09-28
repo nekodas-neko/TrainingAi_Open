@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
+import { lowerMedian } from '@trainingai/shared/stats'
 import { rateLimit } from '@/lib/rate-limit'
 import { runStepCounterPipeline, type RawFrame } from '@/lib/oura-ble/step-counter-pipeline'
 import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
@@ -67,8 +68,11 @@ export async function GET(req: NextRequest) {
   }
 
   const hz = result.strideFrequencyHz.filter((v) => Number.isFinite(v))
-  const sorted = [...hz].sort((a, b) => a - b)
-  const median = sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)] : null
+  // The LOWER of the two middles, deliberately: this console reads back decoded stride
+  // frequencies, so averaging [1, 2, 3, 4] into 2.5 Hz would report a cadence the ring never
+  // produced. LA-151 moved the sort-and-index into the shared `lowerMedian` and left the
+  // definition exactly where it was.
+  const medianHz = lowerMedian(hz)
   // Typical walking cadence lands ~1.5–3 Hz — a coarse sanity band for the decoded stride frequency.
   const inWalkingBand = hz.filter((v) => v >= 1.5 && v <= 3).length
 
@@ -83,9 +87,9 @@ export async function GET(req: NextRequest) {
       gateEstimateSteps: result.gateEstimateSteps,
       strideFrequencyHz: {
         subRows: hz.length,
-        min: sorted[0] ?? null,
-        median,
-        max: sorted[sorted.length - 1] ?? null,
+        min: hz.length ? Math.min(...hz) : null,
+        median: medianHz,
+        max: hz.length ? Math.max(...hz) : null,
         inWalkingBand,
       },
       stepWindows: result.stepWindows.map((w) => ({ startMs: w.startMs, endMs: w.endMs, steps: Math.round(w.steps * 100) / 100 })),

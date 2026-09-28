@@ -6,7 +6,8 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationBucket, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
 import { restAdherencePct } from '@trainingai/shared/workout/rest-adherence'
-import { energyBalanceByDay, medianOf } from '@trainingai/shared/health/energy-balance'
+import { energyBalanceByDay } from '@trainingai/shared/health/energy-balance'
+import { median as medianOfValues } from '@trainingai/shared/stats'
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
@@ -426,7 +427,7 @@ export async function GET(req: Request) {
     ])
     const baseline = buildExercise1rmBaseline(workoutSessions)
     const balanceByDate = energyBalanceByDay(bodyMetrics)
-    const median = medianOf([...balanceByDate.values()])
+    const median = medianOfValues([...balanceByDate.values()])
 
     const points: { x: number; y: number }[] = []
     const control: number[] = []

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, memo, useState } from "react";
+import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import {
   Sunrise, Moon, Dumbbell, Footprints, Utensils,
   BedDouble, Flame, Clock, Zap, Tag,
@@ -36,11 +37,11 @@ const TYPE_ICON_COLOR: Record<string, string> = {
   tag:     "text-muted-foreground",
 };
 
-function fmt(h: number): string {
-  const hrs = Math.floor(h);
-  const mins = Math.round((h - hrs) * 60);
-  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-}
+// RV-208: a fourth copy, and the one that was wrong — under an hour it floored to `0h` and threw
+// the minutes away, so a 45-minute nap read as `0h` on the timeline. `formatHoursMinutes` takes
+// MINUTES and returns `45m` there, which is why importing it fixes the bug rather than just the
+// inconsistency. An exact hour now reads `7h 00m`.
+const fmt = (h: number): string => formatHoursMinutes(h * 60);
 
 function WakeupCard({ ev }: { ev: TimelineEvent }) {
   return (
@@ -87,11 +88,11 @@ function WorkoutCard({ ev }: { ev: TimelineEvent }) {
         {ev.sets != null && (
           <span className="flex items-center gap-1">
             <Dumbbell className="h-3 w-3" />
-            {ev.sets} sets
+            {ev.sets} {ev.sets === 1 ? 'set' : 'sets'}
           </span>
         )}
         {ev.exerciseCount != null && (
-          <span>{ev.exerciseCount} exercises</span>
+          <span>{ev.exerciseCount} {ev.exerciseCount === 1 ? 'exercise' : 'exercises'}</span>
         )}
       </div>
     </div>

@@ -23,13 +23,13 @@ export const EXERCISE_ROLE_LABEL: Record<ExerciseRole, string> = {
 }
 
 /**
- * A missing or unrecognised role reads as `primary`, matching what the editor's selected-pill logic
- * already does with `ex.exerciseRole ?? 'primary'`. The two have to agree: a badge that named the
+ * A missing or unrecognised role reads as the unclassified role (`accessory`, BF-15), matching what
+ * the editor's selected-pill logic does with `ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE`. The two have to agree: a badge that named the
  * raw enum value while the editor highlighted Main would be the same mismatch this file exists to
  * remove, one layer down.
  */
 export function exerciseRoleLabel(role: string | null | undefined): string {
-  return EXERCISE_ROLE_LABEL[role as ExerciseRole] ?? EXERCISE_ROLE_LABEL.primary
+  return EXERCISE_ROLE_LABEL[role as ExerciseRole] ?? EXERCISE_ROLE_LABEL.accessory
 }
 
 export const EXERCISE_ROLE_BADGE: Record<ExerciseRole, string> = {
@@ -39,5 +39,5 @@ export const EXERCISE_ROLE_BADGE: Record<ExerciseRole, string> = {
 }
 
 export function exerciseRoleBadge(role: string | null | undefined): string {
-  return EXERCISE_ROLE_BADGE[role as ExerciseRole] ?? EXERCISE_ROLE_BADGE.primary
+  return EXERCISE_ROLE_BADGE[role as ExerciseRole] ?? EXERCISE_ROLE_BADGE.accessory
 }

@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { LBS_TO_KG, lbsToKg, kgToLbs } from '../units'
+import { stripComments } from '../../../../../scripts/lib/strip-comments.js'
 
 describe('BF-141 — one lb↔kg constant', () => {
   it('is the exact international definition', () => {
@@ -60,8 +61,7 @@ describe('BF-141 — one lb↔kg constant', () => {
 
     const declarations = files.filter(f => {
       if (f === 'packages/shared/src/workout/units.ts') return false   // the one home
-      const code = readFileSync(f, 'utf8')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
+      const code = stripComments(readFileSync(f, 'utf8'))
         .split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
       return /(?:const|let|var)\s+\w+\s*[:=][^\n]*0\.45359237/.test(code)
     })

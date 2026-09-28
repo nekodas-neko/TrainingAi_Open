@@ -5,12 +5,13 @@ import { settleRouteBoundary, suppressMorningCheckin } from './fixtures'
 /**
  * BF-5 PR 2b — the week in review is a page (`/health/week`), not a banner that expands.
  *
- * **What this can and cannot prove.** `/api/weekly-digest` POSTs through an LLM and 5xxs in this
- * environment — `tabs-instant-paint.spec.ts` lists it under `EXPECTED_5XX` for exactly that reason —
- * so the first test exercises the real failure path, which is what a harness run actually reaches.
- * The second stubs the route to drive the render: that proves the PAGE draws the metrics it is
- * given, and says nothing about whether the route computes them correctly. PR 2a's own tests own
- * that half.
+ * **What this can and cannot prove.** Both tests stub the route. Until RV-201 the first did not
+ * need to: the route POSTed through an LLM and 5xxd here for want of an API key, so the failure
+ * path was simply what a harness run reached. It answers 200 now, so the failure has to be
+ * injected — the test asserts the same thing either way, that a failed recap says so rather than
+ * leaving an empty screen. The second stub drives the render: it proves the PAGE draws the metrics
+ * it is given, and says nothing about whether the route computes them correctly. PR 2a's own tests
+ * own that half.
  */
 
 /**

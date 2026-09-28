@@ -1,6 +1,7 @@
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { SleepSession } from '@trainingai/shared/types/body'
+import { median } from '@trainingai/shared/stats'
 
 // Our own 0–100 Sleep Score. The weights are the ecore combiner weights recovered by
 // open_health (`Th0rgal/open_health`, docs/algorithms/score-weights.md) by regressing an
@@ -363,11 +364,6 @@ export function sleepScoreBaselines(priorSessions: BaselineSessionInput[], tz: s
   // Trailing window, newest last — see SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS for why these two
   // are not an all-time mean. The min-nights gates below still count the windowed sample.
   const recent = <T,>(xs: T[]) => xs.slice(-SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS)
-  const median = (xs: number[]) => {
-    const a = [...xs].sort((p, q) => p - q)
-    const mid = a.length >> 1
-    return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2
-  }
   const hrv = recent(nights.map(s => s.averageHrvMs).filter((v): v is number => v != null && v > 0))
   const hr = recent(nights.map(s => s.avgHeartRate).filter((v): v is number => v != null && v > 0))
   const localHour = (d: Date) => {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
@@ -10,10 +11,7 @@ const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
  * comments first, then collapse whitespace so an assertion survives a reformat.
  */
 const code = (rel: string) =>
-  read(rel)
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
     .replace(/\s+/g, ' ')
 
 describe('BF-169 — the COMPLETED stamp is not gated on the exercise library', () => {
@@ -74,8 +72,10 @@ describe('BF-168 — "Leave workout?" must not fire on the session-select tab', 
     // is the SAME pathname, so a usePathname effect would not fire for the reported case.
     expect(src).toContain('const workoutActive = useWorkoutStore(isWorkoutActive)')
     expect(src).toContain('if (!workoutActive) setConfirmLeaveOpen(false)')
-    // All three guards can outlive their screen, not just the workout one.
-    expect(src).toContain('if (!walkActive) setConfirmLeaveWalkOpen(false)')
+    // All three guards can outlive their screen, not just the workout one. The walk's state stopped
+    // being a boolean in LB-141 — it carries the elapsed seconds the prompt is decided from — so
+    // this pins that the effect CLEARS it, not what the setter is called.
+    expect(src).toMatch(/if \(!walkActive\) set\w+\((?:false|null)\)/)
     expect(src).toContain('if (!activityActive) setConfirmLeaveActivityOpen(false)')
   })
 })
@@ -108,5 +108,26 @@ describe('BF-167 — the deload toggle reads the exercises, not the phase flag',
     // BF-8 made this component label correctly; it does the right thing when told the truth, and
     // "fixing" it here is how the screen came to contradict the card below it in the first place.
     expect(read('components/workout/deload-toggle.tsx')).toContain('As prescribed')
+  })
+})
+
+describe('LA-177 — the completion-time prescribe call excludes the session that just finished', () => {
+  const src = code('components/workout-screen.tsx')
+
+  it('routes the completion call through the helper, which owns the body shape', () => {
+    // The shape itself is tested by CALLING it, in components/workout/__tests__/prescribe-request.test.ts.
+    // What only this file can check is that the completion call actually uses it.
+    expect(src).toContain('fetch(`/api/ai-periodization/session/${psid}/prescribe`, prescribeRequestInit(wsId))')
+    expect(src, 'the bodyless literal it replaced must be gone')
+      .not.toContain('fetch(`/api/ai-periodization/session/${psid}/prescribe`, { method: "POST" })')
+  })
+
+  it('leaves the OPEN-time prescribe call bodyless, which is correct there', () => {
+    // At open time the newest completed session genuinely is in the past, so the gap it measures is
+    // the real one and excluding it would discard the signal. Only the completion path needs this, so
+    // a later change that "consistently" passes the helper here too must fail.
+    expect(src).toContain('fetch(`/api/ai-periodization/session/${programSessionId}/prescribe`, { method: "POST" })')
+    expect(src, 'the open-time call must not gain the exclusion')
+      .not.toContain('fetch(`/api/ai-periodization/session/${programSessionId}/prescribe`, prescribeRequestInit')
   })
 })

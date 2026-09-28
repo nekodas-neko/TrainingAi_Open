@@ -48,10 +48,17 @@ test('a card whose endpoint 429s shows an error state instead of vanishing (AI P
 /**
  * The weekly recap banner, same class with one extra edge (Q-112e).
  *
- * Unlike the cards above it fetches **once per completed week**, behind a `hasFetched` ref and a
- * localStorage cache — so a `return null` on failure did not merely hide one paint, it cost the
- * whole week's recap with nothing on screen to say so. Hence the retry: the assertion is that the
- * banner appears at all, and the affordance is what makes appearing useful.
+ * Unlike the cards above, a failure here costs more than one paint: the recap is for a week that
+ * is over, so there is no later visit that would naturally show something different, and a
+ * `return null` cost the whole week's recap with nothing on screen to say so. Hence the retry —
+ * the assertion is that the banner appears at all, and the affordance is what makes appearing
+ * useful.
+ *
+ * The 429 is injected rather than provoked. RV-201 removed this route's rate limit along with the
+ * model it guarded, so the status no longer occurs on its own; what the stub still exercises is
+ * the real hazard, which is that `cachedFetch` swallows every `!res.ok` unless the caller passes
+ * `onError` (Q-499). Dropping that handler is how this banner would silently vanish again, and
+ * the status it vanished on was never the point.
  */
 test('the weekly recap says it failed instead of vanishing, and offers a retry', async ({ page }) => {
   await page.route(u => new URL(u).pathname === '/api/weekly-digest', r =>

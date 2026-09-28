@@ -28,6 +28,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 - [`2026-09-02-tn1-chronic-stress-count`](../../overview/history-2026-09-10-folded-6.md#2026-09-02-tn1-chronic-stress-count) — **the chronic-stress refusal now leaves a number behind, 2026-09-02 (TN-1).** `chronic_stress_score` has been NULL on every row since the model shipped, and both gates countable from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the summary level), so the refusal is in the **granular** layer — which recomputes its intermediates in memory by design and records no reason. `chronic_stress_granular_nights` counts the nights in the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run (migrations **258 + 259**, local SQLite **v36**). **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move and nothing consults the count. **⚠ Only a hand-triggered `fullHistory` pass reaches the model**, so the column stays NULL until the owner runs one; ≥ 21 with a null score then puts the fault inside the vendored model, < 21 names the granular stash.
 - [`docs/reviews/2026-09-15-pillars-against-the-connector-guide.md`](../../reviews/2026-09-15-pillars-against-the-connector-guide.md) — **the pillars audited against the connector guide's own invariant, 2026-09-15** (TN-37). **The input layer holds** — `body_metrics` carries a per-field `source_map` resolved by `SOURCE_RANK`, measured at 16 fields across two live sources over 30 days. **§5.4's invariant does not**: *"every calculation reads generic tables, never a device-specific one"*, while `readiness-payload.ts:278-291` reads four device-specific stores and **~20 payload fields never pass the normalise layer**. ⚠ Latent rather than live — `oura_daily`'s recent scored columns are all NULL and Health Connect writes nothing today.
+- [`docs/reviews/2026-09-27-tn70-resilience-snapshot.md`](../../reviews/2026-09-27-tn70-resilience-snapshot.md) — **the 30 published `resilience_level` rows, captured before any backfill overwrites them, 2026-09-27** (TN-70). TN-70's prescribed wide rollup pass fills `night_hrv_baseline_ms` **and overwrites the very rows it is meant to explain** — `upsertDailyDerived` is `COALESCE(excluded, existing)`, so a recompute wins. Of 132 derived days, exactly **30 carry a level** (16 July + 14 September); all 30 are recorded per-day here, so the decisive comparison survives the pass. ⚠ Corrects two of TN-70's readings: `confidence` spans the **identical** four values in both regimes (`{5,6,7,8}/14`) so it separates nothing, and the `resilience_daily_sleep_recovery` finding rests on **5 days against 6**, not 16 against 14.
 - [`docs/reviews/2026-09-17-the-app-saw-it-and-said-nothing.md`](../../reviews/2026-09-17-the-app-saw-it-and-said-nothing.md) — **a real autonomic event, detected and never surfaced, 2026-09-17** (TN-45). The illness radar's `watch` band has fired **twice in 72 days** and readiness on those days averages **32 against 64** — but `watch` carries a zero readiness penalty *and* renders no banner, so **the only band that has ever fired is the silent one**. ⚠ Also corrects a Tuning report from the day before: the owner's sleep had not "collapsed to 3.1 h" — that was PS-17's midday fragments dragging the mean, and the HRV finding it accompanied stands on its own (50 ms on fragment nights vs 45 on real ones, so not a capture artefact).
 - [`docs/reviews/2026-09-15-base-data-reachability-and-composites.md`](../../reviews/2026-09-15-base-data-reachability-and-composites.md) — **base data reviewed against Health Connect, score reachability measured, and four composite metrics, 2026-09-15** (TN-42/43/44). **Readiness has never reached 90 in 62 days** — the `temperature` contributor is scored closer-better and its baseline is miscentred, so 100 is unreachable by construction (TN-6/BF-13). ⚠ **Retires "skin temperature has no second source"**: Health Connect defines `SkinTemperatureRecord` and `HeartRateVariabilityRmssdRecord`, so the ring-only list is about our read list and the user's device, not the platform.
 - [`docs/reviews/2026-09-15-every-metric-and-the-core-line.md`](../../reviews/2026-09-15-every-metric-and-the-core-line.md) — **every metric the app records, tiered by the cheapest device that can supply it, with three candidate core/adjustment lines costed against real weights, 2026-09-15** (TN-38 task C). **The line barely matters for Activity (63% → 100% core on a basic wearable), matters some for Readiness (35% → 66%), and is the whole question for Sleep (35% → 55% → 87%)** — 48 of sleep's 110 points sit in HRV, stages and restfulness. ⚠ Argues against putting sleep stages in the core: stage estimates differ wildly between devices, which reintroduces the incomparability the core exists to remove.
@@ -114,7 +115,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   (`corr(HR, ln rmssd)` = −0.78 over 30–37 days) and its **level is ×0.30 of measured** — real, but
   confounded by chest-ECG vs ring-PPG and by the strap being worn while walking, so **not actionable
   without a controlled same-instrument capture**. Filed LA-112 (the defect), LA-113 (owner-gated
-  scoring), LA-114 (`bucket_start` stores the bucket midpoint). **LA-112 shipped the same day.** LA-113 remains owner-gated, and **LA-114's rename was attempted and reverted** — `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid still needs 15 minutes added.
+  scoring), LA-114 (`bucket_start` stores the bucket midpoint). **LA-112 shipped the same day.** LA-113 remains owner-gated, and **LA-114 shipped 2026-09-28**: the column is `bucket_mid` now, after BF-214 removed the view migrations that had blocked the rename. It still holds the midpoint, so a join on the :00/:30 grid subtracts 15 minutes.
 - [`2026-09-16-lane-a-bf13-rederive-baselines`](../../overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-bf13-rederive-baselines)
   — **a re-derivation for the zero-seeded baselines, 2026-09-16 (BF-13 / TN-6 / Q-506 / TN-8).**
   `POST /api/admin/rederive-baselines` replays the fold cold over the stored nights and rewrites the
@@ -216,7 +217,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
   the Body Battery anchor was re-picked on every read, so it flipped from the sleep score to the
   readiness score part-way through the morning and shifted the whole day's curve. The rule now
-  lives in `app/api/body-battery/anchor.ts` — a readiness anchor is frozen for the day, a sleep
+  lives in `lib/health/body-battery-anchor.ts` — a readiness anchor is frozen for the day, a sleep
   anchor is provisional and upgrades exactly once. The shared-composite refactor that would remove
   the fallback entirely is still open as Q-42.
 
@@ -340,7 +341,7 @@ Live at the time of writing (2026-07-30):
   the 0.933 h gap (52%)**; the ratio reaches **0.875, not ~1.0**. **Do not ship a wider
   `MEDIAN_WINDOW` as the fix, and do not move `RECOVERY_INDEX_OPTIMAL_HOURS`.** Re-confirms the
   level shift at n=57 (mean 2.653 h) and the 2.00 median |Δbpm|. Half the shift is still unexplained.
-- [`docs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoff-2026-08-24-readiness-scores-owner-batch.md)
+- [`docs/handoffs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoffs/handoff-2026-08-24-readiness-scores-owner-batch.md)
   — **the owner's readiness/battery batch, 2026-08-24.** Four owner questions in one session
   (daytime stress, Body Battery flooring, score volatility, the temperature deload trigger) →
   **TN-2** … **TN-7**. Carries the method rules that cost time: a per-sample percentile on the BLE
@@ -349,8 +350,8 @@ Live at the time of writing (2026-07-30):
 
 
 
-- Handoffs: `ls docs/handoff-*-readiness-*.md` — plus
-  [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+- Handoffs: `ls docs/handoffs/handoff-*-readiness-*.md` — plus
+  [`docs/handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-39 — the Body Battery anchor flipping source mid-day, **fixed in #996**), filed under `cross`
   because it spans five pillars and so is not matched by the glob above.
 - Journal: `grep -rl 'readiness\|body.battery\|resilience' docs/overview/entries/` — including
@@ -369,6 +370,18 @@ Live at the time of writing (2026-07-30):
   claiming Readiness, matching the two sibling lines on the same card that already did).
 
 ## Gotchas specific to this domain
+
+- **`readiness_contributors` is stored in TWO shapes under one name, and reading the wrong one is
+  silent.** `oura_daily.readiness_contributors` holds Oura's `{ hrv_balance: 90 }`;
+  `oura_daily_derived.readiness_contributors` — what the app writes, and what every reader prefers
+  when it exists — holds `{ hrvBalance: { score, input, gap, provisional } }` keyed to
+  `READINESS_WEIGHTS`. The keys differ in case, and three of the nine differ by name outright
+  (`checkin`, `temperature`, `prevDayActivity`). Assuming the first shape does not fail: it
+  stringifies to `[object Object]`, which is how every readiness AI insight was assembled until
+  2026-09-26 (`LA-152`, fixed in `RV-201`). **Read them through
+  `lib/oura/contributors.ts`**, which handles both, and never re-assert the type of a row read
+  from JSONB — the `as Record<string, number | null>` on that row is the whole reason nothing
+  caught it.
 
 - **⚑ `mood_logs.energy_level` BEFORE 2026-09-19 MAY BE AUTO-FILLED; FROM 2026-09-19 IT IS AN ANSWER
   (TN-50).** This is the documented cutoff, and it is deliberately a dated line rather than a stored
@@ -445,7 +458,7 @@ Live at the time of writing (2026-07-30):
   snapshot a value the table already writes down with a date on it. Nothing prunes this table —
   `shouldPrune` is `error_events`.
   ([`2026-09-17-lane-a-tn46-baseline-already-retained.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-lane-a-tn46-baseline-already-retained))
-- **The Body Battery anchor is frozen once readiness-derived** (`app/api/body-battery/anchor.ts`).
+- **The Body Battery anchor is frozen once readiness-derived** (`lib/health/body-battery-anchor.ts`).
   Re-picking it on every read is what made the whole day's curve jump mid-morning; a later
   readiness *recompute* must not move it either, or the same bug returns through a smaller door.
 - **An evening nap once threw away the whole day's Body Battery** — nap-vs-night resolution is a

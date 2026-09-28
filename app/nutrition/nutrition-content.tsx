@@ -505,7 +505,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                   setSelectedDate(shiftDateStr(selectedDate, -1));
                 }}
                 aria-label="Previous day"
-                className="-my-3 ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="-my-3 ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-[transform,background-color,color] duration-100 active:scale-95 active:bg-muted active:text-foreground motion-reduce:active:scale-100 motion-reduce:transition-none"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -517,7 +517,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 }}
                 aria-label="Next day"
                 aria-disabled={selectedDate >= todayStr}
-                className={`-my-3 flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${selectedDate >= todayStr ? 'cursor-default text-muted-foreground/70' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                className={`-my-3 flex h-11 w-11 items-center justify-center rounded-lg transition-[transform,background-color,color] duration-100 motion-reduce:active:scale-100 motion-reduce:transition-none ${selectedDate >= todayStr ? 'cursor-default text-muted-foreground/70' : 'text-muted-foreground active:scale-95 active:bg-muted active:text-foreground'}`}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -526,7 +526,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           <button
             onClick={() => setSettingsOpen(true)}
             aria-label="Nutrition settings"
-            className="-mr-2 flex h-11 w-11 flex-none items-center justify-center text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex h-11 w-11 flex-none items-center justify-center text-muted-foreground transition-[transform,color] duration-100 active:scale-95 active:text-foreground motion-reduce:active:scale-100 motion-reduce:transition-none"
           >
             <Settings className="h-5 w-5" />
           </button>

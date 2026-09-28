@@ -1,4 +1,5 @@
 import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { spawnName, blendName, nameHash } from './names'
 
 /**
  * The cat collection (BF-122a) — a pure fold over day series the app already stores.
@@ -28,8 +29,23 @@ export interface Ladder {
   tiers: Tier[]
 }
 
+/** v1's `Ladder` or v2's `V2Ladder`: the fold's internals need only the faucet name and the tiers. */
+type AnyLadder = { faucet: string; tiers: Tier[] }
+
 /** How many of each tier are held, indexed to match `Ladder.tiers`. */
 export type Stock = number[]
+
+/** One held cat, as the client sees it. Top level only: `from` names its parts rather than nesting them. */
+export interface CatSummary {
+  /** Stable across replays of the same history, so a client can key on it. */
+  id: string
+  tier: number
+  name: string
+  /** The day it spawned, or the day its merge completed. */
+  born: string
+  /** The names of the cats it was merged from; empty for a spawned one. */
+  from: string[]
+}
 
 export interface CollectionState {
   stock: Stock
@@ -38,25 +54,45 @@ export interface CollectionState {
   /** How many decay events fired. Surfaced so a widget can say "you lost one" rather than only
    *  showing a smaller number, which reads as a bug. */
   decayEvents: number
+  /** Every held cat, biggest tier first. `stock[i]` always equals the number of tier-`i` cats here. */
+  cats?: CatSummary[]
+  /** True when skipping today would cost a cat: tomorrow is past the rest allowance. */
+  restless?: boolean
+  /** The most recent cat lost to decay, so a widget can name it rather than show a smaller number. */
+  lastLost?: { name: string; day: string } | null
+  /** v2 bank ladders only: the balance in units, and how many make one T1, so a surface can say
+   *  how far the next cat is. */
+  bank?: number
+  unitsPerT1?: number
 }
 
 /**
- * Merge upward as far as the stock allows.
+ * A cat inside the fold. The replay holds real cats rather than counts so each one keeps a stable
+ * identity and name, and so a breakdown gives back the SAME cats that were merged, names and all.
+ * Counts are derived from these lists, so there is still exactly one rule set, not two.
+ */
+interface Cat { id: string; tier: number; name: string; born: string; parts: Cat[] }
+type Held = Cat[][]
+
+const byBorn = (a: Cat, b: Cat) => (a.born === b.born ? (a.id < b.id ? -1 : 1) : a.born < b.born ? -1 : 1)
+
+/**
+ * Merge upward as far as the stock allows, oldest cats first.
  *
  * Repeated to a fixed point rather than one pass: five slimes making one tier-2 can complete a
  * tier-3 in the same step, and a single pass would leave the collection one merge behind its own
  * rule until the next spawn happened to trigger it.
  */
-function settle(stock: Stock, ladder: Ladder): void {
+function settle(held: Held, ladder: AnyLadder, day: string): void {
   let moved = true
   while (moved) {
     moved = false
     for (let i = 0; i < ladder.tiers.length - 1; i++) {
       const cost = ladder.tiers[i + 1].mergeCost
-      if (cost > 0 && stock[i] >= cost) {
-        const merges = Math.floor(stock[i] / cost)
-        stock[i] -= merges * cost
-        stock[i + 1] += merges
+      while (cost > 0 && held[i].length >= cost) {
+        const parts = held[i].splice(0, cost)
+        const id = `${ladder.faucet}-t${i + 1}-${nameHash(parts.map(p => p.id).join('.')).toString(36)}`
+        held[i + 1].push({ id, tier: i + 1, name: blendName(parts[0].name, parts[parts.length - 1].name), born: day, parts })
         moved = true
       }
     }
@@ -72,24 +108,28 @@ function settle(stock: Stock, ladder: Ladder): void {
  *   · **A big item breaks into its components, never vanishes.** Losing a Tank costs the merge, not
  *     the workouts underneath it. Progress is recoverable; the top of the ladder is not free.
  *
- * Returns false when the collection is already empty, so the caller can stop counting events for a
- * loss that did not happen.
+ * The newest loose cat is the one that leaves; a breakdown hands back the exact cats that were
+ * merged, so they return under their own names.
+ *
+ * Returns the cat lost, or null when the collection is already empty, so the caller can stop
+ * counting events for a loss that did not happen.
  */
-function decayOnce(stock: Stock, ladder: Ladder): boolean {
-  const lowest = stock.findIndex(n => n > 0)
-  if (lowest === -1) return false
-  if (lowest === 0) { stock[0] -= 1; return true }
+function decayOnce(held: Held): Cat | null {
+  const lowest = held.findIndex(t => t.length > 0)
+  if (lowest === -1) return null
+  if (lowest === 0) return held[0].pop()!
 
   // Nothing loose: break the smallest held item down one rung, then take from what that produced.
-  stock[lowest] -= 1
-  stock[lowest - 1] += ladder.tiers[lowest].mergeCost
-  return decayOnce(stock, ladder)
+  const broken = held[lowest].pop()!
+  held[lowest - 1].push(...broken.parts)
+  held[lowest - 1].sort(byBorn)
+  return decayOnce(held)
 }
 
 export interface ReplayInput {
   /** `YYYY-MM-DD`, any order, duplicates tolerated — one spawn per distinct day. */
   days: string[]
-  ladder: Ladder
+  ladder: Ladder | V2Ladder
   /** Rest days allowed between faucet days before decay fires. From `maxCompliantRestGap` for the
    *  workout ladder; a constant for steps and sleep, which have no schedule. */
   maxRestGap: number
@@ -122,7 +162,8 @@ const addDays = (d: string, n: number) => shiftDateStr(d, n)
 export function replayCollection(input: ReplayInput): CollectionState {
   const { ladder, maxRestGap, today } = input
   const paused = new Set(input.pausedDays ?? [])
-  const stock: Stock = ladder.tiers.map(() => 0)
+  const held: Held = ladder.tiers.map(() => [])
+  let lastLost: CollectionState['lastLost'] = null
 
   const distinct = [...new Set(input.days)].sort()
   const duplicateDays = input.days.length - distinct.length
@@ -140,23 +181,41 @@ export function replayCollection(input: ReplayInput): CollectionState {
     return Math.max(0, span - 1 - excused)
   }
 
+  /** The n-th day after `from` that the clock was running (not paused). */
+  const nthChargeableDay = (from: string, n: number): string => {
+    let day = from
+    for (let seen = 0; seen < n;) { day = addDays(day, 1); if (!paused.has(day)) seen++ }
+    return day
+  }
+
   const applyGap = (from: string, to: string) => {
     const over = chargeableGap(from, to) - maxRestGap
     for (let k = 0; k < over; k++) {
-      if (decayOnce(stock, ladder)) decayEvents++
+      // The k-th decay of a gap lands on the k-th day past the allowance, which is the day to name.
+      const lost = decayOnce(held)
+      if (lost) { decayEvents++; lastLost = { name: lost.name, day: nthChargeableDay(from, maxRestGap + k + 1) } }
     }
   }
 
   let previous: string | null = null
   for (const day of distinct) {
     if (previous) applyGap(previous, day)
-    stock[0] += 1
-    settle(stock, ladder)
+    const id = `${ladder.faucet}-${day}`
+    held[0].push({ id, tier: 0, name: spawnName(id), born: day, parts: [] })
+    settle(held, ladder, day)
     previous = day
   }
   if (previous) applyGap(previous, today)
 
-  return { stock, duplicateDays, decayEvents }
+  const stock: Stock = held.map(t => t.length)
+  const total = stock.reduce((a, b) => a + b, 0)
+  // Skipping today means tomorrow's gap counts today; if that is past the allowance, a cat leaves.
+  const restless = previous != null && total > 0 && chargeableGap(previous, addDays(today, 1)) > maxRestGap
+  const cats: CatSummary[] = [...held].reverse().flat().map(c => ({
+    id: c.id, tier: c.tier, name: c.name, born: c.born, from: c.parts.map(p => p.name),
+  }))
+
+  return { stock, duplicateDays, decayEvents, cats, restless, lastLost }
 }
 
 /** The three ladders, one per faucet. Constants, per the versioning note at the top of this file. */
@@ -215,3 +274,100 @@ export const SLEEP_MAX_REST_GAP = 2
  * that change silently — the cache half of the versioning note above.
  */
 export const COLLECTION_RULES_VERSION = 1
+
+// ── Collection rules v2 (PS-49) ─────────────────────────────────────────────────────────────────
+// Plan: docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md. Shipped ALONGSIDE v1, not in
+// place of it: the route returns v2 in its own block, so nothing the owner sees changes until the
+// surface switches to it. That switch is the re-score of history PS-48 ④ asks him about.
+
+const tiersOf = (label: string, costs: number[]) =>
+  [{ name: `${label} I`, mergeCost: 0 }, ...costs.map((c, i) => ({ name: `${label} ${['II', 'III', 'IV', 'V', 'VI'][i]}`, mergeCost: c }))]
+
+/**
+ * v2's ladders, six tiers each (owner: "lets assume you up to T6").
+ * - **Tank (workouts): 5 · 4 · 5 · 3 · 3.** 1 · 5 · 20 · 100 · 300 · 900 sessions: the owner's
+ *   "100 days will make a big tier", then the yearly one, then "much later". It keeps v1's
+ *   rest-allowance decay (`replayCollection`), because a constant drain would punish a
+ *   three-a-week lifter on the days their plan tells them to rest.
+ * - **Ranger (steps) and Health cat: 3 → 1 at every tier** (owner: "at 3 they merge"), fed by a
+ *   bank that drains daily (`replayBankCollection`).
+ */
+/** v2's own faucet set, kept apart from v1's so the v1 surface's typed maps are untouched. */
+export interface V2Ladder { faucet: 'workout' | 'steps' | 'health'; tiers: Tier[] }
+
+export const V2_LADDERS: Record<V2Ladder['faucet'], V2Ladder> = {
+  workout: { faucet: 'workout', tiers: tiersOf('Tank', [5, 4, 5, 3, 3]) },
+  steps: { faucet: 'steps', tiers: tiersOf('Ranger', [3, 3, 3, 3, 3]) },
+  health: { faucet: 'health', tiers: tiersOf('Health cat', [3, 3, 3, 3, 3]) },
+}
+
+/** The Ranger's bank: the owner's numbers, marked provisional by him (2026-09-26). */
+export const STEPS_UNITS_PER_T1 = 5_000
+export const STEPS_DRAIN_PER_DAY = 1_000
+/**
+ * The Health cat's bank: one point per category logged that day (sleep recorded, any food log, a
+ * weight). The owner set the faucet; these two numbers are the plan's proposal and he has not seen
+ * them. A fully logged day is one T1, and logging two of the three holds it level.
+ */
+export const HEALTH_POINTS_PER_T1 = 3
+export const HEALTH_DRAIN_PER_DAY = 1
+
+export interface BankReplayInput {
+  /** Units gained on each day (steps, points). Days absent gained nothing. */
+  gains: Map<string, number>
+  ladder: V2Ladder
+  unitsPerT1: number
+  drainPerDay: number
+  /** The day the replay runs to, so the drain since the last gain counts. `YYYY-MM-DD`. */
+  today: string
+}
+
+/**
+ * Replay a draining bank into the same named-cat collection v1 uses.
+ *
+ * Each day: `bank = max(0, bank + gained − drain)`, and the T1s held are `floor(bank / unitsPerT1)`
+ * (owner: "if I make 5000 steps in the day its an effective 4000 profit"). A rise spawns that many
+ * T1 cats and merges; a fall decays that many, smallest first, breaking a bigger cat back into its
+ * parts. With 3 → 1 merges that is exactly the base-3 conversion the plan describes, done by the
+ * fold v1 already trusts, so every cat keeps its name and lineage. A replacement fold would lose
+ * both, which the collection's third PR warned against.
+ *
+ * Integer units only (whole steps, whole points), so no float can floor a T1 away.
+ */
+export function replayBankCollection(input: BankReplayInput): CollectionState {
+  const { ladder, unitsPerT1, drainPerDay, today } = input
+  const held: Held = ladder.tiers.map(() => [])
+  const dates = [...input.gains.keys()].filter(d => d <= today).sort()
+  let bank = 0
+  let t1 = 0
+  let decayEvents = 0
+  let lastLost: CollectionState['lastLost'] = null
+
+  if (dates.length > 0) {
+    for (let day = dates[0]; day <= today; day = addDays(day, 1)) {
+      bank = Math.max(0, bank + (input.gains.get(day) ?? 0) - drainPerDay)
+      const target = Math.floor(bank / unitsPerT1)
+      for (let k = t1; k < target; k++) {
+        const id = `${ladder.faucet}-${day}-${k}`
+        held[0].push({ id, tier: 0, name: spawnName(id), born: day, parts: [] })
+      }
+      if (target > t1) settle(held, ladder, day)
+      for (let k = target; k < t1; k++) {
+        const lost = decayOnce(held)
+        if (lost) { decayEvents++; lastLost = { name: lost.name, day } }
+      }
+      t1 = target
+    }
+  }
+
+  const stock: Stock = held.map(t => t.length)
+  const cats: CatSummary[] = [...held].reverse().flat().map(c => ({
+    id: c.id, tier: c.tier, name: c.name, born: c.born, from: c.parts.map(p => p.name),
+  }))
+  // A day with no gain tomorrow would drain below the current T1 count.
+  const restless = t1 > 0 && Math.floor(Math.max(0, bank - drainPerDay) / unitsPerT1) < t1
+  return { stock, duplicateDays: 0, decayEvents, cats, restless, lastLost, bank, unitsPerT1 }
+}
+
+/** v2's own version, returned in the route's `v2` block beside v1's. */
+export const COLLECTION_RULES_VERSION_V2 = 2

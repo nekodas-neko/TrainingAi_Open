@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** Comments in these files quote the route paths while explaining the history, so an assertion that
  *  matched raw source would pass on prose alone — the failure mode already on this repo's record. */
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const code = (src: string) => stripComments(src)
 
 const CONSOLES = [
   { route: '/admin/oura-ble',     page: 'app/admin/oura-ble/page.tsx' },

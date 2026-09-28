@@ -133,6 +133,8 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   live defects in `generate/route.ts` when pinned meals outnumber the slots.
 - [`docs/reviews/2026-09-22-sweep-53-stale-surfaces-and-movement.md`](../../reviews/2026-09-22-sweep-53-stale-surfaces-and-movement.md) — **the user-visible sweep, 2026-09-22** (RV-103…RV-122), on the angles the owner named. **His report was a RE-report:** BF-177's docblock already quotes him on the same symptom, and its fix is `cachedFetch(...).catch(() => {})` with no `onError` — dead per RV-84 — so any failure leaves the pre-meal budget in place with no retry and nothing on screen (RV-103). **The asymmetry that proves the class:** deleting a food refetches the weekly chart, adding one does not, and the delete site calls itself *"BF-177's third site, which that entry did not name"* (RV-104), plus four more stale surfaces (RV-106…RV-109). **Why the guard missed them:** `check-fetch-once-effects.js` matches only `useEffect(…, [])`, and inside the persistent shell `[userId]`/`[today]` never change either (RV-105). **Movement:** 37 cross-tab `router.push` sites against 5 `navigateToTab`, Home doing both on adjacent lines (RV-110); back during the barcode scanner discards the whole Log Food flow (RV-111). **Consolidation:** two Home widgets answer one question from one cache key — the Q-401/Q-415 shape (RV-116); `aiVolume` is built, unreachable and unfiled (RV-120).
 - [`docs/reviews/2026-09-25-sweep-61-ai-to-logic.md`](../../reviews/2026-09-25-sweep-61-ai-to-logic.md) — **sweep 61, 2026-09-25: where AI can be replaced with logic.** 121 calls in 30 days, which is cents, so the case is offline use and correctness. Entries RV-200 to RV-204.
+- [`docs/reviews/2026-09-26-sweep-63-design-review.md`](../../reviews/2026-09-26-sweep-63-design-review.md) — **sweep 63, 2026-09-26: a design review from 69 web screenshots and a static audit.** Entries RV-207 to RV-215: initials, pressed states, colour and format consistency, the type scale, the keyboard, empty-account truths and loading states.
+- [`docs/reviews/2026-09-26-sweep-64-dv-gallery-review.md`](../../reviews/2026-09-26-sweep-64-dv-gallery-review.md) — **sweep 64, 2026-09-26: DV's device gallery read.** RV-216 to RV-220: the streak contradiction, raw sleep keys, four calorie numbers, Day's card, and the gallery's own capture faults.
 - [`docs/reviews/2026-09-21-sweep-52-what-the-owner-sees.md`](../../reviews/2026-09-21-sweep-52-what-the-owner-sees.md) — **the visual sweep, 2026-09-21** (RV-84…RV-102), ranked by where the owner actually is (resume telemetry: Home 22 · Nutrition 14 · Health 11 · More 7 · Workout 2). **Systemic:** `cachedFetch` cannot reject — its network section is wrapped in `try/catch/finally` — so every `.catch()` chained onto it is dead code at **16 sites**, and the error states built on them are unreachable (RV-84). **Home carries three failure-vanish bugs:** the score row disappears with no skeleton or message (RV-85, whose helper `fetchWithRetry` retries 3× then gives up *silently*, landing on the blank widget its own header says it exists to prevent), a failed streak fetch paints a confident **0-day streak** (RV-86), and Profile invents *Level 1 · Novice · 0 XP* (RV-87). **One stored 1RM renders four numbers** — 92.5 / 92.25 / ~92 / 92.3 — with four sites calling the shared `displayOneRm` for the bodyweight branch and hand-rolling the weighted one (RV-89); `mround125` doing display duty already shipped BF-127. **A real CSS bug:** `truncate` on a flex container clips the name with no ellipsis *and* clips the green done-tick out of existence (RV-92). **A number painted the wrong band's colour:** the ACWR value is hard-coded to the `high` amber while its label says "Optimal" (RV-97). Layout findings are measured against production content (130 of 337 food items exceed the 22-char budget; the owner's lower-back injury is live).
 - [`docs/reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md`](../../reviews/2026-09-03-fk-edges-meal-plan-cross-user-refs.md) — **the FK edges into user-scoped tables, 2026-09-03** (sweep 45, RV-42). The inventory is **31 edges, not the 27** sweep 40 counted, 20 with no `user_id` on the child — re-run the query in §2 rather than the remembered number. **Four nutrition edges hold, each proven with a control**: `food_logs.food_item_id`, `.meal_type_id`, `.saved_meal_id` (400, against a 201 control) and `supplement_logs.supplement_id` (404, against a 200). **RV-42**: `meal_plan_meals.saved_meal_id` and `.meal_type_id` take client ids with no ownership check through two routes. No name leaks — the read joins neither table — but both are `ON DELETE SET NULL`, so the referenced row's owner deleting their own saved meal silently nulled the other account's plan row, driven end to end. The workout and device edges are **untouched, not clean**.
 - [`docs/reviews/2026-09-09-maintenance-2245-is-too-high.md`](../../reviews/2026-09-09-maintenance-2245-is-too-high.md) — **the Calorie Nudge's 2,245 kcal traced to cause, 2026-09-09** (TN-27, TN-28, TN-29). The arithmetic is right and the **window selection** is not: the 28-day and 14-day windows share an identical mean intake of 1,612, so `MIN_LOGGED_FRACTION` cannot separate them, and the whole 591 kcal spread is the weight slope, which nothing gates. Coverage falls as the window grows, so the gate rejects 27 weigh-ins over 27 days and accepts 14 over 13. **`computeEnergyBalance` already derives maintenance a second way — resting rate plus measured movement, 1,895 — and never compares them.** Read as an activity factor the shipped number is **1.67** for someone averaging 3,572 steps/day. Owner-approved: gate on the factor (TN-29), then stop the short-window fallback (TN-27 option 3).
@@ -266,6 +268,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-471 — the meal-plan reroll path is correctly guarded; its double-trip count is a fingerprint artefact, not tap-spam). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
 
 - [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](../../reviews/2026-08-18-nutrition-tdee-calibration.md) — **the TDEE outcome check, 2026-08-18** (Q-517 — the food log captures **~45%** of actual intake, so taking it at face value implies a maintenance *below the owner's own BMR*. `adaptive-tdee.ts` already anticipated this and its gates refuse **75%** of windows — but `MIN_PLAUSIBLE_MAINTENANCE = 1000` sits **52 kcal below** where the artefact lands (1,052), and `MIN_LOGGED_FRACTION` counts logged *days* rather than log *completeness*, so a 45%-complete record passes a 70% gate. Proposed: floor at the user's own BMR — blocks every harmful value, tightening the range to 1,902–2,219).
+- [Shared food library plan (BF-77)](../../superpowers/plans/2026-09-28-shared-food-library.md) — browse an opted-in friend's meals and copy them; why not a group library or a share code.
 
 ## Open issues
 
@@ -336,9 +339,11 @@ Live at the time of writing (2026-07-30):
 - The quick-edit sheet fixes and the NUT-10/11 hygiene pass shipped, but interactive verification
   was blocked in the sandbox.
 - Supplement reminders and meal-type reminder cancellation are unverified on device.
-
-## History
-
+- ✅ **The empty meal's header `+` is NOT undersized** — retracted 2026-09-27, the same day it was
+  filed. `meal-card.tsx` gives it `h-9 w-9`, but `app/globals.css` floors every `button` and
+  `[role="button"]` at 48 px, so it renders at 48 × 48 (measured). **A Tailwind size class is not the
+  rendered size here** — check the global floor before filing one of these. `RV-213`'s collapse is
+  unblocked by it; the entry carries the retraction.
 - [`2026-09-15-bf74-photo-remove-confirm`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf74-photo-remove-confirm)
   — **BF-74 round two (2026-09-15): removing a meal photo asks first.** Round one moved the ✕ out of
   the dismiss corner and made it a bin; the device pass still found it destroyed the photo on one
@@ -349,7 +354,7 @@ Live at the time of writing (2026-07-30):
   case. The e2e drives cancel *then* confirm — cancel first, because a confirm that removes anyway
   passes every happy-path assertion. Device check owed.
 
-- **[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoff-2026-09-02-nutrition-lane-a-session.md)**
+- **[`docs/handoffs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoffs/handoff-2026-09-02-nutrition-lane-a-session.md)**
   — 🆕 **Lane A session, 2026-09-02: ten PRs.** BF-69 stage 1 (supplement contributions, migrations
   254/255, local SQLite v34), LB-48, LB-49's meal-log `scale`, LB-50's prompt fix, LB-18's unscoped
   `Recent` source, plus three CI ratchets and the journal ceiling raise. **Read its Gotchas before
@@ -395,7 +400,7 @@ Live at the time of writing (2026-07-30):
   alongside a name**, and both negatives are what stop the fix rebuilding the bug one layer down.
   **Nothing renders differently yet** — `groupDiaryEntries` still requires a `savedMealId`, and
   changing that is Lane B's half.
-- **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
+- **[`docs/handoffs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoffs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
   — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
   `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
@@ -488,7 +493,7 @@ Live at the time of writing (2026-07-30):
   flip** on identical meal-prep containers (5, 5, 1, 1, 5, 1) and the shipped one is 30 of 30.
 
 
-- **[`docs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
+- **[`docs/handoffs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoffs/handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
   — 🆕 the Meal Plan build-out, Phase 1 through one-tap "I ate this" (v1.282.0 → v1.299.0, fifteen
   merged PRs, migrations 177–183, local SQLite v23–v25). **Start here for anything meal-plan.**
   What it left: **Q-187**, whose four steps have now all shipped — the last on 2026-08-31 (v1.412.0),
@@ -510,10 +515,47 @@ Live at the time of writing (2026-07-30):
   product" — collapsing them told the owner their food was not in the database; and local SQLite
   **v25 has never run on a phone** —
   if Saved Meals comes up blank after an update, revert rather than debug forward.
-- Handoffs: `ls docs/handoff-*-nutrition-*.md`
+- **[`2026-09-26-bf61-web-path-clears`](../../overview/history-2026-09-27-folded-2.md#2026-09-26-bf61-web-path-clears)**
+  — BF-61. The swipe tray's Delete works on the web at 0/100/300/500 ms after the release, so the
+  cause of the device's swallowed press is not in the shared JS. Re-laned to Device Verification
+  with a three-step instrumented probe instead of a third speculative fix.
+- Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
+  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv218-nutrition-copy)
+  (RV-218's copy bugs: "205 workouts" was 205 kcal, and a signed `net` printed "−1,694 deficit" —
+  sign and word both meaning "under". Also why items ①②④ are Lane A's, established from the route
+  rather than assumed),
+  — including
+  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv212-nutrition-tone)
+  (RV-212 ①②: the energy-balance headline stops reading a partial day as a fault, following
+  `energy-card.tsx`'s own earlier split which keeps the colour on the " so far"-qualified label; a
+  taken supplement is muted rather than struck through, while the manage sheet's `!s.active`
+  strikethrough — a different claim — stays. Item ④ went back to the owner as `LB-167`, because
+  `meal-thumb.tsx` records his instruction for the placeholder it asked to remove).
 
 ## Decided, and deliberately not built
+
+- **⛔ ON THE DIARY, VERTICAL SPACE BETWEEN MEAL CARDS IS THE GROUPING MECHANISM — a density change
+  needs a NEW argument (owner, 2026-09-27 — RV-213, declined and struck).** A sweep measured four
+  (really six) empty meal slots at roughly 320 px of mostly-blank card and proposed collapsing each
+  to a single name-plus-`+` row, taking ~1,400 px to ~800 px and pulling two below-the-fold cards
+  onto the screen. A before/after was rendered at 384 px dark and shown. **He said no:**
+  *"I like the original look; it shows the grouping nicely with the space."*
+  - **So the empty height is doing work.** It is what separates one meal from the next, and the
+    saving was real but paid for in the thing the screen exists to show.
+  - **This is a principle, not a one-off no.** Any future sweep measuring blank space on the diary
+    will reach the same finding and should stop here. Re-opening it takes a **new entry with a new
+    reason** — not a second run at this one.
+  - **The finding's other half is on the record and is also not a to-do:** in
+    `components/nutrition/meal-card.tsx`, an empty meal renders a header `+` **and** a body
+    `+ Add food`. Two affordances, one action — but the header `+` is the control that is present in
+    **every** meal state and the body row is the empty-state one, so the pair is consistency rather
+    than duplication. Filing it separately would be re-opening a declined entry through a side door.
+    (Named without line numbers deliberately: `check-index-doc-paths` reads a `file:line` suffix as
+    part of the path, and a pinned line in an orientation doc goes stale on the next edit anyway.)
+  - The declined mockup is kept at
+    [`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html),
+    so the next person can see what was rejected rather than re-drawing it.
 
 - **A plan meal's `suggestedTime` stays a LABEL — it schedules nothing (owner, 2026-08-24 — Q-201,
   removed from the queue).** *"For now it can stay as a label; we already have the notification
@@ -598,6 +640,14 @@ Live at the time of writing (2026-07-30):
   `"1 glass (200 ml)"` matched the "g" of "glass" and reported a one-gram serving, dividing every
   macro by a hundred. Its macros are also not guaranteed to agree with its own calorie figure
   (Q-196).
+- **A scanned barcode is resolved from the user's own foods FIRST** — `lookupBarcode(code, userId)`
+  (`packages/shared/src/nutrition/barcode-lookup.ts`), the one path both scanners take. LB-158:
+  `food_items.barcode` had existed server-side the whole time and held **nothing** (341 rows, zero
+  codes, 42 of them `source: 'barcode'`), because no client ever set it — the column, the Zod
+  schema, the push branch and `rowToFoodItem` were all ready and the write never happened. The code
+  now travels on `NutritionScanResult` / `NewFoodItem` / `NewFoodEntry`, and the device mirrors it
+  at local SQLite v41. **The local upsert COALESCEs that one column** — a code is known only at the
+  scan, so letting `excluded` win would erase it the next time the food is logged from Recent.
 - **Text → macros already exists: `POST /api/nutrition/scan` with `{ text }`.** It returns the same
   `NutritionIngredient` shape everything else in nutrition works in. Do not add a second route for
   this; the meal-plan picker reuses it.

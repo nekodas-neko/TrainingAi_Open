@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { macroCalorieDisagreement, MACRO_MISMATCH_VISIBLE_LIMIT } from '@trainingai/shared/nutrition/scan-totals'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-109 — the barcode Review sheet was the one food surface with no macro/calorie cross-check.
@@ -49,8 +50,7 @@ describe('what must NOT be flagged', () => {
 })
 
 const ROOT = path.resolve(__dirname, '../../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('the Review sheet is wired to it', () => {
   it('renders the warning, ungated, directly under the Calories field', () => {

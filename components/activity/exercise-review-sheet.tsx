@@ -261,7 +261,7 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
 
   return (
     <Sheet open={!!sessionId} onOpenChange={open => { if (!open) onClose() }}>
-      <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-2xl px-6">
+      <SheetContent side="bottom" className="h-[85dvh] overflow-y-auto rounded-t-2xl px-6">
         {session && (
           <>
             <SheetHeader className="mb-4 pt-4">

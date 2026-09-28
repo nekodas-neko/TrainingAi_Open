@@ -20,6 +20,7 @@
 // the chronic_stress_score / chronic_stress_contributors columns already exist from migration 123).
 
 import type { CumulativeStressConstants } from './constants'
+import { lowerMedian } from '@trainingai/shared/stats'
 
 // The constants are INJECTED, not read from disk here (Q-545). Importing the loader put `node:fs`
 // in this module's graph, and the Oura rollup reaches this file through
@@ -135,9 +136,8 @@ function nansum(a: number[]): number {
 // torch.median: on an even-length tensor returns the LOWER of the two middle values
 // (element at floor((n−1)/2) of the sorted array), NOT the average.
 function medianLowerMiddle(values: number[]): number {
-  if (values.length === 0) return NaN
-  const s = [...values].sort((a, b) => a - b)
-  return s[Math.floor((s.length - 1) / 2)]
+  // NaN on empty, not null — see `daily-baselines.ts`; the sort-and-index is `lowerMedian` (LA-151).
+  return lowerMedian(values) ?? NaN
 }
 
 // utils.torch_median: the TRUE median (average of the two middle values on even n) over the

@@ -55,7 +55,7 @@ export function StepCounterExportConsole() {
       </p>
       <div className="flex items-center gap-2">
         <input
-          type="number"
+          type="number" enterKeyHint="done"
           min={50}
           max={1000}
           step={50}

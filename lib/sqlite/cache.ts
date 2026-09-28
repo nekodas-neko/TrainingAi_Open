@@ -541,9 +541,23 @@ export async function cachedFetch<T>(
 // cache hit and silently renders yesterday's data before the network fetch lands.
 interface TodayEnvelope<T> { date: string; data: T }
 
+// LB-150. The envelope's "today" is the USER's today. It was the bare `todayInTz()`, so it rolled at
+// Brisbane midnight for everyone while every server route computes today in the user's zone. For a
+// user in New York, a reading from their previous day passed the guard for 14 hours of every 24.
+// The stamp and the check read this one value, so they cannot disagree with each other, which is
+// the failure a stamp-only or check-only change would introduce. Set by `UserTimezoneProvider`
+// during render, before any child's mount-time seed read. Until it is set this is undefined, which
+// is the Brisbane default, so a Brisbane user's behaviour is unchanged byte for byte.
+let cacheTimezone: string | undefined
+
+/** Called by `UserTimezoneProvider`. Idempotent, so calling it on every render is harmless. */
+export function setCacheTimezone(tz: string | undefined): void {
+  cacheTimezone = tz || undefined;
+}
+
 function unwrapToday<T>(stored: unknown): T | null {
   const envelope = stored as TodayEnvelope<T> | null;
-  if (!envelope || envelope.date !== todayInTz()) return null;
+  if (!envelope || envelope.date !== todayInTz(cacheTimezone)) return null;
   return envelope.data;
 }
 
@@ -600,7 +614,7 @@ export async function cachedFetchToday<T>(
 ): Promise<boolean> {
   return cachedFetchCore<T>(
     key, url, ttlSeconds, onData,
-    (data): TodayEnvelope<T> => ({ date: todayInTz(), data }),
+    (data): TodayEnvelope<T> => ({ date: todayInTz(cacheTimezone), data }),
     unwrapToday<T>,
     undefined,
     opts?.onError,

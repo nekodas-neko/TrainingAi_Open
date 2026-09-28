@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { formatBuildDate } from '@/components/more/build-label'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-111 — "Up to date — v1.414.1 is the newest build" under a v1.436.2 badge, both correct.
@@ -13,8 +14,7 @@ import { formatBuildDate } from '@/components/more/build-label'
 
 const ROOT = path.resolve(__dirname, '..', '..')
 const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-const stripped = (rel: string) => src(rel)
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const stripped = (rel: string) => stripComments(src(rel))
 
 describe('the build date', () => {
   it('renders in the user timezone, not the device one', () => {

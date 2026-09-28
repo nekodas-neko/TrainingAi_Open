@@ -7,7 +7,7 @@ version: 2.0.0
 # Session Handoff
 
 Produce a single, self-contained handoff doc at
-**`docs/handoff-YYYY-MM-DD-<domain>-<descriptive-title>.md`** that lets the next session resume
+**`docs/handoffs/handoff-YYYY-MM-DD-<domain>-<descriptive-title>.md`** that lets the next session resume
 with **zero** re-discovery. It is the *per-session record* companion to the durable
 `projectOverview.md` — projectOverview is the standing index; a handoff doc says what one
 session did, decided, and left behind.
@@ -17,17 +17,17 @@ root `HANDOFF.md` — that convention is retired and its files were folded into 
 
 ### The filename
 
-`docs/handoff-<YYYY-MM-DD>-<domain>-<descriptive-title>.md`
+`docs/handoffs/handoff-<YYYY-MM-DD>-<domain>-<descriptive-title>.md`
 
 - **`<domain>`** is one slug from [`docs/domains/README.md`](../../../docs/domains/README.md):
   `sleep` · `readiness` · `heart-rate` · `cardio` · `activity` · `workouts` · `nutrition` ·
   `body` · `devices` · `app-shell` · `platform` (or `cross` for genuinely app-wide work).
   Pick the **primary** domain — the one an agent would be working in when it needs this doc — and
-  list any others in the doc header. This is what makes `ls docs/handoff-*-sleep-*.md` a complete
+  list any others in the doc header. This is what makes `ls docs/handoffs/handoff-*-sleep-*.md` a complete
   answer to "what do we already know about sleep work".
 - **`<descriptive-title>`** describes the *work*, not the session.
 
-Example: `docs/handoff-2026-07-30-sleep-nap-vs-night-resolution.md`
+Example: `docs/handoffs/handoff-2026-07-30-sleep-nap-vs-night-resolution.md`
 
 Before writing, read that domain's index (`docs/domains/<domain>/README.md`) — it tells you which
 reference docs and open issues the handoff should link rather than restate.
@@ -43,7 +43,7 @@ is a lost handoff.
 ## Steps
 
 1. **Pick the primary domain, then look for an existing handoff for this line of work** —
-   `ls docs/handoff-*-<domain>-*.md` (and `ls docs/handoff-*.md` for anything predating the
+   `ls docs/handoffs/handoff-*-<domain>-*.md` (and `ls docs/handoffs/handoff-*.md` for anything predating the
    domain convention). If this session already wrote one, **update that file** rather than adding
    a second doc for the same work. Start a new file only for genuinely new work.
 2. **Gather live state** — don't guess:
@@ -53,7 +53,7 @@ is a lost handoff.
    - Whether `pnpm dev` / tests / typecheck were last run and their result — state it honestly, including anything **not** verified (per CLAUDE.md's "state which failure surfaces were NOT exercised" rule; device-only paths count).
 3. **Write the doc** using the template below. Be specific: "Changed rest-timer floor from 60s→90s in `components/workout/active-workout-screen.tsx:212`", never "fixed the timer".
 4. **Write the `## Pickup prompt` section last** — a block the user can paste verbatim into a cold session. No "see above", no references to the current chat.
-5. **Commit and push to the current feature branch** (never `main`): `git add docs/handoff-*.md && git commit && git push -u origin <branch>`. This is the step that makes the handoff survive into the next session. If a PR is already open for this branch, the handoff rides in that PR — don't open a second one.
+5. **Commit and push to the current feature branch** (never `main`): `git add docs/handoffs/handoff-*.md && git commit && git push -u origin <branch>`. This is the step that makes the handoff survive into the next session. If a PR is already open for this branch, the handoff rides in that PR — don't open a second one.
 6. **Tell the user the branch name and repeat the pickup prompt in the chat reply.**
 
 ## Template

@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { readStrapBattery, writeStrapBattery, STRAP_BATTERY_KEY } from '../strap-battery'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * Q-111 — the strap's last-seen battery, and the two writers that must land in one place.
@@ -28,7 +29,11 @@ beforeEach(() => {
 describe('the store', () => {
   it('round-trips a reading with its age', () => {
     writeStrapBattery(72, 1_700_000_000_000)
-    expect(readStrapBattery()).toEqual({ percent: 72, at: 1_700_000_000_000 })
+    // One reading is its own low-water mark (BF-215) — not a missing field, so the chip is correct
+    // from the first render with no migration and no blank state.
+    expect(readStrapBattery()).toEqual({
+      percent: 72, at: 1_700_000_000_000, min: 72, minAt: 1_700_000_000_000,
+    })
   })
 
   it('is empty rather than wrong when nothing has been stored', () => {
@@ -69,8 +74,7 @@ describe('the store', () => {
 })
 
 const ROOT = path.resolve(__dirname, '../../..')
-const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const source = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 describe('both writers reach the one store', () => {
   it('the native status listener records it', () => {

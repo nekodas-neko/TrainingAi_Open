@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 /**
@@ -9,10 +10,7 @@ const ROOT = path.resolve(__dirname, '../../..')
  * failure this repo has on its record twice (BF-154's header names the second).
  */
 const read = (rel: string) =>
-  readFileSync(path.join(ROOT, rel), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
+  stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 const ASSIGN_STEP = read('components/nutrition/assign-step.tsx')
 const FOOD_LOGGER = read('components/nutrition/food-logger-sheet.tsx')

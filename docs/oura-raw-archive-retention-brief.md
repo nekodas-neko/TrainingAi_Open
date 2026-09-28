@@ -131,6 +131,39 @@ order Q-29 currently describes would remove the wrong table.
 
 ---
 
+## ✅ DECIDED 2026-09-28 — the archive is KEPT. There is no 30-day prune on `oura_raw_packed`.
+
+The owner's *"i dont wanna keep dead weight data for more than 30days if we dont need it"* set a
+condition — **need**, not cost — and this brief's first version answered the wrong one by offering
+him the size and the bill. `OR-192` was filed to take the measurement that answers the right one.
+It was taken, he was re-asked with the need and nothing else, and he chose to keep it.
+
+**Why it is the exception to his retention instinct:**
+
+- **A redecode reads every stored day by construction.** `fullHistory: true` is hardcoded in
+  `app/api/oura-ble/samples/redecode/route.ts` — not a caller option — because *"a new/fixed decoder
+  backfills every stored day, so this must bypass the incremental read window"*. **There is no
+  windowed redecode mode**, so *how far back does a fix reach* has one answer: all of it, every time.
+- **62% of the archive is already past 30 days** — 992 of 1,580 buckets, 1,215,622 of 1,954,802
+  frames, 17 MB of 27 MB (measured 2026-09-28). A 30-day window narrows every future protocol fix to
+  the most recent third of history, permanently: a pruned row cannot be re-drained from the ring.
+- **Decoder- and clock-adjacent fixes are not rare** — ~10 in six weeks, the most recent three days
+  before the measurement (`LA-141`, #1625, changing the ds↔UTC mapping every stored frame is read
+  through).
+
+**Two limits, recorded rather than smoothed over.** The **2026-08-16 public snapshot squashed the
+pipeline's first five weeks out of git**, so this covers six weeks and not the five months the
+question was framed over. And **no *completed* redecode consuming >30-day bytes can be shown**:
+`oura_redecode_jobs` holds exactly two rows (2026-08-30, 2026-09-03), both `fullHistory`, **both
+abandoned**, and the table only exists since migration 196, so earlier passes left no trace. So the
+archive is insurance that has not yet been visibly cashed — but the mechanism that would cash it
+reads all of it by design, and the loss would be permanent.
+
+**Do not re-offer the storage cost.** Money was never the axis, and offering it is what stalled this
+decision for five days.
+
+---
+
 **Sources.** Production reads on 2026-09-23 via `/api/admin/db-query` (`pg_stat_user_tables`,
 `claude_ro.oura_raw_samples`, `claude_ro.oura_raw_packed`);
 `lib/data/postgres/slices/oura-raw-pack.ts` (the packer's seal/verify/delete contract);

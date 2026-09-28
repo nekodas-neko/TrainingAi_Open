@@ -8,6 +8,7 @@ import { Moon, Footprints, MessageCircle, BatteryLow, Frown, Meh, Smile, Zap, ty
 import { cn, accentCardStyle } from '@trainingai/shared/utils'
 import { CARD_DEFAULT_COLORS } from '@/app/session-select/constants'
 import { Sparkline } from '@/components/ui/sparkline'
+import { SleepFeelLine } from '@/components/home/sleep-feel-line'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { HomeNutritionCard } from '@/components/home/home-nutrition-card'
 import dynamic from 'next/dynamic'
@@ -29,6 +30,7 @@ const CollectionCard = dynamic(() => import('@/components/home/collection-card')
 // erased at compile time and never exists at runtime.
 import type { CardWidgetKey } from '@/lib/home/home-prefs'
 import { formatKg } from '@trainingai/shared/format/units'
+import { SleepVerdictNote } from '@/components/home/sleep-verdict-note'
 
 export type CardSectionKey = `card_${CardWidgetKey}`
 
@@ -45,6 +47,8 @@ interface HrReading { timestamp: string; bpm: number; source: string | null }
 interface WorkoutSession { sessionName: string; startedAt: string; completedAt: string | null }
 
 interface HomeCardWidgetProps {
+  /** LA-136 — the sleep line reads `day_checkins` local-first, which needs the store's owner. */
+  userId?: string
   sectionKey: CardSectionKey
   sectionEditMode: boolean
   activeCardWidgets: CardWidgetKey[]
@@ -71,6 +75,8 @@ interface HomeCardWidgetProps {
   hrData: { readings: HrReading[]; workoutSessions: WorkoutSession[]; sleep: HrSleepWindow | null } | null
   // callbacks
   setMoodSheetOpen: (open: boolean) => void
+  /** TN-85 — opens the morning check-in, where the sleep scale a verdict correction sets lives. */
+  onCorrectSleepVerdict: () => void
 }
 
 export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCardWidgetProps) {
@@ -82,6 +88,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
     metaToday, metaRecent, metaLoading, weekToDate,
     calorieGoal, calorieType, weightLookback, stepsGoal, stepsGoalType,
     sleepGoal, moodLog, sleepData, acwrData, muscleData, hrData, setMoodSheetOpen,
+    onCorrectSleepVerdict, userId,
   } = props
 
   const sparklinePoints = [...metaRecent].reverse().map(r => r.weightKg).filter((w): w is number => w != null)
@@ -165,6 +172,11 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
             {goalPct !== null && <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: "rgba(139,92,246,0.15)" }}><div className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none" style={{ transform: `scaleX(${goalPct / 100})`, background: "linear-gradient(90deg, #6366f1, #a78bfa)" }} /></div>}
             {totalStageHrs > 0 && (<><div className="flex h-2 rounded-full overflow-hidden gap-px mb-1.5">{stages.filter(s => (s.hours ?? 0) > 0).map(s => <div key={s.label} style={{ flex: s.hours ?? 0, background: s.color }} />)}</div><div className="flex gap-3">{stages.map(s => <div key={s.label} className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} /><span className="text-xs text-muted-foreground">{s.label}</span><span className="text-xs font-bold">{s.hours != null ? `${s.hours.toFixed(1)}h` : "—"}</span></div>)}</div></>)}
           </div>
+          {/* TN-85 — OUTSIDE the card's own `role="button"`, because the note carries a button of
+              its own and a button inside a button is what `check-nested-buttons.js` fails on. It is
+              also hidden in edit mode: the section editor is about layout, and an announcement with
+              a live control in it does not belong in a rearranging surface. */}
+          {!sectionEditMode && <SleepVerdictNote date={_today} onCorrect={onCorrectSleepVerdict} />}
         </div>
       )
     }
@@ -220,6 +232,11 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
               </div>
               <MessageCircle className="h-6 w-6 ml-2 flex-none" style={{ color: "var(--accent-amber)" }} />
             </div>
+            {/* LA-136: under the mood card, as approved. A SIBLING of the row above, not inside its
+                left column — the approved drawing runs the divider the full width of the card and
+                puts the dots at its right edge, which nesting it beside the chat icon cannot do.
+                Renders nothing until he has rated. */}
+            <SleepFeelLine userId={userId} />
           </div>
         </div>
       )

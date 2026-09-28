@@ -2,14 +2,16 @@ import { describe, it, expect } from 'vitest'
 import { computeActivityScore, volumeTargetKg } from '@trainingai/shared/health/activity-score'
 import type { DailyGoals } from '@trainingai/shared/health/daily-goals'
 
-// NOTE: `**/__tests__/**` is excluded from tsconfig, so a missing field here is NOT a compile
-// error — it surfaces as NaN through the score. Keep this literal complete.
+// Keep this literal complete: a missing field surfaces as NaN through the score rather than as
+// an obviously wrong answer. `tsconfig.tests.json` does typecheck this file (that is what
+// `scripts/check-test-typecheck.js` runs), so an EXTRA field is a compile error — but a missing
+// one inside a `Partial<>` override still is not.
 const GOALS: DailyGoals = { stepGoal: 8000, activeEnergyGoal: 400, zoneMinutesGoal: 22, strengthFreqGoal: 3, sessionVolumeGoalKg: 5000 }
 
 function input(overrides: Partial<Parameters<typeof computeActivityScore>[0]> = {}) {
   return {
     steps: null, activeCalories: null, zoneMinutes: null, moveHours: null, moveHoursGoal: null,
-    sessions7d: 0, volume7dKg: 0, typicalSessionVolumeKg: 5000, goals: GOALS, acwr: null,
+    sessions7d: 0, volume7dKg: 0, goals: GOALS, acwr: null,
     ...overrides,
   }
 }
@@ -109,24 +111,24 @@ describe('computeActivityScore — a lifting day with no zone-2+ minutes (Q-183)
 
 // Q-137 (2026-08-11): raising DEFAULT_STRENGTH_FREQ_GOAL from 3 to 5 unfreezes BOTH strength
 // contributors, because the volume lane's target is derived from it —
-// `volTarget = typicalSessionVolumeKg × strengthFreqGoal` (activity-score.ts).
+// `volTarget = sessionVolumeGoalKg × strengthFreqGoal` (activity-score.ts).
 //
-// Numbers are the owner's measured ones, so this fails if either lane re-saturates: median session
-// tonnage 4,700 kg; a strong week 25,159 kg over 5 sessions; a weak week 16,843 kg over 3.
+// ⚠ That formula line, and the arithmetic in the three cases below, said
+// `typicalSessionVolumeKg × strengthFreqGoal` until 2026-09-26 — the multiplicand Q-190 replaced
+// six weeks earlier. The assertions were right the whole time and the reasoning printed beside
+// them was not, which is the harder kind of stale comment to notice.
+//
+// Weeks are the owner's measured ones, so this fails if either lane re-saturates: a strong week
+// 25,159 kg over 5 sessions; a weak week 16,843 kg over 3.
 describe('strength lanes discriminate once the frequency goal matches the athlete (Q-137)', () => {
-  const TYPICAL_SESSION_KG = 4_700
   const STRONG_WEEK = { sessions7d: 5, volume7dKg: 25_159 }
   const WEAK_WEEK   = { sessions7d: 3, volume7dKg: 16_843 }
 
   const strengthOnly = (goal: number, week: { sessions7d: number; volume7dKg: number }) =>
-    computeActivityScore(input({
-      ...week,
-      typicalSessionVolumeKg: TYPICAL_SESSION_KG,
-      goals: { ...GOALS, strengthFreqGoal: goal },
-    }))!
+    computeActivityScore(input({ ...week, goals: { ...GOALS, strengthFreqGoal: goal } }))!
 
   it('the OLD goal of 3 scored a weak week identically to a strong one', () => {
-    // volTarget was 4,700 × 3 = 14,100 — below even the weak week's 16,843 — so both lanes
+    // volTarget was 5,000 × 3 = 15,000 — below even the weak week's 16,843 — so both lanes
     // clamped to 100 and 45 of the 100 available weight carried no information at all.
     const strong = strengthOnly(3, STRONG_WEEK)
     const weak   = strengthOnly(3, WEAK_WEEK)
@@ -136,7 +138,7 @@ describe('strength lanes discriminate once the frequency goal matches the athlet
   })
 
   it('the NEW goal of 5 separates them on both lanes', () => {
-    // volTarget is now 4,700 × 5 = 23,500, which the strong week clears and the weak week does not.
+    // volTarget is now 5,000 × 5 = 25,000, which the strong week clears and the weak week does not.
     const strong = strengthOnly(5, STRONG_WEEK)
     const weak   = strengthOnly(5, WEAK_WEEK)
     expect(weak.components.strengthFreq).toBeLessThan(strong.components.strengthFreq)
@@ -155,26 +157,34 @@ describe('strength lanes discriminate once the frequency goal matches the athlet
 // median of the user's OWN sessions. Train harder, the median rises, the target rises, the score
 // stays put: the treadmill the 2026-07-22 rewrite removed from the daily-movement lane and left
 // here. It is now an absolute per-session goal.
+//
+// ⚠ **The original regression case is GONE, deliberately (LA-154, 2026-09-26).** It passed three
+// different personal medians into the same training week and asserted the score did not move.
+// `typicalSessionVolumeKg` is no longer a field on `ActivityScoreInput`, so that case can no
+// longer be written — and the guarantee is stronger for it: the treadmill is unreachable by
+// construction rather than asserted against. What is kept below is the half that still has teeth,
+// which is that the target comes from the GOAL and responds to it.
 describe('the volume target is absolute, not the user\'s own median (Q-190)', () => {
   const GOALS_V: DailyGoals = { ...GOALS, strengthFreqGoal: 5, sessionVolumeGoalKg: 5200 }
-  const week = (volume7dKg: number, typicalSessionVolumeKg: number) =>
-    computeActivityScore(input({ sessions7d: 5, volume7dKg, typicalSessionVolumeKg, goals: GOALS_V }))!
+  const week = (volume7dKg: number) =>
+    computeActivityScore(input({ sessions7d: 5, volume7dKg, goals: GOALS_V }))!
 
-  it('scores the same week identically however strong the athlete has become', () => {
-    // THE regression. Same training week, three very different personal medians. Before the fix the
-    // stronger athlete was punished for having a higher median — the target moved with them.
-    const beginner     = week(25_159, 2_000)
-    const intermediate = week(25_159, 4_438) // the owner's measured median
-    const advanced     = week(25_159, 9_000)
-    expect(intermediate.components.strengthVolume).toBe(beginner.components.strengthVolume)
-    expect(advanced.components.strengthVolume).toBe(beginner.components.strengthVolume)
+  it('moves the target with the GOAL, which is the input that replaced the median', () => {
+    // The positive form of the old case: the same week scores differently only because the goal
+    // differs. Nothing about the athlete's own history is an input any more.
+    const atLowGoal  = computeActivityScore(input({
+      sessions7d: 5, volume7dKg: 25_159, goals: { ...GOALS_V, sessionVolumeGoalKg: 4_000 } }))!
+    const atHighGoal = computeActivityScore(input({
+      sessions7d: 5, volume7dKg: 25_159, goals: { ...GOALS_V, sessionVolumeGoalKg: 6_500 } }))!
+    expect(atLowGoal.components.strengthVolume)
+      .toBeGreaterThan(atHighGoal.components.strengthVolume)
   })
 
   it('separates the owner\'s measured weak, typical and strong weeks', () => {
     // volTarget = 5,200 × 5 = 26,000. Measured weeks over 8 weeks: 16,843 / 25,159 / 31,083.
-    const weak    = week(16_843, 4_438).components.strengthVolume
-    const typical = week(25_159, 4_438).components.strengthVolume
-    const strong  = week(31_083, 4_438).components.strengthVolume
+    const weak    = week(16_843).components.strengthVolume
+    const typical = week(25_159).components.strengthVolume
+    const strong  = week(31_083).components.strengthVolume
     expect(weak).toBeLessThan(typical)
     expect(typical).toBeLessThan(100)   // near the target, not at it — a typical week is not a best week
     expect(strong).toBe(100)            // and a strong week is still reachable

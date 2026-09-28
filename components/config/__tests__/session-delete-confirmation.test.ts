@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { sessionDeletePrompt, sessionLabel } from '@/components/config/session-delete-prompt'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const session = (name: string, n: number) => ({ name, exercises: Array.from({ length: n }) })
 
@@ -32,9 +33,7 @@ describe('the trash icon cannot delete a session on its own — BF-132', () => {
   // No proximity window and no exact-marker anchor either — both have broken a guard in this repo
   // without the guarded behaviour changing.
   const read = (rel: string) =>
-    readFileSync(path.join(process.cwd(), rel), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/[^\n]*/g, '')
+    stripComments(readFileSync(path.join(process.cwd(), rel), 'utf8'))
 
   const sheet = read('components/config/program-editor-sheet.tsx')
   const header = read('components/config/session-header-row.tsx')

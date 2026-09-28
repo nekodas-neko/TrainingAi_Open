@@ -58,6 +58,14 @@ describe('POST /api/dexa-scans', () => {
     expect(saveDexaScan).not.toHaveBeenCalled()
   })
 
+  // LA-145. The shape regex accepts an impossible day, which then fails at the driver as a 500.
+  it('rejects a well-shaped date that is not a real day, in either separator', async () => {
+    for (const scannedOn of ['2026-02-31', '2026/02/30', '2026-13-01', '2026-00-10']) {
+      expect((await post({ scannedOn })).status, scannedOn).toBe(400)
+    }
+    expect(saveDexaScan).not.toHaveBeenCalled()
+  })
+
   it('stores a negative T and Z score rather than refusing them', async () => {
     expect((await post({ ...MINIMAL, tScore: -1.6, zScore: -1.6 })).status).toBe(200)
     expect(saveDexaScan.mock.calls[0][1]).toMatchObject({ tScore: -1.6, zScore: -1.6 })

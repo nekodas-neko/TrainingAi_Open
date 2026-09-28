@@ -16,19 +16,26 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { PROSE_GUARDS, PROSE_FIELD_GUARDS, METRIC_UNITS_RULE, NO_SUPERLATIVE_RULE, QUOTE_NUMBERS_RULE } from '../prompt-guards'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
 
-// Routes whose whole output is prose. `prompt.ts` is health-insight's builder, which is where all
-// 7 Fahrenheit errors landed.
+// Routes whose whole output is prose, and which therefore need the shared guards in their prompt.
+//
+// `app/api/ai/health-insight/prompt.ts` headed this list — it was where all 7 Fahrenheit errors
+// landed — and RV-201 removed it by removing the model: the insight is now assembled from the
+// numbers by `insight-text.ts`, which cannot pick a unit or a superlative at all. A route leaves
+// this list when its model call goes, never because the guards became inconvenient.
+//
+// `app/api/workout-review/session/[sessionId]/route.ts` left the field list the same way
+// (RV-204): its `generateObject` call is gone and the `reasoning` it returns is now assembled by
+// `buildRulesReview` from the budget arithmetic, so there is no model text to guard and
+// `review/prompt.ts` has been deleted.
 const PROSE_ROUTES = [
-  'app/api/ai/health-insight/prompt.ts',
   'app/api/daily-digest/route.ts',
-  'app/api/weekly-digest/route.ts',
   'app/api/workout-sessions/[id]/recap/route.ts',
   'app/api/session-explain/insight/route.ts',
-  'app/api/running-plan/explain/route.ts',
 ]
 
 // Routes that return structured data with a user-facing text field in it, and whose numbers are
@@ -37,7 +44,6 @@ const PROSE_FIELD_ROUTES = [
   'app/api/nutrition-goals/recommend/route.ts',
   'app/api/generate-program/route.ts',
   'app/api/builder-chat/route.ts',
-  'app/api/workout-review/session/[sessionId]/route.ts',
 ]
 
 describe('the prose guards reach every route that writes prose (Q-292, PS-32)', () => {
@@ -105,10 +111,6 @@ describe('the two guard sets differ only where they have to', () => {
 // object — which the explicit list above already covers.
 const PROSE_CALL = /\b(loggedStreamText|streamText|generateText)\s*\(/
 
-/** Comments discuss these very identifiers, so a raw scan matches its own prose. */
-const stripComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-
 function routeFiles(dir: string): string[] {
   const out: string[] = []
   for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
@@ -144,7 +146,12 @@ describe('every route that writes prose can reach the guards (RV-173)', () => {
   const prose = routeFiles('app/api').filter(f => PROSE_CALL.test(stripComments(read(f))))
 
   it('finds the prose routes at all — a scan that matches nothing would pass silently', () => {
-    expect(prose.length).toBeGreaterThanOrEqual(7)
+    // A floor, not a target: it exists so a scan that silently matches nothing cannot pass. It was
+    // 7 until RV-200 deleted `running-plan/explain`, 6 until RV-201 did the same to
+    // `ai/health-insight`, and 5 until RV-201's second half took `weekly-digest` — each one a
+    // model rewording facts its own handler had already computed. Lower it when a prose route
+    // genuinely goes; never raise it to paper over one that stopped matching.
+    expect(prose.length).toBeGreaterThanOrEqual(4)
   })
 
   it.each(prose)('%s reaches PROSE_GUARDS or PROSE_FIELD_GUARDS', rel => {

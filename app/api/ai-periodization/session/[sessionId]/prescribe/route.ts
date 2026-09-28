@@ -4,11 +4,25 @@ import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { generatePrescriptionForSession } from '@trainingai/shared/ai-periodization/generate-prescription'
+import { refitPrescriptionToBudget } from '@trainingai/shared/ai-periodization/refit-prescription'
 import { z } from 'zod'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // Optional prescription overrides.
+/**
+ * The model's hourly allowance. Ten was the original figure, when generation was automatic-only —
+ * one per session open or completion. At ~3.4k tokens a call, twenty stays well inside the free
+ * tier, and the dedup cache collapses the open-burst the first limit was sized against.
+ */
+const PRESCRIBE_MODEL_PER_HOUR = 20
+/**
+ * The ceiling over every prescribe request, model or not. Higher than the model's, because a
+ * duration re-fit costs no tokens — but not unlimited: the re-fit still runs a full
+ * `aggregateSignals`, which is ~30 repository reads, so it needs a real bound of its own.
+ */
+const PRESCRIBE_ANY_PER_HOUR = 60
+
 const MAX_BODY_BYTES = 16 * 1024
 
 export const maxDuration = 30
@@ -41,12 +55,12 @@ export async function POST(
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 20/hour, not 10: generation used to be automatic-only (one per session open or
-  // completion), but the duration picker makes it user-initiated — switching short →
-  // standard → long to compare is three calls on its own, on top of the automatic ones.
-  // At ~3.4k tokens a call this stays well inside the free tier, and the dedup cache
-  // already collapses the open-burst that the original limit was sized against.
-  if (!rateLimit(`prescribe:${userId}`, 20, 60 * 60 * 1000)) {
+  // TWO buckets, because two very different things arrive here (LA-147).
+  //
+  // This one is the outer ceiling and it is checked FIRST, before the body is even read, so an
+  // abusive caller cannot spend anything — not a parse, not a repository read — by omitting the
+  // field that decides the branch. It bounds every prescribe request regardless of kind.
+  if (!rateLimit(`prescribe-any:${userId}`, PRESCRIBE_ANY_PER_HOUR, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
@@ -70,6 +84,38 @@ export async function POST(
   const { excludeSessionId, durationPreset } = parsed.data
   const repo = await getRepository()
   const tz = session.user?.timezone ?? DEFAULT_TZ
+
+  // A duration change does not need the model. The plan it would produce is the stored one
+  // re-fitted to a different budget, and that fit is deterministic arithmetic — asking Gemini
+  // again cost ~30 s of "Preparing your AI workout…" and a token spend for nothing (RV-202 ②).
+  // Anything the stored plan cannot answer — no prescription yet, one generated before the
+  // baseline existed, an expired or finished one, a whole-session deload — falls through to the
+  // full generation below, which is what used to run every time.
+  if (durationPreset != null) {
+    const refit = await refitPrescriptionToBudget(userId, programSessionId, repo, tz, durationPreset)
+    if (refit.ok) {
+      return NextResponse.json({
+        prescription: refit.prescription,
+        prescriptionStatus: refit.prescriptionStatus,
+        estimatedSessionDurationMin: refit.estimatedSessionDurationMin,
+        durationPreset: refit.prescription.durationPreset ?? 'standard',
+      })
+    }
+  }
+
+  // The model's own budget, spent only on the branch that actually reaches it.
+  //
+  // Before LA-147 this was the single limit, and RV-202 ② made it wrong: a duration change stopped
+  // calling the model but kept spending its allowance, so twenty preset switches in an hour
+  // produced "Too many requests" for work the AI never saw. The limit's own comment cited
+  // preset-switching as the reason it was 20 rather than 10 — that justification moved here with
+  // the model call.
+  //
+  // A preset request that FALLS THROUGH (no stored plan, expired, a pending whole-session deload)
+  // reaches this and is charged, which is right: it is about to run a real generation.
+  if (!rateLimit(`prescribe:${userId}`, PRESCRIBE_MODEL_PER_HOUR, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
 
   // All generation/validation/persistence lives in the shared function so the
   // workout-completion path (lib/workout/complete-workout.ts) can regenerate the

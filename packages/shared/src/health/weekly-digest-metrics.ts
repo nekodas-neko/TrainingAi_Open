@@ -88,68 +88,107 @@ export function weekDays(weekStart: string): string[] {
  * because changing what the model is told changes what the user reads and that is a separate
  * decision from making the numbers available.
  */
-export function buildWeeklyDigestContext(m: WeeklyDigestMetrics): string {
-  // The sign comes from comparing the volumes, not from the rounded percentage: a +0.4% week is
-  // "+0%", and deriving the sign from the rounded value would print a bare "0%" instead.
-  const volChange = m.training.priorVolumeKg > 0
-    ? `${m.training.volumeKg > m.training.priorVolumeKg ? '+' : ''}${m.training.volumeChangePct}% vs the week before`
-    : 'first week of data'
+// The week's recap, written from the numbers rather than asked for (RV-201).
+//
+// The model was handed `buildWeeklyDigestContext(metrics)` — a complete, deterministic fact block —
+// and asked to reword it as bullets. Under the owner's 2026-09-25 prefer-logic decision (recorded
+// on RV-200) that call goes, and the bullets are built here from the same metrics.
+//
+// **What is deliberately NOT carried over: the prompt's "one specific recommendation for the week
+// ahead".** Templating a fact is restating something measured; templating advice is inventing it,
+// and a rule that tells the owner to back off a week is a training decision rather than a
+// rendering one. RV-201 asked for "bullets from the week-over-week deltas" and that is what this
+// produces. If he wants the recommendation back it is a separate, deliberate design.
 
-  const muscleVolumeLine = m.muscleSets.length > 0
-    ? `Sets per muscle that week (weighted): ${m.muscleSets.map(x => `${x.muscle} ${x.sets.toFixed(1)}`).join(', ')}`
+/** `+12%` / `−4%` / null when there is no prior week to compare against. */
+function pct(now: number, prior: number): string | null {
+  if (prior <= 0) return null
+  const change = Math.round(((now - prior) / prior) * 100)
+  return `${change > 0 ? '+' : change < 0 ? '−' : '±'}${Math.abs(change)}%`
+}
+
+/**
+ * A signed delta between two whole-number readings, or null when either is missing.
+ * Uses the same minus sign as `pct` — a hyphen and a minus render differently at the card's size.
+ */
+function delta(now: number | null, prior: number | null, unit: string): string | null {
+  if (now == null || prior == null) return null
+  const d = Math.round(now - prior)
+  if (d === 0) return `level at ${now}${unit}`
+  return `${d > 0 ? 'up' : 'down'} ${Math.abs(d)}${unit} to ${now}${unit}`
+}
+
+export function buildWeeklyDigestText(m: WeeklyDigestMetrics): string {
+  const bullets: string[] = []
+
+  // Training load. Sessions and tonnage together, because either alone misreads a week: three
+  // heavy sessions and five light ones are not the same week at equal volume.
+  const volPct = pct(m.training.volumeKg, m.training.priorVolumeKg)
+  // A missing percentage has two causes and only one of them is "first week of data": a prior week
+  // that was pure rest, or pure cardio, also has no tonnage to divide by. Saying the history does
+  // not exist because last week was a deload is a false claim about the account, so the sentence
+  // is reserved for a prior week with no sessions at all.
+  const noPrior = m.training.priorSessions === 0 && m.training.priorVolumeKg === 0
+  const load = `${m.training.sessions} session${m.training.sessions === 1 ? '' : 's'}, `
+    + `${Math.round(m.training.volumeKg).toLocaleString('en-AU')} kg total`
+    + (volPct ? ` (${volPct} vs the week before, which had ${m.training.priorSessions})`
+      : noPrior ? ' — first week of data'
+      : ` (the week before logged ${m.training.priorSessions} session${m.training.priorSessions === 1 ? '' : 's'} and no tonnage)`)
+  bullets.push(load)
+
+  if (m.muscleSets.length > 0) {
+    const top = m.muscleSets.slice(0, 3).map(x => `${x.muscle} ${x.sets.toFixed(1)}`).join(', ')
+    bullets.push(`Most-worked muscles by weighted sets: ${top}`)
+  }
+
+  bullets.push(m.prs.length > 0
+    ? `Personal records: ${m.prs.map(p => p.description).join('; ')}`
+    : 'No personal records this week')
+
+  // Recovery, as one bullet rather than three — three near-identical lines read as padding.
+  // Each clause carries its OWN label: hanging one "overnight HRV" off the front of the joined
+  // list reads correctly only while HRV is present, and turns into "overnight HRV readiness down
+  // 5" on any week without it.
+  const sleepDiff = m.sleepHours.week != null && m.sleepHours.priorWeek != null
+    ? m.sleepHours.week - m.sleepHours.priorWeek
     : null
+  const recovery = [
+    m.hrv.week != null
+      ? `overnight HRV ${delta(m.hrv.week, m.hrv.priorWeek, ' ms') ?? `${Math.round(m.hrv.week)} ms`}`
+      : null,
+    m.readiness.week != null
+      ? `readiness ${delta(m.readiness.week, m.readiness.priorWeek, '') ?? `${m.readiness.week}`}`
+      : null,
+    m.sleepScore.week != null
+      ? `sleep quality ${delta(m.sleepScore.week, m.sleepScore.priorWeek, '') ?? `${m.sleepScore.week}`}/100`
+      : null,
+    m.sleepHours.week != null
+      ? `sleep averaging ${m.sleepHours.week.toFixed(1)} h a night`
+        // A rendered "+0.0 h" is a claim of change that the number contradicts; below the
+        // printed precision there is nothing to report, so report nothing.
+        + (sleepDiff != null && Math.abs(sleepDiff) >= 0.05
+          ? ` (${sleepDiff > 0 ? '+' : '−'}${Math.abs(sleepDiff).toFixed(1)} h)`
+          : '')
+      : null,
+  ].filter((x): x is string => x != null)
+  if (recovery.length > 0) bullets.push(`Recovery — ${recovery.join(', ')}`)
 
-  const prLine = m.prs.length > 0
-    ? `PRs that week: ${m.prs.map(p => p.description).join(', ')}`
-    : 'PRs that week: none'
+  if (m.stressHighMinutes.week != null) {
+    bullets.push(`High daytime stress ~${Math.round(m.stressHighMinutes.week)} min/day`
+      + (m.stressHighMinutes.priorWeek != null
+        ? ` (week before ~${Math.round(m.stressHighMinutes.priorWeek)})`
+        : ''))
+  }
+  if (m.ots) {
+    bullets.push(`Training stress averaged ${m.ots.avg.toFixed(1)}`
+      + (m.ots.hasHighLoadDay ? ', with at least one high-load day' : ''))
+  }
 
-  const hrvLine = m.hrv.week != null
-    ? `Overnight HRV: ${m.hrv.week} ms avg that week${m.hrv.priorWeek != null ? ` (week before ${m.hrv.priorWeek} ms)` : ''}`
-    : null
+  if (m.illness) bullets.push(`Illness radar: ${m.illness.flag}`)
+  if (m.resilience) bullets.push(`Resilience: ${m.resilience.band} (as of ${m.resilience.asOf})`)
+  if (m.weightChangeKg != null && Math.abs(m.weightChangeKg) >= 0.1) {
+    bullets.push(`Weight ${m.weightChangeKg > 0 ? 'up' : 'down'} ${Math.abs(m.weightChangeKg).toFixed(1)} kg over the fortnight`)
+  }
 
-  const readinessLine = m.readiness.week != null
-    ? `Readiness: ${m.readiness.week}/100 avg that week${m.readiness.priorWeek != null ? ` (week before ${m.readiness.priorWeek}/100)` : ''}`
-    : null
-
-  const illnessZs = m.illness?.biomarkers && m.illness.flag !== 'normal'
-    ? Object.entries(m.illness.biomarkers)
-        .map(([k, v]) => `${k} z ${v.z > 0 ? '+' : ''}${v.z}`)
-        .join(', ')
-    : null
-  const illnessLine = m.illness
-    ? `Illness radar (vs personal baseline): ${m.illness.flag}${illnessZs ? ` — ${illnessZs}` : ''}`
-    : null
-
-  const stressLine = m.stressHighMinutes.week != null
-    ? `Daytime stress: high for ~${m.stressHighMinutes.week} min/day avg that week${m.stressHighMinutes.priorWeek != null ? ` (week before ~${m.stressHighMinutes.priorWeek} min/day)` : ''}`
-    : null
-
-  const resilienceLine = m.resilience
-    ? `Stress resilience: ${m.resilience.band} (level ${m.resilience.level}/5, as of ${m.resilience.asOf})`
-    : null
-
-  const otsLine = m.ots
-    ? `Training stress (own OTS model): avg ${m.ots.avg.toFixed(1)} that week${m.ots.hasHighLoadDay ? ', with high-load day(s)' : ''}`
-    : null
-
-  const sleepQualityLine = m.sleepScore.week != null
-    ? `Sleep quality: ${m.sleepScore.week}/100 avg nightly sleep score that week${m.sleepScore.priorWeek != null ? ` (week before ${m.sleepScore.priorWeek}/100)` : ''}`
-    : null
-
-  return [
-    `Last week (the completed Mon–Sun week being reviewed): ${m.training.sessions} sessions, ${m.training.volumeKg} kg volume (${volChange})`,
-    `The week before that: ${m.training.priorSessions} sessions, ${m.training.priorVolumeKg} kg volume`,
-    muscleVolumeLine,
-    prLine,
-    hrvLine,
-    readinessLine,
-    illnessLine,
-    stressLine,
-    resilienceLine,
-    otsLine,
-    m.weightChangeKg != null ? `Body weight change: ${m.weightChangeKg.toFixed(1)} kg over 2 weeks` : null,
-    m.sleepHours.week != null ? `${m.sleepHours.week.toFixed(1)}h avg sleep` : null,
-    sleepQualityLine,
-    m.friendCount != null ? `Friends training that week: ${m.friendCount} friends connected` : null,
-  ].filter(Boolean).join('\n')
+  return bullets.map(b => `• ${b}`).join('\n')
 }

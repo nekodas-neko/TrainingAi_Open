@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { formatDateDisplay } from '@trainingai/shared/date-utils'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /** LB-126. `formatDateDisplay` gained `weekday`, `weekday-date` and `weekday-date-long` in LB-125
  *  (Lane A, #1404); these are the call sites that were spelling those option bags themselves.
@@ -33,8 +34,7 @@ describe('LB-126 — the weekday labels come from the shared formatter', () => {
 
   it('the converted sites no longer spell their own option bag', () => {
     for (const f of CONVERTED) {
-      const src = readFileSync(path.join(ROOT, f), 'utf8')
-        .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      const src = stripComments(readFileSync(path.join(ROOT, f), 'utf8'))
       expect(src, `${f} hand-rolls a weekday option bag again`).not.toMatch(/weekday:\s*['"]/)
       expect(src, `${f} does not use the shared formatter`).toMatch(/formatDateDisplay\(/)
     }
@@ -49,7 +49,7 @@ describe('LB-126 — the weekday labels come from the shared formatter', () => {
 
     const offenders = files.filter(f =>
       /weekday:\s*['"](short|long)['"]/.test(
-        readFileSync(path.join(ROOT, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''),
+        stripComments(readFileSync(path.join(ROOT, f), 'utf8')),
       ),
     )
     expect(offenders, 'a weekday label is being formatted at the call site again — use '

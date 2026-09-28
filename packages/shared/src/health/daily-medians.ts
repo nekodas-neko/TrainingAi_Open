@@ -8,6 +8,8 @@
 // accuracy field, so the rollup substitutes a coverage proxy (band/beat-count checks) — see the
 // recovery sub-plan. This core handles the MET/sleep exclusion + median, which are fully sourced.
 
+import { median } from '@trainingai/shared/stats'
+
 export interface TimedSample {
   /** Timestamp in ring deciseconds (or any consistent unit shared with the windows). */
   ds: number
@@ -17,14 +19,6 @@ export interface TimedSample {
 export interface ExclusionWindow {
   startDs: number
   endDs: number
-}
-
-/** numpy-style median: average of the two middle values for an even count. Empty → null. */
-export function median(values: number[]): number | null {
-  if (values.length === 0) return null
-  const s = [...values].sort((a, b) => a - b)
-  const mid = s.length >> 1
-  return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2
 }
 
 const inAnyWindow = (ds: number, windows: ExclusionWindow[]): boolean =>
