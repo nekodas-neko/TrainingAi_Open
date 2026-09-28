@@ -7871,93 +7871,30 @@ drift.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
-- **Lane: A** — was `B (callers)`, corrected 2026-09-25 once the caller half was done and the
-  remainder proved to need `lib/sqlite/cache.ts`. Nothing here is Lane B's any more; the lane field
-  is changed so the next B session does not re-derive that from scratch.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Counted from code; RV-186 counts them on the phone.
-- **Every launch and every resume sends 6 reminder-reconcile GETs** (`sync-provider.tsx:253-383`):
-  meal-types, today's food logs, next-session, supplements, readiness-score and body-battery.
-  - Two of them are local-first domains whose data is already on the device.
-  - Three duplicate Home's own fetches.
-  - Readiness alone is 11 parallel reads.
-- **After a food log, the first refetch round is wasted when online.** `logFoodEntries`
-  (`log-food.ts:296-297`) invalidates 13 prefixes before the push, so every server aggregate
-  refetches pre-write data, then refetches again after the push. That is 2N+1 requests where N+1
-  would do; sweep 1 saw 3×2+1. **Offline, and when the push fails, keep the immediate round**
-  (LB-4/LB-132's reason still holds).
-- **⚠ THE EXERCISE-CATALOGUE CLAIM IS WRONG AND IS RETRACTED (LB-147, 2026-09-25).** It is **not**
-  refetched on every Workout tab show. `workout-select-content.tsx:176` passes
-  **`freshWithinTtl: true`** with `TTL_LONG` (6 h), and `cachedFetchCore` returns before any network
-  call when the entry is fresh (`lib/sqlite/cache.ts:306`). The flag has been there since the
-  initial snapshot, and `invalidateExerciseLibrary` — the key's only invalidator — fires on
-  catalogue edits alone. So the ceiling is ~4 fetches a day per device, not one per show. **The
-  3,040 server reads are real and are explained by that ceiling across many days and cold starts,
-  not by a defect.** Read counts do not localise a cause.
-- **`app/more/more-content.tsx`'s comment was false and is FIXED (LB-147).** It claimed
-  *"cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing"*; the TTL governs
-  whether the cached PAINT is used, never whether the request is sent, so a re-show did send 2 GETs.
-  The comment now says so. **The requests themselves remain** — `freshWithinTtl` on
-  `more-user-profile`/`more-seasons` needs the written invalidation proof, which nobody has done.
-- **✅ THE SUPPLEMENT HALF SHIPPED (LB-147), and it was a CORRECTNESS bug, not only waste.**
-  Supplements are CLAUDE.md's named reference for offline-first, so the device holds the truth —
-  yet `sync-provider.tsx` reconciled its reminder notifications from `/api/supplements`. **A
-  supplement added or stopped offline scheduled the wrong reminder until the next pull.** It now
-  reads the local store first, with the API kept as the fallback for the web and for a store that
-  failed to open; an empty local table falls through rather than cancelling live reminders.
-  The local→`SupplementWithStatus` mapping was extracted to `lib/supplements/local-status.ts`
-  because a second copy is precisely BF-112, where the inline one dropped the dose fields and a
-  prompt that worked on the web never fired on the APK.
-- **✅ THE MEAL HALF SHIPPED TOO (LB-147, 2026-09-25) — and "it needs a join" was WRONG.** The
-  previous amendment deferred this saying `reconcileMealReminders` needed a join nobody had built.
-  Reading it rather than assuming: it takes `Pick<FoodLog, 'mealTypeId'>[]` and reads exactly six
-  fields off a meal type, **all of which `LocalFoodLog` and `LocalMealType` already carry**. There
-  is no join. What blocked it was the declared parameter type — `MealType[]` demanded `userId`,
-  `sortOrder`, `timeStartHour` and `createdAt` that the file never reads, so the local row could not
-  be passed without inventing them. Narrowed to `MealTypeForReminders`, and the reconcile now reads
-  the device first. Same correctness point as the supplements: **a meal logged offline kept nagging
-  you to log it** until the next pull.
-  An empty meal-type table falls through to the API (an unhydrated store, not a user with no meals);
-  zero food logs deliberately does NOT, because that is the case the reminder exists for.
-- **⚠ THE REMAINING FETCH HALF IS LANE A's, NOT LANE B's — established 2026-09-25 (LB-149's
-  sibling read), and this entry said the opposite.** All four remaining reads
-  (`next-session`, `readiness-score`, `body-battery`, plus the warm list's own) are
-  **`cachedFetchToday`**, and plain `cachedFetch*` ALWAYS revalidates, so each resume spends a GET
-  on an entry that is already fresh. The one-line fix is `freshWithinTtl` — **and
-  `cachedFetchToday` passes `undefined` for it** (`lib/sqlite/cache.ts:604`, the 7th positional
-  arg), so the flag is unreachable from every today-envelope key. Exposing it is a one-line change
-  in Lane A's file and composes correctly: the today-check lives in the unwrap, the TTL check in
-  `isFreshWithinTtl`.
-  **The two Lane-B-only shapes were both examined and both are wrong.** `getCached()` respects the
-  TTL but returns the raw `{date, data}` envelope, and neither `unwrapToday` nor `TodayEnvelope` is
-  exported — so three call sites would hand-roll a date comparison that is **itself defective**
-  (LB-150). `readTodayCacheSync()` keeps the unwrap in one place but is not TTL-aware, so a
-  health-alert reconcile would act on a reading up to a Brisbane day old. **Do not hand-roll it at
-  the call sites to keep the item in Lane B.**
-- **⚠ THE "ONE-LINE ENABLER" HAS AT MOST ONE LEGITIMATE CALLER — checked 2026-09-28 (Lane A)
-  against CLAUDE.md's RV-67 rule**, which disqualifies `freshWithinTtl` on any payload that is not a
-  pure function of stored rows the client can see being written:
-  - **`body-battery`: disqualified.** It drains with the clock, so its value changes with no writer
-    at all, and no invalidation group could ever catch that.
-  - **`readiness-score`: disqualified.** Its inputs are written server-side by the BLE rollup (sleep,
-    HRV, the derived scores). The client never observes those writes, so no proof can list them.
-  - **`next-session`: possible, not proven.** It is `getNextSession` (program, schedule, logs, rest
-    days, phase) **plus** the stored AI prescription (`getSessionPeriodization`) **plus** muscle
-    assignments. A proof has to show every one of those writers invalidates the key. The
-    prescription is written by the prescribe route and consumed at completion, which makes it the
-    one to check first.
-  - **The warm list's own read** inherits whichever of the above it warms.
-  **So do not expose the parameter on its own.** Ship it only in the PR that writes the
-  `next-session` proof. A flag with no qualifying caller is an invitation to add a disqualified one.
-- **Still open:** `next-session`'s proof (above), and the other Lane A halves
-  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round). **On the 2N+1 round,
-  keep the immediate invalidate unless a change also handles a push that moves nothing.**
-  `pushThenRevalidate` revalidates only when `pushed > 0`. With LB-151's single-flight push, a
-  concurrent drain can carry this write and report 0 here, and dropping the immediate round would
-  then leave the screen stale for the key's TTL. One wasted request a log is the cheaper side of
-  that trade.
-- **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
-  Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
-  across the 3 modules now take the user's zone.
+- **Lane: B** — `app/more/more-content.tsx`. Re-laned 2026-09-28: every Lane A half is now shipped
+  or closed with a reason (below), and what is left is two callers on the More screen.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **What is left:** `more-user-profile` and `more-seasons` send 2 GETs on every More re-show.
+  `freshWithinTtl` would stop that, **but only with the written invalidation proof** CLAUDE.md
+  requires. Run the RV-67 purity check first. It has disqualified every other candidate here.
+- **Closed 2026-09-28 (Lane A): the today-envelope keys cannot take `freshWithinTtl`, so the
+  "one-line enabler" in `cachedFetchToday` is NOT to be built.** All three fail RV-67:
+  - `body-battery` drains with the clock.
+  - `readiness-score` is fed by the BLE rollup's server-side writes.
+  - `next-session` fails for the same reason in `ai_dynamic` mode. There, `getNextSession` scores
+    from Oura rows, sleep, body metrics and derived scores over a `Date.now()` window
+    (`adapter.ts`, the `phaseMode === 'ai_dynamic'` branch). The prescription half WAS provable:
+    every client writer (prescribe, respond, transition, check-in) calls
+    `invalidatePrescriptionChanged`, and workout-review apply calls `invalidateProgramStructure` +
+    `invalidateWorkoutSummaries`. But a proof has to hold for every user, and one mode breaks it.
+  A flag with no qualifying caller invites a disqualified one, so the parameter stays unexposed.
+- **Closed: the 2N+1 post-write round stays.** `pushThenRevalidate` revalidates only when
+  `pushed > 0`. Under LB-151's single-flight push, a concurrent drain can carry this write and report
+  0, and dropping the immediate invalidate would then leave the screen stale for the key's TTL. One
+  wasted request per log is the cheaper side.
+- **Shipped earlier:** the supplement and meal reminder reconciles read local-first (LB-147; both
+  were correctness bugs offline), `LB-148`'s reminder time zones, and the exercise-catalogue claim
+  was retracted (it is already `freshWithinTtl` with a proof).
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
