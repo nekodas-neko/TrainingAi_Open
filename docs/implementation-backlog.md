@@ -19530,86 +19530,42 @@ the match. `Gate: owner` when it is next picked up.
   a wrong or missing field reads as `undefined` and fails silently.
 - **📊 Read 2026-09-24 (Review sweep 57 data census, production, SELECT only):** **the exact-match rule is not holding in production.** **19 `food_items` rows created after #598 (2026-08-30) are identical** on name, brand, serving and all four macros to an earlier row. 16 are `barcode` and 2 are `ai`. The `ai` ones are the exact case the shipped rule claims to stop (for example Cooked White Rice on 09-17, identical to a 07-04 row). New duplicates arrive about every 1–2 days. The Known-Issues row *"the device half has not been seen"* now reads **FAILED on real data**, not merely unverified.
 
-### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
+### [nutrition][platform] BF-77 — a friend's meal library: the read route and the opt-in
 
-- **⏸ THE OWNER DID NOT PICK A SIZE — they asked for a design session, 2026-09-20.** Verbatim:
-  *"This requires more thought - will need a session to look into this one to see the most effecient
-  way to share a food library."*
-- **⚠ Read that as a correction to how it was asked, not just a deferral.** It was put to them as
-  three sizes (A copies · B a share code · C a group library) with a recommendation of A. They did
-  not answer in those terms — they asked for **the most efficient way to share a food library**,
-  which is a different question: the A/B/C framing assumed the mechanism was the choice, and what
-  they want examined is the mechanism itself.
-- **So this becomes a PLANNING item, per the backlog-driven rule — PR 1 is docs-only.** A session
-  reads the existing label/share machinery, the saved-meal data shape and what "library" would have
-  to mean, then writes a plan to `docs/superpowers/plans/` and files the implementation entry. **It
-  does not implement**, and it should not re-present A/B/C unless the investigation independently
-  lands there.
-- **What that session must not skip:** the scannable label already exists and its sheet already has
-  a system share button handing over a PNG — so *some* sharing works today. The plan has to say what
-  is actually inadequate about it before proposing anything larger, or it will re-derive option A
-  and call it new.
+- **Lane: A**
+- **Added:** 2026-08-31 · owner, with a library of eight meals: *"share meals with my partner/friend …
+  or sync between a group so you all have the same meals."* Owner asked 2026-09-20 for *"the most
+  efficient way to share a food library"*; an agent ran that design session 2026-09-28 (his choice,
+  2026-09-25).
+- **Plan:** [`docs/superpowers/plans/2026-09-28-shared-food-library.md`](superpowers/plans/2026-09-28-shared-food-library.md). **Recommended design: browse an opted-in friend's saved meals and copy one, or
+  all of them, into your own library.** It adds no migration, no new sync domain and no co-owned data,
+  and each copy goes through the unchanged `saveSharedMealToLibrary`.
+- **Scope:**
+  - `shareMealLibrary` in `UserPreferences`, default off, server-authoritative.
+  - `GET /api/friends/[id]/saved-meals`. It returns **404 unless the friendship is accepted AND the
+    friend has opted in**, with an identical body in every refusal. On success it returns uncapped
+    `SharedMeal`s built by `savedMealToIngredients`.
+  - Tests per the plan §6.
+- **Not in scope:** the "updated since you copied" badge (plan §5). It needs two columns and is filed
+  only if the owner asks.
+- **⚠ The old entry's claim that `meal-label-render.ts` still encodes the owner-only token is stale.**
+  The recipe is encoded for every style that carries one, so the one-meal copy path is finished and
+  proven (two-phone test, 2026-09-13).
 
-- **✅ OWNER ANSWERED 2026-09-13: yes to a shared library.** Verbatim: *"yes a share 'library' option
-  would be a good option too"* — "too", i.e. **alongside** the copy-a-meal sharing that already
-  works, not replacing it. BF-57's two-phone test passed in the same sitting, so the copy path is
-  proven; this is the next step up from it, and the entry's own framing (*"a shared library is a
-  different product"*) still holds — it is a real feature, not a toggle.
+### [nutrition][app-shell] BF-77a — a friend's meal library: toggle, profile row, library screen
 
-
-- **Lane:** A if a server path is chosen; B for anything built on the QR payload.
-- **✅ GATE STRUCK 2026-09-25 — an AGENT runs the session, not him.** He was asked the one
-  clarification this entry was waiting on and chose to read the result rather than sit through the
-  investigation. **So the docs-only planning PR is startable now**, and nothing further is owed by
-  him until that plan comes back with a recommendation.
-- **Planning item** — the request contains two products and they resolve differently. Needs a
-  decision from the owner before implementation. **The `Gate:` field above is what makes that
-  legible to `next-item.js`** (added 2026-09-02): the prose said it from the day the entry was
-  filed, and the tool cannot read prose, so the entry sat at the head of Lane A's READY list
-  offering work that cannot start. What is owed is the A-or-B choice in the table below.
-- **Added:** 2026-08-31 · owner, with a library of eight meals: *"I've made a lot of meals now and I
-  will continue to make meals. I would like to be able to share meals with my partner/friend. So some
-  sort of way to share meals DB entries. Or sync between a group so you all have the same meals."*
-
-**⚠ Most of this is already designed and half-built — start there, not from scratch.** BF-57's engine
-shipped 2026-08-30: `encodeSharedMeal` puts the **whole meal** in the code — name, servings, every
-ingredient's grams and macros — so it resolves for a stranger, offline, with no account, as a copy.
-The owner chose that design over a resolvable share id, explicitly. **What is not built is the
-surface**, and one line proves it: `meal-label-render.ts:694` still calls
-`encodeMealLabelToken(mealId)`, the old owner-only token. So the Label button works today and
-produces a label **only its author can scan** — which is the exact complaint BF-57 was filed for.
-
-**The two products, because "share a meal" and "have the same meals" are not the same ask:**
-
-| | What it does | What it costs |
-|---|---|---|
-| **A · Finish BF-57** | Any meal becomes a code anyone can scan into their own library. Works offline, no accounts, no server. The label sheet **already has a system share button** that hands over a PNG, so a meal can be texted to a partner who scans it off their screen. | Lane B work already in the queue. Near-free relative to the rest. |
-| **B · A share code or link** | Send a short code; the recipient's app fetches the snapshot and copies it. Works without an image and without both phones present. | A server-stored snapshot, a route, a code space, expiry, and a rate limit. Medium. |
-| **C · A group library** | Everyone in a group sees the same meals, and an edit reaches all of them. | Large: membership, invites, who may add/edit/delete, what an edit does to a meal someone else already logged, what happens when a member leaves. Genuinely multi-user. |
-
-- **Recommendation: A now, B only if remote sharing turns out to matter, and C only if the owner
-  wants a *living* library rather than copies.** A is the smallest change that satisfies the
-  sentence as written — and it is mostly finished. It also fails safe: a copy that diverges is a
-  copy, whereas a shared library that diverges is a bug.
-- **⚠ C reverses a principle the owner has chosen twice.** BF-57 rejected globally-resolvable meal
-  ids so that two users' data never couples; BF-58 rejected a household link for the scale for the
-  same reason and settled on per-phone attribution instead. C is that coupling, deliberately. That
-  is a legitimate change of mind — but it should be made knowingly, not arrived at.
-- **The question that decides it, and it is one question:** *when your partner changes a shared meal,
-  should your copy change too?* **No** → A or B, and this is finished work plus a code. **Yes** → C,
-  and it is a project with a membership model.
-- **⚠ C carries a consent surface the app does not have yet.** Sharing a meal shares what someone
-  eats. A group library means one person's food library is visible to others by default, which needs
-  a Play-Store-grade answer (the Canonical Runtime amendment already flags the privacy policy and
-  data-safety declarations as gating real multi-user support). A and B have no such surface — the
-  sender chooses each meal, each time.
-- **Whichever is built, `savedMealToIngredients` and the label payload are the one conversion.** A
-  second serialiser for "a meal as data" is how the printed label and the shared copy would drift on
-  rounding, which is exactly what the payload's *totals are sacred* rule exists to prevent.
-- **Verification (for A, which is the recommended first step):** the owner shares a meal from the
-  label sheet, the partner scans it on a different account, and the meal lands in **their** library
-  with the same ingredients and the same total macros — verified in airplane mode, and with a
-  12-ingredient meal whose tail rolls into one remainder.
+- **Lane: B**
+- **Needs:** BF-77
+- **Added:** 2026-09-28 · split from BF-77's planning session.
+- **Plan:** [`docs/superpowers/plans/2026-09-28-shared-food-library.md`](superpowers/plans/2026-09-28-shared-food-library.md) §6.
+- **Scope:**
+  - An opt-in toggle in nutrition settings, off by default.
+  - A **Meals** row on a friend's profile, shown only when the route answers 200.
+  - A library screen with **Add to my meals** per meal and **Add all**, skipping meals whose name is
+    already in your library. Both call `saveSharedMealToLibrary` unchanged.
+- **No mockup gate:** it is a new screen and does not rearrange a daily one.
+- **Verify on device:** see plan §6. Test **Add all** into a second account, including a meal with
+  more than 12 ingredients arriving whole, then log a copy in airplane mode.
 
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
