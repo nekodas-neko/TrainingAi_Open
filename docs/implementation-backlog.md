@@ -781,60 +781,6 @@ below threshold and left in place for next time.
   number he reads every day, so it owes the device-verification gate, not just a green `pnpm dev`.
 
 
-### [platform] OR-192 — the owner set a 30-day retention instinct; answer whether the raw archive is the exception before re-asking him
-
-- **Lane: O** · **Added:** 2026-09-27 · Orchestrator, splitting the retention question out of `Q-30`,
-  which is `Gate: owner` and therefore PARKED — the question would have died inside it.
-- **What he said**, offered the archive's size and cost and declining to decide: *"Lets come back to
-  this i dont wanna keep dead weight data for more than 30days if we dont need it."*
-- **The offer was the mistake.** He was given 25 MB and cents a month. His condition is **"if we
-  don't need it"**, and money was never the axis.
-- **One measurement decides it, and it is not his to make.** `oura_raw_packed` is the only
-  re-decodable copy of the ring's history: the ring's buffer moves forward, the sync cursor never
-  rewinds, and a protocol fix can only back-fill by re-decoding stored bytes. The device-local copy
-  is **not** a second copy — the 14-day rolling window never shipped (`pruneRaw` has no caller) and
-  none of it is backed up.
-  **So: has any decoder fix since the BLE pipeline shipped (2026-07-07) needed bytes older than 30
-  days, and how far back did it reach?** Answerable from the git history of the decoders and the
-  redecode passes. If the answer is "never in five months", his instinct is right and this becomes
-  a retention change. If protocol fixes routinely reach further, the archive is not dead weight and
-  he should be told that in one line instead of being shown the bill again.
-- **Then re-ask him** with that number attached and nothing else. Prior art:
-  [`docs/oura-raw-archive-retention-brief.md`](oura-raw-archive-retention-brief.md).
-- **Reversal cost: none for the measurement; total and permanent for acting on a wrong answer** —
-  a pruned raw row cannot be re-drained from the ring.
-- **MEASURED 2026-09-28 (Orchestrator) — the answer is that the archive is NOT dead weight, and the
-  reason is structural rather than anecdotal.**
-  - **A redecode reads EVERY stored day, by construction.** `fullHistory: true` is hardcoded in
-    `app/api/oura-ble/samples/redecode/route.ts`, not an option a caller passes, and the comment
-    beside it gives the reason: *"a new/fixed decoder backfills every stored day, so this must
-    bypass the incremental read window"*. **There is no windowed redecode mode to fall back on**, so
-    the question *"how far back did a fix reach"* has one answer — as far back as the archive goes,
-    every time.
-  - **62% of the archive is already past 30 days.** `oura_raw_packed` holds **1,580 buckets /
-    1,954,802 frames / 27 MB**; of that, **992 buckets / 1,215,622 frames / 17 MB** were packed more
-    than 30 days ago. A 30-day retention deletes that 62% of frames to reclaim 17 MB.
-  - **Decoder- and clock-adjacent fixes are not rare:** ~10 in the six weeks of visible history, the
-    most recent three days before this measurement — `LA-141` (#1625, 2026-09-25) made the ring
-    clock's inverse an actual inverse, changing the ds↔UTC mapping that **every stored frame** is
-    read through, across nine adapter call sites.
-- **⚠ TWO LIMITS ON THIS MEASUREMENT, both of which narrow it and neither of which reverses it.**
-  - **Git cannot answer the question as the entry framed it.** The premise *"answerable from the git
-    history"* is half false: the **initial public snapshot (2026-08-16) squashed everything before
-    it**, so the pipeline's first five weeks from 2026-07-07 are not recoverable from git at all.
-    Everything above is measured over six weeks, not five months.
-  - **No COMPLETED redecode consuming >30-day bytes can be shown.** `oura_redecode_jobs` holds
-    **exactly two rows** — 2026-08-30 and 2026-09-03, both `fullHistory: true`, and **both
-    abandoned** without recording a result. The table itself only exists since migration 196
-    (2026-08-17), so any earlier pass left no trace. So the archive is insurance that has not yet
-    been visibly cashed — but the mechanism that would cash it reads all of it by design, and the
-    loss is permanent.
-- **The re-ask, one line and nothing else** (per this entry's own instruction — offer him the need,
-  never the bill again): *every decoder fix re-reads the whole archive by construction, and 62% of
-  it is already older than 30 days, so a 30-day window would silently narrow every future protocol
-  fix to the most recent third. Keep it?*
-
-
 ### [platform] LA-167 — every base-comparison ratchet starts one `git` process per file, which is 98% of its runtime
 - **Lane: O** — `scripts/lib/base-ref.js` (`countAtBase`), shared by the ratchet checks in Custom Rules.
 - **Added:** 2026-09-28 · Lane A, while fixing LA-163.
@@ -6565,11 +6511,11 @@ drift.
 - **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
   today's state exactly.
 
-### [platform][workouts] LA-173 — four things Lane A needs from the owner (two merge yeses, a style, a key)
+### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
-- **Ask** — owner: four answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge LA-142
-  (#1849), and close #1749? ③ Which progression style should Barbell Skull Crusher use? ④ Can fresh
-  storage keys go into Railway?
+- **Ask** — owner: five answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge
+  LA-142 (#1849), and close #1749? ③ Assign styles to the **nine** unstyled slots in `Bankai` —
+  match by role, or name one? ④ Can fresh storage keys go into Railway? ⑤ Merge TN-56 (#1902)? ⑤ Merge TN-56 (#1902)?
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6585,10 +6531,28 @@ drift.
   and CI enforces that.
   **#1849 shows a red E2E, and that is not this change:** the full E2E run fails the same way on every
   PR that runs it (LA-176), including three merged before it. The five required checks are green.
-- **③ Barbell Skull Crusher has no progression style** (BF-200 residue, TN-75). The engine now
-  deloads it, but it records no per-set plan until a style is assigned. **⭐ Recommend: the style
-  his other Upper accessories use.** He assigns it in Config, or names one here and an agent sets
-  it. A preference, so not assumed.
+- **③ NINE slots in the ACTIVE program have no progression style — not one.** (BF-200 residue,
+  TN-75.) The engine deloads them, but none records a per-set plan until a style is assigned.
+  **⚠ This item named Barbell Skull Crusher alone; measured against production 2026-09-28 it
+  understates the problem ninefold**, which matters because the fix is the same amount of work for
+  all nine and answering only for the one leaves eight behind.
+  **In `Bankai` (`is_active = true`), 9 unstyled slots:**
+  - **7 accessory** — Hanging Leg Raise, Cable Chest Dips, Face Pull, Cable Lying Leg Curl,
+    **Barbell Skull Crusher**, Dumbbell Calf Raise, Cable Seated Leg Curl.
+  - **1 primary** — Barbell Hip Thrust. **This is the one that should not wait**: a primary with no
+    per-set plan is the most visible of the nine.
+  - **1 secondary** — Dumbbell Bulgarian Split.
+  - The other **5 unstyled primaries** (Squat, Deadlift, Bench, Incline Bench, Bent-Over Row) are in
+    **`Main`, which is INACTIVE** — out of scope, and not to be counted with the nine.
+  **⭐ Recommend: match each slot to what the same role already uses in that program**, rather than
+  picking one style for all nine. His accessories already run **`Hypertrophy 3-set`** (17 slots) and
+  **`General`** (15); his primaries run **`Powerbuilding`** (13). Barbell Skull Crusher itself
+  already carries `Hypertrophy 3-set` in one session and `General` in another, so there is no single
+  right answer for the exercise — only for each slot.
+  **A preference, so not assumed.** He assigns them in Config, or says "match by role" here and an
+  agent sets all nine.
+  **Method:** `claude_ro.session_exercises` joined to `program_sessions`/`programs`, `deleted_at IS
+  NULL`, grouped by program and role. Row-scoped to the owner, which is the whole population here.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
@@ -6596,12 +6560,28 @@ drift.
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
 
+- **⑤ TN-56 (#1902, draft): the admin replay endpoint Tuning needs. ⭐ Recommend: yes.** Held only
+  because it touches authorisation: `/api/admin/db-query`'s auth moved into one shared helper
+  (`lib/admin/claude-token-auth.ts`), with identical logic and the same rate key, and the new
+  `/api/admin/replay` uses it. The replay reads the owner's own data and writes nothing. On his
+  real data its defaults reproduce production on 15 of 17 nights. The 87 existing
+  db-query/admin-guard tests pass unchanged. Reversal: revert the PR.
+
 ### [workouts][readiness] LA-175 — Q-279's ACWR switch, re-measured before building: the deload card's direction reversed
-- **Lane: O** — the owner approved a change with measured numbers, and today's measurement differs in
-  direction, so the approval does not cover what would ship.
-- **Ask** — owner: re-measured on today's data, switching to the EWMA makes the early-deload card fire
-  on **17 days instead of 30** (you approved 12 → 15) and the over-exertion taper on **1 instead of 7**
-  (you approved 4 → 1). Still switch?
+- **✅ ANSWERED 2026-09-28 — DO NOT SWITCH YET. Re-measure on a reproducible harness first.** The
+  owner was shown today's numbers (early-deload **17** days against the **15** he approved, taper
+  **1** against the **4 → 1** he approved) and declined to proceed on them: *"Don't switch yet —
+  re-measure first."* **The 2026-09-03 approval is spent** — it was given against a baseline that no
+  longer reproduces, so it cannot be carried forward onto a re-run.
+- **Lane: T** — this is a scoring change, so it owes a **Tuning proposal** before anyone builds it,
+  per the rule that scoring drives every recommendation the app makes. Tuning re-lanes it to A once
+  the proposal lands. `Q-279` stays blocked behind it.
+- **⚑ WHAT THE RE-MEASURE MUST FIX is the reason this came back, not the numbers themselves.** The
+  2026-09-03 review **recorded its numbers but not its formula or its harness**, which is precisely
+  why its baseline could not be reproduced five days later. The proposal is not complete until the
+  harness is committed and re-runnable, and it states **how many other days the change moves** —
+  20 days flip at the deload boundary on today's data, and that figure is the one to re-derive, not
+  to copy from here.
 - **Added:** 2026-09-28 · Lane A, on picking up Q-279 to build it.
 - **What happened.** The 2026-09-03 review recorded its numbers but not its formula or harness, and its
   baseline no longer reproduces: over the same 95 days (05-29 → 09-01), the current formula gives
@@ -6708,21 +6688,22 @@ drift.
   `LB-135` left behind.** Three panes at 384 px dark: today, (a) the `bpm` caption, (b) the HR cell
   drawn without a ring. The measurements that rule out both of `RV-211`'s proposals are on the page
   as a table rather than as prose.
-- **Gate:** owner — the picture exists now, so his pick is the only outstanding thing.
-- **⚑ ONE QUESTION SETTLES IT, and it is not about taste:** does he use the `nolabel` or `overlap`
-  ring style? **In those two, (a) does nothing at all** — `nolabel` removes the label on purpose and
-  `overlap` has no caption slot — so 58 keeps reading as a score with nothing naming the metric.
-  If he uses either, (b) is the only option that works and the recommendation flips. Asked that way
-  on the page.
+- **✅ ANSWERED 2026-09-28 — NEITHER. The owner declined both fixes and deferred the whole thing:**
+  *"Leave it as it is. We will decide how to score HR later."* **Do not build (a) or (b), and do not
+  re-ask which he prefers** — the fork this entry was built around is closed.
+- **⛔ What unparks it is a DIFFERENT decision that has not been taken: how resting HR is scored.**
+  Once HR has a scoring treatment, the cell's visual language follows from it, and this entry is
+  re-opened against that answer rather than against the two shapes measured here. Until then the
+  ambiguity is **accepted, knowingly** — 58 keeps reading as a score, and that is the owner's call,
+  not an oversight to re-file.
+- **Gate:** owner — parked on the HR-scoring decision above, which has not been sought yet.
+- **The measurement survives and is the reason to keep this entry.** Whoever takes the scoring
+  question inherits a drawn, measured page ruling out both of `RV-211`'s proposals; that work does
+  not need redoing.
 - **⚠ Not device-verified.** Drawn from the harness geometry, not screenshotted on the S25 — the row
   needs live scores. **(b) owes a device look before it ships**, because it changes a shape rather
   than adding a word.
-- **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
-  Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
-  would park it. Add the gate once he has seen one.
-- **Ask** — owner: should the Resting HR cell carry a small unit caption in the styles that already
-  show a label (and stay ambiguous in the ones that do not), or should it be styled differently from
-  the three score cells outright?
+- **Lane: O** — held here until the HR-scoring decision exists. Nothing is buildable in the meantime.
 - **Added:** 2026-09-27 · split out of `RV-211` ⑥ by Lane B after measuring it.
 - **The defect is real.** Three of the four cells on Home are 0–100 scores; the fourth is a heart
   rate in bpm, drawn in the same ring at the same weight. **"58" reads as a score**, and nothing on
@@ -8916,13 +8897,18 @@ drift.
   `app/session-select/session-select-content.tsx:1128–1192` renders `IllnessAdvisoryBanner`, the
   auto-detected walk/run prompt, the `earlyDeloadRecommended` banner, `showGoalsCheckin`, the
   day-review `DismissibleBanner` and `WeeklyRecapBanner`, in that order.
-- **Ask:** owner — one pick: **A (one strip)** or **B (thin rows)** for the four that collapse. Recommendation A, on the page with what each costs.
-- **Gate:** owner — the picture now exists, so his answer is the only outstanding thing.
+- **✅ PICKED 2026-09-28 — A, ONE COMBINED STRIP.** The owner chose A off the redrawn page: the four
+  collapsing banners (exercise-detected, goals check-in, day-review, weekly recap) become a single
+  strip; illness advisory and early deload stay full-width. **Build A. The fork is closed — do not
+  re-open B**, whose only advantage was keeping each banner independently dismissible.
+- **⚠ What the strip owes, and it is the known cost of A:** the four lose their individual dismiss
+  affordance. Decide the strip's own dismiss behaviour as part of the build and say what you chose;
+  that is a structural call, not a second owner question.
 - **⚠ Heights on the page are drawn to scale relative to one another, NOT measured on the device.**
   A live screenshot needs all six conditions true at once, which no sandbox can arrange. Whichever
   treatment he picks owes a device look at the real stack before it is called done.
-- **✅ ANSWERED 2026-09-28 — REDRAW the mockup and re-approve. Do not build to the 2026-09-22
-  approval.**
+- **✅ ANSWERED 2026-09-28 (the earlier question, now superseded by the pick above) — REDRAW the
+  mockup and re-approve. Do not build to the 2026-09-22 approval.**
   He chose redrawing over building to the described split. The reasoning stands on its own: the
   approval survives and the artefact does not, so *"build to it"* is not actionable, and a lane can
   implement the description exactly and still produce a Home he dislikes — the failure the mockup
@@ -8938,14 +8924,11 @@ drift.
   unrecoverable, so the redraw supersedes the export.
 
 
-- **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
-  owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
-  saved to the repo, so no implementer can reach it. **Orchestrator: export it to
-  `docs/design/2026-09-22-home-health-ia-mockups.html` (one file, or one per entry), link it from
-  this bullet, and set the lane back to `B`.** Nothing else blocks the build — it is understood and
-  ready the moment the artefact lands.
-- **Was Lane B** — `app/session-select/session-select-content.tsx:1128-1193`. **Added:** 2026-09-22 ·
-  Review sweep 53.
+- **Lane: B** — returned 2026-09-28, both blockers cleared: the mockup was redrawn and committed
+  (the 2026-09-22 artefact was unrecoverable, so `LB-135`'s export is superseded), and the owner
+  has picked A off it. `app/session-select/session-select-content.tsx:1128-1193`.
+  **Added:** 2026-09-22 · Review sweep 53.
+- **Owed at the end, not before:** a device look at the real stack, per the scale warning above.
 - **Owner gate SATISFIED 2026-09-22** — mockup shown at 384 px dark, owner replied *"The other ones
   are fine to go ahead with."* Build to it; a departure from it needs a fresh yes.
 - **⚠ THE MOCKUP IT SAYS TO BUILD TO WAS NOT PRESERVED, so "build to it" is not actionable.**
@@ -16737,6 +16720,19 @@ stronger reason the measured one wins.
   its longest single session.**
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
+
+- **✔ NATIVE FIX BUILT 2026-09-28 (Lane A), v1.478.4, APK.** `MainActivity.onResume` asks the WebView to
+  re-measure against its parent now and again at 250 ms, before the JS recheck at 500 ms reads the
+  viewport. `AndroidRenderer.viewHeights()` exposes the WebView's and its parent's heights, and the
+  recheck breadcrumb appends them (`native view=… parent=…`). Java compiled locally, and a typo in
+  the new code fails the build.
+- **Verify:** device, read from the telemetry the owner already produces. After the APK is installed,
+  `error_events WHERE message LIKE 'bf110 resume recheck%'`: before this it read `stuck` 25 of 25.
+  - Mostly `resized`: the relayout works, and this entry can close.
+  - Still `stuck` with `native view` < `parent`: the view is not re-measured, so try a
+    harder nudge (detach and re-attach the layout params).
+  - Still `stuck` with `view` = `parent`: only Chromium's viewport lags. That is a WebView-level
+    fix (resize the view by a pixel and back), and this relayout cannot reach it.
 
 - **✅ THE READING IS IN, and it says NATIVE — measured 2026-09-18 (Review sweep 50). This entry is
   no longer waiting on data.** `error_events WHERE message LIKE 'bf110 resume recheck%'`:
@@ -32093,7 +32089,22 @@ D4's durability precondition and can happen in the same device session as future
   back?** If the answer is "never, in five months", his 30-day instinct is probably right and this
   becomes a retention change. If protocol fixes routinely reach back further, it is not dead weight
   and he should be told so plainly.
-- **Ask:** owner — deferred pending that measurement. Do NOT re-offer him the storage cost; the question is whether a decoder fix has ever needed bytes older than 30 days.
+- **✅ ANSWERED 2026-09-28 — KEEP THE ARCHIVE. There is no 30-day prune on `oura_raw_packed`.** The
+  measurement `OR-192` called for was taken and put to the owner with the *need*, not the bill; he
+  chose to keep it. **The 30-day retention instinct does NOT extend to this table** — it stands for
+  the tables it was given about, and this one is the exception, on the evidence below.
+  - **A redecode reads every stored day by construction**: `fullHistory: true` is hardcoded in
+    `app/api/oura-ble/samples/redecode/route.ts`, not a caller option, because *"a new/fixed decoder
+    backfills every stored day"*. There is no windowed mode to fall back on.
+  - **62% of the archive is already past 30 days** — 992 of 1,580 buckets, 1,215,622 of 1,954,802
+    frames, 17 MB of 27 MB. A 30-day window would narrow every future protocol fix to the most
+    recent third of history, permanently, since a pruned row cannot be re-drained from the ring.
+  - **Two limits recorded with it** (full detail in `OR-192`): the 2026-08-16 public snapshot
+    squashed the pipeline's first five weeks out of git, so this covers six weeks and not five
+    months; and only two redecode jobs were ever recorded, both abandoned, so no *completed* pass
+    consuming old bytes can be shown. Neither reverses the answer.
+  **Do not re-ask this, and do not re-offer the storage cost.** What remains open in this entry is
+  the rest of the DB-volume work, not retention on the raw archive.
 
 - **Lane:** A
 **✅ OWNER DECISION 2026-08-13 — D4 is confirmed as the direction, and the reason is multi-user.**
