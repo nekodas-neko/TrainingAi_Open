@@ -726,57 +726,50 @@ below threshold and left in place for next time.
   carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
 - **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
   than re-deriving it; the diff read is still Review's.
-- **✅ THE COLLISION IS RESOLVED — the contributor fixed it, verified 2026-09-27 22:56 on head
-  `0bb5a87e`.** This entry said the PR took **288/289**, which `main` already held, and that the
-  later-sorting twin would silently drop the new view. He renumbered to **290/291** and regenerated
-  the twin **after** applying, which is the ordering that matters: the regenerated file carries
-  `training_load_grid_len` and `training_load_valid_min`, so it was generated against a database
-  holding LA-161 rather than against a stale one.
-  **Checked with the tool that owns the question, not by reading the diff:**
-  `node scripts/next-schema-number.js` reports **292** next free, lists 290/291 as claimed by
-  `origin/health-sample-storage` alone, and reports **no collision** on them. CI is **all ten jobs
-  completed and success** on that head, Migration Check included.
-- **What is still owed is the diff read, and only that.** Storage carve-out, outside contributor:
-  **Review** reads it, **the owner merges**. Nothing here is blocking any more.
-- **⚠ Separately, `next-schema-number.js` reports a REAL collision that is OURS, not his** — `273`
-  and `274` are claimed by both `main` (merged, `273_exercise_media_review_status.sql`) and
-  `origin/lane-a/q44-phase3-pr1-table-rename`. That branch must renumber before it can land; the
-  check fails once both are in one tree. Not this entry's work — recorded so it is not lost.
 - **Needs:** — nothing.
-- **Superseded in part by BF-214 ① (built 2026-09-27, awaiting the owner).** `#1608` has since
-  renumbered to 290/291. Once BF-214 merges, its `291_claude_ro_views_…` twin must be deleted and
-  `lib/data/postgres/claude-ro-views.sql` regenerated instead; the new test fails the PR until then.
-- **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
-  `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
-  holds `288_training_load_grid_dimensions.sql` and `289_claude_ro_views_grid_dimensions.sql`
-  (LA-161). Same numbers, different content, both applied — `ensureSchema` tracks by **filename**,
-  so nothing stops either.
-- **The consequence is worse than a duplicate number, and it is silent.** Every `claude_ro` twin
-  opens with `DROP SCHEMA claude_ro CASCADE; CREATE SCHEMA claude_ro;` and recreates every view from
-  a snapshot of the database it was generated against. The two 289s sort by filename, so
-  `…_apple_health_samples` runs **first** and `…_grid_dimensions` runs **second** — and the second
-  was generated before `apple_health_samples` existed. **`claude_ro.apple_health_samples` is created
-  and then dropped in the same deploy**, leaving the table unreadable through `/api/admin/db-query`
-  with no error anywhere.
-- **What the contributor should do, and it is small:** renumber to the next free pair (**290/291**
-  as of 2026-09-27) and **regenerate the twin after applying**, not before — the generator reads
-  `information_schema` from a live database, so generating first produces a file byte-identical to
-  its predecessor. That gotcha is already in CLAUDE.md's twin section and is exactly what bites here.
-- **The PR also edits `docs/implementation-backlog.md`'s pointer** from 286 to 290. Correct for
-  `main` today and still worth flagging: a contributor editing the shared pointer row is a guaranteed
-  conflict with any agent PR that adds a migration.
-- **This is `BF-211`'s evidence, and the two should be read together** — the issue proposes deriving
-  the migration number from filenames, and this is what deriving it produces when an unmerged branch
-  holds numbers the filenames cannot show.
-- **Reproduced independently by the tool BF-211 shipped**, 2026-09-27: `node
-  scripts/next-schema-number.js` names `288: merged: 288_training_load_grid_dimensions.sql vs
-  origin/health-sample-storage: 288_apple_health_samples.sql`, and the same for 289. It also reports
-  **290** as the next free pair, which is what this entry recommends. So the renumber can be
-  verified rather than argued.
-- **It flags a second collision that is NOT work: 273/274 on `origin/lane-a/q44-phase3-pr1-table-rename`**,
-  a branch with no open PR. A dead branch reads exactly like a reservation to any tool that scans
-  refs. Delete the branch or leave it; do not renumber anything for it.
-- **Reversal cost:** none here — nothing has merged.
+
+- **CURRENT STATE, read 2026-09-28 22:56 on head `5d680b16`. Nothing is blocking; the diff read is
+  all that is owed.** The PR adds `apple_health_samples` — a user-scoped table with soft deletes,
+  four CHECK constraints and a partial history index — plus its Drizzle definition and both
+  `export-map.ts` rows (`SOFT_DELETED` and `EXPORTED`). **All ten CI jobs completed and success**,
+  Migration Check included.
+  **The green is NOT stale, checked rather than assumed:** no commit on `main` has touched
+  `lib/data/postgres/claude-ro-views.sql` or added a migration since his run at 08:43Z, so the one
+  shared file this PR edits has not moved underneath it.
+
+- **⚠ THIS ENTRY HAS BEEN WRONG TWICE, BOTH TIMES BECAUSE THE CONTRIBUTOR FIXED IT FIRST.** The
+  history, compressed, because three contradicting layers were harder to read than the outcome:
+  ① Filed 09-27 saying the PR took migrations **288/289**, which `main` already held, and that the
+  later-sorting `claude_ro` twin would silently drop the new view. True when written.
+  ② Corrected 09-27 22:56 — he had renumbered to **290/291** and regenerated the twin *after*
+  applying, which is the ordering that matters.
+  ③ Corrected again 09-28 22:56 — **the numbered scheme is gone from this PR entirely.** He has
+  adopted BF-214's conventions: the migration is `202609280817_apple_health_samples.sql` (the
+  `YYYYMMDDHHMM_<what>` form) and the views are an **in-place edit of the single
+  `claude-ro-views.sql`**, not a numbered twin. So there is no number left to collide on, and this
+  entry's prediction that "its `291_claude_ro_views_…` twin must be deleted once BF-214 merges" was
+  satisfied by the author without being asked.
+  **The lesson worth keeping is procedural, not technical:** an entry describing an inbound PR
+  describes a moving object, and re-reading the PR costs one call. Read before citing it.
+
+- **⚠ Separately, a REAL collision that is OURS, not his** — `273` and `274` are claimed by both
+  `main` (merged, `273_exercise_media_review_status.sql`) and
+  `origin/lane-a/q44-phase3-pr1-table-rename`, a branch with no open PR. A dead branch reads as a
+  reservation to any tool that scans refs. Delete the branch or leave it; do not renumber for it.
+  Recorded so it is not lost. Not this entry's work.
+
+- **Scope: storage ONLY. 4 files, +89/−1, `mergeable_state: clean`, and the owner is already a
+  requested reviewer.** The author's own summary — *"it doesn't change syncing or calculations"* —
+  matches the diff: there is **no ingest route in this PR**, so nothing writes the table yet.
+- **What Review should look at, since the schema is the whole substance.** The
+  `apple_health_samples_payload` CHECK requires a live row to carry either a quantity or a category
+  and never both, and exempts a tombstone — the question is whether that matches what the future
+  sync endpoint will actually write, because a CHECK is expensive to loosen once rows exist. The
+  table is keyed `(user_id, sample_id)` with `sample_id` supplied by the client; the composite key
+  scopes it to the user, so the cross-user hazard in `CLAUDE.md`'s write-path discipline does not
+  apply here — but it becomes the thing to check on the follow-up PR that adds the route, and that
+  route needs its Zod schema at creation per the ingest rule.
+- **Reversal cost:** none here — nothing has merged, and the table has no writer.
 
 ### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
 
