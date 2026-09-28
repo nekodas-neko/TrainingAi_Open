@@ -24582,6 +24582,36 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
 
+### [devices][platform] LA-179 — a 2-second raw-frame read runs ~1.5 times a minute, and its caller is not yet identified
+
+- **Lane: A** — `lib/data/postgres/slices/oura-raw-frames.ts` (`readRawFrames`) and whichever caller
+  this turns out to be.
+- **Added:** 2026-09-28 · Lane A, while closing RV-181.
+- **Measured in production, `pg_stat_statements` deltas over two windows (16.8 and 19.1 min):**
+  the hot-tier raw read (`user_id`, a tag list, `ring_timestamp_ds >= cutoff`, no upper bound,
+  ordered) ran **27 and 28 times, at 2.1 and 2.0 s a call**. That is about **3 minutes of database
+  time an hour** if it persists. Its lifetime mean is 93 ms.
+- **What such a call reads:** for the rollup's 15 tags, all **136,976** hot rows, **3.5 MB of hex**,
+  none with `decoded`. A server-side `count` and byte sum over the same rows takes **99 ms**, so the
+  2 s is returning and sorting the rows, not finding them.
+- **⚠ THE CALLER IS NOT ESTABLISHED, and the first reading of this was wrong.** It was filed as "the
+  rollup re-reads its hot window on every ingest". Checked the same session:
+  - the ingest route rolls up only when `stored > 0`;
+  - only **5 minutes** in the preceding two hours stored anything;
+  - `oura_daily_derived` was rewritten once (110 days at 07:45) and not during the window.
+  So ingest-driven rollups do not account for 28 calls in 19 minutes. The readers with that
+  shape are the rollup (`run.ts`, ingest or admin redecode) and `getOuraRawSamplesForTags`,
+  which feeds the admin `/api/oura-ble/device-metrics` panel and the daytime-HRV refit. An
+  automated harness driving the admin diagnostics, as Device Verification does, fits 1.5 a minute
+  better than anything the app does on its own.
+- **Next step: attribute before optimising.** Re-sample on a day with no agent driving the device;
+  if the rate drops to a handful an hour, this is harness load and the entry closes. If it persists,
+  add a route tag to the query (a SQL comment on each caller) so `pg_stat_statements` names it.
+- **If it IS the rollup, the directions:** read only the span a drain touched, plus each
+  derivation's look-back; or one rollup per drain rather than per batch; or a decoded per-user
+  cache in the worker. Measure rollups per drain first.
+- **Not urgent:** nothing reported slowness, and the cache hit rate is 99.9%.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A
