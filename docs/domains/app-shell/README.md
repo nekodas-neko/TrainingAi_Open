@@ -592,3 +592,13 @@ Live at the time of writing (2026-07-30):
   band (~345°) at 40° separation. So the rows keep their labels and share one accent — hue was
   redundant encoding. `rv208-movement-category-hues.test.ts` asserts the arithmetic against
   `globals.css`, not the literals. **Before adding any category palette, scan both systems first.**
+
+- **[`2026-09-28-home-banner-strip`](../../overview/entries/2026-09-28-home-banner-strip.md)**
+  — **RV-119: Home's banners split by severity, four behind one strip.** Illness advisory and early
+  deload stay full-width; activity-to-review, goals check-in, day review and weekly recap collapse.
+  **Read this before adding any Home banner:** two of the four decide their own visibility and
+  `return null`, so the strip counts a **registry** they report into
+  (`useReportBannerPresence`) rather than anything the parent can see — and the two the stack
+  controls are reported by the stack, which is the half that undercounts the strip **silently** when
+  missed. The four are hidden, never unmounted: that is what keeps them in the registry *and* keeps
+  their own dismiss controls, which the entry expected to lose.

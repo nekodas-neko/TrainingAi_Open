@@ -31,6 +31,25 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] Home's banner strip is NOT device-verified, and the multi-banner case was never rendered
+
+- **Shipped 2026-09-28 (RV-119, v1.481.0), web-verified with ONE banner present.** The four
+  "ready for you" banners collapse behind one strip; illness advisory and early deload stay
+  full-width. The harness run had exactly **one** of the four waiting, so the strip rendered as
+  `1 ready` with a single icon — **the multi-icon row and the four-banner expansion have never been
+  drawn**, and the mockup's heights are relative, not measured on a device.
+- **What a device pass must answer:**
+  1. The strip with **three or four** icons at 384 px: do the chips, the count and the chevron still
+     fit on one line without wrapping or clipping?
+  2. Expand it with several banners waiting — does the stack push the recommendation below the fold
+     again, which is the whole thing this entry exists to stop?
+  3. With an illness advisory **and** an early deload both live, plus the strip: three elements
+     above the first real card. That is the worst realistic case and the one the split was chosen
+     for.
+  4. Each expanded banner's own dismiss still works, and dismissing one drops the strip's count.
+- **Why it is here rather than in a lane:** nothing is known to be broken. The entry states the
+  device look is owed at the end, and no sandbox can arrange six banner conditions at once.
+
 ### [sleep][app-shell] The rebuilt morning check-in is NOT device-verified, and its save path is the untested half
 
 - **Shipped 2026-09-28 (TN-82, v1.480.0), web-verified only.** `components/morning-checkin-sheet.tsx`
