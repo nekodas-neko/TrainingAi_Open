@@ -8871,6 +8871,15 @@ drift.
   the sandbox can only prove the primitive is wired in.
 
 ### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
+- **✅ CLOSED 2026-09-28 — SUPERSEDED, not completed.** This entry's job was exporting the
+  2026-09-22 Home mockup from the Orchestrator's chat to the repo. **That artefact is
+  unrecoverable** — the session is gone and nothing in `docs/design/` holds it — so it was
+  **redrawn** instead: [`docs/design/2026-09-28-home-banner-stack.html`](design/2026-09-28-home-banner-stack.html),
+  linked from `RV-119`, which is where the remaining decision lives.
+- **The rule it leaves behind, which is the durable part:** a mockup is not shown until it is in
+  `docs/design/`. An approval whose artefact lives only in a transcript records that a decision
+  happened and loses what was decided — `RV-119` sat unbuildable for six days on exactly that.
+  **Strike this entry.**
 - **✅ THE CLASS IS FIXED FOR THE 2026-09-27 BATCH, though this entry's own artefact is still lost.**
   Four mockups (`LB-163`, `LA-136`, `RV-213`, `RV-166`) were produced and **committed to the repo**
   as [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html)
@@ -8957,6 +8966,22 @@ drift.
 - Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
+- **📐 REDRAWN 2026-09-28 — [`docs/design/2026-09-28-home-banner-stack.html`](design/2026-09-28-home-banner-stack.html)
+  ([hosted](https://claude.ai/artifact/V3PRnnjchdhAA9nXYwgXLt)). Committed, so it cannot be lost a
+  second time. **`LB-135`'s export is superseded** — the 2026-09-22 artefact is unrecoverable, so
+  it was redrawn rather than found.
+- **The agreed split is UNCHANGED and is not re-asked:** illness advisory and early deload stay
+  full-width; exercise-detected, goals check-in, day-in-review and weekly recap collapse. The APK
+  banner is already shipped as removed, so it is six, not seven.
+  **Verified against `main` 2026-09-28, not taken from the entry:**
+  `app/session-select/session-select-content.tsx:1128–1192` renders `IllnessAdvisoryBanner`, the
+  auto-detected walk/run prompt, the `earlyDeloadRecommended` banner, `showGoalsCheckin`, the
+  day-review `DismissibleBanner` and `WeeklyRecapBanner`, in that order.
+- **Ask:** owner — one pick: **A (one strip)** or **B (thin rows)** for the four that collapse. Recommendation A, on the page with what each costs.
+- **Gate:** owner — the picture now exists, so his answer is the only outstanding thing.
+- **⚠ Heights on the page are drawn to scale relative to one another, NOT measured on the device.**
+  A live screenshot needs all six conditions true at once, which no sandbox can arrange. Whichever
+  treatment he picks owes a device look at the real stack before it is called done.
 - **✅ ANSWERED 2026-09-28 — REDRAW the mockup and re-approve. Do not build to the 2026-09-22
   approval.**
   He chose redrawing over building to the described split. The reasoning stands on its own: the
