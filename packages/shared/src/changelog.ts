@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.479.0",
+    date: "2026-09-28",
+    changes: [
+      "New: Home shows what you said about last night's sleep. Under the readiness card you get your own rating \u2014 Great, Good, OK, Poor or Terrible \u2014 with five dots and a \u201cYour rating, not a score\u201d caption, so it can never be mistaken for a number the app worked out. It appears only on a morning you actually rated: leave the sleep question alone in the check-in and nothing is shown.",
+    ],
+  },
+  {
     version: "1.478.7",
     date: "2026-09-28",
     changes: [

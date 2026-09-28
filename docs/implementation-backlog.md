@@ -3189,73 +3189,25 @@ which is the right shape for something that can only be validated by living with
   `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
-### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
-- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
-  The sleep line returns under the mood card from `sleepQualityFeel` (1–5), with the caption naming
-  it as his rating rather than a score. **The caption is part of the approval, not decoration** —
-  the line it replaces was fabricated and read as derived for 91 days.
-  **⚠ The cost is unchanged and is the whole risk here:** Home is in the persistent tab shell, so
-  this needs `useCachedValue`, a canonical TTL in `cache-ttl.ts`, and registration in every write
-  group touching `day_checkins`. A hand-rolled `useEffect(() => { cachedFetch(…) }, [])` never
-  re-runs there and the line will hold its first value until the app is killed — the Q-402 shape,
-  which this repo has shipped twelve times.
-- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
-  Before/after at the real **384 px dark viewport**, using the app's own tokens from
-  `app/globals.css`. **Proposed:** the sleep line returns under the mood card, driven by `sleepQualityFeel` (1–5), captioned *"Your rating, not a score"* so it cannot be misread as derived the way the fabricated `Sleep: OK` was.
-- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
-  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
-  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
-  `LB-163` describes; applying it before the picture existed is the trap.)
-- **The cost is on the mockup and is not optional:** Home is in the persistent tab shell, so it needs `useCachedValue`, a canonical TTL and registration in every `day_checkins` write group, or it paints once and never refreshes.
-- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
-  Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
-  and `RV-213` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>. The after reads
-  *"You rated last night's sleep **Good** this morning."* under the readiness card.
-- **Gate cleared 2026-09-27** — approved. Lane B builds to the mockup.
-- **The WORDING is part of what he is being asked to approve**, not an implementation detail. Naming
-  whose judgement it is — *"you rated"* — is precisely what the dead `sleep_quality` line got wrong,
-  so if he takes this, keep the phrasing. The `useCachedValue`/TTL/write-group cost is stated on the
-  page too, because it is the one part of this that a picture cannot show.
+### [nutrition][sleep] LB-182 — the nutrition prompt is never told what he said about his sleep
 
-- **✅ ANSWERED 2026-09-27 — yes, put his morning sleep-feel back on Home, but SHOW HIM A MOCKUP FIRST.**
-  He picked the mockup-gated variant over building it straight. So the next act is to produce a
-  before/after at **384 px dark** and put it to him; the code waits on his yes to that picture.
-  **Now Lane B, ungated on purpose** — producing the mockup is work, and `Gate: owner` would park
-  it. Add the gate once the mockup has been shown and his answer is the only thing outstanding
-  (`LB-163` is the reference for this distinction).
-  **Show it in the same sitting as `LB-163` and `RV-213`** — three Home/Nutrition mockups owed to
-  one person; splitting them across three sittings gets the same screen judged three times.
-  **The cost stated in this entry still holds and is not optional:** Home is inside the persistent
-  tab shell, so the new read needs `useCachedValue`, a canonical TTL in `cache-ttl.ts`, and
-  registration in every write group touching `day_checkins` — or it paints once and never refreshes.
-
-
-- **Lane: B** — it needs a product preference before it needs code, and the code half is then Lane B
-  (`components/home/**`). **Added:** 2026-09-24 · Lane A, as the stated residue of TN-66.
-- **What TN-66 removed and why.** Home showed *"Sleep: OK"* under the mood card. It came from
-  `mood_logs.sleep_quality`, a `NOT NULL` column the check-in stopped collecting on 2026-06-25, so
-  the write path's `'ok'` default was the stored value on 93 of 108 rows. Home was telling the owner
-  what he had said about his sleep, every day for 91 days, and he had never said it. The line is
-  gone; nothing replaced it.
-- **⚠ THE SIGNAL EXISTS, and TN-66 did not notice it.** `morning-checkin-sheet.tsx` collects
-  **`sleepQualityFeel`** on a 1–5 scale **with its own touched flag** — TN-57's convention, built for
-  exactly this question — and stores it in `day_checkins`, a different table from the dead field.
-  The names differ by one word, which is why a grep for the dead one reports that nothing collects
-  sleep quality at all.
-- **The question is the owner's, not an implementer's:** does he want his own morning sleep-feel on
-  Home in that spot, or is the mood card better without it? Removing a fabricated line needed no
-  permission. Putting a different number in its place is an information-architecture choice on a
-  screen he reads daily, which CLAUDE.md sends to him with a mockup rather than to a lane.
-- **⚠ It is not a one-line swap, and the cost belongs in the question.** Neither surface holds
-  check-in data today: `home-card-widget.tsx` has no reference to it, and Home is inside the
-  persistent tab shell — so a new read there needs `useCachedValue`, a canonical TTL, and
-  registration in every write group that touches `day_checkins`, or it paints once and never
-  refreshes (the Q-402 shape). A "just show the real one" that skips this is the bug class this
-  repo has fixed twelve times.
-- **The nutrition prompt is the cheap half, if it is wanted at all.** That route already runs a
-  `Promise.all` of repository reads, so `listDayCheckins` + `answeredMorningScales` is one more line
-  — but it feeds an LLM, and adding a self-reported scale to a prompt is a change to what the model
-  is told rather than a rendering fix. Decide it with the Home half, not separately.
+- **Lane: A** — `app/api/**`, which is Lane A by the path rule. Filed out of `LA-136`, whose Home
+  half shipped 2026-09-28; this is the half that entry deliberately did not decide separately.
+- **Added:** 2026-09-28 · Lane B, on shipping `LA-136`.
+- **The cheap half of LA-136, and the reason it is its own entry.** The route already runs a
+  `Promise.all` of repository reads, so `listDayCheckins` + `answeredMorningScales` is close to one
+  more line. What makes it not a rendering fix is that it changes **what the model is told about
+  him**, which is a different kind of change from putting a number on a screen.
+- **⛔ It must go through `answeredMorningScales`, never the raw column.** The sheet writes a neutral
+  `3` for a scale he never tapped, flagged `sleepQualityFeelTouched: false`. Four earlier readers in
+  this repo took the column directly and were calibrating, plotting and displaying **78 values
+  nobody gave**; telling an LLM he reported a night he never rated is the same bug with a worse
+  blast radius, because the model will then reason from it in prose.
+- **Recommendation, not a question for the owner: include it.** The prompt is already given other
+  self-reports, this is his own words about the thing the advice is partly for, and it is one line
+  to remove if the advice gets worse. A cheap reversible change does not need his sign-off — but if
+  the nutrition advice starts leaning on sleep in a way he dislikes, that IS his call and this is
+  the line to pull.
 
 ### [platform] RV-188 — production has not deployed 22 merges, including tonight's fixes: unblock the Railway build, then take it off the memory boundary
 

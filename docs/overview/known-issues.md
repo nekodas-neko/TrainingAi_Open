@@ -31,6 +31,26 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep][app-shell] Home's sleep line is NOT device-verified, and the offline path is the untested half
+
+- **Shipped 2026-09-28 (LA-136, v1.479.0), web-verified only.** `components/home/sleep-feel-line.tsx`
+  + `lib/hooks/use-morning-sleep-feel.ts`. The line reads `day_checkins` **local-first** because the
+  morning sheet writes `upsertDayCheckin` + `queueMutation` before the network — but
+  `getLocalStore` returns null in the web sandbox, so every test run took the **API fallback**. The
+  local branch has not executed once.
+- **What a device pass must answer**, in order of what is most likely to fail:
+  1. Rate sleep in the morning check-in **with the phone offline**. The line appears on Home
+     immediately (the invalidation fires whether or not the push succeeded) and is **still there
+     after force-killing and reopening the app**. A blank here means the local read is not running.
+  2. Rate it online, then leave the tab and come back — the value updates **without** the app being
+     killed. A stale value is the Q-402 shape returning through the escape hatch.
+  3. Leave the sleep question **untouched** in the sheet and save. Home must show **nothing**. A
+     line reading *"OK · 3/5"* means the neutral seed reached the screen and the fabricated
+     `Sleep: OK` is back.
+- **Why it is here rather than in a lane:** nothing is known to be broken. This is the device gate
+  the canonical-runtime rule owes for a change touching an offline-first domain, recorded because no
+  device was available in-session.
+
 ### [app-shell] ⚠️ A native relayout on resume targets the blank screen, and only telemetry from the phone can say if it worked (BF-110, 2026-09-28)
 
 `MainActivity.onResume` now re-measures the WebView on resume. It is Java, so it reaches the phone only

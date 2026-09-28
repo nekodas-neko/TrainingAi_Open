@@ -1196,6 +1196,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               // rendered nothing until someone remembered to add its line.
               if (key.startsWith("card_")) return (
                 <HomeCardWidget
+                  userId={userId}
                   sectionKey={key as CardSectionKey}
                   sectionEditMode={sectionEditMode}
                   activeCardWidgets={activeCardWidgets}

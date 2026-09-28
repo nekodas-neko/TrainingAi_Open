@@ -312,3 +312,11 @@ curve). **Before writing anything that treats one row as one night, call the hel
   with the numbers first for an outlier, with a correction one tap away. The morning modal is not a
   home for it: it opens once a day on one screen and retires on dismissal, and the owner has saved
   82 of those sheets while touching a scale in 3.
+
+- **[`2026-09-28-home-sleep-feel-line`](../../overview/entries/2026-09-28-home-sleep-feel-line.md)**
+  — LA-136. Home shows the sleep rating he actually gave, under the mood card, captioned as his
+  rating rather than a score. **The gate is the point:** the morning sheet stores a neutral `3` for
+  a scale he never tapped, so the read goes through `answeredMorningScales` — without it Home prints
+  *"OK · 3/5"* for a value nobody gave, which is the fabricated `Sleep: OK` this entry removed. The
+  scale is stored 1 = great … 5 = terrible while its labels run the other way; `storedOrderLabels`
+  is the only correct reverse.
