@@ -76,7 +76,7 @@ survives from one PR to the next. The shape that gives it:
   can share a database with the other. Rebuild the snapshot database, then load it:
 
   ```bash
-  LOCAL_DB_PORT=5434 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a \
+  LOCAL_DB_PORT=5434 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a_snapshot \
   SNAPSHOT_URL='https://trainingai-production.up.railway.app/api/admin/db-snapshot?bulk=0' \
   ADMIN_SNAPSHOT_SECRET=<from .env.local> node scripts/local-db/snapshot.js
   ```
