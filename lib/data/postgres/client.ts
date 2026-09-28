@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
+import { createHash } from 'crypto'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import * as schema from './schema'
@@ -128,5 +129,53 @@ export async function ensureSchema(): Promise<void> {
     // production rather than surface anything new. Loud and non-fatal is the trade.
     console.error(`[ensureSchema] ${failed.length} migration(s) DID NOT APPLY: ${failed.join(', ')}`)
   }
+  await applyClaudeRoViews(pool, applied)
   schemaApplied = true
+}
+
+/**
+ * The `claude_ro` read-only view schema (BF-214). It used to be a numbered migration re-issued in
+ * full on every schema change — 59 copies, 92% of the migration corpus, one migration number burned
+ * per change, and a silent failure when two landed together (the later-sorting copy dropped the
+ * schema the earlier one built). Only the newest copy ever mattered, so it is now ONE generated file,
+ * regenerated in place and applied after the migrations.
+ *
+ * Gated on a hash of the file's content recorded in `schema_migrations`, so an unchanged file does
+ * not rebuild the schema on every cold start. The file DROPs the schema before rebuilding it, and a
+ * failure halfway must leave the previous views standing. Postgres already runs a multi-statement
+ * query as one implicit transaction, which is what guarantees that; the explicit one here extends it
+ * to the marker row, so a recorded marker always means a rebuild that committed.
+ * Loud and non-fatal on failure, for the same reason a failed migration is (see above).
+ *
+ * `scripts/local-db/migrate.js` mirrors this; `claude-ro-views-file.test.ts` pins that the two record
+ * the same marker.
+ */
+export const CLAUDE_RO_VIEWS_FILE = 'lib/data/postgres/claude-ro-views.sql'
+
+export function claudeRoViewsMarker(sqlText: string): string {
+  return `claude-ro-views.sql@${createHash('sha256').update(sqlText).digest('hex').slice(0, 16)}`
+}
+
+export async function applyClaudeRoViews(
+  pool: Pool,
+  applied: Set<string>,
+  sqlText: string = readFileSync(join(process.cwd(), CLAUDE_RO_VIEWS_FILE), 'utf-8'),
+): Promise<void> {
+  const marker = claudeRoViewsMarker(sqlText)
+  if (applied.has(marker)) return
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(sqlText)
+    await client.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [marker])
+    await client.query('COMMIT')
+    console.info(`[ensureSchema] claude_ro views rebuilt (${marker})`)
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    const code = (err as { code?: string }).code ?? 'no code'
+    console.error(`[ensureSchema] claude_ro views DID NOT APPLY [${code}] — the previous views stand:`,
+      (err as Error).message?.slice(0, 200))
+  } finally {
+    client.release()
+  }
 }

@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
- * Generates the `claude_ro` view-schema migration — the read-only surface Claude sessions can query
+ * Generates `lib/data/postgres/claude-ro-views.sql` — the read-only surface Claude sessions can query
  * (see docs/superpowers/plans/2026-07-26-claude-readonly-prod-db-access.md).
  *
  * The security model is DEFAULT-DENY: nothing is readable unless a view exists for it. Re-run this
- * after adding tables, and commit the regenerated migration:
+ * in the same PR as any migration that adds or drops a table or column, OVERWRITING the one file:
  *
- *   node scripts/next-schema-number.js     # what <NEXT-FREE-NUMBER> is — fetches, reads every branch
  *   CLAUDE_RO_OWNER_USER_ID=<uuid> node scripts/generate-claude-ro-views.js \\
- *     > lib/data/postgres/migrations/<NEXT-FREE-NUMBER>_claude_ro_views_<reason>.sql
+ *     > lib/data/postgres/claude-ro-views.sql
  *
- * ALWAYS a NEW migration number — never overwrite an already-committed one. `ensureSchema` tracks
- * applied migrations by FILENAME, so editing a file that has already run in production means the
- * runner skips it and the change never takes effect (this exact mistake shipped once: the row-scoping
- * fix silently did nothing until it was re-issued as its own file).
+ * **Not a migration any more (BF-214), so overwriting is correct.** It used to be re-issued under a
+ * NEW migration number on every schema change, because `ensureSchema` tracks migrations by filename
+ * and skips one it has seen. The file is now applied after the migrations and re-applied whenever its
+ * content hash changes, so an edit in place takes effect. `claude-ro-views-file.test.ts` regenerates
+ * it against the test database and fails on any difference, so a schema change that forgets this
+ * step cannot pass CI.
  *
  * Reads the live local schema, so the generated views always match reality rather than a hand-kept
- * list that drifts. Requires the local dev DB (pnpm db:local).
+ * list that drifts. Run it against a database built from migrations alone (`pnpm db:local`), not a
+ * long-lived one with hand-applied changes: those would be written into the views.
  */
 const { Client } = require('pg')
 
@@ -275,9 +277,9 @@ async function main() {
   out.push('')
 
   // The role is created out-of-band by the owner (it carries a password, which must never live in a
-  // committed migration). This migration runs on every cold start via ensureSchema, so the GRANT is
-  // guarded: without the guard, a database where the owner has not created the role would fail the
-  // migration and take the app down.
+  // committed file). `ensureSchema` applies this file on a cold start whenever its content changes,
+  // so the GRANT is guarded: without the guard, a database where the owner has not created the role
+  // would fail the whole file.
   out.push('DO $$')
   out.push('BEGIN')
   out.push("  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'claude_readonly') THEN")
