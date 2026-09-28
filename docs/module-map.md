@@ -302,6 +302,8 @@ Injuries, Supplements, AI Periodization, Oura Ring, Body Battery.
 | Server error reporting | `lib/observability.ts` → `reportServerError(err, context)` → `POST /api/client-error` |
 | Client error boundary | `components/error-reporter.tsx`, `app/error.tsx` |
 | Structured logging | `packages/shared/src/logger.ts` → `errorLog`, `infoLog` |
+| Native ingest-URL allowlist | `android/app/src/main/java/com/trainingai/app/IngestUrlPolicy.kt` → `isAllowed`, `normalize` — the one place deciding where the Oura/scale/Polar services may post frames (RV-196). Pure, no Android deps, JVM-tested. |
+| Android backup exclusions | `android/app/src/main/res/xml/backup_rules.xml` (API 23-30) + `data_extraction_rules.xml` (API 31+) — the WebView session cookie is kept out of backup and device transfer (OR-159). So is the Oura ring key (`sharedpref` `oura_ble.xml`), per OR-160: the owner holds his own copy and keeps Google out of its custody. |
 
 Security defaults (fail-closed, verify-before-lookup, Zod-at-ingest, no bare `JSON.parse`
 of LLM text) are in `CLAUDE.md` "AI & Security Defaults".
