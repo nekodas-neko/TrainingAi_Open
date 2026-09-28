@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.2",
+    date: "2026-09-28",
+    changes: [
+      "Changed: the Start Workout and Continue Workout buttons no longer carry a dumbbell icon, so they match the plain-text buttons used everywhere else in the app.",
+    ],
+  },
+  {
     version: "1.478.1",
     date: "2026-09-28",
     changes: [
