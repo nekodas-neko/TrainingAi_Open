@@ -19,6 +19,9 @@ import { MovementBalanceCard } from "@/components/health/movement-balance-card";
 import { WeekInReviewCard } from "@/components/health/week/week-in-review-card";
 import { BodyMuscleCard } from "@/components/health/body-muscle-card";
 import { EnergyBudgetPrompt } from "@/components/health/energy-budget-prompt";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CellEmpty } from "@/components/health/cell-empty";
+import { WeightTrendCard } from "@/components/health/body-cards/weight-trend-card";
 import { CalorieBalanceBar } from "@/components/nutrition/calorie-balance-bar";
 import { TrainingLoadCard } from "@/components/health/training-load-card";
 import { SleepVsPerformanceCard } from "@/components/health/sleep-vs-performance-card";
@@ -137,6 +140,14 @@ export interface HealthSectionsCtx {
   recoveryMuscles: MuscleRecoveryEntry[];
   handleDayClick: (date: string) => void;
   weeklyStats: WeeklyStatsResponse | null;
+  weeklyStatsError: boolean;
+  /** LB-176 — these say the feeding read FAILED, as opposed to having returned nothing. */
+  metaFailed: boolean;
+  energyBalanceFailed: boolean;
+  trainingLoadFailed: boolean;
+  sleepCorrFailed: boolean;
+  goalsFailed: boolean;
+  retryWeeklyStats: () => void;
   activeSessions: ProgramSession[];
   /** The active program's training goal — scales the volume landmarks (Q-305). */
   trainingGoal?: string;
@@ -160,7 +171,8 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
-    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
+    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError, retryWeeklyStats,
+    metaFailed, energyBalanceFailed, trainingLoadFailed, sleepCorrFailed, goalsFailed,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
     progressSummary, bodyBaseline, healthTrends, bodyFatCalibration,
   } = ctx;
@@ -212,7 +224,9 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           {weightPoints.length >= 2 ? (
             <Sparkline values={weightPoints} width={160} height={48} color="#00d4ff" showDots />
           ) : (
-            <div className="flex items-center justify-center h-12 text-xs text-muted-foreground">Not enough data</div>
+            <div className="flex items-center justify-center h-12 text-xs text-muted-foreground">
+              {metaFailed ? "Couldn't load" : 'Not enough data'}
+            </div>
           )}
           <p className="text-[10px] text-muted-foreground mt-1">
             {latestWeightIsStale && latestWeightDate ? `Last logged ${latestWeightDate}` : "Last 7 days"}
@@ -436,7 +450,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               ) : latestDistanceKm != null ? (
                 <p className="text-2xl font-bold tabular-nums">{latestDistanceKm.toFixed(1)}<span className="text-xs font-normal ml-1">km</span></p>
               ) : (
-                <p className="text-xs text-muted-foreground mt-1">No data</p>
+                <CellEmpty failed={metaFailed} className="text-xs text-muted-foreground mt-1" />
               )}
               <p className="text-xs text-muted-foreground mt-1">Today</p>
             </div>
@@ -490,7 +504,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               ) : activeEnergyKcalToday != null ? (
                 <p className="text-2xl font-bold tabular-nums">{Math.round(activeEnergyKcalToday)}<span className="text-sm font-normal ml-1">kcal</span></p>
               ) : (
-                <p className="text-xs text-muted-foreground">No data</p>
+                <CellEmpty failed={metaFailed} />
               )}
               <p className="text-xs text-muted-foreground mt-1">From cardio today</p>
             </div>
@@ -511,7 +525,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                   {bmiUsesBf && <p className="text-[9px] text-muted-foreground/70 mt-0.5">via body fat %{latestBfIsCorrected ? " (DEXA-calibrated)" : ""}</p>}
                 </>
               ) : (
-                <p className="text-xs text-muted-foreground">No data</p>
+                <CellEmpty failed={metaFailed} />
               )}
               {openInfo === 'bmi' && (
                 <div className="mt-3 flex gap-2 rounded-xl bg-muted/50 p-2.5">
@@ -575,7 +589,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                   <p className="text-[10px] text-muted-foreground mt-0.5">vs TDEE est.</p>
                 </>
               ) : (
-                <p className="text-xs text-muted-foreground">No data</p>
+                <CellEmpty failed={energyBalanceFailed} />
               )}
               {openInfo === 'balance' && (
                 <div className="mt-3 rounded-xl bg-muted/50 p-2.5">
@@ -595,6 +609,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           metaToday={metaToday}
           metaRecent={metaRecent}
           metaLoading={metaLoading}
+          metaFailed={metaFailed}
           onOpenSheet={setMetricSheet}
         />
       );
@@ -643,15 +658,29 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       // Lives here, not in renderTrainingSection: "energyBudget" is listed in BODY_GROUPS and in
       // no training order, so the case sitting in the training renderer made this card
       // unreachable from both tabs — it had never rendered.
-      case "energyBudget": return energyBalance?.balance != null || energyBalance?.missingProfileFields.length
-        ? <CalorieBalanceBar key="energyBudget" data={energyBalance} isToday />
-        : <EnergyBudgetPrompt key="energyBudget" />;
+      // LB-176 — the null case is split by cause: a failed read said "Add your height, age and sex in
+      // Profile". `energy-budget-prompt.tsx` carries the reachability analysis.
+      case "energyBudget": {
+        if (energyBalance != null) {
+          return energyBalance.balance != null || energyBalance.missingProfileFields.length
+            ? <CalorieBalanceBar key="energyBudget" data={energyBalance} isToday />
+            : <EnergyBudgetPrompt key="energyBudget" />;
+        }
+        return energyBalanceFailed
+          ? <EmptyState key="energyBudget" title="Couldn't load your energy budget" />
+          : <div key="energyBudget" className="h-20 animate-pulse rounded-2xl bg-muted" />;
+      }
 
       case "nutritionActivityTrends": return <NutritionActivityTrendsCard key="nutritionActivityTrends" trends={healthTrends} />;
 
-      case "trainingLoad": return <TrainingLoadCard key="trainingLoad" trainingLoad={trainingLoad} />;
+      case "trainingLoad": return <TrainingLoadCard key="trainingLoad" trainingLoad={trainingLoad} failed={trainingLoadFailed} />;
 
-      case "sleepVsPerformance": return sleepCorr ? <SleepVsPerformanceCard key="sleepVsPerformance" sleepCorr={sleepCorr} /> : null;
+      // LB-176 — a VANISH rather than a lie; see the card's own docstring.
+      case "sleepVsPerformance":
+        if (sleepCorr) return <SleepVsPerformanceCard key="sleepVsPerformance" sleepCorr={sleepCorr} />;
+        return sleepCorrFailed
+          ? <EmptyState key="sleepVsPerformance" title="Couldn't load sleep vs performance" />
+          : null;
 
       case "injury": return (
         <div key="injury">
@@ -686,7 +715,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       // calendar entry; but for the whole week"*, and this is the entry point that outlives the
       // dismissible banner (BF-5).
       case "weekInReview":    return <WeekInReviewCard key="weekInReview" />;
-      case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} sessions={activeSessions} />;
+      case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} error={weeklyStatsError} onRetry={retryWeeklyStats} sessions={activeSessions} />;
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
       case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
@@ -707,60 +736,16 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           weekToDate={weekToDate}
           userGoals={userGoals}
           progressSummary={progressSummary}
+          failed={goalsFailed}
         />
       );
-      case "weightTrendProgress": {
-        const trendWeightPoints = [...metaRecent].reverse().map(r => r.weightKg).filter((w): w is number => w != null);
-        return (
-        <div key="weightTrendProgress" className="rounded-2xl p-4 bg-muted/30 border border-border/40">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Weight Trend</p>
-          {trendWeightPoints.length >= 2 ? (
-            <Sparkline values={trendWeightPoints} width={160} height={48} color="var(--color-brand)" showDots />
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">Log body weight to see trend</p>
-          )}
-          {((latestWeight != null && bodyBaseline.weightKg != null && targetWeightKg != null) ||
-            (latestBf != null && bodyBaseline.bodyFatPct != null && targetBfPct != null)) && (
-            <div className="space-y-3 mt-3">
-              {latestWeight != null && bodyBaseline.weightKg != null && targetWeightKg != null && (
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span>Weight</span>
-                    <span className="font-semibold">{latestWeight} → {targetWeightKg} kg</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${goalProgressPct(bodyBaseline.weightKg, latestWeight, targetWeightKg)}%`,
-                        background: 'var(--color-brand)',
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-              {latestBf != null && bodyBaseline.bodyFatPct != null && targetBfPct != null && (
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span>Body Fat</span>
-                    <span className="font-semibold">{latestBf}% → {targetBfPct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${goalProgressPct(bodyBaseline.bodyFatPct, latestBf, targetBfPct)}%`,
-                        background: '#2dd4bf',
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      case "weightTrendProgress": return (
+        <WeightTrendCard key="weightTrendProgress"
+          metaRecent={metaRecent} metaFailed={metaFailed} latestWeight={latestWeight} latestBf={latestBf}
+          targetWeightKg={targetWeightKg} targetBfPct={targetBfPct} bodyBaseline={bodyBaseline}
+          bodyFatBarColor="#2dd4bf"
+        />
       );
-      }
       case "strengthTrend": return <StrengthTrendCard key="strengthTrend" exercises={strengthTrend ?? []} loading={strengthTrend === null} />;
       case "trends": return <TrendsSection key="trends" userId={userId} />;
       default: return null;

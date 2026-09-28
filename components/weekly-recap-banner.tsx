@@ -6,13 +6,17 @@ import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useReportBannerPresence } from "@/components/home/home-banner-presence";
 import { WEEKLY_DIGEST_TTL } from "@trainingai/shared/cache-ttl";
+import type { WeeklyDigestMetrics } from "@trainingai/shared/health/weekly-digest-metrics";
+import { weekHasAnything } from "@/components/health/week/week-has-data";
 
 const DISMISSED_KEY_PREFIX = "ta_weekly_recap_dismissed_";
 
 interface DigestResponse {
   digest: string;
   weekStart: string;
+  metrics?: WeeklyDigestMetrics;
 }
 
 // A one-time notification for the week that just ended — not an always-there card.
@@ -71,6 +75,11 @@ function WeeklyRecapBannerContent(
   );
   const content = data?.digest ?? null;
   const isLoading = data === null && !error;
+  // A week with nothing in it still produces a digest — the text builder always writes at least
+  // "0 sessions, 0 kg total" — so an empty account was told its week in review was ready (RV-211 ①).
+  // `metrics` is optional at runtime, not just in the type: this paints from a cache entry that may
+  // predate the field, and absent must read as "don't suppress" rather than as an empty week.
+  const emptyWeek = data != null && data.metrics != null && !weekHasAnything(data.metrics);
 
   // The retry re-runs the hook's own fetch rather than adding a second one beside it, so there is
   // no path here that could drift from the one the first paint took.
@@ -79,7 +88,16 @@ function WeeklyRecapBannerContent(
     setReloadToken(t => t + 1);
   }, []);
 
+  // RV-119 — reported from the CHILD, not the parent: the parent knows only `dismissed`, while
+  // whether a recap exists at all is decided here. A dismissed week does not mount this component,
+  // so the hook's own cleanup takes it out of the strip. Above every early return, as hooks must be.
+  const hasSomethingToSay = (isLoading || !!content || error) && !emptyWeek
+  useReportBannerPresence('weeklyRecap', hasSomethingToSay)
+
   if (!isLoading && !content && !error) return null;
+  // Nothing happened, so there is nothing to announce. Safe above the error branch below: a failed
+  // fetch leaves `data` null, so `emptyWeek` cannot be true for one and cannot swallow it.
+  if (emptyWeek) return null;
 
   // A failed recap used to return null, so the request simply never produced anything and the user
   // had no way to tell a quiet week from a broken one (Q-499's class; the plan calls for the same

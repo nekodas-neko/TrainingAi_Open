@@ -5,10 +5,12 @@
 # Idempotent — safe to run on every session start.
 set -euo pipefail
 
-PGDATA=/var/lib/postgresql/local-dev
-PGPORT=5433
-DBNAME=trainingai_dev
-LOGFILE=/var/log/postgresql/local-dev.log
+# Overridable so two lanes on one machine do not share a cluster or a database (OR-194 ②). The
+# defaults are the cloud container's, unchanged.
+PGDATA=${LOCAL_PGDATA:-/var/lib/postgresql/local-dev}
+PGPORT=${LOCAL_DB_PORT:-5433}
+DBNAME=${LOCAL_DB_NAME:-trainingai_dev}
+LOGFILE=${LOCAL_PGLOG:-/var/log/postgresql/local-dev.log}
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 mkdir -p "$(dirname "$LOGFILE")"
@@ -54,7 +56,11 @@ fi
 # Write/update .env.local with the local DB connection string
 ENV_FILE="$REPO_ROOT/.env.local"
 touch "$ENV_FILE"
-if grep -q "^DATABASE_URL=" "$ENV_FILE" 2>/dev/null; then
+# Never overwrite a DATABASE_URL that points somewhere else (OR-194). On a developer machine that line
+# can hold production credentials, and the sed below replaces every matching line.
+if grep -E "^DATABASE_URL=" "$ENV_FILE" 2>/dev/null | grep -vqE "@(localhost|127\.0\.0\.1|\[::1\])?[:/]"; then
+  echo "[local-db] .env.local has a non-local DATABASE_URL — leaving it alone. Use: DATABASE_URL=$LOCAL_DATABASE_URL"
+elif grep -q "^DATABASE_URL=" "$ENV_FILE" 2>/dev/null; then
   ESCAPED_URL=$(printf '%s' "$LOCAL_DATABASE_URL" | sed 's/[&|]/\\&/g')
   sed -i "s|^DATABASE_URL=.*|DATABASE_URL=$ESCAPED_URL|" "$ENV_FILE"
 else

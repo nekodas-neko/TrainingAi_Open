@@ -62,7 +62,7 @@ export function AddFoodByHandForm({
           className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-1 ring-brand"
         />
         <input
-          type="number"
+          type="number" enterKeyHint="done"
           inputMode="decimal"
           value={form.calories}
           onChange={e => setForm(f => ({ ...f, calories: e.target.value }))}
@@ -73,7 +73,7 @@ export function AddFoodByHandForm({
           {([['proteinG', 'Protein g'], ['carbsG', 'Carbs g'], ['fatG', 'Fat g']] as [keyof typeof form, string][]).map(([field, placeholder]) => (
             <input
               key={field}
-              type="number"
+              type="number" enterKeyHint="done"
               inputMode="decimal"
               value={form[field]}
               onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}

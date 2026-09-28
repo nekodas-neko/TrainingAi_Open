@@ -30,7 +30,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   notification retarget. **RV-201 then removed the model entirely (2026-09-26)** — the route is a
   `GET`, the prose comes from `buildWeeklyDigestText`, and Home's banner and the week page share
   one cached `weekly-digest:<week>` entry, which is what lets the page paint without a network.
-  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md).
+  See [`../../overview/entries/2026-09-26-rv201-weekly-digest-offline.md`](../../overview/history-2026-09-27-folded-3.md#2026-09-26-rv201-weekly-digest-offline).
   Read §1 before touching the plan, because three of the original backlog entry's claims about the
   code were stale even then.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
@@ -128,7 +128,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   structural and **not observed** (the fixture had nothing to scroll). §5 records two lenses that came
   back clean: all seven `freshWithinTtl` sites have every writer in a group, and the fetch-once
   CAN-BITE group is empty.
-- [`docs/handoff-phase-3-bundled-shell.md`](../../handoff-phase-3-bundled-shell.md) — the live
+- [`docs/handoffs/handoff-phase-3-bundled-shell.md`](../../handoffs/handoff-phase-3-bundled-shell.md) — the live
   Phase 3 baton (bundling the shell into the APK). Task 4 is now **decided** (option B).
 - [`2026-08-19-cache-invalidation-signal`](../../overview/history-2026-09-10-folded-1.md#2026-08-19-cache-invalidation-signal)
   — **Q-402: the shell has no unmount, so a fetch-once effect in it never fetches again.** All six
@@ -144,7 +144,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - [`docs/superpowers/plans/2026-07-30-phase-3-workspace-split.md`](../../superpowers/plans/2026-07-30-phase-3-workspace-split.md)
   — the Task 4 (option B) workspace-restructuring plan: workspace + shared `lib/` package → app
   split (`shell/` + `api/`) → the export flip.
-- [`docs/handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md`](../../handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md)
+- [`docs/handoffs/handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md`](../../handoffs/handoff-2026-07-30-app-shell-perf-audit-auth-fixes-and-offline-direction.md)
   — navigation perf audit, two auth-boundary fixes, the Task 4 = option B decision (superseded on
   content by the 2026-07-30 consolidation handoff, kept for the gotchas it recorded).
 - The **`mobile-app-design-standards`** and **`mobile-app-ui-design`** skills.
@@ -193,7 +193,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
   `components/more/__tests__/more-row-group-arity.test.ts` holds it. **Still owed:** the owner's
   answer on §2(c), and one look on the S25.
 - Reviews: [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](../../reviews/2026-08-14-app-ui-flow-ia-review.md) — **UI / flow / information-architecture + caching review, 2026-08-14** (owner-requested; the full navigation map with a reachability count for all 39 page routes, the proposed target structure for More/Settings/Devices/Program/Admin, and 13 findings queued as Q-232…Q-244). Its prompt is [`2026-08-14-app-ui-flow-ia-review-prompt.md`](../../reviews/2026-08-14-app-ui-flow-ia-review-prompt.md). **§7 is the separate testing-capability measurement** — the 81 "NOT verified on device" rows split into five gates, only 25 of which need the device, queued as Q-249…Q-254.
-- Handoff: [`docs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
+- Handoff: [`docs/handoffs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoffs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
 - [`docs/reviews/2026-08-18-offline-read-surfaces.md`](../../reviews/2026-08-18-offline-read-surfaces.md) — **offline read surfaces, driven for real, 2026-08-18** (**both paths work** once the SW controls the page: a reload serves the precached offline document, and an offline tab tap paints **2515 chars vs 2486 online, ~101%**. Q-555 — in the **uncontrolled** state, which is the first-ever load, the same tap is a **silent no-op**: no navigation, no offline page, no feedback). **Web only** — `cachedFetch` falls back to `localStorage` there, so the seed path was verified, not the native SQLite store.
@@ -342,7 +342,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- **[`docs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
+- **[`docs/handoffs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoffs/handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
 
 - **[`2026-08-30-apk-banner-tap-target`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-apk-banner-tap-target)**
   — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
@@ -380,7 +380,7 @@ Live at the time of writing (2026-07-30):
   closed on the frame it opened.
   [`2026-08-26-sibling-sheet-back-dismiss.md`](../../overview/history-2026-09-10-folded-3.md#2026-08-26-sibling-sheet-back-dismiss).
 
-- **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
+- **[`docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
   — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
   StrictMode-safe, so a sheet mounted already-open closed itself on the frame it opened and five
   sheets looked unopenable in `pnpm dev` while production was fine. **Q-477 completed** — the
@@ -429,7 +429,7 @@ Live at the time of writing (2026-07-30):
   was being labelled. Guarded by `e2e/profile-group-labelling.spec.ts`, whose two assertions were
   each proven lethal by mutation. Left open as **Q-350**: none of the app's eight radiogroups
   implements arrow-key navigation, which wants one shared primitive rather than eight copies.
-- **[`docs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md`](../../handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md)**
+- **[`docs/handoffs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md`](../../handoffs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md)**
   — 🆕 what came after the IA cluster: 6 PRs closing Q-255, Q-232-followup, Q-258, Q-259, Q-260 and
   Q-262. **Q-260 is the substantive fix** — `user-goals` was fetched by the Progress tab's group
   while the water goal renders on a `BODY_GROUPS` card, and because every tab stays mounted for the
@@ -439,7 +439,7 @@ Live at the time of writing (2026-07-30):
   (Playwright's `:visible` is not "on screen"), three attempts at one guard of which none is one, and
   the parallel-lane trap that cost two complete pieces of work.
 
-- **[`docs/handoff-2026-08-15-app-shell-ia-cluster-complete.md`](../../handoff-2026-08-15-app-shell-ia-cluster-complete.md)**
+- **[`docs/handoffs/handoff-2026-08-15-app-shell-ia-cluster-complete.md`](../../handoffs/handoff-2026-08-15-app-shell-ia-cluster-complete.md)**
   — 🆕 the 2026-08-14 UI/flow/IA cluster worked to completion: 11 PRs, v1.307.2→v1.314.0, closing
   Q-232/233/234/235/236/237/238/239/242/244 and Q-256. `profile-tab.tsx` 845 → 465 lines and off the
   size baseline; Custom Rules 33 → 35 steps. Records the decisions (why Q-238 was deleted rather than
@@ -448,7 +448,7 @@ Live at the time of writing (2026-07-30):
   `pnpm build` corrupting a running dev server's `.next`, checks firing on comments, and an assertion
   that passed while the behaviour it guarded was broken.
 
-- **[`docs/handoff-2026-08-08-app-shell-review-backlog-ui-batch.md`](../../handoff-2026-08-08-app-shell-review-backlog-ui-batch.md)**
+- **[`docs/handoffs/handoff-2026-08-08-app-shell-review-backlog-ui-batch.md`](../../handoffs/handoff-2026-08-08-app-shell-review-backlog-ui-batch.md)**
   — 🆕 the Agent-2 half of that dispatch, worked to completion: 16 PRs (v1.270.x→v1.270.30) closing
   Q-119/120/121/123/125/126/127/132/133/135/136-pt1 and the Q-95/Q-97/Q-109 follow-ups, plus Q-148
   (client components could not read the user's timezone at all) and Q-111's ring half. Records four
@@ -456,7 +456,7 @@ Live at the time of writing (2026-07-30):
   was silently miscolouring **26 shipped sites** — with `scripts/check-color-mix-hue.js` as its
   ratchet. Also the git/tooling traps that cost time: version collisions under a parallel agent,
   `reset --soft` leaving rebased copies of `main`, and `pkill -f "next dev"` killing its own shell.
-- **[`docs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](../../handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md)**
+- **[`docs/handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](../../handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md)**
   — 🆕 wrap-up for the 2026-08-07 full-app-review backlog drain (9 PRs merged this session,
   including Q-73's home hydration-mismatch fix and Q-118's navless safe-area sweep). Splits the
   remaining ~18 ready items into two parallel-agent pickup prompts by file territory; Agent 2 owns
@@ -487,17 +487,32 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
-- **[`docs/overview/entries/2026-09-27-rv209-type-scale-floor.md`](../../overview/entries/2026-09-27-rv209-type-scale-floor.md)**
+- **[`2026-09-27-rv215-loading-states`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv215-loading-states)**
+  — RV-215 ①. Weekly stats' skeleton could not end on a failed fetch (`cachedFetchToday` swallows
+  `!res.ok` without `onError`); the error branch must be checked BEFORE `loading`, because a
+  failure leaves `data` null and the skeleton would otherwise still win. Also why item ②'s "12
+  components" count is unreliable — a `return null` while loading is a defer, not a vanish.
+- **[`2026-09-27-rv211-empty-account-claims`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv211-empty-account-claims)**
+  — RV-211 ①②③. Home's empty-account states: no week-in-review banner for an empty week, Body
+  Battery's "No data yet" instead of a band, "—" instead of "rest" with no program. Also why item ⑤
+  is **not** a defect — the "stray dot" is one of 18 `Math.random()` background stars — and why the
+  progress bar (which no source guard caught) is the case for the e2e render.
+- **[`2026-09-27-rv210-keyboard-and-viewport`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv210-keyboard-and-viewport)**
+  — RV-210. `interactive-widget=resizes-content`, all 23 `vh` sheet heights to `dvh` (22 others were
+  already there — an unrecorded 22/23 split), and `enterKeyHint="done"` on all 42 numeric inputs.
+  Guarded by `check-keyboard-viewport.js`, which holds both source conditions at once because either
+  alone is a half-fix. **None of it is verifiable in the sandbox** — no soft keyboard exists there.
+- **[`2026-09-27-rv209-type-scale-floor`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv209-type-scale-floor)**
   — RV-209 steps 1–2. `--text-2xs: 11px` is the floor of the type scale (42 sizes, 1,035 uses under
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
-- **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
+- **[`2026-09-27-rv208-numbers-and-durations`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv208-numbers-and-durations)**
   — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
   casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
   collides with `SESSION_PALETTE` because that palette is indexed by POSITION, not by name.
-- Handoffs: `ls docs/handoff-*-app-shell-*.md`
+- Handoffs: `ls docs/handoffs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-73 — the home header's date string mismatched between server (UTC) and client (Australia/Brisbane)
@@ -566,3 +581,24 @@ Live at the time of writing (2026-07-30):
   Defaults a call site must not be able to break belong on an **inner** element it cannot reach;
   `components/ui/sheet.tsx` does this for the close button's 64px corner and says why. Related:
   `SheetContent side="bottom"` bakes the bottom inset and `p-0` does not strip it.
+
+- **[`2026-09-28-movement-balance-palette-clash`](../../overview/entries/2026-09-28-movement-balance-palette-clash.md)**
+  — **RV-208 ③: category colours stopped borrowing session colours, and the hue space is
+  over-subscribed.** Movement Balance coloured `legs` `--accent-green` (**0°** from session green)
+  and `pull` `--accent-purple` (**10°** from session purple, **20°** from indigo), while the calendar
+  two cards up colours sessions by POSITION — so the same three words carried two maps, transposed.
+  **The entry's "add two new hues" was not available:** a candidate must clear `SESSION_PALETTE`'s
+  six Tailwind hues *and* four `--accent-*` tokens, and scanning the wheel leaves one comfortable
+  band (~345°) at 40° separation. So the rows keep their labels and share one accent — hue was
+  redundant encoding. `rv208-movement-category-hues.test.ts` asserts the arithmetic against
+  `globals.css`, not the literals. **Before adding any category palette, scan both systems first.**
+
+- **[`2026-09-28-home-banner-strip`](../../overview/entries/2026-09-28-home-banner-strip.md)**
+  — **RV-119: Home's banners split by severity, four behind one strip.** Illness advisory and early
+  deload stay full-width; activity-to-review, goals check-in, day review and weekly recap collapse.
+  **Read this before adding any Home banner:** two of the four decide their own visibility and
+  `return null`, so the strip counts a **registry** they report into
+  (`useReportBannerPresence`) rather than anything the parent can see — and the two the stack
+  controls are reported by the stack, which is the half that undercounts the strip **silently** when
+  missed. The four are hidden, never unmounted: that is what keeps them in the registry *and* keeps
+  their own dismiss controls, which the entry expected to lose.

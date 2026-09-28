@@ -252,6 +252,14 @@ class OuraBlePlugin : Plugin() {
         call.resolve(JSObject().put("sent", svc.startDrain(fromZero)).put("cursor", cursor))
     }
 
+    /** BF-187: drain on app open/resume unless the service drained within `maxAgeMs`
+     *  (default 10 min). The service makes the call; see OuraRingService.drainIfStale. */
+    @PluginMethod fun drainIfStale(call: PluginCall) {
+        val svc = OuraRingService.instance ?: return call.resolve(JSObject().put("result", "not-running"))
+        val maxAgeMs = (call.getDouble("maxAgeMs") ?: 600_000.0).toLong()
+        call.resolve(JSObject().put("result", svc.drainIfStale(maxAgeMs)))
+    }
+
     /** Advance the persisted resume cursor after the server confirms storage.
      *  `ds` is deciseconds (can exceed Int32) so it arrives as a JS number (double).
      *  Normally driven by the service's own native ingest; kept as a plugin method so

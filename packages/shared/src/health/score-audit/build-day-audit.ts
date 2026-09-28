@@ -2,8 +2,8 @@ import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } 
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
+import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
+import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
@@ -50,7 +50,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows, program,
-    hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin,
+    hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin, userGoals,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
@@ -69,6 +69,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     // finding Q-16) — it sits in the audit context so "what the model said" and "what it felt
     // like" are readable side by side on the same day.
     repo.getDayCheckin(userId, date, 'morning'),
+    // Q-524: the audit must score steps against the same goal the live route does.
+    repo.getUserGoals(userId).catch(() => null),
   ])
 
   // Everything below is scoped to the audited day, never "today".
@@ -106,6 +108,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     ageYears,
     sex: user?.sex ?? null,
     activityLevel: user?.activityLevel ?? null,
+    stepsGoal: userGoals?.stepsGoal ?? null,
   }
   const goals = getDailyGoals(goalProfile)
 
@@ -133,8 +136,10 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   let moveHours: number | null = null
   if (baselineRhr != null && hrRows.length > 0) {
     const zones = computeHrZones({ maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr })
-    zoneMinutes = activeMinutesFromZoneSeconds(
-      accumulateZoneSeconds(hrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })), zones),
+    zoneMinutes = activeMinutesFromReadings(
+      hrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
+      zones,
+      moderateIntensityBpm({ maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr }),
     )
     moveHours = computeMovedHours({ hrRows, maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr, tz, dateIso: date })
   }

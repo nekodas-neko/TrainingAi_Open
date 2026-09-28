@@ -48,9 +48,12 @@ function MonotonyMeter({ monotony, strain }: { monotony: number; strain: number 
  * monotony/strain, the stress-line chart and the explainer behind an expand toggle so it no
  * longer eats a full screen.
  */
-export function TrainingLoadCard({ trainingLoad }: { trainingLoad: TrainingLoadResponse | null }) {
+export function TrainingLoadCard({ trainingLoad, failed = false }: { trainingLoad: TrainingLoadResponse | null; failed?: boolean }) {
   const [open, setOpen] = useState(false)
   const interpretation = trainingLoad?.interpretation
+  // LB-176. `trainingLoad` is null for three different reasons — still loading, the read failed, or a
+  // successful `insufficient_data` response the parent deliberately does not store. "Not enough data
+  // yet" is true of the third and a fabrication for the second, so the cause arrives as a prop.
   const insufficient = !trainingLoad || interpretation === 'insufficient_data'
   const baselining = interpretation === 'baselining'
   // RV-97 asks whether `interpretation` can carry a key outside `AcwrBand['key']`: it can. The
@@ -74,7 +77,9 @@ export function TrainingLoadCard({ trainingLoad }: { trainingLoad: TrainingLoadR
         <div className="min-w-0 flex-1">
           <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Training Load (ACWR)</h3>
           {insufficient ? (
-            <p className="text-base font-semibold text-foreground">Not enough data yet</p>
+            <p className="text-base font-semibold text-foreground">
+              {failed ? "Couldn't load your training load" : 'Not enough data yet'}
+            </p>
           ) : baselining ? (
             <p className="text-base font-semibold text-foreground">Baselining new routine</p>
           ) : (

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { auth } from "@/auth";
-import { getRepository } from "@/lib/data";
-import { deleteWorkoutSession } from "@/lib/workout/delete-session";
+import { deleteWorkoutSessionAndReconcile, WorkoutSessionDeleteSchema } from "@/lib/workout/delete-session-reconcile";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -21,20 +19,15 @@ export async function DELETE(req: NextRequest) {
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
-  const parsed = z.object({ workoutSessionId: z.string().uuid() }).strict().safeParse(read.body);
+  const parsed = WorkoutSessionDeleteSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
   const { workoutSessionId } = parsed.data;
 
   try {
-    const { deleted, exerciseNames } = await deleteWorkoutSession(userId, workoutSessionId);
+    const { deleted } = await deleteWorkoutSessionAndReconcile(userId, workoutSessionId);
     if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    const repo = await getRepository();
-    for (const name of exerciseNames) {
-      await repo.reconcilePersonalRecord(userId, name);
-    }
     return NextResponse.json({ success: true });
   } catch (e) {
     reportServerError(e, { userId, url: '/api/workout-sessions' })

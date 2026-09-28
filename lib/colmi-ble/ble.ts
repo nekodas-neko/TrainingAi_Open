@@ -177,7 +177,7 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
 
   const onV1 = (view: DataView) => {
     framesSeen++
-    const bytes = new Uint8Array(view.buffer)
+    const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
     const f = decodeV1(bytes)
     note(bytes, f)
     if (f.kind === 'battery') battery = { percent: f.percent, charging: f.charging }
@@ -187,7 +187,7 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
 
   const onV2 = (view: DataView) => {
     framesSeen++
-    const chunk = Array.from(new Uint8Array(view.buffer))
+    const chunk = Array.from(new Uint8Array(view.buffer, view.byteOffset, view.byteLength))
     bigDataBuffer = bigDataBuffer.length === 0 ? chunk : bigDataBuffer.concat(chunk)
     const declared = bigDataPayloadLength(bigDataBuffer)
     if (declared === null) { bigDataBuffer = []; return }          // not a frame start — drop and resync

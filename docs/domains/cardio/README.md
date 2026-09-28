@@ -143,14 +143,14 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
-- Handoffs: `ls docs/handoff-*-cardio-*.md` — most recent:
-  [`docs/handoff-2026-08-06-cardio-owner-ui-bug-batch-continuation.md`](../../handoff-2026-08-06-cardio-owner-ui-bug-batch-continuation.md)
+- Handoffs: `ls docs/handoffs/handoff-*-cardio-*.md` — most recent:
+  [`docs/handoffs/handoff-2026-08-06-cardio-owner-ui-bug-batch-continuation.md`](../../handoffs/handoff-2026-08-06-cardio-owner-ui-bug-batch-continuation.md)
   (owner UI-bug batch continuation — Q-93/Q-92/Q-91/Q-90 shipped this session across app-shell/
   heart-rate/sleep; Q-88/Q-87/Q-86 next, then Q-98/Q-99). Plus
-  [`docs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md`](../../handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md)
+  [`docs/handoffs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md`](../../handoffs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md)
   (filed under `workouts`, also covers Q-84 — guided-walk summary cadence, triaged and queued, not
   yet built) and
-  [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+  [`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md)
   (Q-66 — guided walk treadmill/no-GPS mode; Q-68 — auto walk/run detection false positives),
   filed under `cross` because it spans five pillars.
 - Journal: `grep -rl 'cardio\|guided.walk\|cadence\|VO₂\|vo2' docs/overview/entries/`

@@ -428,7 +428,7 @@ describe('GET /api/admin/program-export', () => {
     sessions: [{
       id: 's-1', name: 'Session One', timeBudgetMinutes: 60,
       exercises: [
-        { exerciseName: 'Row', position: 2, styleId: 'st-1', exerciseRole: 'accessory', muscleGroups: ['back'], supersetGroup: null },
+        { exerciseName: 'Row', position: 2, styleId: 'st-1', exerciseRole: 'secondary', muscleGroups: ['back'], supersetGroup: null },
         { exerciseName: 'Bench Press', position: 1, styleId: 'st-1', muscleGroups: ['chest'], supersetGroup: 'A' },
       ],
     }],
@@ -461,13 +461,13 @@ describe('GET /api/admin/program-export', () => {
     ])
   })
 
-  it('defaults a missing role to primary and keeps an explicit one', async () => {
+  it('defaults a missing role to the unclassified accessory (BF-15) and keeps an explicit one', async () => {
     // A fixture where every exercise carried a role could not tell the default from the field.
     getActiveProgram.mockResolvedValue(PROGRAM)
     listProgressionStyles.mockResolvedValue([STYLE])
     const ex = (await (await programReq()).json()).program.sessions[0].exercises
-    expect(ex[0].role).toBe('primary')
-    expect(ex[1].role).toBe('accessory')
+    expect(ex[0].role).toBe('accessory')
+    expect(ex[1].role).toBe('secondary')
   })
 
   it('estimates a duration beside the budget, and leaves an unstyled exercise out of it', async () => {

@@ -32,6 +32,42 @@ A previous session may have run under this name; if so, its baton is waiting for
 4. `CLAUDE.md` — the engineering rules, and the recurring bug classes. Most owner reports are a
    repeat of a class already documented there; recognising which one is half the triage.
 
+**Then, before triaging anything the owner said: READ THE THREE INTAKE CHANNELS.** Reports do not
+only arrive in chat, and two of the three are silent — nobody chases you for them.
+
+1. **GitHub — `list_issues` (state OPEN) and `list_pull_requests` (open).** File an entry for every
+   issue, and for **every PR you did not author**.
+   **⚑ YOU REVIEW IT AND YOU ANSWER IT — the same session, on the PR itself** (owner, 2026-09-28:
+   *"bugfix should be able to review PR's … and update the PR/issue in github without sending to
+   Review"*). Read the diff against this repo's rules and **post the review yourself**. Do not hand
+   the diff to Review and do not post a bare acknowledgement instead of a review.
+   **Filing silently IS the defect:** the entry is internal, an author cannot see the queue, and an
+   unanswered PR is indistinguishable from an ignored one — *"from his end it just goes silent"*.
+   **You MAY APPROVE. You may NEVER MERGE** — merging is the author's or the owner's, with no
+   exception for green CI or a one-line diff. Cannot approve → comment and wait; do not close it,
+   push to their branch, or open a rival PR.
+   **Very concise:** no preamble, no praise, no restating the diff. One finding per comment with
+   its `file:line` or the rule behind it — a finding with no cited rule is an opinion. **Nothing
+   wrong → one line saying so.** A contributor does not know this repo's conventions, so name the
+   rule rather than assuming it.
+   **You do not escalate — your review IS the review, on every PR including auth** (owner,
+   2026-09-28: *"bugfix can be enough to review PR's as they are technically 'bugfixes'"*). Where a
+   diff warrants deeper scrutiny, run **`/security-review` in this session** and post the findings
+   with the rest; that is a tool you already have, not a handoff to another role.
+   **⛔ This channel went unread entirely until
+   2026-09-25**, and an outside contributor said so: *"it's also not picking up the issues and PRs
+   I raise to your Training app, so they're never getting touched/reviewed either."* Three of his
+   items sat four days. **An inbound PR is not ours to merge** — the ceiling is review, comment,
+   approve (owner, 2026-09-27). Review it, answer it, file what you found — all here.
+2. **`claude_ro.feedback_submissions`** — *Report an Issue* on `/more`, which is yours to own.
+   The query and the watermark rule are in `CLAUDE.md`'s session-start list. A report is never
+   answered by replying to it; it becomes an entry.
+3. **`error_events`** — faults that reached nobody. It prunes at 30 days, so one that stops on its
+   own expires unrecorded. Something that stopped is not something that was fixed.
+
+**Do this at session start, not when you run out of owner reports.** All three were designed as
+the intake and two of them only work if somebody looks.
+
 **Your job is intake, not repair.** The owner sends you screenshots, descriptions, "why is this
 doing that" — you turn each into a backlog entry good enough to implement from, land it in a
 docs-only PR, merge it, and wait for the next one. **You do not fix.** Fixing a one-line bug in the

@@ -7,6 +7,7 @@ import { RefreshCwIcon, CalendarIcon, HeartPulse, ChevronRight, SlidersHorizonta
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "motion/react";
 import type { ProgramSession, ExerciseLibraryEntry } from "@trainingai/shared/types/program";
+import { SessionGlyph } from "@/components/session-glyph";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import { cn } from "@trainingai/shared/utils";
 import { MuscleHeatmap, type MuscleActivation } from "@/components/muscle-heatmap";
@@ -41,8 +42,8 @@ function getLastTrainedLabel(session: ProgramSession, tz: string): string {
     if (!dates.length) return "Never trained";
     const maxDate = dates.reduce((a, b) => (a > b ? a : b));
     const days = daysBetweenDateStrs(maxDate, todayKey);
-    if (days === 1) return "Yesterday";
-    return `${days} days ago`;
+    if (days === 1) return "Last done yesterday";
+    return `Last done ${days} days ago`;
   } catch { return ""; }
 }
 
@@ -372,7 +373,13 @@ export default function WorkoutSelectContent() {
                   className="flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-3xl">{currentSession?.icon ?? p.emoji}</span>
+                    {/* `getSessionIcon`, never the raw stored value (RV-214 ①). This slot rendered
+                        `session.icon` as TEXT at `text-3xl`, so anything that is not an emoji — an
+                        icon NAME, say — printed as a 30 px word beside a 20 px session name, which
+                        is what the sweep saw as "Dumbbell". A-7 established the convention and its
+                        comment already claimed "every other session surface uses getSessionIcon";
+                        three surfaces did not. A component cannot render a word. */}
+                    <SessionGlyph icon={currentSession?.icon} palettePosition={currentSession?.position ?? 0} className="h-8 w-8" />
                     <div className="min-w-0">
                       <p className={cn("text-xl font-bold truncate", p.textClass)}>
                         {currentSession?.name}

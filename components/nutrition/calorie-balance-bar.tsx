@@ -54,7 +54,13 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Energy Balance</p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums leading-none" style={{ color: b.zoneColor }}>
+          {/* Plain foreground, not the zone colour (RV-212 ①). At 2 pm a legitimately partial day
+              painted this headline RED, which reads as an error rather than as "the day is not
+              over". `energy-card.tsx` made exactly this change for its own copy of the number and
+              its comment names this component as the one still doing it. The verdict keeps the
+              colour on the label below, where " so far" qualifies it — that half is deliberate and
+              is NOT changed here. */}
+          <p className="mt-1.5 text-2xl font-bold tabular-nums leading-none">
             {Math.abs(b.remainingKcal).toLocaleString()}
             <span className="text-xs font-normal ml-1.5 text-muted-foreground">
               kcal {overTarget ? 'over target' : 'left today'}

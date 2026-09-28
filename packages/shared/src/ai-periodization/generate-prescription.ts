@@ -1,4 +1,15 @@
 import { todayInTz } from '@trainingai/shared/date-utils'
+
+/**
+ * How long a rules fallback plan is held (LB-165).
+ *
+ * Long enough to cover the session the lifter is about to do, short enough that one provider
+ * blip is not a day of uninformed plans — the seven-day hold a normal `storePrescription` takes
+ * is the thing RV-202 was right to refuse. Expressed as a duration rather than a local-day
+ * boundary deliberately: a day boundary needs calendar arithmetic and a timezone, and neither
+ * buys anything here over "a few hours from now".
+ */
+const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
 import { accessoryTargetRpe } from '@trainingai/shared/ai-periodization/goal-ranges'
@@ -29,6 +40,7 @@ import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase } from 
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { createDedupCache } from '@trainingai/shared/ai-periodization/generation-dedup'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 export type GeneratePrescriptionResult =
   | {
@@ -46,20 +58,31 @@ export type GeneratePrescriptionResult =
 // is generated 2-3× per open (confirmed via the ai_call_log double-trip panel:
 // prescription was the #1 token spender AND the worst double-trip). The dedup collapses
 // concurrent calls (in-flight) and near-simultaneous repeats (a 30s read-through
-// cooldown). Per-process (per Railway replica); a user's rapid requests hit one replica,
-// so the open-burst is caught, and signals don't change within the window so the reused
-// result is identical to a re-run.
-const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(30_000)
+// cooldown). Per-process (per Railway replica), so the two open-time triggers landing on
+// different replicas miss it; `runPrescriptionGeneration` carries a stored-row twin for that
+// (RV-184). Signals don't change within the window, so the reused result is identical to a re-run.
+const JUST_GENERATED_MS = 30_000
+const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(JUST_GENERATED_MS)
 
 // Whole-session deload construction shared by the emergency-deload path and the
 // per-exercise deload's >50%-soreness escalation (see
 // docs/superpowers/specs/2026-07-02-per-exercise-deload-design.md) — "deloaded"
 // means the same numbers regardless of which trigger fired.
-function buildWholeSessionDeloadPrescription(
+export function buildWholeSessionDeloadPrescription(
   signals: PrescriptionSignals,
   reasoning: string,
 ): AiPrescription {
   const goal = signals.trainingGoal
+  // BF-198: what `Full` reverts to. The per-exercise deload records the numbers it replaced as
+  // `preDeload` (reevaluate.ts); this builder recorded nothing, so on a whole-session deload the
+  // `Full` toggle had nothing to restore and every set was still logged as a deload, earning no
+  // 1RM. There are no model numbers to keep here, so the full session is the program's own — the
+  // same plan the rules prescriber builds. An exercise with no base style gets none, and stays
+  // deloaded under `Full`, which is also what the per-exercise path does without a record.
+  const fullById = new Map(
+    (buildRulesPrescription(signals, reasoning)?.exercises ?? [])
+      .map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]),
+  )
   const pct = DELOAD_LOWER_PCT[goal] ?? 50
   const reps = DELOAD_REPS[goal] ?? 8
 
@@ -91,6 +114,7 @@ function buildWholeSessionDeloadPrescription(
     // server's shouldCountTowardPr gate — treated these sets as genuine max-effort work.
     // Stamping it here gives every consumer one consistent signal instead of two (Q-115).
     deloaded: true,
+    preDeload: fullById.get(ex.sessionExerciseId),
   }))
 
   const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
@@ -304,6 +328,30 @@ async function runPrescriptionGeneration(
     return { ok: false, error: 'Baseline not complete', status: 400 }
   }
 
+  // RV-184. Opening a workout fires two plain generations: `workout-data`'s server-side one and
+  // the client's POST. On different replicas they miss the per-process cooldown above.
+  // Production 2026-09-15 has the pair: identical input, the second starting 5.4 s after the
+  // first had finished, which a shared cache would have answered. The stored row is visible to
+  // every replica, so a plain call (no preset, no completion exclusion: exactly the calls the
+  // cooldown would have collapsed) returns a plan generated under 30 s ago instead of asking the
+  // model again. Anything it cannot vouch for falls through to generation as before: a preset or
+  // custom-length plan, or a slot already consumed or dismissed.
+  const fresh = state.prescription
+  if (
+    fresh && excludeSessionId == null && durationPreset == null &&
+    (fresh.durationPreset == null || fresh.durationPreset === 'standard') &&
+    (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'auto_applied') &&
+    state.prescriptionGeneratedAt != null &&
+    Date.now() - state.prescriptionGeneratedAt.getTime() < JUST_GENERATED_MS
+  ) {
+    return {
+      ok: true,
+      prescription: fresh,
+      prescriptionStatus: state.prescriptionStatus,
+      estimatedSessionDurationMin: fresh.estimatedSessionDurationMin,
+    }
+  }
+
   // BF-7 PR 2b — "is this the default?" is now a comparison, not a label test. `!== 'standard'` was
   // the same question while the only way to say "the session's own length" was that word; a number
   // equal to the anchor means it too, and must produce no override for the same reason. Reading the
@@ -422,15 +470,32 @@ async function runPrescriptionGeneration(
     // workout…" for about thirty seconds and then got the base program anyway. This arrives at
     // the same numbers immediately.
     //
-    // **Deliberately NOT persisted.** `storePrescription` would hold this for seven days and the
-    // model would get no further attempt until it expired — one provider blip becoming a week of
-    // uninformed plans, which is the shape RV-69 fixed for the digests. Leaving the slot empty
-    // means the next open re-runs the model, and this plan is only what today's caller is handed.
+    // **Persisted, with a SHORT expiry — and the comment here used to say the opposite.**
+    //
+    // RV-202 left this unstored, reasoning that `storePrescription` holds a plan for seven days
+    // so the model would get no further attempt until it expired. That reasoning is still right
+    // about seven days, and the conclusion it reached was wrong, because it assumed the returned
+    // plan reached someone: *"this plan is only what today's caller is handed"*. LB-165 measured
+    // the caller. `workout-data` fires this generation as a background single-flight and never
+    // reads its result; both `/prescribe` clients check `res.ok` and refetch. Nothing painted it.
+    // And `isAiPrescriptionPending` keys on `prescriptionStatus === 'consumed'`, which only
+    // `storePrescription` clears — so not storing also left the screen saying "Preparing your AI
+    // workout…" forever. The lifter's experience was unchanged by RV-202: the same ten 3 s polls
+    // and the same amber banner.
+    //
+    // Storing it is what makes it visible, and the seven-day objection is answered by the expiry
+    // rather than by refusing to store: `RULES_PRESCRIPTION_TTL_MS` covers the session in front of
+    // the lifter and lets the model be tried again the same day. `reevaluate` re-generates once
+    // `prescriptionExpiresAt` passes, and `workout-data` serves a stored plan without checking
+    // expiry, so the short TTL costs nothing on the read side.
     const rules = buildRulesPrescription(
       signals,
       'Your AI coach could not be reached, so this is your program as written.',
     )
     if (rules) {
+      await repo.storePrescription(
+        userId, programSessionId, rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS),
+      )
       return {
         ok: true,
         prescription: rules,
@@ -522,7 +587,7 @@ async function runPrescriptionGeneration(
   for (const ex of parsed.exercises) {
     const a = autoregById.get(ex.session_exercise_id)
     if (!a) continue
-    const role = roleById.get(ex.session_exercise_id) ?? 'primary'
+    const role = roleById.get(ex.session_exercise_id) ?? UNCLASSIFIED_EXERCISE_ROLE
     ex.reps = a.reps
     ex.sets = a.sets
     if (role === 'accessory') {

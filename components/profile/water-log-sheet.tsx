@@ -140,7 +140,7 @@ export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLog
           </div>
           <div className="flex items-center gap-2">
             <input
-              type="number"
+              type="number" enterKeyHint="done"
               inputMode="decimal"
               value={value}
               onChange={e => setValue(e.target.value)}

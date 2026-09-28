@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@trainingai/shared/utils";
 
 /**
- * What a `type="number"` field needs so its text can actually centre (BF-85).
+ * What a `type="number" enterKeyHint="done"` field needs so its text can actually centre (BF-85).
  *
  * Chromium draws the inner spin button INSIDE the box, so a `text-center` value centres in what is
  * left of the field and reads visibly off-centre — which is what the owner saw on the Assign step,
@@ -11,7 +11,7 @@ import { cn } from "@trainingai/shared/utils";
  *
  * A constant rather than a third hand-copy: `quantity-editor.tsx` and `assign-step.tsx` are two
  * sites for one job, and CLAUDE.md extracts at the third. It is a class string rather than a
- * component because **only 1 of the 28 `type="number"` inputs in the app uses the `Input`
+ * component because **only 1 of the 28 `type="number" enterKeyHint="done"` inputs in the app uses the `Input`
  * primitive** — the other 27 are bare `<input>`, including both of these — so a fix that lived only
  * in the component would reach almost nothing. Measured 2026-09-01; BF-85's own recommendation
  * assumed otherwise.

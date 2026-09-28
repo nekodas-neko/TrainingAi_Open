@@ -166,10 +166,15 @@ export function resolveStyleForExercise(
   phases: ProgramPhase[],
   exercise: { exerciseRole: ExerciseRole; styleId?: string },
 ): string | 'own' | null {
-  // Accessory exercises use the Accessory phase's primary style, always
+  // Accessory exercises use the Accessory phase's primary style. BF-15: when that phase has no style
+  // (the editor offers a blank one), 'own' used to keep the exercise's own style, which can itself be
+  // null, leaving it with no prescribed percentages at all. It falls back to this phase's lighter
+  // style instead; the exercise's own style is kept only when it has one.
   if (exercise.exerciseRole === 'accessory') {
     const accessoryPhase = phases.find(p => p.phaseType === 'accessory')
-    return accessoryPhase?.primaryStyleId ?? 'own'
+    if (accessoryPhase?.primaryStyleId) return accessoryPhase.primaryStyleId
+    if (exercise.styleId) return 'own'
+    return phase.secondaryStyleId ?? phase.primaryStyleId ?? null
   }
   if (exercise.exerciseRole === 'primary') return phase.primaryStyleId ?? null
   // 'secondary'

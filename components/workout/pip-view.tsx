@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { formatLoadKg } from '@trainingai/shared/format/units'
 import { setColor, formatTime } from "./utils"
 import { useWorkoutStore } from "@/lib/stores/workout-store"
 
@@ -118,7 +119,7 @@ export function PipView({
       {/* Weight × reps shown during set */}
       {workoutPhase === "set" && (
         <p className="text-sm font-bold tabular-nums" style={{ color: "rgba(255,255,255,0.8)" }}>
-          {weight}kg × {reps}
+          {formatLoadKg(weight)} × {reps}
         </p>
       )}
     </div>

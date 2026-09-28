@@ -121,3 +121,40 @@ export function capPrimariesPerSession<T extends { exerciseRole?: string }>(exer
     return { ...ex, exerciseRole: 'secondary' }
   })
 }
+
+// ── BF-15: roles for an exercise added to an existing session ───────────────────────────────────
+// Design: docs/superpowers/plans/2026-08-24-exercise-roles.md §2. The plan's WHOLE-SESSION rule is
+// deliberately not here (2026-09-28): every whole-session creation path now takes its roles from the
+// model and caps Primaries in code (`capPrimariesPerSession`, BF-126), and re-measured against the
+// BF-16a-corrected catalogue the rule agreed with only 87% of the owner's sessions, below its own 90%
+// bar, by making hip thrusts (5 muscles) the Legs anchor over the squat (4). The journal entry has
+// the misses. What remains is the single-add case, where the owner's rule is simply: never Primary.
+
+/** One exercise as the rule sees it. `muscleCount: null` = not in the catalogue. */
+export interface SessionRoleInput {
+  muscleCount: number | null
+  equipment: string[]
+}
+
+export interface SessionShape { exercises: number; primary: number; secondary: number; accessory: number }
+
+/** How many of each role a session of this configured length should carry (plan §2 table). */
+export function sessionShape(budgetMinutes: number): SessionShape {
+  const n = Math.max(3, Math.round(budgetMinutes / 12))
+  const primary = budgetMinutes < 80 ? 1 : 2
+  const secondary = Math.max(1, Math.min(budgetMinutes < 80 ? 2 : 3, n - primary - 1))
+  return { exercises: n, primary, secondary, accessory: n - primary - secondary }
+}
+
+/**
+ * The role for ONE exercise added to a session that already exists. Never Primary: adding a lift
+ * must not silently take the anchor slot. Secondary when it has more than one muscle and the
+ * session's shape still has a Secondary slot free; otherwise Accessory.
+ */
+export function recommendAddedExerciseRole(
+  exercise: SessionRoleInput, existingRoles: ExerciseRole[], budgetMinutes: number,
+): ExerciseRole {
+  const secondaries = existingRoles.filter(r => r === 'secondary').length
+  if ((exercise.muscleCount ?? 0) > 1 && secondaries < sessionShape(budgetMinutes).secondary) return 'secondary'
+  return UNCLASSIFIED_EXERCISE_ROLE
+}

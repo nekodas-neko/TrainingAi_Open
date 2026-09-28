@@ -63,6 +63,14 @@ export const invitedEmails = pgTable('invited_emails', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// LA-61 (migration 296): the undo record for the email backfill. Nothing reads it in the app.
+export const emailNormalisationPreimage = pgTable('email_normalisation_preimage', {
+  tableName:  text('table_name').notNull(),
+  oldEmail:   text('old_email').notNull(),
+  newEmail:   text('new_email').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.tableName, t.oldEmail] })])
+
 export const progressionStyles = pgTable('progression_styles', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -150,7 +158,7 @@ export const sessionExercises = pgTable('session_exercises', {
   styleId:      uuid('style_id').references(() => progressionStyles.id, { onDelete: 'set null' }),
   muscleGroups: text('muscle_groups').array().notNull().default([]),
   position:     integer('position').notNull(),
-  exerciseRole: text('exercise_role').notNull().default('primary'),
+  exerciseRole: text('exercise_role').notNull().default('accessory'), // BF-15: unclassified under-loads
   supersetGroup: smallint('superset_group'),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1484,17 +1492,10 @@ export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
    * The bucket's MIDPOINT, not its start — `daytimeHrvEstimatesPerBucket` emits
    * `t = bStart + bucketMs / 2` and that is what is written here.
    *
-   * **The SQL column is still `bucket_start` and cannot be renamed** (LA-114). Every historical
-   * `claude_ro` view migration selects `t.bucket_start`, and they are replayed against the final
-   * schema by Migration Check's idempotency step, so a rename fails all of them — and editing an
-   * already-applied migration is forbidden because `ensureSchema` tracks by filename. Migration 275
-   * carries the full reasoning and a `COMMENT ON COLUMN` so the database says so too.
-   *
-   * The property is named for what it holds so TypeScript, at least, does not lie. A join on the
-   * :00/:30 grid against the raw column returns zero rows, which reads as missing data rather than
-   * a 15-minute offset — that is the defect, and it survives in `claude_ro`.
+   * The SQL column was `bucket_start` until LA-114 renamed it to `bucket_mid` (migration
+   * 202609280647). A join against a series on the :00/:30 grid must subtract 15 minutes first.
    */
-  bucketMid:   timestamp('bucket_start', { withTimezone: true }).notNull(),
+  bucketMid:   timestamp('bucket_mid', { withTimezone: true }).notNull(),
   level:       doublePrecision('level').notNull(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.bucketMid] })])
@@ -1750,6 +1751,12 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   // the gate that refused. Written on every evaluation, which is what makes "never called"
   // and "called and gated" distinguishable from outside for the first time.
   trainingLoadGate:     text('training_load_gate'),
+  // LA-161: the two numbers the gate evaluated, so `insufficient_met` can be checked against
+  // what the grid actually was rather than against a replay of the same frames.
+  trainingLoadGridLen:  integer('training_load_grid_len'),
+  trainingLoadValidMin: integer('training_load_valid_min'),
+  // LA-170: when the verdict above was computed, so a finished day can be told from a partial one.
+  trainingLoadEvaluatedAt: timestamp('training_load_evaluated_at', { withTimezone: true }),
 
   recoveryIndexHours: doublePrecision('recovery_index_hours'),
   wornHoursBle:       doublePrecision('worn_hours_ble'),

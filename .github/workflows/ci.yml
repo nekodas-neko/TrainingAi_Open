@@ -425,6 +425,12 @@ jobs:
       - name: An e2e stub does not hand the app a literal date
         run: node scripts/check-e2e-stub-dates.js
 
+      - name: A session's stored icon is never rendered as text
+        run: node scripts/check-session-icon-render.js
+
+      - name: The soft keyboard can resize the sheets it covers
+        run: node scripts/check-keyboard-viewport.js
+
       - name: The scale progress bar matches the native give-up deadline
         run: node scripts/check-scale-cycle-budget.js
 
@@ -574,6 +580,9 @@ jobs:
 
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
+
+      - name: How many implementation plans are still live
+        run: node scripts/check-plan-liveness.js
 
       - name: A Known Issue lives in exactly one list
         run: node scripts/check-known-issue-duplication.js

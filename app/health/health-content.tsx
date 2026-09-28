@@ -15,7 +15,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
-import { displayBodyFat, latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
+import { latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
@@ -134,6 +134,18 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const [sleepCorr, setSleepCorr] = useState<import('@/app/api/sleep-performance-correlation/route').SleepCorrelationResponse | null>(null);
 
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStatsResponse | null>(null);
+  // `cachedFetchToday` swallows `!res.ok`, so without this the hub's `data === null` reads as
+  // "still loading" and its skeleton runs forever on a failure (RV-215 ①).
+  const [weeklyStatsError, setWeeklyStatsError] = useState(false);
+  // LB-176. Without these, a FAILED read is indistinguishable from an empty account: `cachedFetch`
+  // and `useCachedValue` both swallow `!res.ok` unless the caller passes `onError` (RV-150/Q-499), so
+  // the value stays null, `metaLoading` clears, and every cell below prints "No data" — a claim about
+  // his account made from a failed request.
+  const [metaFailed, setMetaFailed] = useState(false);
+  const [energyBalanceFailed, setEnergyBalanceFailed] = useState(false);
+  const [trainingLoadFailed, setTrainingLoadFailed] = useState(false);
+  const [sleepCorrFailed, setSleepCorrFailed] = useState(false);
+  const [goalsInputFailed, setGoalsInputFailed] = useState(false);
   // Fetched once here and passed down to OuraSection/WorkoutDensityCard/NutritionActivityTrendsCard
   // (PERF-4) — those three previously each independently fetched the same key, and their
   // staggered dynamic-import mount times defeated cachedFetch's in-flight dedup.
@@ -299,7 +311,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     const networkPromise = Promise.all([
       cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; bodyFatCalibration?: BodyFatCalibrationMeta | null }>(
         'body-metadata', '/api/body-metadata', TTL_MEDIUM,
-        setMetaFromPayload,
+        (data) => { setMetaFailed(false); setMetaFromPayload(data); },
+        { onError: () => setMetaFailed(true) },
       ),
       cachedFetch<SleepRow[]>(
         'sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
@@ -355,7 +368,12 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       ),
       () => cachedFetchToday<ProgressSummaryResponse>(
         'progress-summary', '/api/progress-summary', TTL_MEDIUM,
-        d => { if (d) setProgressSummary(d) },
+        d => { if (d) { setProgressSummary(d); setGoalsInputFailed(false); } },
+        // LB-176. The Goals card builds its rows from four reads and returns null when none survive,
+        // so a failed one made the card leave the screen with nothing saying why. One flag covers the
+        // two reads that are only consumed here; `metaFailed` covers the other two, which come from
+        // the body-metadata payload.
+        { onError: () => setGoalsInputFailed(true) },
       ),
       () => cachedFetch<{ muscles: import('@/app/api/muscle-recovery/route').MuscleRecoveryEntry[] }>(
         'muscle-recovery', '/api/muscle-recovery', MUSCLE_RECOVERY_TTL,
@@ -366,6 +384,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       () => cachedFetch<UserGoals>(
         'user-goals', '/api/user/goals', TTL_MEDIUM,
         d => { if (d) setUserGoals(d) },
+        { onError: () => setGoalsInputFailed(true) },
       ),
     ], 4);
   }, [fetchMeta]);
@@ -374,11 +393,16 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     await runWithConcurrency([
       () => cachedFetchToday<import('@/app/api/training-load/route').TrainingLoadResponse>(
         'training-load', '/api/training-load', TTL_MEDIUM,
-        d => { if (d && d.interpretation !== 'insufficient_data') setTrainingLoad(d) },
+        d => { setTrainingLoadFailed(false); if (d && d.interpretation !== 'insufficient_data') setTrainingLoad(d) },
+        // LB-176. `trainingLoad` is left null for a SUCCESSFUL `insufficient_data` response as well as
+        // for a failure, and the card's "Not enough data yet" is right for the first and wrong for the
+        // second — so the card needs the cause, not just the null.
+        { onError: () => setTrainingLoadFailed(true) },
       ),
       () => cachedFetch<import('@/app/api/sleep-performance-correlation/route').SleepCorrelationResponse>(
         'sleep-performance-correlation', '/api/sleep-performance-correlation', TTL_MEDIUM,
-        d => { if (d) setSleepCorr(d) },
+        d => { setSleepCorrFailed(false); if (d) setSleepCorr(d) },
+        { onError: () => setSleepCorrFailed(true) },
       ),
       () => cachedFetch<Injury[]>(
         'injuries', '/api/injuries', TTL_MEDIUM,
@@ -408,7 +432,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     await runWithConcurrency([
       () => cachedFetchToday<WeeklyStatsResponse>(
         'weekly-stats', '/api/weekly-stats', TTL_MEDIUM,
-        d => { if (d) setWeeklyStats(d) },
+        d => { if (d) { setWeeklyStats(d); setWeeklyStatsError(false) } },
+        { onError: () => setWeeklyStatsError(true) },
       ),
       () => cachedFetch<{ muscles: MuscleSetsEntry[] }>(
         'weekly-muscle-sets', '/api/weekly-muscle-sets', TTL_MEDIUM,
@@ -564,7 +589,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
 
   const { bmi, bmiUsesBf, bmiLabel } = useBmiClassification(latestWeight, heightCm, latestBf, sexProp);
   const weightTrendKgPerWeek = useWeightTrend(metaRecent);
-  const energyBalance = useEnergyBalanceToday();
+  const energyBalance = useEnergyBalanceToday({ onError: () => setEnergyBalanceFailed(true) });
   const energyBalanceKcal = energyBalance?.balance?.netKcal ?? null;
 
 
@@ -574,7 +599,13 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
-    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
+    setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError,
+    metaFailed: metaFailed && metaToday == null && metaRecent.length === 0,
+    energyBalanceFailed: energyBalanceFailed && energyBalance == null,
+    trainingLoadFailed: trainingLoadFailed && trainingLoad == null,
+    sleepCorrFailed: sleepCorrFailed && sleepCorr == null,
+    goalsFailed: (goalsInputFailed || metaFailed) && progressSummary == null,
+    retryWeeklyStats: () => { setWeeklyStatsError(false); void fetchTrainingHealthData() },
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
     progressSummary, bodyBaseline, healthTrends, bodyFatCalibration,
   });

@@ -222,7 +222,7 @@ and "has coverage" are separate questions.
 (prod on v1.270.24) and **zero server errors have been recorded since**. The change makes the next
 fault readable; there has not been one.
 
-Session journal: `docs/overview/entries/2026-08-08-production-counter-audit.md`.
+Session journal: `docs/overview/history-2026-08-07.md#2026-08-08-production-counter-audit`.
 
 ### [workouts][platform] ✅ The Year Review read a deload as a lift dropping to zero (found + fixed 2026-08-08, v1.270.24)
 
@@ -237,7 +237,7 @@ prescriptions and strength history were never affected, only this one screen. Ne
 fails against the pre-fix adapter with `expected +0 to be 92.75`. No backfill: the stored zeros are
 correct data, only the read was wrong.
 
-Session journal: `docs/overview/entries/2026-08-08-year-review-deload-1rm.md`.
+Session journal: `docs/overview/history-2026-08-08.md#2026-08-08-year-review-deload-1rm`.
 
 ### [platform] ✅ Q-144 — the calendar and streak now use the user's own timezone (2026-08-08, v1.270.18)
 
@@ -285,7 +285,7 @@ the honest coverage of a question this data can answer.
 **No backfill:** the 278 stored `true` values remain, separated by `computed_at`; the admin backfill
 can recompute on request. Still open: whether 15 bpm is the right bar for this user.
 
-Session journal: `docs/overview/entries/2026-08-08-rest-adequate-requires-hrr.md`.
+Session journal: `docs/overview/history-2026-08-07.md#2026-08-08-rest-adequate-requires-hrr`.
 
 ### [heart-rate][workouts] ✅ Per-set HR coverage was an artefact of one backfill, not device dropout (answered 2026-08-08)
 
@@ -1117,7 +1117,7 @@ is outstanding, which is what makes this archivable rather than resident.
 
 <!-- Struck 2026-08-20 by Review (session wrap-up, sweeps 29-39). Each verified fixed in
      source on main before moving -- not inferred from the queue's silence. Evidence per entry
-     in docs/handoff-2026-08-20-platform-review-sweeps-29-39.md. -->
+     in docs/handoffs/handoff-2026-08-20-platform-review-sweeps-29-39.md. -->
 
 ### [platform] ✅ Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
 
@@ -1302,7 +1302,7 @@ fan-out would have changed nothing. The evidence that closes it is the retained-
 
 Owner reported the client-side symptom: pull-to-sync on Home surfaces "Sync is backing off after an
 earlier error — retrying shortly" (the deliberate Q-37 backoff-copy branch,
-`session-select-content.tsx:660` — see `docs/overview/entries/2026-08-02-local-sqlite-init-recovery.md`).
+`session-select-content.tsx:660` — see `docs/overview/history-2026-07-30.md#2026-08-02-local-sqlite-init-recovery`).
 That toast only means *a prior pull already failed and set the backoff window* — it doesn't say why.
 Queried `claude_ro.error_events` for the real cause (per the session-start orientation rule) and
 found a live, ongoing, evidenced production fault, not just a copy question.
@@ -1809,7 +1809,7 @@ doubt.
 - **The `FATAL: role "root" does not exist` lead was not the cause** and was not pursued further. It
   is present while the suite passes, so it is noise for this purpose rather than a finding — but
   nobody has explained it, and it should not be re-chased as an E2E failure cause.
-- Context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](../handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
+- Context: [`docs/handoffs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](../handoffs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
 
 ### [platform] ✅ RESOLVED 2026-08-30 — the module map points at `lib/` for modules that live in `packages/shared/` (LA-35)
 
