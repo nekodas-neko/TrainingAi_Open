@@ -490,27 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [platform] LB-177 — migration 295's test throws on the local DB URL this sandbox actually writes
-
-- **Lane: A** — `lib/data/postgres/__tests__/la143-backfill-exercise-ids.test.ts`.
-- **Added:** 2026-09-28 · Lane B, hit while re-gating LA-166 after merging the base that carried it.
-- **What:** with the `DATABASE_URL` that `scripts/local-db/setup.sh` writes — a **Unix socket**,
-  `postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433` — the file throws
-  `TypeError: Invalid URL`, then `Cannot read properties of undefined (reading 'query')` in its
-  teardown. Its two tests report **skipped**, but the file FAILS, so `pnpm test` exits 1 against a
-  suite with zero failing tests. On a TCP URL it passes 2/2.
-- **Why it matters beyond one file:** that exit code is indistinguishable from the LB-168 symptom
-  (`pnpm test` exits 1 with `0 failed`), which cost a day to root-cause. The next lane to hit it
-  will start there.
-- **It is a third instance of a documented class.** CLAUDE.md already warns that
-  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts` need a TCP URL because
-  they rewrite the URL's credentials — those two **skip loudly** instead of throwing, which is the
-  behaviour this one is missing.
-- **Fix shape:** detect the socket URL and skip the file the way its two siblings do, rather than
-  constructing a `new URL()` from it. Whether the local default should simply be TCP is the larger
-  question and is not this entry's.
-- **Reversal cost:** none — a guard in one test file.
-
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
 - **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
   can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
