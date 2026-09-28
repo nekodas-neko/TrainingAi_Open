@@ -4291,24 +4291,6 @@ which is the right shape for something that can only be validated by living with
 - **Not measured:** how many days change once `RV-166` ships. `RV-166` owes that figure before merging
   and this entry does not answer it.
 
-### [platform][app-shell] LB-180 — `/api/user/profile` returns a `workoutCount` nobody reads, and it is what disqualifies the key from a TTL gate
-- **Lane: A** — `app/api/user/profile/route.ts`. One field and one `Promise.all` leg.
-- **Added:** 2026-09-28 · Lane B, while proving `RV-183`'s two More-screen keys against RV-67.
-- **What:** the GET returns `{ user, hasPassword, workoutCount }`, where `workoutCount` is
-  `repo.countWorkoutSessions(userId)`. **Nothing reads it** — a repo-wide grep for `workoutCount`
-  outside the route that produces it finds zero hits in `app/`, `components/`, `lib/` or `packages/`.
-- **Why it matters beyond a dead field.** It is a DERIVATION, so under RV-67 every workout completion
-  is a writer of `more-user-profile`, and no group a completion calls clears that key
-  (`invalidateWorkoutSummaries()` does not contain it; only `invalidateUserProfile()` and
-  `invalidateGoalRecommendations()` do). That is the sole remaining reason the key cannot take
-  `freshWithinTtl`, which would drop the More re-show from one GET to zero. Removing the field makes
-  the payload a pure read of the `users` row and the key eligible.
-- **Also remove the `Promise.all` leg** — it is a `count(*)` over `workout_sessions` on every profile
-  read, for a value that is discarded.
-- **Then `RV-183` can finish:** its `Needs:` clears and Lane B adds the flag with the proof, which is
-  otherwise complete — the equip-title writer was the one genuine gap and it is fixed (#RV-183's PR).
-- **Reversal cost: none.** Re-adding a field no caller reads is a one-line revert.
-
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,

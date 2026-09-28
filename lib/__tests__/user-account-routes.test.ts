@@ -189,6 +189,9 @@ describe('/api/user/profile', () => {
     expect(body.hasPassword).toBe(true)
     expect(body.user).not.toHaveProperty('passwordHash')
     expect(JSON.stringify(body)).not.toContain('$2b$12$')
+    // LB-180: a pure read of the users row, so nothing a workout writes can stale it.
+    expect(body).not.toHaveProperty('workoutCount')
+    expect(countWorkoutSessions).not.toHaveBeenCalled()
 
     getUserByEmail.mockResolvedValue(userRow({ passwordHash: null }))
     expect((await (await readProfile()).json()).hasPassword).toBe(false)
