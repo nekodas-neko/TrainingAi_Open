@@ -20564,37 +20564,17 @@ whether or not anyone draws them first.
 
 ### [nutrition][devices] LA-36 — `food_items.image_data_uri` is written to the device and read back by nothing
 
-- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23:** 1 of 339 local `food_items` carries an `image_data_uri` (4.5 KB). The
-  column is real and unread, but the cost on this device is negligible.
-
-- **Lane:** A (the engine) — the miss is in the local-store read mappers; the visible half is Lane B.
-- **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38
-
-BF-35 stores a food's picture as bytes rather than a URL, and the reason is in its own comment:
-*"this table is read local-first and mirrored into on-device SQLite, where a URL renders nothing
-offline."* The bytes get there — `upsertFoodItem` writes `image_data_uri` on every create and the
-pull mapping keeps it. **Nothing reads it back.** All three local read paths omit the column:
-
-| read | returns the image? |
-|---|---|
-| `searchFoodItems` (Food Library, ingredient picker, food list) | no |
-| `getRecentFoodItemsForMeal` | no |
-| the item embedded in `getFoodLogs` | no |
-
-The server's `rowToFoodItem` returns it, so **`GET /api/nutrition/food-items` carries the picture and
-the local-first read that supersedes it does not** — which is the device-versus-web divergence the
-Canonical Runtime rule exists to prevent, pointing the wrong way: the canonical runtime is the one
-losing the feature. `saved_meals` is the counter-example in the same file — it stores and reads its
-image (`sqlite-backend.ts` ~2481), which is why saved meals show pictures and foods do not.
-
-**The work is three column reads**, one of them in the shared `foodItemRowToItem` helper BF-38 just
-extracted, which is where the deliberate omission is commented. Deliberately NOT folded into BF-38:
-it is a visible change on two Lane B screens with a memory cost worth stating (20 rows at the
-`FOOD_ITEM_IMAGE_MAX_BYTES` 16 KB cap is ~320 KB per search), and a de-duplication PR is the wrong
-place to start rendering pictures.
-
-- **Device check once it ships** (Review, 2026-09-24): the device gate is removed, because it parked unbuilt work behind a check that can only happen afterwards. Sweep 1 already read the pre-fix state: 1 of 339 rows carries a picture, so the fix is cheap to verify and cheap in memory on this device. After it ships, DV opens the Food Library and confirms that food's picture renders.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the `saved_meals` counter-example is now at `sqlite-backend.ts:2549/2613`.
+- **Lane: B** — the render. Re-laned 2026-09-28: the engine half is done (below).
+- **✔ ENGINE SHIPPED 2026-09-28 (Lane A):** every local food read now returns `imageDataUri`:
+  `searchFoodItems` (through `foodItemRowToItem`), the recent-foods read, and the item embedded in
+  `getFoodLogsWithItems`. The server's `rowToFoodItem` always did.
+  `la36-food-item-image-local-read.test.ts` runs on an in-memory SQLite and fails on all three with
+  the fix reverted.
+- **What is left (Lane B):** nothing renders a food item's picture in a list yet.
+  `diary-meal-group.tsx`'s `MealThumb` is the saved-meal shape to copy. Mind the memory: at the
+  16 KB `FOOD_ITEM_IMAGE_MAX_BYTES` cap, 20 search rows are ~320 KB. The device measured 1 of 339
+  local foods carrying a picture on 2026-09-23, so today's cost is negligible.
+- **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 
