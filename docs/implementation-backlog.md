@@ -6509,6 +6509,50 @@ drift.
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
 
+### [workouts][readiness] LA-175 — Q-279's ACWR switch, re-measured before building: the deload card's direction reversed
+- **Lane: O** — the owner approved a change with measured numbers, and today's measurement differs in
+  direction, so the approval does not cover what would ship.
+- **Ask** — owner: re-measured on today's data, switching to the EWMA makes the early-deload card fire
+  on **17 days instead of 30** (you approved 12 → 15) and the over-exertion taper on **1 instead of 7**
+  (you approved 4 → 1). Still switch?
+- **Added:** 2026-09-28 · Lane A, on picking up Q-279 to build it.
+- **What happened.** The 2026-09-03 review recorded its numbers but not its formula or harness, and its
+  baseline no longer reproduces: over the same 95 days (05-29 → 09-01), the current formula gives
+  mean **1.062**, not 0.919. The data has changed since (corrected volumes, deleted sessions). The
+  EWMA side does reproduce closely (standard 7/28-day EWMA, seeded from the first day: max **1.517**
+  against the review's 1.512, taper **1** against 1), so the formula is almost certainly right. What
+  moved is the baseline it is compared to.
+- **Today's measurement** (the current formula evaluated as live, including today's sessions):
+
+  | 95 days | current | EWMA |
+  |---|---|---|
+  | mean / max | 1.062 / 1.693 | 0.964 / 1.517 |
+  | early-deload, ≥ 1.2 | **30** | **17** |
+  | taper, ≥ 1.5 | 7 | 1 |
+  | 20 days flip at the deload boundary | | |
+
+- **⭐ Recommendation: switch, as decided.** The reason you chose it still holds: it removes the
+  mathematical coupling, and the taper result (a single heavy session no longer trips it) is the same.
+  The difference is that the deload card would fire **less** often rather than slightly more. That is
+  arguably better on this data, because the current formula fires it on nearly a third of days,
+  which dilutes a card meant to be exceptional. It is not evidence either way about injury risk.
+- **Alternative:** keep the current formula. It is better only if you value the card firing often,
+  and it keeps the coupling you decided against.
+- **Reversal cost: low.** One function, three test files, no stored data.
+- **Q-279 waits on this answer** (`Needs: LA-175`). The review's harness should be saved as a script
+  next time, so the same argument can be re-run instead of reconstructed.
+
+### [platform] LA-174 — a migration test deadlocks under the full suite because it UPDATEs shared tables
+- **Lane: A** · **Added:** 2026-09-28 · Lane A, seen in Q-524's full local run.
+- **What:** `planned-pct-bodyweight-migration.test.ts` runs migration 153, a table-wide
+  `UPDATE set_logs`, against the shared test database while other files write the same table, and
+  failed with `deadlock detected`. It passes 4/4 alone. This is the same hazard LA-159's guard test
+  hit (`tuple concurrently updated`), and the fix is the same shape: run it in a throwaway database
+  holding only what the migration touches (LA-159 and LA-142's guard tests are the pattern).
+- **Also sweep:** any other test that executes a migration's SQL against the shared database.
+  `grep -rln "migrations/.*.sql" lib/data/postgres/__tests__` finds the candidates.
+- **Done when:** no migration-SQL test mutates the shared test database.
+
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
   Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
@@ -29009,6 +29053,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
     `components/health/readiness-breakdown.tsx`, so it is cheaper than it reads.
 
 ### [workouts][readiness] Q-279 — ACWR drives two user-facing behaviours on evidence that has substantially collapsed
+
+- **Needs: LA-175** — re-measured 2026-09-28 before building; the approved numbers no longer hold (see LA-175).
 
 > **⚑ MEASURED BEFORE BUILDING (2026-09-03, Lane A) —**
 > [`review`](reviews/2026-09-03-acwr-ewma-day-shift.md). Piece 2 is *"a contained change to one
