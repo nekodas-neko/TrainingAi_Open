@@ -6,7 +6,15 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
+> `grep -n '^### [nutrition][devices] ⚠️ The device's food reads now return the stored picture, and no phone has run them (LA-36, 2026-09-28)
+
+`searchFoodItems`, the recent-foods read and the day's logs now select and map `image_data_uri` on
+the device's SQLite. Nothing renders it yet, so the screen should look the same. What could break is
+the read itself. The queries are plain SQLite and pass on `node:sqlite`, but the Capacitor plugin
+is not that engine. **Pass test on the S25:** open Nutrition, search foods, open Recent, and scroll a
+logged day. All three must list as before, with no error toast and no empty list.
+
+### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
 
 The three handlers in `use-day-entry-mutations.ts` used to `fetch` first and mirror locally only
 after a 2xx, so offline they toasted "Updated"/"Deleted", then "Failed to …", and queued nothing —
