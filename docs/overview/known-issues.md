@@ -46,6 +46,20 @@
   real timing could reach it; whether it does is unknown.
 - **If a Home crash is ever reported,** this is the first thing to check: open Home with a banner
   that resolves late and watch for the error boundary.
+### [devices][platform] The native security batch (RV-196, OR-159) is NOT device-verified, and ring uploads are the half that matters
+
+- **Shipped in #1755, Kotlin, so it needs the CI APK installed as an UPDATE.** Never uninstall first:
+  the ring key exists only on the phone.
+- **Owed on the S25 (Lane DV):**
+  1. **After the update and one app open, the ring, the scale and the strap still upload.**
+     `setIngestUrl` now refuses any origin but the app's own. A wrong refusal is swallowed by the
+     caller, and the previously stored URL keeps working, so the failure would be silent rather
+     than an outage. Check `oura_raw_samples` for rows newer than the install.
+  2. **Show key** and **Clear key** in the Oura BLE console each open a system dialog. For Clear,
+     **tap Cancel and never confirm**; the pass is that the dialog appears and the key survives.
+  3. The backup exclusion cannot be observed while backup sits over its 25 MB quota (see OR-159's
+     Keep).
+- **Strike this row** when 1 and 2 are VERIFIED.
 
 ### [app-shell] Home's banner strip is NOT device-verified, and the multi-banner case was never rendered
 

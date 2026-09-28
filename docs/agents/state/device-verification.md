@@ -4,7 +4,9 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-26 · **By:** the sweep-4b session (`device/sweep-4b`) · **Next ID:** `DV-20`
+**Updated:** 2026-09-28 · **By:** the Orchestrator, adding the sitting plan under **Next** only —
+**the sweep state above and the rules below are the sweep-4b session's (`device/sweep-4b`,
+2026-09-26) and are untouched.** · **Next ID:** `DV-20`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
@@ -19,9 +21,16 @@
 
 ## Next
 
-Owed: RV-206 P29–P31 (owner OK for font size, display size, battery saver) and P35–P38; RV-155 station
-C (throwaway supplement writes) and the rest of B/D/E/F; BF-61's meal-list half; DV-18's still-frame
-half; RV-150 cold start; BF-22 around an active workout. The admin console waits for DV-13.
+**The sitting plan is [`docs/device-sitting-plan-2026-09-28.md`](../../device-sitting-plan-2026-09-28.md)** —
+five sittings, **ordered so the ones most likely to FAIL come first**, covering the 126 owed checks
+and the 10 entries blocked until the phone answers. **Start at Sitting 1** (known failures and
+regressions: `BF-61` ①, `DV-12`/`OR-162`, `RV-186` ②/③, `DV-19`, `DV-8`, `RV-150`, `BF-22`).
+
+**⛔ Outranks the plan's order:** the admin console waits for `DV-13`, and until it closes **never
+open `/admin/oura-ble`** — that parks the whole `admin-console-sitting` batch.
+
+Also still owed from sweeps 4a/4b, folded into the plan: `RV-206` P29–P31 and P35–P38; `RV-155`
+station C and the rest of B/D/E/F; `BF-61`'s meal-list half; `DV-18`'s still-frame half.
 
 ## Rules for every message and every input
 

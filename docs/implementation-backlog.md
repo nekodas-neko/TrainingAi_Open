@@ -797,6 +797,37 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
+### [workouts] LA-182 — nine exercises in his program have no progression style: he assigns them in Config
+
+- **Lane: O** · **Added:** 2026-09-29 · Lane A, closing BF-217.
+- **What he needs to do, about two minutes:** in Config → Bankai, give a style to each of these nine
+  exercises, whose style picker is blank:
+  - **Lower:** all five;
+  - Legs: Cable Lying Leg Curl;
+  - Pull: Face Pull;
+  - Push: Cable Chest Dips;
+  - Upper: Barbell Skull Crusher.
+- **Why it matters even though Bankai is AI-dynamic:** the AI picks a style each session, but the
+  rules fallback (used when he turns **Full** back on after a deload, and when the AI is
+  unavailable) skips any exercise without one. **Lower's Full toggle does nothing until these are
+  set.**
+- **Recommendation:** use the style each one was last logged with (Hypertrophy Plus, Hypertrophy
+  3-set or Powerbuilding), or his usual one. Any style fixes the fallback; the AI still chooses
+  per session. **Reversal cost: none.**
+
+### [workouts][app-shell] LA-183 — an exercise can be saved with no progression style, and nothing says so until a deload
+
+- **Lane: B** — `components/config/program-editor-sheet.tsx`, `components/workout-builder/builder-review.tsx`.
+- **Added:** 2026-09-29 · Lane A, closing BF-217.
+- **What:** both program writers accept an exercise with `styleId` unset. The editor leaves a newly
+  added exercise style-less until someone picks one, and the builder passes the AI's
+  `progressionStyleId`, which can be empty. Nothing forces or defaults it. The editor gives no signal at all (its amber border fires only for a style that no longer exists,
+  not for none), and the pre-workout card shows a small `⚠ Style not found`. The cost
+  only lands when the rules fallback skips the exercise (BF-198's Full revert).
+- **Fix shape (Lane B's call on the UI):** default a new exercise's style to the one most used in
+  its session, or block the save with a message naming the style-less exercises. The server
+  already accepts either shape.
+- **Evidence it is not a save-path loss:** see the 2026-09-29 journal entry for BF-217.
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
@@ -2117,24 +2148,25 @@ below threshold and left in place for next time.
   that is a separate question.
   **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
   and what each changes, and chose a standing yes over four interruptions.
-- **⚑ SIX ARE BUILT AND WAITING (Lane A, 2026-09-28/29).** Each is a draft PR, tested and exercised on
-  `pnpm dev`. A yes flips it ready and it merges on green:
-  - **RV-191** → #1912: only a provable PNG/JPEG/WebP is accepted, and the admin panel opens a blob of
-    it, never the stored string;
-  - **RV-190** → #1914: every admin read-only query runs in a rolled-back, scrubbed transaction;
-  - **RV-193** → #1916: the Google refresh token stays in the encrypted JWT;
-  - **RV-197** → #1915: WebSockets are allowed by the CSP only in dev. It was not on the list of six,
-    but it is a security change, so it waits for the same yes.
-
-  - **RV-195** → #1930: the mobile sign-in challenge is bound to its tab, deleted users are signed
-    out, and a pending friend request shows its sender nothing. After merge, owe a DV sign-in through
-    Google on the S25;
-  - **RV-192** → #1931: an invite no longer activates a password registration, and linking Google
-    clears the password. **Behaviour change:** an invited person who registers with a password waits
-    in `/pending` until they use Google or an admin approves them. The "drop password sign-up"
-    option below is still his.
-
-  Only RV-196 (the ring-key plugin, which needs an APK) is not built yet.
+- **⚑ ALL SEVEN ARE BUILT. ONE PR EACH; review these (corrected 2026-09-29):**
+  - **RV-190** → **#1672**: every read-only query runs in a rolled-back transaction, reset on the way
+    in, and mutation-tested;
+  - **RV-191** → **#1671**: images are validated by their bytes (feedback and avatar), and the admin
+    thumbnail zooms in place;
+  - **RV-192** → **#1779**: an invite is not proof of the inbox, and linking Google clears the
+    password;
+  - **RV-193** → **#1781**: the refresh token is read server-side, never from the session;
+  - **RV-195** → **#1784** (② deleted users) **+ #1930** (① mobile sign-in bound to its tab, ③
+    pending friend requests masked);
+  - **RV-196 + OR-159** → **#1755**: native dialogs for the ring key (now including `setKey`),
+    uploads limited to the app's origin, and the cookie **and ring key** kept out of backup. Needs an
+    APK;
+  - **RV-197** → **#1789**: WebSockets are allowed by the CSP only in dev.
+- **⚠ DUPLICATES, DO NOT REVIEW: #1912, #1914, #1915, #1916 and #1931.** A Lane A session on
+  2026-09-28/29 rebuilt RV-190/191/193/197/192 without noticing the PRs above, and listed its own
+  here. Each is a strictly weaker copy of the original, compared diff by diff. They should be
+  closed; closing waits on the owner's OK, per the PR-closing rule. The session's two genuine
+  additions were folded into #1930 and #1755 instead.
 - **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
   - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
     Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
@@ -2726,7 +2758,7 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
 
 ### [devices][platform] OR-159 — Android backup carries the WebView session cookie; exclude it
 
-- **Lane: A** — `android/app/src/main/AndroidManifest.xml` and a backup-rules XML. **Added:**
+- **Lane: A** · **Batch: native-security** — `android/app/src/main/AndroidManifest.xml` and a backup-rules XML. **Added:**
   2026-09-24 · split out of `RV-199` item ③, which the owner approved.
 - **The decision is made — this is implementation, not a question.** `android:allowBackup="true"`
   with no rules (`AndroidManifest.xml:14`) means Google Drive backup takes whatever the app stores.
@@ -2740,6 +2772,10 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+- **Amended 2026-09-29 in the same PR (#1755):** the ring key (`oura_ble.xml`) is now excluded as well, because OR-160 closed with "exclude it". `setKey` also asks before overwriting an existing key.
+- **⚙ BUILT 2026-09-27 (Lane A), batched with RV-196 as `Batch: native-security`.** `backup_rules.xml` (API 23-30) and `data_extraction_rules.xml` (API 31+) exclude `domain="root" path="app_webview"`, wired via `android:fullBackupContent` and `android:dataExtractionRules`. minSdk 26 / targetSdk 36, so both formats are needed. The ring key lives in `shared_prefs/oura_ble.xml` and is untouched — OR-160 stays open and unprejudiced.
+  - **One call of mine to flag:** `device-transfer` is excluded as well as `cloud-backup`. The approval was for keeping the cookie off a restore onto another device, and a direct D2D transfer lands it on another device exactly as a cloud restore does. Cost is re-signing in after switching phones. Say so if that is not wanted.
+- **Keep:** the device check — after the next APK, confirm sign-in survives a normal launch and that a restore does not carry the session. Backup is over the 25 MB quota today (31.2 MB measured), so nothing is backed up at all until D4's pruning lands; the exclusion is correct but currently unobservable.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **✅ ALL SEVEN ANSWERED as of 2026-09-25.** Items 1, 2, 3 and 6 were put to him and answered (delete hr-sync; render zones with the degradation marked; retire the Exercise-detected card; an agent runs the BF-77 session). Items 5 and 7 resolved without asking, and item 2's structural half was decided by the Orchestrator. **What remains is NOT a question: the twelve-entry admin sitting is a scheduling ask, not a decision** — it stays below until those entries are picked up. Each answer is recorded on its own entry; this one leaves the queue when the gates it tracked are all struck.
@@ -3257,7 +3293,30 @@ which is the right shape for something that can only be validated by living with
 
 ### [platform][app-shell] RV-191 — the feedback screenshot is stored unchecked and the admin panel opens it as a URL
 - **Lane: A** first (validation), then **B** (render). One PR covers both halves.
-- **⚠ SECURITY, HIGH — the owner confirms before this merges.**
+- **⚠ SEVERITY CORRECTED, 2026-09-25 — the stated exploit was EXECUTED and did not reproduce.** The
+  entry said "reasoned from source and not executed"; it has now been executed, on Chromium 1194.
+  **`window.open` to a `data:` URI does not navigate** (the opened window stayed `about:blank` and
+  the script never ran), and **SVG inside `<img>` is script-inert** (`<img src="data:image/svg+xml,
+  …<script>">` did not execute). So the admin-RCE path — "an admin who clicks the thumbnail then
+  runs code with the admin's session" — is blocked by the browser at both legs, and this is not the
+  script-execution precondition for RV-193/RV-196 that its priority line claims. **Not measured on
+  the Samsung WebView**, which is the canonical runtime; it follows the same Blink policy, but that
+  is inference rather than a measurement.
+- **Still worth the fix, as boundary validation rather than an exploit**, and the validation half
+  SHIPPED 2026-09-25 ([entry](overview/entries/2026-09-25-rv191-image-data-uri-validation.md)).
+- **⚠ The fix shape in this entry was WEAKER than the codebase already knew.** It says to reuse the
+  avatar route's check — but that route validated the **declared** MIME, which whoever sends the
+  data URI writes, so `data:image/png;base64,<SVG>` passed it. `sniffImageMime` already existed for
+  exactly this ("the bytes are the only thing worth asking", DV-18). The shared
+  `parseImageDataUri` reads the leading bytes and requires them to AGREE with the declaration, and
+  **`/api/user/avatar` was fixed in the same PR** under the sibling-surface rule — it had the same
+  weakness the entry proposed copying.
+- **⚠ `claude_ro` has NO `feedback` view at all**, so the entry's "the view omits `screenshot_data`"
+  understates it: the whole table is default-denied and unreadable through `/api/admin/db-query`.
+  Checked 2026-09-25 against `information_schema`.
+- **Keep:** the existing rows, which remain **unchecked** — there is no read path to them from this
+  container, and any delete of a production row is the owner's call. Whoever has DB access runs the
+  check; nothing in the shipped diff touches a stored row.
 - **Added:** 2026-09-24 · Review sweep 60. **Ahead of RV-190 because any signed-in user can reach it, and it is the script-execution precondition for RV-193 and RV-196.**
 - **What:**
   - `POST /api/feedback` checks only that `screenshotData` is a string of 500 KB or less. The avatar
@@ -3276,37 +3335,6 @@ which is the right shape for something that can only be validated by living with
   3. **Existing rows:** the `claude_ro` view omits `screenshot_data`, so this sweep could not check
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
-
-### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
-
-- **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
-  `lib/data/postgres/readonly-client.ts`, `lib/data/postgres/claude-ro-owner.ts`.
-- **⚠ AUTH/SECURITY — the owner confirms before this merges.** The fix is small; the carve-out applies anyway.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **What:** the route's comment says read-only is enforced by the `claude_readonly` role. The role
-  only sets **session defaults**: the owner scope (`app.claude_ro_owner`), `default_transaction_read_only`
-  and `statement_timeout`. A caller can override all three, and they persist, because each query runs
-  in autocommit on a 2-connection pool that is never reset. **Reproduced on the local database only.
-  Nothing was probed on production.**
-- **Who can reach it:** only a holder of `CLAUDE_DB_QUERY_SECRET` or an admin session. In practice
-  that is the owner and every agent session with the secret in its environment, including one steered
-  by prompt injection from fetched content. What it gets:
-  - other users' rows through the `claude_ro` views;
-  - writes the role was meant to refuse, including writes large enough to recreate the 2026-08-17
-    `disk_full` outage;
-  - queries with no time limit.
-  **Because the pool reuses connections, a later honest query can silently read another user's rows.**
-- **Fix shape:**
-  1. Wrap every db-query and db-snapshot query as `BEGIN TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` →
-     `SET LOCAL app.claude_ro_owner` → query → `ROLLBACK`. The final `ROLLBACK` reverts any session-level
-     setting made inside the transaction; this was verified locally.
-  2. Second layer: `RESET ALL` (or `DISCARD ALL`) when a client is released.
-  3. Regression test: run a query that changes a setting, then assert that the next query on the same
-     pool sees the defaults.
-- **Interaction with OR-138:** OR-138 widens the owner scope on purpose, using `SET LOCAL`. Build this
-  first, or together with it. OR-138 without the transaction wrapper is the same hole with a legitimate
-  entry point.
-- **Reversal cost:** low. No migration is needed, and the views do not change.
 
 ### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
 - **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
@@ -3328,6 +3356,27 @@ which is the right shape for something that can only be validated by living with
      or require the password before linking.
 - **Alternatives:** drop email and password registration and keep only Google, since every current
   user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
+- **✅ BOTH HALVES OF THE TAKEOVER PATH ARE CLOSED (Lane A, 2026-09-27) — but NOT by verifying
+  email, because there is nothing in this repository that can send one.** `createEmailUser` no
+  longer defaults `isActive` to `isInvited(email)`; a password account starts inactive and the owner
+  activates it. `linkOAuthAccount` clears `password_hash` as it links. Google sign-in still honours
+  the invite through `upsertUser`, and that stays right: **Google has verified the address, so there
+  the invite IS being matched against a proven owner.** The asymmetry is the whole fix.
+- **Why clearing the password is safe rather than destructive.** It runs only on the FIRST Google
+  sign-in for a row with no `oauthSub`, and the person triggering it is signing in with Google at
+  that moment, so they are not locked out. The owner's own account already carries an `oauthSub`, so
+  the branch cannot fire for him. `auth.ts:57` already returns null on a falsy hash, so a cleared
+  password is a refusal and not an empty one — pinned by a test, because the fix would be worse than
+  useless if null meant "no password required".
+- **How this survived a test file named for it.** `lib/__tests__/register-inactive.test.ts` is
+  titled *"accounts must start inactive/pending"* and asserts that the **route** passes no `isActive`
+  override — leaving activation to `isInvited`, which is the defect. A test named for a property,
+  asserting something weaker.
+- **Keep: fix 1 as the entry actually words it — real email verification — is NOT done, and it is
+  the owner's.** It needs a mail provider (none exists: no nodemailer/Resend/SES anywhere), a
+  secret, a token table and a verification screen. **Ask him the product question first**, because
+  the entry's own alternative may be the answer: every current user signs in with Google, so
+  dropping password registration outright would close this without building any of it.
 
 ### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
 - **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
@@ -3355,9 +3404,47 @@ which is the right shape for something that can only be validated by living with
 - **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
   token is long-lived, can write to Google Calendar, and outlives sign-out.
 - **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
+- **✅ SHIPPED (Lane A, 2026-09-27) — and it is not one line.** The line is gone from
+  `auth.config.ts`'s session callback and from the `Session` interface in `types/next-auth.d.ts`;
+  the JWT keeps it. The route reads it through a new `lib/auth/session-token.ts`.
+- **Why a shared module rather than a `getToken()` call in the route.** Auth.js derives the
+  decryption **salt from the cookie NAME**, so `secureCookie` is load-bearing: get it wrong and
+  every valid token reads as invalid, the route answers a plain 401, and every workout completion
+  stops reaching the calendar with nothing in the logs. That exact pairing was already solved in
+  `bearer-session.ts` and commented on in `request-error.ts`; a second hand-rolled copy is how it
+  drifts. `bearerSession` now calls the shared reader too.
+- **Both halves are tested against a REALLY encrypted token**, not a mocked decode: one that the
+  session the browser receives no longer carries the claim, driven through the real
+  `authConfig.callbacks.session`; one that the server still reads it back from a cookie minted with
+  `encode()`. The second is the test that would catch the silent death above.
+- **`bearerSession` builds its session by running that same callback**, so the mobile path loses the
+  claim identically — deliberate, and worth stating because it is not visible from the diff.
+- **The route's authorisation semantics are unchanged**: no refresh token is still 401, which is
+  what a signed-in user who never granted the calendar scope gets. A second test now pins the
+  signed-out case separately, because the two conditions became independent.
+
+### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
+
+- **Lane: B** — `components/more/manage-friends-sheet.tsx`.
+- **Added:** 2026-09-29 · Lane A, while shipping RV-195 ③.
+- **What:** `pending` in the sheet holds incoming AND outgoing requests and gives every row
+  Accept/Decline. Accept on a request you SENT always fails, because the server accepts only as the
+  addressee. Since RV-195 the list also masks the target of an outgoing request, so its name reads
+  "Unknown".
+- **Fix:**
+  - Split pending by `f.requesterId === <me>`.
+  - Incoming rows keep Accept/Decline.
+  - Outgoing rows read *"Request sent"* with a Cancel. `DELETE /api/friends/[id]` already allows
+    either party.
+  - `otherUser.displayName` holds what was typed only in the send response, so the list has no name
+    for an outgoing row by design.
+- **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
+  "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
 
 ### [platform] RV-195 — three low-severity auth and social gaps, one PR
-- **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
+- **Lane: A.** **⚠ AUTH — the owner confirms before this merges.**
+- **① and ③ BUILT 2026-09-29 in #1930. ② is #1784**, from an earlier Lane A session. This entry
+  leaves the queue when #1784 merges.
 - **Added:** 2026-09-24 · Review sweep 60.
 1. **Mobile sign-in challenge is not bound to the browser that started it** (`app/auth-mobile-bridge/page.tsx`).
    Exploiting it needs a malicious app on the phone plus a tapped link. Fix: `/mobile-signin` sets a
@@ -3369,9 +3456,38 @@ which is the right shape for something that can only be validated by living with
 3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
    `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
    only what the requester typed.
+- **② SHIPPED (Lane A, 2026-09-27). ① and ③ are NOT, and each for a reason the entry could not have
+  known. The "one PR" line does not survive them — this is three items, shipping separately.**
+- **② was one line and the old comment argued against it.** `is-active-refresh.ts` read *"a missing
+  row is not evidence of deactivation"* and returned the token untouched, so a deleted account
+  stayed signed in until its token expired — up to seven days. What makes the inversion safe is
+  already in the code: a database outage **throws** and is caught, where the claim stands and nobody
+  is signed out by a blip; reaching the `!user` branch means the query ran and answered "no such
+  user" (`getUserById` returns null only for a non-matching id). The two cases the comment conflated
+  were separated by the language all along. Its test is inverted in place, keeping its intent.
+- **⛔ ① CANNOT BE BUILT WHERE THE ENTRY SAYS, and the alternative costs an APK.**
+  `app/mobile-signin/page.tsx` is a **client** component (`"use client"`, it calls `signIn()` in an
+  effect) — it cannot set an httpOnly cookie, and Next 15 forbids `cookies().set()` during a page
+  render, so making it a server component does not help either. The shapes that work:
+  **(a)** a route handler that sets the cookie and redirects — but then the URL the Android app
+  opens changes, which is a Kotlin change and a **new APK**, the one cost the entry does not
+  mention; **(b)** the client page `POST`s to a small route before calling `signIn`, keeping the
+  URL — no APK, and **it is worth checking whether it actually defends anything**, since a Chrome
+  Custom Tab shares Chrome's cookie jar, so an attacker able to open a URL in that browser sets the
+  cookie to their own challenge and the binding holds for them. **This wants the threat model
+  restated before code.** Recommend (b) only if that question resolves; otherwise the real defence
+  is elsewhere and this entry is describing the wrong control.
+- **⚠ ③ IS NOT SYMMETRIC, and "return only what the requester typed" cannot be done on the list
+  path.** Redaction must apply **only when the viewer is the requester** — the addressee has to see
+  who is asking or they cannot decide, and `rowToFriendship` does not know the viewer.
+  And the typed string is **not stored**: `sendFriendRequest` has `emailOrCode` and can echo it,
+  `listFriendships` has nothing, so an outgoing pending request would render blank where a name is
+  today. Storing it is a column, and **a migration ships alone and is never batched**. So ③ is
+  (i) a migration adding the typed identifier, (ii) a viewer-aware redaction, and (iii) a Lane B
+  change to what a pending outgoing row shows. Not one line, and not this PR.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
-- **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
+- **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
   **⚠ SECURITY — the owner confirms before this merges.**
 - **Added:** 2026-09-24 · Review sweep 60.
 - **What:** Capacitor exposes these to the Railway origin:
@@ -3390,6 +3506,18 @@ which is the right shape for something that can only be validated by living with
   2. `revealKey` and `clearKey` require a native confirmation dialog, which script cannot click through.
 - **Reversal cost:** low. The Kotlin change is small, but it costs an APK cycle. Batch it with the next
   native change rather than cutting an APK for it alone, **unless RV-191 cannot land first**.
+- **⚙ BUILT 2026-09-27 (Lane A), batched with OR-159 as `Batch: native-security`** — one APK cycle.
+  1. **`setIngestUrl`** on all three plugins now goes through the new pure `IngestUrlPolicy`
+     (`android/app/src/main/java/com/trainingai/app/IngestUrlPolicy.kt`): the app's own origin over
+     https, plus loopback (`localhost`, `127.0.0.1`, `10.0.2.2`), and nothing else. It parses with
+     `java.net.URI` rather than prefix-matching, and refuses userinfo — `https://<app-origin>@evil/`
+     reads as the app to a human and to a prefix check. Loopback is allowed on purpose: it cannot
+     move data off the device. **9 JVM tests**, which CI runs (`android.yml`).
+  2. **`revealKey` and `clearKey`** now require a native `AlertDialog` tap. A system dialog is
+     outside the WebView, so a script in the origin can open it and cannot answer it. Both callers
+     are explicit buttons in the debug console, so the cost is one deliberate extra tap.
+- **Keep:** the device check (Known Issues: "native security batch"), which includes confirming the ring still uploads after the update. Owner confirmation was given 2026-09-29. The dialog
+  appears and is answerable, and ring/scale/strap ingest still reaches the server afterwards.
 
 ### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
 - **Lane: A** — `lib/security/csp.ts` and its existing test.
@@ -3399,6 +3527,23 @@ which is the right shape for something that can only be validated by living with
   otherwise stop injected script from sending data off-origin.
 - **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
   `generativelanguage.googleapis.com` at the same time.
+- **✅ SHIPPED (Lane A, 2026-09-27), both halves, exactly as written — the entry is right and its
+  evidence reproduces.** No `WebSocket` is constructed anywhere in `app/`, `components/`, `lib/` or
+  `packages/`, and there is no ws client in `package.json`.
+- **The stronger check, because a source grep cannot see a dependency:** built the app and grepped
+  the **emitted client bundles** (`.next/static`). Zero hits for `generativelanguage`, zero for
+  `WebSocket(`, and zero `ws://`/`wss://` literals of any kind. Nothing the browser ships wants
+  either of the things removed.
+- **`ws: wss:` is kept for dev rather than deleted** — the HMR socket is a real consumer. If a
+  production feature ever needs one, **name its host** (`wss://host`); do not restore the scheme.
+- **The enumerating test was loosened while being extended, deliberately.** `dev and production
+  differ only in …` compared exact strings, so it failed when the two ws schemes were merely
+  reordered — a change that changes nothing. It strips them by pattern now and still catches the
+  thing worth catching: a THIRD difference nobody decided on. Found by the mutation pass's
+  equivalent control, which is what that control is for.
+- **NOT verified against a running production server.** `pnpm start` cannot boot in the sandbox —
+  the instrumentation hook needs S3 credentials for the vendored model constants — so the header
+  was read from `buildCsp(false)` and from the bundles, never off the wire.
 
 ### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
 - **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
@@ -5965,9 +6110,14 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
-- **⚠ Build RV-190 first or with this (Review sweep 60).** The owner scope is a setting any caller
-  can change, and it persists on the pooled connection. A `SET LOCAL` without RV-190's transaction
-  wrapper leaves that hole open.
+- **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
+  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  first because the owner scope is a setting any caller can change and it persisted on the pooled
+  connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
+  the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
+  is also the entry point this entry wants: it takes an optional `ownerId` and applies it with
+  `SET LOCAL` inside the read-only transaction, so widening the scope is a parameter rather than a
+  new mechanism.
 - **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
   `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
   views do not change at all. What is fixed is **where that setting comes from**:
@@ -6483,6 +6633,21 @@ drift.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
+  **🔬 DIAGNOSED 2026-09-28 (Orchestrator), after the owner asked whether both key sets had been
+  tested. There are two NAMING SCHEMES and only one has values.**
+  - `lib/exercise-storage.ts:20-22` reads `AWS_* || STORAGE_*`. Only the **`AWS_*`** set is
+    populated; `.env.local` holds `DATABASE_URL` alone, and `STORAGE_*` is documented in
+    `.env.example` but unset.
+  - The populated set fails across **three regions** (`sin` as configured, `auto`, `us-east-1`) and
+    **three endpoints** (`t3.storageapi.dev` as configured, `t3.storage.dev`,
+    `fly.storage.tigris.dev`) — `SignatureDoesNotMatch` every time. **Region and endpoint are ruled
+    out**, which was worth testing because a wrong region produces this exact error from valid keys.
+  - The values are clean: 54-char `tid_…`, 75-char `tsec_…`, no whitespace or truncation. **So the
+    secret genuinely does not match the access key id** — rotated, or mismatched at paste time.
+  - **⛔ THE TRAP: `AWS_*` WINS.** Adding a correct `STORAGE_*` set while the broken `AWS_*` values
+    are still present **changes nothing** — the `||` takes `AWS_*` first. Either replace the
+    `AWS_*` pair, or unset it and use `STORAGE_*`. Setting both is how this gets "fixed" and stays
+    broken.
 - **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
@@ -6857,6 +7022,32 @@ drift.
   ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
   remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
   whether a save path can drop a style is the Lane A question.
+  **⚠ IT IS NOT ONE EXERCISE — measured in production 2026-09-28 (BugFix), while tracing the owner's
+  report that `Full` still would not take on Pull.** The active program `Bankai` has **9 of 25
+  session exercises with `style_id` NULL**, and every inactive program except the long-dead `Main`
+  has **zero**:
+
+  | session (active program) | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull (Face Pull) | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper (Skull Crusher) | 1 | 5 |
+
+  **The losses are spread over days, not one corrupting event.** Dating each from the last
+  `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl **09-09**, Skull Crusher
+  **09-10**, the Lower cluster **09-12**, Face Pull **09-13**. That is repeated, not a single bulk
+  rewrite — which strengthens "a save path drops the style" considerably over "something ran once".
+  **`updated_at` cannot date it:** all 25 rows read `2026-09-28T05:17:31.544Z` to the millisecond, so
+  a program save rewrites every session-exercise row and destroys the timestamp evidence. That is
+  itself worth knowing before anyone tries to bisect this from the table.
+  **The knock-on that makes this urgent rather than cosmetic:** BF-198's `Full` fix takes its revert
+  numbers from `buildRulesPrescription`, which SKIPS a style-less exercise and returns null when
+  every exercise is one (`generate-prescription.ts:169`, `:177`). **So a whole-session deload on
+  `Lower` has a completely dead `Full` toggle even on the fixed code**, and Pull revives 4 of 5.
+  Re-assigning the styles in Config is the owner's one-off repair; stopping the save path from
+  dropping them is the fix.
   ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
   TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
   needs a decision on a default, not a bug fix.
@@ -7022,6 +7213,26 @@ drift.
   new prescription for that"* still names a remedy that does not exist. It now shows only for an
   exercise with no base style, and is Lane B's copy. ② `deloadReason` is NULL on every stored
   prescription, so neither the card nor anyone reading the data can say why a session was deloaded.
+  ③ **The FIX DOES NOT REACH A PRESCRIPTION ALREADY STORED, and the owner hit exactly that the
+  morning after it deployed** (BugFix, 2026-09-28, on his Pull screenshot for Tue 29 Sept still
+  reading *"Full is on, but these weights are unchanged"*). Measured in production: prod is on
+  `1.481.1` and the fix (`d4466c55`, merged 07:17 +10:00 that day) is in the deployed tree, but his
+  Pull prescription was **generated 2026-09-23T09:54:51Z and does not expire until
+  2026-09-30T09:54:51Z** — so it outlives tomorrow's session and keeps its dead toggle. It is the
+  only stored whole-session deload: 5 of 5 deloaded, 0 with `preDeload`.
+  **There IS a workaround, and it is one tap.** Changing the duration preset cannot be served from
+  the stored plan on a whole-session deload — `refitPrescriptionToBudget` needs a baseline and
+  whole-session deloads carry none, so it returns `no_baseline` and the route **falls through to
+  full generation** (`prescribe/route.ts:95`, `refit-prescription.ts:57`). On the fixed code that
+  regeneration writes `preDeload`. So tapping `Quick` or `Long` rebuilds the prescription and
+  revives `Full`, at the cost of one model call.
+  **But only 4 of his 5 Pull exercises would revive.** Face Pull has `style_id` NULL, and
+  `buildRulesPrescription` SKIPS a style-less exercise (`generate-prescription.ts:169`), so it gets
+  no `preDeload` and stays deloaded under `Full` — which is the documented behaviour, surfacing on
+  real data. **On Lower it would revive NOTHING: all 5 of 5 are style-less**, so the rules
+  prescriber returns null (`:177`), `fullById` is empty, and a whole-session deload there has a
+  fully dead `Full` even post-fix. See BF-200 Keep ① — the missing styles are 9 of 25 across the
+  active program, not one exercise.
 
 - **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
   REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,

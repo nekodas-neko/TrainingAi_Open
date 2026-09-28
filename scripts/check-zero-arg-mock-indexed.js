@@ -55,7 +55,6 @@ const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 // choosing the parameter types the assertion reads, which is a judgement per site; getting one wrong
 // makes a spec assert against a shape the code never produces. Shrink it when touching the file.
 const BASELINE = {
-  'app/api/__tests__/admin-db-query.test.ts': 3,
   'app/api/__tests__/dexa-scans-route.test.ts': 3,
   'app/api/__tests__/hr-ingest-poison-pill.test.ts': 3,
   'app/api/sync/pull/__tests__/route.test.ts': 3,
