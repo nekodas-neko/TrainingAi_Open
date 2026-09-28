@@ -1,5 +1,10 @@
 # Exercise roles — the budget-aware recommendation, and the vocabulary
 
+> **Status 2026-09-28 (BF-15):** the defaults, the read fallbacks, defect (a) and the single-add rule
+> shipped. The whole-session rule in §2/§4 was NOT built: the generator now takes roles from the
+> model with Primaries capped (BF-126), and re-run against the corrected catalogue the rule scored
+> 87%, below its own bar. See the backlog entry and the 2026-09-28 journal entry.
+
 **Status:** design settled with the owner, 2026-08-24. Not implemented.
 **Backlog entries:** BF-15 (the rule + defaults), BF-16 (data corrections), BF-17 (labels).
 **Domain:** [`workouts`](../../domains/workouts/README.md)
