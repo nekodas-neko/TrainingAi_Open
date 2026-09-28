@@ -1,20 +1,10 @@
 /**
- * PS-39's last three: `admin/battery-recovery-calibration`, `oura/hr-sync` and
- * `workout/backfill-set-hr-stats`.
- *
- * **`oura/hr-sync` is not an Oura Cloud sync, despite the path.** The Cloud call was removed
- * 2026-08-13 — the ring has been on our own BLE key since the 2026-07-07 re-key, so that request
- * could only ever earn a 401. The route is now a thin HTTP wrapper over
- * `syncAndAttributeSessionHr`, which attributes HR the BLE pipeline has **already ingested**. It is
- * live code with a stale name, not a dead sync; what it has no more of is callers (LA-89).
+ * PS-39's last two: `admin/battery-recovery-calibration` and `workout/backfill-set-hr-stats`.
+ * (`oura/hr-sync` was the third, and was deleted as dead in LA-89 — `complete-workout` runs the
+ * same attribution in-process.)
  *
  * What each decides:
  *
- *   · **`hr-sync` answers `success: true` even when the pipeline throws.** Deliberate: it was
- *     fire-and-forget from workout completion, and failing there would fail a completed workout over
- *     heart-rate data the ring often has not drained yet. `readings: 0` is what carries the truth.
- *   · **`hr-sync` is NOT admin-gated**, unlike its two neighbours here — it acts on the caller's own
- *     workout, and the ownership check is the repository lookup being user-scoped.
  *   · **The set-HR backfill persists a zero-reading row on purpose**, stamping `computed_at` even
  *     when nothing had landed; the lister is coverage-aware and re-lists it, so a later fuller
  *     compute still wins.
@@ -37,9 +27,6 @@ const getBodyBatteryHistory = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listDayCheckins = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const buildBatteryRecoveryCalibration = vi.fn((_i: Row) => ({ from: 'x', to: 'y', rows: [] }))
 
-const getWorkoutSessionById = vi.fn(async (..._a: unknown[]) => null as Row | null)
-const syncAndAttributeSessionHr = vi.fn(async (..._a: unknown[]) => ({ readings: 7, attributed: true }))
-
 const listSessionsMissingSetHrStats = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const upsertSetHrStats = vi.fn(async (..._a: unknown[]) => undefined)
 const computeWorkoutHr = vi.fn(async (..._a: unknown[]) => null as Row | null)
@@ -53,7 +40,6 @@ vi.mock('@/lib/data', () => {
     getUserById,
     getBodyBatteryHistory: (...a: unknown[]) => getBodyBatteryHistory(...a),
     listDayCheckins: (...a: unknown[]) => listDayCheckins(...a),
-    getWorkoutSessionById: (...a: unknown[]) => getWorkoutSessionById(...a),
     listSessionsMissingSetHrStats: (...a: unknown[]) => listSessionsMissingSetHrStats(...a),
     upsertSetHrStats: (...a: unknown[]) => upsertSetHrStats(...a),
   })
@@ -62,15 +48,11 @@ vi.mock('@/lib/data', () => {
 vi.mock('@trainingai/shared/health/battery-recovery-calibration', () => ({
   buildBatteryRecoveryCalibration: (i: Row) => buildBatteryRecoveryCalibration(i),
 }))
-vi.mock('@/lib/workout/post-completion-hr', () => ({
-  syncAndAttributeSessionHr: (...a: unknown[]) => syncAndAttributeSessionHr(...a),
-}))
 vi.mock('@trainingai/shared/workout/compute-workout-hr', () => ({
   computeWorkoutHr: (...a: unknown[]) => computeWorkoutHr(...a),
 }))
 
 import { GET as batteryGet } from '@/app/api/admin/battery-recovery-calibration/route'
-import { POST as hrSyncPost } from '@/app/api/oura/hr-sync/route'
 import { POST as setBackfillPost } from '@/app/api/workout/backfill-set-hr-stats/route'
 
 const batteryReq = async (qs = '') => {
@@ -78,36 +60,20 @@ const batteryReq = async (qs = '') => {
   return batteryGet(new NextRequest(`http://localhost/api/admin/battery-recovery-calibration${qs}`))
 }
 
-const hrSyncReq = async (body?: unknown) => {
-  const { NextRequest } = await import('next/server')
-  return hrSyncPost(new NextRequest('http://localhost/api/oura/hr-sync', body === undefined
-    ? { method: 'POST' }
-    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
-}
-
 const setBackfillReq = (body?: unknown) =>
   setBackfillPost(new Request('http://localhost/api/workout/backfill-set-hr-stats', body === undefined
     ? { method: 'POST' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
 
-// `workout_sessions.id` is a `uuid` column, and the route refuses anything else at the boundary
-// now rather than letting the driver's 22P02 surface as a 500 (RV-177). The repository is mocked
-// here, so the value is never looked up — what matters is that it is a well-formed id.
-const WS_ID = '3f1b9c20-6b1e-4a7d-9f2a-1c0d5e8a4b77'
-
-const COMPLETED = { id: WS_ID, startedAt: new Date('2026-09-01T10:00:00Z'), completedAt: new Date('2026-09-01T11:00:00Z') }
-
 beforeEach(() => {
   for (const m of [getUserById, rateLimit, reportServerError, getBodyBatteryHistory, listDayCheckins,
-                   buildBatteryRecoveryCalibration, getWorkoutSessionById, syncAndAttributeSessionHr,
+                   buildBatteryRecoveryCalibration,
                    listSessionsMissingSetHrStats, upsertSetHrStats, computeWorkoutHr]) m.mockClear()
   rateLimit.mockReturnValue(true)
   getUserById.mockResolvedValue({ isAdmin: true })
   getBodyBatteryHistory.mockResolvedValue([])
   listDayCheckins.mockResolvedValue([])
   buildBatteryRecoveryCalibration.mockReturnValue({ from: 'x', to: 'y', rows: [] })
-  getWorkoutSessionById.mockResolvedValue(COMPLETED)
-  syncAndAttributeSessionHr.mockResolvedValue({ readings: 7, attributed: true })
   listSessionsMissingSetHrStats.mockResolvedValue([])
   computeWorkoutHr.mockResolvedValue(null)
   sessionUser = { id: 'u-1', isAdmin: true }
@@ -115,7 +81,7 @@ beforeEach(() => {
 
 afterEach(() => { vi.useRealTimers() })
 
-describe('the gate — and the one that deliberately has none', () => {
+describe('the admin gate', () => {
   const ADMIN_ONLY: [string, () => Promise<Response>][] = [
     ['battery calibration', () => batteryReq()],
     ['set-HR backfill', () => setBackfillReq()],
@@ -128,14 +94,6 @@ describe('the gate — and the one that deliberately has none', () => {
     expect(upsertSetHrStats).not.toHaveBeenCalled()
   })
 
-  it('lets a non-admin sync HR for their OWN workout — the asymmetry is the design', async () => {
-    // `hr-sync` acts on the caller's own session and was fire-and-forget from workout completion,
-    // so an admin gate there would break completion for every non-admin. Its ownership check is
-    // the repository lookup being user-scoped, asserted below.
-    getUserById.mockResolvedValue({ isAdmin: false })
-    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(200)
-  })
-
   it('answers 503 when the CHECK could not run, not 403 (Q-548)', async () => {
     getUserById.mockRejectedValue(new Error('connection terminated unexpectedly'))
     for (const [name, call] of ADMIN_ONLY) {
@@ -145,74 +103,10 @@ describe('the gate — and the one that deliberately has none', () => {
     }
   })
 
-  it('answers 401 with no session on all three', async () => {
+  it('answers 401 with no session on both', async () => {
     sessionUser = null
-    for (const [name, call] of [...ADMIN_ONLY, ['hr-sync', () => hrSyncReq({ workoutSessionId: WS_ID })]] as [string, () => Promise<Response>][]) {
-      expect((await call()).status, name).toBe(401)
-    }
+    for (const [name, call] of ADMIN_ONLY) expect((await call()).status, name).toBe(401)
     expect(getUserById).not.toHaveBeenCalled()
-    expect(syncAndAttributeSessionHr).not.toHaveBeenCalled()
-  })
-})
-
-describe('POST /api/oura/hr-sync', () => {
-  it('scopes the session lookup to the caller, which is the ownership check', async () => {
-    // There is no separate ownership branch: `getWorkoutSessionById(userId, id)` is user-scoped, so
-    // another user's session id simply does not resolve and answers 404.
-    await hrSyncReq({ workoutSessionId: WS_ID })
-    expect(getWorkoutSessionById).toHaveBeenCalledWith('u-1', WS_ID)
-  })
-
-  it('runs the attribution pipeline with the caller’s timezone and reports the readings', async () => {
-    sessionUser = { id: 'u-1', isAdmin: true, timezone: 'Europe/Berlin' }
-    const body = await (await hrSyncReq({ workoutSessionId: WS_ID })).json()
-    expect(syncAndAttributeSessionHr).toHaveBeenCalledWith('u-1', WS_ID, 'Europe/Berlin')
-    expect(body).toEqual({ success: true, readings: 7 })
-  })
-
-  it('answers success: true even when the pipeline THROWS — pinned, and deliberate', async () => {
-    // It was called fire-and-forget the moment a workout was saved. Failing here would fail a
-    // completed workout over heart-rate data the ring frequently has not drained yet, and the
-    // coverage-aware backfill catches whatever this pass misses. `readings: 0` carries the truth;
-    // the flag does not. Worth knowing before reading `success` as "HR was attributed".
-    syncAndAttributeSessionHr.mockRejectedValue(new Error('oura_heartrate read failed'))
-    const res = await hrSyncReq({ workoutSessionId: WS_ID })
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ success: true, readings: 0 })
-  })
-
-  it('distinguishes a session that does not exist from one not yet completed — same answer', async () => {
-    // Two different causes behind one 404, and both must be refused: attributing HR to a workout
-    // still in progress would snapshot a partial session as if it were done.
-    getWorkoutSessionById.mockResolvedValue(null)
-    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(404)
-    getWorkoutSessionById.mockResolvedValue({ ...COMPLETED, completedAt: null })
-    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(404)
-    expect(syncAndAttributeSessionHr).not.toHaveBeenCalled()
-  })
-
-  it('refuses a missing id, and a body it cannot read, with different messages', async () => {
-    const missing = await hrSyncReq({})
-    expect(missing.status).toBe(400)
-    expect(await missing.json()).toEqual({ error: 'Missing workoutSessionId' })
-
-    const { NextRequest } = await import('next/server')
-    const bad = await hrSyncPost(new NextRequest('http://localhost/api/oura/hr-sync', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{ not json',
-    }))
-    expect(bad.status).toBe(400)
-    expect(await bad.json()).toEqual({ error: 'Invalid JSON body' })
-
-    const big = await hrSyncReq({ workoutSessionId: 'x'.repeat(5 * 1024) })
-    expect(big.status).toBe(413)
-    expect(getWorkoutSessionById).not.toHaveBeenCalled()
-  })
-
-  it('rate-limits generously, because it was fired per completion', async () => {
-    rateLimit.mockReturnValue(false)
-    expect((await hrSyncReq({ workoutSessionId: WS_ID })).status).toBe(429)
-    expect(rateLimit.mock.calls[0].slice(1)).toEqual([20, 60_000])
-    expect(getWorkoutSessionById).not.toHaveBeenCalled()
   })
 })
 
