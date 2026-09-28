@@ -1484,7 +1484,6 @@ export interface OuraDailyDerivedRow {
   readinessSource: string | null
   activityScore: number | null
   activityContributors: unknown | null
-  activeCaloriesEst: number | null
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
   /** TN-64: acute:chronic workload ratio, the half of the early-deload gate nothing recorded. */
@@ -1499,7 +1498,6 @@ export interface OuraDailyDerivedRow {
   /** LA-170: when the training-load verdict was computed. Server-only, like `acwr`. */
   trainingLoadEvaluatedAt: Date | null
   recoveryIndexHours: number | null
-  wornHoursBle: number | null
   nightHrvBaselineMs: number | null
   illnessFlag: string | null
   illnessScore: number | null
@@ -1519,8 +1517,6 @@ export interface OuraDailyDerivedRow {
   daytimeStressCoverageMin: number | null
   chronicStressGranularNights: number | null
   bdiDerived: number | null
-  vascularAge: number | null
-  pwv: number | null
   bodyComp: unknown | null
 }
 
