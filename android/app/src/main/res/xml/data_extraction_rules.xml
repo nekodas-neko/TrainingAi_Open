@@ -10,8 +10,10 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" path="app_webview" />
+        <exclude domain="sharedpref" path="oura_ble.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="root" path="app_webview" />
+        <exclude domain="sharedpref" path="oura_ble.xml" />
     </device-transfer>
 </data-extraction-rules>

@@ -27,6 +27,17 @@ credential: restored onto another device it is a signed-in session. Now excluded
 **Scoped to the cookie, as the entry insists.** The ring key is in `shared_prefs/oura_ble.xml` and
 is a separate decision (OR-160), left exactly as it was.
 
+**Amended 2026-09-29, before merge:**
+- **The ring key is now excluded too.** The owner closed OR-160 on 2026-09-26: exclude it, because he
+  holds his own copy.
+- **`setKey` now asks before overwriting an existing key.** Replacing the key destroys the old one
+  exactly as `clearKey` does, and it was the one destructive door left open. Storing a first key
+  needs no tap.
+
+These were added to this PR rather than a new one. A later session rebuilt RV-196 from scratch
+without noticing this PR, and folding its two genuine additions in here was the way to avoid a
+duplicate.
+
 **One call of mine, flagged rather than buried:** `device-transfer` is excluded as well as
 `cloud-backup`. The approval was for keeping the cookie off a restore onto another device, and a
 direct phone-to-phone transfer lands it on another device exactly as a cloud restore does. The

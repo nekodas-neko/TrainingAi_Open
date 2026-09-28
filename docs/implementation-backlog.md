@@ -2740,6 +2740,7 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+- **Amended 2026-09-29 in the same PR (#1755):** the ring key (`oura_ble.xml`) is now excluded as well, because OR-160 closed with "exclude it". `setKey` also asks before overwriting an existing key.
 - **⚙ BUILT 2026-09-27 (Lane A), batched with RV-196 as `Batch: native-security`.** `backup_rules.xml` (API 23-30) and `data_extraction_rules.xml` (API 31+) exclude `domain="root" path="app_webview"`, wired via `android:fullBackupContent` and `android:dataExtractionRules`. minSdk 26 / targetSdk 36, so both formats are needed. The ring key lives in `shared_prefs/oura_ble.xml` and is untouched — OR-160 stays open and unprejudiced.
   - **One call of mine to flag:** `device-transfer` is excluded as well as `cloud-backup`. The approval was for keeping the cookie off a restore onto another device, and a direct D2D transfer lands it on another device exactly as a cloud restore does. Cost is re-signing in after switching phones. Say so if that is not wanted.
 - **Keep:** the device check — after the next APK, confirm sign-in survives a normal launch and that a restore does not carry the session. Backup is over the 25 MB quota today (31.2 MB measured), so nothing is backed up at all until D4's pruning lands; the exclusion is correct but currently unobservable.

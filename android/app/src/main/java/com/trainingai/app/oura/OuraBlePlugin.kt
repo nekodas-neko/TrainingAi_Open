@@ -33,8 +33,18 @@ class OuraBlePlugin : Plugin() {
     @PluginMethod fun setKey(call: PluginCall) {
         val hex = call.getString("hex") ?: return call.reject("hex required")
         if (OuraAuth.parseKeyHex(hex) == null) return call.reject("key must be 32 hex chars")
-        prefs().edit().putString("key_hex", hex.trim().lowercase()).apply()
-        call.resolve()
+        val store = { prefs().edit().putString("key_hex", hex.trim().lowercase()).apply(); call.resolve() }
+        // RV-196: overwriting a stored key destroys it exactly as clearKey does, so it asks the same
+        // way. First-time storage (no key yet) destroys nothing and needs no tap.
+        if (!prefs().contains("key_hex")) return store()
+        confirmNatively(
+            "Replace the ring key?",
+            "The current key will be overwritten and cannot be recovered from the app or the server.",
+            "Replace",
+        ) { confirmed ->
+            if (!confirmed) return@confirmNatively call.reject("cancelled")
+            store()
+        }
     }
 
     @PluginMethod fun hasKey(call: PluginCall) =
