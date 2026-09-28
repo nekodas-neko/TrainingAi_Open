@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.5",
+    date: "2026-09-28",
+    changes: [
+      "Times in the activity list and activity details now read \"6:40 am\", the same as everywhere else in the app, instead of \"6:40am\".",
+    ],
+  },
+  {
     version: "1.481.4",
     date: "2026-09-29",
     changes: [
