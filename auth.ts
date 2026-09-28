@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import { normalizeEmail } from '@trainingai/shared/validation/email'
 import bcrypt from "bcryptjs"
 import { getRepositoryAsync } from "@/lib/data"
 import { authConfig } from "./auth.config"
@@ -35,7 +36,7 @@ const nextAuth = NextAuth({
         //
         // Two derivations of "the same email" are what made that possible, so there is one now and
         // the key is built from it. Do not reintroduce a second `.toLowerCase()` here.
-        const email = submitted.toLowerCase().trim()
+        const email = normalizeEmail(submitted)
 
         // Per-IP before per-email, so a spray across many accounts is stopped without first
         // spending a victim's bucket. `clientIp` counts in from the right (Q-493) — the leftmost

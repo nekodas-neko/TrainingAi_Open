@@ -63,6 +63,14 @@ export const invitedEmails = pgTable('invited_emails', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// LA-61 (migration 296): the undo record for the email backfill. Nothing reads it in the app.
+export const emailNormalisationPreimage = pgTable('email_normalisation_preimage', {
+  tableName:  text('table_name').notNull(),
+  oldEmail:   text('old_email').notNull(),
+  newEmail:   text('new_email').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.tableName, t.oldEmail] })])
+
 export const progressionStyles = pgTable('progression_styles', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
