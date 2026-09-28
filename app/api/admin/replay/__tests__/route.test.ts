@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server'
 const authOutcome = { current: { ok: true, via: 'session', userId: 'admin-1' } as Record<string, unknown> }
 vi.mock('@/lib/admin/claude-token-auth', () => ({ authorizeAdminRequest: vi.fn(async () => authOutcome.current) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
-vi.mock('@/lib/data', () => ({ getRepository: vi.fn(async () => ({})) }))
+vi.mock('@/lib/data', () => ({ getRepository: vi.fn(async () => ({ getUserById: async () => ({ timezone: 'Australia/Brisbane' }) })) }))
 vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
 
 const load = vi.fn(async () => ({ xs: [1, 2, 3, 4] }))

@@ -17,9 +17,10 @@
  */
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { decodeEventBody, hexToBytes } from '@/lib/oura-ble/decode'
-import { resolveMsToDs } from '@/lib/oura-ble/clock'
+import { resolveMsToDs, resolveDsToMs } from '@/lib/oura-ble/clock'
 import { nightlyTemperatureCentiC, temperatureFrameSeries, RANGE_THRESHOLD, MIN_WINDOWS } from '@trainingai/shared/health/temperature-baseline'
 import { numericField } from '@trainingai/shared/health/night-vitals'
+import { dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import { canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 
 export interface ReplayParam {
@@ -32,6 +33,8 @@ export interface ReplayParam {
 
 export interface ReplayContext {
   userId: string
+  /** The user's own zone, for anything that assigns an instant to a local day. */
+  timezone: string
   from: string
   to: string
   repo: WorkoutRepository
@@ -62,42 +65,84 @@ interface NightInputs {
   nights: { date: string; samples: number[]; stored: number | null }[]
 }
 
-/** The rollup's nightly skin temperature (open_oura port), from each date's main night's 0x75
- *  frames between the stored sleep start and end. Same frames, same collapse, same algorithm. */
+/** A gap this long between two sleep_temp frames ends one sleep block and starts the next. */
+const BLOCK_GAP_DS = 2 * 3600 * 10
+/** Four 30-sample windows: fewer frames than this cannot produce a nightly value at the defaults. */
+const MIN_NIGHT_SAMPLES = 120
+
+/**
+ * The rollup's nightly skin temperature (open_oura port), replayed from the night's own sleep_temp
+ * (0x75) frames, with the same collapse and the same algorithm.
+ *
+ * **Which frames make a night, measured on real data (2026-09-01 → 09-27):**
+ * - The stored `sleep_sessions` window reproduces production EXACTLY (11 of 11) where it is the
+ *   night, because it is the rollup's own trimmed window. But for 7 dates it holds only a daytime
+ *   nap (the night the rollup scored is not kept there; the LA-144 shape), so it scores nothing.
+ * - Clustering the 0x75 frames themselves (0x75 fires only while asleep; a 2 h gap ends a block;
+ *   a day's largest block, by the local day it ends on, is its night) finds every night, but
+ *   without the rollup's trimming it lands a few hundredths off on several.
+ * So: the stored window when it holds enough frames to score a night, else the cluster. The
+ * `matchesStored` count in every response says how many days reproduced exactly.
+ */
 const nightlyTemperature: ReplayFunction<NightInputs> = {
   name: 'nightly-temperature',
-  description: "Nightly skin temperature from the main night's sleep_temp frames (temperature-baseline.ts).",
+  description: "Nightly skin temperature from each day's main sleep block of sleep_temp frames (temperature-baseline.ts).",
   unit: '°C',
   params: [
     { name: 'RANGE_THRESHOLD', description: 'Max in-window range, centi-°C, for a 30-sample window to count', default: RANGE_THRESHOLD, min: 10, max: 2000 },
     { name: 'MIN_WINDOWS', description: 'Valid windows needed before a night gets a value', default: MIN_WINDOWS, min: 1, max: 40 },
   ],
-  async load({ userId, from, to, repo }) {
-    const [sessions, anchors, summaries] = await Promise.all([
-      repo.listSleepSessions(userId, from, to),
+  async load({ userId, timezone, from, to, repo }) {
+    const [anchors, summaries, sessions] = await Promise.all([
       repo.getOuraClockAnchors(userId),
       repo.getOuraDailySummary(userId, from, to),
+      repo.listSleepSessions(userId, from, to),
     ])
     const storedByDate = new Map(summaries.map(s => [s.date, s.tempMeanC]))
-    const dates = [...new Set(sessions.map(s => s.date))].sort()
-    const nights: NightInputs['nights'] = []
-    for (const date of dates) {
-      const night = canonicalNightForDate(sessions, date)
-      if (!night) continue
-      const startDs = resolveMsToDs(new Date(night.sleepStart).getTime(), anchors)
-      const endDs = resolveMsToDs(new Date(night.sleepEnd).getTime(), anchors)
-      if (startDs == null || endDs == null) {
-        nights.push({ date, samples: [], stored: storedByDate.get(date) ?? null })
-        continue
-      }
-      const frames = await repo.readOuraRawFrames(userId, { tags: [SLEEP_TEMP_TAG], startDs: Math.floor(startDs), endDs: Math.ceil(endDs) })
-      const series = temperatureFrameSeries(frames.map(r => ({
+    const dates: string[] = []
+    for (let d = from; d <= to; d = shiftDateStr(d, 1)) dates.push(d)
+
+    // A night that ends on `from` starts the evening before, so read from a day earlier.
+    const startDs = resolveMsToDs(dateStrMidnightInTz(shiftDateStr(from, -1), timezone).getTime(), anchors)
+    const endDs = resolveMsToDs(dateStrMidnightInTz(shiftDateStr(to, 1), timezone).getTime(), anchors)
+    const byDate = new Map<string, number[]>()
+    const toCenti = (rows: { ds: unknown; tag: number; bodyHex: string; decoded: Record<string, unknown> | null }[]) =>
+      temperatureFrameSeries(rows.map(r => ({
         ds: Number(r.ds),
         tempsC: numericField(r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null), 'temps_c'),
-      })))
-      nights.push({ date, samples: series.map(t => t.centi), stored: storedByDate.get(date) ?? null })
+      }))).map(t => t.centi)
+    if (startDs != null && endDs != null) {
+      const frames = (await repo.readOuraRawFrames(userId, { tags: [SLEEP_TEMP_TAG], startDs: Math.floor(startDs), endDs: Math.ceil(endDs) }))
+        .sort((x, y) => Number(x.ds) - Number(y.ds))
+      let block: typeof frames = []
+      const close = () => {
+        if (block.length === 0) return
+        const endMs = resolveDsToMs(Number(block[block.length - 1].ds), anchors)
+        if (endMs != null) {
+          const day = toAestDay(new Date(endMs), timezone)
+          const centi = toCenti(block)
+          if (centi.length > (byDate.get(day)?.length ?? 0)) byDate.set(day, centi)
+        }
+        block = []
+      }
+      for (const f of frames) {
+        if (block.length > 0 && Number(f.ds) - Number(block[block.length - 1].ds) > BLOCK_GAP_DS) close()
+        block.push(f)
+      }
+      close()
+
+      // Prefer the stored window where it is the night: it is the rollup's own trimmed window.
+      for (const date of dates) {
+        const night = canonicalNightForDate(sessions, date)
+        if (!night) continue
+        const a = resolveMsToDs(new Date(night.sleepStart).getTime(), anchors)
+        const b = resolveMsToDs(new Date(night.sleepEnd).getTime(), anchors)
+        if (a == null || b == null) continue
+        const centi = toCenti(frames.filter(f => Number(f.ds) >= a && Number(f.ds) <= b))
+        if (centi.length >= MIN_NIGHT_SAMPLES) byDate.set(date, centi)
+      }
     }
-    return { nights }
+    return { nights: dates.map(date => ({ date, samples: byDate.get(date) ?? [], stored: storedByDate.get(date) ?? null })) }
   },
   evaluate({ nights }, p) {
     return nights.map(n => {

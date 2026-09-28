@@ -5,7 +5,7 @@ import { authorizeAdminRequest } from '@/lib/admin/claude-token-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils'
 import { REPLAY_FUNCTIONS, summarise } from '@/lib/tuning/replay/registry'
 
 /**
@@ -25,7 +25,7 @@ const Body = z.object({
   to: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
   param: z.string().min(1).max(64),
   values: z.array(z.number().finite()).min(1).max(MAX_VALUES),
-})
+}).strict()
 
 export async function POST(req: NextRequest) {
   const authed = await authorizeAdminRequest(req, 'replay-token')
@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const repo = await getRepository()
-    const inputs = await fn.load({ userId: authed.userId, from, to, repo })
+    const user = await repo.getUserById(authed.userId)
+    const timezone = user?.timezone ?? DEFAULT_TZ
+    const inputs = await fn.load({ userId: authed.userId, timezone, from, to, repo })
     const defaults = Object.fromEntries(fn.params.map(p => [p.name, p.default]))
     const run = (value: number) => {
       const days = fn.evaluate(inputs as never, { ...defaults, [param]: value })
