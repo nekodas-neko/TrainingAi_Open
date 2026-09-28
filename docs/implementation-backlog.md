@@ -3777,49 +3777,6 @@ which is the right shape for something that can only be validated by living with
   still ticks once a second; each muscle-sets row shows its target marker standing proud of the
   bar, and no fill looks oval at a low percentage.
 
-### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
-- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
-  Fixed three-column grid, `Log` out from under the icon and below the value. **Acceptance:** at
-  384 px the row fills the width and `Log` does not overlap the icon at any tile count. **Keep the
-  44 px tap target** — the overlap came from `min-h-11` on an absolutely-positioned pill, not from
-  the size, so shrinking the target is the wrong fix. **Known trade, accepted:** a fourth widget
-  wraps to a second line instead of scrolling.
-- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
-  Before/after at the real **384 px dark viewport**, using the app's own tokens from
-  `app/globals.css`. **Proposed:** a fixed three-column grid filling the row, and `Log` moved out from under the icon to its own control below the value. The `absolute top-0.5 right-0.5` pill with `min-h-11` is what puts it on the icon; the flex row is what leaves the right third empty.
-- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
-  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
-  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
-  `LB-163` describes; applying it before the picture existed is the trap.)
-- **The trade, stated on the mockup:** each tile is narrower, so a fourth widget wraps to a second line rather than scrolling sideways.
-- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added, and the lane moved `O` → `B`**: the remaining
-  work after his answer is `app/session-select/components/metric-tiles-card.tsx`, which the path rule
-  puts in Lane B. Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting
-  with `LA-136` and `RV-213`: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
-- **Gate cleared 2026-09-27** — approved. Lane B builds to the mockup.
-- **Two corrections to the figures below, measured at 384 px while capturing the after.** The tiles
-  occupy about **62%** of the row, not 58% — that reading was taken at 412 px. And the trade is not
-  "each tile is narrower": on a three-column grid the tiles come out **wider**. The real cost is that
-  moving `Log` out of the overlay and into the flow as a genuine 44 px target roughly **doubles the
-  row's height**, pushing everything below it down. That is what the page asks him to weigh.
-
-- **Lane: B** · **Branch:** _unassigned_ · **Added:** 2026-09-26 · Lane B, splitting RV-207 ⑥.
-- **Deliberately NOT `Gate: owner`.** The mockup does not exist yet, so the next act is to PRODUCE
-  one and put it to him — that is work, and work is ungated `Lane: O`. A gate here would park the
-  entry and nobody would be tasked with asking. `Gate: owner` belongs on it once a mockup has been
-  shown and the answer is what is outstanding.
-- **The defects behind it are real, and REPRODUCED rather than read** (`metric-tiles-card.tsx`).
-  Rendered in the Playwright harness at the 412 px dark viewport, 2026-09-26: the word **"Log" is
-  drawn directly over each tile's icon** and is barely readable against it, and the three tiles
-  occupy roughly **58% of the row**, leaving the right third empty. The row is a different width
-  again when a tile is empty. Screenshot method: `page.goto('/')` after `suppressMorningCheckin`,
-  2.5 s settle — Health times out at 45 s in `next dev` and needs a longer budget.
-- **Why not just build it:** a lane can implement the entry exactly and still produce a Home the
-  owner does not want — the failure the mockup rule exists to prevent. Three columns fixes the
-  ragged row and makes each tile narrower, which is a trade rather than a strict improvement.
-- **Cheap to reverse** (one component's classes), which is the argument for showing a picture
-  rather than a paragraph.
-
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
 
 - **⛔ THE PROBE SPEC IS RED IN CI, AND ITS OWN MESSAGE SAYS WHAT THAT MEANS — observed
