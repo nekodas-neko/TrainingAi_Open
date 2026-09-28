@@ -31,6 +31,14 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
+
+- Shipped with the web deploy, with no APK. On first open after deploy the S25 should migrate to **v44**,
+  adding .
+- **Owed (Lane DV):** after one app open, the running plan tab still shows today's prescription, and a
+  pull completes without error. Check the WebView console for a SQLite error naming .
+- **Strike this row** when that is VERIFIED.
+
 ### [devices][platform] The native security batch (RV-196, OR-159) is NOT device-verified, and ring uploads are the half that matters
 
 - **Shipped in #1755, Kotlin, so it needs the CI APK installed as an UPDATE.** Never uninstall first:

@@ -345,6 +345,8 @@ export interface LocalPrescribedRun {
   gateAction:    string;
   status:        'pending' | 'completed' | 'skipped';
   activityLogId: string | null;
+  /** LB-179: 'run' | 'walk'; null = completed before this was tracked, i.e. a run. */
+  completedAs?:  'run' | 'walk' | null;
   updatedAt:     string;
   deletedAt:     string | null;
   syncStatus:    'pending' | 'synced';

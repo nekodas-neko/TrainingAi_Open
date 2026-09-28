@@ -1,6 +1,7 @@
 // Shared signal-assembly helpers for the running-plan API routes (GET/POST `/api/running-plan`
 // and POST `/api/running-plan/override`) — extracted so the override route can reuse the exact
 // same recovery-gate inputs/fitness-snapshot resolution instead of drifting a second copy.
+import { completedAsRun } from './run-completion'
 import { getRepository } from '@/lib/data'
 import {
   todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr, dateStrMidnightInTz, ageFromDob,
@@ -78,7 +79,8 @@ export async function assembleInputs(
   // midnight vs now (day-granular data; the conservative estimate). Gives the gate real
   // no-back-to-back-quality protection.
   const lastHardRun = weekRuns
-    .filter(r => r.status === 'completed' && HARD_RUN_TYPES.has(r.runType))
+    // LB-179: a walk that satisfied a hard prescription is not a hard run.
+    .filter(r => completedAsRun(r) && HARD_RUN_TYPES.has(r.runType))
     .sort((a, b) => b.date.localeCompare(a.date))[0]
   const hoursSinceLastHardRun = lastHardRun
     ? (Date.now() - dateStrMidnightInTz(lastHardRun.date, tz).getTime()) / 3_600_000
@@ -94,7 +96,8 @@ export async function assembleInputs(
 
   // Only COMPLETED runs count toward the week's 80/20 sequence — a never-run pending row (created
   // just by opening the tab) must not advance the framework toward an interval day (E2-7).
-  const runsThisWeek = weekRuns.filter(r => r.status === 'completed')
+  // LB-179: a walk that satisfied the prescription does not advance the sequence either.
+  const runsThisWeek = weekRuns.filter(completedAsRun)
   const ctx = {
     fitness,
     weekIndex: weekIndexSince(plan.createdAt, todayMid),

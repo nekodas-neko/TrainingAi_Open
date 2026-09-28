@@ -350,6 +350,16 @@ describe('GET /api/running-plan/run-type-stats', () => {
     expect(body.interval.count).toBe(0)  // neither
   })
 
+  // LB-179: a walk that satisfied a run prescription must not put walking pace into run stats.
+  it('leaves out a prescription a walk completed', async () => {
+    getPrescribedRuns.mockResolvedValue([
+      storedRun({ id: 'r1', runType: 'easy', status: 'completed', activityLogId: LOG, completedAs: 'walk' }),
+    ])
+    listActivityLogs.mockResolvedValue([{ id: LOG, distanceKm: 4, avgPaceSecPerKm: 720, avgHr: 105 }])
+    const body = await (await runTypeStats()).json()
+    expect(body.easy.count).toBe(0)
+  })
+
   // Both reads are best-effort: a stats panel is not worth a 500.
   it('degrades to empty rather than failing when a read throws', async () => {
     getPrescribedRuns.mockRejectedValue(new Error('timeout'))
@@ -394,6 +404,14 @@ describe('PATCH /api/running-plan/runs/[id]', () => {
     expect(id).toBe(RUN)
     expect(userId).toBe(sessionUser!.id)
     expect(patchArg).toEqual({ status: 'completed', activityLogId: LOG })
+  })
+
+  it('passes how the run was completed, and refuses anything but run or walk (LB-179)', async () => {
+    await patch({ status: 'completed', activityLogId: LOG, completedAs: 'walk' })
+    expect((updatePrescribedRun.mock.calls[0][2] as Row).completedAs).toBe('walk')
+    updatePrescribedRun.mockClear()
+    expect((await patch({ status: 'completed', completedAs: 'swim' })).status).toBe(400)
+    expect(updatePrescribedRun).not.toHaveBeenCalled()
   })
 
   it('clears the activity link when none is given', async () => {
