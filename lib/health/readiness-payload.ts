@@ -341,7 +341,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const from28dIso  = toAestDay(from28dDate, tz)
   const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile, userGoals] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -353,6 +353,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getLatestOuraCloudVitals(userId),
     repo.getMoodLog(userId, todayIso),
     repo.getUserById(userId),
+    // Q-524: the step goal the user set, which wins over the activity-level default.
+    repo.getUserGoals(userId).catch(() => null),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -451,6 +453,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     ageYears,
     sex: userProfile?.sex ?? null,
     activityLevel: userProfile?.activityLevel ?? null,
+    stepsGoal: userGoals?.stepsGoal ?? null,
   })
   // Rolling 7-day strength window (inclusive of today).
   const sessions7dRows = recentSessions.filter(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime() - 7 * 86_400_000)
