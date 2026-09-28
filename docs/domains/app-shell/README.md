@@ -487,27 +487,27 @@ Live at the time of writing (2026-07-30):
   — BF-208. The "button" the owner asked about was the MOON in the collection pen's backdrop, and
   `+N more` beside it was a `<span>` styled as a pill. Also the revert of BF-206's label half,
   which the same misread had justified — a guard now keeps the pen's top-right corner clear.
-- **[`docs/overview/entries/2026-09-27-rv215-loading-states.md`](../../overview/entries/2026-09-27-rv215-loading-states.md)**
+- **[`2026-09-27-rv215-loading-states`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv215-loading-states)**
   — RV-215 ①. Weekly stats' skeleton could not end on a failed fetch (`cachedFetchToday` swallows
   `!res.ok` without `onError`); the error branch must be checked BEFORE `loading`, because a
   failure leaves `data` null and the skeleton would otherwise still win. Also why item ②'s "12
   components" count is unreliable — a `return null` while loading is a defer, not a vanish.
-- **[`docs/overview/entries/2026-09-27-rv211-empty-account-claims.md`](../../overview/entries/2026-09-27-rv211-empty-account-claims.md)**
+- **[`2026-09-27-rv211-empty-account-claims`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv211-empty-account-claims)**
   — RV-211 ①②③. Home's empty-account states: no week-in-review banner for an empty week, Body
   Battery's "No data yet" instead of a band, "—" instead of "rest" with no program. Also why item ⑤
   is **not** a defect — the "stray dot" is one of 18 `Math.random()` background stars — and why the
   progress bar (which no source guard caught) is the case for the e2e render.
-- **[`docs/overview/entries/2026-09-27-rv210-keyboard-and-viewport.md`](../../overview/entries/2026-09-27-rv210-keyboard-and-viewport.md)**
+- **[`2026-09-27-rv210-keyboard-and-viewport`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv210-keyboard-and-viewport)**
   — RV-210. `interactive-widget=resizes-content`, all 23 `vh` sheet heights to `dvh` (22 others were
   already there — an unrecorded 22/23 split), and `enterKeyHint="done"` on all 42 numeric inputs.
   Guarded by `check-keyboard-viewport.js`, which holds both source conditions at once because either
   alone is a half-fix. **None of it is verifiable in the sandbox** — no soft keyboard exists there.
-- **[`docs/overview/entries/2026-09-27-rv209-type-scale-floor.md`](../../overview/entries/2026-09-27-rv209-type-scale-floor.md)**
+- **[`2026-09-27-rv209-type-scale-floor`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv209-type-scale-floor)**
   — RV-209 steps 1–2. `--text-2xs: 11px` is the floor of the type scale (42 sizes, 1,035 uses under
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
-- **[`docs/overview/entries/2026-09-27-rv208-numbers-and-durations.md`](../../overview/entries/2026-09-27-rv208-numbers-and-durations.md)**
+- **[`2026-09-27-rv208-numbers-and-durations`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv208-numbers-and-durations)**
   — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
   casing comes from `app/api/day-timeline/route.ts` (Lane A), and the movement-category palette
