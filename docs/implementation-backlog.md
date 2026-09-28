@@ -805,6 +805,19 @@ below threshold and left in place for next time.
   and a wrong sort is a wrong schema.
 
 ### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
+- **✅ UNBLOCKED 2026-09-28 — APPLY 1,618 kcal. The 2026-09-14 recommendation was meant to be applied;
+  1,660 is only the number that was already there.**
+  So the deficit term is settled and the single-number formula can be built:
+  **`RMR + live activity − the deficit for the weight goal`**, recomputed as the day goes on.
+  **The other two numbers come off the screen** — he asked for one, and three unlabelled figures is
+  the confusion `RV-218` filed.
+  **⚠ Applying 1,618 is a WRITE to his live targets, so it follows the standing policy:** verified
+  snapshot first, affected rows against prediction, stop on a mismatch. It is an update, not a
+  delete, so no second confirmation is needed.
+  **Sequence this with `LA-126` and `OR-201`.** `LA-126` is the device agent accepting the
+  post-`RV-66` recommendation, and `OR-201` is his instruction that a computable target should not
+  need a tap at all. **Do not apply 1,618 by hand AND have DV accept a recommendation** — that is
+  two writes racing on the same field. Whoever goes first states which number landed.
 
 - **Lane: A** — the formula lives in shared/server code, so the engine half goes first by the path
   rule; the display half is Lane B and follows in the same batch.
@@ -830,7 +843,6 @@ below threshold and left in place for next time.
   term changes, so `LA-126` should be cleared in the same sitting as `RV-164`.
 - **Reversal cost:** the formula is one function and the display is one component. Low — but it is a
   number he reads every day, so it owes the device-verification gate, not just a green `pnpm dev`.
-- **Ask:** owner — one line: was the 09-14 recommendation of 1,618 kcal meant to be applied? The app still budgets 1,660, and the deficit term cannot be right until that is settled.
 
 
 ### [platform] OR-192 — the owner set a 30-day retention instinct; answer whether the raw archive is the exception before re-asking him
@@ -1761,17 +1773,27 @@ below threshold and left in place for next time.
 - **Do not hold `TN-82` for this.** Build with the draft; swap the strings when he answers.
 
 ### [sleep][app-shell] TN-82 — announce quietly, announce loudly, correct in one tap
+- **✅ ANSWERED 2026-09-28 — the check-in ANNOUNCES its estimate and he corrects it in one tap.**
+  Stop asking for Recovery and Sleep quality outright. He took this over keeping the current ask and
+  over the announce-only-when-confident variant.
+  **Why it fits what he has already decided:** ratings move to outlier-only prompting (`TN-67`) and
+  his rating stops feeding the readiness score (`OR-200`), so the morning stops being a
+  questionnaire in three consistent steps rather than one.
+  **⚠ THE HONEST COST, and it must be carried into the build rather than forgotten:** announcing
+  shows him the app's guess first, so a correction is anchored by it. That is the same anchoring
+  that contaminated 62 days of `energy_level` and it does not disappear here — **it changes shape**:
+  a correction is a stronger signal than a rating precisely because he only acts when the app is
+  wrong, but silence is then ambiguous between *"right"* and *"not looked at"*.
+  **So the build must distinguish an explicit accept from an un-touched default** — the `touched`
+  flag convention `sleepQualityFeel` already uses (`TN-57`). Without it, every unopened morning
+  reads as agreement and the validation problem comes back wearing this feature's clothes.
 
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, three frames — the sheet as it
   is, an ordinary night (quiet line), an outlier night (prominent, numbers first): <https://claude.ai/artifact/Wx6SNHDTMVRBhJbCGctTAZ>.
   The temporary code was reverted; `git diff origin/main` is empty.
-- **Gate: owner** — this removes two inputs from a screen he opens daily, which CLAUDE.md gates on a
+- **Gate cleared 2026-09-28** — he chose announce-and-correct. Nothing further is owed by him; what remains is the build, including the touched-flag distinction above.
   mockup and a yes. `TN-85`'s `Keep:` ② already said so.
-- **Ask** — owner: should the morning check-in stop asking for Recovery and Sleep quality and state its
-  own verdict instead, and does **Recovery** go with it? `Ask:` rather than position, because
-  `Gate: owner` alone would sink this into PARKED where an owner answer is indistinguishable from a
-  device check.
 - **⚠ A GAP THE MOCKUP EXPOSED, AND THE PLAN DOES NOT ADDRESS IT.** `sleep-verdict` is the only verdict
   that exists — there is no recovery verdict, and nothing measures one. So "replace the two scales"
   is really **two different changes**: sleep gets an announcement that can be corrected, and
@@ -6441,10 +6463,17 @@ drift.
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
 ### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
-- **Lane: O** — a product preference: what the app should prescribe, not how.
-- **Ask** — owner: for Chin-Up, Pull-Up, Hanging Leg Raise and other bodyweight movements, should the
-  workout screen prescribe a target (reps per set) the way it does for loaded lifts, or only record
-  what you did?
+- **✅ ANSWERED 2026-09-28 — PRESCRIBE REPS ONLY on bodyweight movements, and record them as the plan.**
+  Chin-Up, Pull-Up, Hanging Leg Raise and the rest get a rep target the way loaded lifts get a
+  weight, using the rep max the app already stores and inverts. **`planned_pct` stays empty** — it
+  is a percentage of a lifted 1RM and there is no load to take a percentage of. No new column.
+  He declined record-only (which leaves them outside every adherence figure) and declined planning
+  them as added weight (which misstates an unweighted set as 0 kg).
+  **What this unblocks:** 23 of September's 49 unplanned sets are bodyweight, so Tuning stops
+  quoting adherence over loaded sets only. **Say so when the first figure moves** — adherence will
+  change the day this ships, and it will look like a regression if nobody names the cause.
+  **Back to Lane A** (`TN-75`'s parent work).
+- **Lane: A** — a product preference: what the app should prescribe, not how.
 - **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
 - **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
   rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
@@ -6459,12 +6488,21 @@ drift.
   already stored changes.
 
 ### [nutrition] LA-172 — how should the app tell that a planned meal was eaten, when no plan meal has a meal type?
-- **Lane: O** — a decision about which food counts toward a plan, which moves the calorie totals the
+- **✅ ANSWERED 2026-09-28 — BOTH, and the answer is wider than option (a).**
+  Verbatim: *"Give it a type by its time; as well as what its tagged with."*
+  **① Derive the meal type from `suggested_time`** — 11:40 becomes Lunch — at plan creation, and
+  **once as a backfill for the 8 existing plan meals**, all of which have `meal_type_id` NULL.
+  **② AND honour an explicit tag where one exists.** A tag the owner sets WINS over the derived
+  type; the time is the default, not the authority.
+  So a plan meal's type resolves as **tag → derived-from-time → none**, and the plan screen can show
+  *"Lunch · Turkey and Rice Bowl"* with the derived value visible and correctable, which is what
+  makes a wrong derivation fixable instead of invisible.
+  **He did NOT take window-matching by log time** — that silently stops counting a real meal on any
+  day he eats late, with nothing on screen explaining why.
+  **The backfill is an UPDATE**, covered by the standing production policy: snapshot, affected rows
+  against prediction, stop on mismatch. **Unblocks `BF-203a`.**
+- **Lane: A** — a decision about which food counts toward a plan, which moves the calorie totals the
   owner reads.
-- **Ask** — owner: when the app checks whether you ate a planned meal, should it (a) give each plan
-  meal the meal type its suggested time falls in (so "Turkey and Rice Bowl" at 11:40 becomes Lunch)
-  and count any food logged under that type, or (b) match by when you logged, within a window
-  around the suggested time?
 - **Added:** 2026-09-28 · Lane A, blocking BF-203a.
 - **What was found:** all 8 of the owner's plan meals have `meal_type_id` NULL. They carry a name,
   targets and a `suggested_time` (07:00, 11:40, 16:20 …), but no meal type. Anything that matches
