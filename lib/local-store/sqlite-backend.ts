@@ -14,6 +14,7 @@ import type { LogExercisePayload } from '@trainingai/shared/workout/log-exercise
 import { resolveLoggedDose } from '@trainingai/shared/nutrition/supplement-dose-freeze';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
 /**
  * The local `ingredients` column is a TEXT mirror of the server's JSONB. A row written by an older
@@ -1064,7 +1065,7 @@ export class SQLiteLocalStore implements LocalStore {
         styleId:      r.style_id ? String(r.style_id) : null,
         muscleGroups: JSON.parse(String(r.muscle_groups ?? '[]')),
         position:     Number(r.position),
-        exerciseRole: String(r.exercise_role ?? 'primary'),
+        exerciseRole: String(r.exercise_role ?? UNCLASSIFIED_EXERCISE_ROLE),
         supersetGroup: r.superset_group != null ? Number(r.superset_group) : null,
       })),
       styles:    styleRows.map(r => ({

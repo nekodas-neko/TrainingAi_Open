@@ -158,7 +158,7 @@ export const sessionExercises = pgTable('session_exercises', {
   styleId:      uuid('style_id').references(() => progressionStyles.id, { onDelete: 'set null' }),
   muscleGroups: text('muscle_groups').array().notNull().default([]),
   position:     integer('position').notNull(),
-  exerciseRole: text('exercise_role').notNull().default('primary'),
+  exerciseRole: text('exercise_role').notNull().default('accessory'), // BF-15: unclassified under-loads
   supersetGroup: smallint('superset_group'),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

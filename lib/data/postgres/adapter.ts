@@ -1915,6 +1915,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           hrvTrend,
           energyLevel: moodLog?.energyLevel ?? null,
           soreMuscles: moodLog?.soreMuscles ?? [],
+          // LB-118: the same check-in's provenance the scorer was fed above, so the explain page
+          // can tell a suggested tick from a chosen one. Null (not []) = not recorded.
+          suggestedSoreMuscles: moodLog?.suggestedSoreMuscles ?? null,
           temperatureDeviation,
           temperatureBaselineDays,
           temperatureAlertThresholdC: TEMP_ALERT_THRESHOLD_C,
