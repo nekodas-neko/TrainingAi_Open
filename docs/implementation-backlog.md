@@ -12385,52 +12385,21 @@ composite reports which of its inputs were inferred.
 ### [devices] LA-115 — Health Connect reads three record types the plugin cannot parse, and fails silently on all three
 
 - **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-44's investigation.
-- **✅ GATE RELEASED 2026-09-23 (OR-134) — it was CIRCULAR, the same shape as BF-165 and LA-49.**
-  It read *"needs a new APK and an on-device Health Connect permission grant"*. Both are true and
-  neither blocks the work: the fix is a patch to the pinned plugin's `RecordConverter`, which is
-  Kotlin and compile-gated in the sandbox like every other `android/**` change. The APK and the
-  permission grant are how the fix is **verified**, and they can only happen *after* it is built —
-  so the gate parked the build behind its own verification and nothing could ever discharge it.
-- **Verification once built:** `Verify: device` — install the APK, grant Health Connect, and prove a
-  non-null value for each of the three types lands in its column. Per the external-field rule, a
-  wrong key reads as `undefined` and fails silently, so a green build proves nothing here.
+- **Verify:** device — install the APK this merge publishes and grant Health Connect. Then show a
+  non-null HRV and SpO₂ from a `health_connect` source landing in `body_metrics`, read from the
+  sync's output or `source_map`. A zero in `source_map` alone proves nothing, because the ring
+  outranks Health Connect. The Known-Issues row carries the same test.
+- **✔ BUILT 2026-09-28 (Lane A).** `patches/@devmaxime__capacitor-health-connect.patch` adds
+  `RecordConverter` branches for `HeartRateVariabilityRmssdRecord` (`heartRateVariabilityMillis`),
+  `OxygenSaturationRecord` (`percentage.value`, unwrapped) and `HeartRateRecord` (`samples[]` with
+  `time`/`beatsPerMinute`). The field names come from connect-client 1.1.0-alpha11's sources jar,
+  and the SDK's `RecordsTypeNameMap` maps all three names (`HeartRateSeries` → `HeartRateRecord`).
+  The TS union is corrected in the same change: the old patch had added `HeartRateVariabilitySdnn`,
+  which nothing reads, and missed `HeartRateSeries`. So all five `as any` casts on `readRecords` are
+  gone. **Compiled locally** (`compileDebugKotlin`), and a deliberate typo fails at the patched
+  line. `la115-hc-record-converter.test.ts` fails if any type the sync reads lacks a branch or a
+  branch writes a key the sync does not read (3 of 3 mutants killed).
 - **Review:** [`the source read`](reviews/2026-09-16-health-connect-record-converter-gap.md).
-- **⚠ This supersedes TN-44's framing.** That entry files the work as "add ten types to
-  `HC_SYNC_READ_TYPES`". The list is not the wall — see TN-44 as re-scoped below.
-- **Measured from the pinned plugin's own source** (`@devmaxime/capacitor-health-connect@1.1.0`,
-  patched locally). `RecordConverter` has exactly **seven** `is XRecord ->` branches —
-  `ExerciseSession`, `Steps`, `Weight`, `SleepSession`, `RestingHeartRate`, `BodyFat`, `Nutrition` —
-  and its fallback is `else -> record.toString()`. An unhandled record comes back as a **Kotlin
-  string blob**, so every field access is `undefined`.
-- **Three types we already ask for land there:**
-
-  | type | read at | result |
-  |---|---|---|
-  | `HeartRateVariabilityRmssd` | `health-connect-sync.ts:343` | `heartRateVariabilityMillis` undefined |
-  | `OxygenSaturation` | `:365` | `percentage` undefined |
-  | `HeartRateSeries` | `:154` (enrich path) | `samples` undefined |
-
-  Each is inside `try { … } catch { /* ignore */ }` and feeds a date filter that drops everything:
-  `new Date(undefined)` → Invalid Date → `NaN` hour → the window test is false. **No error, no log.**
-- **`TotalCaloriesBurned` and `Distance` are fine** — they go through `aggregateRecords`, which has
-  its own `when (type)` in the Kotlin and never reaches `RecordConverter`.
-- **The greppable tell:** every broken call carries `as any` on its `type`. That cast is what let a
-  type past the plugin's `RecordType` union. `BodyFat` and `Nutrition` also carry it and are FINE,
-  because the repo's patch added them to **both** the union and the Kotlin — the patch added
-  `HeartRateVariabilitySdnn`/`OxygenSaturation` to the union **only**. So `as any` marks the boundary
-  where the type list outran the converter.
-- **⚠ The production numbers corroborate but do not prove it.** The owner's `body_metrics` rows that
-  HC touched (n = 17) credit `health_connect` with steps 15 and weight 11, and **HRV 0, SpO₂ 0** — but
-  also **resting heart rate 0**, whose converter branch *does* exist. `source_map` records only the
-  winning source under the ranked merge and the ring outranks HC for those fields, so a zero is
-  equally consistent with "HC produced a value and lost". **Do not quote the zeros as proof.**
-- **The fix is Kotlin, in `patches/@devmaxime__capacitor-health-connect.patch`:** a `RecordConverter`
-  branch per type, plus widening the TS `RecordType` union to match. **Do the union and the Kotlin in
-  the same change** — splitting them is what produced this.
-- **Pass test:** a non-null HRV and SpO₂ value from a Health-Connect source lands in `body_metrics`,
-  observed on the device. Per the external-API rule, the integration is not done until a value is in
-  the column.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the reads are now at `health-connect-sync.ts:351` (HRV), `:372` (SpO₂) and `:162` (HR series), all still `as any`.
 
 ### [platform] LB-119 — chromium SIGSEGVs mid-suite in CI, so an E2E result has to be read twice before it means anything
 

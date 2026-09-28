@@ -23,6 +23,20 @@ a session's last exercise leaves the empty session shell visible on that device 
 reaps it. Online the response says the server cascaded; offline nothing can know that, and queuing a
 second `workout_session_delete` to close the window would double-delete whenever the guess is wrong.
 
+### [devices][heart-rate] ⚠️ Health Connect HRV, SpO₂ and the HR series now convert, and no phone has run it (LA-115, 2026-09-28)
+
+The Health Connect plugin's `RecordConverter` had no branch for three types the sync reads:
+`HeartRateVariabilityRmssd`, `OxygenSaturation` and `HeartRateSeries`. It returned
+`record.toString()` for them, so every field read as `undefined` and the date filter dropped every
+record, silently. The patch adds the three branches, with field names read from
+connect-client 1.1.0-alpha11's own sources jar. It compiles locally, and a deliberate typo fails
+the compile, which proves the patched file is the one built. **It is Kotlin, so it reaches the phone
+only in the CI-built APK that this merge publishes.** **Pass test on the S25:** install that APK,
+confirm Health Connect grants HRV and SpO₂, and run a sync with the ring's overnight data present.
+Then show a non-null HRV or SpO₂ from `health_connect` in `body_metrics`. The ring outranks Health
+Connect in the ranked merge, so check `source_map` or read the sync's own output: a zero in
+`source_map` alone proves nothing.
+
 ### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
 
 `chest-strap-pairing.tsx` read the battery level as `new Uint8Array(batt.buffer)[0]`, which discards
