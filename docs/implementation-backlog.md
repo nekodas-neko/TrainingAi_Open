@@ -8488,15 +8488,47 @@ drift.
   before your last entry."* with **Retry**; unblocked, Retry corrected the card (1,534 → 1,454).
 - **One follow-on found straight after, 1 of 1:** deleting that food left the card on **1,454** for 16 s+
   while the server's balance said 1,534. The DV-15 rounds' deletes (no Retry) did refresh. A tab swap
-  corrected it. It looks like the Retry path leaves the card's refresh subscription dead — **that is what
-  this entry now owes**, not the failure line.
+  corrected it.
+- **⛔ THE HYPOTHESIS ON THIS LINE WAS WRONG, AND THE REAL MECHANISM MOVES THE ENTRY TO LANE A
+  (traced from source 2026-09-28, Lane B).** It read *"the Retry path leaves the card's refresh
+  subscription dead"*. **The subscription is alive and it fires.** `useInvalidationRefetch` holds its
+  callback in a ref, keys its effect on the joined string, and unsubscribes only on unmount — nothing
+  about `retry()` touches it. What swallows the refetch is one layer down.
+- **✅ `cachedFetch` JOINS AN IN-FLIGHT REQUEST INSTEAD OF FIRING A NEW ONE, so the post-push refetch
+  is handed the PRE-push body.** `cache.ts:396` — *"If a request is already in-flight for this key,
+  join its waiter list"*. The delete fires `revalidate()` twice on purpose (immediately, then through
+  `pushThenRevalidate`), exactly as `log-food.ts` does. Round 1 invalidates and refetches while the
+  outbox push has **not** landed, so its GET asks a server that still has the food and answers 1,454.
+  Round 2 invalidates again after the push — and its refetch finds round 1 still in flight, **joins
+  it, and receives 1,454**. No further request is made. The card holds the pre-delete figure until
+  something remounts it, which is the tab swap.
+- **That is why Retry made it reproducible and why the plain deletes did not.** `retry()` runs
+  `fetchWithRetry`, whose ladder is 2.5 s + 5 s + 7.5 s — so a request is far likelier to still be in
+  flight when the push lands. Without a Retry round 1 usually resolves first, round 2 fires a genuine
+  request, and the card corrects. The "16 s+" is the ladder, not a coincidence.
+- **🔑 The clincher, and why this reads as an oversight rather than a design choice:
+  `clearAllCache()` clears `inFlightRequests`; `invalidateCache()` does not.** A response already in
+  flight when the cache was cleared is by definition pre-invalidation data, and the reasoning that put
+  that line in one function applies to the other.
+- **The fix belongs to Lane A** — it is `lib/sqlite/cache.ts`, theirs by the path list. (The lane FIELD
+  is the one below; two `Lane:` bullets would be routed by whichever came first.) **Two levels, and the
+  cheap one is only half:** dropping the key from `inFlightRequests` inside `invalidateCache` stops
+  new joiners, but the ORIGINAL caller still awaits its own promise and will write the pre-push value
+  when it resolves. The complete fix is a per-key generation counter — bump it on invalidation, capture
+  it when a request starts, and discard the response if it no longer matches. **Do not ship the
+  one-liner and call it fixed**; it narrows the window rather than closing it.
+- **Not measured:** no reproduction was run — this is traced from source against a device report. The
+  device case is a delete immediately after a Retry, with the balance route slow rather than blocked.
+- **Keep:** the failure line and Retry from the original entry are shipped and PASSED on device
+  (sweep 4a); only the stale-after-delete half above is outstanding.
 
 - **📱 Sweep 2 — FAILS on the device (S25 · web v1.465.10 · APK 1.460.4 · three-button nav · sweep 2, 2026-09-23).** With `energy-balance` blocked at the network
   (CDP `Network.setBlockedURLs`; 4 requests failed) a Cocoa powder log left the card on **"320 kcal
   left"** for 7 s with **no failure line and no Retry** — a stale number shown as current. (Blocking
   had to be at the network layer: `page.route` cannot see service-worker fetches.)
 
-- **Lane:** B — `app/nutrition/use-energy-balance-refetch.ts`. **Added:** 2026-09-22 ·
+- **Lane:** A — re-laned 2026-09-28; was B for `app/nutrition/use-energy-balance-refetch.ts`, which is
+  not where the remaining defect lives (see the trace above). **Added:** 2026-09-22 ·
   Review sweep 53. **Shipped:** 2026-09-22, `fix/rv103-rv104-nutrition-freshness`.
 - Both of the entry's defects are fixed. The dead `.catch(() => {})` is gone; the refetch runs
   through `fetchWithRetry`, so a transient failure self-heals and a persistent one reports through
