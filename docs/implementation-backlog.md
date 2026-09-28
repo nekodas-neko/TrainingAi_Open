@@ -803,6 +803,36 @@ below threshold and left in place for next time.
   [`docs/oura-raw-archive-retention-brief.md`](oura-raw-archive-retention-brief.md).
 - **Reversal cost: none for the measurement; total and permanent for acting on a wrong answer** —
   a pruned raw row cannot be re-drained from the ring.
+- **MEASURED 2026-09-28 (Orchestrator) — the answer is that the archive is NOT dead weight, and the
+  reason is structural rather than anecdotal.**
+  - **A redecode reads EVERY stored day, by construction.** `fullHistory: true` is hardcoded in
+    `app/api/oura-ble/samples/redecode/route.ts`, not an option a caller passes, and the comment
+    beside it gives the reason: *"a new/fixed decoder backfills every stored day, so this must
+    bypass the incremental read window"*. **There is no windowed redecode mode to fall back on**, so
+    the question *"how far back did a fix reach"* has one answer — as far back as the archive goes,
+    every time.
+  - **62% of the archive is already past 30 days.** `oura_raw_packed` holds **1,580 buckets /
+    1,954,802 frames / 27 MB**; of that, **992 buckets / 1,215,622 frames / 17 MB** were packed more
+    than 30 days ago. A 30-day retention deletes that 62% of frames to reclaim 17 MB.
+  - **Decoder- and clock-adjacent fixes are not rare:** ~10 in the six weeks of visible history, the
+    most recent three days before this measurement — `LA-141` (#1625, 2026-09-25) made the ring
+    clock's inverse an actual inverse, changing the ds↔UTC mapping that **every stored frame** is
+    read through, across nine adapter call sites.
+- **⚠ TWO LIMITS ON THIS MEASUREMENT, both of which narrow it and neither of which reverses it.**
+  - **Git cannot answer the question as the entry framed it.** The premise *"answerable from the git
+    history"* is half false: the **initial public snapshot (2026-08-16) squashed everything before
+    it**, so the pipeline's first five weeks from 2026-07-07 are not recoverable from git at all.
+    Everything above is measured over six weeks, not five months.
+  - **No COMPLETED redecode consuming >30-day bytes can be shown.** `oura_redecode_jobs` holds
+    **exactly two rows** — 2026-08-30 and 2026-09-03, both `fullHistory: true`, and **both
+    abandoned** without recording a result. The table itself only exists since migration 196
+    (2026-08-17), so any earlier pass left no trace. So the archive is insurance that has not yet
+    been visibly cashed — but the mechanism that would cash it reads all of it by design, and the
+    loss is permanent.
+- **The re-ask, one line and nothing else** (per this entry's own instruction — offer him the need,
+  never the bill again): *every decoder fix re-reads the whole archive by construction, and 62% of
+  it is already older than 30 days, so a 30-day window would silently narrow every future protocol
+  fix to the most recent third. Keep it?*
 
 
 ### [platform] LA-167 — every base-comparison ratchet starts one `git` process per file, which is 98% of its runtime
