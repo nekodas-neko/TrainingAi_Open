@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.6",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: Home could crash to a \u201cSomething went wrong\u201d screen shortly after opening, if one of the notifications behind the new \u201cN ready\u201d row changed while the screen was loading \u2014 a failed week-in-review was the reliable way to hit it. Introduced earlier today in v1.481.0; nothing was lost when it happened, but the screen had to be reloaded.",
+    ],
+  },
+  {
     version: "1.481.5",
     date: "2026-09-28",
     changes: [
