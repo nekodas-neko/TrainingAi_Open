@@ -1175,6 +1175,10 @@ export interface WorkoutRepository {
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
   /** RV-45: false when nothing matched. */
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
+  /** TN-46: administered doses of VIAL-DOSED supplements in [from, to]. The dose is the log's own
+   *  `amount`/`unit`, never `supplements.dose` (the vial). Vial-dosed only, so a daily oral
+   *  supplement does not annotate every day. */
+  listDoseEvents(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/dose-context').DoseEvent[]>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
