@@ -36,7 +36,23 @@ A previous session may have run under this name; if so, its baton is waiting for
 only arrive in chat, and two of the three are silent — nobody chases you for them.
 
 1. **GitHub — `list_issues` (state OPEN) and `list_pull_requests` (open).** File an entry for every
-   issue, and for **every PR you did not author**. **⛔ This channel went unread entirely until
+   issue, and for **every PR you did not author**.
+   **⚑ YOU REVIEW IT AND YOU ANSWER IT — the same session, on the PR itself** (owner, 2026-09-28:
+   *"bugfix should be able to review PR's … and update the PR/issue in github without sending to
+   Review"*). Read the diff against this repo's rules and **post the review yourself**. Do not hand
+   the diff to Review and do not post a bare acknowledgement instead of a review.
+   **Filing silently IS the defect:** the entry is internal, an author cannot see the queue, and an
+   unanswered PR is indistinguishable from an ignored one — *"from his end it just goes silent"*.
+   **You MAY APPROVE. You may NEVER MERGE** — merging is the author's or the owner's, with no
+   exception for green CI or a one-line diff. Cannot approve → comment and wait; do not close it,
+   push to their branch, or open a rival PR.
+   **Very concise:** no preamble, no praise, no restating the diff. One finding per comment with
+   its `file:line` or the rule behind it — a finding with no cited rule is an opinion. **Nothing
+   wrong → one line saying so.** A contributor does not know this repo's conventions, so name the
+   rule rather than assuming it.
+   **Escalate but do not wait:** a PR touching **auth, sessions, secrets or a migration** also gets
+   a `/security-review` pass or a `Lane:` to Review — **after** your response, never instead of it.
+   **⛔ This channel went unread entirely until
    2026-09-25**, and an outside contributor said so: *"it's also not picking up the issues and PRs
    I raise to your Training app, so they're never getting touched/reviewed either."* Three of his
    items sat four days. **An inbound PR is not ours to merge** — the ceiling is review, comment,
