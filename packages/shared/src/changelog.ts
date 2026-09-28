@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.6",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: when Health couldn't reach the server it described your account instead of the problem \u2014 Burned, BMI, Balance, Resting HR, HRV and SpO\u2082 all read \"No data\", it said you had no activities this week, and it asked you to add your height, age and sex in Profile and to log a body weight you had already logged. Those cards now say they couldn't load.",
+    ],
+  },
+  {
     version: "1.478.5",
     date: "2026-09-28",
     changes: [

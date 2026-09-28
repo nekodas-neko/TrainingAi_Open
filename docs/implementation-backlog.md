@@ -6702,12 +6702,24 @@ drift.
   - **Failed (1):** `food-log-swipe-delete:238`.
   - **Flaky (4):** `dv12-tab-switch-does-not-redraw-charts:27`, `tabs-instant-paint:42` (Home),
     `tn25-walk-prescription:49`, `tn53-sparkline-does-not-span-gaps:105`.
-- **⚑ THE FLAKY SET CHURNS; THE HARD FAILURE DOES NOT. That is the finding.** Only **2 of 6** flaky
-  specs recurred across the two runs (`tn25-walk-prescription`, `tn53-sparkline`); four from the first
-  census did not reappear and two are new. Meanwhile `food-log-swipe-delete:238` failed **hard in both
-  runs** — and in two of three local runs before that. **So `:238` is a defect and the rest is
-  order/timing noise**, which is exactly the separation this entry was opened to make. Start there and
-  treat the churning set as one population rather than as individual bugs.
+- **⚑ THE FLAKY SET CHURNS, AND A STABLE CORE OF ONE SPEC SITS INSIDE IT.** Across three CI runs the
+  flaky list is almost entirely different each time — but **`tn53-sparkline-does-not-span-gaps:105`
+  appears in ALL THREE**, and nothing else does. `tn25-walk-prescription`, `calorie-progress-bar` and
+  `tabs-instant-paint:42` each appear in two of three, the last two at *different lines/params*, which
+  is itself a signal: the instability is not tied to one assertion. **Start at `tn53:105`** — it is the
+  only spec with a reproduction rate near 100%.
+- **✅ THIRD CENSUS — run on `6a153f6b` (PR #1897), 2026-09-28. 265 passed · 0 FAILED · 6 flaky ·
+  1 skipped · 35.5 min.** Genuinely ran (36.9 min job), not an `e2e-ui-touched` skip.
+  Flaky: `calorie-progress-bar:142`, `deload-visible:109`, `meal-thumb-placeholder:132`,
+  `tabs-instant-paint:42` (Health), `tn53-sparkline:105`, `tn58-vs-yesterday-no-default:15`.
+- **⚠ THIS CORRECTS THE PARAGRAPH THIS ENTRY CARRIED AFTER THE SECOND CENSUS.** It read *"`:238` is a
+  defect and the rest is order/timing noise"* on the strength of two consecutive hard failures.
+  **`food-log-swipe-delete:238` PASSED in run three**, so it is 2 of 3 in CI plus 2 of 3 locally — the
+  highest-frequency flake, not a deterministic defect. Two data points looked like a pattern and were
+  not; the claim was made one run too early.
+- **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
+  all. That is the first evidence that "required check" is not hopeless — the obstacle is the retry
+  budget masking ~6 flaky specs per run, not an unpassable suite.
 - **And the two stress specs are gone from the list, as predicted.** `tn35-stress-against-events` and
   `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
   and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
@@ -8420,35 +8432,6 @@ drift.
     Known-Issues row.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
-
-### [app-shell][heart-rate][body] LB-176 — Health tells him "No data" and "add your height, age and sex" when the read failed
-
-- **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`.
-- **Added:** 2026-09-28 · Lane B, measured while closing `LB-175`. **This replaces that entry's
-  Health row, which was wrong** — see below.
-- **Health degrades honestly where it was built to.** Cold, with every `GET /api/*` failing at
-  412 px, it prints **seven** explicit failure lines: the HR recovery profile, the ring, the weekly
-  stats (with Try again), AI Periodization, movement balance, the trend view, and strength progress.
-  Two of the three sections `LB-175` called silently absent are among them — the heading goes, but a
-  line replaces it.
-- **What is NOT honest is the empty-state copy under them.** These read as facts about his account
-  when they are facts about a failed request:
-  - `BURNED`, `BMI`, `BALANCE`, `RESTING HR`, `HRV`, `SPO₂` — all **"No data"**.
-  - *"No HR captured yet today — the ring records periodically while worn."* — explains an absence
-    that did not happen.
-  - *"No activities this week"*, *"Log body weight to see trend"*, *"No nutrition/activity trends
-    yet"*, *"Not enough data"*.
-  - **The worst one: "Set up your energy budget — Add your height, age and sex in Profile."** It
-    tells the owner to redo something he did months ago, because one read did not land.
-- **`GOALS` is the only section that still vanishes in silence.**
-  `goals-progress-card.tsx` takes its rows as props and `return null`s when it has none, so the fix
-  is a flag on whichever read in `health-content.tsx` feeds it, not an `onError` on the card.
-- **Why this is its own entry:** it is one shape repeated across a dozen cells, and the fix is a
-  decision about what an empty metric cell should say when the read failed — not the per-card
-  `onError` that `RV-150` and `LB-175` were. Settle the copy once and apply it.
-- **Done when:** a cold start with the reads failing shows no cell claiming "No data" and no card
-  instructing him to enter details he already has. `e2e/rv150-failed-read-says-so.spec.ts` is the
-  shape to extend; keep a healthy-cold-start case or a component that always renders the line passes.
 
 ### [platform] RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
 
