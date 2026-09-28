@@ -672,9 +672,9 @@ re-issued under a new number on every schema change — 59 copies, 92% of the mi
 two copies landing together silently destroyed each other. `ensureSchema` and `migrate.js` apply it
 after the migrations whenever its content hash is not in `schema_migrations`. **Never add a
 migration that creates or drops the `claude_ro` schema**: `claude-ro-views-file.test.ts` fails on
-one, and on a file that differs from what the generator emits, so a forgotten column fails CI. Take
-real migration numbers from `node scripts/next-schema-number.js` (it floors at 289, the last number
-a deleted copy held). **The owner's id must not appear in the file** (Q-456).
+one, and on a file that differs from what the generator emits, so a forgotten column fails CI. Name a
+migration from `node scripts/next-schema-number.js`: a UTC minute, `YYYYMMDDHHMM_<what>.sql` (BF-214 ②;
+appliers sort by leading integer). **The owner's id must not appear in the file** (Q-456).
 
 **⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (LA-161). The wrong one does not
 fail: it reads the session's dev database, and anything hand-applied there reaches the file. Build a

@@ -35,10 +35,12 @@ function claimsFromFiles(files) {
  * @param {string[]} merged        migration filenames on the base branch
  * @param {{ref: string, files: string[]}[]} branches  filenames on each other ref
  * @param {number} [floor]  `next` never goes below `floor + 1` — see RETIRED_FLOOR
+ * @param {Date} [now]  when given, `next` is a UTC `YYYYMMDDHHMM` timestamp (BF-214 ②) — or one past
+ *                      the highest claim, if a claim is already at or beyond this minute
  * @returns {{ next: string, reserved: {num: string, ref: string, file: string}[],
  *            collisions: {num: string, claims: string[]}[] }}
  */
-function surveyClaims(merged, branches, floor = RETIRED_FLOOR) {
+function surveyClaims(merged, branches, floor = RETIRED_FLOOR, now) {
   const mergedClaims = claimsFromFiles(merged);
   const owners = new Map(); // num -> [ "main: 284_x.sql", … ]
   const note = (num, where, file) => {
@@ -66,9 +68,23 @@ function surveyClaims(merged, branches, floor = RETIRED_FLOOR) {
 
   const used = [...owners.keys()].map(Number);
   const width = Math.max(3, ...[...owners.keys()].map((n) => n.length));
-  const next = String(Math.max(floor, ...used) + 1).padStart(width, '0');
+  const afterClaims = Math.max(floor, ...used) + 1;
+  const next = now
+    ? String(Math.max(Number(minuteStamp(now)), afterClaims))
+    : String(afterClaims).padStart(width, '0');
 
   return { next, reserved: reserved.sort((a, b) => Number(a.num) - Number(b.num)), collisions };
 }
 
-module.exports = { GRANDFATHERED, RETIRED_FLOOR, claimsFromFiles, surveyClaims };
+/**
+ * A migration prefix for this minute, in UTC: `YYYYMMDDHHMM`. Two authors collide only by picking the
+ * same minute, where a sequential number collided whenever two branches were open at once. The
+ * appliers order by the leading INTEGER (sortMigrationFiles), so this sorts after every `NNN_` file.
+ * UTC on purpose: it is an ordering key, not a date anyone reads as their day.
+ */
+function minuteStamp(now) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${now.getUTCFullYear()}${p(now.getUTCMonth() + 1)}${p(now.getUTCDate())}${p(now.getUTCHours())}${p(now.getUTCMinutes())}`;
+}
+
+module.exports = { GRANDFATHERED, RETIRED_FLOOR, claimsFromFiles, surveyClaims, minuteStamp };

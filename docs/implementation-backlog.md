@@ -726,83 +726,21 @@ below threshold and left in place for next time.
 
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
-- **Lane:** A — `scripts/generate-claude-ro-views.js`, `lib/data/postgres/client.ts`,
-  `scripts/local-db/migrate.js`, `lib/data/postgres/migrations/`.
-- **Added:** 2026-09-27 · BugFix. **Supersedes the narrower `BF-210`**, which proposed replay
-  exemptions for the 58 twins a `DROP COLUMN` breaks; that treats the symptom. It is the root cause
-  behind `BF-213`, and it answers issue **#1620** more completely than `BF-211` did.
-- **`BF-211` shipped the same day and is gone from this queue — read what it settled before
-  starting ②.** It replaced the hand-maintained *Next free Postgres migration* row with
-  `node scripts/next-schema-number.js`, which fetches and reports what every unmerged branch is
-  holding. Two things from it bear on this entry. **The row could never reserve anything** — a CI
-  check pinned it to `max(merged) + 1`, measured — so ② is not removing a working reservation, it is
-  replacing one that was already only a restatement. And **the command reproduces `#1608`'s
-  collision by name**, so ② can be judged against a working detector rather than against prose. ②
-  makes that command obsolete when it lands, which is a deletion, not a conflict.
-- **Needs:** — nothing.
-- **⚙ ① BUILT 2026-09-27 (Lane A, `lane-a/bf214-claude-ro-views-file`) — held for the owner's yes,
-  given 2026-09-27 for the deletion; the merge changes what runs at every deploy.** The views are
-  `lib/data/postgres/claude-ro-views.sql`, applied by `ensureSchema`/`migrate.js` after the
-  migrations in a transaction, gated on a content hash in `schema_migrations`. 59 twins deleted
-  (287 → 228 files). `next-schema-number.js` floors at 289. `claude-ro-views-file.test.ts`
-  regenerates and diffs, so a missed COLUMN now fails CI.
-  - **Corrections to this entry, measured:** the "no CI check" line is half-right —
-    `claude-ro-readonly-role.test.ts` DOES run in CI (the Tests job's URL is TCP) and fails on a
-    table with no view; what was missing was column level. And ① also lifts the baton's
-    "a column rename is not available in this repo", which the historical twins caused.
-  - **The explicit transaction is not what makes the file atomic** — Postgres already runs a
-    multi-statement query as one implicit transaction (a mutant removing `BEGIN` survived for that
-    reason). It ties the marker row to the rebuild.
-  - **Open PRs holding twins must drop them and regenerate the file instead:** `#1608`
-    (`291_claude_ro_views_apple_health_samples.sql`) and `#1749` (`287_claude_ro_views_drop_dead_derived.sql`).
-    Merging either as it stands fails the new test, which is the intent.
-  - **② is what remains**, and it stays this entry.
-- **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
-  are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
-  SNAPSHOT opening `DROP SCHEMA claude_ro CASCADE` and rebuilding all 98 views. **Only the newest
-  affects the final schema**; the other 58 exist solely to be replayed.
-- **Migrations land at 2 per day, every day for the past week — and that is one real change plus
-  one twin.** So the twin doubles the rate at which numbers are consumed, and half of every
-  collision is a snapshot file that has no business owning a migration number. `#1608` needed 288
-  for its table and 289 for its twin; only 288 is a schema change.
-- **The twin is also what makes the collision SILENT.** Two table migrations with different
-  filenames both apply and both succeed. Two twins both apply, sort by filename, and the later one
-  drops the schema the earlier one just built — so the newer view is created and destroyed in the
-  same deploy with no error. That is `BF-213` exactly.
-- **① Recommendation: the twin stops being a numbered migration.** One checked-in file, regenerated
-  in place (`lib/data/postgres/claude-ro-views.sql`), applied after the migration loop in
-  `ensureSchema` (`client.ts:95`). Halves number consumption, deletes ~86k lines, makes `BF-210`
-  disappear because no historical twins remain to break, and makes `BF-213`'s failure structurally
-  impossible.
-  **⚠ Generate it in CI or at authoring time, NOT at runtime — this was the first draft of this
-  entry and stress-testing killed it.** The generator is **default-deny by construction**: its
-  `DENY` map withholds `password_hash`, the four `oura_tokens` secrets and three image/screenshot
-  blobs, and a table it cannot classify calls `process.exit(1)` rather than emitting an unscoped
-  view (`generate-claude-ro-views.js:214`). Two properties depend on the file being checked in:
-  **what columns are exposed is reviewable in the diff**, and **a classification failure happens
-  where a human sees it** rather than on a production boot with the schema already dropped.
-  **The cost of ① is one real conflict**: two concurrent schema changes now edit one file instead of
-  two. That is the right trade — the resolution is mechanical (re-run the generator), and a loud
-  conflict beats a silently dropped view.
-  **There is no CI check today that the twin matches the schema** — only
-  `claude-ro-readonly-role.test.ts` and `db-snapshot-integration.test.ts`, which **skip unless
-  `DATABASE_URL` is TCP**. ① should add that check; it makes the twin strictly better verified than
-  it is now.
-- **② The remaining half: sort migrations NUMERICALLY, then name them by timestamp.** ① does not fix
-  the collision `#1620` is about — a contributor still picks a number that goes stale before review
-  ends. **A naive timestamp rename is a trap, verified rather than assumed:** both appliers sort
-  lexicographically (`client.ts:95`, `migrate.js:69`), and `"202609270534_x.sql" < "289_y.sql"`
-  because `'0' < '8'` — **every new migration would run before every old one.** Sorting by the
-  leading integer instead (one line in each applier) makes a minute-precision timestamp sort
-  correctly and collide only if two authors pick the same minute.
-- **Sequencing: ① then ②, and ① alone is worth shipping.** ① is self-contained; ② touches the apply
-  order for every migration and wants its own PR and its own careful read.
-- **Reply to `#1620` when this is decided** — the author raised it, and the answer is larger than
-  the request.
-- **Reversal cost:** ① moderate — it changes what runs at deploy, so it wants a careful rollout;
-  the 58 deleted twins are recoverable from git and are already recorded in `schema_migrations` by
-  filename, so removing the files does not re-run anything. ② is higher: it changes apply order,
-  and a wrong sort is a wrong schema.
+- **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
+  `lib/data/postgres/claude-ro-views.sql`, applied after the migrations on a content hash; 59 twins
+  deleted. ② (2026-09-28, Lane A): both appliers order migrations by the **leading integer**, then
+  filename (`sortMigrationFiles`), and `next-schema-number.js` hands out a UTC-minute prefix,
+  `YYYYMMDDHHMM`. Every existing file keeps the order production applied it in (a test asserts the
+  new order equals the old string sort on the real directory), and a timestamp file runs after every
+  `NNN_` one. Two authors now collide only by choosing the same minute.
+- **Lane:** O — the one thing left is a public comment, which the owner posts or approves.
+- **Keep:** a reply on issue **#1620**, whose author raised the collision. The answer is larger than
+  the request: numbers are now minute timestamps, so a contributor's pick cannot go stale while a
+  review is open. Draft: *"Fixed more broadly than asked. Migrations are now named by UTC minute
+  (`node scripts/next-schema-number.js` prints one) and applied in numeric order, so two open PRs
+  only collide if both were written in the same minute. The `claude_ro` twin is no longer a
+  numbered migration at all."*
+- **Added:** 2026-09-27 · BugFix.
 
 ### [nutrition][body] OR-191 — the owner wants ONE calorie number, and none of the three on screen is it
 
