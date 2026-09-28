@@ -882,6 +882,10 @@ export interface WorkoutRepository {
   listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
   listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  /** PS-49 — the collection v2 faucets. Narrow on purpose (RV-63): a date, and steps where needed. */
+  listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]>
+  listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
   listRestDays(userId: string, from: string, to: string): Promise<string[]>
 
@@ -1175,6 +1179,10 @@ export interface WorkoutRepository {
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
   /** RV-45: false when nothing matched. */
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
+  /** TN-46: administered doses of VIAL-DOSED supplements in [from, to]. The dose is the log's own
+   *  `amount`/`unit`, never `supplements.dose` (the vial). Vial-dosed only, so a daily oral
+   *  supplement does not annotate every day. */
+  listDoseEvents(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/dose-context').DoseEvent[]>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
