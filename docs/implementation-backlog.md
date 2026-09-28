@@ -4299,6 +4299,24 @@ which is the right shape for something that can only be validated by living with
 - **Not measured:** how many days change once `RV-166` ships. `RV-166` owes that figure before merging
   and this entry does not answer it.
 
+### [platform][app-shell] LB-180 — `/api/user/profile` returns a `workoutCount` nobody reads, and it is what disqualifies the key from a TTL gate
+- **Lane: A** — `app/api/user/profile/route.ts`. One field and one `Promise.all` leg.
+- **Added:** 2026-09-28 · Lane B, while proving `RV-183`'s two More-screen keys against RV-67.
+- **What:** the GET returns `{ user, hasPassword, workoutCount }`, where `workoutCount` is
+  `repo.countWorkoutSessions(userId)`. **Nothing reads it** — a repo-wide grep for `workoutCount`
+  outside the route that produces it finds zero hits in `app/`, `components/`, `lib/` or `packages/`.
+- **Why it matters beyond a dead field.** It is a DERIVATION, so under RV-67 every workout completion
+  is a writer of `more-user-profile`, and no group a completion calls clears that key
+  (`invalidateWorkoutSummaries()` does not contain it; only `invalidateUserProfile()` and
+  `invalidateGoalRecommendations()` do). That is the sole remaining reason the key cannot take
+  `freshWithinTtl`, which would drop the More re-show from one GET to zero. Removing the field makes
+  the payload a pure read of the `users` row and the key eligible.
+- **Also remove the `Promise.all` leg** — it is a `count(*)` over `workout_sessions` on every profile
+  read, for a value that is discarded.
+- **Then `RV-183` can finish:** its `Needs:` clears and Lane B adds the flag with the proof, which is
+  otherwise complete — the equip-title writer was the one genuine gap and it is fixed (#RV-183's PR).
+- **Reversal cost: none.** Re-adding a field no caller reads is a one-line revert.
+
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
@@ -7830,9 +7848,22 @@ drift.
 - **Lane: B** — `app/more/more-content.tsx`. Re-laned 2026-09-28: every Lane A half is now shipped
   or closed with a reason (below), and what is left is two callers on the More screen.
 - **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **What is left:** `more-user-profile` and `more-seasons` send 2 GETs on every More re-show.
-  `freshWithinTtl` would stop that, **but only with the written invalidation proof** CLAUDE.md
-  requires. Run the RV-67 purity check first. It has disqualified every other candidate here.
+- **Needs:** LB-180 — the only thing left here is `more-user-profile`, and it cannot take the flag
+  while its payload carries a `countWorkoutSessions()` derivation. LB-180 removes that dead field.
+- **The `more-seasons` half is done (2026-09-28), with the proof at its call site.** RV-67 purity:
+  `listSeasonsWithResults` is two plain selects mapped to the payload — no clock, no derivation.
+  Writers: **none exist** anywhere in the repo, and `/api/seasons` is GET-only, so the
+  every-writer-is-covered half is vacuous rather than unproven. A re-show inside 30 minutes now costs
+  ONE GET instead of two. Guarded by `app/__tests__/rv183-more-seasons-ttl.test.ts`, which fails on the
+  *appearance of a writer* rather than waiting for the stale symptom.
+- **⚑ One genuine missed writer found and fixed while proving it:** equipping a title PATCHes
+  `/api/user/equipped-title`, which writes `users.equipped_title` — part of `/api/user/profile`'s
+  payload — and updated local state only, never calling `invalidateUserProfile()`. Harmless while that
+  key always revalidates; **30 minutes of a wrong title** on More and on `/more/details` (which reads
+  the same key through `useCachedValue`) the moment it does not. That is the class CLAUDE.md's
+  cache-group rule exists for, and it was a live omission independent of any optimisation.
+- **What is left:** `more-user-profile` only. Its proof is otherwise complete now — the writer gap is
+  closed — so it reduces to LB-180 landing.
 - **Closed 2026-09-28 (Lane A): the today-envelope keys cannot take `freshWithinTtl`, so the
   "one-line enabler" in `cachedFetchToday` is NOT to be built.** All three fail RV-67:
   - `body-battery` drains with the clock.
