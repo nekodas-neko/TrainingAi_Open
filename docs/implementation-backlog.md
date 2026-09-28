@@ -3242,27 +3242,6 @@ which is the right shape for something that can only be validated by living with
   entry point.
 - **Reversal cost:** low. No migration is needed, and the views do not change.
 
-### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
-- **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
-- **⚠ AUTH — the owner confirms before this merges.**
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:**
-  - Registering with an email that has been **invited but not yet registered** activates the account
-    immediately (`isActive = isInvited(email)`). Nothing proves the registrant owns that inbox.
-  - When the real person later signs in with Google, the signIn callback links Google onto that
-    existing password account. The password that created the account keeps working.
-- **Who and what:** anyone who knows an invited address can take the invite. When the invitee then
-  signs in with Google, they land in an account whose password someone else holds. The owner's own
-  account is not exposed, because registering an existing email returns 409. Reasoned from source;
-  not executed.
-- **Fix shape (recommended first):**
-  1. Do not treat an invite as proof of email ownership. A password account stays inactive until the
-     email is verified.
-  2. When Google links onto a password account, clear `password_hash` unless the email is verified,
-     or require the password before linking.
-- **Alternatives:** drop email and password registration and keep only Google, since every current
-  user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
-
 ### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
 - **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
 - **Needs: RV-192**

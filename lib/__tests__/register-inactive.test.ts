@@ -19,7 +19,7 @@ function registerReq(body: object) {
 }
 
 describe('register route — accounts must start inactive/pending', () => {
-  it('never passes an isActive override to createEmailUser (activation stays with the invite check)', async () => {
+  it('never passes an isActive override to createEmailUser (activation is never the registrant\'s to claim)', async () => {
     const res = await POST(registerReq({ email: 'new@example.com', password: 'longenough1', name: 'New' }))
     expect(res.status).toBe(200)
     expect(createEmailUser).toHaveBeenCalledTimes(1)

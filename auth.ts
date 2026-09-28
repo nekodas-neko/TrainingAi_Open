@@ -102,7 +102,12 @@ const nextAuth = NextAuth({
         // Google OAuth to it rather than creating a duplicate row.
         const existing = await repo.getUserByEmail(user.email!)
         if (existing && !existing.oauthSub) {
+          // RV-192: linking clears the password (see linkOAuthAccount). Google also proves the
+          // address, so an invite that registration could not honour is honoured here.
           await repo.linkOAuthAccount(existing.id, oauthSub)
+          if (!existing.isActive && await repo.isInvited(user.email!)) {
+            existing.isActive = await repo.activateUser(existing.id)
+          }
           user.id = existing.id
           user.isActive = existing.isActive
           user.isAdmin = existing.isAdmin

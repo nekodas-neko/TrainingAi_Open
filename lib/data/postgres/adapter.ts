@@ -771,13 +771,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.db.update(s.users).set({ timingBaselineDate: date }).where(eq(s.users.id, userId))
   }
 
+  /**
+   * RV-192. Google has just proved this person owns the address; whoever set the account's password
+   * never did, because registration sends no verification email. So linking CLEARS the password: an
+   * account someone registered on another person's address stops opening with that password the
+   * moment its real owner signs in.
+   */
   async linkOAuthAccount(userId: string, oauthSub: string): Promise<void> {
-    await this.db.update(s.users).set({ oauthSub }).where(eq(s.users.id, userId))
+    await this.db.update(s.users).set({ oauthSub, passwordHash: null }).where(eq(s.users.id, userId))
   }
 
   async createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User> {
     const normal = normalizeEmail(email)
-    const active = isActive ?? await this.isInvited(normal)
+    // RV-192: an invite is NOT proof that the registrant owns the inbox — anyone who knows an invited
+    // address could take it. A password registration starts inactive, like an uninvited one; the
+    // invite is honoured when its owner signs in with Google (auth.ts signIn), or an admin approves.
+    const active = isActive ?? false
     const [r] = await this.db.insert(s.users)
       .values({ email: normal, passwordHash, name: name ?? null, isActive: active })
       .returning()
