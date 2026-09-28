@@ -115,7 +115,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   (`corr(HR, ln rmssd)` = −0.78 over 30–37 days) and its **level is ×0.30 of measured** — real, but
   confounded by chest-ECG vs ring-PPG and by the strap being worn while walking, so **not actionable
   without a controlled same-instrument capture**. Filed LA-112 (the defect), LA-113 (owner-gated
-  scoring), LA-114 (`bucket_start` stores the bucket midpoint). **LA-112 shipped the same day.** LA-113 remains owner-gated, and **LA-114's rename was attempted and reverted** — `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid still needs 15 minutes added.
+  scoring), LA-114 (`bucket_start` stores the bucket midpoint). **LA-112 shipped the same day.** LA-113 remains owner-gated, and **LA-114 shipped 2026-09-28**: the column is `bucket_mid` now, after BF-214 removed the view migrations that had blocked the rename. It still holds the midpoint, so a join on the :00/:30 grid subtracts 15 minutes.
 - [`2026-09-16-lane-a-bf13-rederive-baselines`](../../overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-bf13-rederive-baselines)
   — **a re-derivation for the zero-seeded baselines, 2026-09-16 (BF-13 / TN-6 / Q-506 / TN-8).**
   `POST /api/admin/rederive-baselines` replays the fold cold over the stored nights and rewrites the
@@ -217,7 +217,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
   the Body Battery anchor was re-picked on every read, so it flipped from the sleep score to the
   readiness score part-way through the morning and shifted the whole day's curve. The rule now
-  lives in `app/api/body-battery/anchor.ts` — a readiness anchor is frozen for the day, a sleep
+  lives in `lib/health/body-battery-anchor.ts` — a readiness anchor is frozen for the day, a sleep
   anchor is provisional and upgrades exactly once. The shared-composite refactor that would remove
   the fallback entirely is still open as Q-42.
 
@@ -458,7 +458,7 @@ Live at the time of writing (2026-07-30):
   snapshot a value the table already writes down with a date on it. Nothing prunes this table —
   `shouldPrune` is `error_events`.
   ([`2026-09-17-lane-a-tn46-baseline-already-retained.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-17-lane-a-tn46-baseline-already-retained))
-- **The Body Battery anchor is frozen once readiness-derived** (`app/api/body-battery/anchor.ts`).
+- **The Body Battery anchor is frozen once readiness-derived** (`lib/health/body-battery-anchor.ts`).
   Re-picking it on every read is what made the whole day's curve jump mid-morning; a later
   readiness *recompute* must not move it either, or the same bug returns through a smaller door.
 - **An evening nap once threw away the whole day's Body Battery** — nap-vs-night resolution is a

@@ -204,4 +204,5 @@ export const EXCLUDED: Record<string, Exclusion> = {
   // ── Jointly about another account. ───────────────────────────────────────────
   friendships: { category: 'third-party', reason: 'each row is also the other account\'s relationship record, and the counterparty is an opaque uuid here' },
   invited_emails: { category: 'third-party', reason: 'other people\'s email addresses' },
+  email_normalisation_preimage: { category: 'third-party', reason: 'LA-61\'s undo record: every account\'s pre-backfill email address' },
 }

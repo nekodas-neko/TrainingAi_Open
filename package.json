@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.477.13",
+  "version": "1.478.0",
   "engines": {
     "node": ">=22.12"
   },
@@ -52,6 +52,7 @@
     "check:rules": "node scripts/run-custom-rules.js",
     "fix:baselines": "node scripts/check-doc-index-size.js --fix",
     "db:local": "bash scripts/local-db/setup.sh",
+    "db:rebuild": "node scripts/local-db/rebuild.js",
     "db:snapshot": "node scripts/local-db/snapshot.js"
   },
   "dependencies": {

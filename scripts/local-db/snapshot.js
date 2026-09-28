@@ -35,11 +35,16 @@ function assertLocalTarget(url) {
   const host = hostFromUrl || params.get('host') || ''
   const port = portFromUrl || params.get('port') || ''
   const isLoopback = ['localhost', '127.0.0.1', ''].includes(host) || host.startsWith('/')
-  const isLocalPort = port === '5433'
+  // The port is pinned, not just the host, because a loopback port can be a tunnel to a remote
+  // server (`railway connect` listens on localhost). A machine whose dev Postgres sits elsewhere —
+  // the owner's runs TrainingAI's on 5434 because 5433 belongs to another project — names it with
+  // LOCAL_DB_PORT, the same variable setup.sh reads, rather than this guard widening to any port.
+  const allowedPort = process.env.LOCAL_DB_PORT || '5433'
+  const isLocalPort = port === allowedPort
   if (!isLoopback || !isLocalPort) {
     throw new Error(
       `Refusing to restore into "${url}" — this only targets the local dev DB ` +
-      `(loopback/socket host, port 5433). This command TRUNCATEs tables.`,
+      `(loopback/socket host, port ${allowedPort}; set LOCAL_DB_PORT if yours differs). This command TRUNCATEs tables.`,
     )
   }
 }
@@ -72,14 +77,26 @@ async function main() {
     return
   }
 
-  // ── 3. pnpm db:local first, so every migration is applied. The snapshot carries data, not
+  // ── 3. Migrations first, so every one is applied. The snapshot carries data, not
   // schema (plan §9) — that is the property that makes migration rehearsal work: apply migration
   // N, load prod-shaped rows, then run N+1 and see what it does to real values. ─────────────────
-  console.log('[snapshot] applying local migrations first (pnpm db:local) …')
-  execSync('bash scripts/local-db/setup.sh', { cwd: path.join(__dirname, '..', '..'), stdio: 'inherit' })
+  // migrate.js against the TARGET, not setup.sh: setup.sh provisions the cloud container's cluster
+  // (initdb under /var, port 5433) and cannot run on a machine whose Postgres is a Docker container
+  // or a native install. migrate.js is idempotent and applies exactly what is missing.
+  console.log('[snapshot] applying local migrations first (migrate.js) …')
+  execSync(`node ${JSON.stringify(path.join(__dirname, 'migrate.js'))}`, {
+    cwd: path.join(__dirname, '..', '..'),
+    stdio: 'inherit',
+    env: { ...process.env, DATABASE_URL: TARGET_URL, DATABASE_SSL: 'false' },
+  })
 
   console.log(`[snapshot] fetching ${snapshotUrl} …`)
   const lines = await fetchLines(snapshotUrl, secret)
+  // The server streams, so a failure part-way through arrives as a final `{"error": …}` line
+  // after a 200. Restoring anyway TRUNCATEs every table the stream never reached — measured
+  // 2026-09-28, when `users` and 30 other tables came back empty. Refuse before touching anything.
+  const serverError = lines.find(l => l.error)
+  if (serverError) throw new Error(`the server failed part-way through the snapshot ("${serverError.error}") — nothing was restored`)
   const manifest = lines.find(l => l.manifest)
   if (!manifest) throw new Error('No manifest line in the snapshot — malformed response.')
   console.log(`[snapshot] manifest: ${manifest.tables.length} tables, snapshot at ${manifest.snapshotAt}`)
@@ -103,17 +120,56 @@ async function main() {
     await client.query("SET session_replication_role = 'replica'")
 
     const loaded = {}
+    const notInTarget = new Set()
+    // Truncate EVERY table in one statement before loading any. Truncating each just before its own
+    // insert, with CASCADE, emptied the tables that reference it — including ones already loaded
+    // earlier in the alphabet. Measured 2026-09-28: `set_logs` loaded 1,317 rows and ended with 0,
+    // because `workout_sessions` came later and cascaded through `exercise_logs` to it; `users` did
+    // the same to sleep, Body Battery and the rest. The count check trusted the insert counter, so
+    // it reported a clean restore.
+    const { rows: targetTables } = await client.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`,
+    )
+    const present = new Set(targetTables.map(r => r.table_name))
+    const toTruncate = manifest.tables.filter(t => !SKIP_TABLES.has(t) && present.has(t))
+    if (toTruncate.length) await client.query(`TRUNCATE TABLE ${toTruncate.map(quoteIdent).join(', ')} CASCADE`)
     for (const table of manifest.tables) {
       if (SKIP_TABLES.has(table)) {
         console.log(`[snapshot] skipping ${table} (cannot round-trip — see script header)`)
         continue
       }
+      // The manifest lists every claude_ro view, and some are not app tables at all —
+      // `pg_stat_statements` is an extension's view, absent from a plain local Postgres. Skip what
+      // the target does not have, and count it as not loaded rather than failing the restore.
+      if (!present.has(table)) {
+        console.log(`[snapshot] skipping ${table}: no such table in the target`)
+        notInTarget.add(table)
+        continue
+      }
       const rows = rowsByTable.get(table) ?? []
-      await client.query(`TRUNCATE TABLE ${quoteIdent(table)} CASCADE`)
       if (rows.length === 0) { loaded[table] = 0; continue }
 
-      const columns = Object.keys(rows[0])
+      // A claude_ro view can carry a column the base table does not have: it computes one in place
+      // of a withheld value (`food_items.image_bytes` is `octet_length(image_data_uri)`). Inserting
+      // it fails the whole restore, so load only the columns the table has, and say what was left.
+      const { rows: targetCols } = await client.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+        [table],
+      )
+      const presentCols = new Set(targetCols.map(r => r.column_name))
+      const viewOnly = Object.keys(rows[0]).filter(c => !presentCols.has(c))
+      if (viewOnly.length) console.log(`[snapshot] ${table}: view-only column(s) not restored: ${viewOnly.join(', ')}`)
+      const columns = Object.keys(rows[0]).filter(c => presentCols.has(c))
       const colList = columns.map(quoteIdent).join(', ')
+      // node-postgres binds a JS array as a Postgres ARRAY literal ('{…}'), which a json/jsonb
+      // column rejects as "invalid input syntax for type json" — objects are stringified for it,
+      // arrays are not. So stringify every non-null value bound for a json/jsonb column ourselves.
+      const { rows: typeRows } = await client.query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1 AND data_type IN ('json', 'jsonb')`,
+        [table],
+      )
+      const jsonCols = new Set(typeRows.map(r => r.column_name))
       // Batched parameterized INSERTs rather than the binary COPY protocol — no new dependency,
       // and 500 rows/statement keeps each within Postgres's bind-parameter limits comfortably.
       const BATCH = 500
@@ -123,7 +179,7 @@ async function main() {
         const values = []
         const tuples = batch.map((row, ri) => {
           const placeholders = columns.map((c, ci) => {
-            values.push(row[c])
+            values.push(jsonCols.has(c) && row[c] != null ? JSON.stringify(row[c]) : row[c])
             return `$${ri * columns.length + ci + 1}`
           })
           return `(${placeholders.join(', ')})`
@@ -163,27 +219,31 @@ async function main() {
     // immediately (plan §5.1 — the real password_hash is withheld and restores NULL). ───────────
     await client.query('UPDATE users SET password_hash = $1', [OWNER_PASSWORD_HASH])
 
-    await client.query("SET session_replication_role = 'origin'")
-    await client.query('COMMIT')
-
-    // ── 7. Fail loudly on any mismatch — print per-table loaded counts against the manifest's. ──
+    // ── 7. Compare loaded counts against the manifest BEFORE committing, so a mismatch rolls back
+    // rather than leaving a half-restored database behind. ────────────────────────────────────
     console.log('[snapshot] loaded counts vs manifest:')
     let mismatch = false
     for (const table of manifest.tables) {
-      if (SKIP_TABLES.has(table)) continue
+      if (SKIP_TABLES.has(table) || notInTarget.has(table)) continue
       const expected = manifest.rowCounts?.[table]
-      const actual = loaded[table] ?? 0
+      // What the TABLE holds, not what was inserted: a cascade or a trigger can remove rows after the
+      // insert, and the insert counter would never know.
+      const { rows: [{ n }] } = await client.query(`SELECT count(*)::int AS n FROM ${quoteIdent(table)}`)
+      const actual = n
       const ok = expected == null || expected === actual
       if (!ok) mismatch = true
       console.log(`  ${ok ? 'ok  ' : 'MISMATCH'} ${table}: loaded ${actual}, manifest said ${expected}`)
     }
     if (mismatch) {
-      console.error('[snapshot] MISMATCH — some table loaded a different count than the manifest claimed.')
+      await client.query('ROLLBACK')
+      console.error('[snapshot] MISMATCH — some table loaded a different count than the manifest claimed. Rolled back; the database is as it was.')
       process.exitCode = 1
-    } else {
-      console.log('[snapshot] all counts match. Restored successfully.')
-      console.log(`[snapshot] the owner's user row now logs in with the standard local dev password ("testpass123").`)
+      return
     }
+    await client.query("SET session_replication_role = 'origin'")
+    await client.query('COMMIT')
+    console.log('[snapshot] all counts match. Restored successfully.')
+    console.log(`[snapshot] the owner's user row now logs in with the standard local dev password ("testpass123").`)
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
     throw err

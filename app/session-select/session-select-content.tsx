@@ -87,9 +87,10 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
-import { computeStreak } from "./compute-streak";
+import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
+import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 
 // Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
@@ -140,6 +141,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const localDay = useLocalDay();
   // Bound once so the identity is stable for the children that take it as a prop.
   const dayKey = useCallback((daysAgo = 0) => dayKeyInTz(tz, daysAgo), [tz]);
+  const [streakSchedule, setStreakSchedule] = useState<StreakSchedule>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
@@ -167,7 +169,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const sectionOrderRef = useRef<SectionKey[]>(buildDefaultOrder([]));
   const [hiddenSections, setHiddenSections] = useState<Set<SectionKey>>(() => new Set());
   const [readiness, setReadiness] = useState<import('@/app/api/readiness-score/route').ReadinessScoreResponse | null>(null)
-  const [bodyBattery, setBodyBattery] = useState<import('@/app/api/body-battery/route').BodyBatteryResponse | null>(null)
+  const { battery: bodyBattery, failed: bodyBatteryFailed } = useBodyBattery(refreshTick)
   const [weeklyTarget, setWeeklyTarget] = useState(5)
   const [isAiDynamic, setIsAiDynamic] = useState(false)
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null)
@@ -313,11 +315,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       // Set unconditionally — the chip row hides each chip whose own value is null, so we no
       // longer gate the whole row on the all-or-nothing hasSufficientData flag (per-chip gating).
       if (cachedReadiness) setReadiness(cachedReadiness);
-    } catch { /* ignore */ }
-
-    try {
-      const cachedBattery = readTodayCacheSync<import('@/app/api/body-battery/route').BodyBatteryResponse>('body-battery');
-      if (cachedBattery) setBodyBattery(cachedBattery);
     } catch { /* ignore */ }
 
     // Seed mood from cache so the recommendation card shows immediately instead
@@ -540,6 +537,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
+            setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
             if (!aiDynamic && metaData?.program?.schedule) {
               setWeeklyTarget(getScheduledSessionsPerWeek(metaData.program as unknown as Program));
             }
@@ -815,13 +813,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   }, [userId, tz, localDay]);
 
   useEffect(() => {
-    cachedFetchToday<import('@/app/api/body-battery/route').BodyBatteryResponse>(
-      'body-battery', '/api/body-battery', BODY_BATTERY_TTL,
-      d => { if (d) setBodyBattery(d) },
-    ).catch(() => {});
-  }, [refreshTick]);
-
-  useEffect(() => {
     if (activeCardWidgets.includes("acwrWidget")) {
       cachedFetchToday<TrainingLoadResponse>(
         'training-load', '/api/training-load', TTL_MEDIUM,
@@ -1039,7 +1030,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     });
   }, [trainedDays, tz]);
 
-  const streak = useMemo(() => computeStreak(trainedDays, dayKey), [trainedDays]);
+  const streak = useMemo(() => computeStreak(trainedDays, todayInTz(tz), streakSchedule), [trainedDays, tz, streakSchedule]);
 
   // This Week: Mon → today count (not rolling 7-day)
   const weekSessionCount = useMemo(
@@ -1146,7 +1137,17 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}
 
         {/* ── Body Battery ── */}
-        {bodyBattery && <BodyBatteryCard battery={bodyBattery} />}
+        {bodyBattery
+          ? <BodyBatteryCard battery={bodyBattery} />
+          // Only when there is nothing cached to show: a stale arc beats a banner, and this screen's
+          // other reads take the same posture.
+          : bodyBatteryFailed && (
+            <div className="mx-4 mb-3 rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs text-muted-foreground">
+                Couldn&rsquo;t load your body battery &mdash; pull to refresh.
+              </p>
+            </div>
+          )}
 
         {/* ── Auto-detected walk/run review prompt (hides itself when none pending) ── */}
         <div className="mx-4">

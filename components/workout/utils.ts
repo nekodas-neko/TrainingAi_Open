@@ -2,18 +2,14 @@ import type { ExerciseType } from "@trainingai/shared/types/program";
 import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
+import { categoricalColor } from "@trainingai/shared/chart-colors";
 
 export const DEFAULT_SETS = 3;
 export const DEFAULT_REPS = 8;
-export const SET_COLORS = ["#f59e0b", "#22c55e", "#8b5cf6"] as const;
-
-// Color for set index i. First three keep their long-standing identities; beyond
-// that, golden-angle hue spacing yields visually distinct colors for any set count
-// instead of the old i % 3 repetition.
+// LB-153: set colours come from the one categorical palette. Set 1 used to be amber and set 2 green,
+// which elsewhere in the app mean warning and good, so a set's number read as a verdict on it.
 export function setColor(i: number): string {
-  if (i < SET_COLORS.length) return SET_COLORS[i];
-  const hue = (i * 137.508) % 360;
-  return `oklch(0.72 0.17 ${hue.toFixed(1)})`;
+  return categoricalColor(i);
 }
 
 // Single-line "<weight> kg × <reps> reps" display, collapsing to "<reps> reps" for

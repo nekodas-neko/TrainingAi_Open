@@ -14,7 +14,7 @@ import {
 } from "chart.js";
 import { Bar, Line, Pie } from "react-chartjs-2";
 import type { ChartPayload } from "@trainingai/shared/parse-chart-blocks";
-import { resolveColor } from "@trainingai/shared/chart-colors";
+import { resolveColor, categoricalColor } from "@trainingai/shared/chart-colors";
 
 // Re-export so existing imports from this module still work
 export type { ChartPayload };
@@ -31,14 +31,6 @@ ChartJS.register(
   Legend,
 );
 
-const DEFAULT_COLORS = [
-  "#22c55e",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#14b8a6",
-];
 
 export function ChartMessage({ payload }: { payload: ChartPayload }) {
   const { type, title, labels, datasets } = payload;
@@ -48,9 +40,9 @@ export function ChartMessage({ payload }: { payload: ChartPayload }) {
     datasets: datasets.map((ds, i) => ({
       ...ds,
       backgroundColor:
-        ds.backgroundColor ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+        ds.backgroundColor ?? categoricalColor(i),
       borderColor:
-        ds.borderColor ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+        ds.borderColor ?? categoricalColor(i),
       borderWidth: ds.borderWidth ?? 1,
       tension: ds.tension ?? 0.3,
     })),

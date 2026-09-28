@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -39,13 +40,13 @@ export async function POST(req: NextRequest) {
   }
 
   const repo = await getRepository()
-  const existing = await repo.getUserByEmail(email.toLowerCase().trim())
+  const existing = await repo.getUserByEmail(normalizeEmail(email))
   if (existing) {
     return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 })
   }
 
   const passwordHash = await bcrypt.hash(password, 12)
-  await repo.createEmailUser(email.toLowerCase().trim(), passwordHash, name ?? undefined)
+  await repo.createEmailUser(normalizeEmail(email), passwordHash, name ?? undefined)
 
   return NextResponse.json({ ok: true })
 }

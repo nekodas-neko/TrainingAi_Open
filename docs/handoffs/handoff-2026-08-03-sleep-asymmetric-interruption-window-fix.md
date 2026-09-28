@@ -43,7 +43,7 @@ interruption shows as more awake time rather than a later bedtime.
 - `docs/oura-ble-operations.md` §1 gained row **I23** for this failure signature.
 - `projectOverview.md`: Current Status bullet + a `[sleep]` Known-Issues row (see "Deliberately NOT
   done" below).
-- Journal entry: `docs/overview/entries/2026-08-03-sleep-wake-time-adjustment.md` — has the full
+- Journal entry: `docs/overview/history-2026-07-30.md#2026-08-03-sleep-wake-time-adjustment` — has the full
   investigation writeup, including the exact real per-epoch beat counts for the affected night.
 - Version bump v1.252.6 → **v1.252.8** (main had independently bumped to 1.252.7 for an unrelated
   PR while this one was in flight; rebased and re-bumped on top rather than colliding).
@@ -117,7 +117,7 @@ in-session exempt fix, not a queued item.
   real-world case for each.
 - `lib/sleep/__tests__/sensing-span.test.ts` — the new test is the clearest worked example of the
   bug shape; the beat array in it is the *real* data from the affected night, not synthetic.
-- `docs/overview/entries/2026-08-03-sleep-wake-time-adjustment.md` — full investigation writeup
+- `docs/overview/history-2026-07-30.md#2026-08-03-sleep-wake-time-adjustment` — full investigation writeup
   with the actual per-epoch beat counts table and the exact before/after window boundaries.
 - `docs/oura-ble-operations.md` §1, row I23 — the failure-point-matrix entry for this class of bug.
 - `lib/data/postgres/adapter.ts` around line 4822 — the single call site (`clampToDenseSensing`),

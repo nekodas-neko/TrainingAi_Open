@@ -275,7 +275,7 @@ describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
 
     it('emits that predicate rather than an unscoped view', async () => {
       const { readFileSync } = await import('node:fs')
-      const sql = readFileSync('lib/data/postgres/migrations/241_claude_ro_views_dexa.sql', 'utf8')
+      const sql = readFileSync('lib/data/postgres/claude-ro-views.sql', 'utf8')
       const view = sql.slice(sql.indexOf('CREATE VIEW claude_ro.dexa_scan_regions'))
       expect(view.slice(0, view.indexOf(';'))).toContain(
         'EXISTS (SELECT 1 FROM public.dexa_scans d WHERE d.id = t.scan_id')

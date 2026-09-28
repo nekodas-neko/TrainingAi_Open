@@ -11,8 +11,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client, Pool } from 'pg'
 import { migrationTestLock } from './migration-test-lock'
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync } from 'fs'
 import { join } from 'path'
+
+const VIEWS_FILE = join(process.cwd(), 'lib/data/postgres/claude-ro-views.sql')
 
 const ADMIN_URL = process.env.DATABASE_URL
 // The whole test connects a SECOND time as `claude_readonly` by rewriting the URL's credentials
@@ -118,20 +120,9 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
         ('${OTHER_ID}', '2026-07-20', now(), now(), 7)
       ON CONFLICT DO NOTHING;
     `)
-    // RESOLVED, not pinned (Q-456). Each views migration DROPs and rebuilds the whole schema, so
-    // an older file rebuilds it without the newer tables' views and the coverage assertion below
-    // fails. The hardcoded name went stale silently between 181 and 185 — two migrations landed
-    // while this still read 181, and the count only noticed once one of them added a *table* rather
-    // than a column — and it was stale again at 202 when 205 existed. A green suite never proved
-    // the pin current, only that no table had been added since, which is precisely a check that
-    // reports nothing until it is too late.
-    //
-    // Taking the newest by filename removes the class: `ensureSchema` applies in plain filename
-    // sort order, so "newest by sort" is the same file production ends up with.
-    const dir = join(process.cwd(), 'lib/data/postgres/migrations')
-    const newest = readdirSync(dir).filter(f => /^\d+_claude_ro_views.*\.sql$/.test(f)).sort().pop()
-    if (!newest) throw new Error('no claude_ro views migration found')
-    await exec(ADMIN_URL!, readFileSync(join(dir, newest), 'utf8'))
+    // The one views file (BF-214). This used to find "the newest numbered views migration" by
+    // filename sort, after a hardcoded name went stale twice; there is now only one file to find.
+    await exec(ADMIN_URL!, readFileSync(VIEWS_FILE, 'utf8'))
 
     // Q-456: the owner id is no longer baked into the SQL. The role resolves it from a setting the
     // owner applies once, out of band, the same way the role's password is kept out of committed
@@ -167,24 +158,20 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     }
   })
 
-  it('no committed views migration names a user id (Q-456)', async () => {
-    // The reason for the change: the generated SQL is committed, and `CLAUDE.md` requires
-    // re-running the generator into a NEW migration whenever a table is added — so a baked id was
-    // re-published on every schema change. This asserts the newest file is clean; the 18 older ones
-    // are superseded by it rather than edited, because `ensureSchema` tracks by filename and an
-    // edited already-applied migration is skipped forever.
-    const dir = join(process.cwd(), 'lib/data/postgres/migrations')
-    const newest = readdirSync(dir).filter(f => /^\d+_claude_ro_views.*\.sql$/.test(f)).sort().pop()!
-    const sql = readFileSync(join(dir, newest), 'utf8')
+  it('the committed views file names no user id (Q-456)', async () => {
+    // The reason for the change: the generated SQL is committed and regenerated on every schema
+    // change, so a baked id was re-published each time. The 18 old numbered copies that carried it
+    // were deleted by BF-214; git history still holds them.
+    const newest = 'claude-ro-views.sql'
+    const sql = readFileSync(VIEWS_FILE, 'utf8')
     expect(sql, `${newest} still contains a bare uuid`).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)
     expect(sql).toContain("current_setting('app.claude_ro_owner', true)")
   })
 
   // BF-21. Two properties, and both are things a regeneration could quietly drop.
   it('emits pg_stat_statements guarded, and with only the five safe columns', async () => {
-    const dir = join(process.cwd(), 'lib/data/postgres/migrations')
-    const newest = readdirSync(dir).filter(f => /^\d+_claude_ro_views.*\.sql$/.test(f)).sort().pop()!
-    const sql = readFileSync(join(dir, newest), 'utf8')
+    const newest = 'claude-ro-views.sql'
+    const sql = readFileSync(VIEWS_FILE, 'utf8')
 
     // Guarded: the extension is production-only (it needs `shared_preload_libraries` and a restart),
     // so an unguarded CREATE VIEW over a missing relation fails on every cold start — this migration
@@ -294,8 +281,11 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
       SELECT count(*)::int AS n FROM information_schema.tables
       WHERE table_schema = 'claude_ro'
         AND table_name NOT LIKE '\\_meta\\_%' AND table_name <> 'pg_stat_statements'`)
-    // Two tables are deliberately denied (invited_emails, rate_limits). Any OTHER mismatch means
-    // the generator needs re-running after a schema change.
-    expect(views.rows[0].n).toBe(tables.rows[0].n - 2)
+    // Denied tables get no view by design; the generator publishes that list, so read it rather than
+    // hardcoding a count (it was "2" until LA-61 denied a third). Any OTHER mismatch means the
+    // generator needs re-running after a schema change.
+    const denied = await exec(ADMIN_URL!, `SELECT count(*)::int AS n FROM claude_ro._meta_excluded_tables`)
+    expect(denied.rows[0].n).toBeGreaterThanOrEqual(2)
+    expect(views.rows[0].n).toBe(tables.rows[0].n - denied.rows[0].n)
   })
 })

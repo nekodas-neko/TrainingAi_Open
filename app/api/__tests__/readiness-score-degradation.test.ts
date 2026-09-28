@@ -35,6 +35,7 @@ vi.mock('@/lib/data', () => ({
     getLatestOuraCloudVitals: async () => null,
     getMoodLog:              async () => null,
     getUserById:             async () => ({ id: 'u1', dateOfBirth: '1995-01-01', heightCm: 180, sex: 'male', activityLevel: 'moderate' }),
+    getUserGoals:            async () => ({ stepsGoal: null }),
     upsertOuraDailyDerived:  repo.upsertDerived,
   }),
 }))

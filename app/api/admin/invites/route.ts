@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'email required' }, { status: 400 })
   }
   const repo = await getRepository()
-  await repo.addInvite(email.toLowerCase().trim())
+  await repo.addInvite(normalizeEmail(email))
   return NextResponse.json({ ok: true })
 }
 
@@ -66,6 +67,6 @@ export async function DELETE(req: NextRequest) {
   // value, which POST lowercases and trims — so passing the raw string here made a delete typed as
   // `Foo@Bar.com ` match nothing while still answering `{ ok: true }`. A revoked invite that was
   // never revoked is the worst possible silent failure on this route.
-  await repo.removeInvite(email.toLowerCase().trim())
+  await repo.removeInvite(normalizeEmail(email))
   return NextResponse.json({ ok: true })
 }

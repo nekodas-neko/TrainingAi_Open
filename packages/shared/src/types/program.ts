@@ -145,6 +145,13 @@ export interface NextSessionRecommendation {
     hrvTrend: number | null
     energyLevel: string | null
     soreMuscles: string[]
+    /**
+     * LB-118: which of `soreMuscles` were the app's SUGGESTED ticks rather than the lifter's own,
+     * from the same check-in the recommendation was computed from. `null` means provenance was not
+     * recorded (a check-in from before it existed), which the page must say, not read as "none".
+     * Optional so a stored payload from before this shipped still parses.
+     */
+    suggestedSoreMuscles?: string[] | null
     // Raw temperature-deviation numbers behind `temperatureAlert` (Q-105) — Oura only exposes a
     // deviation from the ring's own baseline, never an absolute value, so this is a °C delta
     // against temperatureAlertThresholdC, not two literal temperatures. The threshold is sent

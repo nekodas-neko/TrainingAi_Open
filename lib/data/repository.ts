@@ -1,3 +1,4 @@
+import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema'
 import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
@@ -258,6 +259,11 @@ export interface SyncDelta {
   scheduleDays:       unknown[];
   progressionStyles:  unknown[];
   styleSets:          unknown[];
+  // RV-174: every program and style id the user HAS, on every page, whatever changed. Both are hard
+  // deletes with no tombstone, so the delta above can say what changed but never what is gone; the
+  // device prunes its read-only mirror to these. Optional so a delta without them prunes nothing.
+  programRoster?:         string[];
+  progressionStyleRoster?: string[];
   bodyMetrics:        unknown[];
   sleepSessions:      unknown[];
   moodLogs:           unknown[];
@@ -316,28 +322,10 @@ export interface BloodPanel {
 
 export type BloodPanelInput = Omit<BloodPanel, 'id'> & { id?: string }
 
-export type MutationDomain =
-  | 'body_metrics'
-  | 'mood_logs'
-  | 'food_logs'
-  | 'food_items'
-  | 'supplement_logs'
-  | 'injuries'
-  | 'supplements'
-  | 'activity_logs'
-  | 'fitness_tests'
-  | 'prescribed_run'
-  | 'workout_log'
-  | 'day_checkins'
-  | 'session_rpe'
-  | 'complete_workout'
-  | 'saved_meals'
-  | 'oura_daily_summary'
-  | 'oura_daily_derived'
-  | 'sleep_session'
-  | 'plan_meal_answers'
-  | 'manual_bedtime'
-  | 'rest_days';
+// Derived, not listed (RV-175): this was a hand-kept copy of SYNCED_MUTATION_DOMAINS, identical to it
+// member for member, and adding a domain meant remembering both. The canonical list's own comment
+// says every domain type derives from it so the two cannot drift; this one had not.
+export type MutationDomain = SyncedMutationDomain
 
 export interface FitnessTest {
   id: string
@@ -765,6 +753,9 @@ export interface WorkoutRepository {
   listRecentPersonalRecords(userId: string, from: Date, to: Date): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date; exerciseType: string | null }[]>
   // All-time best estimated1rm per exercise, keyed by exercise name.
   listPersonalRecords(userId: string): Promise<Map<string, number>>
+  // LB-95: every all-time record WITH the date it was achieved, newest first — for a surface that
+  // must say when each value was read. `listPersonalRecords` drops the date and keeps its callers.
+  listPersonalRecordsDated(userId: string): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date }[]>
   // All-time max reps logged per exercise, keyed by exercise name.
   listMaxReps(userId: string): Promise<Map<string, number>>
   // Second-most-recent estimated 1RM per exercise, keyed by exercise name (for trend detection).
@@ -1508,6 +1499,8 @@ export interface OuraDailyDerivedRow {
   /** LA-161: the MET grid length and valid-minute count the gate above was decided from. */
   trainingLoadGridLen: number | null
   trainingLoadValidMin: number | null
+  /** LA-170: when the training-load verdict was computed. Server-only, like `acwr`. */
+  trainingLoadEvaluatedAt: Date | null
   recoveryIndexHours: number | null
   wornHoursBle: number | null
   nightHrvBaselineMs: number | null

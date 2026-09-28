@@ -522,7 +522,7 @@ and the only two files naming the owner at all.
 **`scripts/private-paths.json` catalogued what it was protecting** (#1396). Its `reason` fields
 described what each removed path contained, and the entry for the most sensitive one restated the
 substance of the file itself. An inventory that describes its contents is a map to them. Worse, the
-*same description* had been copied verbatim into `docs/overview/entries/2026-08-10-github-repo-migration.md`,
+*same description* had been copied verbatim into `docs/overview/history-2026-08-08.md#2026-08-10-github-repo-migration`,
 so trimming only the manifest would have bought nothing — a reader would have found it one file over.
 Owner instruction was "vague so other people can't understand but our agents can": the `reason`
 fields now say what an agent needs to classify a new file and refuse to commit it, the `kind` slugs
