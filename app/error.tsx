@@ -5,6 +5,16 @@ import Link from "next/link";
 import { TriangleAlertIcon, WifiOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/shell/bottom-nav";
+import { isChunkLoadError } from "@/lib/chunk-load-error";
+
+/**
+ * One automatic retry per page life, for a chunk that failed to arrive.
+ *
+ * Module-level on purpose: `reset()` re-renders the errored segment, so if the import fails again
+ * this component remounts — a state or ref guard would be reset along with it and the page would
+ * reload forever. This survives the remount, so the second failure shows the screen.
+ */
+let chunkRetryUsed = false
 
 export default function RootError({
   error,
@@ -18,6 +28,26 @@ export default function RootError({
   useEffect(() => {
     const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
     setOffline(isOffline);
+
+    // ── A chunk that did not arrive is a transport failure, not a broken screen ──────────────
+    // The offline branch below already treats it that way and recovers when connectivity returns;
+    // ONLINE it dead-ended, and a dead end is the wrong answer to a fetch that would very likely
+    // succeed on a second attempt. On the device that is a transient blip putting the owner on an
+    // error screen until he taps; in CI it is `next dev` compiling a `next/dynamic` chunk on
+    // demand, which is one of the three causes behind the E2E suite's churn (LB-178) — a spec on
+    // Home at that moment fails with "element(s) not found", reading as a broken feature.
+    //
+    // Once only, and only while online. The delay gives an in-flight compile or a flapping
+    // connection a moment to finish; retrying in the same tick would usually just re-fail.
+    //
+    // Returning here also skips the report below, deliberately: a chunk that arrives on the second
+    // attempt is noise, and one that does not comes straight back through this boundary with the
+    // retry already spent, so it IS reported — just once, and only when it is real.
+    if (!isOffline && !chunkRetryUsed && isChunkLoadError(error)) {
+      chunkRetryUsed = true;
+      const t = setTimeout(reset, 400);
+      return () => clearTimeout(t);
+    }
     // Only report genuine (online) errors — an offline chunk-load failure is
     // expected, and the report fetch would fail anyway.
     if (!isOffline) {

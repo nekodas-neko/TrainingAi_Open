@@ -6619,10 +6619,20 @@ drift.
   - **The tell to look for:** an assertion failing with "element(s) not found" on a screen that
     should plainly be there, plus a screenshot of the error boundary. Three of the six specs in that
     run's `test-results/` touch Home.
-  - **Not fixed here, and the fix is a real decision rather than a tidy-up.** The candidates are
-    dropping `next/dynamic` for that card (it carries `ssr: false` for a reason), building the app
-    for E2E instead of running `next dev`, or teaching the boundary to retry a chunk load. Each has
-    a cost outside this entry's scope.
+  - **✅ MITIGATED 2026-09-28 (`LB-184`): the root boundary now retries a chunk load once.** Of the
+    three candidates — dropping `next/dynamic` for that card (its `ssr: false` is deliberate),
+    building the app for E2E instead of `next dev`, or teaching the boundary to retry — the third
+    was taken because it is the only one that is **also a user-facing fix**: on the device a
+    transient chunk fetch failure put the owner on an error screen until he tapped, and the
+    boundary's own comment already called an *offline* chunk failure expected while the online case
+    dead-ended. `lib/chunk-load-error.ts` classifies it; `app/error.tsx` retries after 400 ms, once
+    per page life, from a **module-level** guard (`reset()` remounts the boundary, so a state or ref
+    guard would reload forever). The first, transient failure is deliberately not reported; a
+    persistent one comes back with the retry spent and is.
+  - **This does NOT close the entry.** It removes the cause's *effect* on a spec run, and the other
+    two candidates remain open — building for E2E is still the structural answer to `next dev`
+    compiling on demand, and it is `.github/` rather than this lane's. Whether the churn drops is
+    measurable on the next census.
   - **`tn53` is NOT in that run's failures** — the seed-state fix above holds on CI.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
