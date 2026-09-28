@@ -6941,7 +6941,8 @@ drift.
 ### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
 - **Added:** 2026-09-24 · BugFix, from the owner's *"bar load and rest time should be able to be analyzed from past and can determine how much time is needed so not sure if that can be adjusted."*
-- **Needs:** — nothing. Supersedes the "change nothing" recommendation in `LA-65`, amended below.
+- **Needs:** — nothing.
+- **Supersedes** the "change nothing" recommendation in the LA-65 reference, amended below. (Kept out of the `Needs:` line: the parser read the ID there as a dependency, and LA-65 is now a permanent Reference, so it parked this entry.)
 
 - **His hypothesis was right, and the mechanism he asked for already exists.** The model does learn
   both quantities from his own history: `resolveTransitionSec` (`time-audit.ts:338`) prefers his
@@ -15156,6 +15157,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
+- **Reference:** why `resolveTransitionSec` stays as it is. Its two errors cancel at five exercises, and the owner confirmed five fit the hour; the safe-looking fix reintroduces the overrun.
+- **✔ CHECKED 2026-09-28 (Lane A): mixed set counts need no change.** The budget stage sizes sets per exercise, one set at a time by role priority (`time-budget.ts` `expandToBudget`/`fitToBudget`). There is no uniform count anywhere, so a 3×3 + 2×2 session comes out of it naturally. `la65-mixed-set-counts.test.ts` pins that. BF-201's p75 margin still has to be judged against mixed sessions.
 - **Gate cleared 2026-09-28** — the lived feedback arrived: five fits, leave the constant.
 - **Needs:** — nothing.
 - **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
