@@ -6498,6 +6498,8 @@ drift.
   retry, which is how the device database has died before. Rehearsed on his real data (133 rows
   intact). Whichever of ① and ② merges second must re-merge `main` and regenerate the views file,
   and CI enforces that.
+  **#1849 shows a red E2E, and that is not this change:** the full E2E run fails the same way on every
+  PR that runs it (LA-176), including three merged before it. The five required checks are green.
 - **③ Barbell Skull Crusher has no progression style** (BF-200 residue, TN-75). The engine now
   deloads it, but it records no per-set plan until a style is assigned. **⭐ Recommend: the style
   his other Upper accessories use.** He assigns it in Config, or names one here and an agent sets
