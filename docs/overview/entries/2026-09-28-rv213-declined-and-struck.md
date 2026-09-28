@@ -1,4 +1,4 @@
-# 2026-09-28 — RV-213 declined: blank space on the diary is the grouping
+# 2026-09-28 — RV-213 declined and struck; LB-178's start point investigated
 
 **Lane B.** Branch `fix/nutrition-empty-meal-slots`. Docs only — no code, no version bump.
 
@@ -42,7 +42,39 @@ The declined mockup stays at
 [`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html),
 linked from the principle, so the next person can see what was rejected rather than re-drawing it.
 
+## Also here: `LB-178`'s start point, and a refuted suspect
+
+Both items edit `docs/implementation-backlog.md`, and that file is the repo's most frequent
+multi-PR conflict, so they ship as one PR rather than two racing each other.
+
+`LB-178` named `tn53-sparkline-does-not-span-gaps:105` as where to start — the only spec flaky in
+**all three** CI censuses. The entry's stated suspect is shared database state (*"the suite runs
+`workers: 1` against one seeded database"*). **For this spec that is refuted:**
+
+- **Reproduction failed both ways.** Alone: 3 passed. Run after the four other specs that write
+  `body_metrics` (`one-calorie-budget`, `measured-overview`, `reta-weight-response`,
+  `metric-bounds-at-keyboard`): 11 passed.
+- **Nothing else writes the column it asserts on.** A census of `resting_heart_rate` across `e2e/`
+  returns two files — this spec, and `rv72-progress-bars-composite`, whose match is a `page.route`
+  **stub**, not a database write. No other spec can add or remove a point from its 14-day window.
+- **Nothing mutates the other input to that window** either: `LOCAL_TODAY` derives from
+  `users.timezone`, and the only `UPDATE users` in `e2e/` are a `date_of_birth` backfill and a
+  `display_name` reset.
+
+**So the next step changes.** Every E2E run already uploads a `playwright-report` artifact, and
+Playwright retains the **first attempt** of a flaky test in it — which says in one look whether the
+failure was the 60 s wait for the card heading (load), the `3 days missing` text (data), or the
+header-width measurement (layout). Those are three unrelated causes. Shuffling spec order is the
+expensive way to answer something the artifact answers on every run.
+
+**A cheaper thing learned the hard way:** the job *log* is not a substitute. It is ~9,000 lines and
+its tail is container teardown, so a `tail_lines` fetch returns Postgres checkpoint noise instead of
+the Playwright summary. That is recorded on the entry so the next session does not pay for it again.
+
 ## Not exercised
 
-Nothing to exercise — no code changed. `check-backlog-pointers` and `check-doc-links` pass; the queue
-is 538 entries, down one.
+**No root cause for `tn53:105`, and none is claimed** — this is a negative result that narrows the
+search, not a fix. Deliberately nothing was changed in the spec: "flake" is not a root cause, and
+editing a spec that passes locally, on a hypothesis the evidence just refuted, is how a real defect
+gets papered over. No code changed at all; `check-backlog-pointers` and `check-doc-links` pass, and
+the queue is 538 entries, down one.

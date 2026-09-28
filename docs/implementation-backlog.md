@@ -6544,6 +6544,37 @@ drift.
   `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
   and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
   first census's mode-sorting was right.
+- **✅ `tn53:105` INVESTIGATED 2026-09-28 — and the entry's own suspect is REFUTED for this spec.**
+  It was picked as the start point for being the only spec flaky in all three censuses. The entry
+  says *"the suite runs `workers: 1` against one seeded database, so shared state is the obvious
+  suspect and is not yet shown."* It is still not shown, and for this spec it cannot be what the
+  entry means:
+  - **Reproduction attempted and FAILED, both ways.** Alone: **3 passed**. Run after the four other
+    specs that write `body_metrics` (`one-calorie-budget`, `measured-overview`,
+    `reta-weight-response`, `metric-bounds-at-keyboard`): **11 passed**. The entry's local note that
+    it *"fails when run after five other specs and passes alone"* did not reproduce here.
+  - **Nothing else writes the column it asserts on.** A census of `resting_heart_rate` across
+    `e2e/` returns exactly two files: this spec, and `rv72-progress-bars-composite`, whose match is
+    a **`page.route` stub** of a readiness payload — not a database write. So no other spec can add
+    or remove a point from the 14-day window this one counts.
+  - **And nothing mutates the other input to its window.** `LOCAL_TODAY` is derived from
+    `users.timezone`; no spec writes it (the only `UPDATE users` are `fixtures.ts`'s
+    `date_of_birth` and `profile-details-consolidation`'s `display_name`).
+- **⚑ SO THE NEXT STEP IS NOT "SHUFFLE THE ORDER" — IT IS TO READ THE FAILURE THAT ALREADY EXISTS.**
+  Every E2E run uploads a **`playwright-report`** artifact (run `36401730152` → artifact
+  `10962381954`, 42 MB), and Playwright retains the **first attempt** of a flaky test in it. That
+  report says in one look which of the three things failed — the 60 s wait for the card heading
+  (load), the `3 days missing` text (data), or the header-width measurement (layout) — and those
+  three point at completely different causes. Shuffling order is the expensive way to answer a
+  question the artifact has already answered on every run. **Download the report for a run where
+  `tn53:105` is listed flaky and read the first attempt's error before changing any spec.**
+  ⚠ The job LOG is not a substitute: it is ~9,000 lines and its tail is container teardown, so a
+  `tail_lines` fetch returns Postgres checkpoint noise rather than the Playwright summary.
+- **What this does NOT settle:** whether the other churning specs are order-dependent. The negative
+  result above is about `tn53` only — it was chosen precisely because it is the one spec that
+  reproduces across runs, and its data inputs turn out to be isolated. That makes **load/timing**
+  the live hypothesis for it, which is exactly what the retained first-attempt error would confirm
+  or kill.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
