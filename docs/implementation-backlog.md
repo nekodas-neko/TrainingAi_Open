@@ -6513,9 +6513,9 @@ drift.
 
 ### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
-- **Ask** — owner: four answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge LA-142
-  (#1849), and close #1749? ③ Which progression style should Barbell Skull Crusher use? ④ Can fresh
-  storage keys go into Railway? ⑤ Merge TN-56 (#1902)?
+- **Ask** — owner: five answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge
+  LA-142 (#1849), and close #1749? ③ Assign styles to the **nine** unstyled slots in `Bankai` —
+  match by role, or name one? ④ Can fresh storage keys go into Railway? ⑤ Merge TN-56 (#1902)? ⑤ Merge TN-56 (#1902)?
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6531,10 +6531,28 @@ drift.
   and CI enforces that.
   **#1849 shows a red E2E, and that is not this change:** the full E2E run fails the same way on every
   PR that runs it (LA-176), including three merged before it. The five required checks are green.
-- **③ Barbell Skull Crusher has no progression style** (BF-200 residue, TN-75). The engine now
-  deloads it, but it records no per-set plan until a style is assigned. **⭐ Recommend: the style
-  his other Upper accessories use.** He assigns it in Config, or names one here and an agent sets
-  it. A preference, so not assumed.
+- **③ NINE slots in the ACTIVE program have no progression style — not one.** (BF-200 residue,
+  TN-75.) The engine deloads them, but none records a per-set plan until a style is assigned.
+  **⚠ This item named Barbell Skull Crusher alone; measured against production 2026-09-28 it
+  understates the problem ninefold**, which matters because the fix is the same amount of work for
+  all nine and answering only for the one leaves eight behind.
+  **In `Bankai` (`is_active = true`), 9 unstyled slots:**
+  - **7 accessory** — Hanging Leg Raise, Cable Chest Dips, Face Pull, Cable Lying Leg Curl,
+    **Barbell Skull Crusher**, Dumbbell Calf Raise, Cable Seated Leg Curl.
+  - **1 primary** — Barbell Hip Thrust. **This is the one that should not wait**: a primary with no
+    per-set plan is the most visible of the nine.
+  - **1 secondary** — Dumbbell Bulgarian Split.
+  - The other **5 unstyled primaries** (Squat, Deadlift, Bench, Incline Bench, Bent-Over Row) are in
+    **`Main`, which is INACTIVE** — out of scope, and not to be counted with the nine.
+  **⭐ Recommend: match each slot to what the same role already uses in that program**, rather than
+  picking one style for all nine. His accessories already run **`Hypertrophy 3-set`** (17 slots) and
+  **`General`** (15); his primaries run **`Powerbuilding`** (13). Barbell Skull Crusher itself
+  already carries `Hypertrophy 3-set` in one session and `General` in another, so there is no single
+  right answer for the exercise — only for each slot.
+  **A preference, so not assumed.** He assigns them in Config, or says "match by role" here and an
+  agent sets all nine.
+  **Method:** `claude_ro.session_exercises` joined to `program_sessions`/`programs`, `deleted_at IS
+  NULL`, grouped by program and role. Row-scoped to the owner, which is the whole population here.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
