@@ -1,0 +1,66 @@
+// RV-195 ① — a mobile sign-in token is minted only for the challenge this browser tab registered.
+//
+// The bridge used to mint for any `?challenge=` it was handed, so a link straight to it, opened where
+// the user was already signed in, produced a token for a challenge the user never chose.
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
+
+const CHALLENGE = 'A'.repeat(43)
+const OTHER = 'B'.repeat(43)
+
+let cookieJar: Record<string, string> = {}
+const store = { get: (name: string) => (name in cookieJar ? { value: cookieJar[name] } : undefined) }
+const createMobileAuthToken = vi.fn((_c: string, _ch: string) => 'minted-token')
+vi.mock('@/lib/mobile-auth-tokens', () => ({ createMobileAuthToken: (c: string, ch: string) => createMobileAuthToken(c, ch) }))
+
+import { challengeMatchesCookie, MOBILE_CHALLENGE_COOKIE } from '@/lib/mobile-auth-challenge-cookie'
+import { GET as begin } from '@/app/mobile-signin/begin/route'
+import { mintMobileBridgeToken } from '@/lib/mobile-auth-bridge'
+
+const bridge = (challenge: string) => mintMobileBridgeToken(challenge, store)
+
+beforeEach(() => {
+  cookieJar = { 'authjs.session-token': 'session-jwt' }
+  createMobileAuthToken.mockClear()
+})
+
+describe('challengeMatchesCookie', () => {
+  it('matches only an identical, well-formed challenge', () => {
+    expect(challengeMatchesCookie(CHALLENGE, CHALLENGE)).toBe(true)
+    expect(challengeMatchesCookie(CHALLENGE, OTHER)).toBe(false)
+    expect(challengeMatchesCookie(CHALLENGE, undefined)).toBe(false)
+    expect(challengeMatchesCookie('short', 'short')).toBe(false)
+  })
+})
+
+describe('GET /mobile-signin/begin', () => {
+  it('stores the challenge in an httpOnly cookie and continues to the Google step', async () => {
+    const res = await begin(new NextRequest(`http://x/mobile-signin/begin?challenge=${CHALLENGE}`))
+    expect(res.headers.get('location')).toBe(`http://x/mobile-signin?challenge=${CHALLENGE}`)
+    const cookie = res.cookies.get(MOBILE_CHALLENGE_COOKIE)
+    expect(cookie?.value).toBe(CHALLENGE)
+    expect(cookie?.httpOnly).toBe(true)
+    expect(cookie?.sameSite).toBe('lax')
+  })
+
+  it('sets nothing for a malformed challenge', async () => {
+    const res = await begin(new NextRequest('http://x/mobile-signin/begin?challenge=nope'))
+    expect(res.headers.get('location')).toBe('http://x/sign-in')
+    expect(res.cookies.get(MOBILE_CHALLENGE_COOKIE)).toBeUndefined()
+  })
+})
+
+describe('/auth-mobile-bridge (mintMobileBridgeToken)', () => {
+  it('mints for the challenge this tab registered', async () => {
+    cookieJar[MOBILE_CHALLENGE_COOKIE] = CHALLENGE
+    expect(bridge(CHALLENGE)).toBe('minted-token')
+    expect(createMobileAuthToken).toHaveBeenCalledWith('session-jwt', CHALLENGE)
+  })
+
+  it('refuses a challenge the tab never registered, and one that differs from it', async () => {
+    expect(bridge(CHALLENGE)).toBeNull()
+    cookieJar[MOBILE_CHALLENGE_COOKIE] = OTHER
+    expect(bridge(CHALLENGE)).toBeNull()
+    expect(createMobileAuthToken).not.toHaveBeenCalled()
+  })
+})

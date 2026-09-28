@@ -61,9 +61,15 @@ export async function refreshIsActiveClaim<T extends IsActiveClaim>(
 
   try {
     const user = await lookup(token.userId)
-    // A missing row is not evidence of deactivation, so the claim is left alone AND the
-    // timestamp is not advanced — the next request retries rather than waiting a day.
-    if (!user) return token
+    // RV-195 ②: a lookup that SUCCEEDED and found no row means the account was deleted, and a
+    // deleted account must not stay signed in. It used to leave the claim alone, which kept a
+    // deleted user's cookie working until it expired. The timestamp is not advanced, so a row
+    // that reappears is picked up on the next request. A lookup that THROWS is still fail-open
+    // (below): an outage must not sign everyone out.
+    if (!user) {
+      token.isActive = false
+      return token
+    }
     token.isActive = user.isActive
     // Only when the lookup actually supplies it — a lookup that omits `isAdmin` must not be read
     // as "not an admin" and silently strip the claim.

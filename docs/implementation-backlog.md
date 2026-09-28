@@ -3290,19 +3290,23 @@ which is the right shape for something that can only be validated by living with
   token is long-lived, can write to Google Calendar, and outlives sign-out.
 - **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
 
-### [platform] RV-195 — three low-severity auth and social gaps, one PR
-- **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
-- **Added:** 2026-09-24 · Review sweep 60.
-1. **Mobile sign-in challenge is not bound to the browser that started it** (`app/auth-mobile-bridge/page.tsx`).
-   Exploiting it needs a malicious app on the phone plus a tapped link. Fix: `/mobile-signin` sets a
-   short-lived httpOnly cookie holding the challenge, and the bridge mints a token only if the query
-   value matches that cookie.
-2. **A deleted user stays signed in** (`lib/auth/is-active-refresh.ts`). A missing row is treated as
-   "no change". Fix: `auth()` returns null when the lookup succeeds and finds no row. The fail-open
-   for database outages stays.
-3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
-   `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
-   only what the requester typed.
+### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
+
+- **Lane: B** — `components/more/manage-friends-sheet.tsx`.
+- **Added:** 2026-09-29 · Lane A, while shipping RV-195 ③.
+- **What:** `pending` in the sheet holds incoming AND outgoing requests and gives every row
+  Accept/Decline. Accept on a request you SENT always fails, because the server accepts only as the
+  addressee. Since RV-195 the list also masks the target of an outgoing request, so its name reads
+  "Unknown".
+- **Fix:**
+  - Split pending by `f.requesterId === <me>`.
+  - Incoming rows keep Accept/Decline.
+  - Outgoing rows read *"Request sent"* with a Cancel. `DELETE /api/friends/[id]` already allows
+    either party.
+  - `otherUser.displayName` holds what was typed only in the send response, so the list has no name
+    for an outgoing row by design.
+- **Verify:** `pnpm dev` with two local users: send a request, and confirm the sender sees
+  "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
