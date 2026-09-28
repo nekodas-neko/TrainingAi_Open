@@ -24545,6 +24545,40 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
 
+### [devices][platform] LA-179 — the rollup re-reads its whole hot window on every ring ingest: ~88 times an hour, 2 s each
+
+- **Lane: A** — `lib/oura-ble/rollup/run.ts` (the `ROLLUP_TAGS` read at ~line 141) and
+  `lib/data/postgres/slices/oura-raw-frames.ts` (`readRawFrames`).
+- **Added:** 2026-09-28 · Lane A, while closing RV-181.
+- **Measured in production, `pg_stat_statements` deltas over two windows (16.8 and 19.1 min):**
+  the hot-tier half of the rollup read (`user_id`, the 15 `ROLLUP_TAGS`, `ring_timestamp_ds >=
+  cutoff`, ordered by `ring_timestamp_ds`) ran **27 and 28 times, at 2.1 and 2.0 s a call**. That is
+  about **3 minutes of database time an hour, roughly 70 minutes a day**, against a pool of ten.
+  Its lifetime mean is 93 ms, so the per-call cost has grown as the hot tier filled up.
+- **What each call reads:** all **136,976** hot rows for those tags, **3.5 MB of hex**, with no
+  `decoded` (ingest stopped storing it, so every row is decoded in Node from `body_hex`). A server-side
+  `count` and byte sum over the same rows takes **99 ms**, so the 2 s is returning and sorting the
+  rows, not finding them.
+- **Why:** each ingest re-runs the rollup over its 35-day window (`ROLLUP_WINDOW_DAYS`). The hot tier
+  (~7.5 days, 180k rows, steady, packer healthy) is re-read whole every time, although one drain
+  changes minutes of it.
+- **Directions, not yet chosen (measure before picking):**
+  1. **Read only the span a drain touched, plus the context each derivation needs** (sleep
+     windows, HR smoothing). Cheapest in database terms, but every derivation's look-back must be
+     proven, or a boundary night gets computed from half its data.
+  2. **Debounce harder.** Ingests already trigger a 3 s trailing debounce. A longer one, or one
+     rollup per drain rather than per batch, cuts the count without touching the read. Check
+     whether a drain currently produces one rollup or several.
+  3. **Keep a decoded, sorted per-user cache in the worker** and read only rows newer than its high
+     watermark. It saves the most and costs the most (memory, invalidation on redecode).
+  Direction 2 is the first thing to measure: `ai_call_log`-style counting of rollups per drain,
+  set against the ~88/h here.
+- **Not urgent:** the cache hit rate is 99.9% and nothing reported slowness. It is the largest
+  steady cost on the database today, and it grows with every tag the rollup learns to read.
+- **Pass test:** the same `pg_stat_statements` delta over a comparable window shows the rollup's
+  hot read well under 1 minute of DB time an hour, with the rollup outputs unchanged on the
+  snapshot database.
+
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
 - **Lane:** A — `lib/local-store/**` / the WebView rollup consumer (D2 Task 5). Storage, so Lane A
