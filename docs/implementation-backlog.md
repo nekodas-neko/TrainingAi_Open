@@ -6535,27 +6535,30 @@ drift.
 - **Q-279 waits on this answer** (`Needs: LA-175`). The review's harness should be saved as a script
   next time, so the same argument can be re-run instead of reconstructed.
 
-### [platform][app-shell] LA-176 — six E2E specs fail on every PR that runs the full suite, and nothing notices because E2E is advisory
-- **Lane: B** — the six specs are screen flows, so triage belongs to the surface lane. Any engine
-  cause found hands back to Lane A.
-- **Added:** 2026-09-28 · Lane A, while checking why LA-142's PR (#1849) timed out.
-- **What was found.** Most PRs *skip* the real E2E run and report "pass" in about 45 seconds. PRs
-  that touch paths the workflow filters on run all ~250 specs, and those have all hit the
-  **45-minute cap** today: #1818 (RV-175), #1826 (LA-165) and #1849 (LA-142). **Six specs fail in all
-  three:**
-  `food-log-swipe-delete`, `home-card-invalidation-refetch`, `la109-back-from-subroute`,
-  `meal-plan-library-surface`, `one-calorie-budget` and `rv38-body-battery-no-data-badge`.
-  Others fail in one or two (`tn50-checkin-starts-unanswered`, `tn53-sparkline-does-not-span-gaps`,
-  `tn85-sleep-verdict-on-home`, `tabs-instant-paint`, `baseline-not-a-failure`,
-  `card-429-error-state` …).
-- **Not established:** whether these are real regressions or broken tests. `rv38` asserts the Body
-  Battery "Limited data" badge (*"the card must qualify a number it cannot support"*). It was already
-  failing on #1818, before TN-72 moved that computation, so TN-72 did not cause it.
-- **Why it matters beyond E2E hygiene.** Six consistent failures are either six regressions shipping
-  unseen or six tests nobody trusts. Both defeat the suite, and LB-56's decision about whether to
-  make E2E required cannot be made against a suite that is red on every full run.
-- **First step:** run the six locally against `main` (`pnpm e2e -g <spec>`) and sort them into
-  regression or stale test, one line each, before fixing anything.
+### [platform][app-shell] LB-178 — the E2E suite is flaky once specs share a run, and nobody knows how flaky
+
+- **Lane: B** — `e2e/food-log-swipe-delete.spec.ts`, `e2e/tn53-sparkline-does-not-span-gaps.spec.ts`,
+  then whatever a repeat-run census names.
+- **Added:** 2026-09-28 · Lane B, measured while clearing `LA-176`'s six always-red specs.
+- **What LA-176 left behind.** All six deterministic failures are fixed, and five of the six
+  "sometimes fails" specs it listed now pass. What is left is not a failing assertion — it is
+  **order- and timing-sensitivity that only appears when specs share a run**:
+  - `food-log-swipe-delete` had six tests that had never executed, because the file died in
+    `beforeAll`. They pass — but across three runs, **two runs each failed a DIFFERENT one**
+    (`:238 a tap the instant the swipe ends`, then `:274 the tray is hit-testable the moment the row
+    moves`), and the third passed 8/8. Both are swipe-gesture timing tests.
+  - `tn53-sparkline-does-not-span-gaps` **fails when run after five other specs and passes alone.**
+    The suite runs `workers: 1` against one seeded database, so shared state is the obvious suspect
+    and is not yet shown.
+- **Why it matters.** `LB-56` asks whether E2E should be a required check. It cannot be, against a
+  suite where a green run is a coin toss — and "flake" is not a root cause here, it is the finding.
+  A required check that fails one run in three trains everyone to re-run it, which is worse than
+  advisory.
+- **First step, and it is a measurement not a fix:** run the full suite three times and record which
+  specs differ between runs. A spec that fails in one run and passes in the next is order-dependent;
+  the shared database and `workers: 1` make that testable by shuffling order, not by reading code.
+- **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
+  `LB-166`'s.
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **📐 MOCKUP DRAWN 2026-09-28 — [`docs/design/2026-09-28-resting-hr-cell.html`](design/2026-09-28-resting-hr-cell.html)

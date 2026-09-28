@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.1",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: every card on Home was announced to screen readers as a disabled button and took a keyboard tab stop that did nothing \u2014 a side effect of making the sections drag-to-reorder. They are now only announced that way while you are actually rearranging them.",
+    ],
+  },
+  {
     version: "1.478.0",
     date: "2026-09-28",
     changes: [

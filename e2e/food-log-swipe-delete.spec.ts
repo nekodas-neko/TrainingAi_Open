@@ -27,6 +27,17 @@ import { SEED_EMAIL, settleRouteBoundary, stableBox, swipeRowLeft, tapCentre } f
  */
 
 const ITEM_ID = '77777777-7777-4777-8777-777777777771'
+/**
+ * The spec owns its meal type rather than borrowing one (LA-176).
+ *
+ * `food_logs.meal_type_id` is NOT NULL, and the six defaults are created **lazily by the app** on
+ * the first nutrition read (`lib/data/postgres/slices/nutrition.ts`), never by the database seed.
+ * So on a fresh database — which is every CI run — the old
+ * `(SELECT id FROM meal_types … LIMIT 1)` resolved to NULL and the insert died on the not-null
+ * constraint. It passed locally only because an earlier run had already made the app create them,
+ * which is exactly why this spec failed on every full CI run and on nobody's machine.
+ */
+const MEAL_TYPE_ID = '77777777-7777-4777-8777-777777777772'
 const FOOD = 'Spec Swipe Yoghurt'
 
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
@@ -38,8 +49,11 @@ async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
 }
 
 async function cleanup(db: Client) {
+  // Logs first: `food_logs.meal_type_id` is ON DELETE RESTRICT, so the meal type cannot go before
+  // the rows pointing at it — including soft-deleted ones, which this spec creates by design.
   await db.query('DELETE FROM food_logs WHERE food_item_id = $1', [ITEM_ID])
   await db.query('DELETE FROM food_items WHERE id = $1', [ITEM_ID])
+  await db.query('DELETE FROM meal_types WHERE id = $1', [MEAL_TYPE_ID])
 }
 
 /**
@@ -58,13 +72,17 @@ async function seedLog(db: Client, daysAgo: number): Promise<void> {
     [ITEM_ID, userId, FOOD],
   )
   await db.query(
+    `INSERT INTO meal_types (id, user_id, name, sort_order) VALUES ($1, $2, 'Spec Meal', 0)`,
+    [MEAL_TYPE_ID, userId],
+  )
+  await db.query(
     `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, logged_at)
      SELECT $1,
-            to_char((now() AT TIME ZONE u.timezone) - ($3 || ' days')::interval, 'YYYY-MM-DD'),
-            (SELECT id FROM meal_types WHERE user_id = $1 ORDER BY sort_order LIMIT 1),
-            $2, 1.0, now() - ($3 || ' days')::interval
+            to_char((now() AT TIME ZONE u.timezone) - ($4 || ' days')::interval, 'YYYY-MM-DD'),
+            $3,
+            $2, 1.0, now() - ($4 || ' days')::interval
        FROM users u WHERE u.id = $1`,
-    [userId, ITEM_ID, daysAgo],
+    [userId, ITEM_ID, MEAL_TYPE_ID, daysAgo],
   )
 }
 
