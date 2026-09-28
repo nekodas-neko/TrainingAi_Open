@@ -3243,26 +3243,6 @@ which is the right shape for something that can only be validated by living with
   `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
-### [nutrition][sleep] LB-182 — the nutrition prompt is never told what he said about his sleep
-
-- **Lane: A** — `app/api/**`, which is Lane A by the path rule. Filed out of `LA-136`, whose Home
-  half shipped 2026-09-28; this is the half that entry deliberately did not decide separately.
-- **Added:** 2026-09-28 · Lane B, on shipping `LA-136`.
-- **The cheap half of LA-136, and the reason it is its own entry.** The route already runs a
-  `Promise.all` of repository reads, so `listDayCheckins` + `answeredMorningScales` is close to one
-  more line. What makes it not a rendering fix is that it changes **what the model is told about
-  him**, which is a different kind of change from putting a number on a screen.
-- **⛔ It must go through `answeredMorningScales`, never the raw column.** The sheet writes a neutral
-  `3` for a scale he never tapped, flagged `sleepQualityFeelTouched: false`. Four earlier readers in
-  this repo took the column directly and were calibrating, plotting and displaying **78 values
-  nobody gave**; telling an LLM he reported a night he never rated is the same bug with a worse
-  blast radius, because the model will then reason from it in prose.
-- **Recommendation, not a question for the owner: include it.** The prompt is already given other
-  self-reports, this is his own words about the thing the advice is partly for, and it is one line
-  to remove if the advice gets worse. A cheap reversible change does not need his sign-off — but if
-  the nutrition advice starts leaning on sleep in a way he dislikes, that IS his call and this is
-  the line to pull.
-
 ### [platform] RV-188 — production has not deployed 22 merges, including tonight's fixes: unblock the Railway build, then take it off the memory boundary
 
 - **Lane: A** — `package.json` `build` script, `next.config.ts`.
