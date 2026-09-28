@@ -7726,43 +7726,6 @@ drift.
   rewrite and no per-ingest cost. It needs the sleep windows at read time (a join) and it puts the
   rule in two places, so it is a real trade rather than an obvious win.
 
-### [heart-rate][platform] RV-181 — the HR profile pulled 90 days of raw heart rate to compute six numbers
-
-- **Lane: A** — `packages/shared/src/health/hr-profile.ts`, `lib/data/postgres/slices/oura.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
-- **The headline SURVIVED re-measurement on 2026-09-25**, against a moving window three weeks on:
-  **565 s of 1,117 s of all database time (50.6%)**, 12,591 calls, 44.84 ms mean, 16,843 rows a
-  call. The 90-day window is 134,425 raw rows, **133,041** after the chest-strap merge.
-- **SHIPPED 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv181-observed-hr-sql-aggregate)):
-  `repo.getObservedHrProfile` computes the profile in SQL, one row instead of the window. The seven
-  `resolveHrProfile` callers fetch no rows; `/api/cardio-week` reads its two 30-day windows as
-  aggregates too, so `resolveHrProfileWithWindow` (RV-73) is gone with its boundary caveat.
-- **⚠ The EVIDENCE line was wrong — sweep 51's "same statistic as a SQL aggregate at 54 ms" had no
-  chest-strap merge**, which is 78% of the rows and the whole cost. Measured: plain form 67 ms, the
-  merge-preserving form shipped 225–260 ms, the row fetch ~354 ms. **So the saving is about a third,
-  not seven eighths.** The rest of the win is 133,041 rows no longer crossing the wire or being
-  materialised in Node per resolve. Formulations tried and their timings are in the journal entry.
-- **STILL OPEN — the memo, which holds the other two thirds.** The 90-day shape ran **~1,460 times
-  in 25.2 days (~58/day)** and the aggregate does not touch that count: `useHrProfile` is mounted on
-  the active-workout and exercise-summary screens and `hr-profile` is in `invalidateOuraSync`, so
-  every ring drain during a workout refetches it (drains run 20–32/hour at 07–09). Not shipped with
-  the aggregate because it needs a freshness call, not a mechanism — `use-hr-profile.ts` argues at
-  length against pinning this key and that argument has to be answered. **Re-measure first:** with
-  the row fetch gone, `pg_stat_statements` now reports the small-window callers only.
-- **~~STILL OPEN — same shape, smaller~~ — REFUTED 2026-09-28 by the agreement check it asked for.**
-  `/api/health/trends` re-derives HR recovery from raw HR, about 20 queries a call. This proposed
-  reading `workout_hr_stats.hrr1_best` instead. **The two are different statistics:** the trend plots
-  each session's **median** set HRR1 (`sessionHrr1Median`), and `hrr1_best` is the session's **max**
-  (`summariseWorkoutHr`). Measured against production for all 32 completed sessions in 45 days, they
-  disagree on **32 of 32 days**, with the column higher by 3 to 36 bpm/min. Reading it would redraw
-  the chart as a different metric, not make the same chart cheaper. A cheaper route would need a
-  stored per-session *median*, which is a migration. Nothing measured says the route's cost is worth
-  one: it is rate-limited to 10 a minute, and its query cost was never measured. **Not done, on
-  purpose.** The check also turned up LA-168 (fixed 2026-09-28): the raw HR under ring-only workouts has thinned since
-  the snapshots were taken, so this route's live re-derivation and the recap's stored number have
-  drifted apart.
-
-
 ### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
 
 - **Lane: B** — `components/workout-screen.tsx`, the post-completion `/prescribe` call (~line 1547).
