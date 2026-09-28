@@ -15,15 +15,13 @@ import {
 } from 'chart.js'
 import type { HrReading, SetMarker } from '@trainingai/shared/workout/hr-analysis'
 import { bucketAverage, rollingMedian } from '@trainingai/shared/health/hr-smoothing'
-import { resolveColor } from '@trainingai/shared/chart-colors'
+import { resolveColor, categoricalColor } from '@trainingai/shared/chart-colors'
 
 ChartJS.register(LineElement, PointElement, LinearScale, Filler, Tooltip)
 
-const TRACE_COLORS = ['#f97316', '#3b82f6', '#a855f7', '#22c55e', '#ef4444', '#eab308']
-
 function exerciseColor(name: string, allNames: string[]): string {
   const idx = allNames.indexOf(name)
-  return TRACE_COLORS[idx % TRACE_COLORS.length]
+  return categoricalColor(idx)
 }
 
 interface Props {
