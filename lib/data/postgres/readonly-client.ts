@@ -1,4 +1,4 @@
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 
 /**
  * Isolated connection pool for the read-only query endpoint.
@@ -8,9 +8,13 @@ import { Pool } from 'pg'
  * this gets its own two connections and nothing more.
  *
  * The connection string must authenticate as `claude_readonly`, a role created out-of-band with
- * SELECT-only grants on the `claude_ro` view schema and `default_transaction_read_only = on`. That
- * role — not anything in this file — is what makes the endpoint read-only. See
+ * SELECT-only grants on the `claude_ro` view schema and `default_transaction_read_only = on`. See
  * docs/superpowers/plans/2026-07-26-claude-readonly-prod-db-access.md §4.1.
+ *
+ * **The role only sets session DEFAULTS, and a session can change them (RV-190).** The owner scope,
+ * read-only mode and the timeout can each be overridden by one `set_config`, and on a pooled
+ * connection the override outlives the request. Every caller therefore goes through
+ * {@link withReadonlyClient}, never `pool.query` directly.
  */
 
 /** Hard ceiling on connections this pool may hold. Small on purpose — see above. */
@@ -75,6 +79,46 @@ export function describeReadonlyConnection(): {
     }
   } catch (err) {
     return { configured: true, parseError: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Per-statement ceiling inside {@link withReadonlyClient}, restated there with SET LOCAL. */
+export const READONLY_STATEMENT_TIMEOUT_MS = 10_000
+
+/**
+ * Run `work` on one read-only client inside a transaction that is always rolled back, then scrub
+ * the connection before it goes back to the pool.
+ *
+ * RV-190. `BEGIN TRANSACTION READ ONLY` makes read-only a property of THIS transaction rather than a
+ * default a query can switch off. `SET LOCAL statement_timeout` does the same for the timeout. The
+ * final `ROLLBACK` reverts every setting changed inside it, including a session-level
+ * `set_config(..., false)`, so a query that moves the owner scope moves it only for itself.
+ * `DISCARD ALL` is the second layer, for anything that survives a rollback. If either cleanup step
+ * fails, the client is destroyed rather than returned, so a connection in an unknown state is never
+ * reused.
+ */
+export async function withReadonlyClient<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getReadonlyPool().connect()
+  let result: T
+  try {
+    await client.query('BEGIN TRANSACTION READ ONLY')
+    await client.query(`SET LOCAL statement_timeout = ${READONLY_STATEMENT_TIMEOUT_MS}`)
+    result = await work(client)
+  } catch (err) {
+    await scrub(client)
+    throw err
+  }
+  await scrub(client)
+  return result
+}
+
+async function scrub(client: PoolClient): Promise<void> {
+  try {
+    await client.query('ROLLBACK')
+    await client.query('DISCARD ALL')
+    client.release()
+  } catch (err) {
+    client.release(err instanceof Error ? err : new Error(String(err)))
   }
 }
 

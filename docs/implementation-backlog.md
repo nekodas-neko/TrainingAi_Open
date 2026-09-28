@@ -3292,37 +3292,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
-
-- **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
-  `lib/data/postgres/readonly-client.ts`, `lib/data/postgres/claude-ro-owner.ts`.
-- **⚠ AUTH/SECURITY — the owner confirms before this merges.** The fix is small; the carve-out applies anyway.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **What:** the route's comment says read-only is enforced by the `claude_readonly` role. The role
-  only sets **session defaults**: the owner scope (`app.claude_ro_owner`), `default_transaction_read_only`
-  and `statement_timeout`. A caller can override all three, and they persist, because each query runs
-  in autocommit on a 2-connection pool that is never reset. **Reproduced on the local database only.
-  Nothing was probed on production.**
-- **Who can reach it:** only a holder of `CLAUDE_DB_QUERY_SECRET` or an admin session. In practice
-  that is the owner and every agent session with the secret in its environment, including one steered
-  by prompt injection from fetched content. What it gets:
-  - other users' rows through the `claude_ro` views;
-  - writes the role was meant to refuse, including writes large enough to recreate the 2026-08-17
-    `disk_full` outage;
-  - queries with no time limit.
-  **Because the pool reuses connections, a later honest query can silently read another user's rows.**
-- **Fix shape:**
-  1. Wrap every db-query and db-snapshot query as `BEGIN TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` →
-     `SET LOCAL app.claude_ro_owner` → query → `ROLLBACK`. The final `ROLLBACK` reverts any session-level
-     setting made inside the transaction; this was verified locally.
-  2. Second layer: `RESET ALL` (or `DISCARD ALL`) when a client is released.
-  3. Regression test: run a query that changes a setting, then assert that the next query on the same
-     pool sees the defaults.
-- **Interaction with OR-138:** OR-138 widens the owner scope on purpose, using `SET LOCAL`. Build this
-  first, or together with it. OR-138 without the transaction wrapper is the same hole with a legitimate
-  entry point.
-- **Reversal cost:** low. No migration is needed, and the views do not change.
-
 ### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
 - **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
 - **⚠ AUTH — the owner confirms before this merges.**

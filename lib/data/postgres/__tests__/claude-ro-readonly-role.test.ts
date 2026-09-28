@@ -288,4 +288,74 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     expect(denied.rows[0].n).toBeGreaterThanOrEqual(2)
     expect(views.rows[0].n).toBe(tables.rows[0].n - denied.rows[0].n)
   })
+  // RV-190. The role sets session DEFAULTS; a query can change them, and on a pooled connection the
+  // change used to outlive the request. These run through the real pool the route uses.
+  describe('withReadonlyClient — a query cannot leave state behind on a pooled connection', () => {
+    const settings = `SELECT pg_backend_pid() AS pid,
+      current_setting('app.claude_ro_owner', true) AS owner,
+      current_setting('statement_timeout') AS timeout,
+      current_setting('default_transaction_read_only') AS dro`
+    let ro: typeof import('@/lib/data/postgres/readonly-client')
+
+    beforeAll(async () => {
+      process.env.CLAUDE_DB_READONLY_URL = roUrl()
+      ro = await import('@/lib/data/postgres/readonly-client')
+      ro.__resetReadonlyPoolForTests()
+    })
+    afterAll(async () => {
+      await ro.getReadonlyPool().end().catch(() => {})
+      ro.__resetReadonlyPoolForTests()
+      delete process.env.CLAUDE_DB_READONLY_URL
+    })
+
+    it('control: a raw override DOES persist to the next query on the same connection', async () => {
+      // Proves the harness can see the hazard at all, so the next case passing means something.
+      const c = await ro.getReadonlyPool().connect()
+      try {
+        await c.query(`SELECT set_config('app.claude_ro_owner', '${OTHER_ID}', false)`)
+        expect((await c.query(settings)).rows[0].owner).toBe(OTHER_ID)
+      } finally {
+        await c.query('RESET ALL')
+        c.release()
+      }
+    })
+
+    it('reverts the owner scope, the timeout and read-only mode after every request', async () => {
+      const first = await ro.withReadonlyClient(async c => {
+        await c.query(`SELECT set_config('app.claude_ro_owner', '${OTHER_ID}', false),
+                              set_config('statement_timeout', '0', false),
+                              set_config('default_transaction_read_only', 'off', false)`)
+        return (await c.query(settings)).rows[0]
+      })
+      expect(first.owner).toBe(OTHER_ID)   // it did take effect inside the request
+      const pids = new Set<number>()
+      for (let i = 0; i < 4; i++) {
+        const after = await ro.withReadonlyClient(async c => (await c.query(settings)).rows[0])
+        pids.add(after.pid)
+        expect(after).toMatchObject({ owner: OWNER_ID, timeout: '10s', dro: 'on' })
+      }
+      expect(pids.has(first.pid), 'the same connection was never reused, so this proved nothing').toBe(true)
+    })
+
+    it('cannot see another user after trying to widen the scope in an earlier request', async () => {
+      await ro.withReadonlyClient(c => c.query(`SELECT set_config('app.claude_ro_owner', '${OTHER_ID}', false)`))
+      const n = await ro.withReadonlyClient(async c =>
+        (await c.query(`SELECT count(*)::int AS n FROM claude_ro.users WHERE id = '${OTHER_ID}'`)).rows[0].n)
+      expect(n).toBe(0)
+    })
+
+    it('is read-only for the transaction, whatever the session default says', async () => {
+      const err = await ro.withReadonlyClient(async c => {
+        await c.query(`SELECT set_config('default_transaction_read_only', 'off', false)`)
+        return c.query(`SELECT set_config('transaction_read_only', 'off', true)`).then(() => null, (e: Error) => e.message)
+      })
+      expect(err).toMatch(/read-write|read only|must be called before/i)
+    })
+
+    it('refuses a second statement in extended mode, and the connection survives it', async () => {
+      const q = { text: 'SELECT 1; SELECT 2', queryMode: 'extended' } as import('pg').QueryConfig
+      await expect(ro.withReadonlyClient(c => c.query(q))).rejects.toThrow(/multiple commands/i)
+      expect(await ro.withReadonlyClient(async c => (await c.query('SELECT 1 AS one')).rows[0].one)).toBe(1)
+    })
+  })
 })

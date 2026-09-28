@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { QueryConfig } from 'pg'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
-import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
+import { withReadonlyClient, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
@@ -121,7 +122,10 @@ export async function POST(req: NextRequest) {
     // Wrapping in a subquery bounds ANY submitted query without parsing it. MAX_ROWS + 1 detects
     // truncation rather than silently returning a capped set as if it were complete.
     const wrapped = `SELECT * FROM (${sql.replace(/;\s*$/, '')}) _q LIMIT ${MAX_ROWS + 1}`
-    const result = await getReadonlyPool().query(wrapped)
+    // Extended protocol: Postgres refuses a second statement outright, behind the `;` check above.
+    // pg 8.21 honours `queryMode` (lib/query.js) but its type definitions do not declare it yet.
+    const extended = { text: wrapped, queryMode: 'extended' } as QueryConfig
+    const result = await withReadonlyClient(c => c.query(extended))
 
     const truncated = result.rows.length > MAX_ROWS
     const rows = truncated ? result.rows.slice(0, MAX_ROWS) : result.rows
@@ -162,12 +166,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { rows } = await getReadonlyPool().query(`
+    const { rows } = await withReadonlyClient(c => c.query(`
       SELECT table_name, column_name, data_type
       FROM information_schema.columns
       WHERE table_schema = 'claude_ro'
       ORDER BY table_name, ordinal_position
-    `)
+    `))
     const views: Record<string, { column: string; type: string }[]> = {}
     for (const r of rows) {
       ;(views[r.table_name] ??= []).push({ column: r.column_name, type: r.data_type })

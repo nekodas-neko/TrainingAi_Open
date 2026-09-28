@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
-import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
+import { withReadonlyClient, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
@@ -102,11 +102,9 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams
   const bulk = q.get('bulk')
   const tablesParam = q.get('tables')
-  const pool = getReadonlyPool()
-
   let cols
   try {
-    cols = await readTableColumns(pool)
+    cols = await withReadonlyClient(readTableColumns)
     checkDrift(cols)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -125,38 +123,45 @@ export async function GET(req: NextRequest) {
     async start(controller) {
       const push = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
       try {
-        // Manifest first — snapshot time, view count, per-table row counts (from the request's own
-        // read, not a cached estimate), the resolved bulk window, and every omitted table with why.
-        // A consumer must never have to infer completeness from what happens to be in the file.
-        const rowCounts: Record<string, number | null> = {}
-        for (const table of toExport) {
-          try {
-            const { rows } = await pool.query(`SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
-            rowCounts[table] = rows[0]?.n ?? null
-          } catch {
-            rowCounts[table] = null
+        // RV-190: the whole export runs in ONE read-only transaction that is rolled back and scrubbed,
+        // which also makes it a single consistent snapshot rather than one per table.
+        await withReadonlyClient(async (db) => {
+          // Manifest first — snapshot time, view count, per-table row counts (from the request's own
+          // read, not a cached estimate), the resolved bulk window, and every omitted table with why.
+          // A consumer must never have to infer completeness from what happens to be in the file.
+          const rowCounts: Record<string, number | null> = {}
+          for (const table of toExport) {
+            try {
+              // A savepoint per count: inside one transaction a failed statement would abort every one after it.
+              await db.query('SAVEPOINT count_one')
+              const { rows } = await db.query(`SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
+              rowCounts[table] = rows[0]?.n ?? null
+            } catch {
+              await db.query('ROLLBACK TO SAVEPOINT count_one')
+              rowCounts[table] = null
+            }
           }
-        }
-        push({
-          manifest: true,
-          snapshotAt: new Date().toISOString(),
-          viewCount: cols.views.size,
-          tables: toExport,
-          rowCounts,
-          bulk: bulk ?? '0',
-          omitted,
-        })
+          push({
+            manifest: true,
+            snapshotAt: new Date().toISOString(),
+            viewCount: cols.views.size,
+            tables: toExport,
+            rowCounts,
+            bulk: bulk ?? '0',
+            omitted,
+          })
 
-        for (const table of toExport) {
-          const pk = await getPrimaryKeyColumns(pool, table)
-          const since = bulkWindowFor(table, bulk)
-          let n = 0
-          for await (const row of streamTableRows(pool, table, pk, CHUNK_SIZE, since ?? undefined)) {
-            push({ table, row })
-            n++
+          for (const table of toExport) {
+            const pk = await getPrimaryKeyColumns(db, table)
+            const since = bulkWindowFor(table, bulk)
+            let n = 0
+            for await (const row of streamTableRows(db, table, pk, CHUNK_SIZE, since ?? undefined)) {
+              push({ table, row })
+              n++
+            }
+            push({ tableComplete: table, rowCount: n })
           }
-          push({ tableComplete: table, rowCount: n })
-        }
+        })
         await logSnapshot({ tables: toExport, bulk, ip, ok: true, error: null })
         controller.close()
       } catch (err) {

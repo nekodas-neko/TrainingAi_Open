@@ -80,7 +80,7 @@ vi.mock('@/lib/data/postgres/client', () => ({
   ensureSchema: async () => undefined,
 }))
 vi.mock('@/lib/data/postgres/readonly-client', () => ({
-  getReadonlyPool: () => ({ query: (...a: unknown[]) => roQuery(...a) }),
+  withReadonlyClient: (work: (c: unknown) => unknown) => work({ query: (...a: unknown[]) => roQuery(...a) }),
   isReadonlyDbConfigured: () => isReadonlyDbConfigured(),
   describeReadonlyConnection: () => ({ host: 'ro.example', database: 'app' }),
 }))
@@ -286,9 +286,14 @@ describe('GET /api/admin/db-snapshot — the export itself', () => {
   it('counts rows from this request’s own read, and reports a failed count as null', async () => {
     // A consumer must never infer completeness from what happens to be in the file. A count that
     // could not be taken is `null`, which is a different claim from `0`.
-    roQuery.mockRejectedValue(new Error('permission denied'))
+    // Only the COUNT fails; the savepoint around it (RV-190) must let the export carry on.
+    roQuery.mockImplementation(async (sql: unknown) => {
+      if (String(sql).includes('count(*)')) throw new Error('permission denied')
+      return { rows: [] }
+    })
     const lines = await ndjson(await snapshotReq())
     expect(lines[0]).toMatchObject({ rowCounts: { users: null } })
+    expect(roQuery.mock.calls.map(c => c[0])).toContain('ROLLBACK TO SAVEPOINT count_one')
   })
 
   it('fails the export on schema drift rather than exporting a partial shape', async () => {
@@ -340,7 +345,7 @@ describe('GET /api/admin/db-snapshot — the export itself', () => {
 
   it('passes the requested tables and bulk window through to the resolver', async () => {
     // Two different params: a fixture setting only one could not tell which the resolver received.
-    await snapshotReq('?tables=users,sleep_sessions&bulk=30')
+    await ndjson(await snapshotReq('?tables=users,sleep_sessions&bulk=30'))
     expect(resolveRequestedTables.mock.calls[0].slice(1)).toEqual(['users,sleep_sessions', '30'])
     expect(bulkWindowFor).toHaveBeenCalledWith('users', '30')
   })

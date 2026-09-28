@@ -17,7 +17,7 @@ const roQuery = vi.fn(async () => ({ rows: [{ n: 1 }], fields: [{ name: 'n' }] }
 let configured = true
 vi.mock('@/lib/data/postgres/readonly-client', () => ({
   isReadonlyDbConfigured: () => configured,
-  getReadonlyPool: () => ({ query: roQuery }),
+  withReadonlyClient: (work: (c: { query: typeof roQuery }) => unknown) => work({ query: roQuery }),
   describeReadonlyConnection: () => ({ configured, user: 'claude_readonly', host: 'db', port: '5432', database: 'railway' }),
 }))
 
@@ -95,7 +95,10 @@ describe('POST /api/admin/db-query — bounds', () => {
 
   it('wraps the query in a row-capped subquery', async () => {
     await post('SELECT * FROM users', withToken(SECRET))
-    const sent = roQuery.mock.calls[0][0]
+    const call = roQuery.mock.calls[0][0] as unknown as { text: string; queryMode: string }
+    // RV-190: extended protocol, so Postgres itself refuses a second statement.
+    expect(call.queryMode).toBe('extended')
+    const sent = call.text
     expect(sent).toContain('SELECT * FROM (SELECT * FROM users) _q LIMIT 1001')
   })
 

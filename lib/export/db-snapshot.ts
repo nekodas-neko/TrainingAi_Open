@@ -1,4 +1,7 @@
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
+
+/** A pool or one checked-out client — the snapshot runs on a client inside `withReadonlyClient` (RV-190). */
+type Db = Pool | PoolClient
 
 /**
  * Core logic for the admin DB snapshot endpoint (Q-530,
@@ -35,7 +38,7 @@ export interface TableColumns {
 /** Reads the catalog + the two meta views. `pg_catalog` is readable by `claude_readonly` for
  *  `public` even though it holds no `SELECT` grant there — verified against production in the
  *  plan's §4 — which is what lets the drift gate run from the readonly connection at all. */
-export async function readTableColumns(pool: Pool): Promise<TableColumns> {
+export async function readTableColumns(pool: Db): Promise<TableColumns> {
   const [publicRows, viewRows, excludedRows, withheldRows] = await Promise.all([
     pool.query<{ table_name: string; column_name: string }>(`
       SELECT c.relname AS table_name, a.attname AS column_name
@@ -107,7 +110,7 @@ export function checkDrift(cols: TableColumns): void {
  *  catalog entry (the view has no primary key of its own; it mirrors the table's). Every one of the
  *  83 production tables has a primary key (verified in the plan §3.3), so there is no fallback case
  *  to design for — a table with none would need one before it could be paginated safely at all. */
-export async function getPrimaryKeyColumns(pool: Pool, table: string): Promise<string[]> {
+export async function getPrimaryKeyColumns(pool: Db, table: string): Promise<string[]> {
   const { rows } = await pool.query<{ attname: string }>(`
     SELECT a.attname
     FROM pg_index i
@@ -129,7 +132,7 @@ export function quoteIdent(id: string): string {
  * each query well inside the readonly pool's 10s statement_timeout without touching that setting.
  */
 export async function* streamTableRows(
-  pool: Pool, table: string, pkCols: string[], chunkSize = 5_000,
+  pool: Db, table: string, pkCols: string[], chunkSize = 5_000,
   since?: { column: string; date: Date },
 ): AsyncGenerator<Record<string, unknown>> {
   const cols = pkCols.map(quoteIdent).join(', ')
