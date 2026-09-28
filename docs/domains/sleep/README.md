@@ -320,3 +320,10 @@ curve). **Before writing anything that treats one row as one night, call the hel
   *"OK · 3/5"* for a value nobody gave, which is the fabricated `Sleep: OK` this entry removed. The
   scale is stored 1 = great … 5 = terrible while its labels run the other way; `storedOrderLabels`
   is the only correct reverse.
+
+- **[`2026-09-28-checkin-announce-and-correct`](../../overview/entries/2026-09-28-checkin-announce-and-correct.md)**
+  — TN-82. The morning check-in stops asking for sleep quality and recovery; it announces the
+  night's verdict with its reason and takes a one-tap correction. **Only a correction writes
+  `touched: true`** — an auto-fill that flagged itself would re-create TN-57. Two traps recorded
+  there: removing the scales removes the numeric answer `dayCheckinHasAnswers` depends on, and
+  **Save is not an acknowledgement** (82 of 82 sheets saved, 3 scales touched).

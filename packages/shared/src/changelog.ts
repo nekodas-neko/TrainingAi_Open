@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.480.0",
+    date: "2026-09-28",
+    changes: [
+      "Changed: the morning check-in no longer asks you to rate your sleep or your recovery. It tells you what it filled in and why \u2014 \u201cSlept 5h10, 1h20 short of your usual. Marked this a poor night.\u201d \u2014 and you only tap if it got it wrong. Your correction is recorded as yours; the app's own guess never is.",
+    ],
+  },
+  {
     version: "1.479.0",
     date: "2026-09-28",
     changes: [
