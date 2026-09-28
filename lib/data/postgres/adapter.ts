@@ -5382,6 +5382,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           const int = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null)
           const bool = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
           const str = (v: unknown): string | null => (typeof v === 'string' ? v : null)
+          const ts = (v: unknown): Date | null => {
+            if (typeof v !== 'string') return null
+            const d = new Date(v)
+            return Number.isNaN(d.getTime()) ? null : d
+          }
           const json = (v: unknown): unknown | null => {
             if (v == null) return null
             if (typeof v === 'string') { try { return JSON.parse(v) } catch { return null } }
@@ -5404,6 +5409,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             trainingLoadGate:      str(p.trainingLoadGate),
             trainingLoadGridLen:   int(p.trainingLoadGridLen),
             trainingLoadValidMin:  int(p.trainingLoadValidMin),
+            trainingLoadEvaluatedAt: ts(p.trainingLoadEvaluatedAt),
             recoveryIndexHours:    num(p.recoveryIndexHours),
             wornHoursBle:          num(p.wornHoursBle),
             nightHrvBaselineMs:    num(p.nightHrvBaselineMs),

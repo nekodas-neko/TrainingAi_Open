@@ -1496,6 +1496,8 @@ export interface OuraDailyDerivedRow {
   /** LA-161: the MET grid length and valid-minute count the gate above was decided from. */
   trainingLoadGridLen: number | null
   trainingLoadValidMin: number | null
+  /** LA-170: when the training-load verdict was computed. Server-only, like `acwr`. */
+  trainingLoadEvaluatedAt: Date | null
   recoveryIndexHours: number | null
   wornHoursBle: number | null
   nightHrvBaselineMs: number | null

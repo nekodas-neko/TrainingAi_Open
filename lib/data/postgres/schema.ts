@@ -1754,6 +1754,8 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   // what the grid actually was rather than against a replay of the same frames.
   trainingLoadGridLen:  integer('training_load_grid_len'),
   trainingLoadValidMin: integer('training_load_valid_min'),
+  // LA-170: when the verdict above was computed, so a finished day can be told from a partial one.
+  trainingLoadEvaluatedAt: timestamp('training_load_evaluated_at', { withTimezone: true }),
 
   recoveryIndexHours: doublePrecision('recovery_index_hours'),
   wornHoursBle:       doublePrecision('worn_hours_ble'),
