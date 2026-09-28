@@ -6484,6 +6484,21 @@ drift.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
+  **🔬 DIAGNOSED 2026-09-28 (Orchestrator), after the owner asked whether both key sets had been
+  tested. There are two NAMING SCHEMES and only one has values.**
+  - `lib/exercise-storage.ts:20-22` reads `AWS_* || STORAGE_*`. Only the **`AWS_*`** set is
+    populated; `.env.local` holds `DATABASE_URL` alone, and `STORAGE_*` is documented in
+    `.env.example` but unset.
+  - The populated set fails across **three regions** (`sin` as configured, `auto`, `us-east-1`) and
+    **three endpoints** (`t3.storageapi.dev` as configured, `t3.storage.dev`,
+    `fly.storage.tigris.dev`) — `SignatureDoesNotMatch` every time. **Region and endpoint are ruled
+    out**, which was worth testing because a wrong region produces this exact error from valid keys.
+  - The values are clean: 54-char `tid_…`, 75-char `tsec_…`, no whitespace or truncation. **So the
+    secret genuinely does not match the access key id** — rotated, or mismatched at paste time.
+  - **⛔ THE TRAP: `AWS_*` WINS.** Adding a correct `STORAGE_*` set while the broken `AWS_*` values
+    are still present **changes nothing** — the `||` takes `AWS_*` first. Either replace the
+    `AWS_*` pair, or unset it and use `STORAGE_*`. Setting both is how this gets "fixed" and stays
+    broken.
 - **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
