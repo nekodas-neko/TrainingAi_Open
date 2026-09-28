@@ -3421,6 +3421,35 @@ which is the right shape for something that can only be validated by living with
 3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
    `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
    only what the requester typed.
+- **② SHIPPED (Lane A, 2026-09-27). ① and ③ are NOT, and each for a reason the entry could not have
+  known. The "one PR" line does not survive them — this is three items, shipping separately.**
+- **② was one line and the old comment argued against it.** `is-active-refresh.ts` read *"a missing
+  row is not evidence of deactivation"* and returned the token untouched, so a deleted account
+  stayed signed in until its token expired — up to seven days. What makes the inversion safe is
+  already in the code: a database outage **throws** and is caught, where the claim stands and nobody
+  is signed out by a blip; reaching the `!user` branch means the query ran and answered "no such
+  user" (`getUserById` returns null only for a non-matching id). The two cases the comment conflated
+  were separated by the language all along. Its test is inverted in place, keeping its intent.
+- **⛔ ① CANNOT BE BUILT WHERE THE ENTRY SAYS, and the alternative costs an APK.**
+  `app/mobile-signin/page.tsx` is a **client** component (`"use client"`, it calls `signIn()` in an
+  effect) — it cannot set an httpOnly cookie, and Next 15 forbids `cookies().set()` during a page
+  render, so making it a server component does not help either. The shapes that work:
+  **(a)** a route handler that sets the cookie and redirects — but then the URL the Android app
+  opens changes, which is a Kotlin change and a **new APK**, the one cost the entry does not
+  mention; **(b)** the client page `POST`s to a small route before calling `signIn`, keeping the
+  URL — no APK, and **it is worth checking whether it actually defends anything**, since a Chrome
+  Custom Tab shares Chrome's cookie jar, so an attacker able to open a URL in that browser sets the
+  cookie to their own challenge and the binding holds for them. **This wants the threat model
+  restated before code.** Recommend (b) only if that question resolves; otherwise the real defence
+  is elsewhere and this entry is describing the wrong control.
+- **⚠ ③ IS NOT SYMMETRIC, and "return only what the requester typed" cannot be done on the list
+  path.** Redaction must apply **only when the viewer is the requester** — the addressee has to see
+  who is asking or they cannot decide, and `rowToFriendship` does not know the viewer.
+  And the typed string is **not stored**: `sendFriendRequest` has `emailOrCode` and can echo it,
+  `listFriendships` has nothing, so an outgoing pending request would render blank where a name is
+  today. Storing it is a column, and **a migration ships alone and is never batched**. So ③ is
+  (i) a migration adding the typed identifier, (ii) a viewer-aware redaction, and (iii) a Lane B
+  change to what a pending outgoing row shows. Not one line, and not this PR.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
