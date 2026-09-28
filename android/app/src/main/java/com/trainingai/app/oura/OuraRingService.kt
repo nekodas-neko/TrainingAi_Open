@@ -741,6 +741,19 @@ class OuraRingService : Service(), OuraGattClient.Listener {
         return true
     }
 
+    /** BF-187: drain when the app opens or resumes, unless a drain finished within [maxAgeMs].
+     *  The staleness decision lives here because only the service knows the truth: it sees the
+     *  hourly autonomous drains, an in-flight one, and survives a WebView reload that would reset
+     *  any clock kept in JS. Returns "started", "fresh", "draining", "not-ready" or "no-ingest". */
+    fun drainIfStale(maxAgeMs: Long): String {
+        if (state != "ready") return "not-ready"
+        if (ingestUrl == null) return "no-ingest"
+        if (draining) return "draining"
+        if (lastDrainCompletedAt != 0L &&
+            SystemClock.elapsedRealtime() - lastDrainCompletedAt < maxAgeMs) return "fresh"
+        return if (startDrain(false)) "started" else "not-ready"
+    }
+
     fun status(): JSONObject = JSONObject()
         .put("state", state)
         .put("battery", battery ?: JSONObject.NULL)
@@ -752,6 +765,8 @@ class OuraRingService : Service(), OuraGattClient.Listener {
         .put("serviceUptimeMs", SystemClock.elapsedRealtime() - serviceStartedAt)
         .put("consecutiveFailures", consecutiveFailures)
         .put("draining", draining)
+        .put("lastDrainAgeMs", if (lastDrainCompletedAt == 0L) JSONObject.NULL
+            else SystemClock.elapsedRealtime() - lastDrainCompletedAt)
         .put("cursorDs", getSharedPreferences("oura_ble", MODE_PRIVATE).getLong("history_cursor_ds", 0L))
         .put("ingestPosted", ingestPosted)
         .put("ingestStored", ingestStored)

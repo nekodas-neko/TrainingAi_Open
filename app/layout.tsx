@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { MotionConfig } from "motion/react";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { HealthConnectProvider } from "@/components/health-connect-provider";
+import { StatusBarScrim } from "@/components/shell/status-bar-scrim";
 import { MobileAuthHandler } from "@/components/mobile-auth-handler";
 import { SyncProvider } from "@/components/sync-provider";
 import { TabSwipeNavigator } from "@/components/shell/tab-swipe-navigator";
@@ -170,6 +171,10 @@ export default async function RootLayout({
               <ErrorReporter />
               <NavTimingProbe />
               <main className="relative z-[1] h-full">{children}</main>
+              {/* DV-22: outside <main> on purpose — it is z-40 at the root level, so it paints
+                  over the page (z-[1]) and under the warning banners (z-[60]), which is the
+                  same order it had inside the tab shell. */}
+              <StatusBarScrim />
               <Toaster />
               <OfflineIndicator />
               <LocalStoreDeadBanner />

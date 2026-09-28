@@ -107,7 +107,7 @@ exists yet).
    + the Comparison harness admin console. Sandbox-verified end-to-end (unit tests, DB-backed repo test,
    live `pnpm dev` run against local Postgres). **⚠ D-verify gate NOT yet run** — no real H10 spot-check
    burst has happened; the ±5bpm tolerance is a first tripwire, unvalidated until the owner runs one. See
-   `docs/overview/entries/2026-07-27-d6-comparison-harness.md` and the `projectOverview.md` Known Issues row.
+   `docs/overview/history-2026-07-23.md#2026-07-27-d6-comparison-harness` and the `projectOverview.md` Known Issues row.
 2. ✅ **D5 — own daytime-HRV [mixed, needs D6 done] — SHIPPED 2026-07-27 (v1.218.0).**
    `lib/health/daytime-hrv-model.ts` (extraction/fit/evaluate — closed-form 3×3 OLS on this user's
    own night-time `0x5d` events; MET is an evaluation-time gate, not a fit feature) + migration 149

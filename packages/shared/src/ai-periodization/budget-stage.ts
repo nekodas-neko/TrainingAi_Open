@@ -20,6 +20,7 @@ import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
 import { durationDirection, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 /** One exercise as the budget stage receives it — its PRE-budget shape. `sets` is the only
  *  field the stage changes; reps/pct/restSec are read-only inputs to the duration estimate. */
@@ -77,7 +78,7 @@ export function buildTimedExercises(
     }))
     return {
       sessionExerciseId: ex.sessionExerciseId,
-      role: sig?.role ?? 'primary',
+      role: sig?.role ?? UNCLASSIFIED_EXERCISE_ROLE,
       sets: ex.sets,
       reps: ex.reps,
       restSec: ex.restSec,

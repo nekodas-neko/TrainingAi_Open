@@ -1,10 +1,10 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useShallow } from 'zustand/react/shallow'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
-import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
+import { useGuidedWalkStore, MIN_WALK_SEC } from '@/lib/stores/guided-walk-store'
 import { buildIntervalPlan, segmentAt } from '@/lib/walk/interval-plan'
 import { scheduleWalkCues, cancelWalkCues } from '@/lib/walk/walk-cues'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
@@ -35,14 +35,9 @@ export interface WalkHrSample { at: number; bpm: number }
 
 const STALE_MS = 8_000
 
-/**
- * BF-191 — below this, ending a walk offers to discard it instead of saving it.
- *
- * The owner asked for "a mix of min floor duration + confirm on exit". `MIN_SESSION_SEC` (120s,
- * `time-audit.ts`) is the repo's precedent for this shape but is a WORKOUT floor; two minutes of
- * walking is a real walk, so this is its own number rather than a reused one.
- */
-export const MIN_WALK_SEC = 60
+// MIN_WALK_SEC moved to the store (LB-141) so the tab bar can read it; re-exported because
+// this is where callers have always found it.
+export { MIN_WALK_SEC }
 
 export function WalkActive({ userProfile, onFinish, onDiscard }: {
   userProfile: { age: number | null; restingHr: number; hrMax: number }
@@ -55,6 +50,8 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
 }) {
   const config = useGuidedWalkStore(s => s.config)
   const startedAtMs = useGuidedWalkStore(s => s.startedAtMs)
+  const finishRequested = useGuidedWalkStore(s => s.finishRequested)
+  const clearFinishRequest = useGuidedWalkStore(s => s.clearFinishRequest)
   const { rawPoints, distanceKm, currentPaceSecPerKm, recentSpeedKmh } = useGuidedWalkStore(useShallow(s => ({
     rawPoints: s.rawPoints, distanceKm: s.distanceKm, currentPaceSecPerKm: s.currentPaceSecPerKm,
     recentSpeedKmh: s.recentSpeedKmh,
@@ -71,6 +68,10 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
   const onDiscardRef = useRef(onDiscard)
   onDiscardRef.current = onDiscard
   const [elapsedSec, setElapsedSec] = useState(0)
+  // Read by `endWalk`, which must stay stable: the finish-request effect below would otherwise
+  // re-run once a second.
+  const elapsedRef = useRef(0)
+  elapsedRef.current = elapsedSec
   const [liveBpm, setLiveBpm] = useState<number | null>(null)
   const [lastBeatAt, setLastBeatAt] = useState<number | null>(null)
   const [confirmEndOpen, setConfirmEndOpen] = useState(false)
@@ -148,6 +149,32 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
       void tracker.stop()
     }
   }, [startedAtMs])
+
+  /**
+   * End the walk the way the End button does: save it, or discard it below the floor.
+   *
+   * LB-141 made this reachable from outside this screen — the tab bar and the back gesture now ask
+   * rather than discarding silently, and their Save has to run THIS, because the HR samples and the
+   * cadence tracker live in refs here and the write happens on `WalkSummary`'s mount.
+   */
+  const endWalk = useCallback(() => {
+    setConfirmEndOpen(false)
+    if (finishedRef.current) return
+    finishedRef.current = true
+    if (elapsedRef.current < MIN_WALK_SEC) {
+      onDiscardRef.current()
+      return
+    }
+    onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null, elapsedRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (!finishRequested) return
+    // Cleared first: `endWalk` unmounts this screen, and a flag left set would end the next walk
+    // the moment it started.
+    clearFinishRequest()
+    endWalk()
+  }, [finishRequested, clearFinishRequest, endWalk])
 
   // 1 Hz tick resyncing from wall-clock so backgrounding never desyncs the timer.
   useEffect(() => {
@@ -298,16 +325,7 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
         outcome={elapsedSec < MIN_WALK_SEC ? 'discard' : 'save'}
         elapsedSec={elapsedSec}
         onStay={() => setConfirmEndOpen(false)}
-        onLeave={() => {
-          setConfirmEndOpen(false)
-          if (finishedRef.current) return
-          finishedRef.current = true
-          if (elapsedSec < MIN_WALK_SEC) {
-            onDiscardRef.current()
-            return
-          }
-          onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null, elapsedSec)
-        }}
+        onLeave={endWalk}
       />
     </div>
   )

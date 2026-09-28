@@ -66,6 +66,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [types, setTypes] = useState<ActivityType[]>([])
   const [selected, setSelected] = useState<ActivityLog | null>(null)
+  const [failed, setFailed] = useState(false)
   // D-4: activity writes are local+outbox, so an offline/unsynced activity lives only
   // in the local store. The server list must be UNION'd with those pending rows, not
   // replace them — otherwise the walk the user just logged vanishes when the server
@@ -107,7 +108,11 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
         const serverIds = new Set(server.map(s => s.id))
         // Retain any local pending row the server hasn't yet acknowledged.
         setLogs([...server, ...pendingLocalRef.current.filter(p => !serverIds.has(p.id))])
+        setFailed(false)
       },
+      // LB-176: "No activities this week" is a claim about his week. Only make it once the week was
+      // actually read.
+      { onError: () => setFailed(true) },
     )
   }, [userId])
 
@@ -141,7 +146,9 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
         )}
       </div>
       {weekLogs.length === 0 ? (
-        <p className="px-4 py-4 text-center text-xs text-muted-foreground">No activities this week</p>
+        <p className="px-4 py-4 text-center text-xs text-muted-foreground">
+          {failed ? "Couldn't load this week's activities" : 'No activities this week'}
+        </p>
       ) : (
         <div className="divide-y divide-border/50">
           {weekLogs.map(log => {

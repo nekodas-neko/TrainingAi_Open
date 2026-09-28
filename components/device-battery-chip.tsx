@@ -51,6 +51,14 @@ export interface DeviceBattery {
   charging?: boolean
   /** How old the reading is. 0 for a live one. */
   ageMinutes: number
+  /**
+   * Set when `percent` is a LOW-WATER MARK rather than the current reading (BF-215, the strap).
+   *
+   * A CR2025 sags under a sustained BLE session and recovers at rest, so the resting value stays
+   * high until the cell is nearly dead. The drawn number is the sag, because that is the one that
+   * warns; this carries what it actually is, for the accessible name and the tone.
+   */
+  low?: { restingPercent: number; ageMinutes: number }
 }
 
 function ageText(ageMinutes: number): string {
@@ -59,7 +67,11 @@ function ageText(ageMinutes: number): string {
   return hours < 48 ? `${Math.round(hours)}h ago` : `${Math.round(hours / 24)}d ago`
 }
 
-function describe({ label, percent, charging, ageMinutes }: DeviceBattery): string {
+function describe({ label, percent, charging, ageMinutes, low }: DeviceBattery): string {
+  // The `%` lives here rather than on the glass, so this is the only place the number is explained —
+  // and a low-water mark that announced itself as a live level would be the defect BF-215 fixed,
+  // wearing a different hat.
+  if (low) return `${label} battery ${percent}% at its lowest ${ageText(low.ageMinutes)}, ${low.restingPercent}% at rest`
   if (ageMinutes > STALE_AFTER_MINUTES) return `${label} battery ${percent}%, last seen ${ageText(ageMinutes)}`
   return `${label} battery ${percent}%${charging ? ', charging' : ''}`
 }

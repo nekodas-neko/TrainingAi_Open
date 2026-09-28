@@ -19,6 +19,7 @@ import { StyleEditorSheet } from "@/components/config/style-editor-sheet";
 import { WorkoutReviewSheet } from "@/components/workout/review/workout-review-sheet";
 import { PhaseSetEditorSheet } from "@/components/config/phase-set-editor-sheet";
 import { ProgramEditorSheet, type EditableSession } from "@/components/config/program-editor-sheet";
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
 interface EditableSet { key: string; pct: number; reps: number; restSec?: number; useFor1rm?: boolean }
 
@@ -395,7 +396,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                 name: ex.exerciseName,
                 styleId: ex.styleId,
                 styleName: ex.styleId ? (styles.find(s => s.id === ex.styleId)?.name ?? "") : "",
-                exerciseRole: ex.exerciseRole ?? 'primary',
+                exerciseRole: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
                 muscleGroups: ex.muscleGroups,
                 mainMuscles,
                 secondaryMuscles,
@@ -447,7 +448,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
             id: e.id, // keep the DB id so saveProgram doesn't re-mint it (orphaning baseline 1RMs)
             exerciseName: e.name.trim(),
             styleId: e.styleId ?? undefined,
-            exerciseRole: e.exerciseRole ?? 'primary',
+            exerciseRole: e.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
             muscleGroups: e.muscleGroups ?? [],
             position: i,
             supersetGroup: e.supersetGroup ?? null,

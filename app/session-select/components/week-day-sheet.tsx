@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react"
+import { formatLoadKg } from '@trainingai/shared/format/units'
 import { MoonStarIcon, WeightIcon, FootprintsIcon, FlameIcon, BeefIcon, BarChart3Icon, type LucideIcon } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache"
@@ -119,7 +120,7 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
                             <p className="text-sm font-medium truncate flex-1">{ex.name}</p>
                             <p className="text-[11px] text-muted-foreground text-right flex-none tabular-nums">
                               {ex.setWeights.length > 0
-                                ? `${ex.setWeights[0]}kg × ${ex.reps.join(", ")}`
+                                ? `${formatLoadKg(ex.setWeights[0])} × ${ex.reps.join(", ")}`
                                 : ex.sets != null ? `${ex.sets} sets` : ""}
                             </p>
                           </button>

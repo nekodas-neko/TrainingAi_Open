@@ -41,7 +41,7 @@ const EXEMPT = new Set(['components/more/oura-section.tsx'])
 
 const sources = ROOTS
   .flatMap(d => walk(join(repoRoot, d)))
-  .map(f => ({ file: f.slice(repoRoot.length + 1), code: stripComments(readFileSync(f, 'utf8')) as string }))
+  .map(f => ({ file: f.slice(repoRoot.length + 1).replace(/\\/g, '/'), code: stripComments(readFileSync(f, 'utf8')) as string }))
 
 describe('RV-208 — durations', () => {
   it('has sources to scan, or it is checking nothing', () => {

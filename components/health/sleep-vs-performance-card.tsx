@@ -10,6 +10,16 @@ import type { SleepCorrelationResponse } from '@/app/api/sleep-performance-corre
  * small bar chart of how each sleep-duration bucket moves your lifts vs baseline (up = better),
  * replacing the flat number tiles so the pattern is visible at a glance.
  */
+/**
+ * **LB-176 — a failed read used to remove this card from the screen.** `health-sections.tsx` rendered it
+ * only when `sleepCorr` was non-null, and `useCachedValue` returns null for a failure exactly as it does
+ * while loading, so a 500 on `/api/sleep-performance-correlation` took the whole card away with nothing
+ * saying why. That is RV-150's silent-vanish class rather than this entry's false-"No data" one, and it
+ * is the same rule's other half; the caller now draws a "Couldn't load" line in its place.
+ *
+ * Note this component's own "Not enough data yet" is CORRECT — it reads `sleepCorr.hasSufficientData`
+ * from a payload it actually has, so it never speaks for a request that failed.
+ */
 export function SleepVsPerformanceCard({ sleepCorr }: { sleepCorr: SleepCorrelationResponse }) {
   const [open, setOpen] = useState(false)
   const buckets = sleepCorr.buckets ?? []

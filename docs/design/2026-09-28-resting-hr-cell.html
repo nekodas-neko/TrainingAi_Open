@@ -1,0 +1,140 @@
+<title>Resting HR Cell</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --page-bg:#0c1110; --page-panel:#131a18; --page-line:#22302c;
+    --page-fg:#e8efec; --page-dim:#93a49e; --page-accent:#00e07a; --page-warn:#ff8f6b;
+    --background: oklch(0.145 0.020 149);
+    --card:       oklch(0.185 0.028 149);
+    --foreground: oklch(0.985 0 0);
+    --muted-foreground: oklch(0.75 0 0);
+    --border:     oklch(1 0 0 / 7%);
+    --brand:      oklch(0.723 0.219 149.579);
+    --cyan:       oklch(0.62 0.18 210);
+    --amber:      oklch(0.70 0.18 75);
+    --rose:       oklch(0.65 0.19 15);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);color:var(--page-fg);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    line-height:1.55;padding-block:32px;padding-left:16px;padding-right:16px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+  .sub{color:var(--page-dim);margin:0 0 6px;max-width:64ch}
+  .meta{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--page-dim);
+        text-transform:uppercase;letter-spacing:.09em;margin:0 0 26px}
+  section{border-top:1px solid var(--page-line);padding-block:26px 8px}
+  h2{font-size:18px;margin:0 0 10px;font-weight:600}
+  .ask{margin:0 0 18px;max-width:66ch}
+  .pair{display:flex;gap:18px;overflow-x:auto;padding-bottom:12px}
+  .pane{flex:0 0 auto}
+  .cap{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+        padding:3px 8px;border-radius:999px;font-weight:600}
+  .chip.now{background:rgba(255,143,107,.14);color:var(--page-warn);border:1px solid rgba(255,143,107,.3)}
+  .chip.a{background:rgba(0,224,122,.13);color:var(--page-accent);border:1px solid rgba(0,224,122,.32)}
+  .chip.b{background:rgba(255,255,255,.07);color:var(--page-fg);border:1px solid var(--page-line)}
+  .cap .w{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--page-dim)}
+  .phone{width:384px;background:var(--background);border:1px solid var(--page-line);border-radius:22px;
+    overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--foreground)}
+  .screen{padding:16px 0}
+  .cells{display:flex;gap:6px;justify-content:center}
+  .cell{width:82px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .ring{width:66px;height:66px;border-radius:999px;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;position:relative}
+  .ring svg{position:absolute;inset:0}
+  .val{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .unit{font-size:9px;color:var(--muted-foreground);line-height:1;margin-top:2px}
+  .lab{font-size:9.5px;color:var(--muted-foreground);text-align:center;line-height:1.15;margin-top:3px}
+  .flag{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.06em;text-align:center;
+        border:1px dashed rgba(255,143,107,.45);color:var(--page-warn);border-radius:7px;padding:3px 5px;margin-top:6px}
+  .flag.ok{border-color:rgba(0,224,122,.42);color:var(--page-accent)}
+  .note{margin:14px 0 0;padding:12px 14px;background:var(--page-panel);border:1px solid var(--page-line);
+        border-left:3px solid var(--page-accent);border-radius:0 8px 8px 0;font-size:13.5px;max-width:66ch}
+  .note.cost{border-left-color:var(--page-warn)}
+  .note + .note{margin-top:8px}
+  table{border-collapse:collapse;font-size:13px;margin-top:14px}
+  td,th{border-bottom:1px solid var(--page-line);padding:6px 14px 6px 0;text-align:left}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--page-dim)}
+  td.n{font-variant-numeric:tabular-nums;color:var(--page-warn);font-weight:600}
+  footer{border-top:1px solid var(--page-line);margin-top:32px;padding-top:18px;color:var(--page-dim);font-size:13px}
+  footer b{color:var(--page-fg)}
+</style>
+
+<div class="wrap">
+  <h1>Resting HR cell</h1>
+  <p class="sub">Three of the four cells on Home are 0–100 scores. The fourth is a heart rate, drawn in the same ring at the same weight — so <b>58</b> reads as a score. Both fixes the original entry proposed turn out not to fit.</p>
+  <p class="meta">LB-172 · 2026-09-28 · measured in the harness at 384 px dark, cell width 82 px</p>
+
+  <section>
+    <h2>Why the obvious fixes are not available</h2>
+    <table>
+      <tr><th>Proposed</th><th>Measures</th><th>Against</th><th>Verdict</th></tr>
+      <tr><td><code>"58 bpm"</code> at the value's font</td><td class="n">140 px</td><td>82 px cell</td><td>1.7× the whole cell</td></tr>
+      <tr><td><code>"Resting HR (bpm)"</code> in the label</td><td class="n">97 px</td><td>60 px label today</td><td>overflows by 15 px</td></tr>
+    </table>
+    <p class="note" style="margin-top:16px">What <i>is</i> free: the caption slot under the number. The component already draws one there for the cue word at 7.5 px, and in the <b>default</b> style that slot renders nothing. A <code>bpm</code> caption at ~9 px costs about 22 px under a 46 px number.</p>
+  </section>
+
+  <section>
+    <h2>The fork — and it exists because there are nineteen ring styles</h2>
+    <p class="ask"><code>SCORE_RING_STYLES</code> is user-selectable and you have picked between nineteen of them. <b><code>nolabel</code> removes the label on purpose</b> — the glyph is the name — so a unit caption there fights the premise of the style, and <code>overlap</code> has no caption slot at all. No single treatment is right for all nineteen. That is the whole question.</p>
+
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip now">Now — default style</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="cells">
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--brand)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="53" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">72</span></div><div class="lab">Readiness</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="36" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">81</span></div><div class="lab">Sleep</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--amber)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="68" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">64</span></div><div class="lab">Activity</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--rose)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="80" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">58</span></div><div class="lab">Resting HR</div></div>
+          </div>
+          <div style="padding:0 16px"><div class="flag">“58” IS A HEART RATE, DRAWN AS A SCORE</div></div>
+        </div></div>
+      </div>
+
+      <div class="pane">
+        <div class="cap"><span class="chip a">A — unit caption</span><span class="w">recommended</span></div>
+        <div class="phone"><div class="screen">
+          <div class="cells">
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--brand)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="53" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">72</span></div><div class="lab">Readiness</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="36" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">81</span></div><div class="lab">Sleep</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--amber)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="68" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">64</span></div><div class="lab">Activity</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--rose)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="80" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">58</span><span class="unit">bpm</span></div><div class="lab">Resting HR</div></div>
+          </div>
+          <div style="padding:0 16px"><div class="flag ok">ONE WORD, IN A SLOT THAT RENDERS NOTHING TODAY</div></div>
+        </div></div>
+      </div>
+
+      <div class="pane">
+        <div class="cap"><span class="chip b">B — different treatment</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="cells">
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--brand)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="53" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">72</span></div><div class="lab">Readiness</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="36" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">81</span></div><div class="lab">Sleep</div></div>
+            <div class="cell"><div class="ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="33" cy="33" r="30" fill="none" stroke="var(--amber)" stroke-width="4" stroke-dasharray="188" stroke-dashoffset="68" stroke-linecap="round" transform="rotate(-90 33 33)"/></svg><span class="val">64</span></div><div class="lab">Activity</div></div>
+            <div class="cell">
+              <div class="ring" style="border:1px dashed rgba(255,255,255,.16);border-radius:14px;width:66px;height:66px">
+                <span class="val" style="font-size:20px">58</span><span class="unit">bpm</span>
+              </div>
+              <div class="lab">Resting HR</div>
+            </div>
+          </div>
+          <div style="padding:0 16px"><div class="flag ok">NO RING — IT IS NOT A SCORE, SO IT IS NOT DRAWN AS ONE</div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <p class="note"><b>A — a <code>bpm</code> caption under the number, recommended.</b> One word, in a slot that renders nothing in the default style, reversible in one component. It does not re-open a visual language you have already chosen between nineteen times.</p>
+    <p class="note"><b>B — drop the ring on the HR cell.</b> The honest version of "it is not a score": a ring encodes 0–100 progress, and 58 bpm has no such scale. It fixes every one of the nineteen styles at once, including the ones A cannot reach.</p>
+    <p class="note cost"><b>Where A deliberately does nothing, and it is the case against it.</b> You can choose <code>nolabel</code>, which removes the label because the glyph is the name, and <code>overlap</code>, which has no caption slot. In those two, A changes nothing and <b>58 still reads as a score with nothing naming the metric at all</b> — which is where the ambiguity is worst. If you use either style, pick B.</p>
+    <p class="note cost"><b>Not device-verified.</b> Drawn from the measured geometry, not screenshotted on the S25 — the row needs live scores. Whichever wins owes a device look, especially B, which changes a shape rather than adding a word.</p>
+  </section>
+
+  <footer>
+    <p><b>What I need:</b> A or B. If you regularly use the <code>nolabel</code> or <code>overlap</code> ring style, say so — that alone decides it for B.</p>
+    <p>Reversal cost is low either way: one component, no stored data.</p>
+  </footer>
+</div>

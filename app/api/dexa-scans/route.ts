@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 
 // BF-41 / BF-2: where a DEXA scan lands. Hand entry today; the crop-and-extract surface (Lane B)
 // posts the same shape once the owner has confirmed the parsed fields, which is why `source`
@@ -36,7 +37,7 @@ const RegionSchema = z.object({
 const PostSchema = z.object({
   // Both separators: the client's `localDateString()` emits YYYY/MM/DD, and a dash-only regex
   // rejects every real request before the handler runs.
-  scannedOn: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
+  scannedOn: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
 
   manufacturer: z.string().max(120).nullish(),
   model: z.string().max(120).nullish(),

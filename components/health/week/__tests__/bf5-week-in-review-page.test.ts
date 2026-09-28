@@ -111,7 +111,12 @@ describe('BF-5 — the banner becomes the entry point', () => {
   it('drops forceOpen, whose only caller was the deep link that now lands on the page', () => {
     expect(banner).not.toContain('forceOpen')
     const home = code('app/session-select/session-select-content.tsx')
-    expect(home).toContain('<WeeklyRecapBanner />')
+    // RV-119 moved the banner one file deeper: Home renders `HomeBannerStack`, and the stack renders
+    // the banner (collapsed behind the strip). The claim this pins is unchanged — the banner is
+    // still on Home rather than reachable only by a deep link — so it follows the render site.
+    expect(home, 'Home no longer renders the banner stack').toContain('<HomeBannerStack')
+    expect(code('components/home/home-banner-stack.tsx'), 'the weekly recap left Home entirely')
+      .toContain('<WeeklyRecapBanner />')
     expect(home, 'the review=week reader goes with it').not.toMatch(/get\("review"\)/)
   })
 })

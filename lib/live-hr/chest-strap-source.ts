@@ -230,7 +230,7 @@ export class ChestStrapSource implements LiveHrSource {
       await ble.initialize()
       await ble.connect(this.deviceId, () => { this.onDisconnected(ble) })
       await ble.startNotifications(this.deviceId, HR_SERVICE, HR_MEASUREMENT, value => {
-        const parsed = parseHeartRateMeasurement(new Uint8Array(value.buffer))
+        const parsed = parseHeartRateMeasurement(new Uint8Array(value.buffer, value.byteOffset, value.byteLength))
         if (!parsed) return
         this.gattConnected = true
         this.reconnectAttempt = 0

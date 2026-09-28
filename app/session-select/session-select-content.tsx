@@ -49,21 +49,14 @@ import { PullToSync } from "@/components/pull-to-sync";
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
-import { EarlyDeloadCard } from "@/components/home/early-deload-card";
-import { GoalsCheckinCard } from "@/components/home/goals-checkin-card";
-import { WeeklyRecapBanner } from "@/components/weekly-recap-banner";
-import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { HomeCardWidget } from "@/components/home/home-card-widget";
 import type { CardSectionKey } from "@/components/home/home-card-widget";
 import { OuraScoreChipRow } from "@/components/oura-score-chip-row";
 import { IllnessAdvisoryBanner } from "@/components/home/illness-advisory-banner";
+import { HomeBannerStack } from "@/components/home/home-banner-stack";
 import { BodyBatteryCard } from "@/components/body-battery-card";
 import { HomeDayTimeline } from "@/components/home-day-timeline";
 import { initialsOf } from '@/lib/initials';
-const ExerciseDetectedCard = dynamic(
-  () => import("@/components/activity/exercise-detected-card").then(m => ({ default: m.ExerciseDetectedCard })),
-  { ssr: false },
-);
 const ExerciseReviewSheet = dynamic(
   () => import("@/components/activity/exercise-review-sheet").then(m => ({ default: m.ExerciseReviewSheet })),
   { ssr: false },
@@ -87,9 +80,10 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
-import { computeStreak } from "./compute-streak";
+import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
+import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 
 // Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
@@ -140,6 +134,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const localDay = useLocalDay();
   // Bound once so the identity is stable for the children that take it as a prop.
   const dayKey = useCallback((daysAgo = 0) => dayKeyInTz(tz, daysAgo), [tz]);
+  const [streakSchedule, setStreakSchedule] = useState<StreakSchedule>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
@@ -167,7 +162,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const sectionOrderRef = useRef<SectionKey[]>(buildDefaultOrder([]));
   const [hiddenSections, setHiddenSections] = useState<Set<SectionKey>>(() => new Set());
   const [readiness, setReadiness] = useState<import('@/app/api/readiness-score/route').ReadinessScoreResponse | null>(null)
-  const [bodyBattery, setBodyBattery] = useState<import('@/app/api/body-battery/route').BodyBatteryResponse | null>(null)
+  const { battery: bodyBattery, failed: bodyBatteryFailed } = useBodyBattery(refreshTick)
   const [weeklyTarget, setWeeklyTarget] = useState(5)
   const [isAiDynamic, setIsAiDynamic] = useState(false)
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null)
@@ -313,11 +308,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       // Set unconditionally — the chip row hides each chip whose own value is null, so we no
       // longer gate the whole row on the all-or-nothing hasSufficientData flag (per-chip gating).
       if (cachedReadiness) setReadiness(cachedReadiness);
-    } catch { /* ignore */ }
-
-    try {
-      const cachedBattery = readTodayCacheSync<import('@/app/api/body-battery/route').BodyBatteryResponse>('body-battery');
-      if (cachedBattery) setBodyBattery(cachedBattery);
     } catch { /* ignore */ }
 
     // Seed mood from cache so the recommendation card shows immediately instead
@@ -540,6 +530,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
+            setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
             if (!aiDynamic && metaData?.program?.schedule) {
               setWeeklyTarget(getScheduledSessionsPerWeek(metaData.program as unknown as Program));
             }
@@ -815,13 +806,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   }, [userId, tz, localDay]);
 
   useEffect(() => {
-    cachedFetchToday<import('@/app/api/body-battery/route').BodyBatteryResponse>(
-      'body-battery', '/api/body-battery', BODY_BATTERY_TTL,
-      d => { if (d) setBodyBattery(d) },
-    ).catch(() => {});
-  }, [refreshTick]);
-
-  useEffect(() => {
     if (activeCardWidgets.includes("acwrWidget")) {
       cachedFetchToday<TrainingLoadResponse>(
         'training-load', '/api/training-load', TTL_MEDIUM,
@@ -1039,7 +1023,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     });
   }, [trainedDays, tz]);
 
-  const streak = useMemo(() => computeStreak(trainedDays, dayKey), [trainedDays]);
+  const streak = useMemo(() => computeStreak(trainedDays, todayInTz(tz), streakSchedule), [trainedDays, tz, streakSchedule]);
 
   // This Week: Mon → today count (not rolling 7-day)
   const weekSessionCount = useMemo(
@@ -1146,44 +1130,35 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}
 
         {/* ── Body Battery ── */}
-        {bodyBattery && <BodyBatteryCard battery={bodyBattery} />}
+        {bodyBattery
+          ? <BodyBatteryCard battery={bodyBattery} />
+          // Only when there is nothing cached to show: a stale arc beats a banner, and this screen's
+          // other reads take the same posture.
+          : bodyBatteryFailed && (
+            <div className="mx-4 mb-3 rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs text-muted-foreground">
+                Couldn&rsquo;t load your body battery &mdash; pull to refresh.
+              </p>
+            </div>
+          )}
 
-        {/* ── Auto-detected walk/run review prompt (hides itself when none pending) ── */}
-        <div className="mx-4">
-          <ExerciseDetectedCard onReview={handleExerciseDetectedReview} />
-        </div>
-
-        {readiness?.earlyDeloadRecommended && !earlyDeloadDismissed && (
-          <div className="mx-4 mb-3">
-            <EarlyDeloadCard
-              onConfirm={handleEarlyDeloadConfirm}
-              onDismiss={handleEarlyDeloadDismiss}
-              reason={readiness.earlyDeload}
-            />
-          </div>
-        )}
-
-        {showGoalsCheckin && (
-          <div className="mx-4 mb-3">
-            <GoalsCheckinCard onReviewNow={handleGoalsReviewNow} onRemindLater={handleGoalsRemindLater} />
-          </div>
-        )}
-
-        {!dayReviewDismissed && (
-          <DismissibleBanner
-            title="Your day in review is ready"
-            // Q-112a — one door. This opened a second, thinner review only Home had; the real one
-            // lives on Nutrition, with the meal types, logs and targets it needs.
-            onActivate={() => navigateToTab(router, "/nutrition?review=day")}
-            onDismiss={() => {
-              localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
-              setDayReviewDismissed(true);
-            }}
-          />
-        )}
-
-        {/* ── Weekly recap notification (self-hides once dismissed or generated) ── */}
-        <WeeklyRecapBanner />
+        {/* ── RV-119: early deload full-width, the other four behind one strip ── */}
+        <HomeBannerStack
+          readiness={readiness}
+          earlyDeloadDismissed={earlyDeloadDismissed}
+          onEarlyDeloadConfirm={handleEarlyDeloadConfirm}
+          onEarlyDeloadDismiss={handleEarlyDeloadDismiss}
+          onExerciseDetectedReview={handleExerciseDetectedReview}
+          showGoalsCheckin={showGoalsCheckin}
+          onGoalsReviewNow={handleGoalsReviewNow}
+          onGoalsRemindLater={handleGoalsRemindLater}
+          dayReviewDismissed={dayReviewDismissed}
+          onDayReviewActivate={() => navigateToTab(router, "/nutrition?review=day")}
+          onDayReviewDismiss={() => {
+            localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
+            setDayReviewDismissed(true);
+          }}
+        />
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">
@@ -1195,6 +1170,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               // rendered nothing until someone remembered to add its line.
               if (key.startsWith("card_")) return (
                 <HomeCardWidget
+                  userId={userId}
                   sectionKey={key as CardSectionKey}
                   sectionEditMode={sectionEditMode}
                   activeCardWidgets={activeCardWidgets}

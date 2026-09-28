@@ -17,7 +17,7 @@ largest is Q-249, which gave the repo its first tests that actually run the appl
 | #1387 | Q-297 Health per-tab E2E coverage | — |
 | #1390 | Q-297 water write-path spec · Q-309 filed | **STILL OPEN — see below** |
 
-Journal entries: `docs/overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`,
+Journal entries: `docs/overview/history-2026-08-15.md#2026-08-15-nutrition-day-guard-and-deload-bar`,
 `2026-08-15-readiness-card-optimistic-flip.md`, `2026-08-15-e2e-harness.md`,
 `2026-08-15-device-verification-retag.md`, `2026-08-15-health-per-tab-e2e.md`.
 

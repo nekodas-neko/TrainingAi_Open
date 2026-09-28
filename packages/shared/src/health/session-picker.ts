@@ -1,5 +1,5 @@
 import type { ZoneQuota } from './zone-quota'
-import type { HrZone } from './hr-zones'
+import { HR_ZONE_META, type HrZone } from './hr-zones'
 
 // Recommends which cardio modality to open for a given time budget, combining the running
 // program's own gate/prescription (read from its public API — never recomputed here, per
@@ -82,6 +82,5 @@ export function recommendSession(input: {
   }
 }
 
-const ZONE_LABELS: Record<HrZone['id'], string> = {
-  1: 'Recovery', 2: 'Light', 3: 'Aerobic', 4: 'Hard', 5: 'Peak',
-}
+// TN-32: read from the one zone table rather than typed a second time.
+const ZONE_LABELS = Object.fromEntries(HR_ZONE_META.map(z => [z.id, z.name])) as Record<HrZone['id'], string>

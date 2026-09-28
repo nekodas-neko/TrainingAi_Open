@@ -20,6 +20,7 @@ const repo = {
   getLatestOuraCloudVitals: vi.fn(async (_u: string) => null),
   getMoodLog: vi.fn(async (_u: string, _d: string) => null),
   getUserById: vi.fn(async (_u: string) => ({ timezone: 'Australia/Brisbane', dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180 })),
+  getUserGoals: vi.fn(async (_u: string) => ({ stepsGoal: null })),
   upsertOuraDailyDerived: vi.fn(async () => undefined),
   upsertOuraDailySummary: vi.fn(async () => undefined),
 }

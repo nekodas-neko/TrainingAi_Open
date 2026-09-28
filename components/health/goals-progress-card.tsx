@@ -5,6 +5,7 @@ import { usePersistedPreference } from '@/lib/user/preferences-sync'
 import { Footprints, Flame, Droplet, Moon, Dumbbell, type LucideIcon } from 'lucide-react'
 import { accentCardStyle } from '@trainingai/shared/utils'
 import { GoalProgressBar } from './goal-progress-bar'
+import { EmptyState } from '@/components/ui/empty-state'
 import type { UserGoals } from '@/lib/data/repository'
 import type { BodyMetaRow, WeekToDate } from '@/app/api/body-metadata/route'
 import type { ProgressSummaryResponse } from '@/app/api/progress-summary/route'
@@ -28,11 +29,13 @@ interface GoalsProgressCardProps {
   weekToDate: WeekToDate | null
   userGoals: UserGoals | null
   progressSummary: ProgressSummaryResponse | null
+  /** LB-176 — a read feeding these rows FAILED, as opposed to there being no goals set. */
+  failed?: boolean
 }
 
 const GOALS_VIEW_KEY = 'ta_goals_progress_view'
 
-export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, weekToDate, userGoals, progressSummary }: GoalsProgressCardProps) {
+export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, weekToDate, userGoals, progressSummary, failed = false }: GoalsProgressCardProps) {
   const [view, setView] = useState<'today' | 'week'>(() => {
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem(GOALS_VIEW_KEY) : null
@@ -86,7 +89,14 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
   }
 
   const visibleRows = rows.filter(r => r.value != null && r.goal != null && r.goal > 0)
-  if (visibleRows.length === 0) return null
+  // LB-176. `return null` is right for an account with no goals set and wrong for a read that failed —
+  // the card simply left the screen. A vanish is the other half of the same rule as a false "No data"
+  // (RV-150): say which happened.
+  if (visibleRows.length === 0) {
+    return failed
+      ? <EmptyState title="Couldn't load your goals" />
+      : null
+  }
 
   return (
     <div className="rounded-2xl p-4" style={accentCardStyle('#22c55e')}>

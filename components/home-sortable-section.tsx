@@ -36,7 +36,13 @@ export function HomeSortableSection({ id, index, editMode, onHide, children }: P
 
   return (
     <div
-      ref={ref}
+      // **The ref is attached only in edit mode (LA-176).** `disabled: true` stops dnd-kit dragging
+      // but does not stop it DECORATING the element: measured at 412 px, every Home section carried
+      // `role="button" aria-disabled="true" tabindex="0" aria-roledescription="draggable"` all the
+      // time. A screen reader announced each card as a disabled button, each section took a tab stop
+      // it does nothing with, and Playwright — correctly following ARIA — refused to act on anything
+      // in them, which is why two of the six always-red E2E specs were always red.
+      ref={editMode ? ref : undefined}
       // The rendered order is otherwise unreadable from outside: the sections are a dozen
       // unrelated components with no shared marker, and the stored order is only written once a
       // drag has already happened. `e2e/bf205-home-section-drag.spec.ts` reads this.

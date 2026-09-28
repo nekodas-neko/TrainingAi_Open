@@ -260,10 +260,11 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5433/trainingai_dev pnpm t
 ```
 
 **Corollary worth its own line: any migration that adds a column to a table with a `claude_ro` view
-needs a regenerated view migration in the SAME PR** (`CLAUDE_RO_OWNER_USER_ID=<uuid> node
-scripts/generate-claude-ro-views.js > lib/data/postgres/migrations/<next>_claude_ro_views_<reason>.sql`,
-always a new number — `ensureSchema` tracks by filename). The generator emits an explicit column
-list per view, so a new column is invisible to `/api/admin/db-query` until the views are rebuilt.
+needs `lib/data/postgres/claude-ro-views.sql` regenerated in the SAME PR** (`CLAUDE_RO_OWNER_USER_ID=<uuid>
+node scripts/generate-claude-ro-views.js > lib/data/postgres/claude-ro-views.sql`, overwritten in
+place — since BF-214 it is not a migration and takes no number). The generator emits an explicit
+column list per view, so a new column is invisible to `/api/admin/db-query` until the views are
+rebuilt, and `claude-ro-views-file.test.ts` fails until they are.
 **Third blind spot, and this one is self-inflicted: applying a BRANCH's migration to the shared
 local database poisons every later run in the session.** The database outlives the checkout. Apply a
 migration that exists only on one branch, switch to another, and the schema no longer matches any
@@ -281,8 +282,9 @@ the opposite reading costs a rework of working code, or a false "this branch is 
 
 **Reverting needs an order.** The compatibility views were depended on by the `claude_ro` views, so
 a straight reverse fails with `cannot drop view … because other objects depend on it`. The sequence
-that works: `DROP SCHEMA claude_ro CASCADE`, reverse the renames, then re-apply the last
-`claude_ro` migration on the branch you are returning to. Deriving the reverse by parsing the
+that works: `DROP SCHEMA claude_ro CASCADE`, reverse the renames, then re-apply
+`lib/data/postgres/claude-ro-views.sql` from the branch you are returning to (before BF-214, the
+last numbered `claude_ro` migration). Deriving the reverse by parsing the
 migration file beats re-deriving it from the catalogue, which by then describes the renamed world.
 
 The test user `test@local.dev` has password `testpass123` (seeded with a bcrypt

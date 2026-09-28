@@ -27,13 +27,19 @@ export interface HrProfile {
   targetAnchorMax: number
   restingHr: number
   /** `'default'` means no reading was found in the window and 60 was assumed — every zone
-   *  boundary derived from it is a guess, so callers can say so instead of implying data. */
-  restingHrSource: 'measured' | 'default'
+   *  boundary derived from it is a guess, so callers can say so instead of implying data.
+   *  `'unavailable'` means the read itself FAILED and 60 was assumed (LA-82) — not "you have no
+   *  readings", which is a different thing to tell someone. */
+  restingHrSource: 'measured' | 'default' | 'unavailable'
   /** Age-predicted (220 − age), before any observation is considered. */
   estimatedMax: number
   /** Corroborated observed max — null until the profile is reliable. */
   observedMax: number | null
-  maxHrSource: 'observed' | 'estimated'
+  /** `'estimated-age-unread'` (LA-82): the estimate stands in for an age that could not be READ,
+   *  so it is `hrMaxFromAge(null)` — 190 — not this person's 220 − age. For the owner that moves
+   *  every zone boundary by 6 bpm, and without its own value it would read exactly like an ordinary
+   *  estimate. A provenance value rather than a separate flag, so there is one field to trust. */
+  maxHrSource: 'observed' | 'estimated' | 'estimated-age-unread'
   /** The full spike-rejection detail, for surfaces that want to show their working. */
   observed: ObservedHrProfile
 }
@@ -79,13 +85,23 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   const observedFrom = new Date(midnight.getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
   const observedTo = new Date()
 
+  // LA-82. All three reads are guarded now, not one of three. Every caller of this resolver — the
+  // cardio hub among them — is built to degrade on missing data, and an unguarded read made a
+  // transient fault in either of these two take the whole screen down instead. What a guard must
+  // not do is make a failure look like data, so each failed read is named in its source field.
+  const unread = new Set<'user' | 'restingHr'>()
+  const failed = (what: 'user' | 'restingHr') => (err: unknown) => {
+    console.error(`[hr-profile] ${what} read failed, continuing on a default:`, err)
+    unread.add(what)
+    return null
+  }
   const [user, bodyMetrics, observed] = await Promise.all([
-    repo.getUserById(userId),
-    repo.listBodyMetrics(userId, from28dIso, todayIso),
+    repo.getUserById(userId).catch(failed('user')),
+    repo.listBodyMetrics(userId, from28dIso, todayIso).catch(failed('restingHr')),
     repo.getObservedHrProfile(userId, observedFrom, observedTo).catch(() => EMPTY_OBSERVED_HR),
   ])
 
-  const rhrRows = bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
+  const rhrRows = (bodyMetrics ?? []).filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
   const restingHr = rhrRows.length
     ? Math.round(rhrRows.reduce((sum, m) => sum + m.restingHeartRate!, 0) / rhrRows.length)
     : RESTING_HR_DEFAULT
@@ -98,10 +114,10 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     maxHr: resolved.maxUsed,
     targetAnchorMax: observedMax ?? estimatedMax,
     restingHr,
-    restingHrSource: rhrRows.length ? 'measured' : 'default',
+    restingHrSource: unread.has('restingHr') ? 'unavailable' : rhrRows.length ? 'measured' : 'default',
     estimatedMax,
     observedMax,
-    maxHrSource: resolved.source,
+    maxHrSource: resolved.source === 'estimated' && unread.has('user') ? 'estimated-age-unread' : resolved.source,
     observed,
   }
 }
