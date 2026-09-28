@@ -7975,30 +7975,6 @@ drift.
   Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
   across the 3 modules now take the user's zone.
 
-### [platform][app-shell] LB-150 — the "today" cache envelope rolls over at Brisbane midnight for every user
-
-- **Lane: A** — `lib/sqlite/cache.ts` (Lane B found it; the letter records the finder, the lane the builder).
-- **Added:** 2026-09-25 · found reading `cachedFetchToday` while working RV-183's remaining half.
-- **`unwrapToday` compares `envelope.date !== todayInTz()`** (`cache.ts:546`) and the writer stamps
-  `todayInTz()` (`:603`) — **both the bare Brisbane default**. They agree with each other, which is
-  why this is invisible in every test and to the owner, and why the sync-provider's recent
-  writer/reader fix (which corrected a genuine *disagreement*) did not touch it.
-- **What it costs a user outside Brisbane.** The envelope exists to stop yesterday's data painting
-  as today's. It rolls at **Brisbane** midnight, while every server route computes "today" in the
-  **user's** zone. Between the user's midnight and Brisbane's, a cached reading from the user's
-  previous day still satisfies the guard and is served as current — 14 hours a day in New York, the
-  same window Q-478 measured for the guards commented directly below this one.
-- **The comment two lines under it already states this rule** for `isBodyMetadataFresh` and
-  `isWorkoutDataToday` — *"Omit it and the comparison silently becomes 'is the server's date equal
-  to Brisbane's date'"*. `unwrapToday` is the one that does not take a `tz` at all.
-- **Population:** ~10 keys write the envelope (`readiness-score`, `body-battery`, `next-session`,
-  `supplements`, `weekly-stats-rt`, `cardio-week`, `oura-stats`, `running-plan`,
-  `health-trends-summary`) and ~14 read it via `readTodayCacheSync`, adding `training-load`,
-  `training-stress`, `progress-summary` and `weekly-stats`.
-- **Both sides must change together.** Stamping in the user's zone while reading in Brisbane (or
-  the reverse) is strictly worse than the current self-consistent state — it makes the entry
-  unreadable the moment it lands, which is the failure the sync-provider fix was written to undo.
-
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
 - **Lane: B** — measure first, then trim.
