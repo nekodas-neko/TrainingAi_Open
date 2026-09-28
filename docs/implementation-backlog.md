@@ -797,6 +797,61 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
+### [workouts] BF-217 — 9 of the 25 exercises in his live program have silently lost their progression style, and one whole session has lost all five
+- **Lane:** A — the program/session save path (`app/api/programs/**`), `session_exercises.style_id`.
+- **Added:** 2026-09-28 · BugFix intake, tracing the owner's *"I still cant change this to full?"* on Pull for Tue 29 Sept. Promoted out of BF-200 Keep ①, which recorded this as one exercise.
+- **Needs:** — nothing.
+
+- **The active program is the ONLY program this has happened to.** Measured in production
+  (`session_exercises` joined to `programs`, `deleted_at IS NULL`): `Bankai` — active — carries
+  **9 of 25 with `style_id` NULL**. Every other program carries **zero**, except the long-dead
+  `Main` (1 per session, 4 total). It is concentrated where he actually trains.
+
+  | session | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull — Face Pull | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper — Skull Crusher | 1 | 5 |
+
+- **It happened repeatedly over five days, which is what makes a save path the suspect.** Dating
+  each loss from the last `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl
+  **09-09**, Barbell Skull Crusher **09-10**, the four Lower exercises **09-12**, Face Pull
+  **09-13**. A one-off corruption would not arrive in four instalments.
+
+- **⚠ `updated_at` cannot date any of this, and anyone bisecting from the table will be misled.**
+  All 25 rows read **`2026-09-28T05:17:31.544Z` to the millisecond** — a program save rewrites every
+  session-exercise row, so the column records the last save, never the loss. The logs are the only
+  dating evidence.
+
+- **What it costs him, in three places — the third is new and is why this is not cosmetic.**
+  ① The deload did not reach Skull Crusher (BF-200, since fixed at the deload-override site).
+  ② A style-less exercise records **no `planned_pct` on ordinary days**, which is part of TN-75's
+  coverage drop.
+  ③ **It now disables `Full` on a whole-session deload.** BF-198's fix takes its revert numbers from
+  `buildRulesPrescription`, which **skips** a style-less exercise and **returns null when every
+  exercise is one** (`generate-prescription.ts:169`, `:177`). So Pull revives 4 of 5 on
+  regeneration, and **`Lower` revives nothing at all** — its `Full` toggle is dead on the fixed code,
+  for the same reason it was dead on the broken one. The screen gives no hint that a style is
+  missing beyond a small `⚠ Style not found` on the pre-workout card.
+
+- **Two separable pieces of work, and they want different evidence.**
+  - **The repair** is the owner re-assigning styles to nine exercises in Config. One-off, his hands,
+    no code. Worth doing regardless of the cause, and it un-deads `Lower`.
+  - **The cause** is the Lane A question: can a program/session save write `style_id` NULL for an
+    exercise that had one? Read the save handler for the shape where the client omits the field and
+    the writer treats absent as null — the same class as the raw-body `.set()` rule in `CLAUDE.md`,
+    inverted. A remove-and-re-add in the UI would also produce it, and the two are distinguishable:
+    a re-add mints a new `session_exercises.id`, and the stored prescriptions' `sessionExerciseId`s
+    still matched all five Upper exercises on 09-25 (BF-200), so **at least Skull Crusher was not
+    re-added**. That is evidence for the save path and against the UI theory, for one of the nine.
+  - **Done when** a save that does not touch styles provably leaves `style_id` intact, with a test
+    covering the omitted-field shape, and the nine current nulls are accounted for as repaired.
+
+- **Not diagnosed here.** Whether the same save path can drop other per-exercise fields the client
+  may omit. Nobody has looked, and the blast radius question is the same one.
+
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
@@ -6874,6 +6929,32 @@ drift.
   ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
   remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
   whether a save path can drop a style is the Lane A question.
+  **⚠ IT IS NOT ONE EXERCISE — measured in production 2026-09-28 (BugFix), while tracing the owner's
+  report that `Full` still would not take on Pull.** The active program `Bankai` has **9 of 25
+  session exercises with `style_id` NULL**, and every inactive program except the long-dead `Main`
+  has **zero**:
+
+  | session (active program) | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull (Face Pull) | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper (Skull Crusher) | 1 | 5 |
+
+  **The losses are spread over days, not one corrupting event.** Dating each from the last
+  `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl **09-09**, Skull Crusher
+  **09-10**, the Lower cluster **09-12**, Face Pull **09-13**. That is repeated, not a single bulk
+  rewrite — which strengthens "a save path drops the style" considerably over "something ran once".
+  **`updated_at` cannot date it:** all 25 rows read `2026-09-28T05:17:31.544Z` to the millisecond, so
+  a program save rewrites every session-exercise row and destroys the timestamp evidence. That is
+  itself worth knowing before anyone tries to bisect this from the table.
+  **The knock-on that makes this urgent rather than cosmetic:** BF-198's `Full` fix takes its revert
+  numbers from `buildRulesPrescription`, which SKIPS a style-less exercise and returns null when
+  every exercise is one (`generate-prescription.ts:169`, `:177`). **So a whole-session deload on
+  `Lower` has a completely dead `Full` toggle even on the fixed code**, and Pull revives 4 of 5.
+  Re-assigning the styles in Config is the owner's one-off repair; stopping the save path from
+  dropping them is the fix.
   ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
   TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
   needs a decision on a default, not a bug fix.
@@ -7039,6 +7120,26 @@ drift.
   new prescription for that"* still names a remedy that does not exist. It now shows only for an
   exercise with no base style, and is Lane B's copy. ② `deloadReason` is NULL on every stored
   prescription, so neither the card nor anyone reading the data can say why a session was deloaded.
+  ③ **The FIX DOES NOT REACH A PRESCRIPTION ALREADY STORED, and the owner hit exactly that the
+  morning after it deployed** (BugFix, 2026-09-28, on his Pull screenshot for Tue 29 Sept still
+  reading *"Full is on, but these weights are unchanged"*). Measured in production: prod is on
+  `1.481.1` and the fix (`d4466c55`, merged 07:17 +10:00 that day) is in the deployed tree, but his
+  Pull prescription was **generated 2026-09-23T09:54:51Z and does not expire until
+  2026-09-30T09:54:51Z** — so it outlives tomorrow's session and keeps its dead toggle. It is the
+  only stored whole-session deload: 5 of 5 deloaded, 0 with `preDeload`.
+  **There IS a workaround, and it is one tap.** Changing the duration preset cannot be served from
+  the stored plan on a whole-session deload — `refitPrescriptionToBudget` needs a baseline and
+  whole-session deloads carry none, so it returns `no_baseline` and the route **falls through to
+  full generation** (`prescribe/route.ts:95`, `refit-prescription.ts:57`). On the fixed code that
+  regeneration writes `preDeload`. So tapping `Quick` or `Long` rebuilds the prescription and
+  revives `Full`, at the cost of one model call.
+  **But only 4 of his 5 Pull exercises would revive.** Face Pull has `style_id` NULL, and
+  `buildRulesPrescription` SKIPS a style-less exercise (`generate-prescription.ts:169`), so it gets
+  no `preDeload` and stays deloaded under `Full` — which is the documented behaviour, surfacing on
+  real data. **On Lower it would revive NOTHING: all 5 of 5 are style-less**, so the rules
+  prescriber returns null (`:177`), `fullById` is empty, and a whole-session deload there has a
+  fully dead `Full` even post-fix. See BF-200 Keep ① — the missing styles are 9 of 25 across the
+  active program, not one exercise.
 
 - **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
   REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,
