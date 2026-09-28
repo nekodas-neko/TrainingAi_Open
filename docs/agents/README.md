@@ -67,11 +67,15 @@ contributor saw nothing for days. He said so: *"from his end it just goes silent
 channel, one response.** BugFix already traces a symptom to `file:line` and already knows the
 recurring bug classes; reading a patch against the same rules is the same competence, not a new one.
 
-**The one thing it escalates, and it is narrow:** a PR touching **auth, sessions, secrets, or a
-migration** gets a `/security-review` pass or a `Lane:` to Review *in addition* to BugFix's own
-response — not instead of it. Those are the owner's carve-out categories, an intake-depth read is
-the wrong depth for a second credential path, and `#1607` was exactly that shape. **BugFix still
-posts first**, so the author is never left waiting on the escalation.
+**⛔ IT DOES NOT ESCALATE, INCLUDING ON AUTH — struck by the owner 2026-09-28** the same day it was
+proposed: *"bugfix can be enough to review PR's as they are technically 'bugfixes'"*. BugFix's
+review is the review, on every inbound PR without exception. **Do not re-add a second-reader rule**
+for auth, sessions, secrets or migrations; the Orchestrator suggested exactly that and it was
+declined, and a handoff re-introduced anywhere is the thing that made a contributor wait.
+**Run `/security-review` inside the BugFix session** when a diff warrants it — that is a tool this
+role already has, not a handoff — and post the findings in the same response.
+**What does NOT change:** the merge is still never ours (below), and auth remains the owner's
+carve-out **for merging**, which is his call and not a routing step.
 
 **It does not fix.** The temptation to fix a one-line bug in the intake session is exactly how
 intake stops being reliable — the queue is the record, and a fix that skipped the queue is a fix
@@ -119,9 +123,10 @@ and opens a PR"*), so a collaborator's arrived into a channel with no reader, an
 and Review read, so the first visible response waited on a weekly sweep. See §1 — BugFix now reads
 the diff and posts the review itself.
 
-**What Review keeps here:** the **escalation** only. A PR touching auth, sessions, secrets or a
-migration comes to Review (or a `/security-review` pass) *after* BugFix has already responded, for
-a second and deeper read. Review never becomes the author's first contact again.
+**What Review keeps here: NOTHING.** An escalation path for auth/secret/migration PRs was proposed
+and **struck by the owner on 2026-09-28** — *"bugfix can be enough to review PR's as they are
+technically 'bugfixes'"*. Review has no role in an inbound PR at all. Where a diff warrants deeper
+scrutiny, BugFix runs `/security-review` in its own session; that is a tool, not a handoff.
 
 **The rules below apply to whoever is posting** — they were written for Review and are now BugFix's
 in the ordinary case.

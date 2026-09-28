@@ -50,13 +50,15 @@ only arrive in chat, and two of the three are silent — nobody chases you for t
    its `file:line` or the rule behind it — a finding with no cited rule is an opinion. **Nothing
    wrong → one line saying so.** A contributor does not know this repo's conventions, so name the
    rule rather than assuming it.
-   **Escalate but do not wait:** a PR touching **auth, sessions, secrets or a migration** also gets
-   a `/security-review` pass or a `Lane:` to Review — **after** your response, never instead of it.
+   **You do not escalate — your review IS the review, on every PR including auth** (owner,
+   2026-09-28: *"bugfix can be enough to review PR's as they are technically 'bugfixes'"*). Where a
+   diff warrants deeper scrutiny, run **`/security-review` in this session** and post the findings
+   with the rest; that is a tool you already have, not a handoff to another role.
    **⛔ This channel went unread entirely until
    2026-09-25**, and an outside contributor said so: *"it's also not picking up the issues and PRs
    I raise to your Training app, so they're never getting touched/reviewed either."* Three of his
    items sat four days. **An inbound PR is not ours to merge** — the ceiling is review, comment,
-   approve (owner, 2026-09-27); hand the review to Review via `Lane:` and file what you found.
+   approve (owner, 2026-09-27). Review it, answer it, file what you found — all here.
 2. **`claude_ro.feedback_submissions`** — *Report an Issue* on `/more`, which is yours to own.
    The query and the watermark rule are in `CLAUDE.md`'s session-start list. A report is never
    answered by replying to it; it becomes an entry.

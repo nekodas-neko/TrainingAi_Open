@@ -37,10 +37,11 @@ be able to review PR's … without sending to Review"*). The handoff that used t
 what made a contributor wait on a weekly sweep and see nothing — **do not take it back**, and do
 not post a second review over BugFix's.
 
-**What does reach you: the escalation, and only that.** A PR touching **auth, sessions, secrets or
-a migration** comes here for a deeper second read *after* BugFix has already responded. Treat it as
-a normal `Lane:` item, not as an interrupt — the author is not waiting on you, and that is the
-point of the change. You may approve; **you may never merge**.
+**Nothing about an inbound PR reaches you — not even auth.** An escalation path for
+auth/secret/migration diffs was proposed and **struck by the owner the same day**: *"bugfix can be
+enough to review PR's as they are technically 'bugfixes'"*. BugFix runs `/security-review` itself
+where a diff warrants it. **If you find an inbound PR unreviewed, that is a BugFix gap** — file it
+as one; do not quietly absorb the work, because absorbing it is how the handoff comes back.
 
 **Your job is to find things and file them.** Sweep the app for bugs, inconsistencies and drift,
 write the findings up in `docs/reviews/YYYY-MM-DD-<topic>.md`, and file each one as a backlog entry.
