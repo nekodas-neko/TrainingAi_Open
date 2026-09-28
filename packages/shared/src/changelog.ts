@@ -6,12 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.481.2",
+    version: "1.481.3",
     date: "2026-09-29",
     changes: [
       "Security: showing, replacing or deleting the Oura ring key now asks for confirmation in a system dialog, which page scripts cannot answer. Each is still one tap away in the ring console, with a confirm step in front of it.",
       "Security: the ring, scale and chest-strap services will only upload to this app's own address (or your own machine). They previously accepted any address the app asked for, and remembered it across restarts.",
       "Security: your signed-in session and the Oura ring key are no longer included in Google Drive backups or phone-to-phone transfers. A restore onto another device cannot arrive already signed in as you, and you will sign in again after switching phones. Keep your own copy of the ring key.",
+    ],
+  },
+  {
+    version: "1.481.2",
+    date: "2026-09-29",
+    changes: [
+      "Security: being invited no longer lets someone else claim your account. Registering with an invited email address used to activate the account straight away, with nothing checking that the person registering could actually read that inbox — so whoever got there first held the password. A new email-and-password account now waits for approval, and signing in with Google clears any password set on it beforehand. Signing in with Google is unaffected: Google has already proved the address, so an invite is honoured there as before.",
     ],
   },
   {

@@ -797,6 +797,61 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
+### [workouts] BF-217 — 9 of the 25 exercises in his live program have silently lost their progression style, and one whole session has lost all five
+- **Lane:** A — the program/session save path (`app/api/programs/**`), `session_exercises.style_id`.
+- **Added:** 2026-09-28 · BugFix intake, tracing the owner's *"I still cant change this to full?"* on Pull for Tue 29 Sept. Promoted out of BF-200 Keep ①, which recorded this as one exercise.
+- **Needs:** — nothing.
+
+- **The active program is the ONLY program this has happened to.** Measured in production
+  (`session_exercises` joined to `programs`, `deleted_at IS NULL`): `Bankai` — active — carries
+  **9 of 25 with `style_id` NULL**. Every other program carries **zero**, except the long-dead
+  `Main` (1 per session, 4 total). It is concentrated where he actually trains.
+
+  | session | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull — Face Pull | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper — Skull Crusher | 1 | 5 |
+
+- **It happened repeatedly over five days, which is what makes a save path the suspect.** Dating
+  each loss from the last `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl
+  **09-09**, Barbell Skull Crusher **09-10**, the four Lower exercises **09-12**, Face Pull
+  **09-13**. A one-off corruption would not arrive in four instalments.
+
+- **⚠ `updated_at` cannot date any of this, and anyone bisecting from the table will be misled.**
+  All 25 rows read **`2026-09-28T05:17:31.544Z` to the millisecond** — a program save rewrites every
+  session-exercise row, so the column records the last save, never the loss. The logs are the only
+  dating evidence.
+
+- **What it costs him, in three places — the third is new and is why this is not cosmetic.**
+  ① The deload did not reach Skull Crusher (BF-200, since fixed at the deload-override site).
+  ② A style-less exercise records **no `planned_pct` on ordinary days**, which is part of TN-75's
+  coverage drop.
+  ③ **It now disables `Full` on a whole-session deload.** BF-198's fix takes its revert numbers from
+  `buildRulesPrescription`, which **skips** a style-less exercise and **returns null when every
+  exercise is one** (`generate-prescription.ts:169`, `:177`). So Pull revives 4 of 5 on
+  regeneration, and **`Lower` revives nothing at all** — its `Full` toggle is dead on the fixed code,
+  for the same reason it was dead on the broken one. The screen gives no hint that a style is
+  missing beyond a small `⚠ Style not found` on the pre-workout card.
+
+- **Two separable pieces of work, and they want different evidence.**
+  - **The repair** is the owner re-assigning styles to nine exercises in Config. One-off, his hands,
+    no code. Worth doing regardless of the cause, and it un-deads `Lower`.
+  - **The cause** is the Lane A question: can a program/session save write `style_id` NULL for an
+    exercise that had one? Read the save handler for the shape where the client omits the field and
+    the writer treats absent as null — the same class as the raw-body `.set()` rule in `CLAUDE.md`,
+    inverted. A remove-and-re-add in the UI would also produce it, and the two are distinguishable:
+    a re-add mints a new `session_exercises.id`, and the stored prescriptions' `sessionExerciseId`s
+    still matched all five Upper exercises on 09-25 (BF-200), so **at least Skull Crusher was not
+    re-added**. That is evidence for the save path and against the UI theory, for one of the nine.
+  - **Done when** a save that does not touch styles provably leaves `style_id` intact, with a test
+    covering the omitted-field shape, and the nine current nulls are accounted for as repaired.
+
+- **Not diagnosed here.** Whether the same save path can drop other per-exercise fields the client
+  may omit. Nobody has looked, and the blast radius question is the same one.
+
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
@@ -2117,24 +2172,25 @@ below threshold and left in place for next time.
   that is a separate question.
   **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
   and what each changes, and chose a standing yes over four interruptions.
-- **⚑ SIX ARE BUILT AND WAITING (Lane A, 2026-09-28/29).** Each is a draft PR, tested and exercised on
-  `pnpm dev`. A yes flips it ready and it merges on green:
-  - **RV-191** → #1912: only a provable PNG/JPEG/WebP is accepted, and the admin panel opens a blob of
-    it, never the stored string;
-  - **RV-190** → #1914: every admin read-only query runs in a rolled-back, scrubbed transaction;
-  - **RV-193** → #1916: the Google refresh token stays in the encrypted JWT;
-  - **RV-197** → #1915: WebSockets are allowed by the CSP only in dev. It was not on the list of six,
-    but it is a security change, so it waits for the same yes.
-
-  - **RV-195** → #1930: the mobile sign-in challenge is bound to its tab, deleted users are signed
-    out, and a pending friend request shows its sender nothing. After merge, owe a DV sign-in through
-    Google on the S25;
-  - **RV-192** → #1931: an invite no longer activates a password registration, and linking Google
-    clears the password. **Behaviour change:** an invited person who registers with a password waits
-    in `/pending` until they use Google or an admin approves them. The "drop password sign-up"
-    option below is still his.
-
-  Only RV-196 (the ring-key plugin, which needs an APK) is not built yet.
+- **⚑ ALL SEVEN ARE BUILT. ONE PR EACH; review these (corrected 2026-09-29):**
+  - **RV-190** → **#1672**: every read-only query runs in a rolled-back transaction, reset on the way
+    in, and mutation-tested;
+  - **RV-191** → **#1671**: images are validated by their bytes (feedback and avatar), and the admin
+    thumbnail zooms in place;
+  - **RV-192** → **#1779**: an invite is not proof of the inbox, and linking Google clears the
+    password;
+  - **RV-193** → **#1781**: the refresh token is read server-side, never from the session;
+  - **RV-195** → **#1784** (② deleted users) **+ #1930** (① mobile sign-in bound to its tab, ③
+    pending friend requests masked);
+  - **RV-196 + OR-159** → **#1755**: native dialogs for the ring key (now including `setKey`),
+    uploads limited to the app's origin, and the cookie **and ring key** kept out of backup. Needs an
+    APK;
+  - **RV-197** → **#1789**: WebSockets are allowed by the CSP only in dev.
+- **⚠ DUPLICATES, DO NOT REVIEW: #1912, #1914, #1915, #1916 and #1931.** A Lane A session on
+  2026-09-28/29 rebuilt RV-190/191/193/197/192 without noticing the PRs above, and listed its own
+  here. Each is a strictly weaker copy of the original, compared diff by diff. They should be
+  closed; closing waits on the owner's OK, per the PR-closing rule. The session's two genuine
+  additions were folded into #1930 and #1755 instead.
 - **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
   - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
     Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
@@ -3281,37 +3337,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
-
-- **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
-  `lib/data/postgres/readonly-client.ts`, `lib/data/postgres/claude-ro-owner.ts`.
-- **⚠ AUTH/SECURITY — the owner confirms before this merges.** The fix is small; the carve-out applies anyway.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **What:** the route's comment says read-only is enforced by the `claude_readonly` role. The role
-  only sets **session defaults**: the owner scope (`app.claude_ro_owner`), `default_transaction_read_only`
-  and `statement_timeout`. A caller can override all three, and they persist, because each query runs
-  in autocommit on a 2-connection pool that is never reset. **Reproduced on the local database only.
-  Nothing was probed on production.**
-- **Who can reach it:** only a holder of `CLAUDE_DB_QUERY_SECRET` or an admin session. In practice
-  that is the owner and every agent session with the secret in its environment, including one steered
-  by prompt injection from fetched content. What it gets:
-  - other users' rows through the `claude_ro` views;
-  - writes the role was meant to refuse, including writes large enough to recreate the 2026-08-17
-    `disk_full` outage;
-  - queries with no time limit.
-  **Because the pool reuses connections, a later honest query can silently read another user's rows.**
-- **Fix shape:**
-  1. Wrap every db-query and db-snapshot query as `BEGIN TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` →
-     `SET LOCAL app.claude_ro_owner` → query → `ROLLBACK`. The final `ROLLBACK` reverts any session-level
-     setting made inside the transaction; this was verified locally.
-  2. Second layer: `RESET ALL` (or `DISCARD ALL`) when a client is released.
-  3. Regression test: run a query that changes a setting, then assert that the next query on the same
-     pool sees the defaults.
-- **Interaction with OR-138:** OR-138 widens the owner scope on purpose, using `SET LOCAL`. Build this
-  first, or together with it. OR-138 without the transaction wrapper is the same hole with a legitimate
-  entry point.
-- **Reversal cost:** low. No migration is needed, and the views do not change.
-
 ### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
 - **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
 - **⚠ AUTH — the owner confirms before this merges.**
@@ -3332,6 +3357,27 @@ which is the right shape for something that can only be validated by living with
      or require the password before linking.
 - **Alternatives:** drop email and password registration and keep only Google, since every current
   user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
+- **✅ BOTH HALVES OF THE TAKEOVER PATH ARE CLOSED (Lane A, 2026-09-27) — but NOT by verifying
+  email, because there is nothing in this repository that can send one.** `createEmailUser` no
+  longer defaults `isActive` to `isInvited(email)`; a password account starts inactive and the owner
+  activates it. `linkOAuthAccount` clears `password_hash` as it links. Google sign-in still honours
+  the invite through `upsertUser`, and that stays right: **Google has verified the address, so there
+  the invite IS being matched against a proven owner.** The asymmetry is the whole fix.
+- **Why clearing the password is safe rather than destructive.** It runs only on the FIRST Google
+  sign-in for a row with no `oauthSub`, and the person triggering it is signing in with Google at
+  that moment, so they are not locked out. The owner's own account already carries an `oauthSub`, so
+  the branch cannot fire for him. `auth.ts:57` already returns null on a falsy hash, so a cleared
+  password is a refusal and not an empty one — pinned by a test, because the fix would be worse than
+  useless if null meant "no password required".
+- **How this survived a test file named for it.** `lib/__tests__/register-inactive.test.ts` is
+  titled *"accounts must start inactive/pending"* and asserts that the **route** passes no `isActive`
+  override — leaving activation to `isInvited`, which is the defect. A test named for a property,
+  asserting something weaker.
+- **Keep: fix 1 as the entry actually words it — real email verification — is NOT done, and it is
+  the owner's.** It needs a mail provider (none exists: no nodemailer/Resend/SES anywhere), a
+  secret, a token table and a verification screen. **Ask him the product question first**, because
+  the entry's own alternative may be the answer: every current user signs in with Google, so
+  dropping password registration outright would close this without building any of it.
 
 ### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
 - **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
@@ -5981,9 +6027,14 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
-- **⚠ Build RV-190 first or with this (Review sweep 60).** The owner scope is a setting any caller
-  can change, and it persists on the pooled connection. A `SET LOCAL` without RV-190's transaction
-  wrapper leaves that hole open.
+- **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
+  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  first because the owner scope is a setting any caller can change and it persisted on the pooled
+  connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
+  the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
+  is also the entry point this entry wants: it takes an optional `ownerId` and applies it with
+  `SET LOCAL` inside the read-only transaction, so widening the scope is a parameter rather than a
+  new mechanism.
 - **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
   `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
   views do not change at all. What is fixed is **where that setting comes from**:
@@ -6499,6 +6550,21 @@ drift.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
+  **🔬 DIAGNOSED 2026-09-28 (Orchestrator), after the owner asked whether both key sets had been
+  tested. There are two NAMING SCHEMES and only one has values.**
+  - `lib/exercise-storage.ts:20-22` reads `AWS_* || STORAGE_*`. Only the **`AWS_*`** set is
+    populated; `.env.local` holds `DATABASE_URL` alone, and `STORAGE_*` is documented in
+    `.env.example` but unset.
+  - The populated set fails across **three regions** (`sin` as configured, `auto`, `us-east-1`) and
+    **three endpoints** (`t3.storageapi.dev` as configured, `t3.storage.dev`,
+    `fly.storage.tigris.dev`) — `SignatureDoesNotMatch` every time. **Region and endpoint are ruled
+    out**, which was worth testing because a wrong region produces this exact error from valid keys.
+  - The values are clean: 54-char `tid_…`, 75-char `tsec_…`, no whitespace or truncation. **So the
+    secret genuinely does not match the access key id** — rotated, or mismatched at paste time.
+  - **⛔ THE TRAP: `AWS_*` WINS.** Adding a correct `STORAGE_*` set while the broken `AWS_*` values
+    are still present **changes nothing** — the `||` takes `AWS_*` first. Either replace the
+    `AWS_*` pair, or unset it and use `STORAGE_*`. Setting both is how this gets "fixed" and stays
+    broken.
 - **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
@@ -6873,6 +6939,32 @@ drift.
   ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
   remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
   whether a save path can drop a style is the Lane A question.
+  **⚠ IT IS NOT ONE EXERCISE — measured in production 2026-09-28 (BugFix), while tracing the owner's
+  report that `Full` still would not take on Pull.** The active program `Bankai` has **9 of 25
+  session exercises with `style_id` NULL**, and every inactive program except the long-dead `Main`
+  has **zero**:
+
+  | session (active program) | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull (Face Pull) | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper (Skull Crusher) | 1 | 5 |
+
+  **The losses are spread over days, not one corrupting event.** Dating each from the last
+  `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl **09-09**, Skull Crusher
+  **09-10**, the Lower cluster **09-12**, Face Pull **09-13**. That is repeated, not a single bulk
+  rewrite — which strengthens "a save path drops the style" considerably over "something ran once".
+  **`updated_at` cannot date it:** all 25 rows read `2026-09-28T05:17:31.544Z` to the millisecond, so
+  a program save rewrites every session-exercise row and destroys the timestamp evidence. That is
+  itself worth knowing before anyone tries to bisect this from the table.
+  **The knock-on that makes this urgent rather than cosmetic:** BF-198's `Full` fix takes its revert
+  numbers from `buildRulesPrescription`, which SKIPS a style-less exercise and returns null when
+  every exercise is one (`generate-prescription.ts:169`, `:177`). **So a whole-session deload on
+  `Lower` has a completely dead `Full` toggle even on the fixed code**, and Pull revives 4 of 5.
+  Re-assigning the styles in Config is the owner's one-off repair; stopping the save path from
+  dropping them is the fix.
   ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
   TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
   needs a decision on a default, not a bug fix.
@@ -7038,6 +7130,26 @@ drift.
   new prescription for that"* still names a remedy that does not exist. It now shows only for an
   exercise with no base style, and is Lane B's copy. ② `deloadReason` is NULL on every stored
   prescription, so neither the card nor anyone reading the data can say why a session was deloaded.
+  ③ **The FIX DOES NOT REACH A PRESCRIPTION ALREADY STORED, and the owner hit exactly that the
+  morning after it deployed** (BugFix, 2026-09-28, on his Pull screenshot for Tue 29 Sept still
+  reading *"Full is on, but these weights are unchanged"*). Measured in production: prod is on
+  `1.481.1` and the fix (`d4466c55`, merged 07:17 +10:00 that day) is in the deployed tree, but his
+  Pull prescription was **generated 2026-09-23T09:54:51Z and does not expire until
+  2026-09-30T09:54:51Z** — so it outlives tomorrow's session and keeps its dead toggle. It is the
+  only stored whole-session deload: 5 of 5 deloaded, 0 with `preDeload`.
+  **There IS a workaround, and it is one tap.** Changing the duration preset cannot be served from
+  the stored plan on a whole-session deload — `refitPrescriptionToBudget` needs a baseline and
+  whole-session deloads carry none, so it returns `no_baseline` and the route **falls through to
+  full generation** (`prescribe/route.ts:95`, `refit-prescription.ts:57`). On the fixed code that
+  regeneration writes `preDeload`. So tapping `Quick` or `Long` rebuilds the prescription and
+  revives `Full`, at the cost of one model call.
+  **But only 4 of his 5 Pull exercises would revive.** Face Pull has `style_id` NULL, and
+  `buildRulesPrescription` SKIPS a style-less exercise (`generate-prescription.ts:169`), so it gets
+  no `preDeload` and stays deloaded under `Full` — which is the documented behaviour, surfacing on
+  real data. **On Lower it would revive NOTHING: all 5 of 5 are style-less**, so the rules
+  prescriber returns null (`:177`), `fullById` is empty, and a whole-session deload there has a
+  fully dead `Full` even post-fix. See BF-200 Keep ① — the missing styles are 9 of 25 across the
+  active program, not one exercise.
 
 - **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
   REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,
