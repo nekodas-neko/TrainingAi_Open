@@ -3216,14 +3216,28 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
+  The sleep line returns under the mood card from `sleepQualityFeel` (1–5), with the caption naming
+  it as his rating rather than a score. **The caption is part of the approval, not decoration** —
+  the line it replaces was fabricated and read as derived for 91 days.
+  **⚠ The cost is unchanged and is the whole risk here:** Home is in the persistent tab shell, so
+  this needs `useCachedValue`, a canonical TTL in `cache-ttl.ts`, and registration in every write
+  group touching `day_checkins`. A hand-rolled `useEffect(() => { cachedFetch(…) }, [])` never
+  re-runs there and the line will hold its first value until the app is killed — the Q-402 shape,
+  which this repo has shipped twelve times.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** the sleep line returns under the mood card, driven by `sleepQualityFeel` (1–5), captioned *"Your rating, not a score"* so it cannot be misread as derived the way the fabricated `Sleep: OK` was.
+- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The cost is on the mockup and is not optional:** Home is in the persistent tab shell, so it needs `useCachedValue`, a canonical TTL and registration in every `day_checkins` write group, or it paints once and never refreshes.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
   and `RV-213` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>. The after reads
   *"You rated last night's sleep **Good** this morning."* under the readiness card.
-- **Gate: owner** — the mockup has been shown; the code waits on his yes to that picture.
-- **Ask** — owner: does he want his morning sleep-feel back on Home, in the wording the mockup
-  shows? `Ask:` rather than position, because `Gate: owner` alone would sink this into PARKED
-  beside 35 device gates and nobody would see that an answer is the deliverable.
+- **Gate cleared 2026-09-27** — approved. Lane B builds to the mockup.
 - **The WORDING is part of what he is being asked to approve**, not an implementation detail. Naming
   whose judgement it is — *"you rated"* — is precisely what the dead `sleep_quality` line got wrong,
   so if he takes this, keep the phrasing. The `useCachedValue`/TTL/write-group cost is stated on the
@@ -3790,11 +3804,25 @@ which is the right shape for something that can only be validated by living with
   bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
+- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
+  Fixed three-column grid, `Log` out from under the icon and below the value. **Acceptance:** at
+  384 px the row fills the width and `Log` does not overlap the icon at any tile count. **Keep the
+  44 px tap target** — the overlap came from `min-h-11` on an absolutely-positioned pill, not from
+  the size, so shrinking the target is the wrong fix. **Known trade, accepted:** a fourth widget
+  wraps to a second line instead of scrolling.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** a fixed three-column grid filling the row, and `Log` moved out from under the icon to its own control below the value. The `absolute top-0.5 right-0.5` pill with `min-h-11` is what puts it on the icon; the flex row is what leaves the right third empty.
+- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The trade, stated on the mockup:** each tile is narrower, so a fourth widget wraps to a second line rather than scrolling sideways.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added, and the lane moved `O` → `B`**: the remaining
   work after his answer is `app/session-select/components/metric-tiles-card.tsx`, which the path rule
   puts in Lane B. Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting
   with `LA-136` and `RV-213`: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
-- **Gate: owner** — the mockup has been shown; the layout answer is the only outstanding thing.
+- **Gate cleared 2026-09-27** — approved. Lane B builds to the mockup.
 - **Two corrections to the figures below, measured at 384 px while capturing the after.** The tiles
   occupy about **62%** of the row, not 58% — that reading was taken at 412 px. And the trade is not
   "each tile is narrower": on a three-column grid the tiles come out **wider**. The real cost is that
@@ -3806,12 +3834,6 @@ which is the right shape for something that can only be validated by living with
   one and put it to him — that is work, and work is ungated `Lane: O`. A gate here would park the
   entry and nobody would be tasked with asking. `Gate: owner` belongs on it once a mockup has been
   shown and the answer is what is outstanding.
-- **Ask: owner — three columns with `Log` below the value, accepting a roughly doubled row height?**
-  The mockup exists now (see the top of this entry); what is outstanding is his answer to it.
-  RV-207 ⑥ asks to move the "Log" label beside or
-  below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
-  of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
-  is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
 - **The defects behind it are real, and REPRODUCED rather than read** (`metric-tiles-card.tsx`).
   Rendered in the Playwright harness at the 412 px dark viewport, 2026-09-26: the word **"Log" is
   drawn directly over each tile's icon** and is barely readable against it, and the three tiles
@@ -4223,12 +4245,34 @@ which is the right shape for something that can only be validated by living with
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **⛔ DECLINED 2026-09-27 — the owner said no to this one and yes to the other three in the same
+  sitting. Do NOT build it.**
+- **✅ HIS REASON, given when asked (2026-09-27): *"I like the original look; it shows the grouping
+  nicely with the space."*** So the empty height the finding measured is **doing work** — it is what
+  separates one meal from the next. Collapsing the slots would have saved ~150 px and cost the
+  grouping, which is the thing the screen is for.
+- **⚑ THIS IS A DESIGN PRINCIPLE FOR NUTRITION, NOT A ONE-OFF NO — record it and do not re-file it.**
+  A future sweep measuring blank space on the diary will reach the same finding and should stop
+  here: on this screen, **vertical space between meal cards is the grouping mechanism** and a
+  density change needs a new argument, not a repeat of this one.
+- **The finding itself was not disputed and is left on the record:** four empty meals render a
+  header `+` **and** a body `+ Add food` (`meal-card.tsx:73`, `:105`) — two controls for one action
+  — across roughly 320 px of mostly empty card. The mockup that was declined is in
+  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html).
+- **Nothing is owed. Strike this entry** — a declined change is finished, not parked. Re-opening it
+  needs a new entry and a new reason, not a second attempt at this one.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** an empty meal collapses to one row — its name and a single `+`; meals with food keep the full card. Four empty meals go from roughly **320 px to 170 px**.
+- **Gate cleared 2026-09-27** — DECLINED, so nothing is owed by him. Do not build.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The trade:** adding to an empty meal becomes a `+` rather than a labelled full-width row. Still a 44 px target, but a smaller one.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
   and `LA-136` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
-- **Gate: owner** — the mockup has been shown; the collapse is his pick, as the entry says.
-- **Ask** — owner: collapse an empty meal to one row with its name and a single `+`, accepting
-  that the `+` must grow to 48 px as part of it? `Ask:` for the same reason as `LA-136`.
+- _(historic gate note)_ — the mockup has been shown; the collapse is his pick, as the entry says.
 - **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
   Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
   goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
@@ -7532,17 +7576,44 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
-- **✅ ANSWERED 2026-09-27 — and the answer is a DESIGN INSTRUCTION, not the yes/no that was asked.**
-  Verbatim: *"the walk/run section should be combined in the cardio hub; and would require one or
-  the other to be done."*
-  So: **merge walk and run into one section in the cardio hub, and completing EITHER satisfies the
-  prescription.** That resolves the finding — no prescribed run has ever been marked done while he
-  does most of them as walks — by removing the distinction rather than by ruling on it.
-  **⚠ This is an information-architecture change to a screen he uses, so it OWES A MOCKUP FIRST**
-  (CLAUDE.md: merging sections on a daily screen gets a mockup at 384 px dark and a yes before any
-  code). **Show it in the same sitting as `LA-136`, `LB-163` and `RV-213`** — that makes four.
-  The compliance/streak consequences need naming in the mockup: every past run day becomes
-  completable, so adherence figures move.
+- **✅ APPROVED 2026-09-27 — build it, WITH the walk flow below. Mockup:
+  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html),
+  sections RV-166 and RV-166b.**
+- **The owner's added requirement, verbatim:** *"I will mostly do my treadmill walk; so when I click
+  walk; id like to be able set a guided walk - or just a treadmill walk + time. Or perhaps it could
+  even say x amount of minutes in x zone rate to count as complete."*
+  **Take both halves, they are complementary.**
+  **① State the criterion in ZONE terms on the card** — *"25 min in Zone 2 · 107–134 bpm"* with live
+  progress against it, rather than an opaque done/not-done.
+  **② Tapping `Walk it` offers two routes:** a **guided walk** (app paces, counts zone minutes
+  live) or a **treadmill walk + duration** from preset chips. Two taps for the common case.
+- **⚑ THIS ONLY WORKS BECAUSE OF `TN-78`, SHIPPED THE SAME DAY (#1774) — do not build one without
+  the other.** The moderate floor moved from 60% to **40% of heart-rate reserve**: at 60% it was
+  **134 bpm**, which he hit on **3 of 31 days**, so a treadmill walk earned ZERO zone minutes and a
+  zone-stated criterion would have been unreachable on foot. At 40% it is **107 bpm**, hit on
+  **24 of 31**. A zone-worded target on the pre-TN-78 floor would have been a target he could not
+  meet by walking.
+- **✅ FULLY SPECIFIED 2026-09-27 — the last open question is answered: a treadmill walk with NO
+  heart-rate data DOES count.** Count the logged minutes toward the target and mark the day
+  **estimated**. Refusing to complete a walk he actually did is the worse failure, and he took that
+  recommendation.
+  **⚑ REUSE THE EXISTING CONVENTION — do not invent a flag.** `packages/shared/src/health/observed-hr.ts:125`
+  already models this exact distinction as **`source: 'observed' | 'estimated'`** on
+  `MaxHrResolution`, and `body-battery-inputs.ts` and `hr-profile.ts` use the same shape. A
+  discriminator beats a boolean here for the reason that file demonstrates: it says *where the
+  number came from* rather than *whether to trust it*, so a third source can be added later without
+  rewriting every reader. Check `docs/module-map.md` before adding anything new.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed, to his instruction:** one *Today's cardio* card at the top of the hub holding the prescription and both ways to satisfy it, with either marking the day done.
+- **Gate cleared 2026-09-27** — approved and fully specified, walk flow included.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **⚠ THIS ONE MOVES STORED NUMBERS, unlike the other three.** Every past run day becomes completable, so adherence, streaks and compliance all shift once it ships — **quantify how far before merging.**
+- **⚠ Its BEFORE pane is rebuilt from the components, not screenshotted** — the hub needs live data the sandbox does not have. The other three befores come from source, and `LB-163`'s was independently reproduced in the Playwright harness.
+- **(Superseded 2026-09-27: this entry previously read *"owes a mockup first"*. The mockup was
+  drawn, shown and answered the same day — the approval above is the current state.)**
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
 - **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
@@ -8777,6 +8848,14 @@ drift.
   the sandbox can only prove the primitive is wired in.
 
 ### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
+- **✅ THE CLASS IS FIXED FOR THE 2026-09-27 BATCH, though this entry's own artefact is still lost.**
+  Four mockups (`LB-163`, `LA-136`, `RV-213`, `RV-166`) were produced and **committed to the repo**
+  as [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html)
+  rather than shown only in a chat, which is exactly the failure this entry records. **The
+  convention to follow: a mockup is not shown until it is in `docs/design/`** — an approval whose
+  artefact lives in a transcript is an approval no implementer can build to.
+  **What is STILL owed here is unchanged:** the 2026-09-22 Home IA mockup that `RV-119` was approved
+  against was never saved and cannot be recovered from this repo. That one has to be redrawn.
 
 - **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
 - **RV-119, RV-117 and RV-118 all carry "Owner gate SATISFIED 2026-09-22 — mockup shown at 384 px
