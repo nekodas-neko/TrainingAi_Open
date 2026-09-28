@@ -121,6 +121,18 @@ async function main() {
 
     const loaded = {}
     const notInTarget = new Set()
+    // Truncate EVERY table in one statement before loading any. Truncating each just before its own
+    // insert, with CASCADE, emptied the tables that reference it — including ones already loaded
+    // earlier in the alphabet. Measured 2026-09-28: `set_logs` loaded 1,317 rows and ended with 0,
+    // because `workout_sessions` came later and cascaded through `exercise_logs` to it; `users` did
+    // the same to sleep, Body Battery and the rest. The count check trusted the insert counter, so
+    // it reported a clean restore.
+    const { rows: targetTables } = await client.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`,
+    )
+    const present = new Set(targetTables.map(r => r.table_name))
+    const toTruncate = manifest.tables.filter(t => !SKIP_TABLES.has(t) && present.has(t))
+    if (toTruncate.length) await client.query(`TRUNCATE TABLE ${toTruncate.map(quoteIdent).join(', ')} CASCADE`)
     for (const table of manifest.tables) {
       if (SKIP_TABLES.has(table)) {
         console.log(`[snapshot] skipping ${table} (cannot round-trip — see script header)`)
@@ -129,16 +141,12 @@ async function main() {
       // The manifest lists every claude_ro view, and some are not app tables at all —
       // `pg_stat_statements` is an extension's view, absent from a plain local Postgres. Skip what
       // the target does not have, and count it as not loaded rather than failing the restore.
-      const { rows: exists } = await client.query(
-        `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1`, [table],
-      )
-      if (exists.length === 0) {
+      if (!present.has(table)) {
         console.log(`[snapshot] skipping ${table}: no such table in the target`)
         notInTarget.add(table)
         continue
       }
       const rows = rowsByTable.get(table) ?? []
-      await client.query(`TRUNCATE TABLE ${quoteIdent(table)} CASCADE`)
       if (rows.length === 0) { loaded[table] = 0; continue }
 
       // A claude_ro view can carry a column the base table does not have: it computes one in place
@@ -148,10 +156,10 @@ async function main() {
         `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
         [table],
       )
-      const present = new Set(targetCols.map(r => r.column_name))
-      const viewOnly = Object.keys(rows[0]).filter(c => !present.has(c))
+      const presentCols = new Set(targetCols.map(r => r.column_name))
+      const viewOnly = Object.keys(rows[0]).filter(c => !presentCols.has(c))
       if (viewOnly.length) console.log(`[snapshot] ${table}: view-only column(s) not restored: ${viewOnly.join(', ')}`)
-      const columns = Object.keys(rows[0]).filter(c => present.has(c))
+      const columns = Object.keys(rows[0]).filter(c => presentCols.has(c))
       const colList = columns.map(quoteIdent).join(', ')
       // node-postgres binds a JS array as a Postgres ARRAY literal ('{…}'), which a json/jsonb
       // column rejects as "invalid input syntax for type json" — objects are stringified for it,
@@ -218,7 +226,10 @@ async function main() {
     for (const table of manifest.tables) {
       if (SKIP_TABLES.has(table) || notInTarget.has(table)) continue
       const expected = manifest.rowCounts?.[table]
-      const actual = loaded[table] ?? 0
+      // What the TABLE holds, not what was inserted: a cascade or a trigger can remove rows after the
+      // insert, and the insert counter would never know.
+      const { rows: [{ n }] } = await client.query(`SELECT count(*)::int AS n FROM ${quoteIdent(table)}`)
+      const actual = n
       const ok = expected == null || expected === actual
       if (!ok) mismatch = true
       console.log(`  ${ok ? 'ok  ' : 'MISMATCH'} ${table}: loaded ${actual}, manifest said ${expected}`)
