@@ -99,7 +99,9 @@ describe('LA-166 — logged-work edits and deletes survive being offline', () =>
     // Pinned against the source of truth rather than restated: these schemas are `.strict()`, so
     // an extra or renamed key is a push-time rejection, not a silent no-op.
     const edits = read('lib/workout/exercise-log-edits.ts')
-    expect(edits).toMatch(/ExerciseLogEditSchema = z\.object\(\{[^}]*exerciseLogId[^}]*weights[^}]*reps/s)
+    // `[\s\S]` rather than the `s` flag: `tsconfig.tests.json` targets below es2018, where the
+    // flag is a compile error — and the test typecheck is a required check, not a nicety.
+    expect(edits).toMatch(/ExerciseLogEditSchema = z\.object\(\{[\s\S]*?exerciseLogId[\s\S]*?weights[\s\S]*?reps/)
     expect(edits).toMatch(/ExerciseLogDeleteSchema = z\.object\(\{\s*exerciseLogId/)
     expect(read('lib/workout/delete-session-reconcile.ts'))
       .toMatch(/WorkoutSessionDeleteSchema = z\.object\(\{\s*workoutSessionId/)
