@@ -7248,6 +7248,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * first when reviewing this: a meal's contribution must still be there afterwards.
    */
   // RV-45. See deleteSupplement — reports the match, does not change it.
+  async listDoseEvents(userId: string, from: string, to: string) {
+    const rows = await this.db
+      .select({ name: s.supplements.name, date: s.supplementLogs.logDate, amount: s.supplementLogs.amount, unit: s.supplementLogs.unit })
+      .from(s.supplementLogs)
+      .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+      .where(and(
+        eq(s.supplementLogs.userId, userId),
+        gte(s.supplementLogs.logDate, from),
+        lte(s.supplementLogs.logDate, to),
+        isNull(s.supplementLogs.deletedAt),
+        isNotNull(s.supplementLogs.amount),
+        isNotNull(s.supplementLogs.vialStrengthMg),
+      ))
+      .orderBy(asc(s.supplementLogs.logDate))
+    return rows.map(r => ({ supplementName: r.name, date: r.date, amount: Number(r.amount), unit: r.unit }))
+  }
+
   async unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean> {
     const rows = await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })

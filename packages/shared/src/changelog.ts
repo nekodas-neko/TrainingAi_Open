@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.5",
+    date: "2026-09-28",
+    changes: [
+      "When your recovery signals are flagged within a few days of an injected dose, the message now names the dose (for example \"Retatrutide 1 mg, 3 days ago\") and says it may be the medication rather than illness. Your scores are not changed.",
+    ],
+  },
+  {
+    version: "1.478.4",
+    date: "2026-09-28",
+    changes: [
+      "Fixed (needs the new app version): coming back to the app could show a mostly blank screen until you scrolled. The app now makes the screen re-measure itself as it comes back. If you still see a blank screen, it records which part was stuck so the next fix can target it.",
+    ],
+  },
+  {
     version: "1.478.3",
     date: "2026-09-28",
     changes: [

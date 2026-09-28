@@ -11213,123 +11213,29 @@ existing 65 days moves by less than 5 points on every one of them.
   (`packages/shared/src/ai-periodization/generation-dedup.ts`).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **THE PREMISE DOES NOT HOLD.** This entry's own 2026-09-23 re-verification says the two top-up calls aim at different targets, so they are not duplicates. The path has **zero** top-up calls in `ai_call_log` ever (sweep 56). A dedup key would be a near no-op that reads as done. RV-189 proposes removing it, or rewording it as *"top up once, re-scale for the rest variant"* and parking it until meal-plan generation is in use.
 
-### [readiness][devices][platform] TN-46 — correlate vitals against dose: the app holds both halves and joins neither 🔴 LIVE
+### [readiness][devices][platform] TN-46 — plot dose against vitals: the engine join shipped, the overlay chart has not
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate
-  change in vitals with reta"*, and *"go with whatever option you think is best"*.
-- **Lane: A** — `packages/shared/src/health/*` plus the read path that joins `supplement_logs`.
-  Storage-reaching, so Lane A by the rule.
-- **No gate.** The owner delegated the choice (*"go with whatever option you think is best"*); the
-  decision is recorded below and is built to without a further round-trip.
-- **Review:** [`what the temperature re-derive would do`](reviews/2026-09-17-what-the-temperature-rederive-would-do.md)
-  for the radar mechanics underneath.
-
-**⚠ CORRECTION, and it was this agent's error.** An earlier draft read `supplements.dose = '10mg'`
-as the administered dose. **It is the VIAL STRENGTH** — `supplement_logs` carries
-`vial_strength_mg 10, vial_water_ml 3, vial_units_per_ml 100`. The real doses are **0.5 mg on
-2026-09-07 and 1 mg on 2026-09-13**, a conservative titration that starts *below* the published
-trial protocols rather than above them. The remark that the dose looked high was wrong and is
-withdrawn. **The trap is worth keeping:** anything that reads `supplements.dose` for a dose gets a
-20× overstatement. `supplement_logs.amount` + `unit` is the administered dose; the `supplements` row
-describes the vial.
-
-**The dose-response is already in the data, and it is clean.** Nightly vitals against the two doses:
-
-| date | resting HR | HRV | dose |
-|---|---:|---:|---|
-| 09-04 → 09-06 | 52.6 / 52.5 / 51.7 | 59 / 50 / 56 | — (pre-dose baseline) |
-| **09-07** | 48.4 | 63.5 | **0.5 mg** |
-| 09-08 | 52.0 | 51 | |
-| **09-09** | **56.3** | **39** | ← peak, 2 days after |
-| 09-10 → 09-12 | 53.8 / 55.0 / 54.5 | 43.5 / 49 / 45 | partial washout |
-| **09-13** | 55.4 | 48 | **1 mg** |
-| 09-14 → 09-15 | 56.9 / 57.2 | 38.5 / 42 | |
-| **09-16 → 09-17** | **65.1 / 64.9** | **28 / 19** | ← still falling at day 4 |
-
-**Doubling the dose roughly tripled the resting-HR excursion** (+4 bpm after 0.5 mg, +13 after 1 mg)
-and drove HRV from ~55 to 19. The 0.5 mg dose partially washed out by day 5; the 1 mg dose has not
-turned yet. That is a lagged dose-response with a 2–4 day peak, and it is exactly the thing the
-owner wants to see — **the app has the doses, has the vitals, and plots neither against the other.**
-
-**⚑ THE DECISION — retain a pre-intervention reference baseline; annotate, do not correct.** Taken
-under the owner's delegation, and it is options 1 and 2 of the earlier draft combined in the only
-way that avoids the downside of each.
-
-- **The live baseline keeps adapting.** Do not freeze it. Freezing means a permanently depressed
-  readiness score and a radar crying wolf every night for as long as the medication runs — the
-  reason option 2 lost on its own.
-- **~~Snapshot the baseline at the intervention date~~ — STRUCK. The snapshot already exists and no
-  migration is needed.** See the correction immediately below; this was the entry's load-bearing
-  half and it solved a problem the storage layout does not have.
-- **Join `supplement_logs` (date, `amount`, `unit`) into the score audit and the advisory**, so a
-  flagged day reads *"resting HR and HRV are off your baseline; Retatrutide 1 mg, 3 days ago"*
-  instead of implying infection, and so a dose-vs-vitals overlay has something to plot. **This is now
-  the whole entry**, and it needs no schema change.
-- **Plot it with a lag.** The peak is 2–4 days after a dose, so a same-day correlation finds nothing
-  and would read as "no effect" on data that plainly shows one.
-
-**⚠ CORRECTION 2026-09-17 (Lane A, verified against production before any code was written) — THE
-SNAPSHOT IS UNNECESSARY AND THERE IS NO DEADLINE. The entry's arithmetic is right and its conclusion
-does not follow.**
-
-`updateBaseline` does move ~1/32 per night once mature (`ageDays > 14` → `ashrRound(delta + bias, 5)`),
-so the **live** baseline is genuinely dragged toward the new values. All of that holds. What does not
-follow is that the comparison is destroyed: **baselines are stored per night, per row** on
-`oura_daily_summary` (`rhr_baseline_mean_x8`, `hrv_baseline_mean_x8`, … alongside `n_history`). Every
-historical night keeps the baseline as of that night, so the pre-intervention reference is already
-persisted and later drift cannot reach it.
-
-Measured on the owner's production rows:
-
-| row | stored RHR baseline | stored HRV baseline |
-|---|---:|---:|
-| **2026-09-06** (night before dose 1) | **52.875** | **56.125** |
-| 2026-09-18 | 54.250 | 51.750 |
-
-The 09-06 row is what a snapshot would have captured, and it is already there. The table holds **74
-rows back to 2026-07-07** (the BLE re-key), **73 carrying baselines**, and nothing prunes it — the
-`shouldPrune` path is `error_events`, not this table. So *"what did Retatrutide do to my vitals"* stays
-answerable from the baselines indefinitely, by reading the row before the intervention date.
-
-**The generalisable form:** a rolling aggregate that is *checkpointed per period* has no erasure
-problem, however fast it adapts. Before adding storage to preserve a value, check whether the value is
-already written down somewhere with a date on it.
-
-**What the correction does NOT touch:** the dose-response table above is unchanged and was not
-re-measured, except to note the 09-18 row, which the entry predates — RHR **59.4** (from 64.9) and HRV
-**47** (from 19). The 1 mg excursion has begun to turn at day 5, matching the 0.5 mg pattern, so the
-entry's *"still falling at day 4"* was accurate when written and is no longer the latest picture.
-
-**Why this generalises past one drug.** GLP-1 class agonists raise heart rate as a documented class
-effect; stimulants, beta-blockers and thyroid medication all move tracked vitals. The app has a
-medication table with per-administration doses and start/stop dates and consults it nowhere in
-scoring. The same machinery answers "what did X do to me" for anything logged.
-
-**⚠ Do NOT re-tune any threshold against this period.** Eleven nights inside a pharmacological
-transient, spanning a dose change, is the worst possible calibration sample. It is evidence about
-the system's blindness, not about where `ILLNESS_WATCH_SCORE` or the readiness weights belong.
-
-**⚠ CORRECTED 2026-09-20 — the magnitudes below were SINGLE-DAY EXTREMES, not the sustained shift,
-and this agent repeated them several times.** *"Resting HR +13 bpm, HRV down two thirds"* described
-2026-09-16/17 alone. Measured as window means instead — 28 pre-dose nights (Aug 10 → Sep 06) against
-14 on the drug (Sep 07 → 20):
-
-| | pre-dose | on reta | change |
-|---|---:|---:|---|
-| resting HR | 52.3 | 56.2 | **+3.9 bpm** |
-| HRV | 58.8 ms | 44.6 ms | **−14.2 ms (−24%)** |
-
-The 65 bpm and 19 ms readings were a two-day excursion that has since returned to 54–57 and 45–47.
-**The real sustained change is about a quarter of what was reported.** It is still a genuine shift —
-+3.9 bpm is 1.2× this owner's own pre-drug nightly sd of 3.15 bpm — but "down two thirds" was wrong.
-**A +3.9 bpm / −24% shift at 1 mg remains worth mentioning to whoever prescribes and monitors this,
-stated at that size and not the inflated one.** Nothing here is medical advice. This entry records what
-is in the app; it is not medical advice and nothing here is a clinical judgement.
-
-**Pass test:** the pre-intervention baseline is still recoverable after 60 nights, a flagged day
-during an active medication period names the medication and the most recent dose rather than implying
-illness, and dose-vs-vitals can be read off one surface with a selectable lag.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** say plainly that the one-surface, selectable-lag overlay is a Lane B half; the engine half goes first.
+- **Lane: B** — the overlay. Re-laned 2026-09-28: the engine half shipped (below).
+- **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate change in vitals with reta"*,
+  and *"go with whatever option you think is best"*. The decision (annotate, never correct; the
+  pre-dose reference is the baseline already stored per night) is recorded in the journal entries
+  and the 2026-09-28 entry below.
+- **✔ ENGINE SHIPPED 2026-09-28 (Lane A):**
+  - `packages/shared/src/health/dose-context.ts` finds recent doses in a 5-day window (the measured
+    peak was 2–4 days) and phrases them.
+  - `repo.listDoseEvents` reads the log's own `amount`/`unit`, never the vial's `dose` (a 20×
+    trap), and only vial-dosed logs.
+  - The readiness payload carries `recentDoses`, and its illness advisory, which the notification
+    reuses, names the latest dose. No score reads either.
+- **What is left (Lane B):** the overlay. `GET /api/health/dose-vitals?days=60` returns the doses,
+  each night's resting HR (the night's low, which is what the baseline tracks) and HRV, and the
+  baseline stored for that night, plus `effectLookbackDays`. Plot the vitals as lines with the
+  baseline beside them and the doses as markers. **Do not correlate same-day:** the effect lags
+  2–4 days.
+- **Known limit, chosen:** vial-dosed only, so a daily oral medication does not annotate every day.
+  If an oral medication ever needs this, give supplements an explicit "track against vitals" flag
+  rather than widening the filter.
+- **Do NOT re-tune any threshold against the dosing period** (the original entry's warning stands).
 
 ### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
 
