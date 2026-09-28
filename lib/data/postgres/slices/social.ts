@@ -31,6 +31,20 @@ function rowToFriendship(
   }
 }
 
+/**
+ * RV-195 ③. Until a request is accepted, the person who SENT it learns nothing about the target
+ * beyond what they typed. Returning the target's name, avatar and friend code let anyone probe an
+ * email address and get a profile back. The ADDRESSEE still sees the requester in full: the
+ * requester chose to reveal themselves, and the addressee needs that to decide.
+ */
+function maskedForRequester(f: Friendship, viewerId: string, typed: string | null = null): Friendship {
+  if (f.status !== 'pending' || f.requesterId !== viewerId) return f
+  return {
+    ...f,
+    otherUser: { id: f.otherUser.id, displayName: typed, name: null, avatar: null, friendCode: null, equippedTitle: null },
+  }
+}
+
 // ── Friends ────────────────────────────────────────────────────────────────────
 
 export async function listFriendships(db: Db, userId: string): Promise<Friendship[]> {
@@ -42,7 +56,7 @@ export async function listFriendships(db: Db, userId: string): Promise<Friendshi
       and(eq(s.friendships.addresseeId, userId), eq(s.users.id, s.friendships.requesterId)),
     ))
     .where(or(eq(s.friendships.requesterId, userId), eq(s.friendships.addresseeId, userId)))
-  return rows.map(({ f, u }) => rowToFriendship(f, u))
+  return rows.map(({ f, u }) => maskedForRequester(rowToFriendship(f, u), userId))
 }
 
 export async function sendFriendRequest(db: Db, requesterId: string, emailOrCode: string): Promise<Friendship> {
@@ -58,7 +72,7 @@ export async function sendFriendRequest(db: Db, requesterId: string, emailOrCode
     .onConflictDoNothing()
     .returning()
   if (!f) throw new UserFacingError('Friend request already exists', 409)
-  return rowToFriendship(f, target)
+  return maskedForRequester(rowToFriendship(f, target), requesterId, emailOrCode.trim())
 }
 
 export async function acceptFriendRequest(db: Db, friendshipId: string, userId: string): Promise<Friendship> {
