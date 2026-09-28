@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.480.1",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: on Health → Training, Movement Balance coloured Push, Pull and Legs with the same colours your session calendar uses two cards above — and mapped them to different ones, so the same three words meant two different colours on one screen. The category bars now share a single colour and are told apart by their labels, which is also the only version that stays right if you reorder your sessions.",
+    ],
+  },
+  {
     version: "1.480.0",
     date: "2026-09-28",
     changes: [

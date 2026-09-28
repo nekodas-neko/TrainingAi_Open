@@ -581,3 +581,14 @@ Live at the time of writing (2026-07-30):
   Defaults a call site must not be able to break belong on an **inner** element it cannot reach;
   `components/ui/sheet.tsx` does this for the close button's 64px corner and says why. Related:
   `SheetContent side="bottom"` bakes the bottom inset and `p-0` does not strip it.
+
+- **[`2026-09-28-movement-balance-palette-clash`](../../overview/entries/2026-09-28-movement-balance-palette-clash.md)**
+  — **RV-208 ③: category colours stopped borrowing session colours, and the hue space is
+  over-subscribed.** Movement Balance coloured `legs` `--accent-green` (**0°** from session green)
+  and `pull` `--accent-purple` (**10°** from session purple, **20°** from indigo), while the calendar
+  two cards up colours sessions by POSITION — so the same three words carried two maps, transposed.
+  **The entry's "add two new hues" was not available:** a candidate must clear `SESSION_PALETTE`'s
+  six Tailwind hues *and* four `--accent-*` tokens, and scanning the wheel leaves one comfortable
+  band (~345°) at 40° separation. So the rows keep their labels and share one accent — hue was
+  redundant encoding. `rv208-movement-category-hues.test.ts` asserts the arithmetic against
+  `globals.css`, not the literals. **Before adding any category palette, scan both systems first.**
